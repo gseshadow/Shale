@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="UTF-8"?>
+	<project name="IntakeGeneratorMaven" default="do-deploy" basedir="."  xmlns:fx="javafx:com.sun.javafx.tools.ant">
+	<target name="init-fx-tasks">
+		<path id="fxant">
+			<filelist>
+				<file name="${java.home}\..\lib\ant-javafx.jar"/>
+				<file name="${java.home}\lib\jfxrt.jar"/>
+			</filelist>
+		</path>
+	
+		<taskdef resource="com/sun/javafx/tools/ant/antlib.xml"
+			uri="javafx:com.sun.javafx.tools.ant"
+			classpathref="fxant"/>
+	</target>
+	<target name="setup-staging-area">
+		<delete dir="externalLibs" />
+		<delete dir="project" />
+		<delete dir="projectRefs" />
+	
+		<mkdir dir="externalLibs" />
+	
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="commons-codec-1.12.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\apache\commons\io">
+				<filename name="commons-io-2.8.0-test-sources.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\javafx-sdk-15.0.1\lib">
+				<filename name="javafx.graphics.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="wmf2svg-0.9.8.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="antlr-2.7.7.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\apache\commons\io">
+				<filename name="commons-io-2.8.0-javadoc.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="xalan-interpretive-11.0.0.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\javafx-sdk-15.0.1\lib">
+				<filename name="javafx.fxml.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="jakarta.activation-api-1.2.1.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9">
+				<filename name="docx4j-openxml-objects-pml-11.2.9.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="jakarta.xml.bind-api-2.3.2.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\apache\commons\io">
+				<filename name="commons-io-2.8.0-tests.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\javafx-sdk-15.0.1\lib">
+				<filename name="javafx-swt.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="xmlgraphics-commons-2.3.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="jackson-core-2.9.9.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\JABX\dependencies">
+				<filename name="txw2-2.3.2.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="jaxb-svg11-1.0.2.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="jackson-annotations-2.9.0.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\javafx-sdk-15.0.1\lib">
+				<filename name="javafx.web.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="httpclient-4.5.8.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9">
+				<filename name="docx4j-core-11.2.9.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\apache\commons\io">
+				<filename name="commons-io-2.8.0-sources.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="commons-lang3-3.9.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="commons-compress-1.18.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\javafx-sdk-15.0.1\lib">
+				<filename name="javafx.controls.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="httpcore-4.4.11.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java">
+				<filename name="jaxb-svg11-1.0.2.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="stringtemplate-3.2.1.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="checker-qual-2.8.1.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\JABX\dependencies">
+				<filename name="istack-commons-runtime-3.0.8.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\JABX\dependencies">
+				<filename name="FastInfoset-1.2.16.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="mbassador-1.3.2.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\javafx-sdk-15.0.1\lib">
+				<filename name="javafx.swing.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9">
+				<filename name="docx4j-openxml-objects-sml-11.2.9.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\JABX\dependencies">
+				<filename name="jakarta.activation-api-1.2.1.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\javafx-sdk-15.0.1\lib">
+				<filename name="javafx.base.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="jcl-over-slf4j-1.7.26.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\apache-maven-3.8.2\lib">
+				<filename name="slf4j-api-1.7.32.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\JABX\dependencies">
+				<filename name="stax-ex-1.8.1.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9">
+				<filename name="docx4j-openxml-objects-11.2.9.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="error_prone_annotations-2.3.3.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="jackson-databind-2.9.9.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\apache\commons\io">
+				<filename name="commons-io-2.8.0.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="xalan-serializer-11.0.0.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\JABX">
+				<filename name="docx4j-JAXB-ReferenceImpl-8.2.8.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\JABX\dependencies">
+				<filename name="jaxb-runtime-2.3.2.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\javafx-sdk-15.0.1\lib">
+				<filename name="javafx.media.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="antlr-runtime-3.5.2.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\Docx4J Libs\docx4j-community-11.2.9\dependencies">
+				<filename name="commons-io-2.6.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="externalLibs">
+			<fileset dir="C:\Program Files\Java\JABX\dependencies">
+				<filename name="jakarta.xml.bind-api-2.3.2.jar"/>
+			</fileset>
+		</copy>
+	
+		<mkdir dir="project" />
+		<copy todir="project">
+			<fileset dir="J:\OneDrive\Documents\Workspace\IntakeGeneratorMaven">
+				<include name="src/**" />
+			</fileset>
+		</copy>
+	
+		<mkdir dir="projectRefs" />
+	</target>
+	<target name='do-compile'>
+		<delete dir="build" />
+		<mkdir dir="build/src" />
+		<mkdir dir="build/libs" />
+		<mkdir dir="build/classes" />
+	
+		<!-- Copy project-libs references -->
+		<copy todir="build/libs">
+			<fileset dir="externalLibs">
+				<include name="javafx-swt.jar"/>
+				<include name="javafx.fxml.jar"/>
+				<include name="istack-commons-runtime-3.0.8.jar"/>
+				<include name="javafx.media.jar"/>
+				<include name="javafx.controls.jar"/>
+				<include name="jaxb-svg11-1.0.2.jar"/>
+				<include name="commons-io-2.8.0-test-sources.jar"/>
+				<include name="commons-io-2.8.0-sources.jar"/>
+				<include name="jakarta.activation-api-1.2.1.jar"/>
+				<include name="jackson-annotations-2.9.0.jar"/>
+				<include name="stringtemplate-3.2.1.jar"/>
+				<include name="wmf2svg-0.9.8.jar"/>
+				<include name="docx4j-JAXB-ReferenceImpl-8.2.8.jar"/>
+				<include name="stax-ex-1.8.1.jar"/>
+				<include name="checker-qual-2.8.1.jar"/>
+				<include name="javafx.swing.jar"/>
+				<include name="jackson-databind-2.9.9.jar"/>
+				<include name="antlr-runtime-3.5.2.jar"/>
+				<include name="xmlgraphics-commons-2.3.jar"/>
+				<include name="javafx.graphics.jar"/>
+				<include name="httpcore-4.4.11.jar"/>
+				<include name="commons-compress-1.18.jar"/>
+				<include name="docx4j-openxml-objects-11.2.9.jar"/>
+				<include name="xalan-interpretive-11.0.0.jar"/>
+				<include name="jakarta.xml.bind-api-2.3.2.jar"/>
+				<include name="jcl-over-slf4j-1.7.26.jar"/>
+				<include name="txw2-2.3.2.jar"/>
+				<include name="error_prone_annotations-2.3.3.jar"/>
+				<include name="commons-codec-1.12.jar"/>
+				<include name="commons-io-2.8.0-tests.jar"/>
+				<include name="docx4j-core-11.2.9.jar"/>
+				<include name="commons-io-2.8.0-javadoc.jar"/>
+				<include name="httpclient-4.5.8.jar"/>
+				<include name="javafx.web.jar"/>
+				<include name="FastInfoset-1.2.16.jar"/>
+				<include name="slf4j-api-1.7.32.jar"/>
+				<include name="commons-lang3-3.9.jar"/>
+				<include name="xalan-serializer-11.0.0.jar"/>
+				<include name="docx4j-openxml-objects-pml-11.2.9.jar"/>
+				<include name="jackson-core-2.9.9.jar"/>
+				<include name="commons-io-2.6.jar"/>
+				<include name="docx4j-openxml-objects-sml-11.2.9.jar"/>
+				<include name="mbassador-1.3.2.jar"/>
+				<include name="jaxb-runtime-2.3.2.jar"/>
+				<include name="commons-io-2.8.0.jar"/>
+				<include name="antlr-2.7.7.jar"/>
+				<include name="javafx.base.jar"/>
+			</fileset>
+		</copy>
+	
+		<!-- Copy project references -->
+	
+		<!-- Copy project sources itself -->
+		<copy todir="build/src">
+			<fileset dir="project/src">
+				<include name="**/*"/>
+			</fileset>
+		</copy>
+	
+		<javac includeantruntime="false" source="15" target="15" srcdir="build/src" destdir="build/classes" encoding="UTF-8">
+			<classpath>
+				<fileset dir="build/libs">
+					<include name="*"/>
+				</fileset>
+			</classpath>
+		</javac>
+	
+		<!-- Copy over none Java-Files -->
+		<copy todir="build/classes">
+		<fileset dir="project/src">
+			<exclude name="**/*.java"/>
+		</fileset>
+		</copy>
+	
+	
+	</target>
+	<target name="do-deploy" depends="setup-staging-area, do-compile, init-fx-tasks">
+		<delete file="dist"/>
+		<delete file="deploy" />
+	
+		<mkdir dir="dist" />
+		<mkdir dir="dist/libs" />
+	
+		<copy todir="dist/libs">
+			<fileset dir="externalLibs">
+				<include name="*" />
+			</fileset>
+		</copy>
+	
+	
+		<fx:resources id="appRes">
+			<fx:fileset dir="dist" includes="IntakeGeneratorMaven.jar"/>
+			<fx:fileset dir="dist" includes="libs/*"/>
+		</fx:resources>
+	
+		<fx:application id="fxApplication"
+			name=""
+			mainClass="application.MainBypass"
+		/>
+	
+		<mkdir dir="build/classes/META-INF" />
+	
+	
+	
+		<fx:jar destfile="dist/IntakeGeneratorMaven.jar">
+			<fx:application refid="fxApplication"/>
+			<fileset dir="build/classes">
+			</fileset>
+			<fx:resources refid="appRes"/>
+	
+			<manifest>
+				<attribute name="Implementation-Vendor" value=""/>
+				<attribute name="Implementation-Title" value=""/>
+				<attribute name="Implementation-Version" value=""/>
+				<attribute name="JavaFX-Feature-Proxy" value="None"/>
+			</manifest>
+		</fx:jar>
+	
+	
+	
+	
+	</target>
+</project>
