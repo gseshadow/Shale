@@ -1,7 +1,5 @@
 package GUIElements;
 
-import java.io.File;
-
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -16,12 +14,12 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import application.util.ResourceManager;
 
 public class LoadingScreen extends FlowPane {
 
-	private ImageView loadingImageView;
-	private Image loadingImage;
-	private File loadingFile;
+        private ImageView loadingImageView;
+        private Image loadingImage;
 
 //	private ImageView shaleImageView;
 //	private Image shaleImage;
@@ -38,9 +36,8 @@ public class LoadingScreen extends FlowPane {
 		box.setSpacing(50);
 		box.setAlignment(Pos.CENTER);
 
-		loadingFile = new File("Local" + System.getProperty("file.separator") + "Loading.gif");
-		loadingImage = new Image(loadingFile.toURI().toString());
-		loadingImageView = new ImageView(loadingImage);
+                loadingImage = ResourceManager.loadImage("Loading.gif");
+                loadingImageView = new ImageView(loadingImage);
 		loadingImageView.setScaleX(.5);
 		loadingImageView.setScaleY(.5);
 

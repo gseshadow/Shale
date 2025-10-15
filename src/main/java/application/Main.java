@@ -2,13 +2,8 @@ package application;
 
 import java.awt.Dimension;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
-//import java.io.ObjectInputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -29,6 +24,7 @@ import GUIElements.Terminal;
 import connections.ConnectionResources;
 import connections.Server;
 import connections.Updater;
+import application.util.ResourceManager;
 import dataStructures.Case;
 import dataStructures.Contact;
 import dataStructures.Facility;
@@ -119,7 +115,7 @@ public class Main extends Application {
 
 			menuBackground = new Background(new BackgroundFill(menuBackgroundColor, null, null));
 
-			logo = new Image(new File("Local" + System.getProperty("file.separator") + "ShaleNoText.png").toURI().toString());
+                        logo = ResourceManager.loadImage("ShaleNoText.png");
 
 			String appResources = System.getProperty("os.name");
 			if (appResources.contains("Mac")) {
@@ -245,26 +241,24 @@ public class Main extends Application {
 			}
 			/* copy IntakeFormBlank to AppData folder from the install folder */
 
-			Path sourceFile = Paths.get("Local" + System.getProperty("file.separator") + "IntakeFormBlank.docx");
-			Path destFile = Paths.get(defaultLocation + System.getProperty("file.separator") + "Resources" + System.getProperty("file.separator")
-					+ "IntakeFormBlank.docx");
-			try {
-				if (!Files.exists(destFile))
-					Files.copy(sourceFile, destFile, StandardCopyOption.REPLACE_EXISTING);
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
+                        Path intakeTemplate = Paths.get(defaultLocation + System.getProperty("file.separator") + "Resources"
+                                        + System.getProperty("file.separator") + "IntakeFormBlank.docx");
+                        try {
+                                if (!Files.exists(intakeTemplate)) {
+                                        ResourceManager.copyResource("IntakeFormBlank.docx", intakeTemplate, StandardCopyOption.REPLACE_EXISTING);
+                                }
+                        } catch (IOException e1) {
+                                e1.printStackTrace();
+                        }
 
-			/* copy default background to AppData folder from the install folder */
+                        /* copy default background to AppData folder from the install folder */
 
-			sourceFile = Paths.get("Local" + System.getProperty("file.separator") + "Backgrounds");
-			destFile = Paths
-					.get(defaultLocation + System.getProperty("file.separator") + "Resources" + System.getProperty("file.separator") + "Backgrounds");
-
-			File source = new File(sourceFile.toString());
-			File destination = new File(destFile.toString());
-
-			copyFolder(source, destination);
+                        try {
+                                ResourceManager.copyBackgroundAssets(Paths.get(defaultLocation + System.getProperty("file.separator") + "Resources"
+                                                + System.getProperty("file.separator") + "Backgrounds"));
+                        } catch (IOException e1) {
+                                e1.printStackTrace();
+                        }
 
 			try {
 				file = new File(defaultLocation + System.getProperty("file.separator") + "Resources" + System.getProperty("file.separator")
@@ -784,50 +778,6 @@ public class Main extends Application {
 
 	public static void setVersion(double version) {
 		Main.version = version;
-	}
-
-	public static void copyFolder(File source, File destination) {
-		if (source.isDirectory()) {
-			if (!destination.exists()) {
-				destination.mkdirs();
-			}
-
-			String files[] = source.list();
-
-			for (String file : files) {
-				File srcFile = new File(source, file);
-				File destFile = new File(destination, file);
-
-				copyFolder(srcFile, destFile);
-			}
-		} else {
-			InputStream in = null;
-			OutputStream out = null;
-
-			try {
-				in = new FileInputStream(source);
-				out = new FileOutputStream(destination);
-
-				byte[] buffer = new byte[1024];
-
-				int length;
-				while ((length = in.read(buffer)) > 0) {
-					out.write(buffer, 0, length);
-				}
-			} catch (Exception e) {
-				try {
-					in.close();
-				} catch (IOException e1) {
-					e1.printStackTrace();
-				}
-
-				try {
-					out.close();
-				} catch (IOException e1) {
-					e1.printStackTrace();
-				}
-			}
-		}
 	}
 
 	public static File getLog() {

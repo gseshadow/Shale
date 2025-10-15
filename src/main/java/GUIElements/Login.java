@@ -53,6 +53,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import application.util.ResourceManager;
 
 public class Login extends FlowPane {
 	private TextField email = new TextField();
@@ -63,9 +64,8 @@ public class Login extends FlowPane {
 	private boolean newUser = false;
 	private boolean authenticated = false;
 
-	private ImageView shaleImageView;
-	private Image shaleImage;
-	private File shaleFile;
+        private ImageView shaleImageView;
+        private Image shaleImage;
 
 	public Login() {
 
@@ -77,9 +77,8 @@ public class Login extends FlowPane {
 		this.setVgap(10);
 		this.setPadding(new Insets(5));
 		this.setAlignment(Pos.TOP_CENTER);
-		shaleFile = new File("Local" + System.getProperty("file.separator") + "Shale.png");
-		shaleImage = new Image(shaleFile.toURI().toString());
-		shaleImageView = new ImageView(shaleImage);
+                shaleImage = ResourceManager.loadImage("Shale.png");
+                shaleImageView = new ImageView(shaleImage);
 		shaleImageView.setFitHeight(529);
 		shaleImageView.setFitWidth(900);
 		VBox loginBox = new VBox();

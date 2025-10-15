@@ -1,12 +1,12 @@
 package GUIElements;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 
 import application.Main;
+import application.util.ResourceManager;
 import connections.ConnectionResources;
 import connections.Server;
 import dataStructures.Facility;
@@ -22,7 +22,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
-import javafx.scene.image.Image;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -147,7 +146,7 @@ public class MultiPicker extends BorderPane {
 		 */
 		Stage stage = new Stage();
 		Scene scene = new Scene(this);
-		stage.getIcons().add(new Image(new File("Local" + System.getProperty("file.separator") + "ShaleNoText.png").toURI().toString()));
+                stage.getIcons().add(ResourceManager.loadImage("ShaleNoText.png"));
 		stage.setScene(scene);
 		stage.show();
 

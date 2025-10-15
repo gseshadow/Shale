@@ -152,9 +152,9 @@ public class SettingsPane extends FlowPane {
 					try {
 						File backgroundCustomLocation = new File(Main.getDefaultLocation() + System.getProperty("file.separator") + "Resources"
 								+ System.getProperty("file.separator") + "CustomBackgroundLocation.txt");
-						FileWriter fw = new FileWriter(backgroundCustomLocation);
-						fw.write("Local" + System.getProperty("file.separator") + "Dark.jpg");
-						fw.close();
+                                                FileWriter fw = new FileWriter(backgroundCustomLocation);
+                                                fw.write(Main.getDefaultBackgroundLocation());
+                                                fw.close();
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -200,9 +200,9 @@ public class SettingsPane extends FlowPane {
 
 						scanner.close();
 					} else {
-						FileWriter fw = new FileWriter(backgroundCustomLocation);
-						fw.write("Local" + System.getProperty("file.separator") + "Dark.jpg");
-						fw.close();
+                                                FileWriter fw = new FileWriter(backgroundCustomLocation);
+                                                fw.write(Main.getDefaultBackgroundLocation());
+                                                fw.close();
 						backgroundFolder = System.getProperty("user.home") + System.getProperty("file.separator") + "Pictures";
 					}
 				} catch (IOException e) {
