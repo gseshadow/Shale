@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx"
+	xmlns:fx="http://javafx.com/fxml"
+	fx:controller="com.shale.ui.controller.MainController">
+
+	<!-- Top bar -->
+	<top>
+		<HBox spacing="12" styleClass="top-bar">
+			<children>
+				<Label text="Shale" styleClass="app-title" />
+
+				<!-- Global search -->
+				<TextField fx:id="globalSearchField"
+					promptText="Search cases, contacts, tasks..." HBox.hgrow="ALWAYS" />
+				<Button fx:id="globalSearchButton" text="Search"
+					onAction="#onGlobalSearch" />
+
+				<Region HBox.hgrow="ALWAYS" />
+
+				<Label text="Signed in as:" />
+				<Label fx:id="userEmailLabel" text="user@example.com"
+					styleClass="user-email" />
+
+				<Button fx:id="logoutButton" text="Logout"
+					onAction="#onLogout" />
+			</children>
+			<padding>
+				<Insets top="8" right="12" bottom="8" left="12" />
+			</padding>
+		</HBox>
+	</top>
+
+	<!-- Left navigation sidebar -->
+	<left>
+		<VBox spacing="6" styleClass="sidebar">
+			<children>
+				<Label text="Navigation" styleClass="sidebar-header" />
+
+				<Button fx:id="navMyShaleButton" text="My Shale"
+					maxWidth="Infinity" onAction="#onNavMyShale" />
+
+				<Button fx:id="navTasksButton" text="Tasks"
+					maxWidth="Infinity" onAction="#onNavTasks" />
+
+				<Button fx:id="navCasesButton" text="Cases"
+					maxWidth="Infinity" onAction="#onNavCases" />
+
+				<Button fx:id="navContactsButton" text="Contacts"
+					maxWidth="Infinity" onAction="#onNavContacts" />
+
+				<Button fx:id="navOrganizationsButton" text="Organizations"
+					maxWidth="Infinity" onAction="#onNavOrganizations" />
+
+				<Button fx:id="navTeamButton" text="Team" maxWidth="Infinity"
+					onAction="#onNavTeam" />
+
+				<Button fx:id="navSettingsButton" text="Settings"
+					maxWidth="Infinity" onAction="#onNavSettings" />
+			</children>
+			<padding>
+				<Insets top="10" right="8" bottom="10" left="8" />
+			</padding>
+		</VBox>
+	</left>
+
+	<!-- Main content area (shell-controlled) -->
+	<center>
+		<VBox spacing="10" styleClass="content-root">
+			<children>
+				<Label fx:id="sectionTitleLabel" text="My Shale"
+					styleClass="section-title" />
+
+				<Separator />
+
+				<Label fx:id="sectionSubtitleLabel" wrapText="true"
+					text="Select a section from the left to get started." />
+
+				<!-- Shell-controlled content placeholder -->
+				<StackPane fx:id="sectionContent">
+					<children>
+						<Label fx:id="placeholderLabel"
+							text="This section is not implemented yet." />
+					</children>
+				</StackPane>
+			</children>
+			<padding>
+				<Insets top="16" right="16" bottom="16" left="16" />
+			</padding>
+		</VBox>
+	</center>
+</BorderPane>

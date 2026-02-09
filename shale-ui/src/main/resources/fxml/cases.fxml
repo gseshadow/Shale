@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+	xmlns:fx="http://javafx.com/fxml/1"
+	fx:controller="com.shale.ui.controller.CasesController">
+
+	<top>
+		<HBox spacing="10">
+			<padding>
+				<Insets top="10" right="10" bottom="10" left="10" />
+			</padding>
+			<TextField fx:id="casesSearchField"
+				promptText="Search cases…" HBox.hgrow="ALWAYS" />
+			<ChoiceBox fx:id="casesSortChoice" prefWidth="220" />
+		</HBox>
+	</top>
+
+	<center>
+		<ScrollPane fx:id="casesScroll" fitToWidth="true"
+			pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED">
+			<content>
+				<FlowPane fx:id="casesFlow" hgap="10" vgap="10"
+					prefWrapLength="900">
+					<padding>
+						<Insets top="10" right="10" bottom="10" left="10" />
+					</padding>
+				</FlowPane>
+			</content>
+		</ScrollPane>
+	</center>
+
+</BorderPane>

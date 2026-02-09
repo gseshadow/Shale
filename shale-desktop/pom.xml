@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<!-- Inherit shared settings and dependency versions -->
+	<parent>
+		<groupId>com.shale</groupId>
+		<artifactId>shale-parent</artifactId>
+		<version>1.0.0</version>
+	</parent>
+
+	<artifactId>shale-desktop</artifactId>
+	<packaging>jar</packaging>
+
+	<name>Shale Desktop</name>
+	<description>JavaFX desktop launcher and runtime client</description>
+
+	<dependencies>
+		<!-- Internal modules -->
+		<dependency>
+			<groupId>com.shale</groupId>
+			<artifactId>shale-data</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.shale</groupId>
+			<artifactId>shale-core</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.shale</groupId>
+			<artifactId>shale-ui</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
+		<!-- JavaFX modules -->
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-controls</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-fxml</artifactId>
+		</dependency>
+
+		<!-- Logging -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+		</dependency>
+
+		<!-- Optional HTTP client (for negotiate call) -->
+		<dependency>
+			<groupId>org.apache.httpcomponents.client5</groupId>
+			<artifactId>httpclient5</artifactId>
+		</dependency>
+
+
+	</dependencies>
+
+	<build>
+		<plugins>
+			<!-- JavaFX Maven Plugin (simplifies run: javafx:run) -->
+			<plugin>
+				<groupId>org.openjfx</groupId>
+				<artifactId>javafx-maven-plugin</artifactId>
+				<version>0.0.8</version>
+				<configuration>
+					<mainClass>com.shale.desktop.MainApp</mainClass>
+				</configuration>
+			</plugin>
+
+			<!-- Standard compiler settings -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<release>21</release>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</project>

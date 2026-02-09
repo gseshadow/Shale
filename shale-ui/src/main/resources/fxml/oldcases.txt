@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.shale.ui.controller.CasesController"
+      spacing="10">
+
+    <!-- Cases filters / sort controls -->
+    <HBox spacing="8">
+        <children>
+            <Label text="Filter:"/>
+            <TextField fx:id="casesSearchField"
+                       promptText="Search cases..."/>
+
+            <Label text="Sort by:"/>
+            <ChoiceBox fx:id="casesSortChoice"/>
+        </children>
+    </HBox>
+
+    <!-- Cases table -->
+    <TableView fx:id="casesTable">
+        <!-- Columns defined in controller -->
+    </TableView>
+
+    <padding>
+        <Insets top="4" right="0" bottom="0" left="0"/>
+    </padding>
+</VBox>

@@ -1,0 +1,4 @@
+.root { -fx-font-size: 14px; }
+.title { -fx-font-size: 20px; -fx-font-weight: bold; }
+.error { -fx-text-fill: #c62828; }
+.header { -fx-background-color: -fx-outer-border, -fx-control-inner-background; }

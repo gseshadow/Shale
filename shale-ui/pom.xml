@@ -1,0 +1,47 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.shale</groupId>
+    <artifactId>shale-parent</artifactId>
+    <version>1.0.0</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>shale-ui</artifactId>
+  <name>shale-ui</name>
+  <packaging>jar</packaging>
+
+  <dependencies>
+		<!-- Internal modules -->
+    <dependency>
+      <groupId>com.shale</groupId>
+      <artifactId>shale-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    
+    <dependency>
+      <groupId>com.shale</groupId>
+      <artifactId>shale-data</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+		<!-- JavaFX (UI-only pieces needed here) -->
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-controls</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-fxml</artifactId>
+    </dependency>
+
+		<!-- Logging API (implementation provided by desktop or parent) -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+  </dependencies>
+</project>

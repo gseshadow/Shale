@@ -1,0 +1,320 @@
+package com.shale.ui.controller;
+
+import com.shale.data.dao.CaseDao;
+import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.state.AppState;
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+import javafx.geometry.Insets;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public final class CasesController {
+
+	// Existing controls (keep these IDs in FXML)
+	@FXML
+	private TextField casesSearchField;
+	@FXML
+	private ChoiceBox<String> casesSortChoice;
+
+	// NEW: FlowPane layout (add these IDs in FXML)
+	@FXML
+	private ScrollPane casesScroll;
+	@FXML
+	private FlowPane casesFlow;
+
+	private AppState appState;
+	private UiRuntimeBridge runtimeBridge;
+	private CaseDao caseDao;
+
+	// Paging state
+	private int currentPage = 0;
+	private final int pageSize = 100;
+	private boolean loading = false;
+	private boolean hasMore = true;
+
+	// Loaded items (we keep these so search/sort can re-render)
+	private final List<CaseCardVm> loaded = new ArrayList<>();
+
+	// Background DB executor (so UI doesn’t freeze)
+	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
+	{
+		Thread t = new Thread(r, "cases-loader");
+		t.setDaemon(true);
+		return t;
+	});
+
+	public CasesController() {
+		System.out.println("CasesController()");
+	}
+
+	public void init(AppState appState, UiRuntimeBridge runtimeBridge, CaseDao caseDao) {
+		System.out.println("CasesController.init()");
+		this.appState = appState;
+		this.runtimeBridge = runtimeBridge;
+		this.caseDao = caseDao;
+	}
+
+	@FXML
+	private void initialize() {
+		System.out.println("CasesController.initialize()");
+
+		// sort choices
+		if (casesSortChoice != null) {
+			casesSortChoice.getItems().setAll(
+					"Intake date (newest first)",
+					"Intake date (oldest first)",
+					"Statute date (soonest first)",
+					"Statute date (latest first)",
+					"Case name (A–Z)",
+					"Case name (Z–A)",
+					"Responsible attorney (A–Z)",
+					"Responsible attorney (Z–A)"
+			);
+			casesSortChoice.getSelectionModel().select(0);
+			casesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> rerender());
+		}
+
+		// search filter
+		if (casesSearchField != null) {
+			casesSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
+		}
+
+		Platform.runLater(() ->
+		{
+			if (caseDao == null) {
+				System.out.println("CasesController: caseDao is null (not injected).");
+				return;
+			}
+			wireInfiniteScroll();
+			loadFirstPage();
+		});
+	}
+
+	private void wireInfiniteScroll() {
+		if (casesScroll == null)
+			return;
+
+		// vvalue is 0..1
+		casesScroll.vvalueProperty().addListener((obs, oldV, newV) ->
+		{
+			if (newV != null && newV.doubleValue() >= 0.95) {
+				loadNextPage();
+			}
+		});
+	}
+
+	private void loadFirstPage() {
+		currentPage = 0;
+		loading = false;
+		hasMore = true;
+
+		loaded.clear();
+		if (casesFlow != null)
+			casesFlow.getChildren().clear();
+
+		loadNextPage();
+	}
+
+	private void loadNextPage() {
+		if (loading || !hasMore)
+			return;
+		if (caseDao == null)
+			return;
+
+		loading = true;
+		final int pageToLoad = currentPage;
+
+		dbExec.submit(() ->
+		{
+			try {
+				var page = caseDao.findPage(pageToLoad, pageSize);
+
+				// map DAO rows into UI VM
+				List<CaseCardVm> newItems = page.items().stream()
+						.map(r -> new CaseCardVm(
+								r.id(),
+								safe(r.name()),
+								r.intakeDate(),
+								r.statuteOfLimitationsDate(),
+								safe(r.responsibleAttorneyName())
+						))
+						.toList();
+
+				Platform.runLater(() ->
+				{
+					loaded.addAll(newItems);
+
+					currentPage++;
+					hasMore = loaded.size() < page.total();
+					loading = false;
+
+					// Render according to current search/sort
+					rerender();
+
+					System.out.println("Loaded cases page " + pageToLoad + ": " + newItems.size()
+							+ " (loaded=" + loaded.size() + " / total=" + page.total() + ")");
+				});
+
+			} catch (Exception ex) {
+				Platform.runLater(() ->
+				{
+					loading = false;
+					ex.printStackTrace();
+				});
+			}
+		});
+	}
+
+	private void rerender() {
+		if (casesFlow == null)
+			return;
+
+		String q = casesSearchField == null ? "" : safe(casesSearchField.getText()).trim().toLowerCase();
+		String sort = casesSortChoice == null ? "Intake date (newest first)" : casesSortChoice.getValue();
+
+		Comparator<CaseCardVm> comp = comparatorFor(sort);
+
+		List<CaseCardVm> view = loaded.stream()
+				.filter(vm ->
+				{
+					if (q.isEmpty())
+						return true;
+					return vm.name.toLowerCase().contains(q) || vm.responsibleAttorney.toLowerCase().contains(q);
+				})
+				.sorted(comp)
+				.toList();
+
+		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
+	}
+
+	private Comparator<CaseCardVm> comparatorFor(String sortOption) {
+		if (sortOption == null)
+			sortOption = "Intake date (newest first)";
+
+		return switch (sortOption) {
+		case "Intake date (oldest first)" ->
+			Comparator.comparing((CaseCardVm v) -> v.intakeDate, this::nullsLastDate);
+
+		case "Statute date (soonest first)" ->
+			Comparator.comparing((CaseCardVm v) -> v.solDate, this::nullsLastDate);
+
+		case "Statute date (latest first)" ->
+			Comparator.comparing((CaseCardVm v) -> v.solDate, this::nullsLastDate).reversed();
+
+		case "Case name (A–Z)" ->
+			Comparator.comparing((CaseCardVm v) -> v.name, this::nullsLastString);
+
+		case "Case name (Z–A)" ->
+			Comparator.comparing((CaseCardVm v) -> v.name, this::nullsLastString).reversed();
+
+		case "Responsible attorney (A–Z)" ->
+			Comparator.comparing((CaseCardVm v) -> v.responsibleAttorney, this::nullsLastString);
+
+		case "Responsible attorney (Z–A)" ->
+			Comparator.comparing((CaseCardVm v) -> v.responsibleAttorney, this::nullsLastString).reversed();
+
+		// default: newest first
+		default ->
+			Comparator.comparing((CaseCardVm v) -> v.intakeDate, this::nullsLastDate).reversed();
+		};
+	}
+
+	private int nullsLastDate(LocalDate a, LocalDate b) {
+		if (a == null && b == null)
+			return 0;
+		if (a == null)
+			return 1;
+		if (b == null)
+			return -1;
+		return a.compareTo(b);
+	}
+
+	private int nullsLastString(String a, String b) {
+		if (a == null && b == null)
+			return 0;
+		if (a == null)
+			return 1;
+		if (b == null)
+			return -1;
+		return a.compareToIgnoreCase(b);
+	}
+
+	private Node buildCaseCard(CaseCardVm vm) {
+		VBox card = new VBox(6);
+		card.setPadding(new Insets(10));
+		card.setPrefWidth(280);
+
+		card.setStyle("""
+					-fx-background-color: white;
+					-fx-background-radius: 14;
+					-fx-border-radius: 14;
+					-fx-border-color: #e5e5e5;
+					-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0.2, 0, 2);
+				""");
+
+		Label title = new Label(vm.name.isBlank() ? "(no name)" : vm.name);
+		title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+
+		Label atty = new Label(vm.responsibleAttorney.isBlank() ? "" : vm.responsibleAttorney);
+		atty.setStyle("-fx-font-size: 12px; -fx-opacity: 0.75;");
+
+		HBox dates = new HBox(10);
+		Label intake = new Label("Intake: " + (vm.intakeDate == null ? "" : vm.intakeDate.toString()));
+		intake.setStyle("-fx-font-size: 12px;");
+
+		Label sol = new Label("SOL: " + (vm.solDate == null ? "" : vm.solDate.toString()));
+		sol.setStyle("-fx-font-size: 12px;");
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		dates.getChildren().addAll(intake, spacer, sol);
+
+		card.getChildren().addAll(title, atty, dates);
+
+		// Click handler placeholder (wire to your selection / navigation later)
+		card.setOnMouseClicked(e ->
+		{
+			// Example: System.out.println("Clicked case id=" + vm.id);
+		});
+
+		return card;
+	}
+
+	private static String safe(String s) {
+		return s == null ? "" : s;
+	}
+
+	// Simple view-model for the card (keeps rendering logic separate from DAO record)
+	private static final class CaseCardVm {
+		final long id;
+		final String name;
+		final LocalDate intakeDate;
+		final LocalDate solDate;
+		final String responsibleAttorney;
+
+		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney) {
+			this.id = id;
+			this.name = Objects.requireNonNullElse(name, "");
+			this.intakeDate = intakeDate;
+			this.solDate = solDate;
+			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
+		}
+	}
+}
