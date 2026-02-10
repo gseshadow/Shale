@@ -18,6 +18,8 @@
 					promptText="Search cases, contacts, tasks..." HBox.hgrow="ALWAYS" />
 				<Button fx:id="globalSearchButton" text="Search"
 					onAction="#onGlobalSearch" />
+				<Button fx:id="smokeTestButton" text="Run Smoke Test"
+					onAction="#onRunSmokeTest" />
 
 				<Region HBox.hgrow="ALWAYS" />
 

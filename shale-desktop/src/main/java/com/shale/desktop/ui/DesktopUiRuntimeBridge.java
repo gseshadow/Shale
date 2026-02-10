@@ -1,6 +1,7 @@
 package com.shale.desktop.ui;
 
 import com.shale.data.runtime.RuntimeSessionService;
+import com.shale.desktop.net.LiveBusSmokeTest;
 import com.shale.desktop.live.LiveEventDispatcher;
 import com.shale.desktop.runtime.DesktopRuntimeSessionProvider;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -45,6 +46,19 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		// - shut down live bus
 		// - clear session context
 		System.out.println("Logout requested");
+	}
+
+	@Override
+	public void runLiveBusSmokeTest() {
+		Thread smokeTestThread = new Thread(() -> {
+			try {
+				LiveBusSmokeTest.main(new String[0]);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}, "livebus-smoketest");
+		smokeTestThread.setDaemon(true);
+		smokeTestThread.start();
 	}
 
 	public void setRuntimeSessionService(RuntimeSessionService runtime) {

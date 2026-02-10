@@ -8,4 +8,6 @@ public interface UiRuntimeBridge {
 	void onLoginSuccess(int userId, int shaleClientId, String email);
 
 	void onLogout();
+
+	void runLiveBusSmokeTest();
 }

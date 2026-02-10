@@ -22,6 +22,9 @@ public final class MainController {
 	@FXML
 	private Button globalSearchButton;
 
+	@FXML
+	private Button smokeTestButton;
+
 	// Sidebar nav buttons
 	@FXML
 	private Button navMyShaleButton;
@@ -188,6 +191,12 @@ public final class MainController {
 		}
 
 		sceneManager.showLogin();
+	}
+
+	@FXML
+	private void onRunSmokeTest() {
+		System.out.println("MainController.onRunSmokeTest()");//TODO remove
+		runtimeBridge.runLiveBusSmokeTest();
 	}
 
 	// === Helpers ===
