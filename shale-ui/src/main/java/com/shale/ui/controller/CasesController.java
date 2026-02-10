@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -114,7 +115,7 @@ public final class CasesController {
 		// vvalue is 0..1
 		casesScroll.vvalueProperty().addListener((obs, oldV, newV) ->
 		{
-			if (newV != null && newV.doubleValue() >= 0.95) {
+			if (newV != null && newV.doubleValue() >= 0.95 && !isSearchActive()) {
 				loadNextPage();
 			}
 		});
@@ -186,18 +187,13 @@ public final class CasesController {
 		if (casesFlow == null)
 			return;
 
-		String q = casesSearchField == null ? "" : safe(casesSearchField.getText()).trim().toLowerCase();
+		String q = normalizedSearchQuery();
 		String sort = casesSortChoice == null ? "Intake date (newest first)" : casesSortChoice.getValue();
 
 		Comparator<CaseCardVm> comp = comparatorFor(sort);
 
 		List<CaseCardVm> filtered = loaded.stream()
-				.filter(vm ->
-				{
-					if (q.isEmpty())
-						return true;
-					return vm.name.toLowerCase().contains(q) || vm.responsibleAttorney.toLowerCase().contains(q);
-				})
+				.filter(vm -> matchesQuery(vm, q))
 				.sorted(comp)
 				.toList();
 
@@ -208,6 +204,24 @@ public final class CasesController {
 		List<CaseCardVm> view = q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList();
 
 		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
+	}
+
+
+	private boolean isSearchActive() {
+		return !normalizedSearchQuery().isEmpty();
+	}
+
+	private String normalizedSearchQuery() {
+		if (casesSearchField == null)
+			return "";
+		return safe(casesSearchField.getText()).trim().toLowerCase(Locale.ROOT);
+	}
+
+	private static boolean matchesQuery(CaseCardVm vm, String query) {
+		if (query.isEmpty())
+			return true;
+		return vm.name.toLowerCase(Locale.ROOT).contains(query)
+				|| vm.responsibleAttorney.toLowerCase(Locale.ROOT).contains(query);
 	}
 
 	private Comparator<CaseCardVm> comparatorFor(String sortOption) {
