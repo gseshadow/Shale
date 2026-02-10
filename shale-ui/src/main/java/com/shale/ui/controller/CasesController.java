@@ -191,7 +191,7 @@ public final class CasesController {
 
 		Comparator<CaseCardVm> comp = comparatorFor(sort);
 
-		List<CaseCardVm> view = loaded.stream()
+		List<CaseCardVm> filtered = loaded.stream()
 				.filter(vm ->
 				{
 					if (q.isEmpty())
@@ -200,6 +200,12 @@ public final class CasesController {
 				})
 				.sorted(comp)
 				.toList();
+
+		if (!q.isEmpty() && filtered.size() < pageSize && hasMore && !loading) {
+			loadNextPage();
+		}
+
+		List<CaseCardVm> view = q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList();
 
 		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
 	}
