@@ -20,6 +20,17 @@ public final class CaseDao {
 	// CaseUsers.Role (int) for Responsible Attorney
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
 
+	public enum CaseSort {
+		INTAKE_NEWEST,
+		INTAKE_OLDEST,
+		STATUTE_SOONEST,
+		STATUTE_LATEST,
+		CASE_NAME_ASC,
+		CASE_NAME_DESC,
+		RESPONSIBLE_ATTORNEY_ASC,
+		RESPONSIBLE_ATTORNEY_DESC
+	}
+
 	private final DbSessionProvider db;
 
 	public CaseDao(DbSessionProvider dbSessionProvider) {
@@ -42,6 +53,11 @@ public final class CaseDao {
 
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize) {
+		return findPage(page, pageSize, CaseSort.INTAKE_NEWEST);
+	}
+
+	/** page is 0-based */
+	public PagedResult<CaseRow> findPage(int page, int pageSize, CaseSort sort) {
 		if (page < 0)
 			throw new IllegalArgumentException("page must be >= 0");
 		if (pageSize <= 0)
@@ -53,6 +69,8 @@ public final class CaseDao {
 		}
 
 		int offset = page * pageSize;
+		CaseSort effectiveSort = sort == null ? CaseSort.INTAKE_NEWEST : sort;
+		String orderByClause = orderByClauseFor(effectiveSort);
 
 		// Pick ONE responsible attorney row per case:
 		// - prefer IsPrimary=1
@@ -86,10 +104,9 @@ public final class CaseDao {
 				  ON u.id = ra.UserId
 				WHERE (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
 				ORDER BY
-				  c.CallerDate DESC,
-				  c.Id DESC
+				  %s
 				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-				""".formatted(CASES_TABLE, CASE_USERS_TABLE, USERS_TABLE);
+				""".formatted(CASES_TABLE, CASE_USERS_TABLE, USERS_TABLE, orderByClause);
 
 		List<CaseRow> out = new ArrayList<>(pageSize);
 
@@ -126,6 +143,19 @@ public final class CaseDao {
 					e
 			);
 		}
+	}
+
+	private static String orderByClauseFor(CaseSort sort) {
+		return switch (sort) {
+		case INTAKE_OLDEST -> "c.CallerDate ASC, c.Id ASC";
+		case STATUTE_SOONEST -> "c.IncidentStatuteOfLimitations ASC, c.Id ASC";
+		case STATUTE_LATEST -> "c.IncidentStatuteOfLimitations DESC, c.Id DESC";
+		case CASE_NAME_ASC -> "c.Name ASC, c.Id ASC";
+		case CASE_NAME_DESC -> "c.Name DESC, c.Id DESC";
+		case RESPONSIBLE_ATTORNEY_ASC -> "ResponsibleAttorneyName ASC, c.Id ASC";
+		case RESPONSIBLE_ATTORNEY_DESC -> "ResponsibleAttorneyName DESC, c.Id DESC";
+		case INTAKE_NEWEST -> "c.CallerDate DESC, c.Id DESC";
+		};
 	}
 
 	public long countAll() {

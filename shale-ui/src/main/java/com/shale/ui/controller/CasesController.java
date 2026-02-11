@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
@@ -89,7 +90,7 @@ public final class CasesController {
 					"Responsible attorney (Z–A)"
 			);
 			casesSortChoice.getSelectionModel().select(0);
-			casesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> rerender());
+			casesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> loadFirstPage());
 		}
 
 		// search filter
@@ -145,7 +146,7 @@ public final class CasesController {
 		dbExec.submit(() ->
 		{
 			try {
-				var page = caseDao.findPage(pageToLoad, pageSize);
+				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort());
 
 				// map DAO rows into UI VM
 				List<CaseCardVm> newItems = page.items().stream()
@@ -222,6 +223,22 @@ public final class CasesController {
 			return true;
 		return vm.name.toLowerCase(Locale.ROOT).contains(query)
 				|| vm.responsibleAttorney.toLowerCase(Locale.ROOT).contains(query);
+	}
+
+	private CaseSort selectedSort() {
+		if (casesSortChoice == null || casesSortChoice.getValue() == null)
+			return CaseSort.INTAKE_NEWEST;
+
+		return switch (casesSortChoice.getValue()) {
+		case "Intake date (oldest first)" -> CaseSort.INTAKE_OLDEST;
+		case "Statute date (soonest first)" -> CaseSort.STATUTE_SOONEST;
+		case "Statute date (latest first)" -> CaseSort.STATUTE_LATEST;
+		case "Case name (A–Z)" -> CaseSort.CASE_NAME_ASC;
+		case "Case name (Z–A)" -> CaseSort.CASE_NAME_DESC;
+		case "Responsible attorney (A–Z)" -> CaseSort.RESPONSIBLE_ATTORNEY_ASC;
+		case "Responsible attorney (Z–A)" -> CaseSort.RESPONSIBLE_ATTORNEY_DESC;
+		default -> CaseSort.INTAKE_NEWEST;
+		};
 	}
 
 	private Comparator<CaseCardVm> comparatorFor(String sortOption) {
