@@ -7,6 +7,7 @@ import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -34,6 +35,8 @@ public final class CasesController {
 	private TextField casesSearchField;
 	@FXML
 	private ChoiceBox<String> casesSortChoice;
+	@FXML
+	private CheckBox includeClosedDeniedCheckBox;
 
 	// NEW: FlowPane layout (add these IDs in FXML)
 	@FXML
@@ -98,6 +101,11 @@ public final class CasesController {
 			casesSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
 		}
 
+		if (includeClosedDeniedCheckBox != null) {
+			includeClosedDeniedCheckBox.setSelected(false);
+			includeClosedDeniedCheckBox.selectedProperty().addListener((obs, oldV, newV) -> loadFirstPage());
+		}
+
 		Platform.runLater(() ->
 		{
 			if (caseDao == null) {
@@ -146,7 +154,7 @@ public final class CasesController {
 		dbExec.submit(() ->
 		{
 			try {
-				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort());
+				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort(), includeClosedDenied());
 
 				// map DAO rows into UI VM
 				List<CaseCardVm> newItems = page.items().stream()
@@ -208,6 +216,10 @@ public final class CasesController {
 		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
 	}
 
+
+	private boolean includeClosedDenied() {
+		return includeClosedDeniedCheckBox != null && includeClosedDeniedCheckBox.isSelected();
+	}
 
 	private boolean isSearchActive() {
 		return !normalizedSearchQuery().isEmpty();
