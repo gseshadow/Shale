@@ -53,6 +53,7 @@ public final class CasesController {
 	private final int pageSize = 100;
 	private boolean loading = false;
 	private boolean hasMore = true;
+	private int loadGeneration = 0;
 
 	// Loaded items (we keep these so search/sort can re-render)
 	private final List<CaseCardVm> loaded = new ArrayList<>();
@@ -131,6 +132,7 @@ public final class CasesController {
 	}
 
 	private void loadFirstPage() {
+		loadGeneration++;
 		currentPage = 0;
 		loading = false;
 		hasMore = true;
@@ -150,6 +152,7 @@ public final class CasesController {
 
 		loading = true;
 		final int pageToLoad = currentPage;
+		final int generationAtSubmit = loadGeneration;
 
 		dbExec.submit(() ->
 		{
@@ -170,6 +173,11 @@ public final class CasesController {
 
 				Platform.runLater(() ->
 				{
+					if (generationAtSubmit != loadGeneration) {
+						loading = false;
+						return;
+					}
+
 					loaded.addAll(newItems);
 
 					currentPage++;
@@ -186,6 +194,9 @@ public final class CasesController {
 			} catch (Exception ex) {
 				Platform.runLater(() ->
 				{
+					if (generationAtSubmit != loadGeneration) {
+						return;
+					}
 					loading = false;
 					ex.printStackTrace();
 				});
