@@ -359,12 +359,12 @@ public final class CasesController {
 			return "white";
 		}
 
-		String aa = normalized.substring(0, 2);
-		String rr = normalized.substring(2, 4);
-		String gg = normalized.substring(4, 6);
-		String bb = normalized.substring(6, 8);
-
-		// JavaFX supports #RRGGBBAA; source values are stored as AARRGGBB.
+		// Stored values are RRGGBBAA (for example 0xe6994dff should render orange).
+		// JavaFX accepts the same #RRGGBBAA layout directly.
+		String rr = normalized.substring(0, 2);
+		String gg = normalized.substring(2, 4);
+		String bb = normalized.substring(4, 6);
+		String aa = normalized.substring(6, 8);
 		return "#" + rr + gg + bb + aa;
 	}
 
