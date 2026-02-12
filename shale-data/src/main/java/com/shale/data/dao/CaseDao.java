@@ -16,6 +16,8 @@ public final class CaseDao {
 	private static final String CASES_TABLE = "Cases";
 	private static final String CASE_USERS_TABLE = "CaseUsers";
 	private static final String USERS_TABLE = "Users";
+	private static final String CASE_STATUSES_TABLE = "CaseStatuses";
+	private static final String STATUSES_TABLE = "Statuses";
 
 	// CaseUsers.Role (int) for Responsible Attorney
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
@@ -54,17 +56,22 @@ public final class CaseDao {
 
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize) {
-		return findPage(page, pageSize, CaseSort.INTAKE_NEWEST);
+		return findPage(page, pageSize, CaseSort.INTAKE_NEWEST, false);
 	}
 
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize, CaseSort sort) {
+		return findPage(page, pageSize, sort, false);
+	}
+
+	/** page is 0-based */
+	public PagedResult<CaseRow> findPage(int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
 		if (page < 0)
 			throw new IllegalArgumentException("page must be >= 0");
 		if (pageSize <= 0)
 			throw new IllegalArgumentException("pageSize must be > 0");
 
-		long total = countAll();
+		long total = countAll(includeClosedDenied);
 		if (total == 0) {
 			return new PagedResult<>(List.of(), page, pageSize, 0);
 		}
@@ -100,13 +107,30 @@ public final class CaseDao {
 				      cu.CreatedAt DESC,
 				      cu.Id DESC
 				) ra
+				OUTER APPLY (
+				    SELECT TOP (1) s.Name AS CurrentStatusName
+				    FROM %s cs
+				    INNER JOIN %s s ON s.Id = cs.StatusId
+				    WHERE cs.CaseId = c.Id
+				    ORDER BY
+				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+				      cs.UpdatedAt DESC,
+				      cs.CreatedAt DESC,
+				      cs.Id DESC
+				) current_status
 				LEFT JOIN %s u
 				  ON u.id = ra.UserId
 				WHERE (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND (
+				    ? = 1
+				    OR current_status.CurrentStatusName IS NULL
+				    OR LOWER(current_status.CurrentStatusName) NOT IN ('closed', 'denied')
+				  )
 				ORDER BY
 				  %s
 				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-				""".formatted(CASES_TABLE, CASE_USERS_TABLE, USERS_TABLE, orderByClause);
+				""".formatted(CASES_TABLE, CASE_USERS_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, USERS_TABLE,
+				orderByClause);
 
 		List<CaseRow> out = new ArrayList<>(pageSize);
 
@@ -115,6 +139,7 @@ public final class CaseDao {
 
 			int idx = 1;
 			ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setInt(idx++, includeClosedDenied ? 1 : 0);
 			ps.setInt(idx++, offset);
 			ps.setInt(idx++, pageSize);
 
@@ -160,18 +185,41 @@ public final class CaseDao {
 	}
 
 	public long countAll() {
+		return countAll(false);
+	}
+
+	public long countAll(boolean includeClosedDenied) {
 		String sql = """
 				SELECT COUNT(1)
 				FROM %s c
-				WHERE (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
-				""".formatted(CASES_TABLE);
+				OUTER APPLY (
+				    SELECT TOP (1) s.Name AS CurrentStatusName
+				    FROM %s cs
+				    INNER JOIN %s s ON s.Id = cs.StatusId
+				    WHERE cs.CaseId = c.Id
+				    ORDER BY
+				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+				      cs.UpdatedAt DESC,
+				      cs.CreatedAt DESC,
+				      cs.Id DESC
+				) current_status
+				WHERE (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND (
+				    ? = 1
+				    OR current_status.CurrentStatusName IS NULL
+				    OR LOWER(current_status.CurrentStatusName) NOT IN ('closed', 'denied')
+				  );
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE);
 
 		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql);
-				ResultSet rs = ps.executeQuery()) {
+				PreparedStatement ps = con.prepareStatement(sql)) {
 
-			rs.next();
-			return rs.getLong(1);
+			ps.setInt(1, includeClosedDenied ? 1 : 0);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				rs.next();
+				return rs.getLong(1);
+			}
 
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to count cases", e);
