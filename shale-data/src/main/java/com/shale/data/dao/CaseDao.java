@@ -44,7 +44,8 @@ public final class CaseDao {
 			LocalDate intakeDate, // CallerDate
 			LocalDate statuteOfLimitationsDate, // IncidentStatuteOfLimitations
 			Integer responsibleAttorneyId,
-			String responsibleAttorneyName
+			String responsibleAttorneyName,
+			String responsibleAttorneyColor
 	) {
 	}
 
@@ -72,10 +73,8 @@ public final class CaseDao {
 		CaseSort effectiveSort = sort == null ? CaseSort.INTAKE_NEWEST : sort;
 		String orderByClause = orderByClauseFor(effectiveSort);
 
-		// Pick ONE responsible attorney row per case:
-		// - prefer IsPrimary=1
-		// - otherwise take any (most recent by UpdatedAt/CreatedAt if available, else stable by
-		// Id)
+		// Pick ONE PRIMARY responsible attorney row per case.
+		// If none is marked primary, return null attorney/color so UI remains white.
 		String sql = """
 				SELECT
 				  c.Id,
@@ -83,6 +82,7 @@ public final class CaseDao {
 				  c.CallerDate,
 				  c.IncidentStatuteOfLimitations,
 				  ra.UserId AS ResponsibleAttorneyId,
+				  u.color AS ResponsibleAttorneyColor,
 				  LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -94,8 +94,8 @@ public final class CaseDao {
 				    FROM %s cu
 				    WHERE cu.CaseId = c.Id
 				      AND cu.Role = ?
+				      AND cu.IsPrimary = 1
 				    ORDER BY
-				      CASE WHEN cu.IsPrimary = 1 THEN 1 ELSE 0 END DESC,
 				      cu.UpdatedAt DESC,
 				      cu.CreatedAt DESC,
 				      cu.Id DESC
@@ -126,7 +126,8 @@ public final class CaseDao {
 							toLocalDate(rs.getDate("CallerDate")),
 							toLocalDate(rs.getDate("IncidentStatuteOfLimitations")),
 							getNullableInt(rs, "ResponsibleAttorneyId"),
-							rs.getString("ResponsibleAttorneyName")
+							rs.getString("ResponsibleAttorneyName"),
+							rs.getString("ResponsibleAttorneyColor")
 					));
 				}
 			}

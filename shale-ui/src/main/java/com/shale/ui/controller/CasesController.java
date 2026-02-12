@@ -155,7 +155,8 @@ public final class CasesController {
 								safe(r.name()),
 								r.intakeDate(),
 								r.statuteOfLimitationsDate(),
-								safe(r.responsibleAttorneyName())
+								safe(r.responsibleAttorneyName()),
+								safe(r.responsibleAttorneyColor())
 						))
 						.toList();
 
@@ -298,13 +299,14 @@ public final class CasesController {
 		card.setPadding(new Insets(10));
 		card.setPrefWidth(280);
 
+		String backgroundColor = toCssBackgroundColor(vm.responsibleAttorneyColor);
 		card.setStyle("""
-					-fx-background-color: white;
+					-fx-background-color: %s;
 					-fx-background-radius: 14;
 					-fx-border-radius: 14;
 					-fx-border-color: #e5e5e5;
 					-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0.2, 0, 2);
-				""");
+				""".formatted(backgroundColor));
 
 		Label title = new Label(vm.name.isBlank() ? "(no name)" : vm.name);
 		title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
@@ -338,6 +340,34 @@ public final class CasesController {
 		return s == null ? "" : s;
 	}
 
+	private static String toCssBackgroundColor(String argbHex) {
+		if (argbHex == null)
+			return "white";
+
+		String normalized = argbHex.trim();
+		if (normalized.isEmpty()) {
+			return "white";
+		}
+		if (normalized.startsWith("#")) {
+			normalized = normalized.substring(1);
+		}
+		if (normalized.startsWith("0x") || normalized.startsWith("0X")) {
+			normalized = normalized.substring(2);
+		}
+
+		if (!normalized.matches("(?i)[0-9a-f]{8}")) {
+			return "white";
+		}
+
+		String aa = normalized.substring(0, 2);
+		String rr = normalized.substring(2, 4);
+		String gg = normalized.substring(4, 6);
+		String bb = normalized.substring(6, 8);
+
+		// JavaFX supports #RRGGBBAA; source values are stored as AARRGGBB.
+		return "#" + rr + gg + bb + aa;
+	}
+
 	// Simple view-model for the card (keeps rendering logic separate from DAO record)
 	private static final class CaseCardVm {
 		final long id;
@@ -345,13 +375,16 @@ public final class CasesController {
 		final LocalDate intakeDate;
 		final LocalDate solDate;
 		final String responsibleAttorney;
+		final String responsibleAttorneyColor;
 
-		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney) {
+		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney,
+				String responsibleAttorneyColor) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
 			this.solDate = solDate;
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
+			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
 		}
 	}
 }
