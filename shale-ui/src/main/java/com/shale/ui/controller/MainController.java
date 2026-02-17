@@ -65,14 +65,14 @@ public final class MainController {
 	private UiRuntimeBridge runtimeBridge;
 
 	public MainController() {
-		System.out.println("MainController()");//TODO remove
+		System.out.println("MainController()");// TODO remove
 	}
 
 	// Injected by SceneManager
 	public void init(SceneManager sceneManager,
 			AppState appState,
 			UiRuntimeBridge runtimeBridge) {
-		System.out.println("MainController.init()");//TODO remove
+		System.out.println("MainController.init()");// TODO remove
 		this.sceneManager = sceneManager;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
@@ -80,7 +80,7 @@ public final class MainController {
 
 	@FXML
 	private void initialize() {
-		System.out.println("MainController.initialize()");//TODO remove
+		System.out.println("MainController.initialize()");// TODO remove
 		highlightNav(navMyShaleButton);
 
 		if (globalSearchField != null) {
@@ -102,7 +102,7 @@ public final class MainController {
 	@FXML
 	private void onGlobalSearch() {
 		String query = globalSearchField.getText();
-		System.out.println("Global search (shell): " + query);//TODO remove
+		System.out.println("Global search (shell): " + query);// TODO remove
 
 		highlightNav(null);
 		sectionTitleLabel.setText("Search");
@@ -138,8 +138,8 @@ public final class MainController {
 		sectionTitleLabel.setText("Cases");
 		sectionSubtitleLabel.setText("Browse, search, and manage cases.");
 
-		// Ask SceneManager to create the Cases view (from cases.fxml)
-		Node casesRoot = sceneManager.createCasesView();
+		// Pass callback so case cards can open the case workspace view
+		Node casesRoot = sceneManager.createCasesView(this::openCase);
 		sectionContent.getChildren().setAll(casesRoot);
 	}
 
@@ -177,7 +177,7 @@ public final class MainController {
 
 	@FXML
 	private void onLogout() {
-		System.out.println("MainController.onLogout()");//TODO remove
+		System.out.println("MainController.onLogout()");// TODO remove
 
 		runtimeBridge.onLogout();
 
@@ -191,6 +191,14 @@ public final class MainController {
 	}
 
 	// === Helpers ===
+	public void openCase(int caseId) {
+		highlightNav(navCasesButton);
+		sectionTitleLabel.setText("Case");
+		sectionSubtitleLabel.setText("Case #" + caseId);
+
+		Node caseRoot = sceneManager.createCaseView(caseId);
+		sectionContent.getChildren().setAll(caseRoot);
+	}
 
 	private void showMyShalePlaceholder() {
 		setSectionContentText("My Shale dashboard is not implemented yet.");

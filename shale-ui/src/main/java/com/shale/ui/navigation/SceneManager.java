@@ -1,8 +1,8 @@
 package com.shale.ui.navigation;
 
-import com.shale.data.dao.CaseDao;
 import com.shale.core.runtime.DbSessionProvider;
-
+import com.shale.data.dao.CaseDao;
+import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
@@ -17,9 +17,11 @@ import javafx.stage.Stage;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 public final class SceneManager {
+
 	private final Stage stage;
 	private final AppState appState;
 	private final UiAuthService authService;
@@ -60,7 +62,16 @@ public final class SceneManager {
 		setScene(root, "Shale");
 	}
 
+	/** Backwards-compatible: no callback. */
 	public Parent createCasesView() {
+		return createCasesView(null);
+	}
+
+	/**
+	 * Create the Cases view and optionally provide a callback that the CasesController can
+	 * invoke when a case card is clicked (open case).
+	 */
+	public Parent createCasesView(Consumer<Integer> onOpenCase) {
 		return load("/fxml/cases.fxml", controller ->
 		{
 			CasesController c = (CasesController) controller;
@@ -68,7 +79,20 @@ public final class SceneManager {
 			// DB access is enforced inside DbSessionProvider (throws if not logged in)
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 
-			c.init(appState, runtimeBridge, caseDao);
+			// NOTE: this requires you to update CasesController.init(...) to accept the callback
+			c.init(appState, runtimeBridge, caseDao, onOpenCase);
+			return c;
+		});
+	}
+
+	public Parent createCaseView(int caseId) {
+		return load("/fxml/case.fxml", controller ->
+		{
+			CaseController c = (CaseController) controller;
+
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			c.init(caseId, caseDao);
+
 			return c;
 		});
 	}
@@ -112,5 +136,4 @@ public final class SceneManager {
 	public void showError(String message) {
 		System.out.println("*******************SceneManager.showError() " + message);
 	}
-
 }

@@ -2,11 +2,13 @@ package com.shale.ui.controller;
 
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
+import com.shale.ui.component.CaseCard;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -26,6 +28,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 public final class CasesController {
 
@@ -34,6 +37,8 @@ public final class CasesController {
 	private TextField casesSearchField;
 	@FXML
 	private ChoiceBox<String> casesSortChoice;
+	@FXML
+	private CheckBox includeClosedDeniedCheckBox;
 
 	// NEW: FlowPane layout (add these IDs in FXML)
 	@FXML
@@ -44,12 +49,14 @@ public final class CasesController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private CaseDao caseDao;
+	private Consumer<Integer> onOpenCase;
 
 	// Paging state
 	private int currentPage = 0;
 	private final int pageSize = 100;
 	private boolean loading = false;
 	private boolean hasMore = true;
+	private int loadGeneration = 0;
 
 	// Loaded items (we keep these so search/sort can re-render)
 	private final List<CaseCardVm> loaded = new ArrayList<>();
@@ -66,11 +73,15 @@ public final class CasesController {
 		System.out.println("CasesController()");
 	}
 
-	public void init(AppState appState, UiRuntimeBridge runtimeBridge, CaseDao caseDao) {
+	public void init(AppState appState,
+			UiRuntimeBridge runtimeBridge,
+			CaseDao caseDao,
+			Consumer<Integer> onOpenCase) {
 		System.out.println("CasesController.init()");
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.caseDao = caseDao;
+		this.onOpenCase = onOpenCase;
 	}
 
 	@FXML
@@ -98,6 +109,11 @@ public final class CasesController {
 			casesSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
 		}
 
+		if (includeClosedDeniedCheckBox != null) {
+			includeClosedDeniedCheckBox.setSelected(false);
+			includeClosedDeniedCheckBox.selectedProperty().addListener((obs, oldV, newV) -> loadFirstPage());
+		}
+
 		Platform.runLater(() ->
 		{
 			if (caseDao == null) {
@@ -123,6 +139,7 @@ public final class CasesController {
 	}
 
 	private void loadFirstPage() {
+		loadGeneration++;
 		currentPage = 0;
 		loading = false;
 		hasMore = true;
@@ -142,11 +159,12 @@ public final class CasesController {
 
 		loading = true;
 		final int pageToLoad = currentPage;
+		final int generationAtSubmit = loadGeneration;
 
 		dbExec.submit(() ->
 		{
 			try {
-				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort());
+				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort(), includeClosedDenied());
 
 				// map DAO rows into UI VM
 				List<CaseCardVm> newItems = page.items().stream()
@@ -162,6 +180,11 @@ public final class CasesController {
 
 				Platform.runLater(() ->
 				{
+					if (generationAtSubmit != loadGeneration) {
+						loading = false;
+						return;
+					}
+
 					loaded.addAll(newItems);
 
 					currentPage++;
@@ -178,6 +201,9 @@ public final class CasesController {
 			} catch (Exception ex) {
 				Platform.runLater(() ->
 				{
+					if (generationAtSubmit != loadGeneration) {
+						return;
+					}
 					loading = false;
 					ex.printStackTrace();
 				});
@@ -208,6 +234,9 @@ public final class CasesController {
 		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
 	}
 
+	private boolean includeClosedDenied() {
+		return includeClosedDeniedCheckBox != null && includeClosedDeniedCheckBox.isSelected();
+	}
 
 	private boolean isSearchActive() {
 		return !normalizedSearchQuery().isEmpty();
@@ -295,46 +324,72 @@ public final class CasesController {
 	}
 
 	private Node buildCaseCard(CaseCardVm vm) {
-		VBox card = new VBox(6);
-		card.setPadding(new Insets(10));
-		card.setPrefWidth(280);
 
+		// NEW reusable component
+		CaseCard card = new CaseCard();
+
+		card.setCaseId((int) vm.id); // adjust to long if your CaseCard uses long
+		card.setTitle(vm.name.isBlank() ? "(no name)" : vm.name);
+		card.setResponsibleAttorney(vm.responsibleAttorney);
+		card.setIntakeDate(vm.intakeDate);
+		card.setSolDate(vm.solDate);
+
+		// Use your existing color conversion logic
 		String backgroundColor = toCssBackgroundColor(vm.responsibleAttorneyColor);
-		card.setStyle("""
-					-fx-background-color: %s;
-					-fx-background-radius: 14;
-					-fx-border-radius: 14;
-					-fx-border-color: #e5e5e5;
-					-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0.2, 0, 2);
-				""".formatted(backgroundColor));
+		card.setBackgroundCssColor(backgroundColor);
 
-		Label title = new Label(vm.name.isBlank() ? "(no name)" : vm.name);
-		title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-
-		Label atty = new Label(vm.responsibleAttorney.isBlank() ? "" : vm.responsibleAttorney);
-		atty.setStyle("-fx-font-size: 12px; -fx-opacity: 0.75;");
-
-		HBox dates = new HBox(10);
-		Label intake = new Label("Intake: " + (vm.intakeDate == null ? "" : vm.intakeDate.toString()));
-		intake.setStyle("-fx-font-size: 12px;");
-
-		Label sol = new Label("SOL: " + (vm.solDate == null ? "" : vm.solDate.toString()));
-		sol.setStyle("-fx-font-size: 12px;");
-
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		dates.getChildren().addAll(intake, spacer, sol);
-
-		card.getChildren().addAll(title, atty, dates);
-
-		// Click handler placeholder (wire to your selection / navigation later)
-		card.setOnMouseClicked(e ->
+		// Wire navigation callback
+		card.setOnOpen(id ->
 		{
-			// Example: System.out.println("Clicked case id=" + vm.id);
+			if (onOpenCase != null) {
+				onOpenCase.accept(id);
+			}
 		});
 
 		return card;
 	}
+
+//	private Node buildCaseCard(CaseCardVm vm) {
+//		VBox card = new VBox(6);
+//		card.setPadding(new Insets(10));
+//		card.setPrefWidth(280);
+//
+//		String backgroundColor = toCssBackgroundColor(vm.responsibleAttorneyColor);
+//		card.setStyle("""
+//					-fx-background-color: %s;
+//					-fx-background-radius: 14;
+//					-fx-border-radius: 14;
+//					-fx-border-color: #e5e5e5;
+//					-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0.2, 0, 2);
+//				""".formatted(backgroundColor));
+//
+//		Label title = new Label(vm.name.isBlank() ? "(no name)" : vm.name);
+//		title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+//
+//		Label atty = new Label(vm.responsibleAttorney.isBlank() ? "" : vm.responsibleAttorney);
+//		atty.setStyle("-fx-font-size: 12px; -fx-opacity: 0.75;");
+//
+//		HBox dates = new HBox(10);
+//		Label intake = new Label("Intake: " + (vm.intakeDate == null ? "" : vm.intakeDate.toString()));
+//		intake.setStyle("-fx-font-size: 12px;");
+//
+//		Label sol = new Label("SOL: " + (vm.solDate == null ? "" : vm.solDate.toString()));
+//		sol.setStyle("-fx-font-size: 12px;");
+//
+//		Region spacer = new Region();
+//		HBox.setHgrow(spacer, Priority.ALWAYS);
+//		dates.getChildren().addAll(intake, spacer, sol);
+//
+//		card.getChildren().addAll(title, atty, dates);
+//
+//		// Click handler placeholder (wire to your selection / navigation later)
+//		card.setOnMouseClicked(e ->
+//		{
+//			// Example: System.out.println("Clicked case id=" + vm.id);
+//		});
+//
+//		return card;
+//	}
 
 	private static String safe(String s) {
 		return s == null ? "" : s;
