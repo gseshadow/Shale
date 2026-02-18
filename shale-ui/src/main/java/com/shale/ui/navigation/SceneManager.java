@@ -93,8 +93,17 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			c.init(caseId, caseDao);
 
+			// ✅ ADD THIS LINE
+			c.setOnOpenUser(this::openUserProfile);
+
 			return c;
 		});
+	}
+
+	private void openUserProfile(Integer userId) {
+		System.out.println("Navigate to User Profile: " + userId);
+		// TODO: when you have user view:
+		// set center content to user view / or navigate
 	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {

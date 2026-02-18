@@ -1,25 +1,5 @@
 package com.shale.ui.controller;
 
-import com.shale.data.dao.CaseDao;
-import com.shale.data.dao.CaseDao.CaseSort;
-import com.shale.ui.component.CaseCard;
-import com.shale.ui.services.UiRuntimeBridge;
-import com.shale.ui.state.AppState;
-import javafx.application.Platform;
-import javafx.fxml.FXML;
-import javafx.scene.Node;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
-import javafx.geometry.Insets;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,6 +9,22 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+
+import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseDao.CaseSort;
+import com.shale.ui.component.factory.CaseCardFactory;
+import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.state.AppState;
+
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.FlowPane;
 
 public final class CasesController {
 
@@ -46,10 +42,7 @@ public final class CasesController {
 	@FXML
 	private FlowPane casesFlow;
 
-	private AppState appState;
-	private UiRuntimeBridge runtimeBridge;
 	private CaseDao caseDao;
-	private Consumer<Integer> onOpenCase;
 
 	// Paging state
 	private int currentPage = 0;
@@ -60,6 +53,8 @@ public final class CasesController {
 
 	// Loaded items (we keep these so search/sort can re-render)
 	private final List<CaseCardVm> loaded = new ArrayList<>();
+
+	private CaseCardFactory caseCardFactory;
 
 	// Background DB executor (so UI doesn’t freeze)
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
@@ -78,10 +73,9 @@ public final class CasesController {
 			CaseDao caseDao,
 			Consumer<Integer> onOpenCase) {
 		System.out.println("CasesController.init()");
-		this.appState = appState;
-		this.runtimeBridge = runtimeBridge;
 		this.caseDao = caseDao;
-		this.onOpenCase = onOpenCase;
+		this.caseCardFactory = new CaseCardFactory(onOpenCase);
+
 	}
 
 	@FXML
@@ -324,103 +318,18 @@ public final class CasesController {
 	}
 
 	private Node buildCaseCard(CaseCardVm vm) {
-
-		// NEW reusable component
-		CaseCard card = new CaseCard();
-
-		card.setCaseId((int) vm.id); // adjust to long if your CaseCard uses long
-		card.setTitle(vm.name.isBlank() ? "(no name)" : vm.name);
-		card.setResponsibleAttorney(vm.responsibleAttorney);
-		card.setIntakeDate(vm.intakeDate);
-		card.setSolDate(vm.solDate);
-
-		// Use your existing color conversion logic
-		String backgroundColor = toCssBackgroundColor(vm.responsibleAttorneyColor);
-		card.setBackgroundCssColor(backgroundColor);
-
-		// Wire navigation callback
-		card.setOnOpen(id ->
-		{
-			if (onOpenCase != null) {
-				onOpenCase.accept(id);
-			}
-		});
-
-		return card;
+		return caseCardFactory.create(new CaseCardModel(
+				vm.id,
+				vm.name,
+				vm.intakeDate,
+				vm.solDate,
+				vm.responsibleAttorney,
+				vm.responsibleAttorneyColor
+		));
 	}
-
-//	private Node buildCaseCard(CaseCardVm vm) {
-//		VBox card = new VBox(6);
-//		card.setPadding(new Insets(10));
-//		card.setPrefWidth(280);
-//
-//		String backgroundColor = toCssBackgroundColor(vm.responsibleAttorneyColor);
-//		card.setStyle("""
-//					-fx-background-color: %s;
-//					-fx-background-radius: 14;
-//					-fx-border-radius: 14;
-//					-fx-border-color: #e5e5e5;
-//					-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0.2, 0, 2);
-//				""".formatted(backgroundColor));
-//
-//		Label title = new Label(vm.name.isBlank() ? "(no name)" : vm.name);
-//		title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-//
-//		Label atty = new Label(vm.responsibleAttorney.isBlank() ? "" : vm.responsibleAttorney);
-//		atty.setStyle("-fx-font-size: 12px; -fx-opacity: 0.75;");
-//
-//		HBox dates = new HBox(10);
-//		Label intake = new Label("Intake: " + (vm.intakeDate == null ? "" : vm.intakeDate.toString()));
-//		intake.setStyle("-fx-font-size: 12px;");
-//
-//		Label sol = new Label("SOL: " + (vm.solDate == null ? "" : vm.solDate.toString()));
-//		sol.setStyle("-fx-font-size: 12px;");
-//
-//		Region spacer = new Region();
-//		HBox.setHgrow(spacer, Priority.ALWAYS);
-//		dates.getChildren().addAll(intake, spacer, sol);
-//
-//		card.getChildren().addAll(title, atty, dates);
-//
-//		// Click handler placeholder (wire to your selection / navigation later)
-//		card.setOnMouseClicked(e ->
-//		{
-//			// Example: System.out.println("Clicked case id=" + vm.id);
-//		});
-//
-//		return card;
-//	}
 
 	private static String safe(String s) {
 		return s == null ? "" : s;
-	}
-
-	private static String toCssBackgroundColor(String argbHex) {
-		if (argbHex == null)
-			return "white";
-
-		String normalized = argbHex.trim();
-		if (normalized.isEmpty()) {
-			return "white";
-		}
-		if (normalized.startsWith("#")) {
-			normalized = normalized.substring(1);
-		}
-		if (normalized.startsWith("0x") || normalized.startsWith("0X")) {
-			normalized = normalized.substring(2);
-		}
-
-		if (!normalized.matches("(?i)[0-9a-f]{8}")) {
-			return "white";
-		}
-
-		// Stored values are RRGGBBAA (for example 0xe6994dff should render orange).
-		// JavaFX accepts the same #RRGGBBAA layout directly.
-		String rr = normalized.substring(0, 2);
-		String gg = normalized.substring(2, 4);
-		String bb = normalized.substring(4, 6);
-		String aa = normalized.substring(6, 8);
-		return "#" + rr + gg + bb + aa;
 	}
 
 	// Simple view-model for the card (keeps rendering logic separate from DAO record)
