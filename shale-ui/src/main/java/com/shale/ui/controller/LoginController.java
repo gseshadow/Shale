@@ -26,7 +26,6 @@ public final class LoginController {
 	private UiAuthService authService;
 	private UiRuntimeBridge runtimeBridge;
 
-
 	public LoginController() {
 		System.out.println("LoginController()");// TODO
 	}
@@ -51,6 +50,16 @@ public final class LoginController {
 		// Hitting Enter in either field will trigger sign-in
 		emailField.setOnAction(e -> onSignIn());
 		passwordField.setOnAction(e -> onSignIn());
+
+		// DEV ONLY: auto login shortcut
+		// TODO REMOVE BEFORE PRODUCTION
+
+//		Platform.runLater(() ->
+//		{
+//			emailField.setText("brian@curtislawfirm.org");
+//			passwordField.setText("Quazi1der@");
+//		});
+
 	}
 
 	@FXML

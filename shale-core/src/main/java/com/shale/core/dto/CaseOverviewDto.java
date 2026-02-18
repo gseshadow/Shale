@@ -18,7 +18,12 @@ public final class CaseOverviewDto {
 
 	// Core overview fields
 	private final String caseStatus;
+
+	// Responsible attorney (for UserCard MINI + navigation)
+	private final Integer responsibleAttorneyUserId; // NEW
 	private final String responsibleAttorney;
+	private final String responsibleAttorneyColor; // NEW (dbo.Users.Color)
+
 	private final String practiceArea;
 
 	// Key dates
@@ -42,7 +47,11 @@ public final class CaseOverviewDto {
 			String caseNumber,
 			String caseName,
 			String caseStatus,
+
+			Integer responsibleAttorneyUserId, // NEW
 			String responsibleAttorney,
+			String responsibleAttorneyColor, // NEW
+
 			String practiceArea,
 			LocalDate intakeDate,
 			LocalDate incidentDate,
@@ -52,13 +61,18 @@ public final class CaseOverviewDto {
 			String opposingCounsel,
 			List<String> team,
 			String description) {
+
 		this.caseId = caseId;
 
 		this.caseNumber = safe(caseNumber);
 		this.caseName = safe(caseName);
 
 		this.caseStatus = safe(caseStatus);
+
+		this.responsibleAttorneyUserId = responsibleAttorneyUserId;
 		this.responsibleAttorney = safe(responsibleAttorney);
+		this.responsibleAttorneyColor = safe(responsibleAttorneyColor);
+
 		this.practiceArea = safe(practiceArea);
 
 		this.intakeDate = intakeDate;
@@ -90,8 +104,16 @@ public final class CaseOverviewDto {
 		return caseStatus;
 	}
 
+	public Integer getResponsibleAttorneyUserId() {
+		return responsibleAttorneyUserId;
+	}
+
 	public String getResponsibleAttorney() {
 		return responsibleAttorney;
+	}
+
+	public String getResponsibleAttorneyColor() {
+		return responsibleAttorneyColor;
 	}
 
 	public String getPracticeArea() {
@@ -143,5 +165,4 @@ public final class CaseOverviewDto {
 	private static String safe(String s) {
 		return Objects.toString(s, "").trim();
 	}
-
 }

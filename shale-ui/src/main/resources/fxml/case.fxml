@@ -5,174 +5,203 @@
 <?import javafx.scene.layout.*?>
 
 <BorderPane xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.shale.ui.controller.CaseController">
+	fx:controller="com.shale.ui.controller.CaseController">
 
-    <!-- TOP: Header / Command Bar (slightly tighter) -->
-    <top>
-        <VBox spacing="6.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets top="10" right="12" bottom="8" left="12" />
-            </padding>
+	<!-- TOP: Header / Command Bar (slightly tighter) -->
+	<top>
+		<VBox spacing="6.0" BorderPane.alignment="CENTER">
+			<padding>
+				<Insets top="10" right="12" bottom="8" left="12" />
+			</padding>
 
-            <HBox spacing="10.0" alignment="CENTER_LEFT">
-                <Label fx:id="caseTitleLabel"
-                       text="Case (Placeholder)"
-                       style="-fx-font-size: 18px; -fx-font-weight: bold;" />
+			<!-- Main header row: (usercard) : Case# -->
+			<HBox spacing="8.0" alignment="CENTER_LEFT">
 
-                <Region HBox.hgrow="ALWAYS" />
+				<!-- Responsible Attorney MINI card -->
+				<StackPane fx:id="assignedUserHost" />
 
-                <Button fx:id="addEntryButton" text="Add Entry" />
-                <Button fx:id="addTaskButton" text="Add Task" />
-                <Button fx:id="backToCasesButton" text="Back to Cases" />
-            </HBox>
+				<!-- Colon separator -->
+				<Label text=":" style="-fx-font-size: 16px; -fx-opacity: 0.6;" />
 
-            <HBox spacing="10.0" alignment="CENTER_LEFT">
-                <Label fx:id="statusLabel"
-                       text="Status: —"
-                       style="-fx-background-color: rgba(0,0,0,0.08); -fx-padding: 4 8; -fx-background-radius: 10;" />
+				<!-- Case Title -->
+				<Label fx:id="caseTitleLabel" text="Case (Placeholder)"
+					style="-fx-font-size: 18px; -fx-font-weight: bold;" />
 
-                <Label fx:id="assignedLabel" text="Assigned: —" />
-                <Region HBox.hgrow="ALWAYS" />
-                <Label fx:id="lastUpdatedLabel"
-                       text="Last updated: —"
-                       style="-fx-opacity: 0.7;" />
-            </HBox>
-        </VBox>
-    </top>
+				<Region HBox.hgrow="ALWAYS" />
 
-    <!-- LEFT: Case navigation -->
-    <left>
-        <VBox spacing="8.0"
-              BorderPane.alignment="TOP_LEFT"
-              style="-fx-background-color: rgba(0,0,0,0.03);">
-            <padding>
-                <Insets top="10" right="10" bottom="10" left="12" />
-            </padding>
+				<Button fx:id="addEntryButton" text="Add Entry" />
+				<Button fx:id="addTaskButton" text="Add Task" />
+				<Button fx:id="backToCasesButton" text="Back to Cases" />
+			</HBox>
 
-            <Label text="Sections"
-                   style="-fx-font-weight: bold; -fx-opacity: 0.8;" />
-            <ListView fx:id="sectionListView"
-                      prefWidth="200.0"
-                      prefHeight="600.0" />
-        </VBox>
-    </left>
+			<!-- Secondary row: status + last updated -->
+			<HBox spacing="10.0" alignment="CENTER_LEFT">
+				<Label fx:id="statusLabel" text="Status: —"
+					style="-fx-background-color: rgba(0,0,0,0.08); -fx-padding: 4 8; -fx-background-radius: 10;" />
 
-    <!-- CENTER: Content area (we switch panes by showing/hiding) -->
-    <center>
-        <StackPane fx:id="contentHost" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets top="10" right="12" bottom="12" left="12" />
-            </padding>
+				<Region HBox.hgrow="ALWAYS" />
 
-            <!-- OVERVIEW PANE -->
-            <VBox fx:id="overviewPane" spacing="10" maxWidth="980">
-                <Label fx:id="contentTitleLabel"
-                       text="Overview"
-                       style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+				<Label fx:id="lastUpdatedLabel" text="Last updated: —"
+					style="-fx-opacity: 0.7;" />
+			</HBox>
+		</VBox>
+	</top>
 
-                <GridPane hgap="14" vgap="8">
-                    <columnConstraints>
-                        <ColumnConstraints minWidth="150" prefWidth="170" />
-                        <ColumnConstraints hgrow="ALWAYS" />
-                    </columnConstraints>
+	<!-- LEFT: Case navigation -->
+	<left>
+		<VBox spacing="8.0" BorderPane.alignment="TOP_LEFT"
+			style="-fx-background-color: rgba(0,0,0,0.03);">
+			<padding>
+				<Insets top="10" right="10" bottom="10" left="12" />
+			</padding>
 
-                    <Label text="Case name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" GridPane.columnIndex="0" />
-                    <Label fx:id="ovCaseNameValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+			<Label text="Sections"
+				style="-fx-font-weight: bold; -fx-opacity: 0.8;" />
+			<ListView fx:id="sectionListView" prefWidth="200.0"
+				prefHeight="600.0" />
+		</VBox>
+	</left>
 
-                    <Label text="Case number:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" GridPane.columnIndex="0" />
-                    <Label fx:id="ovCaseNumberValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+	<!-- CENTER: Content area (we switch panes by showing/hiding) -->
+	<center>
+		<StackPane fx:id="contentHost" BorderPane.alignment="CENTER">
+			<padding>
+				<Insets top="10" right="12" bottom="12" left="12" />
+			</padding>
 
-                    <Label text="Responsible atty:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" GridPane.columnIndex="0" />
-                    <Label fx:id="ovResponsibleAttorneyValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+			<!-- OVERVIEW PANE -->
+			<VBox fx:id="overviewPane" spacing="10" maxWidth="980">
+				<Label fx:id="contentTitleLabel" text="Overview"
+					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 
-                    <Label text="Case status:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" GridPane.columnIndex="0" />
-                    <Label fx:id="ovCaseStatusValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+				<GridPane hgap="14" vgap="8">
+					<columnConstraints>
+						<ColumnConstraints minWidth="150"
+							prefWidth="170" />
+						<ColumnConstraints hgrow="ALWAYS" />
+					</columnConstraints>
 
-                    <Label text="Caller:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" GridPane.columnIndex="0" />
-                    <Label fx:id="ovCallerValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+					<Label text="Case name:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="0" GridPane.columnIndex="0" />
+					<Label fx:id="ovCaseNameValue" text="—" wrapText="true"
+						GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
-                    <Label text="Client:" style="-fx-opacity: 0.8;" GridPane.rowIndex="5" GridPane.columnIndex="0" />
-                    <Label fx:id="ovClientValue" text="—" wrapText="true" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+					<Label text="Case number:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="1" GridPane.columnIndex="0" />
+					<Label fx:id="ovCaseNumberValue" text="—"
+						GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
-                    <Label text="Practice area:" style="-fx-opacity: 0.8;" GridPane.rowIndex="6" GridPane.columnIndex="0" />
-                    <Label fx:id="ovPracticeAreaValue" text="—" GridPane.rowIndex="6" GridPane.columnIndex="1" />
+					<Label text="Responsible atty:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="2" GridPane.columnIndex="0" />
+					<StackPane fx:id="ovResponsibleAttorneyHost"
+						GridPane.rowIndex="2" GridPane.columnIndex="1" />
 
-                    <Label text="Opposing counsel:" style="-fx-opacity: 0.8;" GridPane.rowIndex="7" GridPane.columnIndex="0" />
-                    <Label fx:id="ovOpposingCounselValue" text="—" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" />
+					<Label text="Case status:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="3" GridPane.columnIndex="0" />
+					<Label fx:id="ovCaseStatusValue" text="—"
+						GridPane.rowIndex="3" GridPane.columnIndex="1" />
 
-                    <Label text="Team:" style="-fx-opacity: 0.8;" GridPane.rowIndex="8" GridPane.columnIndex="0" />
-                    <Label fx:id="ovTeamValue" text="—" wrapText="true" GridPane.rowIndex="8" GridPane.columnIndex="1" />
+					<Label text="Caller:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="4" GridPane.columnIndex="0" />
+					<Label fx:id="ovCallerValue" text="—" wrapText="true"
+						GridPane.rowIndex="4" GridPane.columnIndex="1" />
 
-                    <Label text="Intake date:" style="-fx-opacity: 0.8;" GridPane.rowIndex="9" GridPane.columnIndex="0" />
-                    <Label fx:id="ovIntakeDateValue" text="—" GridPane.rowIndex="9" GridPane.columnIndex="1" />
+					<Label text="Client:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="5" GridPane.columnIndex="0" />
+					<Label fx:id="ovClientValue" text="—" wrapText="true"
+						GridPane.rowIndex="5" GridPane.columnIndex="1" />
 
-                    <Label text="Incident date:" style="-fx-opacity: 0.8;" GridPane.rowIndex="10" GridPane.columnIndex="0" />
-                    <Label fx:id="ovIncidentDateValue" text="—" GridPane.rowIndex="10" GridPane.columnIndex="1" />
+					<Label text="Practice area:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="6" GridPane.columnIndex="0" />
+					<Label fx:id="ovPracticeAreaValue" text="—"
+						GridPane.rowIndex="6" GridPane.columnIndex="1" />
 
-                    <Label text="SOL date:" style="-fx-opacity: 0.8;" GridPane.rowIndex="11" GridPane.columnIndex="0" />
-                    <Label fx:id="ovSolDateValue" text="—" GridPane.rowIndex="11" GridPane.columnIndex="1" />
-                </GridPane>
+					<Label text="Opposing counsel:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="7" GridPane.columnIndex="0" />
+					<Label fx:id="ovOpposingCounselValue" text="—"
+						wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" />
 
-                <Separator />
+					<Label text="Team:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="8" GridPane.columnIndex="0" />
+					<Label fx:id="ovTeamValue" text="—" wrapText="true"
+						GridPane.rowIndex="8" GridPane.columnIndex="1" />
 
-                <Label text="Case description:"
-                       style="-fx-font-weight: bold; -fx-opacity: 0.85;" />
-                <TextArea fx:id="ovDescriptionArea"
-                          promptText="(description / overview notes)"
-                          prefRowCount="6"
-                          wrapText="true" />
-            </VBox>
+					<Label text="Intake date:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="9" GridPane.columnIndex="0" />
+					<Label fx:id="ovIntakeDateValue" text="—"
+						GridPane.rowIndex="9" GridPane.columnIndex="1" />
 
-            <!-- TASKS TAB PANE (center) -->
-            <VBox fx:id="tasksTabPane" spacing="10" maxWidth="980" visible="false" managed="false">
-                <Label text="Tasks"
-                       style="-fx-font-size: 16px; -fx-font-weight: bold;" />
-                <TextField fx:id="tasksTabSearchField" promptText="Search tasks…" />
-                <ListView fx:id="tasksTabListView" prefHeight="520.0" />
-                <Label text="(placeholder) Task details / actions go here"
-                       wrapText="true" style="-fx-opacity: 0.7;" />
-            </VBox>
+					<Label text="Incident date:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="10" GridPane.columnIndex="0" />
+					<Label fx:id="ovIncidentDateValue" text="—"
+						GridPane.rowIndex="10" GridPane.columnIndex="1" />
 
-            <!-- GENERIC PLACEHOLDER PANE -->
-            <VBox fx:id="genericPane" spacing="10" maxWidth="980" visible="false" managed="false">
-                <Label fx:id="genericTitleLabel"
-                       text="Section"
-                       style="-fx-font-size: 16px; -fx-font-weight: bold;" />
-                <TextArea fx:id="placeholderTextArea"
-                          promptText="Placeholder notes / testing area"
-                          prefRowCount="12" />
-            </VBox>
+					<Label text="SOL date:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="11" GridPane.columnIndex="0" />
+					<Label fx:id="ovSolDateValue" text="—" GridPane.rowIndex="11"
+						GridPane.columnIndex="1" />
+				</GridPane>
 
-        </StackPane>
-    </center>
+				<Separator />
 
-    <!-- RIGHT: Tasks panel (only for Overview) -->
-    <right>
-        <VBox fx:id="tasksPanel"
-              spacing="10.0"
-              BorderPane.alignment="TOP_RIGHT"
-              style="-fx-background-color: rgba(0,0,0,0.03);">
-            <padding>
-                <Insets top="10" right="12" bottom="10" left="10" />
-            </padding>
+				<Label text="Case description:"
+					style="-fx-font-weight: bold; -fx-opacity: 0.85;" />
+				<TextArea fx:id="ovDescriptionArea"
+					promptText="(description / overview notes)" prefRowCount="6"
+					wrapText="true" />
+			</VBox>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT">
-                <Label text="Tasks"
-                       style="-fx-font-size: 16px; -fx-font-weight: bold;" />
-                <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="newTaskInlineButton" text="+" />
-            </HBox>
+			<!-- TASKS TAB PANE (center) -->
+			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980"
+				visible="false" managed="false">
+				<Label text="Tasks"
+					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+				<TextField fx:id="tasksTabSearchField"
+					promptText="Search tasks…" />
+				<ListView fx:id="tasksTabListView" prefHeight="520.0" />
+				<Label text="(placeholder) Task details / actions go here"
+					wrapText="true" style="-fx-opacity: 0.7;" />
+			</VBox>
 
-            <TextField fx:id="taskSearchField" promptText="Search tasks…" />
+			<!-- GENERIC PLACEHOLDER PANE -->
+			<VBox fx:id="genericPane" spacing="10" maxWidth="980"
+				visible="false" managed="false">
+				<Label fx:id="genericTitleLabel" text="Section"
+					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+				<TextArea fx:id="placeholderTextArea"
+					promptText="Placeholder notes / testing area" prefRowCount="12" />
+			</VBox>
 
-            <!-- Top 5 upcoming / past due (for Overview only) -->
-            <ListView fx:id="taskListView" prefWidth="320.0" prefHeight="260.0" />
+		</StackPane>
+	</center>
 
-            <Separator />
+	<!-- RIGHT: Tasks panel (only for Overview) -->
+	<right>
+		<VBox fx:id="tasksPanel" spacing="10.0"
+			BorderPane.alignment="TOP_RIGHT"
+			style="-fx-background-color: rgba(0,0,0,0.03);">
+			<padding>
+				<Insets top="10" right="12" bottom="10" left="10" />
+			</padding>
 
-            <Label text="(placeholder) Quick actions here"
-                   wrapText="true" style="-fx-opacity: 0.7;" />
-        </VBox>
-    </right>
+			<HBox spacing="8.0" alignment="CENTER_LEFT">
+				<Label text="Tasks"
+					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+				<Region HBox.hgrow="ALWAYS" />
+				<Button fx:id="newTaskInlineButton" text="+" />
+			</HBox>
+
+			<TextField fx:id="taskSearchField"
+				promptText="Search tasks…" />
+
+			<ListView fx:id="taskListView" prefWidth="320.0"
+				prefHeight="260.0" />
+
+			<Separator />
+
+			<Label text="(placeholder) Quick actions here" wrapText="true"
+				style="-fx-opacity: 0.7;" />
+		</VBox>
+	</right>
 
 </BorderPane>

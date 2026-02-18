@@ -1,16 +1,21 @@
 package com.shale.ui.controller;
 
-import javafx.fxml.FXML;
-import javafx.scene.control.*;
-import javafx.scene.layout.VBox;
-
 import java.time.LocalDate;
 import java.util.List;
-
-import com.shale.data.dao.CaseDao;
+import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.data.dao.CaseDao;
+import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
+import com.shale.ui.component.factory.UserCardFactory.Variant;
+
 import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.control.*;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 
 public class CaseController {
 
@@ -19,8 +24,11 @@ public class CaseController {
 	private Label caseTitleLabel;
 	@FXML
 	private Label statusLabel;
+
+	// REPLACED: was Label assignedLabel
 	@FXML
-	private Label assignedLabel;
+	private StackPane assignedUserHost;
+
 	@FXML
 	private Label lastUpdatedLabel;
 
@@ -55,8 +63,11 @@ public class CaseController {
 	private Label ovCaseNameValue;
 	@FXML
 	private Label ovCaseNumberValue;
+
+	// REPLACED: was Label ovResponsibleAttorneyValue
 	@FXML
-	private Label ovResponsibleAttorneyValue;
+	private StackPane ovResponsibleAttorneyHost;
+
 	@FXML
 	private Label ovCaseStatusValue;
 	@FXML
@@ -97,6 +108,10 @@ public class CaseController {
 	private CaseDao caseDao;
 	private boolean overviewLoaded = false;
 
+	// --- User card / navigation wiring ---
+	private Consumer<Integer> onOpenUser;
+	private UserCardFactory userCardFactory;
+
 	// Context
 	private Integer caseId;
 
@@ -112,6 +127,15 @@ public class CaseController {
 		this.caseDao = caseDao;
 		refreshHeader();
 		// don’t load yet if you want it tab-driven; we’ll trigger when Overview is selected
+	}
+
+	/**
+	 * Call this from SceneManager (or wherever you inject controller callbacks) so UserCards
+	 * can navigate to a user profile view later.
+	 */
+	public void setOnOpenUser(Consumer<Integer> onOpenUser) {
+		this.onOpenUser = onOpenUser;
+		this.userCardFactory = new UserCardFactory(onOpenUser);
 	}
 
 	@FXML
@@ -240,8 +264,10 @@ public class CaseController {
 
 		if (statusLabel != null)
 			statusLabel.setText("Status: —");
-		if (assignedLabel != null)
-			assignedLabel.setText("Assigned: —");
+
+		// MINI user card placeholder
+		renderResponsibleAttorneyMini(null, "—", null);
+
 		if (lastUpdatedLabel != null)
 			lastUpdatedLabel.setText("Last updated: —");
 	}
@@ -253,8 +279,10 @@ public class CaseController {
 			ovCaseNameValue.setText(caseId == null ? "—" : "Case #" + caseId + " (Placeholder name)");
 		if (ovCaseNumberValue != null)
 			ovCaseNumberValue.setText(caseId == null ? "—" : String.valueOf(caseId));
-		if (ovResponsibleAttorneyValue != null)
-			ovResponsibleAttorneyValue.setText("—");
+
+		// MINI user card placeholder
+		renderResponsibleAttorneyMini(null, "—", null);
+
 		if (ovCaseStatusValue != null)
 			ovCaseStatusValue.setText("—");
 
@@ -280,55 +308,6 @@ public class CaseController {
 		if (ovDescriptionArea != null && (ovDescriptionArea.getText() == null || ovDescriptionArea.getText().isBlank())) {
 			ovDescriptionArea.setText("");
 		}
-	}
-
-	// When you have real data, call this method from SceneManager injection.
-	@SuppressWarnings("unused")
-	private void setOverview(
-			String caseName,
-			String caseNumber,
-			String responsibleAttorney,
-			String caseStatus,
-			String description,
-			String caller,
-			String client,
-			LocalDate intakeDate,
-			LocalDate incidentDate,
-			LocalDate solDate,
-			String opposingCounsel,
-			String practiceArea,
-			List<String> teamUsers) {
-		if (ovCaseNameValue != null)
-			ovCaseNameValue.setText(safe(caseName));
-		if (ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(safe(caseNumber));
-		if (ovResponsibleAttorneyValue != null)
-			ovResponsibleAttorneyValue.setText(safe(responsibleAttorney));
-		if (ovCaseStatusValue != null)
-			ovCaseStatusValue.setText(safe(caseStatus));
-
-		if (ovCallerValue != null)
-			ovCallerValue.setText(safe(caller));
-		if (ovClientValue != null)
-			ovClientValue.setText(safe(client));
-
-		if (ovPracticeAreaValue != null)
-			ovPracticeAreaValue.setText(safe(practiceArea));
-		if (ovOpposingCounselValue != null)
-			ovOpposingCounselValue.setText(safe(opposingCounsel));
-
-		if (ovTeamValue != null)
-			ovTeamValue.setText(teamUsers == null || teamUsers.isEmpty() ? "—" : String.join(", ", teamUsers));
-
-		if (ovIntakeDateValue != null)
-			ovIntakeDateValue.setText(formatDate(intakeDate));
-		if (ovIncidentDateValue != null)
-			ovIncidentDateValue.setText(formatDate(incidentDate));
-		if (ovSolDateValue != null)
-			ovSolDateValue.setText(formatDate(solDate));
-
-		if (ovDescriptionArea != null)
-			ovDescriptionArea.setText(safe(description));
 	}
 
 	private static void setPaneVisible(VBox pane, boolean visible) {
@@ -391,22 +370,22 @@ public class CaseController {
 		if (statusLabel != null)
 			statusLabel.setText("Status: " + safe(dto.getCaseStatus()));
 
-		if (assignedLabel != null)
-			assignedLabel.setText("Assigned: " + safe(dto.getResponsibleAttorney()));
+		// ✅ PROPER responsible attorney wiring
 
-		// You can wire this once you add UpdatedAt to the DTO.
-		if (lastUpdatedLabel != null)
-			lastUpdatedLabel.setText("Last updated: —");
+		Integer raUserId = dto.getResponsibleAttorneyUserId(); // <-- must exist
+		String raName = safe(dto.getResponsibleAttorney());
+		String raColor = dto.getResponsibleAttorneyColor(); // <-- must exist
 
-		// Overview grid values
+		System.out.println("RA userId=" + raUserId + " name=" + raName);
+
+		renderResponsibleAttorneyMini(raUserId, raName, raColor);
+
+		// --- rest of your overview values ---
 		if (ovCaseNameValue != null)
 			ovCaseNameValue.setText(safe(dto.getCaseName()));
 
 		if (ovCaseNumberValue != null)
 			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
-
-		if (ovResponsibleAttorneyValue != null)
-			ovResponsibleAttorneyValue.setText(safe(dto.getResponsibleAttorney()));
 
 		if (ovCaseStatusValue != null)
 			ovCaseStatusValue.setText(safe(dto.getCaseStatus()));
@@ -437,10 +416,60 @@ public class CaseController {
 		if (ovSolDateValue != null)
 			ovSolDateValue.setText(formatDate(dto.getSolDate()));
 
-		if (ovDescriptionArea != null) {
-			// For Overview, keep it read-friendly; editing can move to Details later.
+		if (ovDescriptionArea != null)
 			ovDescriptionArea.setText(dto.getDescription() == null ? "" : dto.getDescription());
+	}
+
+	private void renderResponsibleAttorneyMini(Integer userId, String displayName, String userColorCss) {
+
+		if (userCardFactory == null) {
+			userCardFactory = new UserCardFactory(id ->
+			{
+			});
+		}
+
+		UserCardModel model = new UserCardModel(
+				userId,
+				(displayName == null || displayName.isBlank()) ? "—" : displayName,
+				userColorCss,
+				null
+		);
+
+		// ✅ IMPORTANT: create a separate Node for each host
+		var headerCard = userCardFactory.create(model, Variant.MINI);
+		var overviewCard = userCardFactory.create(model, Variant.MINI);
+
+		if (assignedUserHost != null) {
+			assignedUserHost.getChildren().setAll(headerCard);
+		}
+		if (ovResponsibleAttorneyHost != null) {
+			ovResponsibleAttorneyHost.getChildren().setAll(overviewCard);
 		}
 	}
 
+	private static Integer tryGetInt(Object target, String... methodNames) {
+		for (String m : methodNames) {
+			try {
+				var method = target.getClass().getMethod(m);
+				Object val = method.invoke(target);
+				if (val instanceof Number n)
+					return n.intValue();
+			} catch (Exception ignored) {
+			}
+		}
+		return null;
+	}
+
+	private static String tryGetString(Object target, String... methodNames) {
+		for (String m : methodNames) {
+			try {
+				var method = target.getClass().getMethod(m);
+				Object val = method.invoke(target);
+				if (val != null)
+					return val.toString();
+			} catch (Exception ignored) {
+			}
+		}
+		return null;
+	}
 }
