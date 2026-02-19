@@ -90,31 +90,26 @@ public final class LiveBus {
 				+ " clientId=" + tenantId
 				+ " updatedBy=" + updatedByUserId);
 
-		return CompletableFuture.supplyAsync(() ->
-		{
-			try {
-				HttpRequest.Builder builder = HttpRequest.newBuilder()
-						.uri(URI.create(publishEndpointUrl))
-						.timeout(Duration.ofSeconds(HTTP_TIMEOUT_SECS))
-						.header("Content-Type", "application/json")
-						.header("Accept", "application/json, text/plain; q=0.8")
-						.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+		HttpRequest.Builder builder = HttpRequest.newBuilder()
+				.uri(URI.create(publishEndpointUrl))
+				.timeout(Duration.ofSeconds(HTTP_TIMEOUT_SECS))
+				.header("Content-Type", "application/json")
+				.header("Accept", "application/json, text/plain; q=0.8")
+				.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
 
-				String functionKey = System.getenv("FUNCTION_KEY");
-				if (functionKey != null && !functionKey.isBlank() && !publishEndpointUrl.contains("code=")) {
-					builder.header("x-functions-key", functionKey);
-				}
+		String functionKey = System.getenv("FUNCTION_KEY");
+		if (functionKey != null && !functionKey.isBlank() && !publishEndpointUrl.contains("code=")) {
+			builder.header("x-functions-key", functionKey);
+		}
 
-				HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-				if (response.statusCode() / 100 != 2) {
-					throw new IllegalStateException("Live publish failed: HTTP " + response.statusCode()
-							+ " body=" + preview(response.body(), 200));
-				}
-				return null;
-			} catch (Exception ex) {
-				throw new RuntimeException(ex);
-			}
-		});
+		return http.sendAsync(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+				.thenAccept(response ->
+				{
+					if (response.statusCode() / 100 != 2) {
+						throw new IllegalStateException("Live publish failed: HTTP " + response.statusCode()
+								+ " body=" + preview(response.body(), 200));
+					}
+				});
 	}
 
 	public void onEvent(Consumer<Event> listener) {
@@ -123,12 +118,6 @@ public final class LiveBus {
 
 	public void shutdown() {
 		// no-op for now
-	}
-
-	private void ensureReady() {
-		if (wsClient == null || groupName == null) {
-			throw new IllegalStateException("LiveBus not connected. Call connectAndJoin() first.");
-		}
 	}
 
 	private void handleInbound(String text) {
