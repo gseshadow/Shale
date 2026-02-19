@@ -15,6 +15,10 @@ public final class DesktopRuntimeSessionProvider implements DbSessionProvider {
 		this.runtime = Objects.requireNonNull(runtime, "runtime");
 	}
 
+	public void clear() {
+		this.runtime = null;
+	}
+
 	@Override
 	public Connection requireConnection() {
 		if (runtime == null) {

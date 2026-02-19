@@ -87,11 +87,19 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	@Override
 	public void onLogout() {
+		// 1) stop live bus
 		LiveBus bus = liveBus;
 		liveBus = null;
 		if (bus != null) {
 			bus.shutdown();
 		}
+
+		// 2) clear runtime session wiring
+		dbProvider.clear(); // <-- add this (implement clear() if you haven't)
+		if (runtimeSessionService != null) {
+			runtimeSessionService.clear(); // <-- add this (you implement clear() in RuntimeSessionService)
+		}
+
 		System.out.println("Logout requested");
 	}
 
