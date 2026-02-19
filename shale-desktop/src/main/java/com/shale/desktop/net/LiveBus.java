@@ -30,6 +30,7 @@ public final class LiveBus {
 	private final CopyOnWriteArrayList<Consumer<Event>> listeners = new CopyOnWriteArrayList<>();
 	private volatile LiveBusClient wsClient;
 	private volatile String groupName;
+	private volatile String connectionId;
 
 	public LiveBus(NegotiateClient negotiate, int shaleClientId, int userId) {
 		this.negotiate = Objects.requireNonNull(negotiate);
@@ -38,7 +39,7 @@ public final class LiveBus {
 	}
 
 	public CompletableFuture<Void> connectAndJoin() {
-		groupName = "tenant:" + shaleClientId;
+		groupName = "client-" + shaleClientId;
 		return CompletableFuture.supplyAsync(() ->
 		{
 			try {
@@ -55,8 +56,13 @@ public final class LiveBus {
 				}
 			});
 			return wsClient.connect(wss);
-		}).thenCompose(ws -> wsClient.joinGroup(groupName, 1)).thenAccept(v -> {
-		});
+		}).thenCompose(ws -> wsClient.joinGroup(groupName, 1)
+				.thenRun(() -> System.out.println("[LIVE] joined group " + groupName + " ok"))
+				.exceptionally(ex ->
+				{
+					System.out.println("[LIVE] join group failed: " + ex.getMessage());
+					throw new RuntimeException(ex);
+				}));
 	}
 
 	public CompletableFuture<Void> publishCaseUpdated(int caseId, int tenantId, int updatedByUserId) {
@@ -82,12 +88,25 @@ public final class LiveBus {
 	}
 
 	private void handleInbound(String text) {
-		if (!(text.contains("\"type\":\"message\"") && text.contains("\"dataType\":\"json\"")))
+		String raw = text == null ? "" : text;
+		String preview = raw.length() > 200 ? raw.substring(0, 200) : raw;
+		System.out.println("[LIVE RX RAW] " + preview);
+
+		if (raw.contains("\"type\":\"connected\"")) {
+			String connId = extractString(raw, "connectionId");
+			if (connId != null && !connId.isBlank()) {
+				connectionId = connId;
+			}
+			System.out.println("[LIVE] connected. userId=" + userId + ", clientId=" + shaleClientId + ", connectionId=" + (connectionId == null ? "?" : connectionId));
 			return;
-		int i = text.indexOf("\"data\":");
+		}
+
+		if (!(raw.contains("\"type\":\"message\"") && raw.contains("\"dataType\":\"json\"")))
+			return;
+		int i = raw.indexOf("\"data\":");
 		if (i < 0)
 			return;
-		String sub = text.substring(i + 7).trim();
+		String sub = raw.substring(i + 7).trim();
 		String dataJson = extractFirstJsonObject(sub);
 		if (dataJson == null)
 			return;
@@ -101,7 +120,8 @@ public final class LiveBus {
 		if (type == null || by == null)
 			return;
 
-		Event ev = new Event(type, by, caseId, tenantId, text);
+		System.out.println("[LIVE RX] type=" + type + " caseId=" + caseId + " clientId=" + tenantId + " updatedBy=" + by);
+		Event ev = new Event(type, by, caseId, tenantId, raw);
 		for (var l : listeners)
 			l.accept(ev);
 	}

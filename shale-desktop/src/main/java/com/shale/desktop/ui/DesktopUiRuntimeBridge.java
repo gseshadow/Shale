@@ -102,10 +102,13 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			return;
 		}
 		bus.publishCaseUpdated(caseId, shaleClientId, updatedByUserId)
-				.exceptionally(ex ->
+				.whenComplete((ok, ex) ->
 				{
-					System.out.println("Failed to publish CaseUpdated: " + ex.getMessage());
-					return null;
+					if (ex != null) {
+						System.out.println("[LIVE] publish failed: " + ex.getMessage());
+						return;
+					}
+					System.out.println("[LIVE] publish ok");
 				});
 	}
 

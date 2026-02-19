@@ -517,6 +517,7 @@ public class CaseController {
 			return;
 		}
 		try {
+			System.out.println("[LIVE] publish CaseUpdated caseId=" + updatedCaseId + ", clientId=" + appState.getShaleClientId() + ", updatedBy=" + appState.getUserId());
 			runtimeBridge.publishCaseUpdated((int) updatedCaseId, appState.getShaleClientId(), appState.getUserId());
 		} catch (Exception ex) {
 			System.out.println("CaseUpdated publish skipped: " + ex.getMessage());
