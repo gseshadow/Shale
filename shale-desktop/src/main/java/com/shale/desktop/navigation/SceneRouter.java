@@ -25,12 +25,14 @@ public final class SceneRouter {
 	public SceneRouter(Stage stage,
 			AuthService authService,
 			LiveEventDispatcher dispatcher,
-			RuntimeSessionService runtimeSessionService) {
+			RuntimeSessionService runtimeSessionService,
+			String negotiateEndpointUrl) {
 
 		this.stage = Objects.requireNonNull(stage, "stage");
 		Objects.requireNonNull(authService, "authService");
 		Objects.requireNonNull(dispatcher, "dispatcher");
 		Objects.requireNonNull(runtimeSessionService, "runtimeSessionService");
+		Objects.requireNonNull(negotiateEndpointUrl, "negotiateEndpointUrl");
 
 		this.stage.setTitle("Shale");
 		this.stage.setOnCloseRequest(e -> Platform.exit());
@@ -42,7 +44,7 @@ public final class SceneRouter {
 		this.dbProvider = new DesktopRuntimeSessionProvider();
 
 		// Desktop bridge will "arm" dbProvider on successful login
-		var runtimeBridge = new DesktopUiRuntimeBridge(dispatcher, dbProvider);
+		var runtimeBridge = new DesktopUiRuntimeBridge(dispatcher, dbProvider, negotiateEndpointUrl);
 		runtimeBridge.setRuntimeSessionService(runtimeSessionService);
 
 		this.sceneManager = new SceneManager(

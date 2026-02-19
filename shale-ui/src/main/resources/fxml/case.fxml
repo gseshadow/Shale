@@ -71,8 +71,23 @@
 
 			<!-- OVERVIEW PANE -->
 			<VBox fx:id="overviewPane" spacing="10" maxWidth="980">
-				<Label fx:id="contentTitleLabel" text="Overview"
-					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+				<HBox alignment="CENTER_LEFT" spacing="8">
+					<Label fx:id="contentTitleLabel" text="Overview"
+						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+					<Region HBox.hgrow="ALWAYS" />
+					<Button fx:id="editButton" text="Edit" />
+					<Button fx:id="saveButton" text="Save" visible="false" managed="false" />
+					<Button fx:id="cancelButton" text="Cancel" visible="false" managed="false" />
+				</HBox>
+
+				<HBox spacing="8" alignment="CENTER_LEFT">
+					<Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
+				</HBox>
+
+				<HBox fx:id="remoteUpdateBanner" spacing="8" alignment="CENTER_LEFT" visible="false" managed="false">
+					<Label text="This case was updated elsewhere." style="-fx-text-fill: #b42318;" />
+					<Button fx:id="reloadRemoteButton" text="Reload" />
+				</HBox>
 
 				<GridPane hgap="14" vgap="8">
 					<columnConstraints>
@@ -84,6 +99,8 @@
 					<Label text="Case name:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="0" GridPane.columnIndex="0" />
 					<Label fx:id="ovCaseNameValue" text="—" wrapText="true"
+						GridPane.rowIndex="0" GridPane.columnIndex="1" />
+					<TextField fx:id="ovCaseNameEditor" visible="false" managed="false"
 						GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
 					<Label text="Case number:" style="-fx-opacity: 0.8;"
@@ -146,9 +163,10 @@
 
 				<Label text="Case description:"
 					style="-fx-font-weight: bold; -fx-opacity: 0.85;" />
-				<TextArea fx:id="ovDescriptionArea"
+				<Label fx:id="ovDescriptionValue" text="" wrapText="true" />
+				<TextArea fx:id="ovDescriptionEditor"
 					promptText="(description / overview notes)" prefRowCount="6"
-					wrapText="true" />
+					wrapText="true" visible="false" managed="false" />
 			</VBox>
 
 			<!-- TASKS TAB PANE (center) -->

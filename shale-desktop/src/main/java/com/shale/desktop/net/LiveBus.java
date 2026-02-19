@@ -9,14 +9,16 @@ public final class LiveBus {
 
 	public static final class Event {
 		public final String type;
-		public final int byUser;
-		public final Integer caseId; // nullable, depends on type
-		public final String raw; // raw JSON frame (for debugging)
+		public final int updatedByUserId;
+		public final Integer caseId;
+		public final Integer shaleClientId;
+		public final String raw;
 
-		public Event(String type, int byUser, Integer caseId, String raw) {
+		public Event(String type, int updatedByUserId, Integer caseId, Integer shaleClientId, String raw) {
 			this.type = type;
-			this.byUser = byUser;
+			this.updatedByUserId = updatedByUserId;
 			this.caseId = caseId;
+			this.shaleClientId = shaleClientId;
 			this.raw = raw;
 		}
 	}
@@ -35,7 +37,6 @@ public final class LiveBus {
 		this.userId = userId;
 	}
 
-	/** Connects → joins tenant group. */
 	public CompletableFuture<Void> connectAndJoin() {
 		groupName = "tenant:" + shaleClientId;
 		return CompletableFuture.supplyAsync(() ->
@@ -49,47 +50,31 @@ public final class LiveBus {
 		{
 			wsClient = new LiveBusClient(new LiveBusClient.Handler() {
 				@Override
-				public void onOpen() {
-					/* no-op */ }
-
-				@Override
 				public void onMessage(String text) {
 					handleInbound(text);
 				}
-
-				@Override
-				public void onClosed(int code, String reason) {
-					/* could auto-reconnect later */ }
-
-				@Override
-				public void onError(Throwable error) {
-					/* log */ }
 			});
 			return wsClient.connect(wss);
-		}).thenCompose(ws -> wsClient.joinGroup(groupName, 1))
-				.thenAccept(v ->
-				{
-					/* joined */ });
+		}).thenCompose(ws -> wsClient.joinGroup(groupName, 1)).thenAccept(v -> {
+		});
 	}
 
-	/** Publish a "CaseUpdated" event to the tenant group. */
-	public CompletableFuture<Void> publishCaseUpdated(int caseId) {
+	public CompletableFuture<Void> publishCaseUpdated(int caseId, int tenantId, int updatedByUserId) {
 		ensureReady();
-		String payload = "{\"event\":\"CaseUpdated\",\"caseId\":" + caseId + ",\"by\":" + userId + "}";
+		String payload = "{\"event\":\"CaseUpdated\",\"caseId\":" + caseId
+				+ ",\"shaleClientId\":" + tenantId
+				+ ",\"updatedByUserId\":" + updatedByUserId + "}";
 		return wsClient.sendToGroup(groupName, payload, 2);
 	}
 
-	/** Subscribe to inbound events. */
 	public void onEvent(Consumer<Event> listener) {
 		listeners.add(listener);
 	}
 
-	/** Stop (optional). */
 	public void shutdown() {
-		// Basic close: rely on GC or extend LiveBusClient to expose a close()
+		// no-op for now
 	}
 
-	// ---- internal ----
 	private void ensureReady() {
 		if (wsClient == null || groupName == null) {
 			throw new IllegalStateException("LiveBus not connected. Call connectAndJoin() first.");
@@ -97,35 +82,30 @@ public final class LiveBus {
 	}
 
 	private void handleInbound(String text) {
-		// Expect Azure frames. We care about: type=message, dataType=json, data={...}
-		// Minimal parse without pulling in a JSON lib:
-		// 1) Only process frames containing `"type":"message"` and `"dataType":"json"`
 		if (!(text.contains("\"type\":\"message\"") && text.contains("\"dataType\":\"json\"")))
 			return;
-
-		// 2) Extract the inner data object (very small heuristic parse)
 		int i = text.indexOf("\"data\":");
 		if (i < 0)
 			return;
 		String sub = text.substring(i + 7).trim();
-		// sub starts with { ... } maybe followed by }
 		String dataJson = extractFirstJsonObject(sub);
 		if (dataJson == null)
 			return;
 
-		// 3) Pull fields we care about
 		String type = extractString(dataJson, "event");
 		Integer caseId = extractInt(dataJson, "caseId");
-		Integer by = extractInt(dataJson, "by");
-
+		Integer tenantId = extractInt(dataJson, "shaleClientId");
+		Integer by = extractInt(dataJson, "updatedByUserId");
+		if (by == null)
+			by = extractInt(dataJson, "by");
 		if (type == null || by == null)
 			return;
-		Event ev = new Event(type, by, caseId, text);
+
+		Event ev = new Event(type, by, caseId, tenantId, text);
 		for (var l : listeners)
 			l.accept(ev);
 	}
 
-	// --- tiny helpers (stringy JSON parse to avoid extra deps) ---
 	private static String extractFirstJsonObject(String s) {
 		int depth = 0, start = -1;
 		for (int idx = 0; idx < s.length(); idx++) {

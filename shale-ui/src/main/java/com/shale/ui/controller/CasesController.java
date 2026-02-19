@@ -43,6 +43,8 @@ public final class CasesController {
 	private FlowPane casesFlow;
 
 	private CaseDao caseDao;
+	private AppState appState;
+	private UiRuntimeBridge runtimeBridge;
 
 	// Paging state
 	private int currentPage = 0;
@@ -74,6 +76,8 @@ public final class CasesController {
 			Consumer<Integer> onOpenCase) {
 		System.out.println("CasesController.init()");
 		this.caseDao = caseDao;
+		this.appState = appState;
+		this.runtimeBridge = runtimeBridge;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 
 	}
@@ -116,6 +120,21 @@ public final class CasesController {
 			}
 			wireInfiniteScroll();
 			loadFirstPage();
+		});
+		subscribeLiveCaseUpdates();
+	}
+
+	private void subscribeLiveCaseUpdates() {
+		if (runtimeBridge == null) {
+			return;
+		}
+		runtimeBridge.subscribeCaseUpdated(event ->
+		{
+			Integer userId = appState == null ? null : appState.getUserId();
+			if (userId != null && userId.intValue() == event.updatedByUserId()) {
+				return;
+			}
+		runOnFx(this::loadFirstPage);
 		});
 	}
 
@@ -326,6 +345,15 @@ public final class CasesController {
 				vm.responsibleAttorney,
 				vm.responsibleAttorneyColor
 		));
+	}
+
+
+	private static void runOnFx(Runnable runnable) {
+		if (Platform.isFxApplicationThread()) {
+			runnable.run();
+		} else {
+			Platform.runLater(runnable);
+		}
 	}
 
 	private static String safe(String s) {
