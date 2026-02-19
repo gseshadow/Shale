@@ -4,8 +4,15 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 public final class LiveBus {
+	private static final int HTTP_TIMEOUT_SECS = 12;
 
 	public static final class Event {
 		public final String type;
@@ -26,6 +33,10 @@ public final class LiveBus {
 	private final NegotiateClient negotiate;
 	private final int shaleClientId;
 	private final int userId;
+	private final String publishEndpointUrl;
+	private final HttpClient http = HttpClient.newBuilder()
+			.connectTimeout(Duration.ofSeconds(HTTP_TIMEOUT_SECS))
+			.build();
 
 	private final CopyOnWriteArrayList<Consumer<Event>> listeners = new CopyOnWriteArrayList<>();
 	private volatile LiveBusClient wsClient;
@@ -36,6 +47,7 @@ public final class LiveBus {
 		this.negotiate = Objects.requireNonNull(negotiate);
 		this.shaleClientId = shaleClientId;
 		this.userId = userId;
+		this.publishEndpointUrl = System.getenv("LIVE_PUBLISH_ENDPOINT_URL");
 	}
 
 	public CompletableFuture<Void> connectAndJoin() {
@@ -57,7 +69,7 @@ public final class LiveBus {
 			});
 			return wsClient.connect(wss);
 		}).thenCompose(ws -> wsClient.joinGroup(groupName, 1)
-				.thenRun(() -> System.out.println("[LIVE] joined group " + groupName + " ok"))
+				.thenRun(() -> System.out.println("[LIVE] group joined: " + groupName))
 				.exceptionally(ex ->
 				{
 					System.out.println("[LIVE] join group failed: " + ex.getMessage());
@@ -66,11 +78,43 @@ public final class LiveBus {
 	}
 
 	public CompletableFuture<Void> publishCaseUpdated(int caseId, int tenantId, int updatedByUserId) {
-		ensureReady();
-		String payload = "{\"event\":\"CaseUpdated\",\"caseId\":" + caseId
+		if (publishEndpointUrl == null || publishEndpointUrl.isBlank()) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+					"Missing LIVE_PUBLISH_ENDPOINT_URL for server-side publish endpoint"));
+		}
+
+		String body = "{\"caseId\":" + caseId
 				+ ",\"shaleClientId\":" + tenantId
 				+ ",\"updatedByUserId\":" + updatedByUserId + "}";
-		return wsClient.sendToGroup(groupName, payload, 2);
+		System.out.println("[LIVE] server publish requested: caseId=" + caseId
+				+ " clientId=" + tenantId
+				+ " updatedBy=" + updatedByUserId);
+
+		return CompletableFuture.supplyAsync(() ->
+		{
+			try {
+				HttpRequest.Builder builder = HttpRequest.newBuilder()
+						.uri(URI.create(publishEndpointUrl))
+						.timeout(Duration.ofSeconds(HTTP_TIMEOUT_SECS))
+						.header("Content-Type", "application/json")
+						.header("Accept", "application/json, text/plain; q=0.8")
+						.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+
+				String functionKey = System.getenv("FUNCTION_KEY");
+				if (functionKey != null && !functionKey.isBlank() && !publishEndpointUrl.contains("code=")) {
+					builder.header("x-functions-key", functionKey);
+				}
+
+				HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+				if (response.statusCode() / 100 != 2) {
+					throw new IllegalStateException("Live publish failed: HTTP " + response.statusCode()
+							+ " body=" + preview(response.body(), 200));
+				}
+				return null;
+			} catch (Exception ex) {
+				throw new RuntimeException(ex);
+			}
+		});
 	}
 
 	public void onEvent(Consumer<Event> listener) {
@@ -97,7 +141,7 @@ public final class LiveBus {
 			if (connId != null && !connId.isBlank()) {
 				connectionId = connId;
 			}
-			System.out.println("[LIVE] connected. userId=" + userId + ", clientId=" + shaleClientId + ", connectionId=" + (connectionId == null ? "?" : connectionId));
+			System.out.println("[LIVE] client connected: userId=" + userId + ", clientId=" + shaleClientId + ", connectionId=" + (connectionId == null ? "?" : connectionId));
 			return;
 		}
 
@@ -174,5 +218,12 @@ public final class LiveBus {
 		} catch (Exception e) {
 			return null;
 		}
+	}
+
+	private static String preview(String text, int maxChars) {
+		if (text == null)
+			return "<null>";
+		String compact = text.replaceAll("\\s+", " ");
+		return compact.substring(0, Math.min(maxChars, compact.length()));
 	}
 }
