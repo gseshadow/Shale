@@ -54,7 +54,12 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		}
 
 		try {
-			NegotiateClient negotiateClient = new NegotiateClient(negotiateEndpointUrl);
+			String base = negotiateEndpointUrl;
+			String negotiateUrl = base + (base.contains("?") ? "&" : "?")
+					+ "tenantId=" + shaleClientId
+					+ "&userId=" + userId;
+			System.out.println("NEGOTIATE URL: " + negotiateUrl);
+			NegotiateClient negotiateClient = new NegotiateClient(negotiateUrl);
 			LiveBus bus = new LiveBus(negotiateClient, shaleClientId, userId);
 			bus.onEvent(event ->
 			{
