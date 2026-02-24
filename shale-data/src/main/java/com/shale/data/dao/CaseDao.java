@@ -1,10 +1,12 @@
 package com.shale.data.dao;
 
 import java.sql.Connection;
+import java.sql.Timestamp;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -414,10 +416,110 @@ public final class CaseDao {
 		}
 	}
 
+	public com.shale.core.dto.CaseDetailDto getDetail(long caseId) {
+		try (Connection con = db.requireConnection()) {
+			return selectCaseDetail(con, caseId);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load case detail (caseId=" + caseId + ")", e);
+		}
+	}
+
+	private com.shale.core.dto.CaseDetailDto selectCaseDetail(Connection con, long caseId) throws SQLException {
+		String sql = """
+				SELECT
+				  c.Id,
+				  c.CaseNumber,
+				  c.Name,
+				  c.Description,
+				  c.UpdatedAt,
+				  c.RowVer,
+				  current_status.CurrentStatusName
+				FROM %s c
+				OUTER APPLY (
+				    SELECT TOP (1) s.Name AS CurrentStatusName
+				    FROM %s cs
+				    INNER JOIN %s s ON s.Id = cs.StatusId
+				    WHERE cs.CaseId = c.Id
+				    ORDER BY
+				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+				      cs.UpdatedAt DESC,
+				      cs.CreatedAt DESC,
+				      cs.Id DESC
+				) current_status
+				WHERE c.Id = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE);
+
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) {
+					return null;
+				}
+				return mapCaseDetail(rs);
+			}
+		}
+	}
+
+	private static com.shale.core.dto.CaseDetailDto mapCaseDetail(ResultSet rs) throws SQLException {
+		return new com.shale.core.dto.CaseDetailDto(
+				rs.getLong("Id"),
+				rs.getString("CaseNumber"),
+				rs.getString("Name"),
+				rs.getString("Description"),
+				rs.getString("CurrentStatusName"),
+				toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+				rs.getBytes("RowVer")
+		);
+	}
+
+	public com.shale.core.dto.CaseDetailDto updateCase(long caseId, String name, String description, byte[] expectedRowVer) {
+		if (expectedRowVer == null || expectedRowVer.length == 0) {
+			throw new IllegalArgumentException("expectedRowVer is required");
+		}
+
+		String sql = """
+				UPDATE %s
+				SET Name = ?,
+				    Description = ?,
+				    UpdatedAt = SYSDATETIME()
+				WHERE Id = ?
+				  AND RowVer = ?
+				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
+				""".formatted(CASES_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setString(1, name);
+			ps.setString(2, description);
+			ps.setLong(3, caseId);
+			ps.setBytes(4, expectedRowVer);
+
+			int rows = ps.executeUpdate();
+			if (rows == 0) {
+				return null;
+			}
+			if (rows == 1) {
+				com.shale.core.dto.CaseDetailDto updated = selectCaseDetail(con, caseId);
+				if (updated == null) {
+					throw new RuntimeException("Case updated but detail row was not found (caseId=" + caseId + ")");
+				}
+				return updated;
+			}
+			throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update case (caseId=" + caseId + ")", e);
+		}
+	}
+
 	// ---- helpers ----
 
 	private static LocalDate toLocalDate(java.sql.Date d) {
 		return d == null ? null : d.toLocalDate();
+	}
+
+	private static LocalDateTime toLocalDateTime(Timestamp ts) {
+		return ts == null ? null : ts.toLocalDateTime();
 	}
 
 	private static Integer getNullableInt(ResultSet rs, String col) throws SQLException {

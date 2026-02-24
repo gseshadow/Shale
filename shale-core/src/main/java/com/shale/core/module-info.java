@@ -6,6 +6,7 @@ module com.shale.core {
 	exports com.shale.core.result;
 	exports com.shale.core.util;
 	exports com.shale.core.runtime;
+	exports com.shale.core.dto;
 	
 	requires java.sql;
 

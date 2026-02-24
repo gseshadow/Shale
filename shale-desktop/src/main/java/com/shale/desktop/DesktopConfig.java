@@ -37,6 +37,9 @@ public final class DesktopConfig {
 
 		String appEnv = env.getOrDefault("APP_ENV", "dev");
 		String negotiateUrl = require(env, "NEGOTIATE_ENDPOINT_URL");
+		
+		
+		
 
 		// Let shale-data Config pull all DB settings from env/system properties
 		Config cfg = new Config();

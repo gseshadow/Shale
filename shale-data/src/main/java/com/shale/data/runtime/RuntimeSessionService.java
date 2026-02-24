@@ -25,25 +25,6 @@ public final class RuntimeSessionService {
 	public void initialize(int shaleClientId, int userId) {
 		this.shaleClientId = shaleClientId;
 		this.userId = userId;
-
-		// 🔑 Stamp ONE physical connection with read-only context
-		try (Connection c = runtimeDs.getConnection()) {
-
-			try (PreparedStatement ps = c.prepareStatement(
-					"EXEC sys.sp_set_session_context @key=N'ShaleClientId', @value=?, @read_only=1")) {
-				ps.setInt(1, shaleClientId);
-				ps.execute();
-			}
-
-			try (PreparedStatement ps = c.prepareStatement(
-					"EXEC sys.sp_set_session_context @key=N'PrincipalUserId', @value=?")) {
-				ps.setInt(1, userId);
-				ps.execute();
-			}
-
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to initialize runtime session context", e);
-		}
 	}
 
 	/** Convenience overload */
@@ -63,13 +44,26 @@ public final class RuntimeSessionService {
 		return shaleClientId > 0;
 	}
 
-	/**
-	 * Borrow a connection. Session context is already stamped.
-	 */
 	public Connection getConnection() throws SQLException {
 		if (!isInitialized()) {
 			throw new IllegalStateException("RuntimeSessionService not initialized.");
 		}
-		return runtimeDs.getConnection();
+
+		Connection c = runtimeDs.getConnection();
+
+		try (PreparedStatement ps = c.prepareStatement(
+				"EXEC sys.sp_set_session_context @key=N'ShaleClientId', @value=?")) {
+			ps.setInt(1, shaleClientId);
+			ps.execute();
+		}
+
+		try (PreparedStatement ps = c.prepareStatement(
+				"EXEC sys.sp_set_session_context @key=N'PrincipalUserId', @value=?")) {
+			ps.setInt(1, userId);
+			ps.execute();
+		}
+
+		return c;
 	}
+
 }

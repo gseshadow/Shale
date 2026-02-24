@@ -46,10 +46,7 @@ public final class LiveBusSmokeTest {
 		client.joinGroup(group, 1).join();
 		System.out.println("Joined group: " + group);
 
-		// send a test event to everyone in the group
-		client.sendToGroup(group,
-				"{\"event\":\"Ping\",\"fromUser\":" + userId + "}", 2).join();
-		System.out.println("Sent Ping");
+		System.out.println("Connected and joined. Trigger case updates through backend publish endpoint.");
 
 		Thread.sleep(60_000);
 

@@ -20,7 +20,7 @@ public final class MainApp extends Application {
 		AuthService authService = config.getAuthService();
 		LiveEventDispatcher dispatcher = new LiveEventDispatcher();
 
-		router = new SceneRouter(primaryStage, authService, dispatcher, config.runtimeService);
+		router = new SceneRouter(primaryStage, authService, dispatcher, config.runtimeService, config.negotiateEndpointUrl);
 
 		router.showLogin();
 	}

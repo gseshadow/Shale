@@ -4,19 +4,28 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 public final class LiveBus {
+	private static final int HTTP_TIMEOUT_SECS = 12;
 
 	public static final class Event {
 		public final String type;
-		public final int byUser;
-		public final Integer caseId; // nullable, depends on type
-		public final String raw; // raw JSON frame (for debugging)
+		public final int updatedByUserId;
+		public final Integer caseId;
+		public final Integer shaleClientId;
+		public final String raw;
 
-		public Event(String type, int byUser, Integer caseId, String raw) {
+		public Event(String type, int updatedByUserId, Integer caseId, Integer shaleClientId, String raw) {
 			this.type = type;
-			this.byUser = byUser;
+			this.updatedByUserId = updatedByUserId;
 			this.caseId = caseId;
+			this.shaleClientId = shaleClientId;
 			this.raw = raw;
 		}
 	}
@@ -24,20 +33,25 @@ public final class LiveBus {
 	private final NegotiateClient negotiate;
 	private final int shaleClientId;
 	private final int userId;
+	private final String publishEndpointUrl;
+	private final HttpClient http = HttpClient.newBuilder()
+			.connectTimeout(Duration.ofSeconds(HTTP_TIMEOUT_SECS))
+			.build();
 
 	private final CopyOnWriteArrayList<Consumer<Event>> listeners = new CopyOnWriteArrayList<>();
 	private volatile LiveBusClient wsClient;
 	private volatile String groupName;
+	private volatile String connectionId;
 
 	public LiveBus(NegotiateClient negotiate, int shaleClientId, int userId) {
 		this.negotiate = Objects.requireNonNull(negotiate);
 		this.shaleClientId = shaleClientId;
 		this.userId = userId;
+		this.publishEndpointUrl = System.getenv("LIVE_PUBLISH_ENDPOINT_URL");
 	}
 
-	/** Connects → joins tenant group. */
 	public CompletableFuture<Void> connectAndJoin() {
-		groupName = "tenant:" + shaleClientId;
+		groupName = "client-" + shaleClientId;
 		return CompletableFuture.supplyAsync(() ->
 		{
 			try {
@@ -49,83 +63,103 @@ public final class LiveBus {
 		{
 			wsClient = new LiveBusClient(new LiveBusClient.Handler() {
 				@Override
-				public void onOpen() {
-					/* no-op */ }
-
-				@Override
 				public void onMessage(String text) {
 					handleInbound(text);
 				}
-
-				@Override
-				public void onClosed(int code, String reason) {
-					/* could auto-reconnect later */ }
-
-				@Override
-				public void onError(Throwable error) {
-					/* log */ }
 			});
 			return wsClient.connect(wss);
-		}).thenCompose(ws -> wsClient.joinGroup(groupName, 1))
-				.thenAccept(v ->
+		}).thenCompose(ws -> wsClient.joinGroup(groupName, 1)
+				.thenRun(() -> System.out.println("[LIVE] group joined: " + groupName))
+				.exceptionally(ex ->
 				{
-					/* joined */ });
+					System.out.println("[LIVE] join group failed: " + ex.getMessage());
+					throw new RuntimeException(ex);
+				}));
 	}
 
-	/** Publish a "CaseUpdated" event to the tenant group. */
-	public CompletableFuture<Void> publishCaseUpdated(int caseId) {
-		ensureReady();
-		String payload = "{\"event\":\"CaseUpdated\",\"caseId\":" + caseId + ",\"by\":" + userId + "}";
-		return wsClient.sendToGroup(groupName, payload, 2);
+	public CompletableFuture<Void> publishCaseUpdated(int caseId, int tenantId, int updatedByUserId) {
+		if (publishEndpointUrl == null || publishEndpointUrl.isBlank()) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+					"Missing LIVE_PUBLISH_ENDPOINT_URL for server-side publish endpoint"));
+		}
+
+		String body = "{\"caseId\":" + caseId
+				+ ",\"shaleClientId\":" + tenantId
+				+ ",\"updatedByUserId\":" + updatedByUserId + "}";
+		System.out.println("[LIVE] LIVE_PUBLISH_ENDPOINT_URL:" + System.getenv("LIVE_PUBLISH_ENDPOINT_URL"));
+		System.out.println("[LIVE] server publish requested: caseId=" + caseId
+				+ " clientId=" + tenantId
+				+ " updatedBy=" + updatedByUserId);
+
+		HttpRequest.Builder builder = HttpRequest.newBuilder()
+				.uri(URI.create(publishEndpointUrl))
+				.timeout(Duration.ofSeconds(HTTP_TIMEOUT_SECS))
+				.header("Content-Type", "application/json")
+				.header("Accept", "application/json, text/plain; q=0.8")
+				.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+
+		String functionKey = System.getenv("FUNCTION_KEY");
+		if (functionKey != null && !functionKey.isBlank() && !publishEndpointUrl.contains("code=")) {
+			builder.header("x-functions-key", functionKey);
+		}
+
+		return http.sendAsync(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+				.thenAccept(response ->
+				{
+					if (response.statusCode() / 100 != 2) {
+						throw new IllegalStateException("Live publish failed: HTTP " + response.statusCode()
+								+ " body=" + preview(response.body(), 200));
+					}
+				});
 	}
 
-	/** Subscribe to inbound events. */
 	public void onEvent(Consumer<Event> listener) {
 		listeners.add(listener);
 	}
 
-	/** Stop (optional). */
 	public void shutdown() {
-		// Basic close: rely on GC or extend LiveBusClient to expose a close()
-	}
-
-	// ---- internal ----
-	private void ensureReady() {
-		if (wsClient == null || groupName == null) {
-			throw new IllegalStateException("LiveBus not connected. Call connectAndJoin() first.");
-		}
+		// no-op for now
 	}
 
 	private void handleInbound(String text) {
-		// Expect Azure frames. We care about: type=message, dataType=json, data={...}
-		// Minimal parse without pulling in a JSON lib:
-		// 1) Only process frames containing `"type":"message"` and `"dataType":"json"`
-		if (!(text.contains("\"type\":\"message\"") && text.contains("\"dataType\":\"json\"")))
-			return;
+		String raw = text == null ? "" : text;
+		String preview = raw.length() > 200 ? raw.substring(0, 200) : raw;
+		System.out.println("[LIVE RX RAW] " + preview);
 
-		// 2) Extract the inner data object (very small heuristic parse)
-		int i = text.indexOf("\"data\":");
+		if (raw.contains("\"type\":\"connected\"")) {
+			String connId = extractString(raw, "connectionId");
+			if (connId != null && !connId.isBlank()) {
+				connectionId = connId;
+			}
+			System.out.println("[LIVE] client connected: userId=" + userId + ", clientId=" + shaleClientId + ", connectionId=" + (connectionId == null ? "?" : connectionId));
+			return;
+		}
+
+		if (!(raw.contains("\"type\":\"message\"") && raw.contains("\"dataType\":\"json\"")))
+			return;
+		int i = raw.indexOf("\"data\":");
 		if (i < 0)
 			return;
-		String sub = text.substring(i + 7).trim();
-		// sub starts with { ... } maybe followed by }
+		String sub = raw.substring(i + 7).trim();
 		String dataJson = extractFirstJsonObject(sub);
 		if (dataJson == null)
 			return;
 
-		// 3) Pull fields we care about
 		String type = extractString(dataJson, "event");
 		Integer caseId = extractInt(dataJson, "caseId");
-		Integer by = extractInt(dataJson, "by");
-
+		Integer tenantId = extractInt(dataJson, "shaleClientId");
+		Integer by = extractInt(dataJson, "updatedByUserId");
+		if (by == null)
+			by = extractInt(dataJson, "by");
 		if (type == null || by == null)
 			return;
-		Event ev = new Event(type, by, caseId, text);
+
+		System.out.println("[LIVE RX] type=" + type + " caseId=" + caseId + " clientId=" + tenantId + " updatedBy=" + by);
+		Event ev = new Event(type, by, caseId, tenantId, raw);
 		for (var l : listeners)
 			l.accept(ev);
 	}
 
-	// --- tiny helpers (stringy JSON parse to avoid extra deps) ---
 	private static String extractFirstJsonObject(String s) {
 		int depth = 0, start = -1;
 		for (int idx = 0; idx < s.length(); idx++) {
@@ -174,5 +208,12 @@ public final class LiveBus {
 		} catch (Exception e) {
 			return null;
 		}
+	}
+
+	private static String preview(String text, int maxChars) {
+		if (text == null)
+			return "<null>";
+		String compact = text.replaceAll("\\s+", " ");
+		return compact.substring(0, Math.min(maxChars, compact.length()));
 	}
 }
