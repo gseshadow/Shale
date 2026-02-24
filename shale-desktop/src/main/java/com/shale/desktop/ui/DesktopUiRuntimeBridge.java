@@ -54,12 +54,13 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		}
 
 		try {
-			String base = negotiateEndpointUrl;
-			String negotiateUrl = base + (base.contains("?") ? "&" : "?")
-					+ "tenantId=" + shaleClientId
-					+ "&userId=" + userId;
-			System.out.println("NEGOTIATE URL: " + negotiateUrl);
-			NegotiateClient negotiateClient = new NegotiateClient(negotiateUrl);
+			// OPTION A: pass BASE negotiate endpoint only (include ?code=... if needed),
+			// do NOT append tenantId/userId here. NegotiateClient will append them.
+			String base = negotiateEndpointUrl.trim();
+			System.out.println("NEGOTIATE BASE URL: " + base);
+
+			NegotiateClient negotiateClient = new NegotiateClient(base);
+
 			LiveBus bus = new LiveBus(negotiateClient, shaleClientId, userId);
 			bus.onEvent(event ->
 			{
@@ -75,6 +76,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 					}
 				}
 			});
+
 			bus.connectAndJoin()
 					.whenComplete((ok, ex) ->
 					{
@@ -85,6 +87,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 						liveBus = bus;
 						System.out.println("LiveBus connected.");
 					});
+
 		} catch (Exception ex) {
 			System.out.println("LiveBus unavailable: " + ex.getMessage());
 		}

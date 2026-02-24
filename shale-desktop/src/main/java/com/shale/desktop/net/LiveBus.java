@@ -86,6 +86,7 @@ public final class LiveBus {
 		String body = "{\"caseId\":" + caseId
 				+ ",\"shaleClientId\":" + tenantId
 				+ ",\"updatedByUserId\":" + updatedByUserId + "}";
+		System.out.println("[LIVE] LIVE_PUBLISH_ENDPOINT_URL:" + System.getenv("LIVE_PUBLISH_ENDPOINT_URL"));
 		System.out.println("[LIVE] server publish requested: caseId=" + caseId
 				+ " clientId=" + tenantId
 				+ " updatedBy=" + updatedByUserId);
