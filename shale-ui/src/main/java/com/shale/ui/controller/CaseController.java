@@ -167,6 +167,14 @@ public class CaseController {
 			if (currentUserId != null && currentUserId.intValue() == event.updatedByUserId()) {
 				return;
 			}
+			if (event.newName() != null) {
+				runOnFx(() -> {
+					applyLiveCaseName(event.newName());
+					remoteDirty = false;
+					hideRemoteUpdateBanner();
+				});
+				return;
+			}
 			if (editMode) {
 				runOnFx(() -> {
 					remoteDirty = true;
@@ -174,8 +182,26 @@ public class CaseController {
 				});
 				return;
 			}
-			reloadCurrentCaseForViewMode();
+			runOnFx(() -> {
+				remoteDirty = true;
+				showRemoteUpdateBanner();
+			});
 		});
+	}
+
+	private void applyLiveCaseName(String newName) {
+		String safeName = safeText(newName).trim();
+		if (!safeName.isBlank()) {
+			if (ovCaseNameValue != null) {
+				ovCaseNameValue.setText(safeName);
+			}
+			if (current != null) {
+				String num = safeText(current.getCaseNumber());
+				if (caseTitleLabel != null) {
+					caseTitleLabel.setText(num.isBlank() ? safeName : safeName + " — " + num);
+				}
+			}
+		}
 	}
 
 	private void reloadCurrentCaseForViewMode() {
@@ -500,7 +526,7 @@ public class CaseController {
 					applyDetail(updated);
 					clearError();
 					setBusy(false);
-					publishCaseUpdated(saveCaseId);
+					publishCaseUpdated(saveCaseId, saveDraft.caseName());
 				});
 			} catch (Exception ex) {
 				runOnFx(() ->
@@ -512,13 +538,17 @@ public class CaseController {
 		}, "case-save-" + caseId).start();
 	}
 
-	private void publishCaseUpdated(long updatedCaseId) {
+	private void publishCaseUpdated(long updatedCaseId, String updatedName) {
 		if (runtimeBridge == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null) {
 			return;
 		}
 		try {
-			System.out.println("[LIVE] publish CaseUpdated caseId=" + updatedCaseId + ", clientId=" + appState.getShaleClientId() + ", updatedBy=" + appState.getUserId());
-			runtimeBridge.publishCaseUpdated((int) updatedCaseId, appState.getShaleClientId(), appState.getUserId());
+			System.out.println("[LIVE] publish CaseUpdated caseId=" + updatedCaseId + ", clientId=" + appState.getShaleClientId() + ", updatedBy=" + appState.getUserId() + ", namePatch=" + (updatedName != null));
+			if (updatedName != null) {
+				runtimeBridge.publishCaseNameUpdated((int) updatedCaseId, appState.getShaleClientId(), appState.getUserId(), updatedName);
+			} else {
+				runtimeBridge.publishCaseUpdated((int) updatedCaseId, appState.getShaleClientId(), appState.getUserId());
+			}
 		} catch (Exception ex) {
 			System.out.println("CaseUpdated publish skipped: " + ex.getMessage());
 		}

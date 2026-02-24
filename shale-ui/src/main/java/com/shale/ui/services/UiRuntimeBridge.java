@@ -15,6 +15,10 @@ public interface UiRuntimeBridge {
 		// Optional runtime capability. Desktop implementation provides this.
 	}
 
+	default void publishCaseNameUpdated(int caseId, int shaleClientId, int updatedByUserId, String newName) {
+		// Optional runtime capability. Desktop implementation provides this.
+	}
+
 	default void subscribeCaseUpdated(Consumer<CaseUpdatedEvent> handler) {
 		// Optional runtime capability. Desktop implementation provides this.
 	}
@@ -23,6 +27,6 @@ public interface UiRuntimeBridge {
 		// Optional runtime capability. Desktop implementation provides this.
 	}
 
-	record CaseUpdatedEvent(int caseId, int shaleClientId, int updatedByUserId) {
+	record CaseUpdatedEvent(int caseId, int shaleClientId, int updatedByUserId, String newName, String rawPatchJson) {
 	}
 }

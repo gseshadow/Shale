@@ -134,8 +134,27 @@ public final class CasesController {
 			if (userId != null && userId.intValue() == event.updatedByUserId()) {
 				return;
 			}
-		runOnFx(this::loadFirstPage);
+			if (event.newName() == null) {
+				System.out.println("[LIVE] Case update received without patch.name; skipping list reload for caseId=" + event.caseId());
+				return;
+			}
+			runOnFx(() -> applyLiveCaseNameUpdate(event.caseId(), event.newName()));
 		});
+	}
+
+	private void applyLiveCaseNameUpdate(int caseId, String newName) {
+		String safeName = safe(newName).trim();
+		if (safeName.isBlank()) {
+			return;
+		}
+		for (int i = 0; i < loaded.size(); i++) {
+			CaseCardVm vm = loaded.get(i);
+			if (vm.id == caseId) {
+				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.responsibleAttorney, vm.responsibleAttorneyColor));
+				rerender();
+				return;
+			}
+		}
 	}
 
 	private void wireInfiniteScroll() {
