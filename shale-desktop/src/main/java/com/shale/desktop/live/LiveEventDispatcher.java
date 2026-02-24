@@ -68,10 +68,24 @@ public final class LiveEventDispatcher {
 		if (q1 < 0) {
 			return null;
 		}
-		int q2 = patchRaw.indexOf('"', q1 + 1);
-		if (q2 < 0) {
+		int q2 = q1 + 1;
+		while (q2 < patchRaw.length()) {
+			if (patchRaw.charAt(q2) == '"' && patchRaw.charAt(q2 - 1) != '\\') {
+				break;
+			}
+			q2++;
+		}
+		if (q2 >= patchRaw.length()) {
 			return null;
 		}
-		return patchRaw.substring(q1 + 1, q2);
+		return unescapeJsonString(patchRaw.substring(q1 + 1, q2));
+	}
+
+	private static String unescapeJsonString(String value) {
+		return value
+				.replace("\\\"", "\"")
+				.replace("\\n", "\n")
+				.replace("\\r", "\r")
+				.replace("\\\\", "\\");
 	}
 }

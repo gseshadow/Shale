@@ -1,6 +1,5 @@
 package com.shale.desktop.ui;
 
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 import com.shale.data.runtime.RuntimeSessionService;

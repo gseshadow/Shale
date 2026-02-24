@@ -260,8 +260,26 @@ public final class LiveBus {
 	}
 
 	private static Long extractLong(String json, String key) {
-		Integer intValue = extractInt(json, key);
-		return intValue == null ? null : intValue.longValue();
+		String pat = "\"" + key + "\"";
+		int i = json.indexOf(pat);
+		if (i < 0)
+			return null;
+		int c = json.indexOf(':', i);
+		if (c < 0)
+			return null;
+		int j = c + 1;
+		while (j < json.length() && Character.isWhitespace(json.charAt(j)))
+			j++;
+		int k = j;
+		while (k < json.length() && "-0123456789".indexOf(json.charAt(k)) >= 0)
+			k++;
+		if (k == j)
+			return null;
+		try {
+			return Long.parseLong(json.substring(j, k));
+		} catch (Exception e) {
+			return null;
+		}
 	}
 
 	private static String extractObject(String json, String key) {
