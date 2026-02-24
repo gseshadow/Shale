@@ -19,7 +19,6 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private final LiveEventDispatcher dispatcher;
 	private final DesktopRuntimeSessionProvider dbProvider;
 	private final String negotiateEndpointUrl;
-	private final CopyOnWriteArrayList<Consumer<CaseUpdatedEvent>> caseUpdatedSubscribers = new CopyOnWriteArrayList<>();
 	private RuntimeSessionService runtimeSessionService;
 	private volatile LiveBus liveBus;
 
@@ -64,17 +63,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			LiveBus bus = new LiveBus(negotiateClient, shaleClientId, userId);
 			bus.onEvent(event ->
 			{
-				if (!"CaseUpdated".equals(event.type) || event.caseId == null) {
-					return;
-				}
-				int tenantId = event.shaleClientId == null ? shaleClientId : event.shaleClientId;
-				CaseUpdatedEvent dto = new CaseUpdatedEvent(event.caseId, tenantId, event.updatedByUserId);
-				for (var handler : caseUpdatedSubscribers) {
-					try {
-						handler.accept(dto);
-					} catch (Exception ignored) {
-					}
-				}
+				dispatcher.dispatch(event);
 			});
 
 			bus.connectAndJoin()
@@ -129,17 +118,30 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	}
 
 	@Override
-	public void subscribeCaseUpdated(Consumer<CaseUpdatedEvent> handler) {
-		if (handler != null) {
-			caseUpdatedSubscribers.add(handler);
+	public void publishCaseNameUpdated(int caseId, int shaleClientId, int updatedByUserId, String newName) {
+		LiveBus bus = liveBus;
+		if (bus == null) {
+			return;
 		}
+		bus.publishCaseNameUpdated(caseId, shaleClientId, updatedByUserId, newName)
+				.whenComplete((ok, ex) ->
+				{
+					if (ex != null) {
+						System.out.println("[LIVE] publish failed: " + ex.getMessage());
+						return;
+					}
+					System.out.println("[LIVE] publish ok");
+				});
+	}
+
+	@Override
+	public void subscribeCaseUpdated(Consumer<CaseUpdatedEvent> handler) {
+		dispatcher.subscribeCaseUpdated(handler);
 	}
 
 	@Override
 	public void unsubscribeCaseUpdated(Consumer<CaseUpdatedEvent> handler) {
-		if (handler != null) {
-			caseUpdatedSubscribers.remove(handler);
-		}
+		dispatcher.unsubscribeCaseUpdated(handler);
 	}
 
 	public void setRuntimeSessionService(RuntimeSessionService runtime) {

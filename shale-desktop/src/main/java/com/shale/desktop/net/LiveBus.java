@@ -1,6 +1,7 @@
 package com.shale.desktop.net;
 
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -10,25 +11,36 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class LiveBus {
 	private static final int HTTP_TIMEOUT_SECS = 12;
 
 	public static final class Event {
 		public final String type;
+		public final String entityType;
+		public final Long entityId;
 		public final int updatedByUserId;
-		public final Integer caseId;
 		public final Integer shaleClientId;
+		public final String patchRaw;
 		public final String raw;
 
-		public Event(String type, int updatedByUserId, Integer caseId, Integer shaleClientId, String raw) {
+		public Event(String type, String entityType, Long entityId, int updatedByUserId, Integer shaleClientId, String patchRaw, String raw) {
 			this.type = type;
+			this.entityType = entityType;
+			this.entityId = entityId;
 			this.updatedByUserId = updatedByUserId;
-			this.caseId = caseId;
 			this.shaleClientId = shaleClientId;
+			this.patchRaw = patchRaw;
 			this.raw = raw;
 		}
 	}
+
+	private static final Pattern JSON_KEY_PATTERN = Pattern.compile("\\\"([^\\\"]+)\\\"\\s*:");
 
 	private final NegotiateClient negotiate;
 	private final int shaleClientId;
@@ -78,17 +90,36 @@ public final class LiveBus {
 	}
 
 	public CompletableFuture<Void> publishCaseUpdated(int caseId, int tenantId, int updatedByUserId) {
+		return publishEntityUpdated("Case", caseId, tenantId, updatedByUserId, null);
+	}
+
+	public CompletableFuture<Void> publishCaseNameUpdated(int caseId, int shaleClientId, int updatedByUserId, String newName) {
+		String safeName = newName == null ? "" : escapeJson(newName);
+		String patchJson = "{\"name\":\"" + safeName + "\"}";
+		return publishEntityUpdated("Case", caseId, shaleClientId, updatedByUserId, patchJson);
+	}
+
+	public CompletableFuture<Void> publishEntityUpdated(String entityType, long entityId,
+			int shaleClientId, int updatedByUserId,
+			String patchJsonOrNull) {
 		if (publishEndpointUrl == null || publishEndpointUrl.isBlank()) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
 					"Missing LIVE_PUBLISH_ENDPOINT_URL for server-side publish endpoint"));
 		}
 
-		String body = "{\"caseId\":" + caseId
-				+ ",\"shaleClientId\":" + tenantId
-				+ ",\"updatedByUserId\":" + updatedByUserId + "}";
+		String body = "{\"eventId\":\"" + UUID.randomUUID() + "\""
+				+ ",\"type\":\"EntityUpdated\""
+				+ ",\"entityType\":\"" + escapeJson(entityType) + "\""
+				+ ",\"entityId\":" + entityId
+				+ ",\"shaleClientId\":" + shaleClientId
+				+ ",\"updatedByUserId\":" + updatedByUserId
+				+ ",\"timestamp\":\"" + Instant.now() + "\""
+				+ (patchJsonOrNull == null || patchJsonOrNull.isBlank() ? "" : ",\"patch\":" + patchJsonOrNull)
+				+ "}";
 		System.out.println("[LIVE] LIVE_PUBLISH_ENDPOINT_URL:" + System.getenv("LIVE_PUBLISH_ENDPOINT_URL"));
-		System.out.println("[LIVE] server publish requested: caseId=" + caseId
-				+ " clientId=" + tenantId
+		System.out.println("[LIVE] server publish requested: entityType=" + entityType
+				+ " entityId=" + entityId
+				+ " clientId=" + shaleClientId
 				+ " updatedBy=" + updatedByUserId);
 
 		HttpRequest.Builder builder = HttpRequest.newBuilder()
@@ -145,17 +176,35 @@ public final class LiveBus {
 		if (dataJson == null)
 			return;
 
-		String type = extractString(dataJson, "event");
-		Integer caseId = extractInt(dataJson, "caseId");
+		String type = null;
+		String entityType = null;
+		Long entityId = null;
+		String patchRaw = null;
+
+		String legacyType = extractString(dataJson, "event");
+		if ("CaseUpdated".equals(legacyType)) {
+			type = "EntityUpdated";
+			entityType = "Case";
+			Integer caseId = extractInt(dataJson, "caseId");
+			if (caseId != null) {
+				entityId = caseId.longValue();
+			}
+		} else {
+			type = extractString(dataJson, "type");
+			entityType = extractString(dataJson, "entityType");
+			entityId = extractLong(dataJson, "entityId");
+			patchRaw = extractObject(dataJson, "patch");
+		}
+
 		Integer tenantId = extractInt(dataJson, "shaleClientId");
 		Integer by = extractInt(dataJson, "updatedByUserId");
 		if (by == null)
 			by = extractInt(dataJson, "by");
-		if (type == null || by == null)
+		if (type == null || by == null || entityType == null || entityId == null)
 			return;
 
-		System.out.println("[LIVE RX] type=" + type + " caseId=" + caseId + " clientId=" + tenantId + " updatedBy=" + by);
-		Event ev = new Event(type, by, caseId, tenantId, raw);
+		System.out.println("[LIVE RX] type=" + type + " entityType=" + entityType + " entityId=" + entityId + " patchKeys=" + String.join(",", patchKeys(patchRaw)));
+		Event ev = new Event(type, entityType, entityId, by, tenantId, patchRaw, raw);
 		for (var l : listeners)
 			l.accept(ev);
 	}
@@ -208,6 +257,59 @@ public final class LiveBus {
 		} catch (Exception e) {
 			return null;
 		}
+	}
+
+	private static Long extractLong(String json, String key) {
+		Integer intValue = extractInt(json, key);
+		return intValue == null ? null : intValue.longValue();
+	}
+
+	private static String extractObject(String json, String key) {
+		String pat = "\"" + key + "\"";
+		int i = json.indexOf(pat);
+		if (i < 0)
+			return null;
+		int c = json.indexOf(':', i);
+		if (c < 0)
+			return null;
+		int j = c + 1;
+		while (j < json.length() && Character.isWhitespace(json.charAt(j)))
+			j++;
+		if (j >= json.length() || json.charAt(j) != '{')
+			return null;
+
+		int depth = 0;
+		for (int k = j; k < json.length(); k++) {
+			char ch = json.charAt(k);
+			if (ch == '{')
+				depth++;
+			else if (ch == '}') {
+				depth--;
+				if (depth == 0) {
+					return json.substring(j, k + 1);
+				}
+			}
+		}
+		return null;
+	}
+
+	private static List<String> patchKeys(String patchRaw) {
+		if (patchRaw == null || patchRaw.isBlank())
+			return List.of();
+		List<String> keys = new ArrayList<>();
+		Matcher m = JSON_KEY_PATTERN.matcher(patchRaw);
+		while (m.find()) {
+			keys.add(m.group(1));
+		}
+		return keys;
+	}
+
+	private static String escapeJson(String value) {
+		return value
+				.replace("\\", "\\\\")
+				.replace("\"", "\\\"")
+				.replace("\n", "\\n")
+				.replace("\r", "\\r");
 	}
 
 	private static String preview(String text, int maxChars) {
