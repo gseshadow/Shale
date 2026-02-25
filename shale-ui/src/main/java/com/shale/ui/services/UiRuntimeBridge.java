@@ -48,6 +48,10 @@ public interface UiRuntimeBridge {
 	default void unsubscribeCaseUpdated(Consumer<CaseUpdatedEvent> handler) {
 	}
 
+	default String getClientInstanceId() {
+		return "";
+	}
+
 	/**
 	 * Generic event all controllers can use. patchRaw is the original JSON string (useful for
 	 * logging/debug). patch is the parsed version (may be empty if absent or parse failed).
@@ -69,7 +73,14 @@ public interface UiRuntimeBridge {
 	 * Back-compat event used by existing controllers. rawPatchJson is the patch object JSON
 	 * string, not the whole event.
 	 */
-	record CaseUpdatedEvent(int caseId, int shaleClientId, int updatedByUserId, String newName, String rawPatchJson) {
+	record CaseUpdatedEvent(
+			int caseId,
+			int shaleClientId,
+			int updatedByUserId,
+			String newName,
+			String rawPatchJson,
+			String clientInstanceId
+	) {
 	}
 
 	// --- tiny JSON helper (enough for string/number/bool/null)

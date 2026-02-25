@@ -140,4 +140,10 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	public void setRuntimeSessionService(RuntimeSessionService runtime) {
 		this.runtimeSessionService = runtime;
 	}
+
+	@Override
+	public String getClientInstanceId() {
+		LiveBus bus = liveBus;
+		return bus == null ? "" : bus.getClientInstanceId();
+	}
 }

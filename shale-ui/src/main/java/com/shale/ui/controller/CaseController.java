@@ -167,9 +167,9 @@ public class CaseController {
 			// IMPORTANT: Don't filter by userId long-term (same user on another machine should still
 			// update).
 			// Keeping your existing behavior for now:
-			Integer currentUserId = appState == null ? null : appState.getUserId();
-			if (currentUserId != null && currentUserId.intValue() == event.updatedByUserId()) {
-				return;
+			String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+			if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
+				return; // ignore only my own echo
 			}
 
 			// Legacy/newName-only event

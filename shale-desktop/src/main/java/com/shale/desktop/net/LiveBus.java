@@ -32,20 +32,24 @@ public final class LiveBus {
 		public final Integer shaleClientId;
 		public final String patchRaw;
 		public final String raw;
+		public final String clientInstanceId;
 
 		public Event(int schemaVersion, String eventId, String timestamp,
 				String type, String entityType, Long entityId,
 				int updatedByUserId, Integer shaleClientId,
-				String patchRaw, String raw) {
+				String patchRaw, String clientInstanceId, String raw) {
+
 			this.schemaVersion = schemaVersion;
 			this.eventId = eventId;
 			this.timestamp = timestamp;
+
 			this.type = type;
 			this.entityType = entityType;
 			this.entityId = entityId;
 			this.updatedByUserId = updatedByUserId;
 			this.shaleClientId = shaleClientId;
 			this.patchRaw = patchRaw;
+			this.clientInstanceId = (clientInstanceId == null ? "" : clientInstanceId);
 			this.raw = raw;
 		}
 	}
@@ -125,6 +129,8 @@ public final class LiveBus {
 				+ ",\"entityId\":" + entityId
 				+ ",\"shaleClientId\":" + shaleClientId
 				+ ",\"updatedByUserId\":" + updatedByUserId
+				+ ",\"updatedByUserId\":" + updatedByUserId
+				+ ",\"clientInstanceId\":\"" + clientInstanceId + "\""
 				+ ",\"timestamp\":\"" + Instant.now() + "\""
 				+ (patchJsonOrNull == null || patchJsonOrNull.isBlank() ? "" : ",\"patch\":" + patchJsonOrNull)
 				+ "}";
@@ -196,7 +202,10 @@ public final class LiveBus {
 		int schemaVersion = (schemaVersionBoxed == null ? 1 : schemaVersionBoxed.intValue());
 		String eventId = extractString(dataJson, "eventId");
 		String timestamp = extractString(dataJson, "timestamp");
+		String inboundClientInstanceId = extractString(dataJson, "clientInstanceId");
 
+		if (inboundClientInstanceId == null)
+			inboundClientInstanceId = "";
 		if (eventId == null)
 			eventId = "";
 		if (timestamp == null)
@@ -226,7 +235,7 @@ public final class LiveBus {
 
 		System.out.println("[LIVE RX] type=" + type + " entityType=" + entityType + " entityId=" + entityId + " patchKeys=" + String.join(",", patchKeys(patchRaw)));
 		Event ev = new Event(schemaVersion, eventId, timestamp,
-				type, entityType, entityId, by, tenantId, patchRaw, raw);
+				type, entityType, entityId, by, tenantId, patchRaw, inboundClientInstanceId, raw);
 		for (var l : listeners)
 			l.accept(ev);
 	}
