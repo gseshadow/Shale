@@ -167,22 +167,51 @@ public class CaseController {
 			if (currentUserId != null && currentUserId.intValue() == event.updatedByUserId()) {
 				return;
 			}
+
+			// If we got a legacy/newName-only event, apply immediately.
 			if (event.newName() != null) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					applyLiveCaseName(event.newName());
 					remoteDirty = false;
 					hideRemoteUpdateBanner();
 				});
 				return;
 			}
+
+			// If we got a patch, try to apply it (name/description supported).
+			String rawPatch = event.rawPatchJson();
+			String patchedName = extractPatchString(rawPatch, "name");
+			String patchedDescription = extractPatchString(rawPatch, "description");
+
+			if ((patchedName != null || patchedDescription != null) && !editMode) {
+				runOnFx(() ->
+				{
+					if (patchedName != null) {
+						applyLiveCaseName(patchedName);
+					}
+					if (patchedDescription != null) {
+						applyLiveCaseDescription(patchedDescription);
+					}
+					remoteDirty = false;
+					hideRemoteUpdateBanner();
+				});
+				return;
+			}
+
+			// If we're editing, don't clobber local edits; show the banner.
 			if (editMode) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					remoteDirty = true;
 					showRemoteUpdateBanner();
 				});
 				return;
 			}
-			runOnFx(() -> {
+
+			// Otherwise show banner (unknown patch keys or no patch)
+			runOnFx(() ->
+			{
 				remoteDirty = true;
 				showRemoteUpdateBanner();
 			});
@@ -201,6 +230,13 @@ public class CaseController {
 					caseTitleLabel.setText(num.isBlank() ? safeName : safeName + " — " + num);
 				}
 			}
+		}
+	}
+
+	private void applyLiveCaseDescription(String newDescription) {
+		String safeDesc = safeText(newDescription);
+		if (ovDescriptionValue != null) {
+			ovDescriptionValue.setText(safeDesc);
 		}
 	}
 
@@ -304,7 +340,8 @@ public class CaseController {
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
 		if (tasksTabListView != null && tasksTabListView.getItems().isEmpty()) {
-			tasksTabListView.getItems().setAll("Call client (placeholder)", "Request records (placeholder)", "Review radiology (placeholder)", "Draft demand (placeholder)", "Schedule depo (placeholder)");
+			tasksTabListView.getItems().setAll("Call client (placeholder)", "Request records (placeholder)", "Review radiology (placeholder)",
+					"Draft demand (placeholder)", "Schedule depo (placeholder)");
 		}
 	}
 
@@ -322,14 +359,17 @@ public class CaseController {
 
 	private void setupOverviewTasksPanel() {
 		if (taskListView != null) {
-			taskListView.getItems().setAll("Past due: Call client (placeholder)", "Upcoming: Request records (placeholder)", "Upcoming: Review radiology (placeholder)", "Upcoming: Send HIPAA auth (placeholder)", "Upcoming: Draft demand outline (placeholder)");
+			taskListView.getItems().setAll("Past due: Call client (placeholder)", "Upcoming: Request records (placeholder)",
+					"Upcoming: Review radiology (placeholder)", "Upcoming: Send HIPAA auth (placeholder)", "Upcoming: Draft demand outline (placeholder)");
 		}
 		if (taskSearchField != null) {
-			taskSearchField.setOnAction(e -> {
+			taskSearchField.setOnAction(e ->
+			{
 			});
 		}
 		if (newTaskInlineButton != null) {
-			newTaskInlineButton.setOnAction(e -> {
+			newTaskInlineButton.setOnAction(e ->
+			{
 			});
 		}
 	}
@@ -492,16 +532,24 @@ public class CaseController {
 		if (ovCaseNameEditor == null || ovDescriptionEditor == null) {
 			return;
 		}
+
+		// Capture "before" values so we can publish per-field changes after save
+		final String oldName = safeText(current.getCaseName()).trim();
+		final String oldDescription = safeText(current.getDescription());
+
 		String name = safeText(ovCaseNameEditor.getText()).trim();
 		String description = safeText(ovDescriptionEditor.getText());
+
 		if (name.isEmpty()) {
 			showError("Case Name is required.");
 			return;
 		}
+
 		draft = new CaseEditModel(name, description);
 		final CaseEditModel saveDraft = draft;
 		final byte[] expectedRowVer = current.getRowVer();
 		final long saveCaseId = caseId.longValue();
+
 		setBusy(true);
 		clearError();
 
@@ -518,6 +566,7 @@ public class CaseController {
 						setBusy(false);
 						return;
 					}
+
 					current = updated;
 					setEditMode(false);
 					draft = null;
@@ -526,7 +575,17 @@ public class CaseController {
 					applyDetail(updated);
 					clearError();
 					setBusy(false);
-					publishCaseUpdated(saveCaseId, saveDraft.caseName());
+
+					// Publish separate live events for each field that changed
+					String newName = safeText(saveDraft.caseName()).trim();
+					String newDesc = safeText(saveDraft.description());
+
+					if (!newName.equals(oldName)) {
+						publishCaseFieldUpdated(saveCaseId, "name", newName);
+					}
+					if (!newDesc.equals(oldDescription)) {
+						publishCaseFieldUpdated(saveCaseId, "description", newDesc);
+					}
 				});
 			} catch (Exception ex) {
 				runOnFx(() ->
@@ -538,17 +597,31 @@ public class CaseController {
 		}, "case-save-" + caseId).start();
 	}
 
-	private void publishCaseUpdated(long updatedCaseId, String updatedName) {
-		if (runtimeBridge == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null) {
+	private void publishCaseFieldUpdated(long caseId, String field, Object newValueOrNull) {
+		if (runtimeBridge == null || appState == null
+				|| appState.getShaleClientId() == null
+				|| appState.getUserId() == null) {
 			return;
 		}
+
 		try {
-			System.out.println("[LIVE] publish CaseUpdated caseId=" + updatedCaseId + ", clientId=" + appState.getShaleClientId() + ", updatedBy=" + appState.getUserId() + ", namePatch=" + (updatedName != null));
-			if (updatedName != null) {
-				runtimeBridge.publishCaseNameUpdated((int) updatedCaseId, appState.getShaleClientId(), appState.getUserId(), updatedName);
-			} else {
-				runtimeBridge.publishCaseUpdated((int) updatedCaseId, appState.getShaleClientId(), appState.getUserId());
-			}
+			int clientId = appState.getShaleClientId();
+			int userId = appState.getUserId();
+
+			System.out.println("[LIVE] publish Case field update caseId=" + caseId
+					+ " clientId=" + clientId
+					+ " updatedBy=" + userId
+					+ " field=" + field
+					+ " hasValue=" + (newValueOrNull != null));
+
+			runtimeBridge.publishEntityFieldUpdated(
+					"Case",
+					(int) caseId,
+					clientId,
+					userId,
+					field,
+					newValueOrNull
+			);
 		} catch (Exception ex) {
 			System.out.println("CaseUpdated publish skipped: " + ex.getMessage());
 		}
@@ -659,5 +732,35 @@ public class CaseController {
 	}
 
 	private record CaseEditModel(String caseName, String description) {
+	}
+
+	/**
+	 * Minimal patch reader for {"name":"...","description":"..."} style patch. Supports
+	 * string values; returns null if missing or malformed.
+	 */
+	private static String extractPatchString(String rawPatchJson, String key) {
+		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank()) {
+			return null;
+		}
+		// crude but effective for your current patch format
+		String needle = "\"" + key + "\"";
+		int k = rawPatchJson.indexOf(needle);
+		if (k < 0)
+			return null;
+
+		int colon = rawPatchJson.indexOf(':', k + needle.length());
+		if (colon < 0)
+			return null;
+
+		int firstQuote = rawPatchJson.indexOf('"', colon + 1);
+		if (firstQuote < 0)
+			return null;
+
+		int secondQuote = rawPatchJson.indexOf('"', firstQuote + 1);
+		if (secondQuote < 0)
+			return null;
+
+		// NOTE: this does not fully unescape JSON sequences; good enough for now
+		return rawPatchJson.substring(firstQuote + 1, secondQuote);
 	}
 }

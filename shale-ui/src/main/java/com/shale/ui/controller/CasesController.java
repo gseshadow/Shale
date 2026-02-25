@@ -134,12 +134,100 @@ public final class CasesController {
 			if (userId != null && userId.intValue() == event.updatedByUserId()) {
 				return;
 			}
-			if (event.newName() == null) {
-				System.out.println("[LIVE] Case update received without patch.name; skipping list reload for caseId=" + event.caseId());
+
+			// 1) Legacy support (newName-only)
+			if (event.newName() != null) {
+				runOnFx(() ->
+				{
+					boolean changed = applyCasePatchToList(event.caseId(), "name", event.newName());
+					if (changed)
+						rerender();
+				});
 				return;
 			}
-			runOnFx(() -> applyLiveCaseNameUpdate(event.caseId(), event.newName()));
+
+			// 2) Patch-based updates (generic)
+			String rawPatch = event.rawPatchJson();
+			if (rawPatch == null || rawPatch.isBlank()) {
+				return;
+			}
+
+			// Decide which fields the CASE LIST cares about.
+			// For now: only name. Later you can add "responsibleAttorney",
+			// "responsibleAttorneyColor", etc.
+			String patchedName = extractPatchString(rawPatch, "name");
+
+			if (patchedName == null) {
+				// Not an error anymore; just irrelevant to this list.
+				System.out.println("[LIVE] Case update patch had no list-relevant fields; skipping list update for caseId=" + event.caseId());
+				return;
+			}
+
+			runOnFx(() ->
+			{
+				boolean changed = applyCasePatchToList(event.caseId(), "name", patchedName);
+				if (changed)
+					rerender();
+			});
 		});
+	}
+
+	/**
+	 * Apply a single field patch to the loaded list VM. Returns true if it changed anything.
+	 */
+	private boolean applyCasePatchToList(int caseId, String field, String newValue) {
+		if (newValue == null)
+			return false;
+
+		String safeVal = safe(newValue).trim();
+		if (safeVal.isBlank())
+			return false;
+
+		for (int i = 0; i < loaded.size(); i++) {
+			CaseCardVm vm = loaded.get(i);
+			if (vm.id == caseId) {
+
+				// Only update what this list actually shows
+				if ("name".equals(field)) {
+					if (safeVal.equals(vm.name)) {
+						return false; // no change
+					}
+					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.responsibleAttorney, vm.responsibleAttorneyColor));
+					return true;
+				}
+
+				return false;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Minimal patch reader for {"name":"...","description":"..."} style patch. Supports
+	 * string values; returns null if missing or malformed.
+	 */
+	private static String extractPatchString(String rawPatchJson, String key) {
+		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank()) {
+			return null;
+		}
+		String needle = "\"" + key + "\"";
+		int k = rawPatchJson.indexOf(needle);
+		if (k < 0)
+			return null;
+
+		int colon = rawPatchJson.indexOf(':', k + needle.length());
+		if (colon < 0)
+			return null;
+
+		int firstQuote = rawPatchJson.indexOf('"', colon + 1);
+		if (firstQuote < 0)
+			return null;
+
+		int secondQuote = rawPatchJson.indexOf('"', firstQuote + 1);
+		if (secondQuote < 0)
+			return null;
+
+		return rawPatchJson.substring(firstQuote + 1, secondQuote);
 	}
 
 	private void applyLiveCaseNameUpdate(int caseId, String newName) {
@@ -365,7 +453,6 @@ public final class CasesController {
 				vm.responsibleAttorneyColor
 		));
 	}
-
 
 	private static void runOnFx(Runnable runnable) {
 		if (Platform.isFxApplicationThread()) {

@@ -18,6 +18,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private final LiveEventDispatcher dispatcher;
 	private final DesktopRuntimeSessionProvider dbProvider;
 	private final String negotiateEndpointUrl;
+
 	private RuntimeSessionService runtimeSessionService;
 	private volatile LiveBus liveBus;
 
@@ -52,18 +53,13 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		}
 
 		try {
-			// OPTION A: pass BASE negotiate endpoint only (include ?code=... if needed),
-			// do NOT append tenantId/userId here. NegotiateClient will append them.
 			String base = negotiateEndpointUrl.trim();
 			System.out.println("NEGOTIATE BASE URL: " + base);
 
 			NegotiateClient negotiateClient = new NegotiateClient(base);
 
 			LiveBus bus = new LiveBus(negotiateClient, shaleClientId, userId);
-			bus.onEvent(event ->
-			{
-				dispatcher.dispatch(event);
-			});
+			bus.onEvent(dispatcher::dispatch);
 
 			bus.connectAndJoin()
 					.whenComplete((ok, ex) ->
@@ -83,46 +79,44 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	@Override
 	public void onLogout() {
-		// 1) stop live bus
 		LiveBus bus = liveBus;
 		liveBus = null;
 		if (bus != null) {
 			bus.shutdown();
 		}
 
-		// 2) clear runtime session wiring
-		dbProvider.clear(); // <-- add this (implement clear() if you haven't)
+		dbProvider.clear();
 		if (runtimeSessionService != null) {
-			runtimeSessionService.clear(); // <-- add this (you implement clear() in RuntimeSessionService)
+			runtimeSessionService.clear();
 		}
 
 		System.out.println("Logout requested");
 	}
 
+	// --- Back-compat wrappers now route through the generic API ---
+
 	@Override
 	public void publishCaseUpdated(int caseId, int shaleClientId, int updatedByUserId) {
-		LiveBus bus = liveBus;
-		if (bus == null) {
-			return;
-		}
-		bus.publishCaseUpdated(caseId, shaleClientId, updatedByUserId)
-				.whenComplete((ok, ex) ->
-				{
-					if (ex != null) {
-						System.out.println("[LIVE] publish failed: " + ex.getMessage());
-						return;
-					}
-					System.out.println("[LIVE] publish ok");
-				});
+		publishEntityUpdated("Case", caseId, shaleClientId, updatedByUserId, null);
 	}
 
 	@Override
 	public void publishCaseNameUpdated(int caseId, int shaleClientId, int updatedByUserId, String newName) {
+		// Requires UiRuntimeBridge default method publishEntityFieldUpdated(...)
+		publishEntityFieldUpdated("Case", caseId, shaleClientId, updatedByUserId, "name", newName);
+	}
+
+	@Override
+	public void publishEntityUpdated(String entityType, long entityId,
+			int shaleClientId, int updatedByUserId,
+			String patchJsonOrNull) {
+
 		LiveBus bus = liveBus;
 		if (bus == null) {
 			return;
 		}
-		bus.publishCaseNameUpdated(caseId, shaleClientId, updatedByUserId, newName)
+
+		bus.publishEntityUpdated(entityType, entityId, shaleClientId, updatedByUserId, patchJsonOrNull)
 				.whenComplete((ok, ex) ->
 				{
 					if (ex != null) {
