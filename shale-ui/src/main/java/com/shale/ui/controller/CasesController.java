@@ -128,9 +128,16 @@ public final class CasesController {
 		if (runtimeBridge == null) {
 			return;
 		}
+
 		runtimeBridge.subscribeCaseUpdated(event ->
 		{
 			Integer userId = appState == null ? null : appState.getUserId();
+
+			System.out.println("[DEBUG LIVE] CASES listenerUserId=" + (appState == null ? null : appState.getUserId())
+					+ " event.updatedByUserId=" + event.updatedByUserId()
+					+ " caseId=" + event.caseId()
+					+ " newName=" + (event.newName() != null)
+					+ " patchLen=" + (event.rawPatchJson() == null ? 0 : event.rawPatchJson().length()));
 			if (userId != null && userId.intValue() == event.updatedByUserId()) {
 				return;
 			}
