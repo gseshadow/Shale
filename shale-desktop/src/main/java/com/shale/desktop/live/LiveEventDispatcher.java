@@ -15,7 +15,8 @@ import com.shale.ui.services.UiRuntimeBridge.EntityUpdatedEvent;
 public final class LiveEventDispatcher {
 
 	private static final Gson GSON = new Gson();
-	private static final java.lang.reflect.Type MAP_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
+	private static final java.lang.reflect.Type MAP_TYPE = new TypeToken<Map<String, Object>>() {
+	}.getType();
 
 	private final List<Consumer<String>> subscribers = new CopyOnWriteArrayList<>();
 
@@ -26,11 +27,13 @@ public final class LiveEventDispatcher {
 	private final List<Consumer<EntityUpdatedEvent>> entityUpdatedSubscribers = new CopyOnWriteArrayList<>();
 
 	public void subscribe(Consumer<String> handler) {
-		if (handler != null) subscribers.add(handler);
+		if (handler != null)
+			subscribers.add(handler);
 	}
 
 	public void unsubscribe(Consumer<String> handler) {
-		if (handler != null) subscribers.remove(handler);
+		if (handler != null)
+			subscribers.remove(handler);
 	}
 
 	public void onMessageReceived(String message) {
@@ -43,26 +46,34 @@ public final class LiveEventDispatcher {
 	}
 
 	public void subscribeCaseUpdated(Consumer<CaseUpdatedEvent> handler) {
-		if (handler != null) caseUpdatedSubscribers.add(handler);
+		if (handler != null)
+			caseUpdatedSubscribers.add(handler);
 	}
 
 	public void unsubscribeCaseUpdated(Consumer<CaseUpdatedEvent> handler) {
-		if (handler != null) caseUpdatedSubscribers.remove(handler);
+		if (handler != null)
+			caseUpdatedSubscribers.remove(handler);
 	}
 
 	public void subscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
-		if (handler != null) entityUpdatedSubscribers.add(handler);
+		if (handler != null)
+			entityUpdatedSubscribers.add(handler);
 	}
 
 	public void unsubscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
-		if (handler != null) entityUpdatedSubscribers.remove(handler);
+		if (handler != null)
+			entityUpdatedSubscribers.remove(handler);
 	}
 
 	public void dispatch(LiveBus.Event event) {
-		if (event == null) return;
-		if (!"EntityUpdated".equals(event.type)) return;
-		if (event.entityType == null || event.entityType.isBlank()) return;
-		if (event.entityId == null) return;
+		if (event == null)
+			return;
+		if (!"EntityUpdated".equals(event.type))
+			return;
+		if (event.entityType == null || event.entityType.isBlank())
+			return;
+		if (event.entityId == null)
+			return;
 
 		int schemaVersion = event.schemaVersion <= 0 ? 1 : event.schemaVersion;
 		String eventId = event.eventId == null ? "" : event.eventId;
@@ -99,7 +110,8 @@ public final class LiveEventDispatcher {
 					tenantId,
 					event.updatedByUserId,
 					newName,
-					event.patchRaw
+					event.patchRaw,
+					event.clientInstanceId // NEW
 			);
 
 			for (var handler : caseUpdatedSubscribers) {

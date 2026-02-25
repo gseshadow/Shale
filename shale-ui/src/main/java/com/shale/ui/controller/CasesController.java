@@ -131,15 +131,18 @@ public final class CasesController {
 
 		runtimeBridge.subscribeCaseUpdated(event ->
 		{
-			Integer userId = appState == null ? null : appState.getUserId();
+			String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
 
 			System.out.println("[DEBUG LIVE] CASES listenerUserId=" + (appState == null ? null : appState.getUserId())
 					+ " event.updatedByUserId=" + event.updatedByUserId()
 					+ " caseId=" + event.caseId()
 					+ " newName=" + (event.newName() != null)
-					+ " patchLen=" + (event.rawPatchJson() == null ? 0 : event.rawPatchJson().length()));
-			if (userId != null && userId.intValue() == event.updatedByUserId()) {
-				return;
+					+ " patchLen=" + (event.rawPatchJson() == null ? 0 : event.rawPatchJson().length())
+					+ " mineInstance=" + mine
+					+ " eventInstance=" + event.clientInstanceId());
+
+			if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
+				return; // ignore only my own echo
 			}
 
 			// 1) Legacy support (newName-only)
