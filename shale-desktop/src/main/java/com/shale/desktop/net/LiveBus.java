@@ -21,6 +21,10 @@ public final class LiveBus {
 	private static final int HTTP_TIMEOUT_SECS = 12;
 
 	public static final class Event {
+		public final int schemaVersion;
+		public final String eventId;
+		public final String timestamp;
+
 		public final String type;
 		public final String entityType;
 		public final Long entityId;
@@ -29,7 +33,13 @@ public final class LiveBus {
 		public final String patchRaw;
 		public final String raw;
 
-		public Event(String type, String entityType, Long entityId, int updatedByUserId, Integer shaleClientId, String patchRaw, String raw) {
+		public Event(int schemaVersion, String eventId, String timestamp,
+				String type, String entityType, Long entityId,
+				int updatedByUserId, Integer shaleClientId,
+				String patchRaw, String raw) {
+			this.schemaVersion = schemaVersion;
+			this.eventId = eventId;
+			this.timestamp = timestamp;
 			this.type = type;
 			this.entityType = entityType;
 			this.entityId = entityId;
@@ -54,6 +64,8 @@ public final class LiveBus {
 	private volatile LiveBusClient wsClient;
 	private volatile String groupName;
 	private volatile String connectionId;
+
+	private final String clientInstanceId = UUID.randomUUID().toString();
 
 	public LiveBus(NegotiateClient negotiate, int shaleClientId, int userId) {
 		this.negotiate = Objects.requireNonNull(negotiate);
@@ -180,6 +192,15 @@ public final class LiveBus {
 		String entityType = null;
 		Long entityId = null;
 		String patchRaw = null;
+		Integer schemaVersionBoxed = extractInt(dataJson, "schemaVersion");
+		int schemaVersion = (schemaVersionBoxed == null ? 1 : schemaVersionBoxed.intValue());
+		String eventId = extractString(dataJson, "eventId");
+		String timestamp = extractString(dataJson, "timestamp");
+
+		if (eventId == null)
+			eventId = "";
+		if (timestamp == null)
+			timestamp = "";
 
 		String legacyType = extractString(dataJson, "event");
 		if ("CaseUpdated".equals(legacyType)) {
@@ -204,7 +225,8 @@ public final class LiveBus {
 			return;
 
 		System.out.println("[LIVE RX] type=" + type + " entityType=" + entityType + " entityId=" + entityId + " patchKeys=" + String.join(",", patchKeys(patchRaw)));
-		Event ev = new Event(type, entityType, entityId, by, tenantId, patchRaw, raw);
+		Event ev = new Event(schemaVersion, eventId, timestamp,
+				type, entityType, entityId, by, tenantId, patchRaw, raw);
 		for (var l : listeners)
 			l.accept(ev);
 	}
@@ -335,5 +357,9 @@ public final class LiveBus {
 			return "<null>";
 		String compact = text.replaceAll("\\s+", " ");
 		return compact.substring(0, Math.min(maxChars, compact.length()));
+	}
+
+	public String getClientInstanceId() {
+		return clientInstanceId;
 	}
 }

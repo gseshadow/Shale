@@ -163,41 +163,39 @@ public class CaseController {
 			if (caseId == null || event.caseId() != caseId.intValue()) {
 				return;
 			}
+
+			// IMPORTANT: Don't filter by userId long-term (same user on another machine should still
+			// update).
+			// Keeping your existing behavior for now:
 			Integer currentUserId = appState == null ? null : appState.getUserId();
 			if (currentUserId != null && currentUserId.intValue() == event.updatedByUserId()) {
 				return;
 			}
 
-			// If we got a legacy/newName-only event, apply immediately.
+			// Legacy/newName-only event
 			if (event.newName() != null) {
 				runOnFx(() ->
 				{
 					applyLiveCaseName(event.newName());
 					remoteDirty = false;
 					hideRemoteUpdateBanner();
+
+					// Refresh rowVer/current so next Save doesn't conflict
+					refreshCurrentAfterRemoteUpdateAsync();
 				});
 				return;
 			}
 
-			// If we got a patch, try to apply it (name/description supported).
+			// Patch-based event
 			String rawPatch = event.rawPatchJson();
 			String patchedName = extractPatchString(rawPatch, "name");
 			String patchedDescription = extractPatchString(rawPatch, "description");
 
-			if ((patchedName != null || patchedDescription != null) && !editMode) {
-				runOnFx(() ->
-				{
-					if (patchedName != null) {
-						applyLiveCaseName(patchedName);
-					}
-					if (patchedDescription != null) {
-						applyLiveCaseDescription(patchedDescription);
-					}
-					remoteDirty = false;
-					hideRemoteUpdateBanner();
-				});
-				return;
-			}
+			System.out.println("[DEBUG LIVE] CASE listenerUserId=" + (appState == null ? null : appState.getUserId())
+					+ " event.updatedByUserId=" + event.updatedByUserId()
+					+ " caseId=" + event.caseId()
+					+ " newName=" + (event.newName() != null)
+					+ " patchLen=" + (event.rawPatchJson() == null ? 0 : event.rawPatchJson().length()));
 
 			// If we're editing, don't clobber local edits; show the banner.
 			if (editMode) {
@@ -209,6 +207,26 @@ public class CaseController {
 				return;
 			}
 
+			// If we can apply the patch, do it and refresh current/rowVer
+			if (patchedName != null || patchedDescription != null) {
+				runOnFx(() ->
+				{
+					if (patchedName != null) {
+						applyLiveCaseName(patchedName);
+					}
+					if (patchedDescription != null) {
+						applyLiveCaseDescription(patchedDescription);
+					}
+
+					remoteDirty = false;
+					hideRemoteUpdateBanner();
+
+					// KEY FIX: update current + rowVer from DB after remote change
+					refreshCurrentAfterRemoteUpdateAsync();
+				});
+				return;
+			}
+
 			// Otherwise show banner (unknown patch keys or no patch)
 			runOnFx(() ->
 			{
@@ -216,6 +234,39 @@ public class CaseController {
 				showRemoteUpdateBanner();
 			});
 		});
+	}
+
+	private void refreshCurrentAfterRemoteUpdateAsync() {
+		if (caseDao == null || caseId == null) {
+			return;
+		}
+		final long id = caseId.longValue();
+
+		new Thread(() ->
+		{
+			try {
+				CaseDetailDto fresh = caseDao.getDetail(id);
+				if (fresh == null) {
+					return;
+				}
+				runOnFx(() ->
+				{
+					// If user started editing while this was loading, don't overwrite draft.
+					if (editMode) {
+						remoteDirty = true;
+						showRemoteUpdateBanner();
+						return;
+					}
+
+					// Update backing model so rowVer is current (prevents "updated elsewhere" on next save)
+					current = fresh;
+
+					// Optional: keep header "Last updated" fresh if you want:
+					// applyDetail(fresh); // only if it won't visually jump in a bad way
+				});
+			} catch (Exception ignored) {
+			}
+		}, "case-refresh-current-" + id).start();
 	}
 
 	private void applyLiveCaseName(String newName) {
