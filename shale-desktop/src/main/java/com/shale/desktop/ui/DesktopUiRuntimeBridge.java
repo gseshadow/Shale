@@ -146,4 +146,14 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		LiveBus bus = liveBus;
 		return bus == null ? "" : bus.getClientInstanceId();
 	}
+
+	@Override
+	public void subscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
+		dispatcher.subscribeEntityUpdated(handler);
+	}
+
+	@Override
+	public void unsubscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
+		dispatcher.unsubscribeEntityUpdated(handler);
+	}
 }
