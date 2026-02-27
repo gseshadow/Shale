@@ -34,6 +34,7 @@ public final class CaseOverviewDto {
 	private final LocalDate solDate;
 
 	// Parties
+	private final Integer primaryCallerContactId;
 	private final String caller;
 	private final String client;
 	private final String opposingCounsel;
@@ -61,6 +62,7 @@ public final class CaseOverviewDto {
 			LocalDate intakeDate,
 			LocalDate incidentDate,
 			LocalDate solDate,
+			Integer primaryCallerContactId,
 			String caller,
 			String client,
 			String opposingCounsel,
@@ -86,6 +88,7 @@ public final class CaseOverviewDto {
 		this.incidentDate = incidentDate;
 		this.solDate = solDate;
 
+		this.primaryCallerContactId = primaryCallerContactId;
 		this.caller = safe(caller);
 		this.client = safe(client);
 		this.opposingCounsel = safe(opposingCounsel);
@@ -148,6 +151,10 @@ public final class CaseOverviewDto {
 
 	public String getCaller() {
 		return caller;
+	}
+
+	public Integer getPrimaryCallerContactId() {
+		return primaryCallerContactId;
 	}
 
 	public String getClient() {

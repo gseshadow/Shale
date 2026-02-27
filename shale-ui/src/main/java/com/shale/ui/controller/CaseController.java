@@ -3,7 +3,9 @@ package com.shale.ui.controller;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseDetailDto;
@@ -18,6 +20,7 @@ import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
@@ -27,11 +30,10 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
-import javafx.scene.control.Button;
-import javafx.scene.control.ChoiceDialog;
-import java.util.Optional;
 
 public class CaseController {
+
+	private static final int ROLE_CASECONTACT_CALLER = 2;
 
 	@FXML
 	private Label caseTitleLabel;
@@ -75,6 +77,8 @@ public class CaseController {
 	private Label ovCaseStatusValue;
 	@FXML
 	private Label ovCallerValue;
+	@FXML
+	private Button changeCallerButton;
 	@FXML
 	private Label ovClientValue;
 	@FXML
@@ -137,6 +141,8 @@ public class CaseController {
 	private UiRuntimeBridge runtimeBridge;
 	private CaseOverviewDto currentOverview;
 	private Integer draftPrimaryStatusId; // only used in edit mode
+	private Integer draftPrimaryCallerContactId; // only used in edit mode
+	private String draftPrimaryCallerName; // only used in edit mode
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -169,6 +175,9 @@ public class CaseController {
 		subscribeLiveCaseUpdates();
 		if (changeStatusButton != null) {
 			changeStatusButton.setOnAction(e -> onChangeStatus());
+		}
+		if (changeCallerButton != null) {
+			changeCallerButton.setOnAction(e -> onChangeCaller());
 		}
 	}
 
@@ -208,6 +217,7 @@ public class CaseController {
 			String patchedName = extractPatchString(rawPatch, "name");
 			String patchedDescription = extractPatchString(rawPatch, "description");
 			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
+			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
 
 			System.out.println("[DEBUG LIVE] CASE listenerUserId=" + (appState == null ? null : appState.getUserId())
 					+ " event.updatedByUserId=" + event.updatedByUserId()
@@ -215,7 +225,8 @@ public class CaseController {
 					+ " hasPatch=" + (rawPatch != null && !rawPatch.isBlank())
 					+ " hasName=" + (patchedName != null)
 					+ " hasDesc=" + (patchedDescription != null)
-					+ " hasPrimaryStatusId=" + (patchedPrimaryStatusId != null));
+					+ " hasPrimaryStatusId=" + (patchedPrimaryStatusId != null)
+					+ " hasPrimaryCallerContactId=" + (patchedPrimaryCallerContactId != null));
 
 			// If we're editing, don't clobber local edits; show the banner.
 			if (editMode) {
@@ -227,8 +238,8 @@ public class CaseController {
 				return;
 			}
 
-			// Status change: easiest + most reliable is to reload overview/detail
-			if (patchedPrimaryStatusId != null) {
+			// Status/caller change: easiest + most reliable is to reload overview/detail
+			if (patchedPrimaryStatusId != null || patchedPrimaryCallerContactId != null) {
 				runOnFx(() ->
 				{
 					reloadCurrentCaseForViewMode();
@@ -532,8 +543,12 @@ public class CaseController {
 				dto.getCaseStatus(), // name you already have
 				dto.getPrimaryStatusColor() // you’ll add this to the DTO
 		);
-		if (ovCallerValue != null)
-			ovCallerValue.setText(safe(dto.getCaller()));
+		if (ovCallerValue != null) {
+			String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
+					? draftPrimaryCallerName
+					: dto.getCaller();
+			ovCallerValue.setText(safe(callerName));
+		}
 		if (ovClientValue != null)
 			ovClientValue.setText(safe(dto.getClient()));
 		if (ovPracticeAreaValue != null)
@@ -584,6 +599,8 @@ public class CaseController {
 
 	private void onEdit() {
 		draftPrimaryStatusId = (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
+		draftPrimaryCallerContactId = (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId());
+		draftPrimaryCallerName = (currentOverview == null ? null : currentOverview.getCaller());
 		if (current == null) {
 			showError("Case is still loading. Please try again.");
 			return;
@@ -605,6 +622,8 @@ public class CaseController {
 		hideRemoteUpdateBanner();
 		clearError();
 		draftPrimaryStatusId = null;
+		draftPrimaryCallerContactId = null;
+		draftPrimaryCallerName = null;
 		setEditMode(false);
 		if (currentOverview != null)
 			applyOverviewEditSafe(currentOverview);
@@ -669,6 +688,20 @@ public class CaseController {
 					caseDao.setPrimaryStatus(saveCaseId, desiredStatusId, null);
 				}
 
+				Integer baseCallerContactId = currentOverview == null ? null : currentOverview.getPrimaryCallerContactId();
+				Integer desiredCallerContactId = draftPrimaryCallerContactId;
+				boolean callerChanged = desiredCallerContactId != null && !desiredCallerContactId.equals(baseCallerContactId);
+
+				if (callerChanged) {
+					caseDao.setPrimaryCaseContact(
+						saveCaseId,
+						appState.getShaleClientId(),
+						ROLE_CASECONTACT_CALLER,
+						desiredCallerContactId,
+						appState.getUserId(),
+						null);
+				}
+
 				// 3) now update UI + publish on FX thread
 				runOnFx(() ->
 				{
@@ -695,9 +728,14 @@ public class CaseController {
 					if (statusChanged) {
 						publishCaseFieldUpdated(saveCaseId, "primaryStatusId", desiredStatusId);
 					}
+					if (callerChanged) {
+						publishCaseFieldUpdated(saveCaseId, "primaryCallerContactId", desiredCallerContactId);
+					}
 
 					// ✅ clear draft after success
 					draftPrimaryStatusId = null;
+					draftPrimaryCallerContactId = null;
+					draftPrimaryCallerName = null;
 
 					// optional: refresh overview so currentOverview reflects new status id/color
 					reloadCurrentCaseForViewMode();
@@ -756,6 +794,7 @@ public class CaseController {
 			hideRemoteUpdateBanner();
 		}
 		setVisibleManaged(changeStatusButton, enabled);
+		setVisibleManaged(changeCallerButton, enabled);
 	}
 
 	private void setBusy(boolean busy) {
@@ -773,6 +812,8 @@ public class CaseController {
 				ovDescriptionEditor.setDisable(busy);
 			if (reloadRemoteButton != null)
 				reloadRemoteButton.setDisable(busy);
+			if (changeCallerButton != null)
+				changeCallerButton.setDisable(busy);
 		});
 	}
 
@@ -990,6 +1031,82 @@ public class CaseController {
 		}, "case-status-list-" + caseId).start();
 	}
 
+
+	private void onChangeCaller() {
+		if (caseDao == null || appState == null || caseId == null) {
+			showError("Caller change is unavailable.");
+			return;
+		}
+		Integer clientId = appState.getShaleClientId();
+		if (clientId == null || clientId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+
+		setBusy(true);
+		clearError();
+
+		new Thread(() ->
+		{
+			try {
+				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(clientId);
+				runOnFx(() ->
+				{
+					setBusy(false);
+					if (contacts == null || contacts.isEmpty()) {
+						showError("No contacts are configured for this tenant.");
+						return;
+					}
+
+					LinkedHashMap<String, CaseDao.ContactRow> labelToRow = new LinkedHashMap<>();
+					String preselect = null;
+					Integer currentId = (editMode && draftPrimaryCallerContactId != null)
+							? draftPrimaryCallerContactId
+							: (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId());
+
+					for (CaseDao.ContactRow c : contacts) {
+						String label = c.displayName() + " (#" + c.id() + ")";
+						labelToRow.put(label, c);
+						if (currentId != null && currentId == c.id()) {
+							preselect = label;
+						}
+					}
+
+					if (preselect == null) {
+						preselect = labelToRow.keySet().iterator().next();
+					}
+
+					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
+					dialog.setTitle("Change Caller");
+					dialog.setHeaderText("Select the primary caller");
+					dialog.setContentText("Caller:");
+
+					Optional<String> chosen = dialog.showAndWait();
+					if (chosen.isEmpty()) {
+						return;
+					}
+
+					CaseDao.ContactRow picked = labelToRow.get(chosen.get());
+					if (picked == null) {
+						return;
+					}
+
+					draftPrimaryCallerContactId = picked.id();
+					draftPrimaryCallerName = picked.displayName();
+					if (ovCallerValue != null) {
+						ovCallerValue.setText(safe(draftPrimaryCallerName));
+					}
+				});
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					showError("Failed to load contacts. " + ex.getMessage());
+					setBusy(false);
+				});
+			}
+		}, "case-caller-list-" + caseId).start();
+	}
+
 	private String getCurrentStatusName() {
 		// Use whatever your UI currently has as the displayed status.
 		// Best is: store the latest CaseOverviewDto in a field and return dto.getCaseStatus().
@@ -1040,8 +1157,12 @@ public class CaseController {
 		// (You can expand this list as needed.)
 		if (ovCaseNumberValue != null)
 			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
-		if (ovCallerValue != null)
-			ovCallerValue.setText(safe(dto.getCaller()));
+		if (ovCallerValue != null) {
+			String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
+					? draftPrimaryCallerName
+					: dto.getCaller();
+			ovCallerValue.setText(safe(callerName));
+		}
 		if (ovClientValue != null)
 			ovClientValue.setText(safe(dto.getClient()));
 		if (ovPracticeAreaValue != null)

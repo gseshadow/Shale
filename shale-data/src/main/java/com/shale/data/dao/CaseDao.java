@@ -60,6 +60,9 @@ public final class CaseDao {
 	public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
 	}
 
+	public record ContactRow(int id, String displayName) {
+	}
+
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize) {
 		return findPage(page, pageSize, CaseSort.INTAKE_NEWEST, false);
@@ -260,7 +263,8 @@ public final class CaseDao {
 				  current_status.PrimaryStatusColor,
 
 				  -- Primary Caller / Client / Opposing Counsel
-				  callerContact.FullName AS CallerName,
+				  callerContact.PrimaryCallerContactId,
+				  callerContact.CallerName,
 				  clientContact.FullName AS ClientName,
 				  oppContact.FullName AS OpposingCounselName
 
@@ -301,6 +305,7 @@ public final class CaseDao {
 				-- Caller (primary)
 				OUTER APPLY (
 				    SELECT TOP (1)
+				      cc.ContactId AS PrimaryCallerContactId,
 				      CASE
 				        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
 				          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
@@ -310,7 +315,7 @@ public final class CaseDao {
 				              COALESCE(ct.LastName, '')
 				            ))
 				        ELSE COALESCE(ct.Name, '')
-				      END AS FullName
+				      END AS CallerName
 				    FROM CaseContacts cc
 				    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
 				    WHERE cc.CaseId = c.Id
@@ -408,6 +413,7 @@ public final class CaseDao {
 						toLocalDate(rs.getDate("CallerDate")),
 						toLocalDate(rs.getDate("DateOfInjury")),
 						toLocalDate(rs.getDate("StatuteOfLimitations")),
+						getNullableInt(rs, "PrimaryCallerContactId"),
 						rs.getString("CallerName"),
 						rs.getString("ClientName"),
 						rs.getString("OpposingCounselName"),
@@ -563,6 +569,156 @@ public final class CaseDao {
 				}
 				return list;
 			}
+		}
+	}
+
+
+	public List<ContactRow> listContactsForTenant(int shaleClientId) {
+		String sql = """
+				SELECT
+				  Id,
+				  CASE
+				    WHEN (NULLIF(LTRIM(RTRIM(COALESCE(FirstName,''))), '') IS NOT NULL)
+				      OR (NULLIF(LTRIM(RTRIM(COALESCE(LastName,''))), '') IS NOT NULL)
+				    THEN LTRIM(RTRIM(
+				          COALESCE(FirstName, '') +
+				          CASE WHEN COALESCE(FirstName, '') = '' OR COALESCE(LastName, '') = '' THEN '' ELSE ' ' END +
+				          COALESCE(LastName, '')
+				        ))
+				    ELSE COALESCE(Name, '')
+				  END AS DisplayName
+				FROM Contacts
+				WHERE ShaleClientId = ?
+				  AND (COL_LENGTH('dbo.Contacts', 'IsDeleted') IS NULL OR IsDeleted = 0 OR IsDeleted IS NULL)
+				ORDER BY LastName, FirstName, Name;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				List<ContactRow> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(new ContactRow(rs.getInt("Id"), rs.getString("DisplayName")));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list contacts (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public void setPrimaryCaseContact(long caseId, int shaleClientId, int role, int contactId, Integer changedByUserId, String notes) {
+		String sql = """
+				BEGIN TRY
+				  BEGIN TRAN;
+				
+				  DECLARE @now datetime2 = SYSDATETIME();
+				  DECLARE @oldName nvarchar(400) = NULL;
+				  DECLARE @newName nvarchar(400) = NULL;
+				
+				  SELECT TOP (1)
+				    @oldName = CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN LTRIM(RTRIM(
+				            COALESCE(ct.FirstName, '') +
+				            CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				            COALESCE(ct.LastName, '')
+				          ))
+				      ELSE COALESCE(ct.Name, '')
+				    END
+				  FROM dbo.CaseContacts cc
+				  INNER JOIN dbo.Contacts ct ON ct.Id = cc.ContactId
+				  WHERE cc.CaseId = ?
+				    AND cc.Role = ?
+				    AND cc.IsPrimary = 1;
+				
+				  SELECT TOP (1)
+				    @newName = CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN LTRIM(RTRIM(
+				            COALESCE(ct.FirstName, '') +
+				            CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				            COALESCE(ct.LastName, '')
+				          ))
+				      ELSE COALESCE(ct.Name, '')
+				    END
+				  FROM dbo.Contacts ct
+				  WHERE ct.Id = ?
+				    AND ct.ShaleClientId = ?;
+				
+				  IF (@newName IS NULL)
+				  BEGIN
+				    THROW 50001, 'Contact not found for tenant.', 1;
+				  END
+				
+				  UPDATE dbo.CaseContacts
+				  SET IsPrimary = 0,
+				      UpdatedAt = @now
+				  WHERE CaseId = ?
+				    AND Role = ?
+				    AND IsPrimary = 1;
+				
+				  UPDATE dbo.CaseContacts
+				  SET IsPrimary = 1,
+				      Notes = ?,
+				      UpdatedAt = @now
+				  WHERE CaseId = ?
+				    AND ContactId = ?
+				    AND Role = ?;
+				
+				  IF @@ROWCOUNT = 0
+				  BEGIN
+				    INSERT INTO dbo.CaseContacts
+				      (CaseId, ContactId, Role, Side, IsPrimary, Notes, AddedAt, CreatedAt, UpdatedAt)
+				    VALUES
+				      (?, ?, ?, NULL, 1, ?, @now, @now, @now);
+				  END
+				
+				  INSERT INTO dbo.CaseUpdates
+				    (CaseId, ShaleClientId, NoteText, CreatedAt, UpdatedAt, CreatedByUserId, EditedByUserId)
+				  VALUES
+				    (?, ?, CONCAT('Caller changed: ', COALESCE(NULLIF(@oldName, ''), '—'), ' → ', COALESCE(NULLIF(@newName, ''), '—')),
+				     @now, @now, ?, NULL);
+				
+				  COMMIT;
+				END TRY
+				BEGIN CATCH
+				  IF @@TRANCOUNT > 0 ROLLBACK;
+				  THROW;
+				END CATCH;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, role);
+			ps.setInt(i++, contactId);
+			ps.setInt(i++, shaleClientId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, role);
+			String cleanNotes = (notes == null || notes.isBlank()) ? null : notes.trim();
+			ps.setString(i++, cleanNotes);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, contactId);
+			ps.setInt(i++, role);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, contactId);
+			ps.setInt(i++, role);
+			ps.setString(i++, cleanNotes);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			if (changedByUserId == null) {
+				ps.setNull(i++, java.sql.Types.INTEGER);
+			} else {
+				ps.setInt(i++, changedByUserId);
+			}
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to set primary case contact (caseId=" + caseId + ", role=" + role + ")", e);
 		}
 	}
 

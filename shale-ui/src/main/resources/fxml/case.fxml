@@ -128,8 +128,12 @@
 
 					<Label text="Caller:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="4" GridPane.columnIndex="0" />
-					<Label fx:id="ovCallerValue" text="—" wrapText="true"
-						GridPane.rowIndex="4" GridPane.columnIndex="1" />
+					<HBox spacing="8" alignment="CENTER_LEFT"
+						GridPane.rowIndex="4" GridPane.columnIndex="1">
+						<Label fx:id="ovCallerValue" text="—" wrapText="true" />
+						<Button fx:id="changeCallerButton" text="Change"
+							visible="false" managed="false" />
+					</HBox>
 
 					<Label text="Client:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="5" GridPane.columnIndex="0" />
