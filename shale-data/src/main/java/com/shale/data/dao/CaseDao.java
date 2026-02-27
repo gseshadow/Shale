@@ -261,7 +261,10 @@ public final class CaseDao {
 				  -- Primary Caller / Client / Opposing Counsel
 				  callerContact.PrimaryCallerContactId,
 				  callerContact.CallerName,
-				  clientContact.FullName AS ClientName,
+
+				  clientContact.PrimaryClientContactId,
+				  clientContact.ClientName AS ClientName,
+
 				  oppContact.FullName AS OpposingCounselName
 
 				FROM %s c
@@ -323,6 +326,7 @@ public final class CaseDao {
 				-- Client (primary)
 				OUTER APPLY (
 				    SELECT TOP (1)
+				      cc.ContactId AS PrimaryClientContactId,
 				      CASE
 				        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
 				          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
@@ -332,7 +336,7 @@ public final class CaseDao {
 				              COALESCE(ct.LastName, '')
 				            ))
 				        ELSE COALESCE(ct.Name, '')
-				      END AS FullName
+				      END AS ClientName
 				    FROM CaseContacts cc
 				    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
 				    WHERE cc.CaseId = c.Id
@@ -409,10 +413,14 @@ public final class CaseDao {
 						toLocalDate(rs.getDate("CallerDate")),
 						toLocalDate(rs.getDate("DateOfInjury")),
 						toLocalDate(rs.getDate("StatuteOfLimitations")),
+
 						getNullableInt(rs, "PrimaryCallerContactId"),
+						getNullableInt(rs, "PrimaryClientContactId"),
+
 						rs.getString("CallerName"),
 						rs.getString("ClientName"),
 						rs.getString("OpposingCounselName"),
+
 						team,
 						rs.getString("Description")
 				);
@@ -646,7 +654,13 @@ public final class CaseDao {
 		}
 	}
 
-	public void setPrimaryCaseContact(long caseId, int shaleClientId, int role, int contactId, Integer changedByUserId, String notes) {
+	public void setPrimaryCaseContact(
+			long caseId,
+			int shaleClientId,
+			int role,
+			int contactId,
+			Integer changedByUserId,
+			String notes) {
 		String sql = """
 				BEGIN TRY
 				  BEGIN TRAN;
@@ -655,6 +669,15 @@ public final class CaseDao {
 				  DECLARE @oldName nvarchar(400) = NULL;
 				  DECLARE @newName nvarchar(400) = NULL;
 
+				  DECLARE @roleName nvarchar(50) =
+				    CASE ?
+				      WHEN 1 THEN 'Client'
+				      WHEN 2 THEN 'Caller'
+				      WHEN 6 THEN 'Opposing counsel'
+				      ELSE CONCAT('Role ', CONVERT(varchar(10), ?))
+				    END;
+
+				  -- Old primary name (if any)
 				  SELECT TOP (1)
 				    @oldName = CASE
 				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
@@ -672,6 +695,7 @@ public final class CaseDao {
 				    AND cc.Role = ?
 				    AND cc.IsPrimary = 1;
 
+				  -- New contact name (must exist in tenant)
 				  SELECT TOP (1)
 				    @newName = CASE
 				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
@@ -692,6 +716,7 @@ public final class CaseDao {
 				    THROW 50001, 'Contact not found for tenant.', 1;
 				  END
 
+				  -- Clear existing primary for this role
 				  UPDATE dbo.CaseContacts
 				  SET IsPrimary = 0,
 				      UpdatedAt = @now
@@ -699,6 +724,7 @@ public final class CaseDao {
 				    AND Role = ?
 				    AND IsPrimary = 1;
 
+				  -- Promote existing row if present
 				  UPDATE dbo.CaseContacts
 				  SET IsPrimary = 1,
 				      Notes = ?,
@@ -707,6 +733,7 @@ public final class CaseDao {
 				    AND ContactId = ?
 				    AND Role = ?;
 
+				  -- Else insert new row
 				  IF @@ROWCOUNT = 0
 				  BEGIN
 				    INSERT INTO dbo.CaseContacts
@@ -715,10 +742,12 @@ public final class CaseDao {
 				      (?, ?, ?, NULL, 1, ?, @now, @now, @now);
 				  END
 
+				  -- Audit log
 				  INSERT INTO dbo.CaseUpdates
 				    (CaseId, ShaleClientId, NoteText, CreatedAt, UpdatedAt, CreatedByUserId, EditedByUserId)
 				  VALUES
-				    (?, ?, CONCAT('Caller changed: ', COALESCE(NULLIF(@oldName, ''), '—'), ' → ', COALESCE(NULLIF(@newName, ''), '—')),
+				    (?, ?, CONCAT(@roleName, ' changed: ', COALESCE(NULLIF(@oldName, ''), '—'),
+				                  ' → ', COALESCE(NULLIF(@newName, ''), '—')),
 				     @now, @now, ?, NULL);
 
 				  COMMIT;
@@ -731,32 +760,55 @@ public final class CaseDao {
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
+
 			int i = 1;
+
+			// @roleName CASE placeholders (two ?s)
+			ps.setInt(i++, role);
+			ps.setInt(i++, role);
+
+			// old primary
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, role);
+
+			// new contact tenant check
 			ps.setInt(i++, contactId);
 			ps.setInt(i++, shaleClientId);
+
+			// clear primary
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, role);
+
 			String cleanNotes = (notes == null || notes.isBlank()) ? null : notes.trim();
+
+			// promote existing
 			ps.setString(i++, cleanNotes);
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, contactId);
 			ps.setInt(i++, role);
+
+			// insert if missing
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, contactId);
 			ps.setInt(i++, role);
 			ps.setString(i++, cleanNotes);
+
+			// audit
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, shaleClientId);
-			if (changedByUserId == null) {
+
+			if (changedByUserId == null)
 				ps.setNull(i++, java.sql.Types.INTEGER);
-			} else {
+			else
 				ps.setInt(i++, changedByUserId);
-			}
+
 			ps.executeUpdate();
+
 		} catch (SQLException e) {
-			throw new RuntimeException("Failed to set primary case contact (caseId=" + caseId + ", role=" + role + ")", e);
+			throw new RuntimeException(
+					"Failed to set primary case contact (caseId=" + caseId + ", role=" + role + ")",
+					e
+			);
 		}
 	}
 

@@ -34,6 +34,7 @@ import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 public class CaseController {
 
 	private static final int ROLE_CASECONTACT_CALLER = 2;
+	private static final int ROLE_CASECONTACT_CLIENT = 1;
 
 	@FXML
 	private Label caseTitleLabel;
@@ -125,6 +126,8 @@ public class CaseController {
 	private StackPane ovCaseStatusHost;
 	@FXML
 	private Button changeStatusButton;
+	@FXML
+	private Button changeClientButton;
 
 	private StatusCardFactory statusCardFactory;
 	private Consumer<Integer> onOpenStatus;
@@ -140,9 +143,14 @@ public class CaseController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private CaseOverviewDto currentOverview;
+
 	private Integer draftPrimaryStatusId; // only used in edit mode
+
 	private Integer draftPrimaryCallerContactId; // only used in edit mode
 	private String draftPrimaryCallerName; // only used in edit mode
+
+	private Integer draftPrimaryClientContactId;
+	private String draftPrimaryClientName;
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -178,6 +186,9 @@ public class CaseController {
 		}
 		if (changeCallerButton != null) {
 			changeCallerButton.setOnAction(e -> onChangeCaller());
+		}
+		if (changeClientButton != null) {
+			changeClientButton.setOnAction(e -> onChangeClient());
 		}
 	}
 
@@ -218,6 +229,7 @@ public class CaseController {
 			String patchedDescription = extractPatchString(rawPatch, "description");
 			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
 			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
+			Integer patchedPrimaryClientContactId = extractPatchInt(rawPatch, "primaryClientContactId");
 
 			System.out.println("[DEBUG LIVE] CASE listenerUserId=" + (appState == null ? null : appState.getUserId())
 					+ " event.updatedByUserId=" + event.updatedByUserId()
@@ -226,7 +238,8 @@ public class CaseController {
 					+ " hasName=" + (patchedName != null)
 					+ " hasDesc=" + (patchedDescription != null)
 					+ " hasPrimaryStatusId=" + (patchedPrimaryStatusId != null)
-					+ " hasPrimaryCallerContactId=" + (patchedPrimaryCallerContactId != null));
+					+ " hasPrimaryCallerContactId=" + (patchedPrimaryCallerContactId != null)
+					+ " hasPrimaryClientContactId=" + (patchedPrimaryClientContactId != null));
 
 			// If we're editing, don't clobber local edits; show the banner.
 			if (editMode) {
@@ -238,8 +251,11 @@ public class CaseController {
 				return;
 			}
 
-			// Status/caller change: easiest + most reliable is to reload overview/detail
-			if (patchedPrimaryStatusId != null || patchedPrimaryCallerContactId != null) {
+			// Status/caller/client change: easiest + most reliable is to reload overview/detail
+			if (patchedPrimaryStatusId != null
+					|| patchedPrimaryCallerContactId != null
+					|| patchedPrimaryClientContactId != null) {
+
 				runOnFx(() ->
 				{
 					reloadCurrentCaseForViewMode();
@@ -660,6 +676,10 @@ public class CaseController {
 		final byte[] expectedRowVer = current.getRowVer();
 		final long saveCaseId = caseId.longValue();
 
+		// capture these once (avoid reading appState off-thread repeatedly)
+		final Integer tenantId = (appState == null ? null : appState.getShaleClientId());
+		final Integer userId = (appState == null ? null : appState.getUserId());
+
 		setBusy(true);
 		clearError();
 
@@ -688,6 +708,7 @@ public class CaseController {
 					caseDao.setPrimaryStatus(saveCaseId, desiredStatusId, null);
 				}
 
+				// 3) caller change (only if changed)
 				Integer baseCallerContactId = currentOverview == null ? null : currentOverview.getPrimaryCallerContactId();
 				Integer desiredCallerContactId = draftPrimaryCallerContactId;
 				boolean callerChanged = desiredCallerContactId != null && !desiredCallerContactId.equals(baseCallerContactId);
@@ -695,14 +716,31 @@ public class CaseController {
 				if (callerChanged) {
 					caseDao.setPrimaryCaseContact(
 							saveCaseId,
-							appState.getShaleClientId(),
+							tenantId,
 							ROLE_CASECONTACT_CALLER,
 							desiredCallerContactId,
-							appState.getUserId(),
-							null);
+							userId,
+							null
+					);
 				}
 
-				// 3) now update UI + publish on FX thread
+				// 4) client change (only if changed)
+				Integer baseClientContactId = currentOverview == null ? null : currentOverview.getPrimaryClientContactId();
+				Integer desiredClientContactId = draftPrimaryClientContactId;
+				boolean clientChanged = desiredClientContactId != null && !desiredClientContactId.equals(baseClientContactId);
+
+				if (clientChanged) {
+					caseDao.setPrimaryCaseContact(
+							saveCaseId,
+							tenantId,
+							ROLE_CASECONTACT_CLIENT,
+							desiredClientContactId,
+							userId,
+							null
+					);
+				}
+
+				// 5) update UI + publish on FX thread
 				runOnFx(() ->
 				{
 					current = updated;
@@ -731,13 +769,20 @@ public class CaseController {
 					if (callerChanged) {
 						publishCaseFieldUpdated(saveCaseId, "primaryCallerContactId", desiredCallerContactId);
 					}
+					if (clientChanged) {
+						publishCaseFieldUpdated(saveCaseId, "primaryClientContactId", desiredClientContactId);
+					}
 
-					// ✅ clear draft after success
+					// ✅ clear drafts after success
 					draftPrimaryStatusId = null;
+
 					draftPrimaryCallerContactId = null;
 					draftPrimaryCallerName = null;
 
-					// optional: refresh overview so currentOverview reflects new status id/color
+					draftPrimaryClientContactId = null;
+					draftPrimaryClientName = null;
+
+					// refresh overview so currentOverview reflects new ids/names/colors
 					reloadCurrentCaseForViewMode();
 				});
 
@@ -795,6 +840,8 @@ public class CaseController {
 		}
 		setVisibleManaged(changeStatusButton, enabled);
 		setVisibleManaged(changeCallerButton, enabled);
+		setVisibleManaged(changeClientButton, enabled);
+
 	}
 
 	private void setBusy(boolean busy) {
@@ -816,6 +863,8 @@ public class CaseController {
 				changeStatusButton.setDisable(busy);
 			if (changeCallerButton != null)
 				changeCallerButton.setDisable(busy);
+			if (changeClientButton != null)
+				changeClientButton.setDisable(busy);
 		});
 	}
 
@@ -1117,6 +1166,90 @@ public class CaseController {
 		}, "case-caller-list-" + caseId).start();
 	}
 
+	private void onChangeClient() {
+		if (caseDao == null || appState == null || caseId == null) {
+			showError("Client change is unavailable.");
+			return;
+		}
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+
+		setBusy(true);
+		clearError();
+
+		new Thread(() ->
+		{
+			try {
+				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(tenantId);
+
+				runOnFx(() ->
+				{
+					setBusy(false);
+
+					if (contacts == null || contacts.isEmpty()) {
+						showError("No contacts are configured for this tenant.");
+						return;
+					}
+
+					// Extra safety (SQL should already filter blanks now)
+					List<CaseDao.ContactRow> cleaned = contacts.stream()
+							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
+							.toList();
+
+					if (cleaned.isEmpty()) {
+						showError("No usable contacts found (all were blank).");
+						return;
+					}
+
+					Integer currentId = (editMode && draftPrimaryClientContactId != null)
+							? draftPrimaryClientContactId
+							: (currentOverview == null ? null : currentOverview.getPrimaryClientContactId());
+
+					CaseDao.ContactRow preselectRow = null;
+					if (currentId != null) {
+						for (CaseDao.ContactRow c : cleaned) {
+							if (c.id() == currentId.intValue()) {
+								preselectRow = c;
+								break;
+							}
+						}
+					}
+
+					// Searchable picker
+					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
+							"Change Client",
+							"Select the primary client",
+							"Search...",
+							cleaned,
+							preselectRow
+					);
+
+					if (chosen.isEmpty()) {
+						return; // cancelled
+					}
+
+					CaseDao.ContactRow picked = chosen.get();
+					draftPrimaryClientContactId = picked.id();
+					draftPrimaryClientName = picked.displayName();
+
+					if (ovClientValue != null) {
+						ovClientValue.setText(safe(draftPrimaryClientName));
+					}
+				});
+
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					showError("Failed to load contacts. " + ex.getMessage());
+					setBusy(false);
+				});
+			}
+		}, "case-client-list-" + caseId).start();
+	}
+
 	private String getCurrentStatusName() {
 		// Use whatever your UI currently has as the displayed status.
 		// Best is: store the latest CaseOverviewDto in a field and return dto.getCaseStatus().
@@ -1173,8 +1306,12 @@ public class CaseController {
 					: dto.getCaller();
 			ovCallerValue.setText(safe(callerName));
 		}
-		if (ovClientValue != null)
-			ovClientValue.setText(safe(dto.getClient()));
+		if (ovClientValue != null) {
+			String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
+					? draftPrimaryClientName
+					: dto.getClient();
+			ovClientValue.setText(safe(clientName));
+		}
 		if (ovPracticeAreaValue != null)
 			ovPracticeAreaValue.setText(safe(dto.getPracticeArea()));
 		if (ovOpposingCounselValue != null)
