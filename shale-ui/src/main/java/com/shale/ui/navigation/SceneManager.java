@@ -95,7 +95,7 @@ public final class SceneManager {
 
 			// ✅ ADD THIS LINE
 			c.setOnOpenUser(this::openUserProfile);
-
+			c.setOnOpenStatus(this::openStatusProfile);
 			return c;
 		});
 	}
@@ -104,6 +104,12 @@ public final class SceneManager {
 		System.out.println("Navigate to User Profile: " + userId);
 		// TODO: when you have user view:
 		// set center content to user view / or navigate
+	}
+
+	private void openStatusProfile(Integer statusId) {
+		System.out.println("Navigate to Status: " + statusId);
+		// TODO later:
+		// navigate to status manager / filter view / status editor
 	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {

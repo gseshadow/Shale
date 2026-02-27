@@ -18,6 +18,8 @@ public final class CaseOverviewDto {
 
 	// Core overview fields
 	private final String caseStatus;
+	private final Integer primaryStatusId;
+	private final String primaryStatusColor;
 
 	// Responsible attorney (for UserCard MINI + navigation)
 	private final Integer responsibleAttorneyUserId; // NEW
@@ -46,11 +48,14 @@ public final class CaseOverviewDto {
 			long caseId,
 			String caseNumber,
 			String caseName,
-			String caseStatus,
 
-			Integer responsibleAttorneyUserId, // NEW
+			String caseStatus,
+			Integer primaryStatusId,
+			String primaryStatusColor,
+
+			Integer responsibleAttorneyUserId,
 			String responsibleAttorney,
-			String responsibleAttorneyColor, // NEW
+			String responsibleAttorneyColor,
 
 			String practiceArea,
 			LocalDate intakeDate,
@@ -68,6 +73,8 @@ public final class CaseOverviewDto {
 		this.caseName = safe(caseName);
 
 		this.caseStatus = safe(caseStatus);
+		this.primaryStatusId = primaryStatusId;
+		this.primaryStatusColor = safe(primaryStatusColor);
 
 		this.responsibleAttorneyUserId = responsibleAttorneyUserId;
 		this.responsibleAttorney = safe(responsibleAttorney);
@@ -84,8 +91,15 @@ public final class CaseOverviewDto {
 		this.opposingCounsel = safe(opposingCounsel);
 
 		this.team = team == null ? List.of() : List.copyOf(team);
-
 		this.description = safe(description);
+	}
+
+	public Integer getPrimaryStatusId() {
+		return primaryStatusId;
+	}
+
+	public String getPrimaryStatusColor() {
+		return primaryStatusColor;
 	}
 
 	public long getCaseId() {

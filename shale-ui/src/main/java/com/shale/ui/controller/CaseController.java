@@ -25,6 +25,11 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import com.shale.ui.component.factory.StatusCardFactory;
+import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
+import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceDialog;
+import java.util.Optional;
 
 public class CaseController {
 
@@ -32,6 +37,8 @@ public class CaseController {
 	private Label caseTitleLabel;
 	@FXML
 	private Label statusLabel;
+	@FXML
+	private StackPane statusHost;
 	@FXML
 	private StackPane assignedUserHost;
 	@FXML
@@ -110,7 +117,13 @@ public class CaseController {
 	private TextField tasksTabSearchField;
 	@FXML
 	private ListView<String> tasksTabListView;
+	@FXML
+	private StackPane ovCaseStatusHost;
+	@FXML
+	private Button changeStatusButton;
 
+	private StatusCardFactory statusCardFactory;
+	private Consumer<Integer> onOpenStatus;
 	private CaseDao caseDao;
 	private boolean overviewLoaded = false;
 	private Consumer<Integer> onOpenUser;
@@ -122,6 +135,8 @@ public class CaseController {
 	private CaseEditModel draft;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
+	private CaseOverviewDto currentOverview;
+	private Integer draftPrimaryStatusId; // only used in edit mode
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -152,24 +167,26 @@ public class CaseController {
 		setEditMode(false);
 		clearError();
 		subscribeLiveCaseUpdates();
+		if (changeStatusButton != null) {
+			changeStatusButton.setOnAction(e -> onChangeStatus());
+		}
 	}
 
 	private void subscribeLiveCaseUpdates() {
 		if (runtimeBridge == null) {
 			return;
 		}
+
 		runtimeBridge.subscribeCaseUpdated(event ->
 		{
-			if (caseId == null || event.caseId() != caseId.intValue()) {
+			if (caseId == null || event == null || event.caseId() != caseId.intValue()) {
 				return;
 			}
 
-			// IMPORTANT: Don't filter by userId long-term (same user on another machine should still
-			// update).
-			// Keeping your existing behavior for now:
-			String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
-			if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
-				return; // ignore only my own echo
+			// Ignore only my own echo (same machine instance)
+			String mine = runtimeBridge.getClientInstanceId();
+			if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId())) {
+				return;
 			}
 
 			// Legacy/newName-only event
@@ -190,12 +207,15 @@ public class CaseController {
 			String rawPatch = event.rawPatchJson();
 			String patchedName = extractPatchString(rawPatch, "name");
 			String patchedDescription = extractPatchString(rawPatch, "description");
+			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
 
 			System.out.println("[DEBUG LIVE] CASE listenerUserId=" + (appState == null ? null : appState.getUserId())
 					+ " event.updatedByUserId=" + event.updatedByUserId()
 					+ " caseId=" + event.caseId()
-					+ " newName=" + (event.newName() != null)
-					+ " patchLen=" + (event.rawPatchJson() == null ? 0 : event.rawPatchJson().length()));
+					+ " hasPatch=" + (rawPatch != null && !rawPatch.isBlank())
+					+ " hasName=" + (patchedName != null)
+					+ " hasDesc=" + (patchedDescription != null)
+					+ " hasPrimaryStatusId=" + (patchedPrimaryStatusId != null));
 
 			// If we're editing, don't clobber local edits; show the banner.
 			if (editMode) {
@@ -207,7 +227,18 @@ public class CaseController {
 				return;
 			}
 
-			// If we can apply the patch, do it and refresh current/rowVer
+			// Status change: easiest + most reliable is to reload overview/detail
+			if (patchedPrimaryStatusId != null) {
+				runOnFx(() ->
+				{
+					reloadCurrentCaseForViewMode();
+					remoteDirty = false;
+					hideRemoteUpdateBanner();
+				});
+				return;
+			}
+
+			// Name/description patch: apply immediately, then refresh rowVer/current
 			if (patchedName != null || patchedDescription != null) {
 				runOnFx(() ->
 				{
@@ -221,7 +252,7 @@ public class CaseController {
 					remoteDirty = false;
 					hideRemoteUpdateBanner();
 
-					// KEY FIX: update current + rowVer from DB after remote change
+					// Update current + rowVer from DB after remote change
 					refreshCurrentAfterRemoteUpdateAsync();
 				});
 				return;
@@ -292,30 +323,33 @@ public class CaseController {
 	}
 
 	private void reloadCurrentCaseForViewMode() {
-		if (caseDao == null || caseId == null) {
+		if (caseDao == null || caseId == null)
 			return;
-		}
+
 		final long activeCaseId = caseId.longValue();
+
 		new Thread(() ->
 		{
 			CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
 			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
+
 			runOnFx(() ->
 			{
-				if (editMode) {
-					return;
-				}
 				if (overview != null) {
-					applyOverview(overview);
+					applyOverviewEditSafe(overview);
 				}
+
+				// Update backing model always; only paint detail when not editing
 				if (detail != null) {
 					current = detail;
-					applyDetail(detail);
+					if (!editMode) {
+						applyDetail(detail);
+					}
 				}
+
 				remoteDirty = false;
 				hideRemoteUpdateBanner();
-				clearError();
-				repaintViewLabels();
+				clearError(); // optional; note it also hides the banner in your current implementation
 			});
 		}, "case-view-sync-" + activeCaseId).start();
 	}
@@ -429,8 +463,7 @@ public class CaseController {
 		if (caseTitleLabel == null || caseId == null)
 			return;
 		caseTitleLabel.setText("Case #" + caseId + " (Placeholder)");
-		if (statusLabel != null)
-			statusLabel.setText("Status: —");
+		renderPrimaryStatusMini(null, "—", null);
 		renderResponsibleAttorneyMini(null, "—", null);
 		if (lastUpdatedLabel != null)
 			lastUpdatedLabel.setText("Last updated: —");
@@ -472,10 +505,12 @@ public class CaseController {
 	}
 
 	private void applyOverview(CaseOverviewDto dto) {
+		currentOverview = dto;
 		if (caseTitleLabel != null) {
 			String name = dto.getCaseName();
 			String num = dto.getCaseNumber();
 			String title;
+
 			if (name != null && !name.isBlank() && num != null && !num.isBlank()) {
 				title = name + " — " + num;
 			} else if (name != null && !name.isBlank()) {
@@ -487,15 +522,16 @@ public class CaseController {
 			}
 			caseTitleLabel.setText(title);
 		}
-		if (statusLabel != null)
-			statusLabel.setText("Status: " + safe(dto.getCaseStatus()));
 		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()), dto.getResponsibleAttorneyColor());
 		if (ovCaseNameValue != null)
 			ovCaseNameValue.setText(safe(dto.getCaseName()));
 		if (ovCaseNumberValue != null)
 			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
-		if (ovCaseStatusValue != null)
-			ovCaseStatusValue.setText(safe(dto.getCaseStatus()));
+		renderPrimaryStatusMini(
+				dto.getPrimaryStatusId(), // you’ll add this to the DTO
+				dto.getCaseStatus(), // name you already have
+				dto.getPrimaryStatusColor() // you’ll add this to the DTO
+		);
 		if (ovCallerValue != null)
 			ovCallerValue.setText(safe(dto.getCaller()));
 		if (ovClientValue != null)
@@ -547,6 +583,7 @@ public class CaseController {
 	}
 
 	private void onEdit() {
+		draftPrimaryStatusId = (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
 		if (current == null) {
 			showError("Case is still loading. Please try again.");
 			return;
@@ -567,7 +604,10 @@ public class CaseController {
 		remoteDirty = false;
 		hideRemoteUpdateBanner();
 		clearError();
+		draftPrimaryStatusId = null;
 		setEditMode(false);
+		if (currentOverview != null)
+			applyOverviewEditSafe(currentOverview);
 		applyDetail(current);
 	}
 
@@ -607,17 +647,31 @@ public class CaseController {
 		new Thread(() ->
 		{
 			try {
+				// 1) update name/description
 				CaseDetailDto updated = caseDao.updateCase(saveCaseId, saveDraft.caseName(), saveDraft.description(), expectedRowVer);
-				runOnFx(() ->
-				{
-					if (updated == null) {
+				if (updated == null) {
+					runOnFx(() ->
+					{
 						remoteDirty = true;
 						showRemoteUpdateBanner();
 						showError("This case was updated elsewhere. Reload and try again.");
 						setBusy(false);
-						return;
-					}
+					});
+					return;
+				}
 
+				// 2) status change (only if changed)
+				Integer baseStatusId = currentOverview == null ? null : currentOverview.getPrimaryStatusId();
+				Integer desiredStatusId = draftPrimaryStatusId;
+				boolean statusChanged = desiredStatusId != null && !desiredStatusId.equals(baseStatusId);
+
+				if (statusChanged) {
+					caseDao.setPrimaryStatus(saveCaseId, desiredStatusId, null);
+				}
+
+				// 3) now update UI + publish on FX thread
+				runOnFx(() ->
+				{
 					current = updated;
 					setEditMode(false);
 					draft = null;
@@ -627,7 +681,7 @@ public class CaseController {
 					clearError();
 					setBusy(false);
 
-					// Publish separate live events for each field that changed
+					// publish name/desc changes
 					String newName = safeText(saveDraft.caseName()).trim();
 					String newDesc = safeText(saveDraft.description());
 
@@ -637,7 +691,18 @@ public class CaseController {
 					if (!newDesc.equals(oldDescription)) {
 						publishCaseFieldUpdated(saveCaseId, "description", newDesc);
 					}
+
+					if (statusChanged) {
+						publishCaseFieldUpdated(saveCaseId, "primaryStatusId", desiredStatusId);
+					}
+
+					// ✅ clear draft after success
+					draftPrimaryStatusId = null;
+
+					// optional: refresh overview so currentOverview reflects new status id/color
+					reloadCurrentCaseForViewMode();
 				});
+
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
@@ -690,6 +755,7 @@ public class CaseController {
 		if (!enabled) {
 			hideRemoteUpdateBanner();
 		}
+		setVisibleManaged(changeStatusButton, enabled);
 	}
 
 	private void setBusy(boolean busy) {
@@ -756,6 +822,32 @@ public class CaseController {
 			ovResponsibleAttorneyHost.getChildren().setAll(overviewCard);
 	}
 
+	private void renderPrimaryStatusMini(Integer statusId, String statusName, String statusColorCss) {
+		if (statusCardFactory == null) {
+			statusCardFactory = new StatusCardFactory(onOpenStatus == null ? id ->
+			{
+			} : onOpenStatus);
+		}
+
+		StatusCardModel model = new StatusCardModel(
+				statusId,
+				(statusName == null || statusName.isBlank()) ? "—" : statusName,
+				false,
+				null,
+				statusColorCss
+		);
+
+		var headerCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
+		var overviewCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
+
+		if (statusHost != null) {
+			statusHost.getChildren().setAll(headerCard);
+		}
+		if (ovCaseStatusHost != null) {
+			ovCaseStatusHost.getChildren().setAll(overviewCard);
+		}
+	}
+
 	private static void setPaneVisible(VBox pane, boolean visible) {
 		if (pane == null)
 			return;
@@ -813,5 +905,196 @@ public class CaseController {
 
 		// NOTE: this does not fully unescape JSON sequences; good enough for now
 		return rawPatchJson.substring(firstQuote + 1, secondQuote);
+	}
+
+	public void setOnOpenStatus(Consumer<Integer> onOpenStatus) {
+		this.onOpenStatus = onOpenStatus;
+		this.statusCardFactory = new StatusCardFactory(onOpenStatus);
+	}
+
+	private void onChangeStatus() {
+		if (caseDao == null || appState == null || caseId == null) {
+			showError("Status change is unavailable.");
+			return;
+		}
+		Integer clientId = appState.getShaleClientId();
+		if (clientId == null || clientId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+
+		setBusy(true);
+		clearError();
+
+		new Thread(() ->
+		{
+			try {
+				List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(clientId);
+
+				runOnFx(() ->
+				{
+					setBusy(false);
+
+					if (statuses == null || statuses.isEmpty()) {
+						showError("No statuses are configured for this tenant.");
+						return;
+					}
+
+					// Build labels for display
+					java.util.Map<String, CaseDao.StatusRow> labelToRow = new java.util.LinkedHashMap<>();
+					String preselect = null;
+
+					Integer currentId = (editMode && draftPrimaryStatusId != null)
+							? draftPrimaryStatusId
+							: (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
+
+					for (CaseDao.StatusRow s : statuses) {
+						String label = s.name() + (s.isClosed() ? " (Closed)" : "");
+						labelToRow.put(label, s);
+						if (currentId != null && currentId == s.id()) {
+							preselect = label;
+						}
+					}
+
+					if (preselect == null) {
+						preselect = labelToRow.keySet().iterator().next();
+					}
+
+					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
+					dialog.setTitle("Change Status");
+					dialog.setHeaderText("Select the new primary status");
+					dialog.setContentText("Status:");
+
+					Optional<String> chosen = dialog.showAndWait();
+					if (chosen.isEmpty()) {
+						return; // cancelled
+					}
+
+					CaseDao.StatusRow picked = labelToRow.get(chosen.get());
+					if (picked == null) {
+						return;
+					}
+
+					// ✅ Edit-only: store draft + update cards immediately
+					draftPrimaryStatusId = picked.id();
+					renderPrimaryStatusMini(picked.id(), picked.name(), picked.color());
+				});
+
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					showError("Failed to load statuses. " + ex.getMessage());
+					setBusy(false);
+				});
+			}
+		}, "case-status-list-" + caseId).start();
+	}
+
+	private String getCurrentStatusName() {
+		// Use whatever your UI currently has as the displayed status.
+		// Best is: store the latest CaseOverviewDto in a field and return dto.getCaseStatus().
+		// For now, try reading from current detail first:
+		if (current != null && current.getCaseStatus() != null)
+			return current.getCaseStatus();
+		return null;
+	}
+
+	private void applyOverviewEditSafe(CaseOverviewDto dto) {
+		currentOverview = dto;
+		// Always refresh these “safe” UI elements while editing:
+		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()), dto.getResponsibleAttorneyColor());
+		Integer statusId = (editMode && draftPrimaryStatusId != null)
+				? draftPrimaryStatusId
+				: dto.getPrimaryStatusId();
+
+		String statusName = dto.getCaseStatus();
+		String statusColor = dto.getPrimaryStatusColor();
+
+		// If you rendered from the chosen status row above, you can keep name/color in draft too.
+		// Otherwise, just reload on save.
+		renderPrimaryStatusMini(statusId, statusName, statusColor);
+
+		// Header title is fine to refresh too:
+		if (caseTitleLabel != null) {
+			String name = dto.getCaseName();
+			String num = dto.getCaseNumber();
+			String title;
+			if (name != null && !name.isBlank() && num != null && !num.isBlank())
+				title = name + " — " + num;
+			else if (name != null && !name.isBlank())
+				title = name;
+			else if (num != null && !num.isBlank())
+				title = num;
+			else
+				title = "Case #" + dto.getCaseId();
+			caseTitleLabel.setText(title);
+		}
+
+		// Only refresh the overview text labels if not editing
+		if (!editMode) {
+			applyOverview(dto);
+			return;
+		}
+
+		// While editing, refresh only labels that are not being edited.
+		// (You can expand this list as needed.)
+		if (ovCaseNumberValue != null)
+			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
+		if (ovCallerValue != null)
+			ovCallerValue.setText(safe(dto.getCaller()));
+		if (ovClientValue != null)
+			ovClientValue.setText(safe(dto.getClient()));
+		if (ovPracticeAreaValue != null)
+			ovPracticeAreaValue.setText(safe(dto.getPracticeArea()));
+		if (ovOpposingCounselValue != null)
+			ovOpposingCounselValue.setText(safe(dto.getOpposingCounsel()));
+		if (ovTeamValue != null) {
+			List<String> team = dto.getTeam();
+			ovTeamValue.setText(team == null || team.isEmpty() ? "—" : String.join(", ", team));
+		}
+		if (ovIntakeDateValue != null)
+			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
+		if (ovIncidentDateValue != null)
+			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
+		if (ovSolDateValue != null)
+			ovSolDateValue.setText(formatDate(dto.getSolDate()));
+
+		// DO NOT touch ovCaseNameValue / ovDescriptionValue in edit mode (those are being edited)
+	}
+
+	private static Integer extractPatchInt(String rawPatchJson, String key) {
+		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank()) {
+			return null;
+		}
+
+		String needle = "\"" + key + "\"";
+		int k = rawPatchJson.indexOf(needle);
+		if (k < 0)
+			return null;
+
+		int colon = rawPatchJson.indexOf(':', k + needle.length());
+		if (colon < 0)
+			return null;
+
+		int i = colon + 1;
+		while (i < rawPatchJson.length() && Character.isWhitespace(rawPatchJson.charAt(i)))
+			i++;
+
+		boolean quoted = i < rawPatchJson.length() && rawPatchJson.charAt(i) == '"';
+		if (quoted)
+			i++;
+
+		int start = i;
+		while (i < rawPatchJson.length() && Character.isDigit(rawPatchJson.charAt(i)))
+			i++;
+
+		if (i == start)
+			return null;
+
+		try {
+			return Integer.parseInt(rawPatchJson.substring(start, i));
+		} catch (Exception ignored) {
+			return null;
+		}
 	}
 }

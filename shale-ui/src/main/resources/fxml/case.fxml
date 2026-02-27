@@ -36,8 +36,7 @@
 
 			<!-- Secondary row: status + last updated -->
 			<HBox spacing="10.0" alignment="CENTER_LEFT">
-				<Label fx:id="statusLabel" text="Status: —"
-					style="-fx-background-color: rgba(0,0,0,0.08); -fx-padding: 4 8; -fx-background-radius: 10;" />
+				<StackPane fx:id="statusHost" />
 
 				<Region HBox.hgrow="ALWAYS" />
 
@@ -76,16 +75,21 @@
 						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 					<Region HBox.hgrow="ALWAYS" />
 					<Button fx:id="editButton" text="Edit" />
-					<Button fx:id="saveButton" text="Save" visible="false" managed="false" />
-					<Button fx:id="cancelButton" text="Cancel" visible="false" managed="false" />
+					<Button fx:id="saveButton" text="Save" visible="false"
+						managed="false" />
+					<Button fx:id="cancelButton" text="Cancel" visible="false"
+						managed="false" />
 				</HBox>
 
 				<HBox spacing="8" alignment="CENTER_LEFT">
-					<Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
+					<Label fx:id="errorLabel" textFill="#b42318" wrapText="true"
+						visible="false" managed="false" />
 				</HBox>
 
-				<HBox fx:id="remoteUpdateBanner" spacing="8" alignment="CENTER_LEFT" visible="false" managed="false">
-					<Label text="This case was updated elsewhere." style="-fx-text-fill: #b42318;" />
+				<HBox fx:id="remoteUpdateBanner" spacing="8"
+					alignment="CENTER_LEFT" visible="false" managed="false">
+					<Label text="This case was updated elsewhere."
+						style="-fx-text-fill: #b42318;" />
 					<Button fx:id="reloadRemoteButton" text="Reload" />
 				</HBox>
 
@@ -100,8 +104,8 @@
 						GridPane.rowIndex="0" GridPane.columnIndex="0" />
 					<Label fx:id="ovCaseNameValue" text="—" wrapText="true"
 						GridPane.rowIndex="0" GridPane.columnIndex="1" />
-					<TextField fx:id="ovCaseNameEditor" visible="false" managed="false"
-						GridPane.rowIndex="0" GridPane.columnIndex="1" />
+					<TextField fx:id="ovCaseNameEditor" visible="false"
+						managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
 					<Label text="Case number:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="1" GridPane.columnIndex="0" />
@@ -115,8 +119,12 @@
 
 					<Label text="Case status:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="3" GridPane.columnIndex="0" />
-					<Label fx:id="ovCaseStatusValue" text="—"
-						GridPane.rowIndex="3" GridPane.columnIndex="1" />
+					<HBox spacing="8" alignment="CENTER_LEFT"
+						GridPane.rowIndex="3" GridPane.columnIndex="1">
+						<StackPane fx:id="ovCaseStatusHost" />
+						<Button fx:id="changeStatusButton" text="Change"
+							visible="false" managed="false" />
+					</HBox>
 
 					<Label text="Caller:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="4" GridPane.columnIndex="0" />

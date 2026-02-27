@@ -25,7 +25,7 @@ public final class CaseDao {
 	private static final int ROLE_CASECONTACT_CALLER = 2;
 	private static final int ROLE_CASECONTACT_OPPOSING_COUNSEL = 6;
 
-	// CaseUsers.Role (int) for Responsible Attorney
+	// CaseUsers.RoleId (int) for Responsible Attorney
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
 
 	public enum CaseSort {
@@ -106,7 +106,7 @@ public final class CaseDao {
 				    SELECT TOP (1) cu.UserId
 				    FROM %s cu
 				    WHERE cu.CaseId = c.Id
-				      AND cu.Role = ?
+				      AND cu.RoleId = ?
 				      AND cu.IsPrimary = 1
 				    ORDER BY
 				      cu.UpdatedAt DESC,
@@ -235,132 +235,135 @@ public final class CaseDao {
 	public com.shale.core.dto.CaseOverviewDto getOverview(long caseId) {
 
 		String sql = """
-								SELECT
-								  c.Id,
-								  c.Name,
-								  c.CaseNumber,
-								  c.Description,
-								  c.CallerDate,
-								  c.DateOfInjury,
-								  c.StatuteOfLimitations,
-								  pa.Name AS PracticeAreaName,
+				SELECT
+				  c.Id,
+				  c.Name,
+				  c.CaseNumber,
+				  c.Description,
+				  c.CallerDate,
+				  c.DateOfInjury,
+				  c.StatuteOfLimitations,
+				  pa.Name AS PracticeAreaName,
 
-								  -- Responsible Attorney (primary) - Users has name_first/name_last
-								 -- Responsible Attorney (primary)
-				ra.UserId AS ResponsibleAttorneyUserId,
-				u.color AS ResponsibleAttorneyColor,
-				LTRIM(RTRIM(
-				  COALESCE(u.name_first, '') +
-				  CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				  COALESCE(u.name_last, '')
-				)) AS ResponsibleAttorneyName,
+				  -- Responsible Attorney (primary)
+				  ra.UserId AS ResponsibleAttorneyUserId,
+				  u.color AS ResponsibleAttorneyColor,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS ResponsibleAttorneyName,
 
+				  -- Current Status (primary-first)
+				  current_status.CurrentStatusName,
+				  current_status.PrimaryStatusId,
+				  current_status.PrimaryStatusColor,
 
-								  -- Current Status
-								  current_status.CurrentStatusName,
+				  -- Primary Caller / Client / Opposing Counsel
+				  callerContact.FullName AS CallerName,
+				  clientContact.FullName AS ClientName,
+				  oppContact.FullName AS OpposingCounselName
 
-								  -- Primary Caller / Client / Opposing Counsel
-								  callerContact.FullName AS CallerName,
-								  clientContact.FullName AS ClientName,
-								  oppContact.FullName AS OpposingCounselName
+				FROM %s c
 
-								FROM %s c
+				LEFT JOIN PracticeAreas pa
+				  ON pa.Id = c.PracticeAreaId
 
-								LEFT JOIN PracticeAreas pa
-								  ON pa.Id = c.PracticeAreaId
+				-- Primary Responsible Attorney
+				OUTER APPLY (
+				    SELECT TOP (1) cu.UserId
+				    FROM %s cu
+				    WHERE cu.CaseId = c.Id
+				      AND cu.RoleId = ?
+				      AND cu.IsPrimary = 1
+				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+				) ra
 
-								-- Primary Responsible Attorney
-								OUTER APPLY (
-								    SELECT TOP (1) cu.UserId
-								    FROM %s cu
-								    WHERE cu.CaseId = c.Id
-								      AND cu.Role = ?
-								      AND cu.IsPrimary = 1
-								    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
-								) ra
+				LEFT JOIN %s u
+				  ON u.id = ra.UserId
 
-								LEFT JOIN %s u
-								  ON u.id = ra.UserId
+				-- Current Status (primary-first)
+				OUTER APPLY (
+				    SELECT TOP (1)
+				      s.Id    AS PrimaryStatusId,
+				      s.Color AS PrimaryStatusColor,
+				      s.Name  AS CurrentStatusName
+				    FROM %s cs
+				    INNER JOIN %s s ON s.Id = cs.StatusId
+				    WHERE cs.CaseId = c.Id
+				    ORDER BY
+				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+				      cs.UpdatedAt DESC,
+				      cs.CreatedAt DESC,
+				      cs.Id DESC
+				) current_status
 
-								-- Current Status
-								OUTER APPLY (
-								    SELECT TOP (1) s.Name AS CurrentStatusName
-								    FROM %s cs
-								    INNER JOIN %s s ON s.Id = cs.StatusId
-								    WHERE cs.CaseId = c.Id
-								    ORDER BY
-								      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-								      cs.UpdatedAt DESC,
-								      cs.CreatedAt DESC,
-								      cs.Id DESC
-								) current_status
+				-- Caller (primary)
+				OUTER APPLY (
+				    SELECT TOP (1)
+				      CASE
+				        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				        THEN LTRIM(RTRIM(
+				              COALESCE(ct.FirstName, '') +
+				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				              COALESCE(ct.LastName, '')
+				            ))
+				        ELSE COALESCE(ct.Name, '')
+				      END AS FullName
+				    FROM CaseContacts cc
+				    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
+				    WHERE cc.CaseId = c.Id
+				      AND cc.Role = ?
+				      AND cc.IsPrimary = 1
+				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
+				) callerContact
 
-								-- Caller (primary)
-								OUTER APPLY (
-								    SELECT TOP (1)
-								      CASE
-								        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-								          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-								        THEN LTRIM(RTRIM(
-								              COALESCE(ct.FirstName, '') +
-								              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-								              COALESCE(ct.LastName, '')
-								            ))
-								        ELSE COALESCE(ct.Name, '')
-								      END AS FullName
-								    FROM CaseContacts cc
-								    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
-								    WHERE cc.CaseId = c.Id
-								      AND cc.Role = ?
-								      AND cc.IsPrimary = 1
-								    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
-								) callerContact
+				-- Client (primary)
+				OUTER APPLY (
+				    SELECT TOP (1)
+				      CASE
+				        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				        THEN LTRIM(RTRIM(
+				              COALESCE(ct.FirstName, '') +
+				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				              COALESCE(ct.LastName, '')
+				            ))
+				        ELSE COALESCE(ct.Name, '')
+				      END AS FullName
+				    FROM CaseContacts cc
+				    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
+				    WHERE cc.CaseId = c.Id
+				      AND cc.Role = ?
+				      AND cc.IsPrimary = 1
+				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
+				) clientContact
 
-								-- Client (primary)
-								OUTER APPLY (
-								    SELECT TOP (1)
-								      CASE
-								        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-								          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-								        THEN LTRIM(RTRIM(
-								              COALESCE(ct.FirstName, '') +
-								              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-								              COALESCE(ct.LastName, '')
-								            ))
-								        ELSE COALESCE(ct.Name, '')
-								      END AS FullName
-								    FROM CaseContacts cc
-								    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
-								    WHERE cc.CaseId = c.Id
-								      AND cc.Role = ?
-								      AND cc.IsPrimary = 1
-								    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
-								) clientContact
+				-- Opposing Counsel (primary)
+				OUTER APPLY (
+				    SELECT TOP (1)
+				      CASE
+				        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				        THEN LTRIM(RTRIM(
+				              COALESCE(ct.FirstName, '') +
+				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				              COALESCE(ct.LastName, '')
+				            ))
+				        ELSE COALESCE(ct.Name, '')
+				      END AS FullName
+				    FROM CaseContacts cc
+				    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
+				    WHERE cc.CaseId = c.Id
+				      AND cc.Role = ?
+				      AND cc.IsPrimary = 1
+				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
+				) oppContact
 
-								-- Opposing Counsel (primary)
-								OUTER APPLY (
-								    SELECT TOP (1)
-								      CASE
-								        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-								          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-								        THEN LTRIM(RTRIM(
-								              COALESCE(ct.FirstName, '') +
-								              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-								              COALESCE(ct.LastName, '')
-								            ))
-								        ELSE COALESCE(ct.Name, '')
-								      END AS FullName
-								    FROM CaseContacts cc
-								    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
-								    WHERE cc.CaseId = c.Id
-								      AND cc.Role = ?
-								      AND cc.IsPrimary = 1
-								    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
-								) oppContact
-
-								WHERE c.Id = ?
-								  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
-								""".formatted(
+				WHERE c.Id = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+				""".formatted(
 				CASES_TABLE,
 				CASE_USERS_TABLE,
 				USERS_TABLE,
@@ -375,9 +378,9 @@ public final class CaseDao {
 
 			ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 
-			ps.setInt(idx++, ROLE_CASECONTACT_CALLER); // 2
-			ps.setInt(idx++, ROLE_CASECONTACT_CLIENT); // 1
-			ps.setInt(idx++, ROLE_CASECONTACT_OPPOSING_COUNSEL); // 6
+			ps.setInt(idx++, ROLE_CASECONTACT_CALLER);
+			ps.setInt(idx++, ROLE_CASECONTACT_CLIENT);
+			ps.setInt(idx++, ROLE_CASECONTACT_OPPOSING_COUNSEL);
 
 			ps.setLong(idx++, caseId);
 
@@ -392,7 +395,10 @@ public final class CaseDao {
 						rs.getLong("Id"),
 						rs.getString("CaseNumber"),
 						rs.getString("Name"),
+
 						rs.getString("CurrentStatusName"),
+						getNullableInt(rs, "PrimaryStatusId"),
+						rs.getString("PrimaryStatusColor"),
 
 						getNullableInt(rs, "ResponsibleAttorneyUserId"),
 						rs.getString("ResponsibleAttorneyName"),
@@ -408,7 +414,6 @@ public final class CaseDao {
 						team,
 						rs.getString("Description")
 				);
-
 			}
 
 		} catch (SQLException e) {
@@ -543,7 +548,7 @@ public final class CaseDao {
 				FROM %s cu
 				INNER JOIN %s u ON u.Id = cu.UserId
 				WHERE cu.CaseId = ?
-				ORDER BY cu.Role, u.name_last, u.name_first;
+				ORDER BY cu.RoleId, u.name_last, u.name_first;
 				""".formatted(CASE_USERS_TABLE, USERS_TABLE);
 
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -558,6 +563,84 @@ public final class CaseDao {
 				}
 				return list;
 			}
+		}
+	}
+
+	public void setPrimaryStatus(long caseId, int statusId, String notes) {
+		String sql = """
+				BEGIN TRAN;
+
+				DECLARE @now datetime2 = SYSDATETIME();
+
+				-- End any active statuses and clear primary
+				UPDATE dbo.CaseStatuses
+				SET EndDate   = @now,
+				    IsPrimary = 0,
+				    UpdatedAt = @now
+				WHERE CaseId = ?
+				  AND EndDate IS NULL;
+
+				-- Insert new active primary status row
+				INSERT INTO dbo.CaseStatuses
+				    (CaseId, StatusId, EffectiveDate, EndDate, Notes, CreatedAt, UpdatedAt, IsPrimary)
+				VALUES
+				    (?, ?, @now, NULL, ?, @now, @now, 1);
+
+				COMMIT;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			int i = 1;
+			ps.setLong(i++, caseId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, statusId);
+			ps.setString(i++, (notes == null || notes.isBlank()) ? null : notes.trim());
+
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to set primary status (caseId=" + caseId + ", statusId=" + statusId + ")", e);
+		}
+	}
+
+	public record StatusRow(
+			int id,
+			String name,
+			boolean isClosed,
+			int sortOrder,
+			String color
+	) {
+	}
+
+	public List<StatusRow> listStatusesForTenant(int shaleClientId) {
+		String sql = """
+				SELECT Id, Name, IsClosed, SortOrder, Color
+				FROM %s
+				WHERE ShaleClientId = ?
+				ORDER BY SortOrder, Name;
+				""".formatted(STATUSES_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setInt(1, shaleClientId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				List<StatusRow> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(new StatusRow(
+							rs.getInt("Id"),
+							rs.getString("Name"),
+							rs.getBoolean("IsClosed"),
+							rs.getInt("SortOrder"),
+							rs.getString("Color")
+					));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list statuses (clientId=" + shaleClientId + ")", e);
 		}
 	}
 

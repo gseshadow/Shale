@@ -19,7 +19,7 @@ public final class ColorUtil {
 			normalized = normalized.substring(2);
 
 		if (!normalized.matches("(?i)[0-9a-f]{8}"))
-			return "white";
+			return "rgba(0,0,0,0.06)";
 
 		String rr = normalized.substring(0, 2);
 		String gg = normalized.substring(2, 4);
