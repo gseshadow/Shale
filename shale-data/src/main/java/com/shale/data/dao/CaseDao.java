@@ -165,10 +165,6 @@ public final class CaseDao {
 					));
 				}
 			}
-			if (!out.isEmpty()) {
-				CaseRow first = out.get(0);
-				System.out.println("CaseDao.findPage first row: " + first);
-			}
 
 			return new PagedResult<>(out, page, pageSize, total);
 
@@ -572,41 +568,61 @@ public final class CaseDao {
 		}
 	}
 
-
 	public List<ContactRow> listContactsForTenant(int shaleClientId) {
 		String baseSql = """
 				SELECT
 				  Id,
-				  CASE
-				    WHEN (NULLIF(LTRIM(RTRIM(COALESCE(FirstName,''))), '') IS NOT NULL)
-				      OR (NULLIF(LTRIM(RTRIM(COALESCE(LastName,''))), '') IS NOT NULL)
-				    THEN LTRIM(RTRIM(
-				          COALESCE(FirstName, '') +
-				          CASE WHEN COALESCE(FirstName, '') = '' OR COALESCE(LastName, '') = '' THEN '' ELSE ' ' END +
-				          COALESCE(LastName, '')
-				        ))
-				    ELSE COALESCE(Name, '')
-				  END AS DisplayName
+				  LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(FirstName, '') +
+				        CASE WHEN COALESCE(FirstName, '') = '' OR COALESCE(LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(LastName, '')
+				      ELSE
+				        COALESCE(Name, '')
+				    END
+				  )) AS DisplayName
 				FROM Contacts
 				WHERE ShaleClientId = ?
+				  AND NULLIF(LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(FirstName, '') +
+				        CASE WHEN COALESCE(FirstName, '') = '' OR COALESCE(LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(LastName, '')
+				      ELSE
+				        COALESCE(Name, '')
+				    END
+				  )), '') IS NOT NULL
 				""";
 
 		String orderSql = """
-				ORDER BY LastName, FirstName, Name;
+				ORDER BY LastName, FirstName, Name, Id;
 				""";
 
 		try (Connection con = db.requireConnection()) {
 			boolean hasIsDeleted = contactsHasIsDeletedColumn(con);
+
 			String sql = hasIsDeleted
 					? baseSql + "\n  AND (IsDeleted = 0 OR IsDeleted IS NULL)\n" + orderSql
 					: baseSql + "\n" + orderSql;
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				ps.setInt(1, shaleClientId);
+
 				try (ResultSet rs = ps.executeQuery()) {
 					List<ContactRow> out = new ArrayList<>();
 					while (rs.next()) {
-						out.add(new ContactRow(rs.getInt("Id"), rs.getString("DisplayName")));
+						String name = rs.getString("DisplayName");
+						// Extra safety (should already be filtered in SQL)
+						if (name == null || name.isBlank()) {
+							continue;
+						}
+						out.add(new ContactRow(rs.getInt("Id"), name));
 					}
 					return out;
 				}
@@ -634,11 +650,11 @@ public final class CaseDao {
 		String sql = """
 				BEGIN TRY
 				  BEGIN TRAN;
-				
+
 				  DECLARE @now datetime2 = SYSDATETIME();
 				  DECLARE @oldName nvarchar(400) = NULL;
 				  DECLARE @newName nvarchar(400) = NULL;
-				
+
 				  SELECT TOP (1)
 				    @oldName = CASE
 				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
@@ -655,7 +671,7 @@ public final class CaseDao {
 				  WHERE cc.CaseId = ?
 				    AND cc.Role = ?
 				    AND cc.IsPrimary = 1;
-				
+
 				  SELECT TOP (1)
 				    @newName = CASE
 				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
@@ -670,19 +686,19 @@ public final class CaseDao {
 				  FROM dbo.Contacts ct
 				  WHERE ct.Id = ?
 				    AND ct.ShaleClientId = ?;
-				
+
 				  IF (@newName IS NULL)
 				  BEGIN
 				    THROW 50001, 'Contact not found for tenant.', 1;
 				  END
-				
+
 				  UPDATE dbo.CaseContacts
 				  SET IsPrimary = 0,
 				      UpdatedAt = @now
 				  WHERE CaseId = ?
 				    AND Role = ?
 				    AND IsPrimary = 1;
-				
+
 				  UPDATE dbo.CaseContacts
 				  SET IsPrimary = 1,
 				      Notes = ?,
@@ -690,7 +706,7 @@ public final class CaseDao {
 				  WHERE CaseId = ?
 				    AND ContactId = ?
 				    AND Role = ?;
-				
+
 				  IF @@ROWCOUNT = 0
 				  BEGIN
 				    INSERT INTO dbo.CaseContacts
@@ -698,13 +714,13 @@ public final class CaseDao {
 				    VALUES
 				      (?, ?, ?, NULL, 1, ?, @now, @now, @now);
 				  END
-				
+
 				  INSERT INTO dbo.CaseUpdates
 				    (CaseId, ShaleClientId, NoteText, CreatedAt, UpdatedAt, CreatedByUserId, EditedByUserId)
 				  VALUES
 				    (?, ?, CONCAT('Caller changed: ', COALESCE(NULLIF(@oldName, ''), '—'), ' → ', COALESCE(NULLIF(@newName, ''), '—')),
 				     @now, @now, ?, NULL);
-				
+
 				  COMMIT;
 				END TRY
 				BEGIN CATCH

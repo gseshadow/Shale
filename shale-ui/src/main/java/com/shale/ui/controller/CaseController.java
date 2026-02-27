@@ -694,12 +694,12 @@ public class CaseController {
 
 				if (callerChanged) {
 					caseDao.setPrimaryCaseContact(
-						saveCaseId,
-						appState.getShaleClientId(),
-						ROLE_CASECONTACT_CALLER,
-						desiredCallerContactId,
-						appState.getUserId(),
-						null);
+							saveCaseId,
+							appState.getShaleClientId(),
+							ROLE_CASECONTACT_CALLER,
+							desiredCallerContactId,
+							appState.getUserId(),
+							null);
 				}
 
 				// 3) now update UI + publish on FX thread
@@ -1033,7 +1033,6 @@ public class CaseController {
 		}, "case-status-list-" + caseId).start();
 	}
 
-
 	private void onChangeCaller() {
 		if (caseDao == null || appState == null || caseId == null) {
 			showError("Caller change is unavailable.");
@@ -1052,53 +1051,62 @@ public class CaseController {
 		{
 			try {
 				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(clientId);
+
 				runOnFx(() ->
 				{
 					setBusy(false);
+
 					if (contacts == null || contacts.isEmpty()) {
 						showError("No contacts are configured for this tenant.");
 						return;
 					}
 
-					LinkedHashMap<String, CaseDao.ContactRow> labelToRow = new LinkedHashMap<>();
-					String preselect = null;
+					// Extra safety (SQL should already filter blanks now)
+					List<CaseDao.ContactRow> cleaned = contacts.stream()
+							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
+							.toList();
+
+					if (cleaned.isEmpty()) {
+						showError("No usable contacts found (all were blank).");
+						return;
+					}
+
 					Integer currentId = (editMode && draftPrimaryCallerContactId != null)
 							? draftPrimaryCallerContactId
 							: (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId());
 
-					for (CaseDao.ContactRow c : contacts) {
-						String label = c.displayName() + " (#" + c.id() + ")";
-						labelToRow.put(label, c);
-						if (currentId != null && currentId == c.id()) {
-							preselect = label;
+					CaseDao.ContactRow preselectRow = null;
+					if (currentId != null) {
+						for (CaseDao.ContactRow c : cleaned) {
+							if (c.id() == currentId.intValue()) {
+								preselectRow = c;
+								break;
+							}
 						}
 					}
 
-					if (preselect == null) {
-						preselect = labelToRow.keySet().iterator().next();
-					}
+					// Searchable picker
+					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
+							"Change Caller",
+							"Select the primary caller",
+							"Search...",
+							cleaned,
+							preselectRow
+					);
 
-					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
-					dialog.setTitle("Change Caller");
-					dialog.setHeaderText("Select the primary caller");
-					dialog.setContentText("Caller:");
-
-					Optional<String> chosen = dialog.showAndWait();
 					if (chosen.isEmpty()) {
-						return;
+						return; // cancelled
 					}
 
-					CaseDao.ContactRow picked = labelToRow.get(chosen.get());
-					if (picked == null) {
-						return;
-					}
-
+					CaseDao.ContactRow picked = chosen.get();
 					draftPrimaryCallerContactId = picked.id();
 					draftPrimaryCallerName = picked.displayName();
+
 					if (ovCallerValue != null) {
 						ovCallerValue.setText(safe(draftPrimaryCallerName));
 					}
 				});
+
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
@@ -1219,5 +1227,101 @@ public class CaseController {
 		} catch (Exception ignored) {
 			return null;
 		}
+
+	}
+
+	private static Optional<CaseDao.ContactRow> showSearchPickerDialog(
+			String title,
+			String headerText,
+			String searchPrompt,
+			List<CaseDao.ContactRow> items,
+			CaseDao.ContactRow preselectOrNull) {
+		javafx.scene.control.Dialog<CaseDao.ContactRow> dialog = new javafx.scene.control.Dialog<>();
+		dialog.setTitle(title);
+		dialog.setHeaderText(headerText);
+
+		javafx.scene.control.ButtonType okType = new javafx.scene.control.ButtonType("OK", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(okType, javafx.scene.control.ButtonType.CANCEL);
+
+		javafx.scene.control.TextField searchField = new javafx.scene.control.TextField();
+		searchField.setPromptText(searchPrompt);
+
+		javafx.scene.control.ListView<CaseDao.ContactRow> listView = new javafx.scene.control.ListView<>();
+
+		// ✅ Stabilize VirtualFlow layout (fixes "index exceeds maxCellCount" warning)
+		listView.setFixedCellSize(24);
+		listView.setPrefHeight(420);
+
+		listView.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
+			@Override
+			protected void updateItem(CaseDao.ContactRow item, boolean empty) {
+				super.updateItem(item, empty);
+				setText(empty || item == null ? null : (item.displayName() + "  (#" + item.id() + ")"));
+			}
+		});
+
+		javafx.collections.ObservableList<CaseDao.ContactRow> all = javafx.collections.FXCollections.observableArrayList(items);
+		javafx.collections.ObservableList<CaseDao.ContactRow> filtered = javafx.collections.FXCollections.observableArrayList(items);
+		listView.setItems(filtered);
+
+		// preselect
+		if (preselectOrNull != null) {
+			listView.getSelectionModel().select(preselectOrNull);
+			listView.scrollTo(preselectOrNull);
+		} else if (!filtered.isEmpty()) {
+			listView.getSelectionModel().select(0);
+		}
+
+		// filter logic
+		searchField.textProperty().addListener((obs, oldV, newV) ->
+		{
+			String q = (newV == null ? "" : newV.trim().toLowerCase());
+			filtered.setAll(all.filtered(r ->
+			{
+				String name = r == null ? "" : (r.displayName() == null ? "" : r.displayName());
+				// optional: require 2 chars before filtering hard
+				if (q.isEmpty())
+					return true;
+				return name.toLowerCase().contains(q) || String.valueOf(r.id()).contains(q);
+			}));
+
+			if (!filtered.isEmpty()) {
+				listView.getSelectionModel().select(0);
+			}
+		});
+
+		// double-click selects OK
+		listView.setOnMouseClicked(e ->
+		{
+			if (e.getClickCount() == 2) {
+				CaseDao.ContactRow sel = listView.getSelectionModel().getSelectedItem();
+				if (sel != null) {
+					dialog.setResult(sel);
+					dialog.close();
+				}
+			}
+		});
+
+		// disable OK if nothing selected
+		javafx.scene.Node okBtn = dialog.getDialogPane().lookupButton(okType);
+		okBtn.setDisable(listView.getSelectionModel().getSelectedItem() == null);
+		listView.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> okBtn.setDisable(n == null));
+
+		javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(10, searchField, listView);
+		box.setPadding(new javafx.geometry.Insets(10));
+		dialog.getDialogPane().setContent(box);
+
+		dialog.setResultConverter(btn ->
+		{
+			if (btn == okType) {
+				return listView.getSelectionModel().getSelectedItem();
+			}
+			return null;
+		});
+
+		// focus search on open
+		javafx.application.Platform.runLater(searchField::requestFocus);
+
+		return dialog.showAndWait();
 	}
 }
