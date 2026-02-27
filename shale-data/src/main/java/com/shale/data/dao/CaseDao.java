@@ -574,7 +574,7 @@ public final class CaseDao {
 
 
 	public List<ContactRow> listContactsForTenant(int shaleClientId) {
-		String sql = """
+		String baseSql = """
 				SELECT
 				  Id,
 				  CASE
@@ -589,22 +589,44 @@ public final class CaseDao {
 				  END AS DisplayName
 				FROM Contacts
 				WHERE ShaleClientId = ?
-				  AND (COL_LENGTH('dbo.Contacts', 'IsDeleted') IS NULL OR IsDeleted = 0 OR IsDeleted IS NULL)
+				""";
+
+		String orderSql = """
 				ORDER BY LastName, FirstName, Name;
 				""";
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, shaleClientId);
-			try (ResultSet rs = ps.executeQuery()) {
-				List<ContactRow> out = new ArrayList<>();
-				while (rs.next()) {
-					out.add(new ContactRow(rs.getInt("Id"), rs.getString("DisplayName")));
+		try (Connection con = db.requireConnection()) {
+			boolean hasIsDeleted = contactsHasIsDeletedColumn(con);
+			String sql = hasIsDeleted
+					? baseSql + "\n  AND (IsDeleted = 0 OR IsDeleted IS NULL)\n" + orderSql
+					: baseSql + "\n" + orderSql;
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<ContactRow> out = new ArrayList<>();
+					while (rs.next()) {
+						out.add(new ContactRow(rs.getInt("Id"), rs.getString("DisplayName")));
+					}
+					return out;
 				}
-				return out;
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list contacts (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	private static boolean contactsHasIsDeletedColumn(Connection con) throws SQLException {
+		String sql = """
+				SELECT 1
+				FROM INFORMATION_SCHEMA.COLUMNS
+				WHERE TABLE_SCHEMA = 'dbo'
+				  AND TABLE_NAME = 'Contacts'
+				  AND COLUMN_NAME = 'IsDeleted';
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+			return rs.next();
 		}
 	}
 

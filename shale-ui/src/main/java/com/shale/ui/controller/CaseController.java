@@ -812,6 +812,8 @@ public class CaseController {
 				ovDescriptionEditor.setDisable(busy);
 			if (reloadRemoteButton != null)
 				reloadRemoteButton.setDisable(busy);
+			if (changeStatusButton != null)
+				changeStatusButton.setDisable(busy);
 			if (changeCallerButton != null)
 				changeCallerButton.setDisable(busy);
 		});
