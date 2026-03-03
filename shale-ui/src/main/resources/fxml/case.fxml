@@ -114,8 +114,13 @@
 
 					<Label text="Responsible atty:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="2" GridPane.columnIndex="0" />
-					<StackPane fx:id="ovResponsibleAttorneyHost"
-						GridPane.rowIndex="2" GridPane.columnIndex="1" />
+
+					<HBox spacing="8" alignment="CENTER_LEFT"
+						GridPane.rowIndex="2" GridPane.columnIndex="1">
+						<StackPane fx:id="ovResponsibleAttorneyHost" />
+						<Button fx:id="changeResponsibleAttorneyButton"
+							text="Change" visible="false" managed="false" />
+					</HBox>
 
 					<Label text="Case status:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="3" GridPane.columnIndex="0" />
@@ -130,7 +135,7 @@
 						GridPane.rowIndex="4" GridPane.columnIndex="0" />
 					<HBox spacing="8" alignment="CENTER_LEFT"
 						GridPane.rowIndex="4" GridPane.columnIndex="1">
-						<Label fx:id="ovCallerValue" text="—" wrapText="true" />
+						<StackPane fx:id="ovCallerHost" />
 						<Button fx:id="changeCallerButton" text="Change"
 							visible="false" managed="false" />
 					</HBox>
@@ -139,20 +144,29 @@
 						GridPane.rowIndex="5" GridPane.columnIndex="0" />
 					<HBox spacing="8" alignment="CENTER_LEFT"
 						GridPane.rowIndex="5" GridPane.columnIndex="1">
-						<Label fx:id="ovClientValue" text="—" wrapText="true" />
+						<StackPane fx:id="ovClientHost" />
 						<Button fx:id="changeClientButton" text="Change"
 							visible="false" managed="false" />
 					</HBox>
 
 					<Label text="Practice area:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="6" GridPane.columnIndex="0" />
-					<Label fx:id="ovPracticeAreaValue" text="—"
-						GridPane.rowIndex="6" GridPane.columnIndex="1" />
 
-					<Label text="Opposing counsel:" style="-fx-opacity: 0.8;"
+					<HBox spacing="8" alignment="CENTER_LEFT"
+						GridPane.rowIndex="6" GridPane.columnIndex="1">
+						<StackPane fx:id="ovPracticeAreaHost" />
+						<Button fx:id="changePracticeAreaButton" text="Change"
+							visible="false" managed="false" />
+					</HBox>
+
+					<Label text="Opposing Counsel" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="7" GridPane.columnIndex="0" />
-					<Label fx:id="ovOpposingCounselValue" text="—"
-						wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" />
+					<HBox spacing="8" alignment="CENTER_LEFT"
+						GridPane.rowIndex="7" GridPane.columnIndex="1">
+						<StackPane fx:id="ovOpposingCounselHost" />
+						<Button fx:id="changeOpposingCounselButton" text="Change"
+							visible="false" managed="false" />
+					</HBox>
 
 					<Label text="Team:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="8" GridPane.columnIndex="0" />

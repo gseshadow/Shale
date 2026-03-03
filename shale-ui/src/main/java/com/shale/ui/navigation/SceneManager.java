@@ -93,9 +93,9 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			c.init(caseId, caseDao, appState, runtimeBridge);
 
-			// ✅ ADD THIS LINE
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
+			c.setOnOpenContact(this::openContactProfile); // ✅ add
 			return c;
 		});
 	}
@@ -110,6 +110,11 @@ public final class SceneManager {
 		System.out.println("Navigate to Status: " + statusId);
 		// TODO later:
 		// navigate to status manager / filter view / status editor
+	}
+
+	private void openContactProfile(Integer contactId) {
+		System.out.println("Navigate to Contact: " + contactId);
+		// TODO later: navigate to contacts page / contact detail
 	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {

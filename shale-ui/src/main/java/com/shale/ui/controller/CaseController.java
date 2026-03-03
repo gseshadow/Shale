@@ -3,7 +3,6 @@ package com.shale.ui.controller;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -11,6 +10,11 @@ import java.util.function.Consumer;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.data.dao.CaseDao;
+import com.shale.ui.component.factory.ContactCardFactory;
+import com.shale.ui.component.factory.PracticeAreaCardFactory;
+import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
+import com.shale.ui.component.factory.StatusCardFactory;
+import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.component.factory.UserCardFactory.Variant;
@@ -28,13 +32,8 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import com.shale.ui.component.factory.StatusCardFactory;
-import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 
 public class CaseController {
-
-	private static final int ROLE_CASECONTACT_CALLER = 2;
-	private static final int ROLE_CASECONTACT_CLIENT = 1;
 
 	@FXML
 	private Label caseTitleLabel;
@@ -52,6 +51,7 @@ public class CaseController {
 	private Button addTaskButton;
 	@FXML
 	private Button backToCasesButton;
+
 	@FXML
 	private ListView<String> sectionListView;
 	@FXML
@@ -66,26 +66,34 @@ public class CaseController {
 	private Label genericTitleLabel;
 	@FXML
 	private TextArea placeholderTextArea;
+
+	@FXML
+	private Label ovCaseStatusValue;
 	@FXML
 	private Label ovCaseNameValue;
 	@FXML
 	private TextField ovCaseNameEditor;
 	@FXML
 	private Label ovCaseNumberValue;
+
 	@FXML
 	private StackPane ovResponsibleAttorneyHost;
 	@FXML
-	private Label ovCaseStatusValue;
-	@FXML
-	private Label ovCallerValue;
+	private Button changeResponsibleAttorneyButton;
+
 	@FXML
 	private Button changeCallerButton;
 	@FXML
-	private Label ovClientValue;
+	private StackPane ovCallerHost;
+
+	@FXML
+	private StackPane ovClientHost;
+
+	// Legacy label; no longer used for rendering (Practice Area is a card in
+	// ovPracticeAreaHost)
 	@FXML
 	private Label ovPracticeAreaValue;
-	@FXML
-	private Label ovOpposingCounselValue;
+
 	@FXML
 	private Label ovTeamValue;
 	@FXML
@@ -94,22 +102,26 @@ public class CaseController {
 	private Label ovIncidentDateValue;
 	@FXML
 	private Label ovSolDateValue;
+
 	@FXML
 	private Label ovDescriptionValue;
 	@FXML
 	private TextArea ovDescriptionEditor;
+
 	@FXML
 	private Button editButton;
 	@FXML
 	private Button saveButton;
 	@FXML
 	private Button cancelButton;
+
 	@FXML
 	private Label errorLabel;
 	@FXML
 	private HBox remoteUpdateBanner;
 	@FXML
 	private Button reloadRemoteButton;
+
 	@FXML
 	private VBox tasksPanel;
 	@FXML
@@ -118,10 +130,12 @@ public class CaseController {
 	private ListView<String> taskListView;
 	@FXML
 	private Button newTaskInlineButton;
+
 	@FXML
 	private TextField tasksTabSearchField;
 	@FXML
 	private ListView<String> tasksTabListView;
+
 	@FXML
 	private StackPane ovCaseStatusHost;
 	@FXML
@@ -129,28 +143,65 @@ public class CaseController {
 	@FXML
 	private Button changeClientButton;
 
+	@FXML
+	private StackPane ovPracticeAreaHost;
+	@FXML
+	private Button changePracticeAreaButton;
+
+	@FXML
+	private Button changeOpposingCounselButton;
+	@FXML
+	private StackPane ovOpposingCounselHost;
+
+	private static final int ROLE_CASECONTACT_CALLER = 2;
+	private static final int ROLE_CASECONTACT_CLIENT = 1;
+	private static final int ROLE_CASECONTACT_OPPOSING_COUNSEL = 6;
+
 	private StatusCardFactory statusCardFactory;
 	private Consumer<Integer> onOpenStatus;
-	private CaseDao caseDao;
-	private boolean overviewLoaded = false;
-	private Consumer<Integer> onOpenUser;
+
 	private UserCardFactory userCardFactory;
-	private Integer caseId;
-	private boolean editMode = false;
-	private boolean remoteDirty = false;
-	private CaseDetailDto current;
-	private CaseEditModel draft;
+	private Consumer<Integer> onOpenUser;
+
+	private ContactCardFactory contactCardFactory;
+	private Consumer<Integer> onOpenContact;
+
+	private PracticeAreaCardFactory practiceAreaCardFactory;
+	private Consumer<Integer> onOpenPracticeArea;
+
+	private CaseDao caseDao;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
+
+	private Integer caseId;
+	private boolean overviewLoaded = false;
+	private boolean editMode = false;
+
+	private CaseDetailDto current;
 	private CaseOverviewDto currentOverview;
 
-	private Integer draftPrimaryStatusId; // only used in edit mode
+	private CaseEditModel draft;
 
-	private Integer draftPrimaryCallerContactId; // only used in edit mode
-	private String draftPrimaryCallerName; // only used in edit mode
+	// edit-mode drafts
+	private Integer draftPrimaryStatusId;
+
+	private Integer draftPrimaryCallerContactId;
+	private String draftPrimaryCallerName;
 
 	private Integer draftPrimaryClientContactId;
 	private String draftPrimaryClientName;
+
+	// Practice Area drafts
+	private Integer draftPracticeAreaId;
+	private String draftPracticeAreaName;
+	private String draftPracticeAreaColor;
+
+	// Responsible Attorney drafts
+	private Integer draftResponsibleAttorneyUserId;
+
+	// Opposing Counsel drafts
+	private Integer draftPrimaryOpposingCounselContactId;
+	private String draftPrimaryOpposingCounselName;
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -171,6 +222,22 @@ public class CaseController {
 		this.userCardFactory = new UserCardFactory(onOpenUser);
 	}
 
+	public void setOnOpenStatus(Consumer<Integer> onOpenStatus) {
+		this.onOpenStatus = onOpenStatus;
+		this.statusCardFactory = new StatusCardFactory(onOpenStatus);
+	}
+
+	public void setOnOpenContact(Consumer<Integer> onOpenContact) {
+		this.onOpenContact = onOpenContact;
+		this.contactCardFactory = new ContactCardFactory(onOpenContact);
+	}
+
+	/** Optional - if you don’t set this, card click will Sys.out for now */
+	public void setOnOpenPracticeArea(Consumer<Integer> onOpenPracticeArea) {
+		this.onOpenPracticeArea = onOpenPracticeArea;
+		this.practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea);
+	}
+
 	@FXML
 	private void initialize() {
 		refreshHeader();
@@ -181,146 +248,120 @@ public class CaseController {
 		setEditMode(false);
 		clearError();
 		subscribeLiveCaseUpdates();
-		if (changeStatusButton != null) {
+
+		if (changeResponsibleAttorneyButton != null)
+			changeResponsibleAttorneyButton.setOnAction(e -> onChangeResponsibleAttorney());
+		if (changeStatusButton != null)
 			changeStatusButton.setOnAction(e -> onChangeStatus());
-		}
-		if (changeCallerButton != null) {
+		if (changeCallerButton != null)
 			changeCallerButton.setOnAction(e -> onChangeCaller());
-		}
-		if (changeClientButton != null) {
+		if (changeClientButton != null)
 			changeClientButton.setOnAction(e -> onChangeClient());
-		}
+		if (changePracticeAreaButton != null)
+			changePracticeAreaButton.setOnAction(e -> onChangePracticeArea());
+		if (changeOpposingCounselButton != null)
+			changeOpposingCounselButton.setOnAction(e -> onChangeOpposingCounsel());
 	}
 
+	// ----------------------------
+	// Live updates
+	// ----------------------------
+
 	private void subscribeLiveCaseUpdates() {
-		if (runtimeBridge == null) {
+		if (runtimeBridge == null)
 			return;
-		}
 
 		runtimeBridge.subscribeCaseUpdated(event ->
 		{
-			if (caseId == null || event == null || event.caseId() != caseId.intValue()) {
+			if (caseId == null || event == null || event.caseId() != caseId.intValue())
 				return;
-			}
 
-			// Ignore only my own echo (same machine instance)
 			String mine = runtimeBridge.getClientInstanceId();
-			if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId())) {
+			if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId()))
 				return;
-			}
 
-			// Legacy/newName-only event
 			if (event.newName() != null) {
 				runOnFx(() ->
 				{
 					applyLiveCaseName(event.newName());
-					remoteDirty = false;
 					hideRemoteUpdateBanner();
-
-					// Refresh rowVer/current so next Save doesn't conflict
 					refreshCurrentAfterRemoteUpdateAsync();
 				});
 				return;
 			}
 
-			// Patch-based event
 			String rawPatch = event.rawPatchJson();
 			String patchedName = extractPatchString(rawPatch, "name");
 			String patchedDescription = extractPatchString(rawPatch, "description");
 			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
 			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
 			Integer patchedPrimaryClientContactId = extractPatchInt(rawPatch, "primaryClientContactId");
+			Integer patchedPracticeAreaId = extractPatchInt(rawPatch, "practiceAreaId");
+			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
+			Integer patchedPrimaryOpposingCounselContactId = extractPatchInt(rawPatch, "primaryOpposingCounselContactId");
 
-			System.out.println("[DEBUG LIVE] CASE listenerUserId=" + (appState == null ? null : appState.getUserId())
-					+ " event.updatedByUserId=" + event.updatedByUserId()
-					+ " caseId=" + event.caseId()
-					+ " hasPatch=" + (rawPatch != null && !rawPatch.isBlank())
-					+ " hasName=" + (patchedName != null)
-					+ " hasDesc=" + (patchedDescription != null)
-					+ " hasPrimaryStatusId=" + (patchedPrimaryStatusId != null)
-					+ " hasPrimaryCallerContactId=" + (patchedPrimaryCallerContactId != null)
-					+ " hasPrimaryClientContactId=" + (patchedPrimaryClientContactId != null));
-
-			// If we're editing, don't clobber local edits; show the banner.
 			if (editMode) {
 				runOnFx(() ->
 				{
-					remoteDirty = true;
 					showRemoteUpdateBanner();
 				});
 				return;
 			}
 
-			// Status/caller/client change: easiest + most reliable is to reload overview/detail
 			if (patchedPrimaryStatusId != null
 					|| patchedPrimaryCallerContactId != null
-					|| patchedPrimaryClientContactId != null) {
-
+					|| patchedPrimaryClientContactId != null
+					|| patchedPracticeAreaId != null
+					|| patchedResponsibleAttorneyUserId != null
+					|| patchedPrimaryOpposingCounselContactId != null) {
 				runOnFx(() ->
 				{
 					reloadCurrentCaseForViewMode();
-					remoteDirty = false;
 					hideRemoteUpdateBanner();
 				});
 				return;
 			}
 
-			// Name/description patch: apply immediately, then refresh rowVer/current
 			if (patchedName != null || patchedDescription != null) {
 				runOnFx(() ->
 				{
-					if (patchedName != null) {
+					if (patchedName != null)
 						applyLiveCaseName(patchedName);
-					}
-					if (patchedDescription != null) {
+					if (patchedDescription != null)
 						applyLiveCaseDescription(patchedDescription);
-					}
 
-					remoteDirty = false;
 					hideRemoteUpdateBanner();
-
-					// Update current + rowVer from DB after remote change
 					refreshCurrentAfterRemoteUpdateAsync();
 				});
 				return;
 			}
 
-			// Otherwise show banner (unknown patch keys or no patch)
 			runOnFx(() ->
 			{
-				remoteDirty = true;
 				showRemoteUpdateBanner();
 			});
 		});
 	}
 
 	private void refreshCurrentAfterRemoteUpdateAsync() {
-		if (caseDao == null || caseId == null) {
+		if (caseDao == null || caseId == null)
 			return;
-		}
 		final long id = caseId.longValue();
 
 		new Thread(() ->
 		{
 			try {
 				CaseDetailDto fresh = caseDao.getDetail(id);
-				if (fresh == null) {
+				if (fresh == null)
 					return;
-				}
+
 				runOnFx(() ->
 				{
-					// If user started editing while this was loading, don't overwrite draft.
 					if (editMode) {
-						remoteDirty = true;
 						showRemoteUpdateBanner();
 						return;
 					}
-
-					// Update backing model so rowVer is current (prevents "updated elsewhere" on next save)
 					current = fresh;
-
-					// Optional: keep header "Last updated" fresh if you want:
-					// applyDetail(fresh); // only if it won't visually jump in a bad way
 				});
 			} catch (Exception ignored) {
 			}
@@ -329,30 +370,36 @@ public class CaseController {
 
 	private void applyLiveCaseName(String newName) {
 		String safeName = safeText(newName).trim();
-		if (!safeName.isBlank()) {
-			if (ovCaseNameValue != null) {
-				ovCaseNameValue.setText(safeName);
-			}
-			if (current != null) {
-				String num = safeText(current.getCaseNumber());
-				if (caseTitleLabel != null) {
-					caseTitleLabel.setText(num.isBlank() ? safeName : safeName + " — " + num);
-				}
-			}
-		}
+		if (safeName.isBlank())
+			return;
+
+		if (ovCaseNameValue != null)
+			ovCaseNameValue.setText(safeName);
+
+		String num = (current == null) ? "" : safeText(current.getCaseNumber());
+		if (caseTitleLabel != null)
+			caseTitleLabel.setText(num.isBlank() ? safeName : safeName + " — " + num);
 	}
 
 	private void applyLiveCaseDescription(String newDescription) {
-		String safeDesc = safeText(newDescription);
-		if (ovDescriptionValue != null) {
-			ovDescriptionValue.setText(safeDesc);
-		}
+		if (ovDescriptionValue != null)
+			ovDescriptionValue.setText(safeText(newDescription));
+	}
+
+	// ----------------------------
+	// Loading + applying data
+	// ----------------------------
+
+	private void loadOverviewOnce() {
+		if (overviewLoaded || caseDao == null || caseId == null)
+			return;
+		overviewLoaded = true;
+		reloadCurrentCaseForViewMode();
 	}
 
 	private void reloadCurrentCaseForViewMode() {
 		if (caseDao == null || caseId == null)
 			return;
-
 		final long activeCaseId = caseId.longValue();
 
 		new Thread(() ->
@@ -362,41 +409,211 @@ public class CaseController {
 
 			runOnFx(() ->
 			{
-				if (overview != null) {
+				if (overview != null)
 					applyOverviewEditSafe(overview);
-				}
 
-				// Update backing model always; only paint detail when not editing
 				if (detail != null) {
 					current = detail;
-					if (!editMode) {
+					if (!editMode)
 						applyDetail(detail);
-					}
 				}
 
-				remoteDirty = false;
 				hideRemoteUpdateBanner();
-				clearError(); // optional; note it also hides the banner in your current implementation
+				clearError();
 			});
 		}, "case-view-sync-" + activeCaseId).start();
 	}
 
-	private void repaintViewLabels() {
-		if (editMode || current == null) {
+	private void applyOverview(CaseOverviewDto dto) {
+		currentOverview = dto;
+
+		if (caseTitleLabel != null) {
+			String name = safeText(dto.getCaseName()).trim();
+			String num = safeText(dto.getCaseNumber()).trim();
+			if (!name.isBlank() && !num.isBlank())
+				caseTitleLabel.setText(name + " — " + num);
+			else if (!name.isBlank())
+				caseTitleLabel.setText(name);
+			else if (!num.isBlank())
+				caseTitleLabel.setText(num);
+			else
+				caseTitleLabel.setText("Case #" + dto.getCaseId());
+		}
+
+		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()),
+				dto.getResponsibleAttorneyColor());
+
+		if (ovCaseNameValue != null)
+			ovCaseNameValue.setText(safe(dto.getCaseName()));
+		if (ovCaseNumberValue != null)
+			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
+
+		renderPrimaryStatusMini(dto.getPrimaryStatusId(), dto.getCaseStatus(), dto.getPrimaryStatusColor());
+
+		// Caller/Client: ALWAYS render cards (even if id is null)
+		String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
+				? draftPrimaryCallerName
+				: dto.getCaller();
+		Integer callerId = (editMode && draftPrimaryCallerContactId != null)
+				? draftPrimaryCallerContactId
+				: dto.getPrimaryCallerContactId();
+		renderCallerMini(callerId, callerName);
+
+		String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
+				? draftPrimaryClientName
+				: dto.getClient();
+		Integer clientId = (editMode && draftPrimaryClientContactId != null)
+				? draftPrimaryClientContactId
+				: dto.getPrimaryClientContactId();
+		renderClientMini(clientId, clientName);
+
+		String oppName = (editMode && draftPrimaryOpposingCounselName != null && !draftPrimaryOpposingCounselName.isBlank())
+				? draftPrimaryOpposingCounselName
+				: dto.getOpposingCounsel();
+
+		Integer oppId = (editMode && draftPrimaryOpposingCounselContactId != null)
+				? draftPrimaryOpposingCounselContactId
+				: dto.getPrimaryOpposingCounselContactId();
+
+		renderOpposingCounselMini(oppId, oppName);
+
+		// Practice Area: card (draft-aware)
+		Integer paId = (editMode && draftPracticeAreaId != null) ? draftPracticeAreaId : dto.getPracticeAreaId();
+		String paName = (editMode && draftPracticeAreaName != null && !draftPracticeAreaName.isBlank())
+				? draftPracticeAreaName
+				: dto.getPracticeArea();
+		String paColor = (editMode && draftPracticeAreaColor != null && !draftPracticeAreaColor.isBlank())
+				? draftPracticeAreaColor
+				: dto.getPracticeAreaColor();
+		renderPracticeAreaMini(paId, paName, paColor);
+
+		if (ovTeamValue != null) {
+			List<String> team = dto.getTeam();
+			ovTeamValue.setText(team == null || team.isEmpty() ? "—" : String.join(", ", team));
+		}
+
+		if (ovIntakeDateValue != null)
+			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
+		if (ovIncidentDateValue != null)
+			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
+		if (ovSolDateValue != null)
+			ovSolDateValue.setText(formatDate(dto.getSolDate()));
+
+		if (ovDescriptionValue != null)
+			ovDescriptionValue.setText(safeText(dto.getDescription()));
+	}
+
+	private void applyDetail(CaseDetailDto detail) {
+		if (detail == null)
+			return;
+
+		if (!editMode && ovCaseNameValue != null)
+			ovCaseNameValue.setText(safe(detail.getCaseName()));
+		if (!editMode && ovDescriptionValue != null)
+			ovDescriptionValue.setText(safeText(detail.getDescription()));
+
+		if (statusLabel != null)
+			statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
+		if (lastUpdatedLabel != null)
+			lastUpdatedLabel.setText("Last updated: " + formatDateTime(detail.getUpdatedAt()));
+
+		if (caseTitleLabel != null) {
+			String num = safeText(detail.getCaseNumber()).trim();
+			String name = safeText(detail.getCaseName()).trim();
+			if (!name.isBlank() && !num.isBlank())
+				caseTitleLabel.setText(name + " — " + num);
+			else if (!name.isBlank())
+				caseTitleLabel.setText(name);
+			else if (!num.isBlank())
+				caseTitleLabel.setText(num);
+		}
+	}
+
+	private void applyOverviewEditSafe(CaseOverviewDto dto) {
+		currentOverview = dto;
+
+		// Always safe to refresh these while editing:
+		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()),
+				dto.getResponsibleAttorneyColor());
+
+		Integer statusId = (editMode && draftPrimaryStatusId != null) ? draftPrimaryStatusId : dto.getPrimaryStatusId();
+		renderPrimaryStatusMini(statusId, dto.getCaseStatus(), dto.getPrimaryStatusColor());
+
+		// Always render contact cards (draft if present, else dto)
+		Integer callerId = (editMode && draftPrimaryCallerContactId != null) ? draftPrimaryCallerContactId
+				: dto.getPrimaryCallerContactId();
+		String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
+				? draftPrimaryCallerName
+				: dto.getCaller();
+		renderCallerMini(callerId, callerName);
+
+		Integer clientId = (editMode && draftPrimaryClientContactId != null) ? draftPrimaryClientContactId
+				: dto.getPrimaryClientContactId();
+		String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
+				? draftPrimaryClientName
+				: dto.getClient();
+		renderClientMini(clientId, clientName);
+
+		// Practice Area card (draft-aware)
+		Integer paId = (editMode && draftPracticeAreaId != null) ? draftPracticeAreaId : dto.getPracticeAreaId();
+		String paName = (editMode && draftPracticeAreaName != null && !draftPracticeAreaName.isBlank())
+				? draftPracticeAreaName
+				: dto.getPracticeArea();
+		String paColor = (editMode && draftPracticeAreaColor != null && !draftPracticeAreaColor.isBlank())
+				? draftPracticeAreaColor
+				: dto.getPracticeAreaColor();
+		renderPracticeAreaMini(paId, paName, paColor);
+
+		String oppName = (editMode && draftPrimaryOpposingCounselName != null && !draftPrimaryOpposingCounselName.isBlank())
+				? draftPrimaryOpposingCounselName
+				: dto.getOpposingCounsel();
+
+		Integer oppId = (editMode && draftPrimaryOpposingCounselContactId != null)
+				? draftPrimaryOpposingCounselContactId
+				: dto.getPrimaryOpposingCounselContactId();
+
+		renderOpposingCounselMini(oppId, oppName);
+
+		// Header title is OK to refresh
+		if (caseTitleLabel != null) {
+			String name = safeText(dto.getCaseName()).trim();
+			String num = safeText(dto.getCaseNumber()).trim();
+			if (!name.isBlank() && !num.isBlank())
+				caseTitleLabel.setText(name + " — " + num);
+			else if (!name.isBlank())
+				caseTitleLabel.setText(name);
+			else if (!num.isBlank())
+				caseTitleLabel.setText(num);
+			else
+				caseTitleLabel.setText("Case #" + dto.getCaseId());
+		}
+
+		// If NOT editing, apply everything
+		if (!editMode) {
+			applyOverview(dto);
 			return;
 		}
-		applyDetail(current);
+
+		// While editing: refresh only safe labels
+		if (ovCaseNumberValue != null)
+			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
+
+		if (ovTeamValue != null) {
+			List<String> team = dto.getTeam();
+			ovTeamValue.setText(team == null || team.isEmpty() ? "—" : String.join(", ", team));
+		}
+
+		if (ovIntakeDateValue != null)
+			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
+		if (ovIncidentDateValue != null)
+			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
+		if (ovSolDateValue != null)
+			ovSolDateValue.setText(formatDate(dto.getSolDate()));
 	}
 
-	private void showRemoteUpdateBanner() {
-		setVisibleManaged(remoteUpdateBanner, true);
-		setVisibleManaged(reloadRemoteButton, true);
-	}
-
-	private void hideRemoteUpdateBanner() {
-		setVisibleManaged(remoteUpdateBanner, false);
-		setVisibleManaged(reloadRemoteButton, false);
-	}
+	// ----------------------------
+	// Edit / Save / Cancel / Reload
+	// ----------------------------
 
 	private void wireEditButtons() {
 		if (editButton != null)
@@ -409,246 +626,81 @@ public class CaseController {
 			reloadRemoteButton.setOnAction(e -> onReloadRemote());
 	}
 
-	private void onReloadRemote() {
-		draft = null;
-		remoteDirty = false;
-		setEditMode(false);
-		hideRemoteUpdateBanner();
-		clearError();
-		reloadCurrentCaseForViewMode();
-	}
-
-	private void setupSections() {
-		if (sectionListView == null)
-			return;
-		sectionListView.getItems().setAll("Overview", "Tasks", "Timeline", "Details", "People", "Organizations", "Documents");
-		sectionListView.getSelectionModel().select("Overview");
-		sectionListView.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) ->
-		{
-			if (newV == null)
-				return;
-			switch (newV) {
-			case "Overview" -> showOverview();
-			case "Tasks" -> showTasksTab();
-			default -> showGeneric(newV);
-			}
-		});
-		showOverview();
-	}
-
-	private void showOverview() {
-		setPaneVisible(overviewPane, true);
-		setPaneVisible(tasksTabPane, false);
-		setPaneVisible(genericPane, false);
-		setPaneVisible(tasksPanel, true);
-		if (contentTitleLabel != null)
-			contentTitleLabel.setText("Overview");
-		loadOverviewOnce();
-	}
-
-	private void showTasksTab() {
-		setPaneVisible(overviewPane, false);
-		setPaneVisible(tasksTabPane, true);
-		setPaneVisible(genericPane, false);
-		setPaneVisible(tasksPanel, false);
-		if (tasksTabListView != null && tasksTabListView.getItems().isEmpty()) {
-			tasksTabListView.getItems().setAll("Call client (placeholder)", "Request records (placeholder)", "Review radiology (placeholder)",
-					"Draft demand (placeholder)", "Schedule depo (placeholder)");
-		}
-	}
-
-	private void showGeneric(String sectionName) {
-		setPaneVisible(overviewPane, false);
-		setPaneVisible(tasksTabPane, false);
-		setPaneVisible(genericPane, true);
-		setPaneVisible(tasksPanel, false);
-		if (genericTitleLabel != null)
-			genericTitleLabel.setText(sectionName);
-		if (placeholderTextArea != null && (placeholderTextArea.getText() == null || placeholderTextArea.getText().isBlank())) {
-			placeholderTextArea.setText(sectionName + " view is not implemented yet.");
-		}
-	}
-
-	private void setupOverviewTasksPanel() {
-		if (taskListView != null) {
-			taskListView.getItems().setAll("Past due: Call client (placeholder)", "Upcoming: Request records (placeholder)",
-					"Upcoming: Review radiology (placeholder)", "Upcoming: Send HIPAA auth (placeholder)", "Upcoming: Draft demand outline (placeholder)");
-		}
-		if (taskSearchField != null) {
-			taskSearchField.setOnAction(e ->
-			{
-			});
-		}
-		if (newTaskInlineButton != null) {
-			newTaskInlineButton.setOnAction(e ->
-			{
-			});
-		}
-	}
-
-	private void refreshHeader() {
-		if (caseTitleLabel == null || caseId == null)
-			return;
-		caseTitleLabel.setText("Case #" + caseId + " (Placeholder)");
-		renderPrimaryStatusMini(null, "—", null);
-		renderResponsibleAttorneyMini(null, "—", null);
-		if (lastUpdatedLabel != null)
-			lastUpdatedLabel.setText("Last updated: —");
-	}
-
-	private void refreshOverviewPlaceholders() {
-		if (ovCaseNameValue != null)
-			ovCaseNameValue.setText(caseId == null ? "—" : "Case #" + caseId + " (Placeholder name)");
-		if (ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(caseId == null ? "—" : String.valueOf(caseId));
-		renderResponsibleAttorneyMini(null, "—", null);
-		if (ovCaseStatusValue != null)
-			ovCaseStatusValue.setText("—");
-		if (ovCallerValue != null)
-			ovCallerValue.setText("—");
-		if (ovClientValue != null)
-			ovClientValue.setText("—");
-		if (ovPracticeAreaValue != null)
-			ovPracticeAreaValue.setText("—");
-		if (ovOpposingCounselValue != null)
-			ovOpposingCounselValue.setText("—");
-		if (ovTeamValue != null)
-			ovTeamValue.setText("—");
-		if (ovIntakeDateValue != null)
-			ovIntakeDateValue.setText(formatDate(null));
-		if (ovIncidentDateValue != null)
-			ovIncidentDateValue.setText(formatDate(null));
-		if (ovSolDateValue != null)
-			ovSolDateValue.setText(formatDate(null));
-		if (ovDescriptionValue != null)
-			ovDescriptionValue.setText("");
-	}
-
-	private void loadOverviewOnce() {
-		if (overviewLoaded || caseDao == null || caseId == null)
-			return;
-		overviewLoaded = true;
-		reloadCurrentCaseForViewMode();
-	}
-
-	private void applyOverview(CaseOverviewDto dto) {
-		currentOverview = dto;
-		if (caseTitleLabel != null) {
-			String name = dto.getCaseName();
-			String num = dto.getCaseNumber();
-			String title;
-
-			if (name != null && !name.isBlank() && num != null && !num.isBlank()) {
-				title = name + " — " + num;
-			} else if (name != null && !name.isBlank()) {
-				title = name;
-			} else if (num != null && !num.isBlank()) {
-				title = num;
-			} else {
-				title = "Case #" + dto.getCaseId();
-			}
-			caseTitleLabel.setText(title);
-		}
-		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()), dto.getResponsibleAttorneyColor());
-		if (ovCaseNameValue != null)
-			ovCaseNameValue.setText(safe(dto.getCaseName()));
-		if (ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
-		renderPrimaryStatusMini(
-				dto.getPrimaryStatusId(), // you’ll add this to the DTO
-				dto.getCaseStatus(), // name you already have
-				dto.getPrimaryStatusColor() // you’ll add this to the DTO
-		);
-		if (ovCallerValue != null) {
-			String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
-					? draftPrimaryCallerName
-					: dto.getCaller();
-			ovCallerValue.setText(safe(callerName));
-		}
-		if (ovClientValue != null)
-			ovClientValue.setText(safe(dto.getClient()));
-		if (ovPracticeAreaValue != null)
-			ovPracticeAreaValue.setText(safe(dto.getPracticeArea()));
-		if (ovOpposingCounselValue != null)
-			ovOpposingCounselValue.setText(safe(dto.getOpposingCounsel()));
-		if (ovTeamValue != null) {
-			List<String> team = dto.getTeam();
-			ovTeamValue.setText(team == null || team.isEmpty() ? "—" : String.join(", ", team));
-		}
-		if (ovIntakeDateValue != null)
-			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
-		if (ovIncidentDateValue != null)
-			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
-		if (ovSolDateValue != null)
-			ovSolDateValue.setText(formatDate(dto.getSolDate()));
-		if (ovDescriptionValue != null)
-			ovDescriptionValue.setText(safeText(dto.getDescription()));
-	}
-
-	private void applyDetail(CaseDetailDto detail) {
-		if (detail == null)
-			return;
-		if (!editMode && ovCaseNameValue != null)
-			ovCaseNameValue.setText(safe(detail.getCaseName()));
-		if (!editMode && ovDescriptionValue != null)
-			ovDescriptionValue.setText(safeText(detail.getDescription()));
-		if (statusLabel != null)
-			statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
-		if (lastUpdatedLabel != null)
-			lastUpdatedLabel.setText("Last updated: " + formatDateTime(detail.getUpdatedAt()));
-		if (caseTitleLabel != null) {
-			String num = safeText(detail.getCaseNumber());
-			String name = safeText(detail.getCaseName());
-			if (!name.isBlank() && !num.isBlank()) {
-				caseTitleLabel.setText(name + " — " + num);
-			} else if (!name.isBlank()) {
-				caseTitleLabel.setText(name);
-			} else if (!num.isBlank()) {
-				caseTitleLabel.setText(num);
-			}
-		}
-	}
-
-	private String formatDateTime(LocalDateTime value) {
-		return value == null ? "—" : value.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-	}
-
 	private void onEdit() {
+		// snapshot drafts from currentOverview (IMPORTANT: include client too)
 		draftPrimaryStatusId = (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
+
 		draftPrimaryCallerContactId = (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId());
 		draftPrimaryCallerName = (currentOverview == null ? null : currentOverview.getCaller());
+
+		draftPrimaryClientContactId = (currentOverview == null ? null : currentOverview.getPrimaryClientContactId());
+		draftPrimaryClientName = (currentOverview == null ? null : currentOverview.getClient());
+
+		// Practice Area drafts
+		draftPracticeAreaId = (currentOverview == null ? null : currentOverview.getPracticeAreaId());
+		draftPracticeAreaName = (currentOverview == null ? null : currentOverview.getPracticeArea());
+		draftPracticeAreaColor = (currentOverview == null ? null : currentOverview.getPracticeAreaColor());
+
+		// Opposing Counsel Drafts
+		draftPrimaryOpposingCounselContactId = (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId());
+		draftPrimaryOpposingCounselName = (currentOverview == null ? null : currentOverview.getOpposingCounsel());
+
 		if (current == null) {
 			showError("Case is still loading. Please try again.");
 			return;
 		}
+
 		draft = new CaseEditModel(current.getCaseName(), current.getDescription());
+
 		if (ovCaseNameEditor != null)
 			ovCaseNameEditor.setText(draft.caseName());
 		if (ovDescriptionEditor != null)
 			ovDescriptionEditor.setText(draft.description());
-		remoteDirty = false;
+
 		hideRemoteUpdateBanner();
 		clearError();
+
 		setEditMode(true);
+
+		// Force repaint of cards using draft values
+		if (currentOverview != null)
+			applyOverviewEditSafe(currentOverview);
 	}
 
 	private void onCancel() {
 		draft = null;
-		remoteDirty = false;
 		hideRemoteUpdateBanner();
 		clearError();
+
 		draftPrimaryStatusId = null;
+
 		draftPrimaryCallerContactId = null;
 		draftPrimaryCallerName = null;
+
+		draftPrimaryClientContactId = null;
+		draftPrimaryClientName = null;
+
+		draftPracticeAreaId = null;
+		draftPracticeAreaName = null;
+		draftPracticeAreaColor = null;
+		draftPrimaryOpposingCounselContactId = null;
+		draftPrimaryOpposingCounselName = null;
+
 		setEditMode(false);
+
 		if (currentOverview != null)
 			applyOverviewEditSafe(currentOverview);
 		applyDetail(current);
 	}
 
 	private void onSave() {
+		// Keep behavior obvious (helps if something silently returns)
 		if (caseDao == null) {
 			showError("Case service is unavailable.");
+			return;
+		}
+		if (caseId == null) {
+			showError("No case is selected.");
 			return;
 		}
 		if (current == null) {
@@ -656,10 +708,10 @@ public class CaseController {
 			return;
 		}
 		if (ovCaseNameEditor == null || ovDescriptionEditor == null) {
+			showError("Edit fields are not available.");
 			return;
 		}
 
-		// Capture "before" values so we can publish per-field changes after save
 		final String oldName = safeText(current.getCaseName()).trim();
 		final String oldDescription = safeText(current.getDescription());
 
@@ -676,9 +728,16 @@ public class CaseController {
 		final byte[] expectedRowVer = current.getRowVer();
 		final long saveCaseId = caseId.longValue();
 
-		// capture these once (avoid reading appState off-thread repeatedly)
 		final Integer tenantId = (appState == null ? null : appState.getShaleClientId());
 		final Integer userId = (appState == null ? null : appState.getUserId());
+
+		// ✅ SNAPSHOT draft selections NOW (before thread starts)
+		final Integer desiredStatusId = draftPrimaryStatusId;
+		final Integer desiredCallerContactId = draftPrimaryCallerContactId;
+		final Integer desiredClientContactId = draftPrimaryClientContactId;
+		final Integer desiredPracticeAreaId = draftPracticeAreaId;
+		final Integer desiredResponsibleAttorneyUserId = draftResponsibleAttorneyUserId;
+		final Integer desiredOpposingCounselContactId = draftPrimaryOpposingCounselContactId;
 
 		setBusy(true);
 		clearError();
@@ -686,12 +745,16 @@ public class CaseController {
 		new Thread(() ->
 		{
 			try {
-				// 1) update name/description
-				CaseDetailDto updated = caseDao.updateCase(saveCaseId, saveDraft.caseName(), saveDraft.description(), expectedRowVer);
+				CaseDetailDto updated = caseDao.updateCase(
+						saveCaseId,
+						saveDraft.caseName(),
+						saveDraft.description(),
+						expectedRowVer
+				);
+
 				if (updated == null) {
 					runOnFx(() ->
 					{
-						remoteDirty = true;
 						showRemoteUpdateBanner();
 						showError("This case was updated elsewhere. Reload and try again.");
 						setBusy(false);
@@ -699,81 +762,95 @@ public class CaseController {
 					return;
 				}
 
-				// 2) status change (only if changed)
+				// Use currentOverview as baseline (can be null)
 				Integer baseStatusId = currentOverview == null ? null : currentOverview.getPrimaryStatusId();
-				Integer desiredStatusId = draftPrimaryStatusId;
 				boolean statusChanged = desiredStatusId != null && !desiredStatusId.equals(baseStatusId);
-
 				if (statusChanged) {
 					caseDao.setPrimaryStatus(saveCaseId, desiredStatusId, null);
 				}
 
-				// 3) caller change (only if changed)
 				Integer baseCallerContactId = currentOverview == null ? null : currentOverview.getPrimaryCallerContactId();
-				Integer desiredCallerContactId = draftPrimaryCallerContactId;
 				boolean callerChanged = desiredCallerContactId != null && !desiredCallerContactId.equals(baseCallerContactId);
-
 				if (callerChanged) {
+					if (tenantId == null || tenantId <= 0)
+						throw new RuntimeException("No tenant is selected.");
 					caseDao.setPrimaryCaseContact(
-							saveCaseId,
-							tenantId,
-							ROLE_CASECONTACT_CALLER,
-							desiredCallerContactId,
-							userId,
-							null
+							saveCaseId, tenantId, ROLE_CASECONTACT_CALLER, desiredCallerContactId, userId, null
 					);
 				}
 
-				// 4) client change (only if changed)
 				Integer baseClientContactId = currentOverview == null ? null : currentOverview.getPrimaryClientContactId();
-				Integer desiredClientContactId = draftPrimaryClientContactId;
 				boolean clientChanged = desiredClientContactId != null && !desiredClientContactId.equals(baseClientContactId);
-
 				if (clientChanged) {
+					if (tenantId == null || tenantId <= 0)
+						throw new RuntimeException("No tenant is selected.");
 					caseDao.setPrimaryCaseContact(
-							saveCaseId,
-							tenantId,
-							ROLE_CASECONTACT_CLIENT,
-							desiredClientContactId,
-							userId,
-							null
+							saveCaseId, tenantId, ROLE_CASECONTACT_CLIENT, desiredClientContactId, userId, null
 					);
 				}
 
-				// 5) update UI + publish on FX thread
+				Integer basePracticeAreaId = currentOverview == null ? null : currentOverview.getPracticeAreaId();
+				boolean practiceAreaChanged = desiredPracticeAreaId != null && !desiredPracticeAreaId.equals(basePracticeAreaId);
+				if (practiceAreaChanged) {
+					if (tenantId == null || tenantId <= 0)
+						throw new RuntimeException("No tenant is selected.");
+					caseDao.setPracticeArea(saveCaseId, tenantId, desiredPracticeAreaId);
+				}
+
+				Integer baseAttyId = currentOverview == null ? null : currentOverview.getResponsibleAttorneyUserId();
+				boolean attyChanged = desiredResponsibleAttorneyUserId != null
+						&& !desiredResponsibleAttorneyUserId.equals(baseAttyId);
+				if (attyChanged) {
+					caseDao.setResponsibleAttorney(saveCaseId, desiredResponsibleAttorneyUserId);
+				}
+
+				Integer baseOpposingCounselContactId = currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId();
+				boolean opposingCounselChanged = desiredOpposingCounselContactId != null
+						&& !desiredOpposingCounselContactId.equals(baseOpposingCounselContactId);
+				if (opposingCounselChanged) {
+					if (tenantId == null || tenantId <= 0)
+						throw new RuntimeException("No tenant is selected.");
+					caseDao.setPrimaryCaseContact(
+							saveCaseId, tenantId, ROLE_CASECONTACT_OPPOSING_COUNSEL, desiredOpposingCounselContactId, userId, null
+					);
+				}
+
 				runOnFx(() ->
 				{
 					current = updated;
+
 					setEditMode(false);
 					draft = null;
-					remoteDirty = false;
+
 					hideRemoteUpdateBanner();
+
 					applyDetail(updated);
 					clearError();
 					setBusy(false);
 
-					// publish name/desc changes
+					// publish diffs (optional)
 					String newName = safeText(saveDraft.caseName()).trim();
 					String newDesc = safeText(saveDraft.description());
 
-					if (!newName.equals(oldName)) {
+					if (!newName.equals(oldName))
 						publishCaseFieldUpdated(saveCaseId, "name", newName);
-					}
-					if (!newDesc.equals(oldDescription)) {
+					if (!newDesc.equals(oldDescription))
 						publishCaseFieldUpdated(saveCaseId, "description", newDesc);
-					}
 
-					if (statusChanged) {
+					if (statusChanged)
 						publishCaseFieldUpdated(saveCaseId, "primaryStatusId", desiredStatusId);
-					}
-					if (callerChanged) {
+					if (callerChanged)
 						publishCaseFieldUpdated(saveCaseId, "primaryCallerContactId", desiredCallerContactId);
-					}
-					if (clientChanged) {
+					if (clientChanged)
 						publishCaseFieldUpdated(saveCaseId, "primaryClientContactId", desiredClientContactId);
-					}
+					if (practiceAreaChanged)
+						publishCaseFieldUpdated(saveCaseId, "practiceAreaId", desiredPracticeAreaId);
+					if (attyChanged)
+						publishCaseFieldUpdated(saveCaseId, "responsibleAttorneyUserId", desiredResponsibleAttorneyUserId);
+					if (opposingCounselChanged)
+						publishCaseFieldUpdated(saveCaseId, "primaryOpposingCounselContactId", desiredOpposingCounselContactId);
 
-					// ✅ clear drafts after success
+					// clear drafts
 					draftPrimaryStatusId = null;
 
 					draftPrimaryCallerContactId = null;
@@ -782,7 +859,16 @@ public class CaseController {
 					draftPrimaryClientContactId = null;
 					draftPrimaryClientName = null;
 
-					// refresh overview so currentOverview reflects new ids/names/colors
+					draftPracticeAreaId = null;
+					draftPracticeAreaName = null;
+					draftPracticeAreaColor = null;
+
+					draftResponsibleAttorneyUserId = null;
+
+					draftPrimaryOpposingCounselContactId = null;
+					draftPrimaryOpposingCounselName = null;
+
+					// refresh overview to pick up updated names/colors/ids
 					reloadCurrentCaseForViewMode();
 				});
 
@@ -797,50 +883,49 @@ public class CaseController {
 	}
 
 	private void publishCaseFieldUpdated(long caseId, String field, Object newValueOrNull) {
-		if (runtimeBridge == null || appState == null
-				|| appState.getShaleClientId() == null
-				|| appState.getUserId() == null) {
+		if (runtimeBridge == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null)
 			return;
-		}
 
 		try {
 			int clientId = appState.getShaleClientId();
 			int userId = appState.getUserId();
 
-			System.out.println("[LIVE] publish Case field update caseId=" + caseId
-					+ " clientId=" + clientId
-					+ " updatedBy=" + userId
-					+ " field=" + field
-					+ " hasValue=" + (newValueOrNull != null));
-
-			runtimeBridge.publishEntityFieldUpdated(
-					"Case",
-					(int) caseId,
-					clientId,
-					userId,
-					field,
-					newValueOrNull
-			);
+			runtimeBridge.publishEntityFieldUpdated("Case", (int) caseId, clientId, userId, field, newValueOrNull);
 		} catch (Exception ex) {
 			System.out.println("CaseUpdated publish skipped: " + ex.getMessage());
 		}
 	}
 
+	private void onReloadRemote() {
+		draft = null;
+		setEditMode(false);
+		hideRemoteUpdateBanner();
+		clearError();
+		reloadCurrentCaseForViewMode();
+	}
+
 	private void setEditMode(boolean enabled) {
 		this.editMode = enabled;
+
 		setVisibleManaged(ovCaseNameValue, !enabled);
 		setVisibleManaged(ovCaseNameEditor, enabled);
+
 		setVisibleManaged(ovDescriptionValue, !enabled);
 		setVisibleManaged(ovDescriptionEditor, enabled);
+
 		setVisibleManaged(editButton, !enabled);
 		setVisibleManaged(saveButton, enabled);
 		setVisibleManaged(cancelButton, enabled);
-		if (!enabled) {
+
+		if (!enabled)
 			hideRemoteUpdateBanner();
-		}
+
+		setVisibleManaged(changeResponsibleAttorneyButton, enabled);
 		setVisibleManaged(changeStatusButton, enabled);
 		setVisibleManaged(changeCallerButton, enabled);
 		setVisibleManaged(changeClientButton, enabled);
+		setVisibleManaged(changePracticeAreaButton, enabled);
+		setVisibleManaged(changeOpposingCounselButton, enabled);
 
 	}
 
@@ -865,144 +950,18 @@ public class CaseController {
 				changeCallerButton.setDisable(busy);
 			if (changeClientButton != null)
 				changeClientButton.setDisable(busy);
+			if (changePracticeAreaButton != null)
+				changePracticeAreaButton.setDisable(busy);
+			if (changeResponsibleAttorneyButton != null)
+				changeResponsibleAttorneyButton.setDisable(busy);
+			if (changeOpposingCounselButton != null)
+				changeOpposingCounselButton.setDisable(busy);
 		});
 	}
 
-	private static void runOnFx(Runnable runnable) {
-		if (Platform.isFxApplicationThread()) {
-			runnable.run();
-		} else {
-			Platform.runLater(runnable);
-		}
-	}
-
-	private void clearError() {
-		if (errorLabel != null) {
-			errorLabel.setText("");
-			errorLabel.setVisible(false);
-			errorLabel.setManaged(false);
-		}
-		hideRemoteUpdateBanner();
-	}
-
-	private void showError(String message) {
-		if (errorLabel != null) {
-			errorLabel.setText(message == null ? "" : message);
-			errorLabel.setVisible(message != null && !message.isBlank());
-			errorLabel.setManaged(message != null && !message.isBlank());
-		}
-	}
-
-	private void renderResponsibleAttorneyMini(Integer userId, String displayName, String userColorCss) {
-		if (userCardFactory == null) {
-			userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
-			{
-			} : onOpenUser);
-		}
-
-		UserCardModel model = new UserCardModel(userId,
-				(displayName == null || displayName.isBlank()) ? "—" : displayName,
-				userColorCss,
-				null);
-
-		var headerCard = userCardFactory.create(model, Variant.MINI);
-		var overviewCard = userCardFactory.create(model, Variant.MINI);
-
-		if (assignedUserHost != null)
-			assignedUserHost.getChildren().setAll(headerCard);
-		if (ovResponsibleAttorneyHost != null)
-			ovResponsibleAttorneyHost.getChildren().setAll(overviewCard);
-	}
-
-	private void renderPrimaryStatusMini(Integer statusId, String statusName, String statusColorCss) {
-		if (statusCardFactory == null) {
-			statusCardFactory = new StatusCardFactory(onOpenStatus == null ? id ->
-			{
-			} : onOpenStatus);
-		}
-
-		StatusCardModel model = new StatusCardModel(
-				statusId,
-				(statusName == null || statusName.isBlank()) ? "—" : statusName,
-				false,
-				null,
-				statusColorCss
-		);
-
-		var headerCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
-		var overviewCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
-
-		if (statusHost != null) {
-			statusHost.getChildren().setAll(headerCard);
-		}
-		if (ovCaseStatusHost != null) {
-			ovCaseStatusHost.getChildren().setAll(overviewCard);
-		}
-	}
-
-	private static void setPaneVisible(VBox pane, boolean visible) {
-		if (pane == null)
-			return;
-		pane.setVisible(visible);
-		pane.setManaged(visible);
-	}
-
-	private static String formatDate(LocalDate d) {
-		return d == null ? "—" : d.toString();
-	}
-
-	private static String safe(String s) {
-		return (s == null || s.isBlank()) ? "—" : s;
-	}
-
-	private static String safeText(String s) {
-		return s == null ? "" : s;
-	}
-
-	private static void setVisibleManaged(javafx.scene.Node node, boolean visible) {
-		if (node == null)
-			return;
-		node.setVisible(visible);
-		node.setManaged(visible);
-	}
-
-	private record CaseEditModel(String caseName, String description) {
-	}
-
-	/**
-	 * Minimal patch reader for {"name":"...","description":"..."} style patch. Supports
-	 * string values; returns null if missing or malformed.
-	 */
-	private static String extractPatchString(String rawPatchJson, String key) {
-		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank()) {
-			return null;
-		}
-		// crude but effective for your current patch format
-		String needle = "\"" + key + "\"";
-		int k = rawPatchJson.indexOf(needle);
-		if (k < 0)
-			return null;
-
-		int colon = rawPatchJson.indexOf(':', k + needle.length());
-		if (colon < 0)
-			return null;
-
-		int firstQuote = rawPatchJson.indexOf('"', colon + 1);
-		if (firstQuote < 0)
-			return null;
-
-		int secondQuote = rawPatchJson.indexOf('"', firstQuote + 1);
-		if (secondQuote < 0)
-			return null;
-
-		// NOTE: this does not fully unescape JSON sequences; good enough for now
-		return rawPatchJson.substring(firstQuote + 1, secondQuote);
-	}
-
-	public void setOnOpenStatus(Consumer<Integer> onOpenStatus) {
-		this.onOpenStatus = onOpenStatus;
-		this.statusCardFactory = new StatusCardFactory(onOpenStatus);
-	}
+	// ----------------------------
+	// Status / Caller / Client / PracticeArea pickers
+	// ----------------------------
 
 	private void onChangeStatus() {
 		if (caseDao == null || appState == null || caseId == null) {
@@ -1032,7 +991,6 @@ public class CaseController {
 						return;
 					}
 
-					// Build labels for display
 					java.util.Map<String, CaseDao.StatusRow> labelToRow = new java.util.LinkedHashMap<>();
 					String preselect = null;
 
@@ -1043,14 +1001,12 @@ public class CaseController {
 					for (CaseDao.StatusRow s : statuses) {
 						String label = s.name() + (s.isClosed() ? " (Closed)" : "");
 						labelToRow.put(label, s);
-						if (currentId != null && currentId == s.id()) {
+						if (currentId != null && currentId == s.id())
 							preselect = label;
-						}
 					}
 
-					if (preselect == null) {
+					if (preselect == null)
 						preselect = labelToRow.keySet().iterator().next();
-					}
 
 					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
 					dialog.setTitle("Change Status");
@@ -1058,16 +1014,13 @@ public class CaseController {
 					dialog.setContentText("Status:");
 
 					Optional<String> chosen = dialog.showAndWait();
-					if (chosen.isEmpty()) {
-						return; // cancelled
-					}
+					if (chosen.isEmpty())
+						return;
 
 					CaseDao.StatusRow picked = labelToRow.get(chosen.get());
-					if (picked == null) {
+					if (picked == null)
 						return;
-					}
 
-					// ✅ Edit-only: store draft + update cards immediately
 					draftPrimaryStatusId = picked.id();
 					renderPrimaryStatusMini(picked.id(), picked.name(), picked.color());
 				});
@@ -1080,6 +1033,83 @@ public class CaseController {
 				});
 			}
 		}, "case-status-list-" + caseId).start();
+	}
+
+	private void onChangePracticeArea() {
+		if (caseDao == null || appState == null || caseId == null) {
+			showError("Practice area change is unavailable.");
+			return;
+		}
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+
+		setBusy(true);
+		clearError();
+
+		new Thread(() ->
+		{
+			try {
+				List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(tenantId);
+
+				runOnFx(() ->
+				{
+					setBusy(false);
+
+					if (areas == null || areas.isEmpty()) {
+						showError("No practice areas are configured for this tenant.");
+						return;
+					}
+
+					java.util.Map<String, CaseDao.PracticeAreaRow> labelToRow = new java.util.LinkedHashMap<>();
+					String preselect = null;
+
+					Integer currentId = (editMode && draftPracticeAreaId != null)
+							? draftPracticeAreaId
+							: (currentOverview == null ? null : currentOverview.getPracticeAreaId());
+
+					for (CaseDao.PracticeAreaRow pa : areas) {
+						String label = (pa.name() == null || pa.name().isBlank())
+								? ("PracticeArea #" + pa.id())
+								: pa.name();
+						labelToRow.put(label, pa);
+						if (currentId != null && currentId == pa.id())
+							preselect = label;
+					}
+
+					if (preselect == null)
+						preselect = labelToRow.keySet().iterator().next();
+
+					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
+					dialog.setTitle("Change Practice Area");
+					dialog.setHeaderText("Select the practice area");
+					dialog.setContentText("Practice area:");
+
+					Optional<String> chosen = dialog.showAndWait();
+					if (chosen.isEmpty())
+						return;
+
+					CaseDao.PracticeAreaRow picked = labelToRow.get(chosen.get());
+					if (picked == null)
+						return;
+
+					draftPracticeAreaId = picked.id();
+					draftPracticeAreaName = picked.name();
+					draftPracticeAreaColor = picked.color();
+
+					renderPracticeAreaMini(picked.id(), picked.name(), picked.color());
+				});
+
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					showError("Failed to load practice areas. " + ex.getMessage());
+					setBusy(false);
+				});
+			}
+		}, "case-practicearea-list-" + caseId).start();
 	}
 
 	private void onChangeCaller() {
@@ -1110,7 +1140,6 @@ public class CaseController {
 						return;
 					}
 
-					// Extra safety (SQL should already filter blanks now)
 					List<CaseDao.ContactRow> cleaned = contacts.stream()
 							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
 							.toList();
@@ -1134,26 +1163,18 @@ public class CaseController {
 						}
 					}
 
-					// Searchable picker
 					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
-							"Change Caller",
-							"Select the primary caller",
-							"Search...",
-							cleaned,
-							preselectRow
-					);
+							"Change Caller", "Select the primary caller", "Search...", cleaned, preselectRow);
 
-					if (chosen.isEmpty()) {
-						return; // cancelled
-					}
+					if (chosen.isEmpty())
+						return;
 
 					CaseDao.ContactRow picked = chosen.get();
 					draftPrimaryCallerContactId = picked.id();
 					draftPrimaryCallerName = picked.displayName();
 
-					if (ovCallerValue != null) {
-						ovCallerValue.setText(safe(draftPrimaryCallerName));
-					}
+					// update UI immediately
+					renderCallerMini(draftPrimaryCallerContactId, draftPrimaryCallerName);
 				});
 
 			} catch (Exception ex) {
@@ -1194,7 +1215,6 @@ public class CaseController {
 						return;
 					}
 
-					// Extra safety (SQL should already filter blanks now)
 					List<CaseDao.ContactRow> cleaned = contacts.stream()
 							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
 							.toList();
@@ -1218,26 +1238,18 @@ public class CaseController {
 						}
 					}
 
-					// Searchable picker
 					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
-							"Change Client",
-							"Select the primary client",
-							"Search...",
-							cleaned,
-							preselectRow
-					);
+							"Change Client", "Select the primary client", "Search...", cleaned, preselectRow);
 
-					if (chosen.isEmpty()) {
-						return; // cancelled
-					}
+					if (chosen.isEmpty())
+						return;
 
 					CaseDao.ContactRow picked = chosen.get();
 					draftPrimaryClientContactId = picked.id();
 					draftPrimaryClientName = picked.displayName();
 
-					if (ovClientValue != null) {
-						ovClientValue.setText(safe(draftPrimaryClientName));
-					}
+					// update UI immediately
+					renderClientMini(draftPrimaryClientContactId, draftPrimaryClientName);
 				});
 
 			} catch (Exception ex) {
@@ -1250,90 +1262,328 @@ public class CaseController {
 		}, "case-client-list-" + caseId).start();
 	}
 
-	private String getCurrentStatusName() {
-		// Use whatever your UI currently has as the displayed status.
-		// Best is: store the latest CaseOverviewDto in a field and return dto.getCaseStatus().
-		// For now, try reading from current detail first:
-		if (current != null && current.getCaseStatus() != null)
-			return current.getCaseStatus();
-		return null;
+	// ----------------------------
+	// Cards
+	// ----------------------------
+
+	private void renderResponsibleAttorneyMini(Integer userId, String displayName, String userColorCss) {
+		if (userCardFactory == null) {
+			userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
+			{
+			} : onOpenUser);
+		}
+
+		UserCardModel model = new UserCardModel(
+				userId,
+				(displayName == null || displayName.isBlank()) ? "—" : displayName,
+				userColorCss,
+				null
+		);
+
+		var headerCard = userCardFactory.create(model, Variant.MINI);
+		var overviewCard = userCardFactory.create(model, Variant.MINI);
+
+		if (assignedUserHost != null)
+			assignedUserHost.getChildren().setAll(headerCard);
+		if (ovResponsibleAttorneyHost != null)
+			ovResponsibleAttorneyHost.getChildren().setAll(overviewCard);
 	}
 
-	private void applyOverviewEditSafe(CaseOverviewDto dto) {
-		currentOverview = dto;
-		// Always refresh these “safe” UI elements while editing:
-		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()), dto.getResponsibleAttorneyColor());
-		Integer statusId = (editMode && draftPrimaryStatusId != null)
-				? draftPrimaryStatusId
-				: dto.getPrimaryStatusId();
-
-		String statusName = dto.getCaseStatus();
-		String statusColor = dto.getPrimaryStatusColor();
-
-		// If you rendered from the chosen status row above, you can keep name/color in draft too.
-		// Otherwise, just reload on save.
-		renderPrimaryStatusMini(statusId, statusName, statusColor);
-
-		// Header title is fine to refresh too:
-		if (caseTitleLabel != null) {
-			String name = dto.getCaseName();
-			String num = dto.getCaseNumber();
-			String title;
-			if (name != null && !name.isBlank() && num != null && !num.isBlank())
-				title = name + " — " + num;
-			else if (name != null && !name.isBlank())
-				title = name;
-			else if (num != null && !num.isBlank())
-				title = num;
-			else
-				title = "Case #" + dto.getCaseId();
-			caseTitleLabel.setText(title);
+	private void renderPrimaryStatusMini(Integer statusId, String statusName, String statusColorCss) {
+		if (statusCardFactory == null) {
+			statusCardFactory = new StatusCardFactory(onOpenStatus == null ? id ->
+			{
+			} : onOpenStatus);
 		}
 
-		// Only refresh the overview text labels if not editing
-		if (!editMode) {
-			applyOverview(dto);
+		StatusCardModel model = new StatusCardModel(
+				statusId,
+				(statusName == null || statusName.isBlank()) ? "—" : statusName,
+				false,
+				null,
+				statusColorCss
+		);
+
+		var headerCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
+		var overviewCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
+
+		if (statusHost != null)
+			statusHost.getChildren().setAll(headerCard);
+		if (ovCaseStatusHost != null)
+			ovCaseStatusHost.getChildren().setAll(overviewCard);
+	}
+
+	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {
+		if (ovPracticeAreaHost == null)
 			return;
+
+		if (practiceAreaCardFactory == null) {
+			practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea == null ? id ->
+			{
+				System.out.println("PracticeAreaCard clicked practiceAreaId=" + id);
+			} : onOpenPracticeArea);
 		}
 
-		// While editing, refresh only labels that are not being edited.
-		// (You can expand this list as needed.)
+		PracticeAreaCardModel model = new PracticeAreaCardModel(
+				practiceAreaId,
+				(name == null || name.isBlank()) ? "—" : name,
+				colorHex
+		);
+
+		ovPracticeAreaHost.getChildren().setAll(
+				practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI)
+		);
+	}
+
+	private void renderCallerMini(Integer contactId, String name) {
+		if (ovCallerHost == null)
+			return;
+		ovCallerHost.getChildren().clear();
+
+		if (contactCardFactory == null) {
+			contactCardFactory = new ContactCardFactory(onOpenContact == null ? id ->
+			{
+			} : onOpenContact);
+		}
+
+		ovCallerHost.getChildren().setAll(contactCardFactory.createMini(contactId, safe(name)));
+	}
+
+	private void renderClientMini(Integer contactId, String name) {
+		if (ovClientHost == null)
+			return;
+		ovClientHost.getChildren().clear();
+
+		if (contactCardFactory == null) {
+			contactCardFactory = new ContactCardFactory(onOpenContact == null ? id ->
+			{
+			} : onOpenContact);
+		}
+
+		ovClientHost.getChildren().setAll(contactCardFactory.createMini(contactId, safe(name)));
+	}
+
+	// ----------------------------
+	// Sections / placeholders
+	// ----------------------------
+
+	private void setupSections() {
+		if (sectionListView == null)
+			return;
+
+		sectionListView.getItems().setAll("Overview", "Tasks", "Timeline", "Details", "People", "Organizations", "Documents");
+		sectionListView.getSelectionModel().select("Overview");
+
+		sectionListView.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) ->
+		{
+			if (newV == null)
+				return;
+			switch (newV) {
+			case "Overview" -> showOverview();
+			case "Tasks" -> showTasksTab();
+			default -> showGeneric(newV);
+			}
+		});
+
+		showOverview();
+	}
+
+	private void showOverview() {
+		setPaneVisible(overviewPane, true);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, false);
+		setPaneVisible(tasksPanel, true);
+		if (contentTitleLabel != null)
+			contentTitleLabel.setText("Overview");
+		loadOverviewOnce();
+	}
+
+	private void showTasksTab() {
+		setPaneVisible(overviewPane, false);
+		setPaneVisible(tasksTabPane, true);
+		setPaneVisible(genericPane, false);
+		setPaneVisible(tasksPanel, false);
+
+		if (tasksTabListView != null && tasksTabListView.getItems().isEmpty()) {
+			tasksTabListView.getItems().setAll(
+					"Call client (placeholder)",
+					"Request records (placeholder)",
+					"Review radiology (placeholder)",
+					"Draft demand (placeholder)",
+					"Schedule depo (placeholder)"
+			);
+		}
+	}
+
+	private void showGeneric(String sectionName) {
+		setPaneVisible(overviewPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, true);
+		setPaneVisible(tasksPanel, false);
+
+		if (genericTitleLabel != null)
+			genericTitleLabel.setText(sectionName);
+
+		if (placeholderTextArea != null && (placeholderTextArea.getText() == null || placeholderTextArea.getText().isBlank())) {
+			placeholderTextArea.setText(sectionName + " view is not implemented yet.");
+		}
+	}
+
+	private void setupOverviewTasksPanel() {
+		if (taskListView != null) {
+			taskListView.getItems().setAll(
+					"Past due: Call client (placeholder)",
+					"Upcoming: Request records (placeholder)",
+					"Upcoming: Review radiology (placeholder)",
+					"Upcoming: Send HIPAA auth (placeholder)",
+					"Upcoming: Draft demand outline (placeholder)"
+			);
+		}
+	}
+
+	private void refreshHeader() {
+		if (caseTitleLabel == null || caseId == null)
+			return;
+
+		caseTitleLabel.setText("Case #" + caseId + " (Placeholder)");
+		renderPrimaryStatusMini(null, "—", null);
+		renderResponsibleAttorneyMini(null, "—", null);
+		renderPracticeAreaMini(null, "—", null);
+
+		if (lastUpdatedLabel != null)
+			lastUpdatedLabel.setText("Last updated: —");
+	}
+
+	private void refreshOverviewPlaceholders() {
+		if (ovCaseNameValue != null)
+			ovCaseNameValue.setText(caseId == null ? "—" : "Case #" + caseId + " (Placeholder name)");
 		if (ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
-		if (ovCallerValue != null) {
-			String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
-					? draftPrimaryCallerName
-					: dto.getCaller();
-			ovCallerValue.setText(safe(callerName));
-		}
-		if (ovClientValue != null) {
-			String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
-					? draftPrimaryClientName
-					: dto.getClient();
-			ovClientValue.setText(safe(clientName));
-		}
-		if (ovPracticeAreaValue != null)
-			ovPracticeAreaValue.setText(safe(dto.getPracticeArea()));
-		if (ovOpposingCounselValue != null)
-			ovOpposingCounselValue.setText(safe(dto.getOpposingCounsel()));
-		if (ovTeamValue != null) {
-			List<String> team = dto.getTeam();
-			ovTeamValue.setText(team == null || team.isEmpty() ? "—" : String.join(", ", team));
-		}
-		if (ovIntakeDateValue != null)
-			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
-		if (ovIncidentDateValue != null)
-			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
-		if (ovSolDateValue != null)
-			ovSolDateValue.setText(formatDate(dto.getSolDate()));
+			ovCaseNumberValue.setText(caseId == null ? "—" : String.valueOf(caseId));
 
-		// DO NOT touch ovCaseNameValue / ovDescriptionValue in edit mode (those are being edited)
+		renderResponsibleAttorneyMini(null, "—", null);
+
+		if (ovCaseStatusValue != null)
+			ovCaseStatusValue.setText("—");
+
+		renderCallerMini(null, "—");
+		renderClientMini(null, "—");
+		renderPracticeAreaMini(null, "—", null);
+
+		if (ovTeamValue != null)
+			ovTeamValue.setText("—");
+
+		if (ovIntakeDateValue != null)
+			ovIntakeDateValue.setText(formatDate(null));
+		if (ovIncidentDateValue != null)
+			ovIncidentDateValue.setText(formatDate(null));
+		if (ovSolDateValue != null)
+			ovSolDateValue.setText(formatDate(null));
+
+		if (ovDescriptionValue != null)
+			ovDescriptionValue.setText("");
+	}
+
+	// ----------------------------
+	// UI helpers / errors
+	// ----------------------------
+
+	private void showRemoteUpdateBanner() {
+		setVisibleManaged(remoteUpdateBanner, true);
+		setVisibleManaged(reloadRemoteButton, true);
+	}
+
+	private void hideRemoteUpdateBanner() {
+		setVisibleManaged(remoteUpdateBanner, false);
+		setVisibleManaged(reloadRemoteButton, false);
+	}
+
+	private void clearError() {
+		if (errorLabel != null) {
+			errorLabel.setText("");
+			errorLabel.setVisible(false);
+			errorLabel.setManaged(false);
+		}
+	}
+
+	private void showError(String message) {
+		if (errorLabel != null) {
+			errorLabel.setText(message == null ? "" : message);
+			errorLabel.setVisible(message != null && !message.isBlank());
+			errorLabel.setManaged(message != null && !message.isBlank());
+		}
+	}
+
+	private static void runOnFx(Runnable runnable) {
+		if (Platform.isFxApplicationThread())
+			runnable.run();
+		else
+			Platform.runLater(runnable);
+	}
+
+	private static void setPaneVisible(VBox pane, boolean visible) {
+		if (pane == null)
+			return;
+		pane.setVisible(visible);
+		pane.setManaged(visible);
+	}
+
+	private static void setVisibleManaged(javafx.scene.Node node, boolean visible) {
+		if (node == null)
+			return;
+		node.setVisible(visible);
+		node.setManaged(visible);
+	}
+
+	private static String formatDate(LocalDate d) {
+		return d == null ? "—" : d.toString();
+	}
+
+	private static String safe(String s) {
+		return (s == null || s.isBlank()) ? "—" : s;
+	}
+
+	private static String safeText(String s) {
+		return s == null ? "" : s;
+	}
+
+	private String formatDateTime(LocalDateTime value) {
+		return value == null ? "—" : value.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+	}
+
+	private record CaseEditModel(String caseName, String description) {
+	}
+
+	// ----------------------------
+	// Patch parsing helpers
+	// ----------------------------
+
+	private static String extractPatchString(String rawPatchJson, String key) {
+		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank())
+			return null;
+
+		String needle = "\"" + key + "\"";
+		int k = rawPatchJson.indexOf(needle);
+		if (k < 0)
+			return null;
+
+		int colon = rawPatchJson.indexOf(':', k + needle.length());
+		if (colon < 0)
+			return null;
+
+		int firstQuote = rawPatchJson.indexOf('"', colon + 1);
+		if (firstQuote < 0)
+			return null;
+
+		int secondQuote = rawPatchJson.indexOf('"', firstQuote + 1);
+		if (secondQuote < 0)
+			return null;
+
+		return rawPatchJson.substring(firstQuote + 1, secondQuote);
 	}
 
 	private static Integer extractPatchInt(String rawPatchJson, String key) {
-		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank()) {
+		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank())
 			return null;
-		}
 
 		String needle = "\"" + key + "\"";
 		int k = rawPatchJson.indexOf(needle);
@@ -1364,8 +1614,11 @@ public class CaseController {
 		} catch (Exception ignored) {
 			return null;
 		}
-
 	}
+
+	// ----------------------------
+	// Search dialog (unchanged)
+	// ----------------------------
 
 	private static Optional<CaseDao.ContactRow> showSearchPickerDialog(
 			String title,
@@ -1373,6 +1626,7 @@ public class CaseController {
 			String searchPrompt,
 			List<CaseDao.ContactRow> items,
 			CaseDao.ContactRow preselectOrNull) {
+
 		javafx.scene.control.Dialog<CaseDao.ContactRow> dialog = new javafx.scene.control.Dialog<>();
 		dialog.setTitle(title);
 		dialog.setHeaderText(headerText);
@@ -1384,8 +1638,6 @@ public class CaseController {
 		searchField.setPromptText(searchPrompt);
 
 		javafx.scene.control.ListView<CaseDao.ContactRow> listView = new javafx.scene.control.ListView<>();
-
-		// ✅ Stabilize VirtualFlow layout (fixes "index exceeds maxCellCount" warning)
 		listView.setFixedCellSize(24);
 		listView.setPrefHeight(420);
 
@@ -1399,9 +1651,9 @@ public class CaseController {
 
 		javafx.collections.ObservableList<CaseDao.ContactRow> all = javafx.collections.FXCollections.observableArrayList(items);
 		javafx.collections.ObservableList<CaseDao.ContactRow> filtered = javafx.collections.FXCollections.observableArrayList(items);
+
 		listView.setItems(filtered);
 
-		// preselect
 		if (preselectOrNull != null) {
 			listView.getSelectionModel().select(preselectOrNull);
 			listView.scrollTo(preselectOrNull);
@@ -1409,25 +1661,22 @@ public class CaseController {
 			listView.getSelectionModel().select(0);
 		}
 
-		// filter logic
 		searchField.textProperty().addListener((obs, oldV, newV) ->
 		{
 			String q = (newV == null ? "" : newV.trim().toLowerCase());
+
 			filtered.setAll(all.filtered(r ->
 			{
 				String name = r == null ? "" : (r.displayName() == null ? "" : r.displayName());
-				// optional: require 2 chars before filtering hard
 				if (q.isEmpty())
 					return true;
 				return name.toLowerCase().contains(q) || String.valueOf(r.id()).contains(q);
 			}));
 
-			if (!filtered.isEmpty()) {
+			if (!filtered.isEmpty())
 				listView.getSelectionModel().select(0);
-			}
 		});
 
-		// double-click selects OK
 		listView.setOnMouseClicked(e ->
 		{
 			if (e.getClickCount() == 2) {
@@ -1439,7 +1688,6 @@ public class CaseController {
 			}
 		});
 
-		// disable OK if nothing selected
 		javafx.scene.Node okBtn = dialog.getDialogPane().lookupButton(okType);
 		okBtn.setDisable(listView.getSelectionModel().getSelectedItem() == null);
 		listView.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> okBtn.setDisable(n == null));
@@ -1448,17 +1696,201 @@ public class CaseController {
 		box.setPadding(new javafx.geometry.Insets(10));
 		dialog.getDialogPane().setContent(box);
 
-		dialog.setResultConverter(btn ->
-		{
-			if (btn == okType) {
-				return listView.getSelectionModel().getSelectedItem();
-			}
-			return null;
-		});
+		dialog.setResultConverter(btn -> btn == okType ? listView.getSelectionModel().getSelectedItem() : null);
 
-		// focus search on open
 		javafx.application.Platform.runLater(searchField::requestFocus);
-
 		return dialog.showAndWait();
+	}
+
+	private void onChangeResponsibleAttorney() {
+		if (caseDao == null || appState == null || caseId == null) {
+			showError("Responsible attorney change is unavailable.");
+			return;
+		}
+
+		Integer clientId = appState.getShaleClientId();
+		if (clientId == null || clientId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+
+		setBusy(true);
+		clearError();
+
+		final long saveCaseId = caseId.longValue();
+
+		new Thread(() ->
+		{
+			try {
+				List<CaseDao.UserRow> users = caseDao.listAttorneysForTenant(clientId);
+
+				runOnFx(() ->
+				{
+					setBusy(false);
+
+					if (users == null || users.isEmpty()) {
+						showError("No attorneys are configured for this tenant.");
+						return;
+					}
+
+					var labelToRow = new java.util.LinkedHashMap<String, CaseDao.UserRow>();
+
+					Integer currentId = (editMode && draftResponsibleAttorneyUserId != null)
+							? draftResponsibleAttorneyUserId
+							: (currentOverview == null ? null : currentOverview.getResponsibleAttorneyUserId());
+
+					String preselect = null;
+
+					for (var u : users) {
+						String label = u.displayName();
+						if (label == null || label.isBlank())
+							continue;
+
+						// avoid collisions if two users share same display name
+						String key = label;
+						if (labelToRow.containsKey(key)) {
+							key = label + " (ID " + u.id() + ")";
+						}
+
+						labelToRow.put(key, u);
+
+						if (currentId != null && currentId.equals(u.id())) {
+							preselect = key;
+						}
+					}
+
+					if (labelToRow.isEmpty()) {
+						showError("No attorneys are configured for this tenant.");
+						return;
+					}
+
+					if (preselect == null) {
+						preselect = labelToRow.keySet().iterator().next();
+					}
+
+					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
+					dialog.setTitle("Change Responsible Attorney");
+					dialog.setHeaderText("Select the responsible attorney");
+					dialog.setContentText("Attorney:");
+
+					Optional<String> chosen = dialog.showAndWait();
+					if (chosen.isEmpty())
+						return;
+
+					CaseDao.UserRow picked = labelToRow.get(chosen.get());
+					if (picked == null)
+						return;
+
+					draftResponsibleAttorneyUserId = picked.id();
+
+					// Update both header + overview card
+					renderResponsibleAttorneyMini(
+							picked.id(),
+							picked.displayName(),
+							picked.color()
+					);
+				});
+
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					showError("Failed to load attorneys. " + ex.getMessage());
+					setBusy(false);
+				});
+			}
+		}, "case-atty-list-" + saveCaseId).start();
+	}
+
+	private void renderOpposingCounselMini(Integer contactId, String name) {
+		if (ovOpposingCounselHost == null)
+			return;
+		ovOpposingCounselHost.getChildren().clear();
+
+		if (contactCardFactory == null) {
+			contactCardFactory = new ContactCardFactory(onOpenContact == null ? id ->
+			{
+			} : onOpenContact);
+		}
+
+		ovOpposingCounselHost.getChildren().setAll(contactCardFactory.createMini(contactId, safe(name)));
+	}
+
+	private void onChangeOpposingCounsel() {
+		if (caseDao == null || appState == null || caseId == null) {
+			showError("Opposing counsel change is unavailable.");
+			return;
+		}
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+
+		setBusy(true);
+		clearError();
+
+		new Thread(() ->
+		{
+			try {
+				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(tenantId);
+
+				runOnFx(() ->
+				{
+					setBusy(false);
+
+					if (contacts == null || contacts.isEmpty()) {
+						showError("No contacts are configured for this tenant.");
+						return;
+					}
+
+					List<CaseDao.ContactRow> cleaned = contacts.stream()
+							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
+							.toList();
+
+					if (cleaned.isEmpty()) {
+						showError("No usable contacts found (all were blank).");
+						return;
+					}
+
+					Integer currentId = (editMode && draftPrimaryOpposingCounselContactId != null)
+							? draftPrimaryOpposingCounselContactId
+							: (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId());
+
+					CaseDao.ContactRow preselectRow = null;
+					if (currentId != null) {
+						for (CaseDao.ContactRow c : cleaned) {
+							if (c.id() == currentId.intValue()) {
+								preselectRow = c;
+								break;
+							}
+						}
+					}
+
+					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
+							"Change Opposing Counsel",
+							"Select the primary opposing counsel",
+							"Search...",
+							cleaned,
+							preselectRow
+					);
+
+					if (chosen.isEmpty())
+						return;
+
+					CaseDao.ContactRow picked = chosen.get();
+					draftPrimaryOpposingCounselContactId = picked.id();
+					draftPrimaryOpposingCounselName = picked.displayName();
+
+					renderOpposingCounselMini(draftPrimaryOpposingCounselContactId, draftPrimaryOpposingCounselName);
+				});
+
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					showError("Failed to load contacts. " + ex.getMessage());
+					setBusy(false);
+				});
+			}
+		}, "case-oppcounsel-list-" + caseId).start();
 	}
 }

@@ -26,7 +26,10 @@ public final class CaseOverviewDto {
 	private final String responsibleAttorney;
 	private final String responsibleAttorneyColor; // NEW (dbo.Users.Color)
 
+	// Practice Area
+	private final Integer practiceAreaId;
 	private final String practiceArea;
+	private final String practiceAreaColor;
 
 	// Key dates
 	private final LocalDate intakeDate;
@@ -39,6 +42,7 @@ public final class CaseOverviewDto {
 	private final String caller;
 	private final String client;
 	private final String opposingCounsel;
+	private final Integer primaryOpposingCounselContactId;
 
 	// Team users assigned
 	private final List<String> team;
@@ -59,12 +63,16 @@ public final class CaseOverviewDto {
 			String responsibleAttorney,
 			String responsibleAttorneyColor,
 
+			Integer practiceAreaId,
 			String practiceArea,
+			String practiceAreaColor,
+
 			LocalDate intakeDate,
 			LocalDate incidentDate,
 			LocalDate solDate,
 			Integer primaryCallerContactId,
 			Integer primaryClientContactId,
+			Integer primaryOpposingCounselContactId,
 			String caller,
 			String client,
 			String opposingCounsel,
@@ -84,7 +92,9 @@ public final class CaseOverviewDto {
 		this.responsibleAttorney = safe(responsibleAttorney);
 		this.responsibleAttorneyColor = safe(responsibleAttorneyColor);
 
+		this.practiceAreaId = practiceAreaId;
 		this.practiceArea = safe(practiceArea);
+		this.practiceAreaColor = safe(practiceAreaColor);
 
 		this.intakeDate = intakeDate;
 		this.incidentDate = incidentDate;
@@ -92,6 +102,7 @@ public final class CaseOverviewDto {
 
 		this.primaryCallerContactId = primaryCallerContactId;
 		this.primaryClientContactId = primaryClientContactId;
+		this.primaryOpposingCounselContactId = primaryOpposingCounselContactId;
 		this.caller = safe(caller);
 		this.client = safe(client);
 		this.opposingCounsel = safe(opposingCounsel);
@@ -136,8 +147,16 @@ public final class CaseOverviewDto {
 		return responsibleAttorneyColor;
 	}
 
+	public Integer getPracticeAreaId() {
+		return practiceAreaId;
+	}
+
 	public String getPracticeArea() {
 		return practiceArea;
+	}
+
+	public String getPracticeAreaColor() {
+		return practiceAreaColor;
 	}
 
 	public LocalDate getIntakeDate() {
@@ -192,5 +211,9 @@ public final class CaseOverviewDto {
 
 	private static String safe(String s) {
 		return Objects.toString(s, "").trim();
+	}
+
+	public Integer getPrimaryOpposingCounselContactId() {
+		return primaryOpposingCounselContactId;
 	}
 }

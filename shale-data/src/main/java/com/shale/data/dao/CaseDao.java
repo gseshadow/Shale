@@ -242,7 +242,11 @@ public final class CaseDao {
 				  c.CallerDate,
 				  c.DateOfInjury,
 				  c.StatuteOfLimitations,
-				  pa.Name AS PracticeAreaName,
+
+				  -- Practice Area
+				  pa.Id    AS PracticeAreaId,
+				  pa.Name  AS PracticeAreaName,
+				  pa.Color AS PracticeAreaColor,
 
 				  -- Responsible Attorney (primary)
 				  ra.UserId AS ResponsibleAttorneyUserId,
@@ -265,6 +269,7 @@ public final class CaseDao {
 				  clientContact.PrimaryClientContactId,
 				  clientContact.ClientName AS ClientName,
 
+				  oppContact.PrimaryOpposingCounselContactId,
 				  oppContact.FullName AS OpposingCounselName
 
 				FROM %s c
@@ -348,6 +353,7 @@ public final class CaseDao {
 				-- Opposing Counsel (primary)
 				OUTER APPLY (
 				    SELECT TOP (1)
+				      cc.ContactId AS PrimaryOpposingCounselContactId,
 				      CASE
 				        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
 				          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
@@ -409,13 +415,18 @@ public final class CaseDao {
 						rs.getString("ResponsibleAttorneyName"),
 						rs.getString("ResponsibleAttorneyColor"),
 
+						// Practice Area (updated)
+						getNullableInt(rs, "PracticeAreaId"),
 						rs.getString("PracticeAreaName"),
+						rs.getString("PracticeAreaColor"),
+
 						toLocalDate(rs.getDate("CallerDate")),
 						toLocalDate(rs.getDate("DateOfInjury")),
 						toLocalDate(rs.getDate("StatuteOfLimitations")),
 
 						getNullableInt(rs, "PrimaryCallerContactId"),
 						getNullableInt(rs, "PrimaryClientContactId"),
+						getNullableInt(rs, "PrimaryOpposingCounselContactId"), // NEW
 
 						rs.getString("CallerName"),
 						rs.getString("ClientName"),
@@ -859,6 +870,65 @@ public final class CaseDao {
 	) {
 	}
 
+	public void setPracticeArea(long caseId, int shaleClientId, int practiceAreaId) {
+		String sql = """
+				BEGIN TRY
+				  BEGIN TRAN;
+
+				  DECLARE @now datetime2 = SYSDATETIME();
+
+				  -- Validate practice area exists for tenant and is active/not deleted
+				  IF NOT EXISTS (
+				    SELECT 1
+				    FROM dbo.PracticeAreas pa
+				    WHERE pa.Id = ?
+				      AND pa.ShaleClientId = ?
+				      AND pa.IsActive = 1
+				      AND pa.IsDeleted = 0
+				  )
+				  BEGIN
+				    THROW 50001, 'Practice area not found for tenant.', 1;
+				  END
+
+				  -- Update case practice area
+				  UPDATE dbo.Cases
+				  SET PracticeAreaId = ?,
+				      UpdatedAt = @now
+				  WHERE Id = ?
+				    AND (IsDeleted = 0 OR IsDeleted IS NULL);
+
+				  IF (@@ROWCOUNT = 0)
+				  BEGIN
+				    THROW 50002, 'Case not found.', 1;
+				  END
+
+				  COMMIT;
+				END TRY
+				BEGIN CATCH
+				  IF @@TRANCOUNT > 0 ROLLBACK;
+				  THROW;
+				END CATCH;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			int i = 1;
+			ps.setInt(i++, practiceAreaId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, practiceAreaId);
+			ps.setLong(i++, caseId);
+
+			ps.executeUpdate();
+
+		} catch (SQLException e) {
+			throw new RuntimeException(
+					"Failed to set practice area (caseId=" + caseId + ", practiceAreaId=" + practiceAreaId + ")",
+					e
+			);
+		}
+	}
+
 	public List<StatusRow> listStatusesForTenant(int shaleClientId) {
 		String sql = """
 				SELECT Id, Name, IsClosed, SortOrder, Color
@@ -887,6 +957,215 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list statuses (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public record PracticeAreaRow(
+			int id,
+			String name,
+			String color
+	) {
+	}
+
+	public List<PracticeAreaRow> listPracticeAreasForTenant(int shaleClientId) {
+		String sql = """
+				SELECT Id, Name, Color
+				FROM dbo.PracticeAreas
+				WHERE ShaleClientId = ?
+				  AND IsActive = 1
+				  AND IsDeleted = 0
+				ORDER BY Name, Id;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setInt(1, shaleClientId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				List<PracticeAreaRow> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(new PracticeAreaRow(
+							rs.getInt("Id"),
+							rs.getString("Name"),
+							rs.getString("Color")
+					));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list practice areas (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public void setResponsibleAttorney(long caseId, int userId) {
+		final String sql = """
+				MERGE dbo.CaseUsers AS target
+				USING (SELECT ? AS CaseId, ? AS RoleId, CAST(1 AS bit) AS IsPrimary) AS src
+				   ON target.CaseId = src.CaseId
+				  AND target.RoleId = src.RoleId
+				  AND target.IsPrimary = src.IsPrimary
+				WHEN MATCHED THEN
+				    UPDATE SET UserId = ?, UpdatedAt = SYSUTCDATETIME()
+				WHEN NOT MATCHED THEN
+				    INSERT (CaseId, UserId, RoleId, IsPrimary, Notes, CreatedAt, UpdatedAt)
+				    VALUES (?, ?, ?, CAST(1 AS bit), NULL, SYSDATETIME(), SYSDATETIME());
+				""";
+
+		try (Connection c = db.requireConnection();
+				PreparedStatement ps = c.prepareStatement(sql)) {
+
+			int i = 1;
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setInt(i++, userId);
+
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, userId);
+			ps.setInt(i++, ROLE_RESPONSIBLE_ATTORNEY);
+
+			ps.executeUpdate();
+
+		} catch (SQLException e) {
+			throw new RuntimeException(
+					"Failed to set responsible attorney (caseId=" + caseId + ", userId=" + userId + ")",
+					e
+			);
+		}
+	}
+
+	public record UserRow(int id, String displayName, String color) {
+	}
+
+	public List<UserRow> listAttorneysForTenant(int shaleClientId) {
+		String baseSql = """
+				SELECT
+				  u.Id,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS DisplayName,
+				  u.Color
+				FROM dbo.Users u
+				WHERE u.ShaleClientId = ?
+				  AND NULLIF(LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )), '') IS NOT NULL
+				""";
+
+		String orderSql = """
+				ORDER BY u.name_last, u.name_first, u.Id;
+				""";
+
+		try (Connection con = db.requireConnection()) {
+
+			boolean hasIsActive = tableHasColumn(con, "Users", "IsActive");
+			boolean hasIsDeleted = tableHasColumn(con, "Users", "IsDeleted");
+
+			StringBuilder sql = new StringBuilder(baseSql);
+
+			if (hasIsActive) {
+				sql.append("\n  AND (u.IsActive = 1 OR u.IsActive IS NULL)\n");
+			}
+			if (hasIsDeleted) {
+				sql.append("\n  AND (u.IsDeleted = 0 OR u.IsDeleted IS NULL)\n");
+			}
+
+			sql.append(orderSql);
+
+			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+				ps.setInt(1, shaleClientId);
+
+				try (ResultSet rs = ps.executeQuery()) {
+					List<UserRow> out = new ArrayList<>();
+					while (rs.next()) {
+						out.add(new UserRow(
+								rs.getInt("Id"),
+								rs.getString("DisplayName"),
+								rs.getString("Color")
+						));
+					}
+					return out;
+				}
+			}
+
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list attorneys (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	private static boolean tableHasColumn(Connection con, String tableName, String columnName) throws SQLException {
+		String sql = """
+				SELECT 1
+				FROM INFORMATION_SCHEMA.COLUMNS
+				WHERE TABLE_SCHEMA = 'dbo'
+				  AND TABLE_NAME = ?
+				  AND COLUMN_NAME = ?;
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setString(1, tableName);
+			ps.setString(2, columnName);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next();
+			}
+		}
+	}
+
+	public CaseRow getCaseRow(long caseId) {
+		String sql = """
+				SELECT
+				  c.Id,
+				  c.Name,
+				  c.CallerDate,
+				  c.StatuteOfLimitations,
+				  ra.UserId AS ResponsibleAttorneyId,
+				  u.color AS ResponsibleAttorneyColor,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS ResponsibleAttorneyName
+				FROM %s c
+				OUTER APPLY (
+				    SELECT TOP (1) cu.UserId
+				    FROM %s cu
+				    WHERE cu.CaseId = c.Id
+				      AND cu.RoleId = ?
+				      AND cu.IsPrimary = 1
+				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+				) ra
+				LEFT JOIN %s u
+				  ON u.id = ra.UserId
+				WHERE c.Id = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+				""".formatted(CASES_TABLE, CASE_USERS_TABLE, USERS_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setLong(2, caseId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next())
+					return null;
+
+				return new CaseRow(
+						rs.getLong("Id"),
+						rs.getString("Name"),
+						toLocalDate(rs.getDate("CallerDate")),
+						toLocalDate(rs.getDate("StatuteOfLimitations")),
+						getNullableInt(rs, "ResponsibleAttorneyId"),
+						rs.getString("ResponsibleAttorneyName"),
+						rs.getString("ResponsibleAttorneyColor")
+				);
+			}
+
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load case row (caseId=" + caseId + ")", e);
 		}
 	}
 

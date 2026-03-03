@@ -141,8 +141,9 @@ public final class CasesController {
 					+ " mineInstance=" + mine
 					+ " eventInstance=" + event.clientInstanceId());
 
+			// Ignore only our own echo
 			if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
-				return; // ignore only my own echo
+				return;
 			}
 
 			// 1) Legacy support (newName-only)
@@ -156,29 +157,36 @@ public final class CasesController {
 				return;
 			}
 
-			// 2) Patch-based updates (generic)
+			// 2) Patch-based updates
 			String rawPatch = event.rawPatchJson();
 			if (rawPatch == null || rawPatch.isBlank()) {
 				return;
 			}
 
-			// Decide which fields the CASE LIST cares about.
-			// For now: only name. Later you can add "responsibleAttorney",
-			// "responsibleAttorneyColor", etc.
 			String patchedName = extractPatchString(rawPatch, "name");
+			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
 
-			if (patchedName == null) {
-				// Not an error anymore; just irrelevant to this list.
-				System.out.println("[LIVE] Case update patch had no list-relevant fields; skipping list update for caseId=" + event.caseId());
+			// If nothing relevant to the list changed, ignore
+			if (patchedName == null && patchedResponsibleAttorneyUserId == null) {
+				System.out.println("[LIVE] Case update patch had no list-relevant fields; skipping list update for caseId="
+						+ event.caseId());
 				return;
 			}
 
-			runOnFx(() ->
-			{
-				boolean changed = applyCasePatchToList(event.caseId(), "name", patchedName);
-				if (changed)
-					rerender();
-			});
+			// Name patch (fast in-memory update)
+			if (patchedName != null) {
+				runOnFx(() ->
+				{
+					boolean changed = applyCasePatchToList(event.caseId(), "name", patchedName);
+					if (changed)
+						rerender();
+				});
+			}
+
+			// Responsible attorney patch (reload that row so we get name + color)
+			if (patchedResponsibleAttorneyUserId != null) {
+				refreshCaseRowFromDb(event.caseId());
+			}
 		});
 	}
 
@@ -494,5 +502,99 @@ public final class CasesController {
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
 		}
+	}
+
+	private static Integer extractPatchInt(String rawPatchJson, String key) {
+		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank())
+			return null;
+
+		String needle = "\"" + key + "\"";
+		int k = rawPatchJson.indexOf(needle);
+		if (k < 0)
+			return null;
+
+		int colon = rawPatchJson.indexOf(':', k + needle.length());
+		if (colon < 0)
+			return null;
+
+		int i = colon + 1;
+		while (i < rawPatchJson.length() && Character.isWhitespace(rawPatchJson.charAt(i)))
+			i++;
+
+		boolean quoted = i < rawPatchJson.length() && rawPatchJson.charAt(i) == '"';
+		if (quoted)
+			i++;
+
+		int start = i;
+		while (i < rawPatchJson.length() && Character.isDigit(rawPatchJson.charAt(i)))
+			i++;
+
+		if (i == start)
+			return null;
+
+		try {
+			return Integer.parseInt(rawPatchJson.substring(start, i));
+		} catch (Exception ignored) {
+			return null;
+		}
+	}
+
+	private void refreshCaseRowFromDb(long caseId) {
+		if (caseDao == null)
+			return;
+
+		final int generationAtSubmit = loadGeneration;
+
+		dbExec.submit(() ->
+		{
+			try {
+				// simplest: fetch a 1-item "page" by filtering current page is awkward,
+				// so add a DAO method later. For now: just reload the *current page* row via DAO helper.
+				CaseDao.CaseRow row = caseDao.getCaseRow(caseId); // you’ll add this method (below)
+				if (row == null)
+					return;
+
+				Platform.runLater(() ->
+				{
+					if (generationAtSubmit != loadGeneration)
+						return;
+
+					boolean changed = applyCaseRowToList(row);
+					if (changed)
+						rerender();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(ex::printStackTrace);
+			}
+		});
+	}
+
+	private boolean applyCaseRowToList(CaseDao.CaseRow r) {
+		for (int i = 0; i < loaded.size(); i++) {
+			CaseCardVm vm = loaded.get(i);
+			if (vm.id == r.id()) {
+				String newName = safe(r.name());
+				String newAtty = safe(r.responsibleAttorneyName());
+				String newColor = safe(r.responsibleAttorneyColor());
+
+				boolean same = newName.equals(vm.name)
+						&& newAtty.equals(vm.responsibleAttorney)
+						&& newColor.equals(vm.responsibleAttorneyColor);
+
+				if (same)
+					return false;
+
+				loaded.set(i, new CaseCardVm(
+						r.id(),
+						newName,
+						r.intakeDate(),
+						r.statuteOfLimitationsDate(),
+						newAtty,
+						newColor
+				));
+				return true;
+			}
+		}
+		return false;
 	}
 }
