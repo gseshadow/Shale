@@ -109,8 +109,10 @@
 
 					<Label text="Case number:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="1" GridPane.columnIndex="0" />
-					<Label fx:id="ovCaseNumberValue" text="—"
+					<Label fx:id="ovCaseNumberValue" text="—" wrapText="true"
 						GridPane.rowIndex="1" GridPane.columnIndex="1" />
+					<TextField fx:id="ovCaseNumberEditor" visible="false"
+						managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
 					<Label text="Responsible atty:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="2" GridPane.columnIndex="0" />
@@ -170,22 +172,29 @@
 
 					<Label text="Team:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="8" GridPane.columnIndex="0" />
-					<Label fx:id="ovTeamValue" text="—" wrapText="true"
-						GridPane.rowIndex="8" GridPane.columnIndex="1" />
+					<HBox spacing="8" alignment="CENTER_LEFT"
+						GridPane.rowIndex="8" GridPane.columnIndex="1">
+						<Button fx:id="btnEditTeam" text="Edit Team"
+							visible="false" managed="false" onAction="#onEditTeam" />
+					</HBox>
+
+					<FlowPane fx:id="teamFlow" hgap="10" vgap="10"
+						prefWrapLength="520" GridPane.rowIndex="9"
+						GridPane.columnIndex="0" GridPane.columnSpan="2" />
 
 					<Label text="Intake date:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="9" GridPane.columnIndex="0" />
-					<Label fx:id="ovIntakeDateValue" text="—"
-						GridPane.rowIndex="9" GridPane.columnIndex="1" />
-
-					<Label text="Incident date:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="10" GridPane.columnIndex="0" />
-					<Label fx:id="ovIncidentDateValue" text="—"
+					<Label fx:id="ovIntakeDateValue" text="—"
 						GridPane.rowIndex="10" GridPane.columnIndex="1" />
 
-					<Label text="SOL date:" style="-fx-opacity: 0.8;"
+					<Label text="Incident date:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="11" GridPane.columnIndex="0" />
-					<Label fx:id="ovSolDateValue" text="—" GridPane.rowIndex="11"
+					<Label fx:id="ovIncidentDateValue" text="—"
+						GridPane.rowIndex="11" GridPane.columnIndex="1" />
+
+					<Label text="SOL date:" style="-fx-opacity: 0.8;"
+						GridPane.rowIndex="12" GridPane.columnIndex="0" />
+					<Label fx:id="ovSolDateValue" text="—" GridPane.rowIndex="12"
 						GridPane.columnIndex="1" />
 				</GridPane>
 

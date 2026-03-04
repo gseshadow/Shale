@@ -18,6 +18,7 @@ import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.component.factory.UserCardFactory.Variant;
+import com.shale.ui.component.dialog.TeamEditorDialog;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 
@@ -29,9 +30,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 public class CaseController {
 
@@ -75,6 +78,8 @@ public class CaseController {
 	private TextField ovCaseNameEditor;
 	@FXML
 	private Label ovCaseNumberValue;
+	@FXML
+	private TextField ovCaseNumberEditor;
 
 	@FXML
 	private StackPane ovResponsibleAttorneyHost;
@@ -153,9 +158,31 @@ public class CaseController {
 	@FXML
 	private StackPane ovOpposingCounselHost;
 
+	@FXML
+	private FlowPane teamFlow;
+	@FXML
+	private Button btnEditTeam;
+
 	private static final int ROLE_CASECONTACT_CALLER = 2;
 	private static final int ROLE_CASECONTACT_CLIENT = 1;
 	private static final int ROLE_CASECONTACT_OPPOSING_COUNSEL = 6;
+	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+	private static final int ROLE_INTAKE_STAFF = 5;
+	private static final int ROLE_ATTORNEY = 7;
+	private static final int ROLE_LEGAL_ASSISTANT = 11;
+	private static final int ROLE_PARALEGAL = 12;
+	private static final int ROLE_LAW_CLERK = 13;
+	private static final int ROLE_CO_COUNSEL = 14;
+
+	private static final java.util.Set<Integer> TEAM_ROLE_IDS = java.util.Set.of(
+			ROLE_RESPONSIBLE_ATTORNEY,
+			ROLE_INTAKE_STAFF,
+			ROLE_ATTORNEY,
+			ROLE_LEGAL_ASSISTANT,
+			ROLE_PARALEGAL,
+			ROLE_LAW_CLERK,
+			ROLE_CO_COUNSEL
+	);
 
 	private StatusCardFactory statusCardFactory;
 	private Consumer<Integer> onOpenStatus;
@@ -202,6 +229,10 @@ public class CaseController {
 	// Opposing Counsel drafts
 	private Integer draftPrimaryOpposingCounselContactId;
 	private String draftPrimaryOpposingCounselName;
+
+	// Team drafts
+	private List<CaseDao.TeamAssignmentRow> draftTeamAssignments;
+	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -261,6 +292,8 @@ public class CaseController {
 			changePracticeAreaButton.setOnAction(e -> onChangePracticeArea());
 		if (changeOpposingCounselButton != null)
 			changeOpposingCounselButton.setOnAction(e -> onChangeOpposingCounsel());
+		if (btnEditTeam != null)
+			btnEditTeam.setOnAction(e -> onEditTeam());
 	}
 
 	// ----------------------------
@@ -292,6 +325,7 @@ public class CaseController {
 
 			String rawPatch = event.rawPatchJson();
 			String patchedName = extractPatchString(rawPatch, "name");
+			String patchedNumber = extractPatchString(rawPatch, "caseNumber");
 			String patchedDescription = extractPatchString(rawPatch, "description");
 			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
 			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
@@ -299,6 +333,10 @@ public class CaseController {
 			Integer patchedPracticeAreaId = extractPatchInt(rawPatch, "practiceAreaId");
 			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
 			Integer patchedPrimaryOpposingCounselContactId = extractPatchInt(rawPatch, "primaryOpposingCounselContactId");
+
+			// ✅ team marker (we publish 1)
+			Integer patchedTeamChanged = extractPatchInt(rawPatch, "teamChanged");
+			boolean teamChanged = patchedTeamChanged != null && patchedTeamChanged.intValue() == 1;
 
 			if (editMode) {
 				runOnFx(() ->
@@ -308,25 +346,37 @@ public class CaseController {
 				return;
 			}
 
+			// Any structural change -> reload
 			if (patchedPrimaryStatusId != null
 					|| patchedPrimaryCallerContactId != null
 					|| patchedPrimaryClientContactId != null
 					|| patchedPracticeAreaId != null
 					|| patchedResponsibleAttorneyUserId != null
-					|| patchedPrimaryOpposingCounselContactId != null) {
+					|| patchedPrimaryOpposingCounselContactId != null
+					|| teamChanged) {
 				runOnFx(() ->
 				{
+					// keep your existing behavior
 					reloadCurrentCaseForViewMode();
+
+					// ✅ ensure team refresh happens even if overview reload is slow/partial
+					if (teamChanged) {
+						loadTeamSectionAsync();
+					}
+
 					hideRemoteUpdateBanner();
 				});
 				return;
 			}
 
-			if (patchedName != null || patchedDescription != null) {
+			// Simple text patch -> apply inline
+			if (patchedName != null || patchedNumber != null || patchedDescription != null) {
 				runOnFx(() ->
 				{
 					if (patchedName != null)
 						applyLiveCaseName(patchedName);
+					if (patchedNumber != null)
+						applyLiveCaseNumber(patchedNumber);
 					if (patchedDescription != null)
 						applyLiveCaseDescription(patchedDescription);
 
@@ -487,10 +537,7 @@ public class CaseController {
 				: dto.getPracticeAreaColor();
 		renderPracticeAreaMini(paId, paName, paColor);
 
-		if (ovTeamValue != null) {
-			List<String> team = dto.getTeam();
-			ovTeamValue.setText(team == null || team.isEmpty() ? "—" : String.join(", ", team));
-		}
+		loadTeamSectionAsync();
 
 		if (ovIntakeDateValue != null)
 			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
@@ -509,11 +556,16 @@ public class CaseController {
 
 		if (!editMode && ovCaseNameValue != null)
 			ovCaseNameValue.setText(safe(detail.getCaseName()));
+
+		if (!editMode && ovCaseNumberValue != null)
+			ovCaseNumberValue.setText(safeText(detail.getCaseNumber()));
+
 		if (!editMode && ovDescriptionValue != null)
 			ovDescriptionValue.setText(safeText(detail.getDescription()));
 
 		if (statusLabel != null)
 			statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
+
 		if (lastUpdatedLabel != null)
 			lastUpdatedLabel.setText("Last updated: " + formatDateTime(detail.getUpdatedAt()));
 
@@ -598,10 +650,7 @@ public class CaseController {
 		if (ovCaseNumberValue != null)
 			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
 
-		if (ovTeamValue != null) {
-			List<String> team = dto.getTeam();
-			ovTeamValue.setText(team == null || team.isEmpty() ? "—" : String.join(", ", team));
-		}
+		loadTeamSectionAsync();
 
 		if (ovIntakeDateValue != null)
 			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
@@ -650,10 +699,12 @@ public class CaseController {
 			return;
 		}
 
-		draft = new CaseEditModel(current.getCaseName(), current.getDescription());
+		draft = new CaseEditModel(current.getCaseName(), current.getCaseNumber(), current.getDescription());
 
 		if (ovCaseNameEditor != null)
 			ovCaseNameEditor.setText(draft.caseName());
+		if (ovCaseNumberEditor != null)
+			ovCaseNumberEditor.setText(draft.caseNumber());
 		if (ovDescriptionEditor != null)
 			ovDescriptionEditor.setText(draft.description());
 
@@ -685,6 +736,7 @@ public class CaseController {
 		draftPracticeAreaColor = null;
 		draftPrimaryOpposingCounselContactId = null;
 		draftPrimaryOpposingCounselName = null;
+		draftTeamAssignments = null;
 
 		setEditMode(false);
 
@@ -694,28 +746,13 @@ public class CaseController {
 	}
 
 	private void onSave() {
-		// Keep behavior obvious (helps if something silently returns)
-		if (caseDao == null) {
-			showError("Case service is unavailable.");
-			return;
-		}
-		if (caseId == null) {
-			showError("No case is selected.");
-			return;
-		}
-		if (current == null) {
-			showError("Case is still loading. Please try again.");
-			return;
-		}
-		if (ovCaseNameEditor == null || ovDescriptionEditor == null) {
-			showError("Edit fields are not available.");
-			return;
-		}
 
 		final String oldName = safeText(current.getCaseName()).trim();
 		final String oldDescription = safeText(current.getDescription());
+		final String oldNumber = safeText(current.getCaseNumber()).trim();
 
 		String name = safeText(ovCaseNameEditor.getText()).trim();
+		String number = safeText(ovCaseNumberEditor.getText()).trim();
 		String description = safeText(ovDescriptionEditor.getText());
 
 		if (name.isEmpty()) {
@@ -723,7 +760,7 @@ public class CaseController {
 			return;
 		}
 
-		draft = new CaseEditModel(name, description);
+		draft = new CaseEditModel(name, number, description);
 		final CaseEditModel saveDraft = draft;
 		final byte[] expectedRowVer = current.getRowVer();
 		final long saveCaseId = caseId.longValue();
@@ -739,6 +776,26 @@ public class CaseController {
 		final Integer desiredResponsibleAttorneyUserId = draftResponsibleAttorneyUserId;
 		final Integer desiredOpposingCounselContactId = draftPrimaryOpposingCounselContactId;
 
+		// ✅ SNAPSHOT team draft NOW (before thread starts)
+		final List<CaseDao.TeamAssignmentRow> desiredTeamAssignments = (draftTeamAssignments == null) ? null : List.copyOf(draftTeamAssignments);
+
+		// Keep behavior obvious (helps if something silently returns)
+		if (caseDao == null) {
+			showError("Case service is unavailable.");
+			return;
+		}
+		if (caseId == null) {
+			showError("No case is selected.");
+			return;
+		}
+		if (current == null) {
+			showError("Case is still loading. Please try again.");
+			return;
+		}
+		if (ovCaseNameEditor == null || ovDescriptionEditor == null || ovCaseNumberEditor == null) {
+			showError("Edit fields are not available.");
+			return;
+		}
 		setBusy(true);
 		clearError();
 
@@ -748,6 +805,7 @@ public class CaseController {
 				CaseDetailDto updated = caseDao.updateCase(
 						saveCaseId,
 						saveDraft.caseName(),
+						saveDraft.caseNumber(),
 						saveDraft.description(),
 						expectedRowVer
 				);
@@ -815,6 +873,12 @@ public class CaseController {
 					);
 				}
 
+				// ✅ Team baseline / changed flag + DB write
+				boolean teamChanged = desiredTeamAssignments != null;
+				if (teamChanged) {
+					caseDao.replaceCaseTeamAssignments(saveCaseId, desiredTeamAssignments);
+				}
+
 				runOnFx(() ->
 				{
 					current = updated;
@@ -829,13 +893,16 @@ public class CaseController {
 					setBusy(false);
 
 					// publish diffs (optional)
-					String newName = safeText(saveDraft.caseName()).trim();
-					String newDesc = safeText(saveDraft.description());
+					String newName2 = safeText(saveDraft.caseName()).trim();
+					String newDesc2 = safeText(saveDraft.description());
+					String newNum2 = safeText(saveDraft.caseNumber()).trim();
 
-					if (!newName.equals(oldName))
-						publishCaseFieldUpdated(saveCaseId, "name", newName);
-					if (!newDesc.equals(oldDescription))
-						publishCaseFieldUpdated(saveCaseId, "description", newDesc);
+					if (!newName2.equals(oldName))
+						publishCaseFieldUpdated(saveCaseId, "name", newName2);
+					if (!newNum2.equals(oldNumber))
+						publishCaseFieldUpdated(saveCaseId, "caseNumber", newNum2);
+					if (!newDesc2.equals(oldDescription))
+						publishCaseFieldUpdated(saveCaseId, "description", newDesc2);
 
 					if (statusChanged)
 						publishCaseFieldUpdated(saveCaseId, "primaryStatusId", desiredStatusId);
@@ -849,6 +916,10 @@ public class CaseController {
 						publishCaseFieldUpdated(saveCaseId, "responsibleAttorneyUserId", desiredResponsibleAttorneyUserId);
 					if (opposingCounselChanged)
 						publishCaseFieldUpdated(saveCaseId, "primaryOpposingCounselContactId", desiredOpposingCounselContactId);
+
+					// ✅ publish team change marker for live updates
+					if (teamChanged)
+						publishCaseFieldUpdated(saveCaseId, "teamChanged", 1);
 
 					// clear drafts
 					draftPrimaryStatusId = null;
@@ -867,6 +938,8 @@ public class CaseController {
 
 					draftPrimaryOpposingCounselContactId = null;
 					draftPrimaryOpposingCounselName = null;
+
+					draftTeamAssignments = null;
 
 					// refresh overview to pick up updated names/colors/ids
 					reloadCurrentCaseForViewMode();
@@ -909,6 +982,8 @@ public class CaseController {
 
 		setVisibleManaged(ovCaseNameValue, !enabled);
 		setVisibleManaged(ovCaseNameEditor, enabled);
+		setVisibleManaged(ovCaseNumberValue, !enabled);
+		setVisibleManaged(ovCaseNumberEditor, enabled);
 
 		setVisibleManaged(ovDescriptionValue, !enabled);
 		setVisibleManaged(ovDescriptionEditor, enabled);
@@ -926,7 +1001,7 @@ public class CaseController {
 		setVisibleManaged(changeClientButton, enabled);
 		setVisibleManaged(changePracticeAreaButton, enabled);
 		setVisibleManaged(changeOpposingCounselButton, enabled);
-
+		setVisibleManaged(btnEditTeam, enabled);
 	}
 
 	private void setBusy(boolean busy) {
@@ -940,6 +1015,8 @@ public class CaseController {
 				cancelButton.setDisable(busy);
 			if (ovCaseNameEditor != null)
 				ovCaseNameEditor.setDisable(busy);
+			if (ovCaseNumberEditor != null)
+				ovCaseNumberEditor.setDisable(busy);
 			if (ovDescriptionEditor != null)
 				ovDescriptionEditor.setDisable(busy);
 			if (reloadRemoteButton != null)
@@ -1550,9 +1627,8 @@ public class CaseController {
 		return value == null ? "—" : value.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
 	}
 
-	private record CaseEditModel(String caseName, String description) {
+	private record CaseEditModel(String caseName, String caseNumber, String description) {
 	}
-
 	// ----------------------------
 	// Patch parsing helpers
 	// ----------------------------
@@ -1892,5 +1968,236 @@ public class CaseController {
 				});
 			}
 		}, "case-oppcounsel-list-" + caseId).start();
+	}
+
+	// ----------------------------
+	// Team (FlowPane + Editor)
+	// ----------------------------
+
+	private void loadTeamSectionAsync() {
+		// ✅ If editing and we have a draft, show it (don’t overwrite with DB)
+		if (editMode && draftTeamAssignments != null) {
+			renderTeamFromDraft();
+			return;
+		}
+
+		if (caseDao == null || appState == null || caseId == null)
+			return;
+
+		final long activeCaseId = caseId.longValue();
+
+		new Thread(() ->
+		{
+			try {
+				List<CaseDao.CaseUserTeamRow> teamRows = caseDao.listCaseTeamRows(activeCaseId);
+
+				runOnFx(() ->
+				{
+					// If they entered edit mode while this thread ran, don't overwrite draft
+					if (editMode && draftTeamAssignments != null) {
+						renderTeamFromDraft();
+						return;
+					}
+					renderTeamCardsFromTeamRows(teamRows);
+				});
+
+			} catch (Exception ex) {
+				runOnFx(() -> System.out.println("[TEAM] Failed to load team: " + ex.getMessage()));
+			}
+		}, "case-team-load-" + activeCaseId).start();
+	}
+
+	private void renderTeamCardsFromTeamRows(List<CaseDao.CaseUserTeamRow> rows) {
+		if (teamFlow == null)
+			return;
+
+		teamFlow.getChildren().clear();
+
+		if (rows == null)
+			rows = List.of();
+
+		List<CaseDao.CaseUserTeamRow> filtered = rows.stream()
+				.filter(r -> r != null && TEAM_ROLE_IDS.contains(r.roleId()))
+				.sorted(java.util.Comparator
+						.comparing((CaseDao.CaseUserTeamRow r) -> !(r.roleId() == ROLE_RESPONSIBLE_ATTORNEY && r.isPrimary()))
+						.thenComparingInt(CaseDao.CaseUserTeamRow::roleId)
+						.thenComparing(r -> safeText(r.displayName()), String.CASE_INSENSITIVE_ORDER))
+				.toList();
+
+		if (filtered.isEmpty()) {
+			teamFlow.getChildren().add(new Label("—"));
+			return;
+		}
+
+		if (userCardFactory == null) {
+			userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
+			{
+			} : onOpenUser);
+		}
+
+		for (var r : filtered) {
+			Integer userId = r.userId();
+			String name = safeText(r.displayName()).isBlank() ? "—" : r.displayName();
+			String color = r.color();
+			String initials = r.initials();
+
+			UserCardModel model = new UserCardModel(userId, name, color, initials);
+			var card = userCardFactory.create(model, Variant.MINI);
+
+			Label role = new Label(roleLabel(r.roleId()));
+			role.getStyleClass().add("muted");
+
+			VBox wrap = new VBox(4, card, role);
+			teamFlow.getChildren().add(wrap);
+		}
+	}
+
+	private String roleLabel(int roleId) {
+		return switch (roleId) {
+		case ROLE_RESPONSIBLE_ATTORNEY -> "Responsible Attorney";
+		case ROLE_INTAKE_STAFF -> "Intake Staff";
+		case ROLE_ATTORNEY -> "Attorney";
+		case ROLE_LEGAL_ASSISTANT -> "Legal Assistant";
+		case ROLE_PARALEGAL -> "Paralegal";
+		case ROLE_LAW_CLERK -> "Law Clerk";
+		case ROLE_CO_COUNSEL -> "Co-counsel";
+		default -> "Role " + roleId;
+		};
+	}
+
+	@FXML
+	private void onEditTeam() {
+		if (caseDao == null || appState == null || caseId == null) {
+			showError("Team edit is unavailable.");
+			return;
+		}
+
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+
+		// Only allow team edits while in edit mode (matches your "draft" behavior)
+		if (!editMode) {
+			showError("Click Edit before changing the team.");
+			return;
+		}
+
+		setBusy(true);
+		clearError();
+
+		final long activeCaseId = caseId.longValue();
+		final int tId = tenantId;
+
+		new Thread(() ->
+		{
+			try {
+				// Load once and cache for rendering draft team
+				List<CaseDao.UserRow> allUsers = caseDao.listUsersForTenant(tId);
+				java.util.Map<Integer, CaseDao.UserRow> map = new java.util.HashMap<>();
+				for (var u : (allUsers == null ? List.<CaseDao.UserRow>of() : allUsers)) {
+					if (u != null)
+						map.put(u.id(), u);
+				}
+
+				// For the dialog: current assigned roles should come from DRAFT if present, else DB
+				List<CaseDao.CaseUserRoleRow> assignedRoles;
+				if (draftTeamAssignments != null) {
+					assignedRoles = draftTeamAssignments.stream()
+							.map(a -> new CaseDao.CaseUserRoleRow(a.userId(), a.roleId()))
+							.toList();
+				} else {
+					assignedRoles = caseDao.listCaseUserRoles(activeCaseId);
+				}
+
+				// Attorneys filter (you already have this)
+				java.util.Set<Integer> attorneyIds = caseDao.listAttorneyUserIdsForTenant(tId);
+
+				runOnFx(() ->
+				{
+					setBusy(false);
+
+					this.tenantUserById = map;
+
+					Stage owner = (Stage) teamFlow.getScene().getWindow();
+
+					TeamEditorDialog dlg = new TeamEditorDialog(
+							owner,
+							allUsers,
+							assignedRoles,
+							attorneyIds
+					);
+
+					dlg.showAndWaitForResult().ifPresent(res ->
+					{
+						// ✅ update draft only
+						draftTeamAssignments = res.assignments().stream()
+								.map(a -> new CaseDao.TeamAssignmentRow(a.userId(), a.roleId()))
+								.toList();
+
+						// ✅ render immediately from draft
+						renderTeamFromDraft();
+
+						// Optional: mark page dirty visually if you want (not required)
+					});
+				});
+
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					setBusy(false);
+					showError("Failed to load team editor. " + ex.getMessage());
+				});
+			}
+		}, "case-team-editor-load-" + activeCaseId).start();
+	}
+
+	private void renderTeamFromDraft() {
+		if (teamFlow == null)
+			return;
+
+		teamFlow.getChildren().clear();
+
+		if (draftTeamAssignments == null || draftTeamAssignments.isEmpty()) {
+			teamFlow.getChildren().add(new Label("—"));
+			return;
+		}
+
+		if (tenantUserById == null)
+			tenantUserById = java.util.Map.of();
+
+		// Convert draft -> display rows using cached tenant users
+		List<CaseDao.CaseUserTeamRow> rows = new java.util.ArrayList<>();
+		for (var a : draftTeamAssignments) {
+			if (a == null)
+				continue;
+			CaseDao.UserRow u = tenantUserById.get(a.userId());
+			String name = (u == null) ? ("User #" + a.userId()) : u.displayName();
+			String color = (u == null) ? null : u.color();
+			String initials = null; // if you have initials in UserRow, use it; otherwise leave null
+
+			boolean isPrimary = (a.roleId() == ROLE_RESPONSIBLE_ATTORNEY);
+			rows.add(new CaseDao.CaseUserTeamRow(a.userId(), name, color, initials, a.roleId(), isPrimary));
+		}
+
+		renderTeamCardsFromTeamRows(rows);
+	}
+
+	private void applyLiveCaseNumber(String newNumber) {
+		String safeNum = safeText(newNumber).trim();
+
+		if (ovCaseNumberValue != null)
+			ovCaseNumberValue.setText(safeNum.isBlank() ? "—" : safeNum);
+
+		String name = (current == null) ? "" : safeText(current.getCaseName()).trim();
+		if (caseTitleLabel != null) {
+			if (!name.isBlank() && !safeNum.isBlank())
+				caseTitleLabel.setText(name + " — " + safeNum);
+			else if (!name.isBlank())
+				caseTitleLabel.setText(name);
+			else if (!safeNum.isBlank())
+				caseTitleLabel.setText(safeNum);
+		}
 	}
 }

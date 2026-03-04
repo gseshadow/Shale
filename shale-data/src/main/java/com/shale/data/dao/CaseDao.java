@@ -8,8 +8,10 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import com.shale.core.runtime.DbSessionProvider;
 
@@ -499,7 +501,12 @@ public final class CaseDao {
 		);
 	}
 
-	public com.shale.core.dto.CaseDetailDto updateCase(long caseId, String name, String description, byte[] expectedRowVer) {
+	public com.shale.core.dto.CaseDetailDto updateCase(
+			long caseId,
+			String name,
+			String caseNumber,
+			String description,
+			byte[] expectedRowVer) {
 		if (expectedRowVer == null || expectedRowVer.length == 0) {
 			throw new IllegalArgumentException("expectedRowVer is required");
 		}
@@ -507,6 +514,7 @@ public final class CaseDao {
 		String sql = """
 				UPDATE %s
 				SET Name = ?,
+				    CaseNumber = ?,
 				    Description = ?,
 				    UpdatedAt = SYSDATETIME()
 				WHERE Id = ?
@@ -516,10 +524,12 @@ public final class CaseDao {
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
+
 			ps.setString(1, name);
-			ps.setString(2, description);
-			ps.setLong(3, caseId);
-			ps.setBytes(4, expectedRowVer);
+			ps.setString(2, caseNumber);
+			ps.setString(3, description);
+			ps.setLong(4, caseId);
+			ps.setBytes(5, expectedRowVer);
 
 			int rows = ps.executeUpdate();
 			if (rows == 0) {
@@ -533,6 +543,7 @@ public final class CaseDao {
 				return updated;
 			}
 			throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
+
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update case (caseId=" + caseId + ")", e);
 		}
@@ -1064,11 +1075,13 @@ public final class CaseDao {
 
 			boolean hasIsActive = tableHasColumn(con, "Users", "IsActive");
 			boolean hasIsDeleted = tableHasColumn(con, "Users", "IsDeleted");
-
+			boolean hasIsDeletedLower = tableHasColumn(con, "Users", "is_deleted");
 			StringBuilder sql = new StringBuilder(baseSql);
 
 			if (hasIsActive) {
 				sql.append("\n  AND (u.IsActive = 1 OR u.IsActive IS NULL)\n");
+			} else if (hasIsDeletedLower) {
+				sql.append("\n  AND (u.is_deleted = 0 OR u.is_deleted IS NULL)\n");
 			}
 			if (hasIsDeleted) {
 				sql.append("\n  AND (u.IsDeleted = 0 OR u.IsDeleted IS NULL)\n");
@@ -1169,4 +1182,246 @@ public final class CaseDao {
 		}
 	}
 
+	public record CaseUserTeamRow(
+			int userId,
+			String displayName,
+			String color,
+			String initials,
+			int roleId,
+			boolean isPrimary
+	) {
+	}
+
+	public record TeamAssignmentRow(int userId, int roleId) {
+	}
+
+	public record CaseUserRoleRow(int userId, int roleId) {
+	}
+
+	public List<CaseUserRoleRow> listCaseUserRoles(long caseId) {
+		String sql = """
+				SELECT UserId, RoleId
+				FROM dbo.CaseUsers
+				WHERE CaseId = ?
+				  AND RoleId IN (4,5,7,11,12,13,14);
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setLong(1, caseId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				List<CaseUserRoleRow> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(new CaseUserRoleRow(
+							rs.getInt("UserId"),
+							rs.getInt("RoleId")
+					));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list case user roles (caseId=" + caseId + ")", e);
+		}
+	}
+
+	public List<UserRow> listUsersForTenant(int shaleClientId) {
+		String baseSql = """
+				SELECT
+				  u.Id,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS DisplayName,
+				  u.Color
+				FROM dbo.Users u
+				WHERE u.ShaleClientId = ?
+				  AND NULLIF(LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )), '') IS NOT NULL
+				""";
+
+		String orderSql = """
+				ORDER BY u.name_last, u.name_first, u.Id;
+				""";
+
+		try (Connection con = db.requireConnection()) {
+
+			boolean hasIsActive = tableHasColumn(con, "Users", "IsActive");
+			boolean hasIsDeleted = tableHasColumn(con, "Users", "IsDeleted");
+			boolean hasIsDeletedLower = tableHasColumn(con, "Users", "is_deleted"); // in case your column is lower-case style
+
+			StringBuilder sql = new StringBuilder(baseSql);
+
+			if (hasIsActive) {
+				sql.append("\n  AND (u.IsActive = 1 OR u.IsActive IS NULL)\n");
+			}
+			if (hasIsDeleted) {
+				sql.append("\n  AND (u.IsDeleted = 0 OR u.IsDeleted IS NULL)\n");
+			}
+			if (hasIsDeletedLower) {
+				sql.append("\n  AND (u.is_deleted = 0 OR u.is_deleted IS NULL)\n");
+			}
+
+			sql.append(orderSql);
+
+			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+				ps.setInt(1, shaleClientId);
+
+				try (ResultSet rs = ps.executeQuery()) {
+					List<UserRow> out = new ArrayList<>();
+					while (rs.next()) {
+						out.add(new UserRow(
+								rs.getInt("Id"),
+								rs.getString("DisplayName"),
+								rs.getString("Color")
+						));
+					}
+					return out;
+				}
+			}
+
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list users (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public List<CaseUserTeamRow> listCaseTeamRows(long caseId) {
+		String sql = """
+				SELECT
+				  cu.UserId,
+				  cu.RoleId,
+				  cu.IsPrimary,
+				  u.Color,
+				  u.Initials,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS DisplayName
+				FROM dbo.CaseUsers cu
+				INNER JOIN dbo.Users u ON u.Id = cu.UserId
+				WHERE cu.CaseId = ?
+				ORDER BY
+				  CASE WHEN cu.RoleId = 4 AND cu.IsPrimary = 1 THEN 0 ELSE 1 END,
+				  cu.RoleId,
+				  u.name_last,
+				  u.name_first,
+				  u.Id;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setLong(1, caseId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				List<CaseUserTeamRow> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(new CaseUserTeamRow(
+							rs.getInt("UserId"),
+							rs.getString("DisplayName"),
+							rs.getString("Color"),
+							rs.getString("Initials"),
+							rs.getInt("RoleId"),
+							rs.getBoolean("IsPrimary")
+					));
+				}
+				return out;
+			}
+
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list case team (caseId=" + caseId + ")", e);
+		}
+	}
+
+	public void replaceCaseTeamAssignments(long caseId, List<TeamAssignmentRow> assignments) {
+
+		final String deleteExisting = """
+				DELETE FROM dbo.CaseUsers
+				WHERE CaseId = ?
+				  AND RoleId IN (4,5,7,11,12,13,14);
+				""";
+
+		final String insertRow = """
+				INSERT INTO dbo.CaseUsers (CaseId, UserId, RoleId, IsPrimary, Notes, CreatedAt, UpdatedAt)
+				VALUES (?, ?, ?, ?, NULL, SYSDATETIME(), SYSDATETIME());
+				""";
+
+		Connection con = null;
+		try {
+			con = db.requireConnection();
+			con.setAutoCommit(false);
+
+			try (PreparedStatement ps = con.prepareStatement(deleteExisting)) {
+				ps.setLong(1, caseId);
+				ps.executeUpdate();
+			}
+
+			if (assignments != null && !assignments.isEmpty()) {
+				try (PreparedStatement ps = con.prepareStatement(insertRow)) {
+					for (TeamAssignmentRow a : assignments) {
+						boolean isPrimary = (a.roleId() == ROLE_RESPONSIBLE_ATTORNEY);
+
+						ps.setLong(1, caseId);
+						ps.setInt(2, a.userId());
+						ps.setInt(3, a.roleId());
+						ps.setBoolean(4, isPrimary);
+						ps.addBatch();
+					}
+					ps.executeBatch();
+				}
+			}
+
+			con.commit();
+
+		} catch (SQLException e) {
+			if (con != null) {
+				try {
+					con.rollback();
+				} catch (SQLException ignored) {
+				}
+			}
+			throw new RuntimeException("Failed to replace case team (caseId=" + caseId + ")", e);
+		} finally {
+			if (con != null) {
+				try {
+					con.setAutoCommit(true);
+				} catch (SQLException ignored) {
+				}
+				try {
+					con.close();
+				} catch (SQLException ignored) {
+				}
+			}
+		}
+	}
+
+	public Set<Integer> listAttorneyUserIdsForTenant(int shaleClientId) {
+		String sql = """
+				SELECT u.Id
+				FROM dbo.Users u
+				WHERE u.ShaleClientId = ?
+				  AND u.is_attorney = 1
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setInt(1, shaleClientId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				Set<Integer> out = new HashSet<>();
+				while (rs.next())
+					out.add(rs.getInt(1));
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list attorney user ids (clientId=" + shaleClientId + ")", e);
+		}
+	}
 }
