@@ -191,11 +191,15 @@
 						GridPane.rowIndex="11" GridPane.columnIndex="0" />
 					<Label fx:id="ovIncidentDateValue" text="—"
 						GridPane.rowIndex="11" GridPane.columnIndex="1" />
+					<DatePicker fx:id="ovIncidentDateEditor" visible="false" managed="false"
+						GridPane.rowIndex="11" GridPane.columnIndex="1" />
 
 					<Label text="SOL date:" style="-fx-opacity: 0.8;"
 						GridPane.rowIndex="12" GridPane.columnIndex="0" />
 					<Label fx:id="ovSolDateValue" text="—" GridPane.rowIndex="12"
 						GridPane.columnIndex="1" />
+					<DatePicker fx:id="ovSolDateEditor" visible="false" managed="false"
+						GridPane.rowIndex="12" GridPane.columnIndex="1" />
 				</GridPane>
 
 				<Separator />

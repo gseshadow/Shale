@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -26,6 +27,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
@@ -106,7 +108,11 @@ public class CaseController {
 	@FXML
 	private Label ovIncidentDateValue;
 	@FXML
+	private DatePicker ovIncidentDateEditor;
+	@FXML
 	private Label ovSolDateValue;
+	@FXML
+	private DatePicker ovSolDateEditor;
 
 	@FXML
 	private Label ovDescriptionValue;
@@ -232,6 +238,9 @@ public class CaseController {
 
 	// Team drafts
 	private List<CaseDao.TeamAssignmentRow> draftTeamAssignments;
+
+	private LocalDate draftIncidentDate;
+	private LocalDate draftSolDate;
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
 
 	public void init(Integer caseId) {
@@ -327,6 +336,10 @@ public class CaseController {
 			String patchedName = extractPatchString(rawPatch, "name");
 			String patchedNumber = extractPatchString(rawPatch, "caseNumber");
 			String patchedDescription = extractPatchString(rawPatch, "description");
+			boolean incidentDatePatched = hasPatchKey(rawPatch, "incidentDate");
+			boolean solDatePatched = hasPatchKey(rawPatch, "solDate");
+			String patchedIncident = extractPatchString(rawPatch, "incidentDate");
+			String patchedSol = extractPatchString(rawPatch, "solDate");
 			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
 			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
 			Integer patchedPrimaryClientContactId = extractPatchInt(rawPatch, "primaryClientContactId");
@@ -369,8 +382,9 @@ public class CaseController {
 				return;
 			}
 
-			// Simple text patch -> apply inline
-			if (patchedName != null || patchedNumber != null || patchedDescription != null) {
+			// Simple text/date patch -> apply inline
+			if (patchedName != null || patchedNumber != null || patchedDescription != null
+					|| incidentDatePatched || solDatePatched) {
 				runOnFx(() ->
 				{
 					if (patchedName != null)
@@ -379,6 +393,10 @@ public class CaseController {
 						applyLiveCaseNumber(patchedNumber);
 					if (patchedDescription != null)
 						applyLiveCaseDescription(patchedDescription);
+					if (incidentDatePatched && ovIncidentDateValue != null)
+						ovIncidentDateValue.setText(formatDate(parsePatchedDate(patchedIncident)));
+					if (solDatePatched && ovSolDateValue != null)
+						ovSolDateValue.setText(formatDate(parsePatchedDate(patchedSol)));
 
 					hideRemoteUpdateBanner();
 					refreshCurrentAfterRemoteUpdateAsync();
@@ -543,8 +561,12 @@ public class CaseController {
 			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
 		if (ovIncidentDateValue != null)
 			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
+		if (ovIncidentDateEditor != null)
+			ovIncidentDateEditor.setValue(draftIncidentDate != null ? draftIncidentDate : dto.getIncidentDate());
 		if (ovSolDateValue != null)
 			ovSolDateValue.setText(formatDate(dto.getSolDate()));
+		if (ovSolDateEditor != null)
+			ovSolDateEditor.setValue(draftSolDate != null ? draftSolDate : dto.getSolDate());
 
 		if (ovDescriptionValue != null)
 			ovDescriptionValue.setText(safeText(dto.getDescription()));
@@ -656,8 +678,12 @@ public class CaseController {
 			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
 		if (ovIncidentDateValue != null)
 			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
+		if (ovIncidentDateEditor != null)
+			ovIncidentDateEditor.setValue(draftIncidentDate != null ? draftIncidentDate : dto.getIncidentDate());
 		if (ovSolDateValue != null)
 			ovSolDateValue.setText(formatDate(dto.getSolDate()));
+		if (ovSolDateEditor != null)
+			ovSolDateEditor.setValue(draftSolDate != null ? draftSolDate : dto.getSolDate());
 	}
 
 	// ----------------------------
@@ -693,6 +719,14 @@ public class CaseController {
 		// Opposing Counsel Drafts
 		draftPrimaryOpposingCounselContactId = (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId());
 		draftPrimaryOpposingCounselName = (currentOverview == null ? null : currentOverview.getOpposingCounsel());
+
+		draftIncidentDate = (currentOverview == null ? null : currentOverview.getIncidentDate());
+		draftSolDate = (currentOverview == null ? null : currentOverview.getSolDate());
+
+		if (ovIncidentDateEditor != null)
+			ovIncidentDateEditor.setValue(draftIncidentDate);
+		if (ovSolDateEditor != null)
+			ovSolDateEditor.setValue(draftSolDate);
 
 		if (current == null) {
 			showError("Case is still loading. Please try again.");
@@ -737,6 +771,8 @@ public class CaseController {
 		draftPrimaryOpposingCounselContactId = null;
 		draftPrimaryOpposingCounselName = null;
 		draftTeamAssignments = null;
+		draftIncidentDate = null;
+		draftSolDate = null;
 
 		setEditMode(false);
 
@@ -775,6 +811,8 @@ public class CaseController {
 		final Integer desiredPracticeAreaId = draftPracticeAreaId;
 		final Integer desiredResponsibleAttorneyUserId = draftResponsibleAttorneyUserId;
 		final Integer desiredOpposingCounselContactId = draftPrimaryOpposingCounselContactId;
+		final LocalDate desiredIncidentDate = (ovIncidentDateEditor == null ? null : ovIncidentDateEditor.getValue());
+		final LocalDate desiredSolDate = (ovSolDateEditor == null ? null : ovSolDateEditor.getValue());
 
 		// ✅ SNAPSHOT team draft NOW (before thread starts)
 		final List<CaseDao.TeamAssignmentRow> desiredTeamAssignments = (draftTeamAssignments == null) ? null : List.copyOf(draftTeamAssignments);
@@ -807,6 +845,8 @@ public class CaseController {
 						saveDraft.caseName(),
 						saveDraft.caseNumber(),
 						saveDraft.description(),
+						desiredIncidentDate,
+						desiredSolDate,
 						expectedRowVer
 				);
 
@@ -821,6 +861,11 @@ public class CaseController {
 				}
 
 				// Use currentOverview as baseline (can be null)
+				LocalDate baseIncidentDate = currentOverview == null ? null : currentOverview.getIncidentDate();
+				LocalDate baseSolDate = currentOverview == null ? null : currentOverview.getSolDate();
+				boolean incidentChanged = !Objects.equals(desiredIncidentDate, baseIncidentDate);
+				boolean solChanged = !Objects.equals(desiredSolDate, baseSolDate);
+
 				Integer baseStatusId = currentOverview == null ? null : currentOverview.getPrimaryStatusId();
 				boolean statusChanged = desiredStatusId != null && !desiredStatusId.equals(baseStatusId);
 				if (statusChanged) {
@@ -903,6 +948,12 @@ public class CaseController {
 						publishCaseFieldUpdated(saveCaseId, "caseNumber", newNum2);
 					if (!newDesc2.equals(oldDescription))
 						publishCaseFieldUpdated(saveCaseId, "description", newDesc2);
+					if (incidentChanged)
+						publishCaseFieldUpdated(saveCaseId, "incidentDate",
+							desiredIncidentDate == null ? null : desiredIncidentDate.toString());
+					if (solChanged)
+						publishCaseFieldUpdated(saveCaseId, "solDate",
+							desiredSolDate == null ? null : desiredSolDate.toString());
 
 					if (statusChanged)
 						publishCaseFieldUpdated(saveCaseId, "primaryStatusId", desiredStatusId);
@@ -938,6 +989,9 @@ public class CaseController {
 
 					draftPrimaryOpposingCounselContactId = null;
 					draftPrimaryOpposingCounselName = null;
+
+					draftIncidentDate = null;
+					draftSolDate = null;
 
 					draftTeamAssignments = null;
 
@@ -988,6 +1042,11 @@ public class CaseController {
 		setVisibleManaged(ovDescriptionValue, !enabled);
 		setVisibleManaged(ovDescriptionEditor, enabled);
 
+		setVisibleManaged(ovIncidentDateValue, !enabled);
+		setVisibleManaged(ovIncidentDateEditor, enabled);
+		setVisibleManaged(ovSolDateValue, !enabled);
+		setVisibleManaged(ovSolDateEditor, enabled);
+
 		setVisibleManaged(editButton, !enabled);
 		setVisibleManaged(saveButton, enabled);
 		setVisibleManaged(cancelButton, enabled);
@@ -1019,6 +1078,10 @@ public class CaseController {
 				ovCaseNumberEditor.setDisable(busy);
 			if (ovDescriptionEditor != null)
 				ovDescriptionEditor.setDisable(busy);
+			if (ovIncidentDateEditor != null)
+				ovIncidentDateEditor.setDisable(busy);
+			if (ovSolDateEditor != null)
+				ovSolDateEditor.setDisable(busy);
 			if (reloadRemoteButton != null)
 				reloadRemoteButton.setDisable(busy);
 			if (changeStatusButton != null)
@@ -1553,8 +1616,12 @@ public class CaseController {
 			ovIntakeDateValue.setText(formatDate(null));
 		if (ovIncidentDateValue != null)
 			ovIncidentDateValue.setText(formatDate(null));
+		if (ovIncidentDateEditor != null)
+			ovIncidentDateEditor.setValue(null);
 		if (ovSolDateValue != null)
 			ovSolDateValue.setText(formatDate(null));
+		if (ovSolDateEditor != null)
+			ovSolDateEditor.setValue(null);
 
 		if (ovDescriptionValue != null)
 			ovDescriptionValue.setText("");
@@ -1633,6 +1700,12 @@ public class CaseController {
 	// Patch parsing helpers
 	// ----------------------------
 
+	private static boolean hasPatchKey(String rawPatchJson, String key) {
+		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank())
+			return false;
+		return rawPatchJson.contains("\"" + key + "\"");
+	}
+
 	private static String extractPatchString(String rawPatchJson, String key) {
 		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank())
 			return null;
@@ -1655,6 +1728,16 @@ public class CaseController {
 			return null;
 
 		return rawPatchJson.substring(firstQuote + 1, secondQuote);
+	}
+
+	private static LocalDate parsePatchedDate(String patchedValue) {
+		if (patchedValue == null || patchedValue.isBlank())
+			return null;
+		try {
+			return LocalDate.parse(patchedValue.trim());
+		} catch (Exception ignored) {
+			return null;
+		}
 	}
 
 	private static Integer extractPatchInt(String rawPatchJson, String key) {

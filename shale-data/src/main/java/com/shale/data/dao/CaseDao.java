@@ -506,6 +506,8 @@ public final class CaseDao {
 			String name,
 			String caseNumber,
 			String description,
+			LocalDate incidentDate,
+			LocalDate solDate,
 			byte[] expectedRowVer) {
 		if (expectedRowVer == null || expectedRowVer.length == 0) {
 			throw new IllegalArgumentException("expectedRowVer is required");
@@ -516,6 +518,8 @@ public final class CaseDao {
 				SET Name = ?,
 				    CaseNumber = ?,
 				    Description = ?,
+				    DateOfInjury = ?,
+				    StatuteOfLimitations = ?,
 				    UpdatedAt = SYSDATETIME()
 				WHERE Id = ?
 				  AND RowVer = ?
@@ -528,8 +532,16 @@ public final class CaseDao {
 			ps.setString(1, name);
 			ps.setString(2, caseNumber);
 			ps.setString(3, description);
-			ps.setLong(4, caseId);
-			ps.setBytes(5, expectedRowVer);
+			if (incidentDate == null)
+				ps.setNull(4, java.sql.Types.DATE);
+			else
+				ps.setDate(4, java.sql.Date.valueOf(incidentDate));
+			if (solDate == null)
+				ps.setNull(5, java.sql.Types.DATE);
+			else
+				ps.setDate(5, java.sql.Date.valueOf(solDate));
+			ps.setLong(6, caseId);
+			ps.setBytes(7, expectedRowVer);
 
 			int rows = ps.executeUpdate();
 			if (rows == 0) {
