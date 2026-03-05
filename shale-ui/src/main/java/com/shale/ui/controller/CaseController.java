@@ -393,10 +393,50 @@ public class CaseController {
 						applyLiveCaseNumber(patchedNumber);
 					if (patchedDescription != null)
 						applyLiveCaseDescription(patchedDescription);
-					if (incidentDatePatched && ovIncidentDateValue != null)
-						ovIncidentDateValue.setText(formatDate(parsePatchedDate(patchedIncident)));
-					if (solDatePatched && ovSolDateValue != null)
-						ovSolDateValue.setText(formatDate(parsePatchedDate(patchedSol)));
+					LocalDate nextIncidentDate = null;
+					LocalDate nextSolDate = null;
+					boolean incidentApplied = false;
+					boolean solApplied = false;
+
+					if (incidentDatePatched) {
+						if (patchedIncident != null) {
+							LocalDate parsed = parsePatchedDate(patchedIncident);
+							if (parsed != null) {
+								nextIncidentDate = parsed;
+								incidentApplied = true;
+							}
+						} else if (isPatchExplicitNull(rawPatch, "incidentDate")) {
+							nextIncidentDate = null;
+							incidentApplied = true;
+						}
+					}
+
+					if (solDatePatched) {
+						if (patchedSol != null) {
+							LocalDate parsed = parsePatchedDate(patchedSol);
+							if (parsed != null) {
+								nextSolDate = parsed;
+								solApplied = true;
+							}
+						} else if (isPatchExplicitNull(rawPatch, "solDate")) {
+							nextSolDate = null;
+							solApplied = true;
+						}
+					}
+
+					if (incidentApplied && ovIncidentDateValue != null)
+						ovIncidentDateValue.setText(formatDate(nextIncidentDate));
+					if (solApplied && ovSolDateValue != null)
+						ovSolDateValue.setText(formatDate(nextSolDate));
+
+					if (incidentApplied || solApplied) {
+						CaseOverviewDto base = currentOverview;
+						if (base != null) {
+							LocalDate mergedIncident = incidentApplied ? nextIncidentDate : base.getIncidentDate();
+							LocalDate mergedSol = solApplied ? nextSolDate : base.getSolDate();
+							currentOverview = copyOverviewWithDates(base, mergedIncident, mergedSol);
+						}
+					}
 
 					hideRemoteUpdateBanner();
 					refreshCurrentAfterRemoteUpdateAsync();
@@ -1700,6 +1740,50 @@ public class CaseController {
 		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank())
 			return false;
 		return rawPatchJson.contains("\"" + key + "\"");
+	}
+
+	private static boolean isPatchExplicitNull(String rawPatchJson, String key) {
+		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank())
+			return false;
+		String needle = "\"" + key + "\"";
+		int k = rawPatchJson.indexOf(needle);
+		if (k < 0)
+			return false;
+		int colon = rawPatchJson.indexOf(':', k + needle.length());
+		if (colon < 0)
+			return false;
+		int i = colon + 1;
+		while (i < rawPatchJson.length() && Character.isWhitespace(rawPatchJson.charAt(i)))
+			i++;
+		return rawPatchJson.regionMatches(true, i, "null", 0, 4);
+	}
+
+	private static CaseOverviewDto copyOverviewWithDates(CaseOverviewDto base, LocalDate incidentDate, LocalDate solDate) {
+		return new CaseOverviewDto(
+				base.getCaseId(),
+				base.getCaseNumber(),
+				base.getCaseName(),
+				base.getCaseStatus(),
+				base.getPrimaryStatusId(),
+				base.getPrimaryStatusColor(),
+				base.getResponsibleAttorneyUserId(),
+				base.getResponsibleAttorney(),
+				base.getResponsibleAttorneyColor(),
+				base.getPracticeAreaId(),
+				base.getPracticeArea(),
+				base.getPracticeAreaColor(),
+				base.getIntakeDate(),
+				incidentDate,
+				solDate,
+				base.getPrimaryCallerContactId(),
+				base.getPrimaryClientContactId(),
+				base.getPrimaryOpposingCounselContactId(),
+				base.getCaller(),
+				base.getClient(),
+				base.getOpposingCounsel(),
+				base.getTeam(),
+				base.getDescription()
+		);
 	}
 
 	private static String extractPatchString(String rawPatchJson, String key) {
