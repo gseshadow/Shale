@@ -561,12 +561,12 @@ public class CaseController {
 			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
 		if (ovIncidentDateValue != null)
 			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
-		if (ovIncidentDateEditor != null)
-			ovIncidentDateEditor.setValue(draftIncidentDate != null ? draftIncidentDate : dto.getIncidentDate());
+		if (ovIncidentDateEditor != null && !editMode)
+			ovIncidentDateEditor.setValue(dto.getIncidentDate());
 		if (ovSolDateValue != null)
 			ovSolDateValue.setText(formatDate(dto.getSolDate()));
-		if (ovSolDateEditor != null)
-			ovSolDateEditor.setValue(draftSolDate != null ? draftSolDate : dto.getSolDate());
+		if (ovSolDateEditor != null && !editMode)
+			ovSolDateEditor.setValue(dto.getSolDate());
 
 		if (ovDescriptionValue != null)
 			ovDescriptionValue.setText(safeText(dto.getDescription()));
@@ -678,12 +678,8 @@ public class CaseController {
 			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
 		if (ovIncidentDateValue != null)
 			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
-		if (ovIncidentDateEditor != null)
-			ovIncidentDateEditor.setValue(draftIncidentDate != null ? draftIncidentDate : dto.getIncidentDate());
 		if (ovSolDateValue != null)
 			ovSolDateValue.setText(formatDate(dto.getSolDate()));
-		if (ovSolDateEditor != null)
-			ovSolDateEditor.setValue(draftSolDate != null ? draftSolDate : dto.getSolDate());
 	}
 
 	// ----------------------------
