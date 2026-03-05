@@ -27,6 +27,7 @@ import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.DatePicker;
@@ -38,7 +39,6 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.geometry.Pos;
 import javafx.stage.Stage;
 
 public class CaseController {
@@ -1567,12 +1567,12 @@ public class CaseController {
 
 		for (String section : SECTIONS) {
 			Button button = createSectionButton(section);
-			button.setOnAction(e -> navigateToSection(section));
+			button.setOnAction(e -> onSectionSelected(section));
 			sectionButtons.put(section, button);
 			sectionButtonsBox.getChildren().add(button);
 		}
 
-		navigateToSection("Overview");
+		onSectionSelected("Overview");
 	}
 
 	private Button createSectionButton(String section) {
@@ -1583,7 +1583,10 @@ public class CaseController {
 		return button;
 	}
 
-	private void navigateToSection(String sectionName) {
+	private void onSectionSelected(String sectionName) {
+		if (sectionName == null)
+			return;
+
 		setActiveSectionButton(sectionName);
 		switch (sectionName) {
 		case "Overview" -> showOverview();
