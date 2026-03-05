@@ -30,8 +30,6 @@
 				<Region HBox.hgrow="ALWAYS" />
 
 				<Button fx:id="addEntryButton" text="Add Entry" />
-				<Button fx:id="addTaskButton" text="Add Task" />
-				<Button fx:id="backToCasesButton" text="Back to Cases" />
 			</HBox>
 
 			<!-- Secondary row: status + last updated -->
@@ -68,149 +66,155 @@
 			</padding>
 
 			<!-- OVERVIEW PANE -->
-			<VBox fx:id="overviewPane" spacing="10" maxWidth="980">
-				<HBox alignment="CENTER_LEFT" spacing="8">
-					<Label fx:id="contentTitleLabel" text="Overview"
-						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
-					<Region HBox.hgrow="ALWAYS" />
-					<Button fx:id="editButton" text="Edit" />
-					<Button fx:id="saveButton" text="Save" visible="false"
-						managed="false" />
-					<Button fx:id="cancelButton" text="Cancel" visible="false"
-						managed="false" />
-				</HBox>
-
-				<HBox spacing="8" alignment="CENTER_LEFT">
-					<Label fx:id="errorLabel" textFill="#b42318" wrapText="true"
-						visible="false" managed="false" />
-				</HBox>
-
-				<HBox fx:id="remoteUpdateBanner" spacing="8"
-					alignment="CENTER_LEFT" visible="false" managed="false">
-					<Label text="This case was updated elsewhere."
-						style="-fx-text-fill: #b42318;" />
-					<Button fx:id="reloadRemoteButton" text="Reload" />
-				</HBox>
-
-				<GridPane hgap="14" vgap="8">
-					<columnConstraints>
-						<ColumnConstraints minWidth="150"
-							prefWidth="170" />
-						<ColumnConstraints hgrow="ALWAYS" />
-					</columnConstraints>
-
-					<Label text="Case name:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="0" GridPane.columnIndex="0" />
-					<Label fx:id="ovCaseNameValue" text="—" wrapText="true"
-						GridPane.rowIndex="0" GridPane.columnIndex="1" />
-					<TextField fx:id="ovCaseNameEditor" visible="false"
-						managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-
-					<Label text="Case number:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="1" GridPane.columnIndex="0" />
-					<Label fx:id="ovCaseNumberValue" text="—" wrapText="true"
-						GridPane.rowIndex="1" GridPane.columnIndex="1" />
-					<TextField fx:id="ovCaseNumberEditor" visible="false"
-						managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-
-					<Label text="Responsible atty:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="2" GridPane.columnIndex="0" />
-
-					<HBox spacing="8" alignment="CENTER_LEFT"
-						GridPane.rowIndex="2" GridPane.columnIndex="1">
-						<StackPane fx:id="ovResponsibleAttorneyHost" />
-						<Button fx:id="changeResponsibleAttorneyButton"
-							text="Change" visible="false" managed="false" />
+			<ScrollPane fx:id="overviewScrollPane" fitToWidth="true"
+				hbarPolicy="NEVER" style="-fx-background-color: transparent;">
+				<VBox fx:id="overviewPane" spacing="10" maxWidth="980">
+					<padding>
+						<Insets top="12" right="12" bottom="12" left="12" />
+					</padding>
+					<HBox alignment="CENTER_LEFT" spacing="8">
+						<Label fx:id="contentTitleLabel" text="Overview"
+							style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+						<Region HBox.hgrow="ALWAYS" />
+						<Button fx:id="editButton" text="Edit" />
+						<Button fx:id="saveButton" text="Save" visible="false"
+							managed="false" />
+						<Button fx:id="cancelButton" text="Cancel" visible="false"
+							managed="false" />
 					</HBox>
 
-					<Label text="Case status:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="3" GridPane.columnIndex="0" />
-					<HBox spacing="8" alignment="CENTER_LEFT"
-						GridPane.rowIndex="3" GridPane.columnIndex="1">
-						<StackPane fx:id="ovCaseStatusHost" />
-						<Button fx:id="changeStatusButton" text="Change"
+					<HBox spacing="8" alignment="CENTER_LEFT">
+						<Label fx:id="errorLabel" textFill="#b42318" wrapText="true"
 							visible="false" managed="false" />
 					</HBox>
 
-					<Label text="Caller:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="4" GridPane.columnIndex="0" />
-					<HBox spacing="8" alignment="CENTER_LEFT"
-						GridPane.rowIndex="4" GridPane.columnIndex="1">
-						<StackPane fx:id="ovCallerHost" />
-						<Button fx:id="changeCallerButton" text="Change"
-							visible="false" managed="false" />
+					<HBox fx:id="remoteUpdateBanner" spacing="8"
+						alignment="CENTER_LEFT" visible="false" managed="false">
+						<Label text="This case was updated elsewhere."
+							style="-fx-text-fill: #b42318;" />
+						<Button fx:id="reloadRemoteButton" text="Reload" />
 					</HBox>
 
-					<Label text="Client:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="5" GridPane.columnIndex="0" />
-					<HBox spacing="8" alignment="CENTER_LEFT"
-						GridPane.rowIndex="5" GridPane.columnIndex="1">
-						<StackPane fx:id="ovClientHost" />
-						<Button fx:id="changeClientButton" text="Change"
-							visible="false" managed="false" />
-					</HBox>
+					<GridPane hgap="14" vgap="8">
+						<columnConstraints>
+							<ColumnConstraints minWidth="150"
+								prefWidth="170" />
+							<ColumnConstraints hgrow="ALWAYS" />
+						</columnConstraints>
 
-					<Label text="Practice area:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="6" GridPane.columnIndex="0" />
+						<Label text="Case name:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="0" GridPane.columnIndex="0" />
+						<Label fx:id="ovCaseNameValue" text="—" wrapText="true"
+							GridPane.rowIndex="0" GridPane.columnIndex="1" />
+						<TextField fx:id="ovCaseNameEditor" visible="false"
+							managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
-					<HBox spacing="8" alignment="CENTER_LEFT"
-						GridPane.rowIndex="6" GridPane.columnIndex="1">
-						<StackPane fx:id="ovPracticeAreaHost" />
-						<Button fx:id="changePracticeAreaButton" text="Change"
-							visible="false" managed="false" />
-					</HBox>
+						<Label text="Case number:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="1" GridPane.columnIndex="0" />
+						<Label fx:id="ovCaseNumberValue" text="—" wrapText="true"
+							GridPane.rowIndex="1" GridPane.columnIndex="1" />
+						<TextField fx:id="ovCaseNumberEditor" visible="false"
+							managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
-					<Label text="Opposing Counsel" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="7" GridPane.columnIndex="0" />
-					<HBox spacing="8" alignment="CENTER_LEFT"
-						GridPane.rowIndex="7" GridPane.columnIndex="1">
-						<StackPane fx:id="ovOpposingCounselHost" />
-						<Button fx:id="changeOpposingCounselButton" text="Change"
-							visible="false" managed="false" />
-					</HBox>
+						<Label text="Responsible atty:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="2" GridPane.columnIndex="0" />
 
-					<Label text="Team:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="8" GridPane.columnIndex="0" />
-					<HBox spacing="8" alignment="CENTER_LEFT"
-						GridPane.rowIndex="8" GridPane.columnIndex="1">
-						<Button fx:id="btnEditTeam" text="Edit Team"
-							visible="false" managed="false" onAction="#onEditTeam" />
-					</HBox>
+						<HBox spacing="8" alignment="CENTER_LEFT"
+							GridPane.rowIndex="2" GridPane.columnIndex="1">
+							<StackPane fx:id="ovResponsibleAttorneyHost" />
+							<Button fx:id="changeResponsibleAttorneyButton"
+								text="Change" visible="false" managed="false" />
+						</HBox>
 
-					<FlowPane fx:id="teamFlow" hgap="10" vgap="10"
-						prefWrapLength="520" GridPane.rowIndex="9"
-						GridPane.columnIndex="0" GridPane.columnSpan="2" />
+						<Label text="Case status:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="3" GridPane.columnIndex="0" />
+						<HBox spacing="8" alignment="CENTER_LEFT"
+							GridPane.rowIndex="3" GridPane.columnIndex="1">
+							<StackPane fx:id="ovCaseStatusHost" />
+							<Button fx:id="changeStatusButton" text="Change"
+								visible="false" managed="false" />
+						</HBox>
 
-					<Label text="Intake date:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="10" GridPane.columnIndex="0" />
-					<Label fx:id="ovIntakeDateValue" text="—"
-						GridPane.rowIndex="10" GridPane.columnIndex="1" />
+						<Label text="Caller:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="4" GridPane.columnIndex="0" />
+						<HBox spacing="8" alignment="CENTER_LEFT"
+							GridPane.rowIndex="4" GridPane.columnIndex="1">
+							<StackPane fx:id="ovCallerHost" />
+							<Button fx:id="changeCallerButton" text="Change"
+								visible="false" managed="false" />
+						</HBox>
 
-					<Label text="Incident date:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="11" GridPane.columnIndex="0" />
-					<Label fx:id="ovIncidentDateValue" text="—"
-						GridPane.rowIndex="11" GridPane.columnIndex="1" />
-					<DatePicker fx:id="ovIncidentDateEditor" visible="false" managed="false"
-						GridPane.rowIndex="11" GridPane.columnIndex="1" />
+						<Label text="Client:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="5" GridPane.columnIndex="0" />
+						<HBox spacing="8" alignment="CENTER_LEFT"
+							GridPane.rowIndex="5" GridPane.columnIndex="1">
+							<StackPane fx:id="ovClientHost" />
+							<Button fx:id="changeClientButton" text="Change"
+								visible="false" managed="false" />
+						</HBox>
 
-					<Label text="SOL date:" style="-fx-opacity: 0.8;"
-						GridPane.rowIndex="12" GridPane.columnIndex="0" />
-					<Label fx:id="ovSolDateValue" text="—" GridPane.rowIndex="12"
-						GridPane.columnIndex="1" />
-					<DatePicker fx:id="ovSolDateEditor" visible="false" managed="false"
-						GridPane.rowIndex="12" GridPane.columnIndex="1" />
-				</GridPane>
+						<Label text="Practice area:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="6" GridPane.columnIndex="0" />
 
-				<Separator />
+						<HBox spacing="8" alignment="CENTER_LEFT"
+							GridPane.rowIndex="6" GridPane.columnIndex="1">
+							<StackPane fx:id="ovPracticeAreaHost" />
+							<Button fx:id="changePracticeAreaButton" text="Change"
+								visible="false" managed="false" />
+						</HBox>
 
-				<Label text="Case description:"
-					style="-fx-font-weight: bold; -fx-opacity: 0.85;" />
-				<Label fx:id="ovDescriptionValue" text="" wrapText="true" />
-				<TextArea fx:id="ovDescriptionEditor"
-					promptText="(description / overview notes)" prefRowCount="6"
-					wrapText="true" visible="false" managed="false" />
-			</VBox>
+						<Label text="Opposing Counsel" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="7" GridPane.columnIndex="0" />
+						<HBox spacing="8" alignment="CENTER_LEFT"
+							GridPane.rowIndex="7" GridPane.columnIndex="1">
+							<StackPane fx:id="ovOpposingCounselHost" />
+							<Button fx:id="changeOpposingCounselButton" text="Change"
+								visible="false" managed="false" />
+						</HBox>
 
+						<Label text="Team:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="8" GridPane.columnIndex="0" />
+						<HBox spacing="8" alignment="CENTER_LEFT"
+							GridPane.rowIndex="8" GridPane.columnIndex="1">
+							<Button fx:id="btnEditTeam" text="Edit Team"
+								visible="false" managed="false" onAction="#onEditTeam" />
+						</HBox>
+
+						<FlowPane fx:id="teamFlow" hgap="10" vgap="10"
+							prefWrapLength="520" GridPane.rowIndex="9"
+							GridPane.columnIndex="0" GridPane.columnSpan="2" />
+
+						<Label text="Intake date:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="10" GridPane.columnIndex="0" />
+						<Label fx:id="ovIntakeDateValue" text="—"
+							GridPane.rowIndex="10" GridPane.columnIndex="1" />
+
+						<Label text="Incident date:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="11" GridPane.columnIndex="0" />
+						<Label fx:id="ovIncidentDateValue" text="—"
+							GridPane.rowIndex="11" GridPane.columnIndex="1" />
+						<DatePicker fx:id="ovIncidentDateEditor"
+							visible="false" managed="false" GridPane.rowIndex="11"
+							GridPane.columnIndex="1" />
+
+						<Label text="SOL date:" style="-fx-opacity: 0.8;"
+							GridPane.rowIndex="12" GridPane.columnIndex="0" />
+						<Label fx:id="ovSolDateValue" text="—"
+							GridPane.rowIndex="12" GridPane.columnIndex="1" />
+						<DatePicker fx:id="ovSolDateEditor" visible="false"
+							managed="false" GridPane.rowIndex="12" GridPane.columnIndex="1" />
+					</GridPane>
+
+					<Separator />
+
+					<Label text="Case description:"
+						style="-fx-font-weight: bold; -fx-opacity: 0.85;" />
+					<Label fx:id="ovDescriptionValue" text="" wrapText="true" />
+					<TextArea fx:id="ovDescriptionEditor"
+						promptText="(description / overview notes)" prefRowCount="6"
+						wrapText="true" visible="false" managed="false" />
+				</VBox>
+			</ScrollPane>
 			<!-- TASKS TAB PANE (center) -->
 			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980"
 				visible="false" managed="false">
@@ -235,33 +239,7 @@
 		</StackPane>
 	</center>
 
-	<!-- RIGHT: Tasks panel (only for Overview) -->
 	<right>
-		<VBox fx:id="tasksPanel" spacing="10.0"
-			BorderPane.alignment="TOP_RIGHT"
-			style="-fx-background-color: rgba(0,0,0,0.03);">
-			<padding>
-				<Insets top="10" right="12" bottom="10" left="10" />
-			</padding>
-
-			<HBox spacing="8.0" alignment="CENTER_LEFT">
-				<Label text="Tasks"
-					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
-				<Region HBox.hgrow="ALWAYS" />
-				<Button fx:id="newTaskInlineButton" text="+" />
-			</HBox>
-
-			<TextField fx:id="taskSearchField"
-				promptText="Search tasks…" />
-
-			<ListView fx:id="taskListView" prefWidth="320.0"
-				prefHeight="260.0" />
-
-			<Separator />
-
-			<Label text="(placeholder) Quick actions here" wrapText="true"
-				style="-fx-opacity: 0.7;" />
-		</VBox>
 	</right>
 
 </BorderPane>

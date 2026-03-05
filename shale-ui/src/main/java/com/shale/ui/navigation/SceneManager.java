@@ -142,7 +142,7 @@ public final class SceneManager {
 	private void setScene(Parent root, String title) {
 		Scene scene = stage.getScene();
 		if (scene == null) {
-			scene = new Scene(root, 1100, 720);
+			scene = new Scene(root, 1650, 900);
 			scene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			stage.setScene(scene);

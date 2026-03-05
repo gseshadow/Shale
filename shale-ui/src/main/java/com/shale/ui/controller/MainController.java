@@ -225,8 +225,5 @@ public final class MainController {
 		navTeamButton.setDisable(false);
 		navSettingsButton.setDisable(false);
 
-		if (active != null) {
-			active.setDisable(true);
-		}
 	}
 }
