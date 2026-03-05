@@ -56,8 +56,7 @@
 
 			<Label text="Sections"
 				style="-fx-font-weight: bold; -fx-opacity: 0.8;" />
-			<ListView fx:id="sectionListView" prefWidth="200.0"
-				prefHeight="600.0" />
+			<VBox fx:id="sectionButtonsBox" spacing="6.0" prefWidth="200.0" />
 		</VBox>
 	</left>
 

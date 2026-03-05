@@ -3,7 +3,9 @@ package com.shale.ui.controller;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -36,6 +38,7 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.geometry.Pos;
 import javafx.stage.Stage;
 
 public class CaseController {
@@ -58,7 +61,7 @@ public class CaseController {
 	private Button backToCasesButton;
 
 	@FXML
-	private ListView<String> sectionListView;
+	private VBox sectionButtonsBox;
 	@FXML
 	private VBox overviewPane;
 	@FXML
@@ -190,6 +193,16 @@ public class CaseController {
 			ROLE_CO_COUNSEL
 	);
 
+	private static final List<String> SECTIONS = List.of(
+			"Overview",
+			"Tasks",
+			"Timeline",
+			"Details",
+			"People",
+			"Organizations",
+			"Documents"
+	);
+
 	private StatusCardFactory statusCardFactory;
 	private Consumer<Integer> onOpenStatus;
 
@@ -242,6 +255,8 @@ public class CaseController {
 	private LocalDate draftIncidentDate;
 	private LocalDate draftSolDate;
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
+
+	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -1544,24 +1559,47 @@ public class CaseController {
 	// ----------------------------
 
 	private void setupSections() {
-		if (sectionListView == null)
+		if (sectionButtonsBox == null)
 			return;
 
-		sectionListView.getItems().setAll("Overview", "Tasks", "Timeline", "Details", "People", "Organizations", "Documents");
-		sectionListView.getSelectionModel().select("Overview");
+		sectionButtons.clear();
+		sectionButtonsBox.getChildren().clear();
 
-		sectionListView.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) ->
-		{
-			if (newV == null)
-				return;
-			switch (newV) {
-			case "Overview" -> showOverview();
-			case "Tasks" -> showTasksTab();
-			default -> showGeneric(newV);
+		for (String section : SECTIONS) {
+			Button button = createSectionButton(section);
+			button.setOnAction(e -> navigateToSection(section));
+			sectionButtons.put(section, button);
+			sectionButtonsBox.getChildren().add(button);
+		}
+
+		navigateToSection("Overview");
+	}
+
+	private Button createSectionButton(String section) {
+		Button button = new Button(section);
+		button.setMaxWidth(Double.MAX_VALUE);
+		button.setAlignment(Pos.CENTER_LEFT);
+		button.setStyle("-fx-padding: 8 10 8 10; -fx-background-radius: 8; -fx-background-color: rgba(0,0,0,0.06);");
+		return button;
+	}
+
+	private void navigateToSection(String sectionName) {
+		setActiveSectionButton(sectionName);
+		switch (sectionName) {
+		case "Overview" -> showOverview();
+		case "Tasks" -> showTasksTab();
+		default -> showGeneric(sectionName);
+		}
+	}
+
+	private void setActiveSectionButton(String activeSection) {
+		sectionButtons.forEach((section, button) -> {
+			if (Objects.equals(section, activeSection)) {
+				button.setStyle("-fx-padding: 8 10 8 10; -fx-background-radius: 8; -fx-background-color: rgba(0,0,0,0.12); -fx-font-weight: bold;");
+			} else {
+				button.setStyle("-fx-padding: 8 10 8 10; -fx-background-radius: 8; -fx-background-color: rgba(0,0,0,0.06);");
 			}
 		});
-
-		showOverview();
 	}
 
 	private void showOverview() {
