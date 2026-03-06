@@ -389,6 +389,13 @@ public class CaseController {
 			// ✅ team marker (we publish 1)
 			Integer patchedTeamChanged = extractPatchInt(rawPatch, "teamChanged");
 			boolean teamChanged = patchedTeamChanged != null && patchedTeamChanged.intValue() == 1;
+			Integer patchedCaseUpdateAdded = extractPatchInt(rawPatch, "caseUpdateAdded");
+			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
+
+			if (caseUpdateAdded) {
+				runOnFx(this::loadCaseUpdatesAsync);
+				return;
+			}
 
 			if (editMode) {
 				runOnFx(() ->
@@ -1097,6 +1104,12 @@ public class CaseController {
 		} catch (Exception ex) {
 			System.out.println("CaseUpdated publish skipped: " + ex.getMessage());
 		}
+	}
+
+	private void publishCaseUpdateAdded(long caseId) {
+		if (runtimeBridge == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null)
+			return;
+		publishCaseFieldUpdated(caseId, "caseUpdateAdded", 1);
 	}
 
 	private void onReloadRemote() {
@@ -1810,6 +1823,7 @@ public class CaseController {
 		new Thread(() -> {
 			try {
 				caseDao.addCaseUpdate(activeCaseId, activeClientId, trimmedText, createdByUserId);
+				publishCaseUpdateAdded(activeCaseId);
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
 				runOnFx(() -> {
 					if (caseId == null || caseId.longValue() != activeCaseId)
