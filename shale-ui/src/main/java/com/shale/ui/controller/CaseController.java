@@ -1100,7 +1100,7 @@ public class CaseController {
 			int clientId = appState.getShaleClientId();
 			int userId = appState.getUserId();
 
-			runtimeBridge.publishEntityFieldUpdated("Case", (int) caseId, clientId, userId, field, newValueOrNull);
+			runtimeBridge.publishEntityFieldUpdated("Case", caseId, clientId, userId, field, newValueOrNull);
 		} catch (Exception ex) {
 			System.out.println("CaseUpdated publish skipped: " + ex.getMessage());
 		}
