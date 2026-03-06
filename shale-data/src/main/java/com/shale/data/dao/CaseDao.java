@@ -576,8 +576,8 @@ public final class CaseDao {
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
 				    COALESCE(u.name_last, '')
 				  )) AS CreatedByDisplayName
-				FROM CaseUpdates cu
-				LEFT JOIN Users u ON u.Id = cu.CreatedByUserId
+				FROM dbo.CaseUpdates cu
+				LEFT JOIN dbo.Users u ON u.Id = cu.CreatedByUserId
 				WHERE cu.CaseId = ?
 				ORDER BY cu.CreatedAt DESC, cu.Id DESC;
 				""";
@@ -618,7 +618,7 @@ public final class CaseDao {
 		}
 
 		String sql = """
-				INSERT INTO CaseUpdates (
+				INSERT INTO dbo.CaseUpdates (
 				  CaseId,
 				  ShaleClientId,
 				  NoteText,
@@ -640,7 +640,10 @@ public final class CaseDao {
 			else
 				ps.setInt(4, createdByUserId);
 
-			ps.executeUpdate();
+			int rows = ps.executeUpdate();
+			if (rows != 1) {
+				throw new RuntimeException("Unexpected insert row count for case update (caseId=" + caseId + "): " + rows);
+			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to add case update (caseId=" + caseId + ")", e);
 		}
@@ -973,7 +976,10 @@ public final class CaseDao {
 			ps.setInt(i++, statusId);
 			ps.setString(i++, (notes == null || notes.isBlank()) ? null : notes.trim());
 
-			ps.executeUpdate();
+			int rows = ps.executeUpdate();
+			if (rows != 1) {
+				throw new RuntimeException("Unexpected insert row count for case update (caseId=" + caseId + "): " + rows);
+			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to set primary status (caseId=" + caseId + ", statusId=" + statusId + ")", e);
 		}

@@ -1739,12 +1739,13 @@ public class CaseController {
 		new Thread(() -> {
 			try {
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
-				runOnFx(() -> renderCaseUpdates(updates));
-			} catch (Exception ex) {
 				runOnFx(() -> {
-					renderCaseUpdates(List.of());
-					showError("Failed to load case updates. " + ex.getMessage());
+					if (caseId == null || caseId.longValue() != activeCaseId)
+						return;
+					renderCaseUpdates(updates);
 				});
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to load case updates. " + ex.getMessage()));
 			}
 		}, "case-updates-load-" + activeCaseId).start();
 	}
@@ -1803,6 +1804,7 @@ public class CaseController {
 		final Integer createdByUserId = appState.getUserId();
 
 		submitCaseUpdateButton.setDisable(true);
+		caseUpdatesComposerArea.setDisable(true);
 		clearError();
 
 		new Thread(() -> {
@@ -1810,8 +1812,12 @@ public class CaseController {
 				caseDao.addCaseUpdate(activeCaseId, activeClientId, trimmedText, createdByUserId);
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
 				runOnFx(() -> {
-					if (caseUpdatesComposerArea != null)
+					if (caseId == null || caseId.longValue() != activeCaseId)
+						return;
+					if (caseUpdatesComposerArea != null) {
 						caseUpdatesComposerArea.clear();
+						caseUpdatesComposerArea.setDisable(false);
+					}
 					renderCaseUpdates(updates);
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
@@ -1819,6 +1825,8 @@ public class CaseController {
 			} catch (Exception ex) {
 				runOnFx(() -> {
 					showError("Failed to save case update. " + ex.getMessage());
+					if (caseUpdatesComposerArea != null)
+						caseUpdatesComposerArea.setDisable(false);
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
 				});
