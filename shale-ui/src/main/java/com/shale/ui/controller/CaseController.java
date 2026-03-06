@@ -393,7 +393,10 @@ public class CaseController {
 			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
 
 			if (caseUpdateAdded) {
-				runOnFx(this::loadCaseUpdatesAsync);
+				runOnFx(() -> {
+					loadCaseUpdatesAsync();
+					refreshLastUpdatedLabelAsync();
+				});
 				return;
 			}
 
@@ -571,12 +574,40 @@ public class CaseController {
 					current = detail;
 					if (!editMode)
 						applyDetail(detail);
+					else
+						applyLastUpdatedLabel(detail.getUpdatedAt());
 				}
 
 				hideRemoteUpdateBanner();
 				clearError();
 			});
 		}, "case-view-sync-" + activeCaseId).start();
+	}
+
+	private void applyLastUpdatedLabel(LocalDateTime updatedAt) {
+		if (lastUpdatedLabel != null)
+			lastUpdatedLabel.setText("Last updated: " + formatDateTime(updatedAt));
+	}
+
+	private void refreshLastUpdatedLabelAsync() {
+		if (caseDao == null || caseId == null)
+			return;
+		final long activeCaseId = caseId.longValue();
+
+		new Thread(() -> {
+			try {
+				CaseDetailDto detail = caseDao.getDetail(activeCaseId);
+				if (detail == null)
+					return;
+				LocalDateTime updatedAt = detail.getUpdatedAt();
+				runOnFx(() -> {
+					if (caseId == null || caseId.longValue() != activeCaseId)
+						return;
+					applyLastUpdatedLabel(updatedAt);
+				});
+			} catch (Exception ignored) {
+			}
+		}, "case-refresh-last-updated-" + activeCaseId).start();
 	}
 
 	private void applyOverview(CaseOverviewDto dto) {
@@ -675,8 +706,7 @@ public class CaseController {
 		if (statusLabel != null)
 			statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
 
-		if (lastUpdatedLabel != null)
-			lastUpdatedLabel.setText("Last updated: " + formatDateTime(detail.getUpdatedAt()));
+		applyLastUpdatedLabel(detail.getUpdatedAt());
 
 		if (caseTitleLabel != null) {
 			String num = safeText(detail.getCaseNumber()).trim();
@@ -1823,6 +1853,7 @@ public class CaseController {
 		new Thread(() -> {
 			try {
 				caseDao.addCaseUpdate(activeCaseId, activeClientId, trimmedText, createdByUserId);
+				runOnFx(() -> applyLastUpdatedLabel(LocalDateTime.now()));
 				publishCaseUpdateAdded(activeCaseId);
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
 				runOnFx(() -> {
@@ -1833,6 +1864,7 @@ public class CaseController {
 						caseUpdatesComposerArea.setDisable(false);
 					}
 					renderCaseUpdates(updates);
+					refreshLastUpdatedLabelAsync();
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
 				});

@@ -617,7 +617,7 @@ public final class CaseDao {
 			throw new IllegalArgumentException("Case update text is required.");
 		}
 
-		String sql = """
+		String insertSql = """
 				INSERT INTO dbo.CaseUpdates (
 				  CaseId,
 				  ShaleClientId,
@@ -630,22 +630,62 @@ public final class CaseDao {
 				VALUES (?, ?, ?, SYSDATETIME(), ?, SYSDATETIME(), NULL);
 				""";
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setLong(1, caseId);
-			ps.setInt(2, shaleClientId);
-			ps.setString(3, trimmedText);
-			if (createdByUserId == null)
-				ps.setNull(4, java.sql.Types.INTEGER);
-			else
-				ps.setInt(4, createdByUserId);
+		String touchCaseSql = """
+				UPDATE dbo.Cases
+				SET UpdatedAt = SYSDATETIME()
+				WHERE Id = ?
+				  AND ShaleClientId = ?;
+				""";
 
-			int rows = ps.executeUpdate();
-			if (rows != 1) {
-				throw new RuntimeException("Unexpected insert row count for case update (caseId=" + caseId + "): " + rows);
+		Connection con = null;
+		try {
+			con = db.requireConnection();
+			con.setAutoCommit(false);
+
+			try (PreparedStatement ps = con.prepareStatement(insertSql)) {
+				ps.setLong(1, caseId);
+				ps.setInt(2, shaleClientId);
+				ps.setString(3, trimmedText);
+				if (createdByUserId == null)
+					ps.setNull(4, java.sql.Types.INTEGER);
+				else
+					ps.setInt(4, createdByUserId);
+
+				int rows = ps.executeUpdate();
+				if (rows != 1) {
+					throw new RuntimeException("Unexpected insert row count for case update (caseId=" + caseId + "): " + rows);
+				}
 			}
+
+			try (PreparedStatement ps = con.prepareStatement(touchCaseSql)) {
+				ps.setLong(1, caseId);
+				ps.setInt(2, shaleClientId);
+				int rows = ps.executeUpdate();
+				if (rows != 1) {
+					throw new RuntimeException("Unexpected update row count when touching case UpdatedAt (caseId=" + caseId + "): " + rows);
+				}
+			}
+
+			con.commit();
 		} catch (SQLException e) {
+			if (con != null) {
+				try {
+					con.rollback();
+				} catch (SQLException ignored) {
+				}
+			}
 			throw new RuntimeException("Failed to add case update (caseId=" + caseId + ")", e);
+		} finally {
+			if (con != null) {
+				try {
+					con.setAutoCommit(true);
+				} catch (SQLException ignored) {
+				}
+				try {
+					con.close();
+				} catch (SQLException ignored) {
+				}
+			}
 		}
 	}
 
