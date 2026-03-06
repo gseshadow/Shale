@@ -838,52 +838,14 @@ public final class CaseDao {
 				  BEGIN TRAN;
 
 				  DECLARE @now datetime2 = SYSDATETIME();
-				  DECLARE @oldName nvarchar(400) = NULL;
-				  DECLARE @newName nvarchar(400) = NULL;
 
-				  DECLARE @roleName nvarchar(50) =
-				    CASE ?
-				      WHEN 1 THEN 'Client'
-				      WHEN 2 THEN 'Caller'
-				      WHEN 6 THEN 'Opposing counsel'
-				      ELSE CONCAT('Role ', CONVERT(varchar(10), ?))
-				    END;
-
-				  -- Old primary name (if any)
-				  SELECT TOP (1)
-				    @oldName = CASE
-				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-				      THEN LTRIM(RTRIM(
-				            COALESCE(ct.FirstName, '') +
-				            CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-				            COALESCE(ct.LastName, '')
-				          ))
-				      ELSE COALESCE(ct.Name, '')
-				    END
-				  FROM dbo.CaseContacts cc
-				  INNER JOIN dbo.Contacts ct ON ct.Id = cc.ContactId
-				  WHERE cc.CaseId = ?
-				    AND cc.Role = ?
-				    AND cc.IsPrimary = 1;
-
-				  -- New contact name (must exist in tenant)
-				  SELECT TOP (1)
-				    @newName = CASE
-				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-				      THEN LTRIM(RTRIM(
-				            COALESCE(ct.FirstName, '') +
-				            CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-				            COALESCE(ct.LastName, '')
-				          ))
-				      ELSE COALESCE(ct.Name, '')
-				    END
-				  FROM dbo.Contacts ct
-				  WHERE ct.Id = ?
-				    AND ct.ShaleClientId = ?;
-
-				  IF (@newName IS NULL)
+				  -- New contact name must exist in tenant
+				  IF NOT EXISTS (
+				    SELECT 1
+				    FROM dbo.Contacts ct
+				    WHERE ct.Id = ?
+				      AND ct.ShaleClientId = ?
+				  )
 				  BEGIN
 				    THROW 50001, 'Contact not found for tenant.', 1;
 				  END
@@ -914,14 +876,6 @@ public final class CaseDao {
 				      (?, ?, ?, NULL, 1, ?, @now, @now, @now);
 				  END
 
-				  -- Audit log
-				  INSERT INTO dbo.CaseUpdates
-				    (CaseId, ShaleClientId, NoteText, CreatedAt, UpdatedAt, CreatedByUserId, EditedByUserId)
-				  VALUES
-				    (?, ?, CONCAT(@roleName, ' changed: ', COALESCE(NULLIF(@oldName, ''), '—'),
-				                  ' → ', COALESCE(NULLIF(@newName, ''), '—')),
-				     @now, @now, ?, NULL);
-
 				  COMMIT;
 				END TRY
 				BEGIN CATCH
@@ -935,15 +889,7 @@ public final class CaseDao {
 
 			int i = 1;
 
-			// @roleName CASE placeholders (two ?s)
-			ps.setInt(i++, role);
-			ps.setInt(i++, role);
-
-			// old primary
-			ps.setLong(i++, caseId);
-			ps.setInt(i++, role);
-
-			// new contact tenant check
+			// tenant contact existence check
 			ps.setInt(i++, contactId);
 			ps.setInt(i++, shaleClientId);
 
@@ -964,15 +910,6 @@ public final class CaseDao {
 			ps.setInt(i++, contactId);
 			ps.setInt(i++, role);
 			ps.setString(i++, cleanNotes);
-
-			// audit
-			ps.setLong(i++, caseId);
-			ps.setInt(i++, shaleClientId);
-
-			if (changedByUserId == null)
-				ps.setNull(i++, java.sql.Types.INTEGER);
-			else
-				ps.setInt(i++, changedByUserId);
 
 			ps.executeUpdate();
 
