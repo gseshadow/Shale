@@ -916,6 +916,7 @@ public class CaseController {
 
 		final Integer tenantId = (appState == null ? null : appState.getShaleClientId());
 		final Integer userId = (appState == null ? null : appState.getUserId());
+		final CaseOverviewDto baseOverview = currentOverview;
 
 		// ✅ SNAPSHOT draft selections NOW (before thread starts)
 		final Integer desiredStatusId = draftPrimaryStatusId;
@@ -1031,10 +1032,25 @@ public class CaseController {
 					);
 				}
 
-				// ✅ Team baseline / changed flag + DB write
-				boolean teamChanged = desiredTeamAssignments != null;
-				if (teamChanged) {
-					caseDao.replaceCaseTeamAssignments(saveCaseId, desiredTeamAssignments);
+				// Team baseline / changed flag + DB write (actual changes only)
+				boolean teamChanged = false;
+				if (desiredTeamAssignments != null) {
+					java.util.Set<String> beforeTeam = normalizeTeamRoleRows(caseDao.listCaseUserRoles(saveCaseId));
+					java.util.Set<String> desiredTeam = normalizeTeamAssignments(desiredTeamAssignments);
+					teamChanged = !beforeTeam.equals(desiredTeam);
+					if (teamChanged) {
+						caseDao.replaceCaseTeamAssignments(saveCaseId, desiredTeamAssignments);
+					}
+				}
+
+				CaseOverviewDto updatedOverview = caseDao.getOverview(saveCaseId);
+				String importantChangesNote = buildImportantOverviewChangesNote(baseOverview, updatedOverview, teamChanged);
+				final boolean finalTeamChanged = teamChanged;
+				final String finalImportantChangesNote = importantChangesNote;
+				if (!finalImportantChangesNote.isBlank()) {
+					if (tenantId == null || tenantId <= 0)
+						throw new RuntimeException("No tenant is selected.");
+					caseDao.addCaseUpdate(saveCaseId, tenantId, importantChangesNote, userId);
 				}
 
 				runOnFx(() ->
@@ -1081,9 +1097,12 @@ public class CaseController {
 					if (opposingCounselChanged)
 						publishCaseFieldUpdated(saveCaseId, "primaryOpposingCounselContactId", desiredOpposingCounselContactId);
 
-					// ✅ publish team change marker for live updates
-					if (teamChanged)
+					// publish team change marker for live updates
+					if (finalTeamChanged)
 						publishCaseFieldUpdated(saveCaseId, "teamChanged", 1);
+
+					if (!finalImportantChangesNote.isBlank())
+						publishCaseUpdateAdded(saveCaseId);
 
 					// clear drafts
 					draftPrimaryStatusId = null;
@@ -1140,6 +1159,72 @@ public class CaseController {
 		if (runtimeBridge == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null)
 			return;
 		publishCaseFieldUpdated(caseId, "caseUpdateAdded", 1);
+	}
+
+	private static java.util.Set<String> normalizeTeamRoleRows(List<CaseDao.CaseUserRoleRow> rows) {
+		java.util.Set<String> out = new java.util.HashSet<>();
+		if (rows == null)
+			return out;
+		for (CaseDao.CaseUserRoleRow r : rows) {
+			if (r == null)
+				continue;
+			out.add(r.userId() + ":" + r.roleId());
+		}
+		return out;
+	}
+
+	private static java.util.Set<String> normalizeTeamAssignments(List<CaseDao.TeamAssignmentRow> rows) {
+		java.util.Set<String> out = new java.util.HashSet<>();
+		if (rows == null)
+			return out;
+		for (CaseDao.TeamAssignmentRow r : rows) {
+			if (r == null)
+				continue;
+			out.add(r.userId() + ":" + r.roleId());
+		}
+		return out;
+	}
+
+	private static String buildOverviewChangeLine(String label, String oldValue, String newValue) {
+		String oldSafe = normalizeUpdateValue(oldValue);
+		String newSafe = normalizeUpdateValue(newValue);
+		if (oldSafe.equals(newSafe))
+			return "";
+		return label + " changed: from " + oldSafe + " to " + newSafe;
+	}
+
+	private static String normalizeUpdateValue(String value) {
+		String trimmed = safeText(value).trim().replaceAll("\\s+", " ");
+		return trimmed.isBlank() ? "none" : trimmed;
+	}
+
+	private static String buildImportantOverviewChangesNote(CaseOverviewDto before, CaseOverviewDto after, boolean teamChanged) {
+		if (before == null || after == null)
+			return "";
+
+		java.util.List<String> lines = new java.util.ArrayList<>();
+		addIfPresent(lines, buildOverviewChangeLine("Responsible attorney", before.getResponsibleAttorney(), after.getResponsibleAttorney()));
+		addIfPresent(lines, buildOverviewChangeLine("Practice area", before.getPracticeArea(), after.getPracticeArea()));
+		addIfPresent(lines, buildOverviewChangeLine("Status", before.getCaseStatus(), after.getCaseStatus()));
+		addIfPresent(lines, buildOverviewChangeLine("Caller", before.getCaller(), after.getCaller()));
+		addIfPresent(lines, buildOverviewChangeLine("Client", before.getClient(), after.getClient()));
+		addIfPresent(lines, buildOverviewChangeLine("Opposing counsel", before.getOpposingCounsel(), after.getOpposingCounsel()));
+		if (teamChanged) {
+			String oldTeam = String.join(", ", before.getTeam());
+			String newTeam = String.join(", ", after.getTeam());
+			if (normalizeUpdateValue(oldTeam).equals(normalizeUpdateValue(newTeam)))
+				newTeam = safeText(newTeam).trim() + " roles updated";
+			addIfPresent(lines, buildOverviewChangeLine("Team", oldTeam, newTeam));
+		}
+		return String.join("\n", lines);
+	}
+
+	private static void addIfPresent(List<String> out, String line) {
+		if (out == null)
+			return;
+		String text = safeText(line).trim();
+		if (!text.isBlank())
+			out.add(text);
 	}
 
 	private void onReloadRemote() {
