@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.runtime.DbSessionProvider;
 
 public final class CaseDao {
@@ -561,6 +562,90 @@ public final class CaseDao {
 		}
 	}
 
+
+	public List<CaseUpdateDto> listCaseUpdates(long caseId) {
+		String sql = """
+				SELECT
+				  cu.Id,
+				  cu.CaseId,
+				  cu.NoteText,
+				  cu.CreatedAt,
+				  cu.CreatedByUserId,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS CreatedByDisplayName
+				FROM CaseUpdates cu
+				LEFT JOIN Users u ON u.Id = cu.CreatedByUserId
+				WHERE cu.CaseId = ?
+				ORDER BY cu.CreatedAt DESC, cu.Id DESC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setLong(1, caseId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				List<CaseUpdateDto> out = new ArrayList<>();
+				while (rs.next()) {
+					Integer createdByUserId = getNullableInt(rs, "CreatedByUserId");
+					String displayName = safeUserDisplayName(
+							rs.getString("CreatedByDisplayName"),
+							createdByUserId
+					);
+					out.add(new CaseUpdateDto(
+							rs.getLong("Id"),
+							rs.getLong("CaseId"),
+							rs.getString("NoteText"),
+							toLocalDateTime(rs.getTimestamp("CreatedAt")),
+							createdByUserId,
+							displayName
+					));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list case updates (caseId=" + caseId + ")", e);
+		}
+	}
+
+	public void addCaseUpdate(long caseId, int shaleClientId, String noteText, Integer createdByUserId) {
+		String trimmedText = noteText == null ? "" : noteText.trim();
+		if (trimmedText.isBlank()) {
+			throw new IllegalArgumentException("Case update text is required.");
+		}
+
+		String sql = """
+				INSERT INTO CaseUpdates (
+				  CaseId,
+				  ShaleClientId,
+				  NoteText,
+				  CreatedAt,
+				  CreatedByUserId,
+				  UpdatedAt,
+				  EditedByUserId
+				)
+				VALUES (?, ?, ?, SYSDATETIME(), ?, SYSDATETIME(), NULL);
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, shaleClientId);
+			ps.setString(3, trimmedText);
+			if (createdByUserId == null)
+				ps.setNull(4, java.sql.Types.INTEGER);
+			else
+				ps.setInt(4, createdByUserId);
+
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to add case update (caseId=" + caseId + ")", e);
+		}
+	}
+
 	// ---- helpers ----
 
 	private static LocalDate toLocalDate(java.sql.Date d) {
@@ -569,6 +654,16 @@ public final class CaseDao {
 
 	private static LocalDateTime toLocalDateTime(Timestamp ts) {
 		return ts == null ? null : ts.toLocalDateTime();
+	}
+
+
+	private static String safeUserDisplayName(String displayName, Integer userId) {
+		String trimmed = displayName == null ? "" : displayName.trim();
+		if (!trimmed.isBlank())
+			return trimmed;
+		if (userId != null)
+			return "User #" + userId;
+		return "Unknown";
 	}
 
 	private static Integer getNullableInt(ResultSet rs, String col) throws SQLException {

@@ -12,6 +12,7 @@ import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseUpdateDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
@@ -27,6 +28,7 @@ import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceDialog;
@@ -35,8 +37,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.Node;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -171,6 +176,15 @@ public class CaseController {
 	private FlowPane teamFlow;
 	@FXML
 	private Button btnEditTeam;
+
+	@FXML
+	private TextArea caseUpdatesComposerArea;
+	@FXML
+	private Button submitCaseUpdateButton;
+	@FXML
+	private ScrollPane caseUpdatesScrollPane;
+	@FXML
+	private VBox caseUpdatesFeedBox;
 
 	private static final int ROLE_CASECONTACT_CALLER = 2;
 	private static final int ROLE_CASECONTACT_CLIENT = 1;
@@ -318,6 +332,16 @@ public class CaseController {
 			changeOpposingCounselButton.setOnAction(e -> onChangeOpposingCounsel());
 		if (btnEditTeam != null)
 			btnEditTeam.setOnAction(e -> onEditTeam());
+		if (submitCaseUpdateButton != null)
+			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
+		if (caseUpdatesComposerArea != null) {
+			caseUpdatesComposerArea.setOnKeyPressed(e -> {
+				if (e.isControlDown() && e.getCode() == javafx.scene.input.KeyCode.ENTER) {
+					onSubmitCaseUpdate();
+					e.consume();
+				}
+			});
+		}
 	}
 
 	// ----------------------------
@@ -524,6 +548,7 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
+		loadCaseUpdatesAsync();
 
 		new Thread(() ->
 		{
@@ -1702,6 +1727,136 @@ public class CaseController {
 
 		if (ovDescriptionValue != null)
 			ovDescriptionValue.setText("");
+		renderCaseUpdates(List.of());
+	}
+
+
+	private void loadCaseUpdatesAsync() {
+		if (caseDao == null || caseId == null)
+			return;
+		final long activeCaseId = caseId.longValue();
+
+		new Thread(() -> {
+			try {
+				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
+				runOnFx(() -> renderCaseUpdates(updates));
+			} catch (Exception ex) {
+				runOnFx(() -> {
+					renderCaseUpdates(List.of());
+					showError("Failed to load case updates. " + ex.getMessage());
+				});
+			}
+		}, "case-updates-load-" + activeCaseId).start();
+	}
+
+	private void renderCaseUpdates(List<CaseUpdateDto> updates) {
+		if (caseUpdatesFeedBox == null)
+			return;
+
+		caseUpdatesFeedBox.getChildren().clear();
+		List<CaseUpdateDto> safeUpdates = updates == null ? List.of() : updates;
+
+		if (safeUpdates.isEmpty()) {
+			Label empty = new Label("No updates yet.");
+			empty.setWrapText(true);
+			empty.setStyle("-fx-opacity: 0.7;");
+			caseUpdatesFeedBox.getChildren().add(empty);
+			if (caseUpdatesScrollPane != null)
+				caseUpdatesScrollPane.setVvalue(0.0);
+			return;
+		}
+
+		for (CaseUpdateDto dto : safeUpdates) {
+			if (dto == null)
+				continue;
+			caseUpdatesFeedBox.getChildren().add(createCaseUpdateCard(dto));
+		}
+
+		if (caseUpdatesScrollPane != null)
+			caseUpdatesScrollPane.setVvalue(0.0);
+	}
+
+	private void onSubmitCaseUpdate() {
+		if (caseDao == null || appState == null || caseId == null) {
+			showError("Case updates are unavailable.");
+			return;
+		}
+		if (caseUpdatesComposerArea == null || submitCaseUpdateButton == null) {
+			showError("Case updates controls are unavailable.");
+			return;
+		}
+
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+
+		String trimmedText = safeText(caseUpdatesComposerArea.getText()).trim();
+		if (trimmedText.isBlank()) {
+			showError("Update text is required.");
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		final int activeClientId = shaleClientId;
+		final Integer createdByUserId = appState.getUserId();
+
+		submitCaseUpdateButton.setDisable(true);
+		clearError();
+
+		new Thread(() -> {
+			try {
+				caseDao.addCaseUpdate(activeCaseId, activeClientId, trimmedText, createdByUserId);
+				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
+				runOnFx(() -> {
+					if (caseUpdatesComposerArea != null)
+						caseUpdatesComposerArea.clear();
+					renderCaseUpdates(updates);
+					if (submitCaseUpdateButton != null)
+						submitCaseUpdateButton.setDisable(false);
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> {
+					showError("Failed to save case update. " + ex.getMessage());
+					if (submitCaseUpdateButton != null)
+						submitCaseUpdateButton.setDisable(false);
+				});
+			}
+		}, "case-updates-submit-" + activeCaseId).start();
+	}
+
+	private Node createCaseUpdateCard(CaseUpdateDto dto) {
+		Label authorLabel = new Label(safeAuthorName(dto));
+		authorLabel.setStyle("-fx-font-weight: bold;");
+
+		Label timestampLabel = new Label(formatDateTime(dto.getCreatedAt()));
+		timestampLabel.setStyle("-fx-opacity: 0.75;");
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+
+		HBox topRow = new HBox(8, authorLabel, spacer, timestampLabel);
+		topRow.setAlignment(Pos.CENTER_LEFT);
+
+		Label noteLabel = new Label(safeText(dto.getNoteText()));
+		noteLabel.setWrapText(true);
+
+		VBox card = new VBox(6, topRow, noteLabel);
+		card.setPadding(new Insets(8, 10, 8, 10));
+		card.setStyle("-fx-background-color: rgba(0,0,0,0.04); -fx-background-radius: 8;");
+		return card;
+	}
+
+	private static String safeAuthorName(CaseUpdateDto dto) {
+		if (dto == null)
+			return "Unknown";
+		String name = safeText(dto.getCreatedByDisplayName()).trim();
+		if (!name.isBlank())
+			return name;
+		if (dto.getCreatedByUserId() != null)
+			return "User #" + dto.getCreatedByUserId();
+		return "Unknown";
 	}
 
 	// ----------------------------
