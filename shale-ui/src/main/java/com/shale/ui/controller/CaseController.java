@@ -1494,234 +1494,7 @@ public class CaseController {
 	// ----------------------------
 
 	private void onSave() {
-		saveCoordinator.onSave();
-	}
-
-	private void onSaveInternal() {
-
-		final String oldName = safeText(current.getCaseName()).trim();
-		final String oldDescription = safeText(current.getDescription());
-		final String oldNumber = safeText(current.getCaseNumber()).trim();
-
-		String name = safeText(ovCaseNameEditor.getText()).trim();
-		String number = safeText(ovCaseNumberEditor.getText()).trim();
-		String description = safeText(ovDescriptionEditor.getText());
-
-		if (name.isEmpty()) {
-			showError("Case Name is required.");
-			return;
-		}
-
-		draft = new CaseEditModel(name, number, description);
-		final CaseEditModel saveDraft = draft;
-		final byte[] expectedRowVer = current.getRowVer();
-		final long saveCaseId = caseId.longValue();
-
-		final Integer tenantId = (appState == null ? null : appState.getShaleClientId());
-		final Integer userId = (appState == null ? null : appState.getUserId());
-		final CaseOverviewDto baseOverview = currentOverview;
-
-		// ✅ SNAPSHOT draft selections NOW (before thread starts)
-		final Integer desiredStatusId = draftPrimaryStatusId;
-		final Integer desiredCallerContactId = draftPrimaryCallerContactId;
-		final Integer desiredClientContactId = draftPrimaryClientContactId;
-		final Integer desiredPracticeAreaId = draftPracticeAreaId;
-		final Integer desiredResponsibleAttorneyUserId = draftResponsibleAttorneyUserId;
-		final Integer desiredOpposingCounselContactId = draftPrimaryOpposingCounselContactId;
-		final LocalDate desiredIncidentDate = (ovIncidentDateEditor == null ? null : ovIncidentDateEditor.getValue());
-		final LocalDate desiredSolDate = (ovSolDateEditor == null ? null : ovSolDateEditor.getValue());
-
-		// ✅ SNAPSHOT team draft NOW (before thread starts)
-		final List<CaseDao.TeamAssignmentRow> desiredTeamAssignments = (draftTeamAssignments == null) ? null : List.copyOf(draftTeamAssignments);
-
-		// Keep behavior obvious (helps if something silently returns)
-		if (caseDao == null) {
-			showError("Case service is unavailable.");
-			return;
-		}
-		if (caseId == null) {
-			showError("No case is selected.");
-			return;
-		}
-		if (current == null) {
-			showError("Case is still loading. Please try again.");
-			return;
-		}
-		if (ovCaseNameEditor == null || ovDescriptionEditor == null || ovCaseNumberEditor == null) {
-			showError("Edit fields are not available.");
-			return;
-		}
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				CaseDetailDto updated = caseDao.updateCase(
-						saveCaseId,
-						saveDraft.caseName(),
-						saveDraft.caseNumber(),
-						saveDraft.description(),
-						desiredIncidentDate,
-						desiredSolDate,
-						expectedRowVer
-				);
-
-				if (updated == null) {
-					runOnFx(() ->
-					{
-						showRemoteUpdateBanner();
-						showError("This case was updated elsewhere. Reload and try again.");
-						setBusy(false);
-					});
-					return;
-				}
-
-				// Use currentOverview as baseline (can be null)
-				LocalDate baseIncidentDate = currentOverview == null ? null : currentOverview.getIncidentDate();
-				LocalDate baseSolDate = currentOverview == null ? null : currentOverview.getSolDate();
-				boolean incidentChanged = !Objects.equals(desiredIncidentDate, baseIncidentDate);
-				boolean solChanged = !Objects.equals(desiredSolDate, baseSolDate);
-
-				Integer baseStatusId = currentOverview == null ? null : currentOverview.getPrimaryStatusId();
-				boolean statusChanged = desiredStatusId != null && !desiredStatusId.equals(baseStatusId);
-				if (statusChanged) {
-					caseDao.setPrimaryStatus(saveCaseId, desiredStatusId, null);
-				}
-
-				Integer baseCallerContactId = currentOverview == null ? null : currentOverview.getPrimaryCallerContactId();
-				boolean callerChanged = desiredCallerContactId != null && !desiredCallerContactId.equals(baseCallerContactId);
-				if (callerChanged) {
-					if (tenantId == null || tenantId <= 0)
-						throw new RuntimeException("No tenant is selected.");
-					caseDao.setPrimaryCaseContact(
-							saveCaseId, tenantId, ROLE_CASECONTACT_CALLER, desiredCallerContactId, userId, null
-					);
-				}
-
-				Integer baseClientContactId = currentOverview == null ? null : currentOverview.getPrimaryClientContactId();
-				boolean clientChanged = desiredClientContactId != null && !desiredClientContactId.equals(baseClientContactId);
-				if (clientChanged) {
-					if (tenantId == null || tenantId <= 0)
-						throw new RuntimeException("No tenant is selected.");
-					caseDao.setPrimaryCaseContact(
-							saveCaseId, tenantId, ROLE_CASECONTACT_CLIENT, desiredClientContactId, userId, null
-					);
-				}
-
-				Integer basePracticeAreaId = currentOverview == null ? null : currentOverview.getPracticeAreaId();
-				boolean practiceAreaChanged = desiredPracticeAreaId != null && !desiredPracticeAreaId.equals(basePracticeAreaId);
-				if (practiceAreaChanged) {
-					if (tenantId == null || tenantId <= 0)
-						throw new RuntimeException("No tenant is selected.");
-					caseDao.setPracticeArea(saveCaseId, tenantId, desiredPracticeAreaId);
-				}
-
-				Integer baseAttyId = currentOverview == null ? null : currentOverview.getResponsibleAttorneyUserId();
-				boolean attyChanged = desiredResponsibleAttorneyUserId != null
-						&& !desiredResponsibleAttorneyUserId.equals(baseAttyId);
-				if (attyChanged) {
-					caseDao.setResponsibleAttorney(saveCaseId, desiredResponsibleAttorneyUserId);
-				}
-
-				Integer baseOpposingCounselContactId = currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId();
-				boolean opposingCounselChanged = desiredOpposingCounselContactId != null
-						&& !desiredOpposingCounselContactId.equals(baseOpposingCounselContactId);
-				if (opposingCounselChanged) {
-					if (tenantId == null || tenantId <= 0)
-						throw new RuntimeException("No tenant is selected.");
-					caseDao.setPrimaryCaseContact(
-							saveCaseId, tenantId, ROLE_CASECONTACT_OPPOSING_COUNSEL, desiredOpposingCounselContactId, userId, null
-					);
-				}
-
-				// Team baseline / changed flag + DB write (actual changes only)
-				boolean teamChanged = false;
-				if (desiredTeamAssignments != null) {
-					java.util.Set<String> beforeTeam = normalizeTeamRoleRows(caseDao.listCaseUserRoles(saveCaseId));
-					java.util.Set<String> desiredTeam = normalizeTeamAssignments(desiredTeamAssignments);
-					teamChanged = !beforeTeam.equals(desiredTeam);
-					if (teamChanged) {
-						caseDao.replaceCaseTeamAssignments(saveCaseId, desiredTeamAssignments);
-					}
-				}
-
-				CaseOverviewDto updatedOverview = caseDao.getOverview(saveCaseId);
-				String importantChangesNote = buildImportantOverviewChangesNote(baseOverview, updatedOverview, teamChanged);
-				final boolean finalTeamChanged = teamChanged;
-				final String finalImportantChangesNote = importantChangesNote;
-				if (!finalImportantChangesNote.isBlank()) {
-					if (tenantId == null || tenantId <= 0)
-						throw new RuntimeException("No tenant is selected.");
-					caseDao.addCaseUpdate(saveCaseId, tenantId, importantChangesNote, userId);
-				}
-
-				runOnFx(() ->
-				{
-					current = updated;
-
-					setEditMode(false);
-					draft = null;
-
-					hideRemoteUpdateBanner();
-
-					applyDetail(updated);
-					clearError();
-					setBusy(false);
-
-					// publish diffs (optional)
-					String newName2 = safeText(saveDraft.caseName()).trim();
-					String newDesc2 = safeText(saveDraft.description());
-					String newNum2 = safeText(saveDraft.caseNumber()).trim();
-
-					if (!newName2.equals(oldName))
-						publishCaseFieldUpdated(saveCaseId, "name", newName2);
-					if (!newNum2.equals(oldNumber))
-						publishCaseFieldUpdated(saveCaseId, "caseNumber", newNum2);
-					if (!newDesc2.equals(oldDescription))
-						publishCaseFieldUpdated(saveCaseId, "description", newDesc2);
-					if (incidentChanged)
-						publishCaseFieldUpdated(saveCaseId, "incidentDate",
-								desiredIncidentDate == null ? null : desiredIncidentDate.toString());
-					if (solChanged)
-						publishCaseFieldUpdated(saveCaseId, "solDate",
-								desiredSolDate == null ? null : desiredSolDate.toString());
-
-					if (statusChanged)
-						publishCaseFieldUpdated(saveCaseId, "primaryStatusId", desiredStatusId);
-					if (callerChanged)
-						publishCaseFieldUpdated(saveCaseId, "primaryCallerContactId", desiredCallerContactId);
-					if (clientChanged)
-						publishCaseFieldUpdated(saveCaseId, "primaryClientContactId", desiredClientContactId);
-					if (practiceAreaChanged)
-						publishCaseFieldUpdated(saveCaseId, "practiceAreaId", desiredPracticeAreaId);
-					if (attyChanged)
-						publishCaseFieldUpdated(saveCaseId, "responsibleAttorneyUserId", desiredResponsibleAttorneyUserId);
-					if (opposingCounselChanged)
-						publishCaseFieldUpdated(saveCaseId, "primaryOpposingCounselContactId", desiredOpposingCounselContactId);
-
-					// publish team change marker for live updates
-					if (finalTeamChanged)
-						publishCaseFieldUpdated(saveCaseId, "teamChanged", 1);
-
-					if (!finalImportantChangesNote.isBlank())
-						publishCaseUpdateAdded(saveCaseId);
-
-					// clear drafts
-					clearDraftState();
-
-					// refresh overview to pick up updated names/colors/ids
-					reloadCurrentCaseForViewMode();
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to save case. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-save-" + caseId).start();
+		saveCoordinator.save();
 	}
 
 	private void publishCaseFieldUpdated(long caseId, String field, Object newValueOrNull) {
@@ -2853,9 +2626,327 @@ public class CaseController {
 	}
 
 	private final class CaseOverviewSaveCoordinator {
-		void onSave() {
-			onSaveInternal();
+		void save() {
+			SaveRequest request = validatePreconditionsAndCapture();
+			if (request == null)
+				return;
+
+			setBusy(true);
+			clearError();
+
+			new Thread(() -> runSaveWorker(request), "case-save-" + caseId).start();
 		}
+
+		private SaveRequest validatePreconditionsAndCapture() {
+			if (caseDao == null) {
+				showError("Case service is unavailable.");
+				return null;
+			}
+			if (caseId == null) {
+				showError("No case is selected.");
+				return null;
+			}
+			if (current == null) {
+				showError("Case is still loading. Please try again.");
+				return null;
+			}
+			if (ovCaseNameEditor == null || ovDescriptionEditor == null || ovCaseNumberEditor == null) {
+				showError("Edit fields are not available.");
+				return null;
+			}
+
+			String name = safeText(ovCaseNameEditor.getText()).trim();
+			String number = safeText(ovCaseNumberEditor.getText()).trim();
+			String description = safeText(ovDescriptionEditor.getText());
+
+			if (name.isEmpty()) {
+				showError("Case Name is required.");
+				return null;
+			}
+
+			draft = new CaseEditModel(name, number, description);
+			CaseEditModel saveDraft = draft;
+
+			SaveBaseline baseline = new SaveBaseline(
+					safeText(current.getCaseName()).trim(),
+					safeText(current.getDescription()),
+					safeText(current.getCaseNumber()).trim(),
+					currentOverview,
+					current.getRowVer()
+			);
+
+			SaveDesiredValues desiredValues = captureRequestedValues();
+
+			return new SaveRequest(
+					caseId.longValue(),
+					saveDraft,
+					baseline,
+					desiredValues,
+					(appState == null ? null : appState.getShaleClientId()),
+					(appState == null ? null : appState.getUserId())
+			);
+		}
+
+		private SaveDesiredValues captureRequestedValues() {
+			return new SaveDesiredValues(
+					draftPrimaryStatusId,
+					draftPrimaryCallerContactId,
+					draftPrimaryClientContactId,
+					draftPracticeAreaId,
+					draftResponsibleAttorneyUserId,
+					draftPrimaryOpposingCounselContactId,
+					(ovIncidentDateEditor == null ? null : ovIncidentDateEditor.getValue()),
+					(ovSolDateEditor == null ? null : ovSolDateEditor.getValue()),
+					(draftTeamAssignments == null) ? null : List.copyOf(draftTeamAssignments)
+			);
+		}
+
+		private void runSaveWorker(SaveRequest request) {
+			try {
+				SaveComputation computation = computeChangeSet(request);
+				CaseDetailDto updated = persistBaseCaseFields(request);
+				if (updated == null) {
+					handleConcurrentUpdate();
+					return;
+				}
+
+				persistRelationshipChanges(request, computation);
+				boolean teamChanged = persistTeamChanges(request);
+
+				CaseOverviewDto updatedOverview = caseDao.getOverview(request.saveCaseId());
+				String importantChangesNote = buildImportantOverviewChangesNote(request.baseline().baseOverview(), updatedOverview, teamChanged);
+				persistImportantChangesNote(request, importantChangesNote);
+
+				runOnFx(() -> finalizeSuccessfulSave(request, updated, computation, teamChanged, importantChangesNote));
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					showError("Failed to save case. " + ex.getMessage());
+					setBusy(false);
+				});
+			}
+		}
+
+		private SaveComputation computeChangeSet(SaveRequest request) {
+			CaseOverviewDto baseOverview = request.baseline().baseOverview();
+			SaveDesiredValues desired = request.desired();
+
+			LocalDate baseIncidentDate = baseOverview == null ? null : baseOverview.getIncidentDate();
+			LocalDate baseSolDate = baseOverview == null ? null : baseOverview.getSolDate();
+
+			boolean incidentChanged = !Objects.equals(desired.desiredIncidentDate(), baseIncidentDate);
+			boolean solChanged = !Objects.equals(desired.desiredSolDate(), baseSolDate);
+
+			Integer baseStatusId = baseOverview == null ? null : baseOverview.getPrimaryStatusId();
+			boolean statusChanged = desired.desiredStatusId() != null && !desired.desiredStatusId().equals(baseStatusId);
+
+			Integer baseCallerContactId = baseOverview == null ? null : baseOverview.getPrimaryCallerContactId();
+			boolean callerChanged = desired.desiredCallerContactId() != null && !desired.desiredCallerContactId().equals(baseCallerContactId);
+
+			Integer baseClientContactId = baseOverview == null ? null : baseOverview.getPrimaryClientContactId();
+			boolean clientChanged = desired.desiredClientContactId() != null && !desired.desiredClientContactId().equals(baseClientContactId);
+
+			Integer basePracticeAreaId = baseOverview == null ? null : baseOverview.getPracticeAreaId();
+			boolean practiceAreaChanged = desired.desiredPracticeAreaId() != null && !desired.desiredPracticeAreaId().equals(basePracticeAreaId);
+
+			Integer baseAttyId = baseOverview == null ? null : baseOverview.getResponsibleAttorneyUserId();
+			boolean attyChanged = desired.desiredResponsibleAttorneyUserId() != null
+					&& !desired.desiredResponsibleAttorneyUserId().equals(baseAttyId);
+
+			Integer baseOpposingCounselContactId = baseOverview == null ? null : baseOverview.getPrimaryOpposingCounselContactId();
+			boolean opposingCounselChanged = desired.desiredOpposingCounselContactId() != null
+					&& !desired.desiredOpposingCounselContactId().equals(baseOpposingCounselContactId);
+
+			return new SaveComputation(incidentChanged, solChanged, statusChanged, callerChanged, clientChanged,
+					practiceAreaChanged, attyChanged, opposingCounselChanged);
+		}
+
+		private CaseDetailDto persistBaseCaseFields(SaveRequest request) {
+			return caseDao.updateCase(
+					request.saveCaseId(),
+					request.saveDraft().caseName(),
+					request.saveDraft().caseNumber(),
+					request.saveDraft().description(),
+					request.desired().desiredIncidentDate(),
+					request.desired().desiredSolDate(),
+					request.baseline().expectedRowVer()
+			);
+		}
+
+		private void persistRelationshipChanges(SaveRequest request, SaveComputation computation) {
+			if (computation.statusChanged())
+				caseDao.setPrimaryStatus(request.saveCaseId(), request.desired().desiredStatusId(), null);
+
+			if (computation.callerChanged()) {
+				requireTenant(request.tenantId());
+				caseDao.setPrimaryCaseContact(
+						request.saveCaseId(), request.tenantId(), ROLE_CASECONTACT_CALLER, request.desired().desiredCallerContactId(), request.userId(), null
+				);
+			}
+
+			if (computation.clientChanged()) {
+				requireTenant(request.tenantId());
+				caseDao.setPrimaryCaseContact(
+						request.saveCaseId(), request.tenantId(), ROLE_CASECONTACT_CLIENT, request.desired().desiredClientContactId(), request.userId(), null
+				);
+			}
+
+			if (computation.practiceAreaChanged()) {
+				requireTenant(request.tenantId());
+				caseDao.setPracticeArea(request.saveCaseId(), request.tenantId(), request.desired().desiredPracticeAreaId());
+			}
+
+			if (computation.attyChanged())
+				caseDao.setResponsibleAttorney(request.saveCaseId(), request.desired().desiredResponsibleAttorneyUserId());
+
+			if (computation.opposingCounselChanged()) {
+				requireTenant(request.tenantId());
+				caseDao.setPrimaryCaseContact(
+						request.saveCaseId(), request.tenantId(), ROLE_CASECONTACT_OPPOSING_COUNSEL,
+						request.desired().desiredOpposingCounselContactId(), request.userId(), null
+				);
+			}
+		}
+
+		private boolean persistTeamChanges(SaveRequest request) {
+			if (request.desired().desiredTeamAssignments() == null)
+				return false;
+
+			java.util.Set<String> beforeTeam = normalizeTeamRoleRows(caseDao.listCaseUserRoles(request.saveCaseId()));
+			java.util.Set<String> desiredTeam = normalizeTeamAssignments(request.desired().desiredTeamAssignments());
+			boolean teamChanged = !beforeTeam.equals(desiredTeam);
+			if (teamChanged)
+				caseDao.replaceCaseTeamAssignments(request.saveCaseId(), request.desired().desiredTeamAssignments());
+			return teamChanged;
+		}
+
+		private void persistImportantChangesNote(SaveRequest request, String importantChangesNote) {
+			if (importantChangesNote.isBlank())
+				return;
+			requireTenant(request.tenantId());
+			caseDao.addCaseUpdate(request.saveCaseId(), request.tenantId(), importantChangesNote, request.userId());
+		}
+
+		private void finalizeSuccessfulSave(
+				SaveRequest request,
+				CaseDetailDto updated,
+				SaveComputation computation,
+				boolean teamChanged,
+				String importantChangesNote) {
+
+			current = updated;
+
+			setEditMode(false);
+			draft = null;
+
+			hideRemoteUpdateBanner();
+
+			applyDetail(updated);
+			clearError();
+			setBusy(false);
+
+			publishFieldUpdates(request, computation, teamChanged, importantChangesNote);
+
+			clearDraftState();
+			reloadCurrentCaseForViewMode();
+		}
+
+		private void publishFieldUpdates(
+				SaveRequest request,
+				SaveComputation computation,
+				boolean teamChanged,
+				String importantChangesNote) {
+
+			String newName = safeText(request.saveDraft().caseName()).trim();
+			String newDesc = safeText(request.saveDraft().description());
+			String newNum = safeText(request.saveDraft().caseNumber()).trim();
+
+			if (!newName.equals(request.baseline().oldName()))
+				publishCaseFieldUpdated(request.saveCaseId(), "name", newName);
+			if (!newNum.equals(request.baseline().oldNumber()))
+				publishCaseFieldUpdated(request.saveCaseId(), "caseNumber", newNum);
+			if (!newDesc.equals(request.baseline().oldDescription()))
+				publishCaseFieldUpdated(request.saveCaseId(), "description", newDesc);
+			if (computation.incidentChanged())
+				publishCaseFieldUpdated(request.saveCaseId(), "incidentDate",
+						request.desired().desiredIncidentDate() == null ? null : request.desired().desiredIncidentDate().toString());
+			if (computation.solChanged())
+				publishCaseFieldUpdated(request.saveCaseId(), "solDate",
+						request.desired().desiredSolDate() == null ? null : request.desired().desiredSolDate().toString());
+
+			if (computation.statusChanged())
+				publishCaseFieldUpdated(request.saveCaseId(), "primaryStatusId", request.desired().desiredStatusId());
+			if (computation.callerChanged())
+				publishCaseFieldUpdated(request.saveCaseId(), "primaryCallerContactId", request.desired().desiredCallerContactId());
+			if (computation.clientChanged())
+				publishCaseFieldUpdated(request.saveCaseId(), "primaryClientContactId", request.desired().desiredClientContactId());
+			if (computation.practiceAreaChanged())
+				publishCaseFieldUpdated(request.saveCaseId(), "practiceAreaId", request.desired().desiredPracticeAreaId());
+			if (computation.attyChanged())
+				publishCaseFieldUpdated(request.saveCaseId(), "responsibleAttorneyUserId", request.desired().desiredResponsibleAttorneyUserId());
+			if (computation.opposingCounselChanged())
+				publishCaseFieldUpdated(request.saveCaseId(), "primaryOpposingCounselContactId", request.desired().desiredOpposingCounselContactId());
+
+			if (teamChanged)
+				publishCaseFieldUpdated(request.saveCaseId(), "teamChanged", 1);
+
+			if (!importantChangesNote.isBlank())
+				publishCaseUpdateAdded(request.saveCaseId());
+		}
+
+		private void handleConcurrentUpdate() {
+			runOnFx(() ->
+			{
+				showRemoteUpdateBanner();
+				showError("This case was updated elsewhere. Reload and try again.");
+				setBusy(false);
+			});
+		}
+
+		private void requireTenant(Integer tenantId) {
+			if (tenantId == null || tenantId <= 0)
+				throw new RuntimeException("No tenant is selected.");
+		}
+	}
+
+	private record SaveRequest(
+			long saveCaseId,
+			CaseEditModel saveDraft,
+			SaveBaseline baseline,
+			SaveDesiredValues desired,
+			Integer tenantId,
+			Integer userId) {
+	}
+
+	private record SaveBaseline(
+			String oldName,
+			String oldDescription,
+			String oldNumber,
+			CaseOverviewDto baseOverview,
+			byte[] expectedRowVer) {
+	}
+
+	private record SaveDesiredValues(
+			Integer desiredStatusId,
+			Integer desiredCallerContactId,
+			Integer desiredClientContactId,
+			Integer desiredPracticeAreaId,
+			Integer desiredResponsibleAttorneyUserId,
+			Integer desiredOpposingCounselContactId,
+			LocalDate desiredIncidentDate,
+			LocalDate desiredSolDate,
+			List<CaseDao.TeamAssignmentRow> desiredTeamAssignments) {
+	}
+
+	private record SaveComputation(
+			boolean incidentChanged,
+			boolean solChanged,
+			boolean statusChanged,
+			boolean callerChanged,
+			boolean clientChanged,
+			boolean practiceAreaChanged,
+			boolean attyChanged,
+			boolean opposingCounselChanged) {
 	}
 
 	private final class CaseOverviewLiveUpdateHandler {
