@@ -1525,9 +1525,6 @@ public class CaseController {
 		liveUpdateHandler.subscribe();
 	}
 
-	private void subscribeLiveCaseUpdatesInternal() {
-		liveUpdateHandler.subscribe();
-	}
 
 	private void refreshCurrentAfterRemoteUpdateAsync() {
 		if (caseDao == null || caseId == null)
