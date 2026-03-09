@@ -46,6 +46,20 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+/**
+ * FXML controller for the Case scene and top-level coordinator for case view/edit flows.
+ * <p>
+ * Responsibility boundaries:
+ * <ul>
+ *   <li>{@code CaseOverviewRenderer}: overview/detail render orchestration</li>
+ *   <li>{@code CaseOverviewEditor}: edit-mode lifecycle and draft-state transitions</li>
+ *   <li>{@code CaseOverviewSaveCoordinator}: save validation/persist/publish pipeline</li>
+ *   <li>{@code CaseOverviewLiveUpdateHandler}: remote case-update subscription/branching</li>
+ *   <li>{@code CaseOverviewPickerCoordinator}: selectable overview relation pickers</li>
+ *   <li>{@code CaseTeamCoordinator}: team loading/edit/render</li>
+ *   <li>{@code CaseUpdatesPanelController}: case updates feed/compose/render</li>
+ * </ul>
+ */
 public class CaseController {
 
 	// ----------------------------
@@ -614,17 +628,25 @@ public class CaseController {
 	// ----------------------------
 	// Overview rendering
 	// ----------------------------
+	// Adding a new editable overview field (behavior-preserving checklist):
+	// 1) Display/render path: update CaseOverviewRenderer view + edit-safe render helpers.
+	// 2) Draft/edit path: snapshot/reset/apply draft in CaseOverviewEditor.
+	// 3) Save path: include field in SaveCoordinator desired-value capture/publish.
+	// 4) Live update path: map remote patch handling in CaseOverviewLiveUpdateHandler.
 
+	// Thin wrapper keeps controller as FXML entrypoint while render ownership stays in renderer.
 	private void applyOverview(CaseOverviewDto dto) {
 		overviewRenderer.applyOverview(dto);
 	}
 
 
+	// Thin wrapper keeps controller wiring stable for callers outside renderer internals.
 	private void applyDetail(CaseDetailDto detail) {
 		overviewRenderer.applyDetail(detail);
 	}
 
 
+	// Thin wrapper keeps edit-safe refresh callsites unchanged after refactor.
 	private void applyOverviewEditSafe(CaseOverviewDto dto) {
 		overviewRenderer.applyOverviewEditSafe(dto);
 	}
@@ -634,153 +656,27 @@ public class CaseController {
 	// Edit lifecycle
 	// ----------------------------
 
+	// FXML action wrapper: edit lifecycle orchestration lives in CaseOverviewEditor.
 	private void onEdit() {
-		overviewEditor.onEdit();
+		overviewEditor.beginEdit();
 	}
 
-	private void onEditInternal() {
-		// snapshot drafts from currentOverview (IMPORTANT: include client too)
-		draftPrimaryStatusId = (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
-
-		draftPrimaryCallerContactId = (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId());
-		draftPrimaryCallerName = (currentOverview == null ? null : currentOverview.getCaller());
-
-		draftPrimaryClientContactId = (currentOverview == null ? null : currentOverview.getPrimaryClientContactId());
-		draftPrimaryClientName = (currentOverview == null ? null : currentOverview.getClient());
-
-		// Practice Area drafts
-		draftPracticeAreaId = (currentOverview == null ? null : currentOverview.getPracticeAreaId());
-		draftPracticeAreaName = (currentOverview == null ? null : currentOverview.getPracticeArea());
-		draftPracticeAreaColor = (currentOverview == null ? null : currentOverview.getPracticeAreaColor());
-
-		// Opposing Counsel Drafts
-		draftPrimaryOpposingCounselContactId = (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId());
-		draftPrimaryOpposingCounselName = (currentOverview == null ? null : currentOverview.getOpposingCounsel());
-
-		draftIncidentDate = (currentOverview == null ? null : currentOverview.getIncidentDate());
-		draftSolDate = (currentOverview == null ? null : currentOverview.getSolDate());
-
-		if (ovIncidentDateEditor != null)
-			ovIncidentDateEditor.setValue(draftIncidentDate);
-		if (ovSolDateEditor != null)
-			ovSolDateEditor.setValue(draftSolDate);
-
-		if (current == null) {
-			showError("Case is still loading. Please try again.");
-			return;
-		}
-
-		draft = new CaseEditModel(current.getCaseName(), current.getCaseNumber(), current.getDescription());
-
-		if (ovCaseNameEditor != null)
-			ovCaseNameEditor.setText(draft.caseName());
-		if (ovCaseNumberEditor != null)
-			ovCaseNumberEditor.setText(draft.caseNumber());
-		if (ovDescriptionEditor != null)
-			ovDescriptionEditor.setText(draft.description());
-
-		hideRemoteUpdateBanner();
-		clearError();
-
-		setEditMode(true);
-
-		// Force repaint of cards using draft values
-		if (currentOverview != null)
-			applyOverviewEditSafe(currentOverview);
-	}
-
+	// FXML action wrapper: preserves controller ownership while delegating behavior.
 	private void onCancel() {
-		overviewEditor.onCancel();
+		overviewEditor.cancelEdit();
 	}
 
-	private void onCancelInternal() {
-		clearDraftState();
-		hideRemoteUpdateBanner();
-		clearError();
-
-		setEditMode(false);
-
-		if (currentOverview != null)
-			applyOverviewEditSafe(currentOverview);
-		applyDetail(current);
-	}
-
+	// FXML action wrapper for remote-conflict resolution during edit mode.
 	private void onReloadRemote() {
-		overviewEditor.onReloadRemote();
-	}
-
-	private void onReloadRemoteInternal() {
-		clearDraftState();
-		setEditMode(false);
-		hideRemoteUpdateBanner();
-		clearError();
-		reloadCurrentCaseForViewMode();
+		overviewEditor.reloadRemote();
 	}
 
 	private void clearDraftState() {
 		overviewEditor.clearDraftState();
 	}
 
-	private void clearDraftStateInternal() {
-		draft = null;
-
-		draftPrimaryStatusId = null;
-
-		draftPrimaryCallerContactId = null;
-		draftPrimaryCallerName = null;
-
-		draftPrimaryClientContactId = null;
-		draftPrimaryClientName = null;
-
-		draftPracticeAreaId = null;
-		draftPracticeAreaName = null;
-		draftPracticeAreaColor = null;
-
-		draftResponsibleAttorneyUserId = null;
-
-		draftPrimaryOpposingCounselContactId = null;
-		draftPrimaryOpposingCounselName = null;
-
-		draftIncidentDate = null;
-		draftSolDate = null;
-
-		draftTeamAssignments = null;
-	}
-
 	private void setEditMode(boolean enabled) {
 		overviewEditor.setEditMode(enabled);
-	}
-
-	private void setEditModeInternal(boolean enabled) {
-		this.editMode = enabled;
-
-		setVisibleManaged(ovCaseNameValue, !enabled);
-		setVisibleManaged(ovCaseNameEditor, enabled);
-		setVisibleManaged(ovCaseNumberValue, !enabled);
-		setVisibleManaged(ovCaseNumberEditor, enabled);
-
-		setVisibleManaged(ovDescriptionValue, !enabled);
-		setVisibleManaged(ovDescriptionEditor, enabled);
-
-		setVisibleManaged(ovIncidentDateValue, !enabled);
-		setVisibleManaged(ovIncidentDateEditor, enabled);
-		setVisibleManaged(ovSolDateValue, !enabled);
-		setVisibleManaged(ovSolDateEditor, enabled);
-
-		setVisibleManaged(editButton, !enabled);
-		setVisibleManaged(saveButton, enabled);
-		setVisibleManaged(cancelButton, enabled);
-
-		if (!enabled)
-			hideRemoteUpdateBanner();
-
-		setVisibleManaged(changeResponsibleAttorneyButton, enabled);
-		setVisibleManaged(changeStatusButton, enabled);
-		setVisibleManaged(changeCallerButton, enabled);
-		setVisibleManaged(changeClientButton, enabled);
-		setVisibleManaged(changePracticeAreaButton, enabled);
-		setVisibleManaged(changeOpposingCounselButton, enabled);
-		setVisibleManaged(btnEditTeam, enabled);
 	}
 
 	private void setBusy(boolean busy) {
@@ -1888,24 +1784,136 @@ public class CaseController {
 	}
 
 	private final class CaseOverviewEditor {
-		void onEdit() {
-			onEditInternal();
+		void beginEdit() {
+			snapshotDraftState();
+			if (!ensureCurrentDetailReady())
+				return;
+			applyDraftStateToEditors();
+			hideRemoteUpdateBanner();
+			clearError();
+			setEditMode(true);
+			rerenderOverviewForDraft();
 		}
 
-		void onCancel() {
-			onCancelInternal();
+		void cancelEdit() {
+			clearDraftState();
+			hideRemoteUpdateBanner();
+			clearError();
+			exitEditMode();
+			restoreViewMode();
 		}
 
-		void onReloadRemote() {
-			onReloadRemoteInternal();
+		void reloadRemote() {
+			handleRemoteReloadDuringEdit();
 		}
 
 		void setEditMode(boolean enabled) {
-			setEditModeInternal(enabled);
+			editMode = enabled;
+
+			setVisibleManaged(ovCaseNameValue, !enabled);
+			setVisibleManaged(ovCaseNameEditor, enabled);
+			setVisibleManaged(ovCaseNumberValue, !enabled);
+			setVisibleManaged(ovCaseNumberEditor, enabled);
+
+			setVisibleManaged(ovDescriptionValue, !enabled);
+			setVisibleManaged(ovDescriptionEditor, enabled);
+
+			setVisibleManaged(ovIncidentDateValue, !enabled);
+			setVisibleManaged(ovIncidentDateEditor, enabled);
+			setVisibleManaged(ovSolDateValue, !enabled);
+			setVisibleManaged(ovSolDateEditor, enabled);
+
+			setVisibleManaged(editButton, !enabled);
+			setVisibleManaged(saveButton, enabled);
+			setVisibleManaged(cancelButton, enabled);
+
+			if (!enabled)
+				hideRemoteUpdateBanner();
+
+			setVisibleManaged(changeResponsibleAttorneyButton, enabled);
+			setVisibleManaged(changeStatusButton, enabled);
+			setVisibleManaged(changeCallerButton, enabled);
+			setVisibleManaged(changeClientButton, enabled);
+			setVisibleManaged(changePracticeAreaButton, enabled);
+			setVisibleManaged(changeOpposingCounselButton, enabled);
+			setVisibleManaged(btnEditTeam, enabled);
 		}
 
 		void clearDraftState() {
-			clearDraftStateInternal();
+			draft = null;
+			draftPrimaryStatusId = null;
+			draftPrimaryCallerContactId = null;
+			draftPrimaryCallerName = null;
+			draftPrimaryClientContactId = null;
+			draftPrimaryClientName = null;
+			draftPracticeAreaId = null;
+			draftPracticeAreaName = null;
+			draftPracticeAreaColor = null;
+			draftResponsibleAttorneyUserId = null;
+			draftPrimaryOpposingCounselContactId = null;
+			draftPrimaryOpposingCounselName = null;
+			draftIncidentDate = null;
+			draftSolDate = null;
+			draftTeamAssignments = null;
+		}
+
+		private void snapshotDraftState() {
+			draftPrimaryStatusId = (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
+			draftPrimaryCallerContactId = (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId());
+			draftPrimaryCallerName = (currentOverview == null ? null : currentOverview.getCaller());
+			draftPrimaryClientContactId = (currentOverview == null ? null : currentOverview.getPrimaryClientContactId());
+			draftPrimaryClientName = (currentOverview == null ? null : currentOverview.getClient());
+			draftPracticeAreaId = (currentOverview == null ? null : currentOverview.getPracticeAreaId());
+			draftPracticeAreaName = (currentOverview == null ? null : currentOverview.getPracticeArea());
+			draftPracticeAreaColor = (currentOverview == null ? null : currentOverview.getPracticeAreaColor());
+			draftPrimaryOpposingCounselContactId = (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId());
+			draftPrimaryOpposingCounselName = (currentOverview == null ? null : currentOverview.getOpposingCounsel());
+			draftIncidentDate = (currentOverview == null ? null : currentOverview.getIncidentDate());
+			draftSolDate = (currentOverview == null ? null : currentOverview.getSolDate());
+			if (ovIncidentDateEditor != null)
+				ovIncidentDateEditor.setValue(draftIncidentDate);
+			if (ovSolDateEditor != null)
+				ovSolDateEditor.setValue(draftSolDate);
+		}
+
+		private boolean ensureCurrentDetailReady() {
+			if (current != null)
+				return true;
+			showError("Case is still loading. Please try again.");
+			return false;
+		}
+
+		private void applyDraftStateToEditors() {
+			draft = new CaseEditModel(current.getCaseName(), current.getCaseNumber(), current.getDescription());
+			if (ovCaseNameEditor != null)
+				ovCaseNameEditor.setText(draft.caseName());
+			if (ovCaseNumberEditor != null)
+				ovCaseNumberEditor.setText(draft.caseNumber());
+			if (ovDescriptionEditor != null)
+				ovDescriptionEditor.setText(draft.description());
+		}
+
+		private void rerenderOverviewForDraft() {
+			if (currentOverview != null)
+				applyOverviewEditSafe(currentOverview);
+		}
+
+		private void exitEditMode() {
+			setEditMode(false);
+		}
+
+		private void restoreViewMode() {
+			if (currentOverview != null)
+				applyOverviewEditSafe(currentOverview);
+			applyDetail(current);
+		}
+
+		private void handleRemoteReloadDuringEdit() {
+			clearDraftState();
+			exitEditMode();
+			hideRemoteUpdateBanner();
+			clearError();
+			reloadCurrentCaseForViewMode();
 		}
 	}
 
