@@ -29,7 +29,6 @@
 
 				<Region HBox.hgrow="ALWAYS" />
 
-				<Button fx:id="addEntryButton" text="Add Entry" />
 			</HBox>
 
 			<!-- Secondary row: status + last updated -->
