@@ -46,6 +46,20 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+/**
+ * FXML controller for the Case scene and top-level coordinator for case view/edit flows.
+ * <p>
+ * Responsibility boundaries:
+ * <ul>
+ *   <li>{@code CaseOverviewRenderer}: overview/detail render orchestration</li>
+ *   <li>{@code CaseOverviewEditor}: edit-mode lifecycle and draft-state transitions</li>
+ *   <li>{@code CaseOverviewSaveCoordinator}: save validation/persist/publish pipeline</li>
+ *   <li>{@code CaseOverviewLiveUpdateHandler}: remote case-update subscription/branching</li>
+ *   <li>{@code CaseOverviewPickerCoordinator}: selectable overview relation pickers</li>
+ *   <li>{@code CaseTeamCoordinator}: team loading/edit/render</li>
+ *   <li>{@code CaseUpdatesPanelController}: case updates feed/compose/render</li>
+ * </ul>
+ */
 public class CaseController {
 
 	// ----------------------------
@@ -614,17 +628,25 @@ public class CaseController {
 	// ----------------------------
 	// Overview rendering
 	// ----------------------------
+	// Adding a new editable overview field (behavior-preserving checklist):
+	// 1) Display/render path: update CaseOverviewRenderer view + edit-safe render helpers.
+	// 2) Draft/edit path: snapshot/reset/apply draft in CaseOverviewEditor.
+	// 3) Save path: include field in SaveCoordinator desired-value capture/publish.
+	// 4) Live update path: map remote patch handling in CaseOverviewLiveUpdateHandler.
 
+	// Thin wrapper keeps controller as FXML entrypoint while render ownership stays in renderer.
 	private void applyOverview(CaseOverviewDto dto) {
 		overviewRenderer.applyOverview(dto);
 	}
 
 
+	// Thin wrapper keeps controller wiring stable for callers outside renderer internals.
 	private void applyDetail(CaseDetailDto detail) {
 		overviewRenderer.applyDetail(detail);
 	}
 
 
+	// Thin wrapper keeps edit-safe refresh callsites unchanged after refactor.
 	private void applyOverviewEditSafe(CaseOverviewDto dto) {
 		overviewRenderer.applyOverviewEditSafe(dto);
 	}
@@ -634,14 +656,17 @@ public class CaseController {
 	// Edit lifecycle
 	// ----------------------------
 
+	// FXML action wrapper: edit lifecycle orchestration lives in CaseOverviewEditor.
 	private void onEdit() {
 		overviewEditor.beginEdit();
 	}
 
+	// FXML action wrapper: preserves controller ownership while delegating behavior.
 	private void onCancel() {
 		overviewEditor.cancelEdit();
 	}
 
+	// FXML action wrapper for remote-conflict resolution during edit mode.
 	private void onReloadRemote() {
 		overviewEditor.reloadRemote();
 	}
