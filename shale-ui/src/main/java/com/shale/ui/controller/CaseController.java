@@ -856,9 +856,27 @@ public class CaseController {
 	}
 
 	private void onCancel() {
-		draft = null;
+		clearDraftState();
 		hideRemoteUpdateBanner();
 		clearError();
+
+		setEditMode(false);
+
+		if (currentOverview != null)
+			applyOverviewEditSafe(currentOverview);
+		applyDetail(current);
+	}
+
+	private void onReloadRemote() {
+		clearDraftState();
+		setEditMode(false);
+		hideRemoteUpdateBanner();
+		clearError();
+		reloadCurrentCaseForViewMode();
+	}
+
+	private void clearDraftState() {
+		draft = null;
 
 		draftPrimaryStatusId = null;
 
@@ -871,25 +889,16 @@ public class CaseController {
 		draftPracticeAreaId = null;
 		draftPracticeAreaName = null;
 		draftPracticeAreaColor = null;
+
+		draftResponsibleAttorneyUserId = null;
+
 		draftPrimaryOpposingCounselContactId = null;
 		draftPrimaryOpposingCounselName = null;
-		draftTeamAssignments = null;
+
 		draftIncidentDate = null;
 		draftSolDate = null;
 
-		setEditMode(false);
-
-		if (currentOverview != null)
-			applyOverviewEditSafe(currentOverview);
-		applyDetail(current);
-	}
-
-	private void onReloadRemote() {
-		draft = null;
-		setEditMode(false);
-		hideRemoteUpdateBanner();
-		clearError();
-		reloadCurrentCaseForViewMode();
+		draftTeamAssignments = null;
 	}
 
 	private void setEditMode(boolean enabled) {
@@ -1662,27 +1671,7 @@ public class CaseController {
 						publishCaseUpdateAdded(saveCaseId);
 
 					// clear drafts
-					draftPrimaryStatusId = null;
-
-					draftPrimaryCallerContactId = null;
-					draftPrimaryCallerName = null;
-
-					draftPrimaryClientContactId = null;
-					draftPrimaryClientName = null;
-
-					draftPracticeAreaId = null;
-					draftPracticeAreaName = null;
-					draftPracticeAreaColor = null;
-
-					draftResponsibleAttorneyUserId = null;
-
-					draftPrimaryOpposingCounselContactId = null;
-					draftPrimaryOpposingCounselName = null;
-
-					draftIncidentDate = null;
-					draftSolDate = null;
-
-					draftTeamAssignments = null;
+					clearDraftState();
 
 					// refresh overview to pick up updated names/colors/ids
 					reloadCurrentCaseForViewMode();
