@@ -290,6 +290,7 @@ public class CaseController {
 	private final CaseOverviewEditor overviewEditor = new CaseOverviewEditor();
 	private final CaseOverviewSaveCoordinator saveCoordinator = new CaseOverviewSaveCoordinator();
 	private final CaseOverviewLiveUpdateHandler liveUpdateHandler = new CaseOverviewLiveUpdateHandler();
+	private final CaseOverviewPickerCoordinator overviewPickerCoordinator = new CaseOverviewPickerCoordinator();
 	private final CaseTeamCoordinator teamCoordinator = new CaseTeamCoordinator();
 	private final CaseUpdatesPanelController updatesPanelController = new CaseUpdatesPanelController();
 
@@ -1009,102 +1010,7 @@ public class CaseController {
 	// ----------------------------
 
 	private void onChangeResponsibleAttorney() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Responsible attorney change is unavailable.");
-			return;
-		}
-
-		Integer clientId = appState.getShaleClientId();
-		if (clientId == null || clientId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		final long saveCaseId = caseId.longValue();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.UserRow> users = caseDao.listAttorneysForTenant(clientId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (users == null || users.isEmpty()) {
-						showError("No attorneys are configured for this tenant.");
-						return;
-					}
-
-					var labelToRow = new java.util.LinkedHashMap<String, CaseDao.UserRow>();
-
-					Integer currentId = (editMode && draftResponsibleAttorneyUserId != null)
-							? draftResponsibleAttorneyUserId
-							: (currentOverview == null ? null : currentOverview.getResponsibleAttorneyUserId());
-
-					String preselect = null;
-
-					for (var u : users) {
-						String label = u.displayName();
-						if (label == null || label.isBlank())
-							continue;
-
-						// avoid collisions if two users share same display name
-						String key = label;
-						if (labelToRow.containsKey(key)) {
-							key = label + " (ID " + u.id() + ")";
-						}
-
-						labelToRow.put(key, u);
-
-						if (currentId != null && currentId.equals(u.id())) {
-							preselect = key;
-						}
-					}
-
-					if (labelToRow.isEmpty()) {
-						showError("No attorneys are configured for this tenant.");
-						return;
-					}
-
-					if (preselect == null) {
-						preselect = labelToRow.keySet().iterator().next();
-					}
-
-					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
-					dialog.setTitle("Change Responsible Attorney");
-					dialog.setHeaderText("Select the responsible attorney");
-					dialog.setContentText("Attorney:");
-
-					Optional<String> chosen = dialog.showAndWait();
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.UserRow picked = labelToRow.get(chosen.get());
-					if (picked == null)
-						return;
-
-					draftResponsibleAttorneyUserId = picked.id();
-
-					// Update both header + overview card
-					renderResponsibleAttorneyMini(
-							picked.id(),
-							picked.displayName(),
-							picked.color()
-					);
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load attorneys. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-atty-list-" + saveCaseId).start();
+		overviewPickerCoordinator.changeResponsibleAttorney();
 	}
 
 	// ----------------------------
@@ -1112,381 +1018,23 @@ public class CaseController {
 	// ----------------------------
 
 	private void onChangeStatus() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Status change is unavailable.");
-			return;
-		}
-		Integer clientId = appState.getShaleClientId();
-		if (clientId == null || clientId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(clientId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (statuses == null || statuses.isEmpty()) {
-						showError("No statuses are configured for this tenant.");
-						return;
-					}
-
-					java.util.Map<String, CaseDao.StatusRow> labelToRow = new java.util.LinkedHashMap<>();
-					String preselect = null;
-
-					Integer currentId = (editMode && draftPrimaryStatusId != null)
-							? draftPrimaryStatusId
-							: (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
-
-					for (CaseDao.StatusRow s : statuses) {
-						String label = s.name() + (s.isClosed() ? " (Closed)" : "");
-						labelToRow.put(label, s);
-						if (currentId != null && currentId == s.id())
-							preselect = label;
-					}
-
-					if (preselect == null)
-						preselect = labelToRow.keySet().iterator().next();
-
-					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
-					dialog.setTitle("Change Status");
-					dialog.setHeaderText("Select the new primary status");
-					dialog.setContentText("Status:");
-
-					Optional<String> chosen = dialog.showAndWait();
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.StatusRow picked = labelToRow.get(chosen.get());
-					if (picked == null)
-						return;
-
-					draftPrimaryStatusId = picked.id();
-					renderPrimaryStatusMini(picked.id(), picked.name(), picked.color());
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load statuses. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-status-list-" + caseId).start();
+		overviewPickerCoordinator.changePrimaryStatus();
 	}
 
 	private void onChangeCaller() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Caller change is unavailable.");
-			return;
-		}
-		Integer clientId = appState.getShaleClientId();
-		if (clientId == null || clientId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(clientId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (contacts == null || contacts.isEmpty()) {
-						showError("No contacts are configured for this tenant.");
-						return;
-					}
-
-					List<CaseDao.ContactRow> cleaned = contacts.stream()
-							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
-							.toList();
-
-					if (cleaned.isEmpty()) {
-						showError("No usable contacts found (all were blank).");
-						return;
-					}
-
-					Integer currentId = (editMode && draftPrimaryCallerContactId != null)
-							? draftPrimaryCallerContactId
-							: (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId());
-
-					CaseDao.ContactRow preselectRow = null;
-					if (currentId != null) {
-						for (CaseDao.ContactRow c : cleaned) {
-							if (c.id() == currentId.intValue()) {
-								preselectRow = c;
-								break;
-							}
-						}
-					}
-
-					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
-							"Change Caller", "Select the primary caller", "Search...", cleaned, preselectRow);
-
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.ContactRow picked = chosen.get();
-					draftPrimaryCallerContactId = picked.id();
-					draftPrimaryCallerName = picked.displayName();
-
-					// update UI immediately
-					renderCallerMini(draftPrimaryCallerContactId, draftPrimaryCallerName);
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load contacts. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-caller-list-" + caseId).start();
+		overviewPickerCoordinator.changeCaller();
 	}
 
 	private void onChangeClient() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Client change is unavailable.");
-			return;
-		}
-		Integer tenantId = appState.getShaleClientId();
-		if (tenantId == null || tenantId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(tenantId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (contacts == null || contacts.isEmpty()) {
-						showError("No contacts are configured for this tenant.");
-						return;
-					}
-
-					List<CaseDao.ContactRow> cleaned = contacts.stream()
-							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
-							.toList();
-
-					if (cleaned.isEmpty()) {
-						showError("No usable contacts found (all were blank).");
-						return;
-					}
-
-					Integer currentId = (editMode && draftPrimaryClientContactId != null)
-							? draftPrimaryClientContactId
-							: (currentOverview == null ? null : currentOverview.getPrimaryClientContactId());
-
-					CaseDao.ContactRow preselectRow = null;
-					if (currentId != null) {
-						for (CaseDao.ContactRow c : cleaned) {
-							if (c.id() == currentId.intValue()) {
-								preselectRow = c;
-								break;
-							}
-						}
-					}
-
-					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
-							"Change Client", "Select the primary client", "Search...", cleaned, preselectRow);
-
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.ContactRow picked = chosen.get();
-					draftPrimaryClientContactId = picked.id();
-					draftPrimaryClientName = picked.displayName();
-
-					// update UI immediately
-					renderClientMini(draftPrimaryClientContactId, draftPrimaryClientName);
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load contacts. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-client-list-" + caseId).start();
+		overviewPickerCoordinator.changeClient();
 	}
 
 	private void onChangePracticeArea() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Practice area change is unavailable.");
-			return;
-		}
-		Integer tenantId = appState.getShaleClientId();
-		if (tenantId == null || tenantId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(tenantId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (areas == null || areas.isEmpty()) {
-						showError("No practice areas are configured for this tenant.");
-						return;
-					}
-
-					java.util.Map<String, CaseDao.PracticeAreaRow> labelToRow = new java.util.LinkedHashMap<>();
-					String preselect = null;
-
-					Integer currentId = (editMode && draftPracticeAreaId != null)
-							? draftPracticeAreaId
-							: (currentOverview == null ? null : currentOverview.getPracticeAreaId());
-
-					for (CaseDao.PracticeAreaRow pa : areas) {
-						String label = (pa.name() == null || pa.name().isBlank())
-								? ("PracticeArea #" + pa.id())
-								: pa.name();
-						labelToRow.put(label, pa);
-						if (currentId != null && currentId == pa.id())
-							preselect = label;
-					}
-
-					if (preselect == null)
-						preselect = labelToRow.keySet().iterator().next();
-
-					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
-					dialog.setTitle("Change Practice Area");
-					dialog.setHeaderText("Select the practice area");
-					dialog.setContentText("Practice area:");
-
-					Optional<String> chosen = dialog.showAndWait();
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.PracticeAreaRow picked = labelToRow.get(chosen.get());
-					if (picked == null)
-						return;
-
-					draftPracticeAreaId = picked.id();
-					draftPracticeAreaName = picked.name();
-					draftPracticeAreaColor = picked.color();
-
-					renderPracticeAreaMini(picked.id(), picked.name(), picked.color());
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load practice areas. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-practicearea-list-" + caseId).start();
+		overviewPickerCoordinator.changePracticeArea();
 	}
 
 	private void onChangeOpposingCounsel() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Opposing counsel change is unavailable.");
-			return;
-		}
-		Integer tenantId = appState.getShaleClientId();
-		if (tenantId == null || tenantId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(tenantId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (contacts == null || contacts.isEmpty()) {
-						showError("No contacts are configured for this tenant.");
-						return;
-					}
-
-					List<CaseDao.ContactRow> cleaned = contacts.stream()
-							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
-							.toList();
-
-					if (cleaned.isEmpty()) {
-						showError("No usable contacts found (all were blank).");
-						return;
-					}
-
-					Integer currentId = (editMode && draftPrimaryOpposingCounselContactId != null)
-							? draftPrimaryOpposingCounselContactId
-							: (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId());
-
-					CaseDao.ContactRow preselectRow = null;
-					if (currentId != null) {
-						for (CaseDao.ContactRow c : cleaned) {
-							if (c.id() == currentId.intValue()) {
-								preselectRow = c;
-								break;
-							}
-						}
-					}
-
-					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
-							"Change Opposing Counsel",
-							"Select the primary opposing counsel",
-							"Search...",
-							cleaned,
-							preselectRow
-					);
-
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.ContactRow picked = chosen.get();
-					draftPrimaryOpposingCounselContactId = picked.id();
-					draftPrimaryOpposingCounselName = picked.displayName();
-
-					renderOpposingCounselMini(draftPrimaryOpposingCounselContactId, draftPrimaryOpposingCounselName);
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load contacts. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-oppcounsel-list-" + caseId).start();
+		overviewPickerCoordinator.changeOpposingCounsel();
 	}
 
 	// ----------------------------
@@ -2796,6 +2344,357 @@ public class CaseController {
 			boolean practiceAreaChanged,
 			boolean attyChanged,
 			boolean opposingCounselChanged) {
+	}
+
+
+	private final class CaseOverviewPickerCoordinator {
+		void changeResponsibleAttorney() {
+			if (!requirePickerContext("Responsible attorney change is unavailable."))
+				return;
+			Integer tenantId = appState.getShaleClientId();
+			if (!requireTenantSelected(tenantId))
+				return;
+
+			setBusy(true);
+			clearError();
+
+			final long activeCaseId = caseId.longValue();
+			new Thread(() ->
+			{
+				try {
+					List<CaseDao.UserRow> users = caseDao.listAttorneysForTenant(tenantId);
+					runOnFx(() -> handleResponsibleAttorneyLoaded(users));
+				} catch (Exception ex) {
+					runOnFx(() ->
+					{
+						showError("Failed to load attorneys. " + ex.getMessage());
+						setBusy(false);
+					});
+				}
+			}, "case-atty-list-" + activeCaseId).start();
+		}
+
+		void changePrimaryStatus() {
+			if (!requirePickerContext("Status change is unavailable."))
+				return;
+			Integer tenantId = appState.getShaleClientId();
+			if (!requireTenantSelected(tenantId))
+				return;
+
+			setBusy(true);
+			clearError();
+
+			new Thread(() ->
+			{
+				try {
+					List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+					runOnFx(() -> handleStatusLoaded(statuses));
+				} catch (Exception ex) {
+					runOnFx(() ->
+					{
+						showError("Failed to load statuses. " + ex.getMessage());
+						setBusy(false);
+					});
+				}
+			}, "case-status-list-" + caseId).start();
+		}
+
+		void changeCaller() {
+			changeContact(
+					"Caller change is unavailable.",
+					"Change Caller",
+					"Select the primary caller",
+					"case-caller-list-",
+					() -> (editMode && draftPrimaryCallerContactId != null)
+							? draftPrimaryCallerContactId
+							: (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId()),
+					picked -> {
+						draftPrimaryCallerContactId = picked.id();
+						draftPrimaryCallerName = picked.displayName();
+						renderCallerMini(draftPrimaryCallerContactId, draftPrimaryCallerName);
+					});
+		}
+
+		void changeClient() {
+			changeContact(
+					"Client change is unavailable.",
+					"Change Client",
+					"Select the primary client",
+					"case-client-list-",
+					() -> (editMode && draftPrimaryClientContactId != null)
+							? draftPrimaryClientContactId
+							: (currentOverview == null ? null : currentOverview.getPrimaryClientContactId()),
+					picked -> {
+						draftPrimaryClientContactId = picked.id();
+						draftPrimaryClientName = picked.displayName();
+						renderClientMini(draftPrimaryClientContactId, draftPrimaryClientName);
+					});
+		}
+
+		void changePracticeArea() {
+			if (!requirePickerContext("Practice area change is unavailable."))
+				return;
+			Integer tenantId = appState.getShaleClientId();
+			if (!requireTenantSelected(tenantId))
+				return;
+
+			setBusy(true);
+			clearError();
+
+			new Thread(() ->
+			{
+				try {
+					List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(tenantId);
+					runOnFx(() -> handlePracticeAreaLoaded(areas));
+				} catch (Exception ex) {
+					runOnFx(() ->
+					{
+						showError("Failed to load practice areas. " + ex.getMessage());
+						setBusy(false);
+					});
+				}
+			}, "case-practicearea-list-" + caseId).start();
+		}
+
+		void changeOpposingCounsel() {
+			changeContact(
+					"Opposing counsel change is unavailable.",
+					"Change Opposing Counsel",
+					"Select the primary opposing counsel",
+					"case-oppcounsel-list-",
+					() -> (editMode && draftPrimaryOpposingCounselContactId != null)
+							? draftPrimaryOpposingCounselContactId
+							: (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId()),
+					picked -> {
+						draftPrimaryOpposingCounselContactId = picked.id();
+						draftPrimaryOpposingCounselName = picked.displayName();
+						renderOpposingCounselMini(draftPrimaryOpposingCounselContactId, draftPrimaryOpposingCounselName);
+					});
+		}
+
+		private boolean requirePickerContext(String unavailableMessage) {
+			if (caseDao == null || appState == null || caseId == null) {
+				showError(unavailableMessage);
+				return false;
+			}
+			return true;
+		}
+
+		private boolean requireTenantSelected(Integer tenantId) {
+			if (tenantId == null || tenantId <= 0) {
+				showError("No tenant is selected.");
+				return false;
+			}
+			return true;
+		}
+
+		private void handleResponsibleAttorneyLoaded(List<CaseDao.UserRow> users) {
+			setBusy(false);
+			if (users == null || users.isEmpty()) {
+				showError("No attorneys are configured for this tenant.");
+				return;
+			}
+
+			Map<String, CaseDao.UserRow> labelToRow = new LinkedHashMap<>();
+			Integer currentId = (editMode && draftResponsibleAttorneyUserId != null)
+					? draftResponsibleAttorneyUserId
+					: (currentOverview == null ? null : currentOverview.getResponsibleAttorneyUserId());
+			String preselect = null;
+			for (CaseDao.UserRow u : users) {
+				String label = u.displayName();
+				if (label == null || label.isBlank())
+					continue;
+				String key = label;
+				if (labelToRow.containsKey(key))
+					key = label + " (ID " + u.id() + ")";
+				labelToRow.put(key, u);
+				if (currentId != null && currentId.equals(u.id()))
+					preselect = key;
+			}
+			if (labelToRow.isEmpty()) {
+				showError("No attorneys are configured for this tenant.");
+				return;
+			}
+			if (preselect == null)
+				preselect = labelToRow.keySet().iterator().next();
+
+			Optional<String> chosen = showChoiceDialog(
+					"Change Responsible Attorney",
+					"Select the responsible attorney",
+					"Attorney:",
+					preselect,
+					labelToRow.keySet());
+			if (chosen.isEmpty())
+				return;
+			CaseDao.UserRow picked = labelToRow.get(chosen.get());
+			if (picked == null)
+				return;
+
+			draftResponsibleAttorneyUserId = picked.id();
+			renderResponsibleAttorneyMini(picked.id(), picked.displayName(), picked.color());
+		}
+
+		private void handleStatusLoaded(List<CaseDao.StatusRow> statuses) {
+			setBusy(false);
+			if (statuses == null || statuses.isEmpty()) {
+				showError("No statuses are configured for this tenant.");
+				return;
+			}
+
+			Map<String, CaseDao.StatusRow> labelToRow = new LinkedHashMap<>();
+			String preselect = null;
+			Integer currentId = (editMode && draftPrimaryStatusId != null)
+					? draftPrimaryStatusId
+					: (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
+			for (CaseDao.StatusRow s : statuses) {
+				String label = s.name() + (s.isClosed() ? " (Closed)" : "");
+				labelToRow.put(label, s);
+				if (currentId != null && currentId == s.id())
+					preselect = label;
+			}
+			if (preselect == null)
+				preselect = labelToRow.keySet().iterator().next();
+
+			Optional<String> chosen = showChoiceDialog(
+					"Change Status",
+					"Select the new primary status",
+					"Status:",
+					preselect,
+					labelToRow.keySet());
+			if (chosen.isEmpty())
+				return;
+			CaseDao.StatusRow picked = labelToRow.get(chosen.get());
+			if (picked == null)
+				return;
+
+			draftPrimaryStatusId = picked.id();
+			renderPrimaryStatusMini(picked.id(), picked.name(), picked.color());
+		}
+
+		private void handlePracticeAreaLoaded(List<CaseDao.PracticeAreaRow> areas) {
+			setBusy(false);
+			if (areas == null || areas.isEmpty()) {
+				showError("No practice areas are configured for this tenant.");
+				return;
+			}
+
+			Map<String, CaseDao.PracticeAreaRow> labelToRow = new LinkedHashMap<>();
+			String preselect = null;
+			Integer currentId = (editMode && draftPracticeAreaId != null)
+					? draftPracticeAreaId
+					: (currentOverview == null ? null : currentOverview.getPracticeAreaId());
+			for (CaseDao.PracticeAreaRow pa : areas) {
+				String label = (pa.name() == null || pa.name().isBlank()) ? ("PracticeArea #" + pa.id()) : pa.name();
+				labelToRow.put(label, pa);
+				if (currentId != null && currentId == pa.id())
+					preselect = label;
+			}
+			if (preselect == null)
+				preselect = labelToRow.keySet().iterator().next();
+
+			Optional<String> chosen = showChoiceDialog(
+					"Change Practice Area",
+					"Select the practice area",
+					"Practice area:",
+					preselect,
+					labelToRow.keySet());
+			if (chosen.isEmpty())
+				return;
+			CaseDao.PracticeAreaRow picked = labelToRow.get(chosen.get());
+			if (picked == null)
+				return;
+
+			draftPracticeAreaId = picked.id();
+			draftPracticeAreaName = picked.name();
+			draftPracticeAreaColor = picked.color();
+			renderPracticeAreaMini(picked.id(), picked.name(), picked.color());
+		}
+
+		private void changeContact(
+				String unavailableMessage,
+				String dialogTitle,
+				String dialogHeader,
+				String threadPrefix,
+				java.util.function.Supplier<Integer> currentIdSupplier,
+				java.util.function.Consumer<CaseDao.ContactRow> applySelection) {
+			if (!requirePickerContext(unavailableMessage))
+				return;
+			Integer tenantId = appState.getShaleClientId();
+			if (!requireTenantSelected(tenantId))
+				return;
+
+			setBusy(true);
+			clearError();
+
+			new Thread(() ->
+			{
+				try {
+					List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(tenantId);
+					runOnFx(() -> handleContactLoaded(contacts, dialogTitle, dialogHeader, currentIdSupplier, applySelection));
+				} catch (Exception ex) {
+					runOnFx(() ->
+					{
+						showError("Failed to load contacts. " + ex.getMessage());
+						setBusy(false);
+					});
+				}
+			}, threadPrefix + caseId).start();
+		}
+
+		private void handleContactLoaded(
+				List<CaseDao.ContactRow> contacts,
+				String dialogTitle,
+				String dialogHeader,
+				java.util.function.Supplier<Integer> currentIdSupplier,
+				java.util.function.Consumer<CaseDao.ContactRow> applySelection) {
+			setBusy(false);
+			if (contacts == null || contacts.isEmpty()) {
+				showError("No contacts are configured for this tenant.");
+				return;
+			}
+
+			List<CaseDao.ContactRow> cleaned = contacts.stream()
+					.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
+					.toList();
+			if (cleaned.isEmpty()) {
+				showError("No usable contacts found (all were blank).");
+				return;
+			}
+
+			CaseDao.ContactRow preselectRow = findContactById(cleaned, currentIdSupplier.get());
+			Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
+					dialogTitle,
+					dialogHeader,
+					"Search...",
+					cleaned,
+					preselectRow);
+			if (chosen.isEmpty())
+				return;
+			applySelection.accept(chosen.get());
+		}
+
+		private CaseDao.ContactRow findContactById(List<CaseDao.ContactRow> contacts, Integer contactId) {
+			if (contactId == null)
+				return null;
+			for (CaseDao.ContactRow c : contacts) {
+				if (c.id() == contactId.intValue())
+					return c;
+			}
+			return null;
+		}
+
+		private Optional<String> showChoiceDialog(
+				String title,
+				String header,
+				String content,
+				String preselect,
+				java.util.Collection<String> options) {
+			ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, options);
+			dialog.setTitle(title);
+			dialog.setHeaderText(header);
+			dialog.setContentText(content);
+			return dialog.showAndWait();
+		}
 	}
 
 	private final class CaseOverviewLiveUpdateHandler {
