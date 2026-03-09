@@ -619,202 +619,16 @@ public class CaseController {
 		overviewRenderer.applyOverview(dto);
 	}
 
-	private void applyOverviewInternal(CaseOverviewDto dto) {
-		currentOverview = dto;
-
-		if (caseTitleLabel != null) {
-			String name = safeText(dto.getCaseName()).trim();
-			String num = safeText(dto.getCaseNumber()).trim();
-			if (!name.isBlank() && !num.isBlank())
-				caseTitleLabel.setText(name + " — " + num);
-			else if (!name.isBlank())
-				caseTitleLabel.setText(name);
-			else if (!num.isBlank())
-				caseTitleLabel.setText(num);
-			else
-				caseTitleLabel.setText("Case #" + dto.getCaseId());
-		}
-
-		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()),
-				dto.getResponsibleAttorneyColor());
-
-		if (ovCaseNameValue != null)
-			ovCaseNameValue.setText(safe(dto.getCaseName()));
-		if (ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
-
-		renderPrimaryStatusMini(dto.getPrimaryStatusId(), dto.getCaseStatus(), dto.getPrimaryStatusColor());
-
-		// Caller/Client: ALWAYS render cards (even if id is null)
-		String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
-				? draftPrimaryCallerName
-				: dto.getCaller();
-		Integer callerId = (editMode && draftPrimaryCallerContactId != null)
-				? draftPrimaryCallerContactId
-				: dto.getPrimaryCallerContactId();
-		renderCallerMini(callerId, callerName);
-
-		String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
-				? draftPrimaryClientName
-				: dto.getClient();
-		Integer clientId = (editMode && draftPrimaryClientContactId != null)
-				? draftPrimaryClientContactId
-				: dto.getPrimaryClientContactId();
-		renderClientMini(clientId, clientName);
-
-		String oppName = (editMode && draftPrimaryOpposingCounselName != null && !draftPrimaryOpposingCounselName.isBlank())
-				? draftPrimaryOpposingCounselName
-				: dto.getOpposingCounsel();
-
-		Integer oppId = (editMode && draftPrimaryOpposingCounselContactId != null)
-				? draftPrimaryOpposingCounselContactId
-				: dto.getPrimaryOpposingCounselContactId();
-
-		renderOpposingCounselMini(oppId, oppName);
-
-		// Practice Area: card (draft-aware)
-		Integer paId = (editMode && draftPracticeAreaId != null) ? draftPracticeAreaId : dto.getPracticeAreaId();
-		String paName = (editMode && draftPracticeAreaName != null && !draftPracticeAreaName.isBlank())
-				? draftPracticeAreaName
-				: dto.getPracticeArea();
-		String paColor = (editMode && draftPracticeAreaColor != null && !draftPracticeAreaColor.isBlank())
-				? draftPracticeAreaColor
-				: dto.getPracticeAreaColor();
-		renderPracticeAreaMini(paId, paName, paColor);
-
-		loadTeamSectionAsync();
-
-		if (ovIntakeDateValue != null)
-			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
-		if (ovIncidentDateValue != null)
-			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
-		if (ovIncidentDateEditor != null && !editMode)
-			ovIncidentDateEditor.setValue(dto.getIncidentDate());
-		if (ovSolDateValue != null)
-			ovSolDateValue.setText(formatDate(dto.getSolDate()));
-		if (ovSolDateEditor != null && !editMode)
-			ovSolDateEditor.setValue(dto.getSolDate());
-
-		if (ovDescriptionValue != null)
-			ovDescriptionValue.setText(safeText(dto.getDescription()));
-	}
 
 	private void applyDetail(CaseDetailDto detail) {
 		overviewRenderer.applyDetail(detail);
 	}
 
-	private void applyDetailInternal(CaseDetailDto detail) {
-		if (detail == null)
-			return;
-
-		if (!editMode && ovCaseNameValue != null)
-			ovCaseNameValue.setText(safe(detail.getCaseName()));
-
-		if (!editMode && ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(safeText(detail.getCaseNumber()));
-
-		if (!editMode && ovDescriptionValue != null)
-			ovDescriptionValue.setText(safeText(detail.getDescription()));
-
-		if (statusLabel != null)
-			statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
-
-		applyLastUpdatedLabel(detail.getUpdatedAt());
-
-		if (caseTitleLabel != null) {
-			String num = safeText(detail.getCaseNumber()).trim();
-			String name = safeText(detail.getCaseName()).trim();
-			if (!name.isBlank() && !num.isBlank())
-				caseTitleLabel.setText(name + " — " + num);
-			else if (!name.isBlank())
-				caseTitleLabel.setText(name);
-			else if (!num.isBlank())
-				caseTitleLabel.setText(num);
-		}
-	}
 
 	private void applyOverviewEditSafe(CaseOverviewDto dto) {
 		overviewRenderer.applyOverviewEditSafe(dto);
 	}
 
-	private void applyOverviewEditSafeInternal(CaseOverviewDto dto) {
-		currentOverview = dto;
-
-		// Always safe to refresh these while editing:
-		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()),
-				dto.getResponsibleAttorneyColor());
-
-		Integer statusId = (editMode && draftPrimaryStatusId != null) ? draftPrimaryStatusId : dto.getPrimaryStatusId();
-		renderPrimaryStatusMini(statusId, dto.getCaseStatus(), dto.getPrimaryStatusColor());
-
-		// Always render contact cards (draft if present, else dto)
-		Integer callerId = (editMode && draftPrimaryCallerContactId != null) ? draftPrimaryCallerContactId
-				: dto.getPrimaryCallerContactId();
-		String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
-				? draftPrimaryCallerName
-				: dto.getCaller();
-		renderCallerMini(callerId, callerName);
-
-		Integer clientId = (editMode && draftPrimaryClientContactId != null) ? draftPrimaryClientContactId
-				: dto.getPrimaryClientContactId();
-		String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
-				? draftPrimaryClientName
-				: dto.getClient();
-		renderClientMini(clientId, clientName);
-
-		// Practice Area card (draft-aware)
-		Integer paId = (editMode && draftPracticeAreaId != null) ? draftPracticeAreaId : dto.getPracticeAreaId();
-		String paName = (editMode && draftPracticeAreaName != null && !draftPracticeAreaName.isBlank())
-				? draftPracticeAreaName
-				: dto.getPracticeArea();
-		String paColor = (editMode && draftPracticeAreaColor != null && !draftPracticeAreaColor.isBlank())
-				? draftPracticeAreaColor
-				: dto.getPracticeAreaColor();
-		renderPracticeAreaMini(paId, paName, paColor);
-
-		String oppName = (editMode && draftPrimaryOpposingCounselName != null && !draftPrimaryOpposingCounselName.isBlank())
-				? draftPrimaryOpposingCounselName
-				: dto.getOpposingCounsel();
-
-		Integer oppId = (editMode && draftPrimaryOpposingCounselContactId != null)
-				? draftPrimaryOpposingCounselContactId
-				: dto.getPrimaryOpposingCounselContactId();
-
-		renderOpposingCounselMini(oppId, oppName);
-
-		// Header title is OK to refresh
-		if (caseTitleLabel != null) {
-			String name = safeText(dto.getCaseName()).trim();
-			String num = safeText(dto.getCaseNumber()).trim();
-			if (!name.isBlank() && !num.isBlank())
-				caseTitleLabel.setText(name + " — " + num);
-			else if (!name.isBlank())
-				caseTitleLabel.setText(name);
-			else if (!num.isBlank())
-				caseTitleLabel.setText(num);
-			else
-				caseTitleLabel.setText("Case #" + dto.getCaseId());
-		}
-
-		// If NOT editing, apply everything
-		if (!editMode) {
-			applyOverview(dto);
-			return;
-		}
-
-		// While editing: refresh only safe labels
-		if (ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
-
-		loadTeamSectionAsync();
-
-		if (ovIntakeDateValue != null)
-			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
-		if (ovIncidentDateValue != null)
-			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
-		if (ovSolDateValue != null)
-			ovSolDateValue.setText(formatDate(dto.getSolDate()));
-	}
 
 	// ----------------------------
 	// Edit lifecycle
@@ -1921,15 +1735,155 @@ public class CaseController {
 
 	private final class CaseOverviewRenderer {
 		void applyOverview(CaseOverviewDto dto) {
-			applyOverviewInternal(dto);
+			if (dto == null)
+				return;
+			currentOverview = dto;
+			renderHeaderTitleFromOverview(dto);
+			renderOverviewCards(dto);
+			renderOverviewTextFields(dto);
+			renderOverviewDates(dto, false);
+			loadTeamSectionAsync();
 		}
 
 		void applyDetail(CaseDetailDto detail) {
-			applyDetailInternal(detail);
+			if (detail == null)
+				return;
+			if (!editMode && ovCaseNameValue != null)
+				ovCaseNameValue.setText(safe(detail.getCaseName()));
+			if (!editMode && ovCaseNumberValue != null)
+				ovCaseNumberValue.setText(safeText(detail.getCaseNumber()));
+			if (!editMode && ovDescriptionValue != null)
+				ovDescriptionValue.setText(safeText(detail.getDescription()));
+			if (statusLabel != null)
+				statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
+			renderLastUpdated(detail.getUpdatedAt());
+			renderHeaderTitleFromDetail(detail);
 		}
 
 		void applyOverviewEditSafe(CaseOverviewDto dto) {
-			applyOverviewEditSafeInternal(dto);
+			if (dto == null)
+				return;
+			currentOverview = dto;
+			renderOverviewCards(dto);
+			renderHeaderTitleFromOverview(dto);
+			if (!editMode) {
+				applyOverview(dto);
+				return;
+			}
+			if (ovCaseNumberValue != null)
+				ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
+			loadTeamSectionAsync();
+			renderOverviewDates(dto, true);
+		}
+
+		private void renderOverviewCards(CaseOverviewDto dto) {
+			renderResponsibleAttorney(dto);
+			renderStatus(dto);
+			renderContacts(dto);
+			renderPracticeArea(dto);
+		}
+
+		private void renderResponsibleAttorney(CaseOverviewDto dto) {
+			renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()),
+					dto.getResponsibleAttorneyColor());
+		}
+
+		private void renderStatus(CaseOverviewDto dto) {
+			Integer statusId = (editMode && draftPrimaryStatusId != null) ? draftPrimaryStatusId : dto.getPrimaryStatusId();
+			renderPrimaryStatusMini(statusId, dto.getCaseStatus(), dto.getPrimaryStatusColor());
+		}
+
+		private void renderContacts(CaseOverviewDto dto) {
+			String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
+					? draftPrimaryCallerName
+					: dto.getCaller();
+			Integer callerId = (editMode && draftPrimaryCallerContactId != null)
+					? draftPrimaryCallerContactId
+					: dto.getPrimaryCallerContactId();
+			renderCallerMini(callerId, callerName);
+
+			String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
+					? draftPrimaryClientName
+					: dto.getClient();
+			Integer clientId = (editMode && draftPrimaryClientContactId != null)
+					? draftPrimaryClientContactId
+					: dto.getPrimaryClientContactId();
+			renderClientMini(clientId, clientName);
+
+			String oppName = (editMode && draftPrimaryOpposingCounselName != null && !draftPrimaryOpposingCounselName.isBlank())
+					? draftPrimaryOpposingCounselName
+					: dto.getOpposingCounsel();
+			Integer oppId = (editMode && draftPrimaryOpposingCounselContactId != null)
+					? draftPrimaryOpposingCounselContactId
+					: dto.getPrimaryOpposingCounselContactId();
+			renderOpposingCounselMini(oppId, oppName);
+		}
+
+		private void renderPracticeArea(CaseOverviewDto dto) {
+			Integer paId = (editMode && draftPracticeAreaId != null) ? draftPracticeAreaId : dto.getPracticeAreaId();
+			String paName = (editMode && draftPracticeAreaName != null && !draftPracticeAreaName.isBlank())
+					? draftPracticeAreaName
+					: dto.getPracticeArea();
+			String paColor = (editMode && draftPracticeAreaColor != null && !draftPracticeAreaColor.isBlank())
+					? draftPracticeAreaColor
+					: dto.getPracticeAreaColor();
+			renderPracticeAreaMini(paId, paName, paColor);
+		}
+
+		private void renderOverviewTextFields(CaseOverviewDto dto) {
+			if (ovCaseNameValue != null)
+				ovCaseNameValue.setText(safe(dto.getCaseName()));
+			if (ovCaseNumberValue != null)
+				ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
+			if (ovDescriptionValue != null)
+				ovDescriptionValue.setText(safeText(dto.getDescription()));
+		}
+
+		private void renderOverviewDates(CaseOverviewDto dto, boolean editSafeOnly) {
+			if (ovIntakeDateValue != null)
+				ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
+			if (ovIncidentDateValue != null)
+				ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
+			if (ovSolDateValue != null)
+				ovSolDateValue.setText(formatDate(dto.getSolDate()));
+			if (!editSafeOnly) {
+				if (ovIncidentDateEditor != null && !editMode)
+					ovIncidentDateEditor.setValue(dto.getIncidentDate());
+				if (ovSolDateEditor != null && !editMode)
+					ovSolDateEditor.setValue(dto.getSolDate());
+			}
+		}
+
+		private void renderHeaderTitleFromOverview(CaseOverviewDto dto) {
+			if (caseTitleLabel == null)
+				return;
+			String name = safeText(dto.getCaseName()).trim();
+			String num = safeText(dto.getCaseNumber()).trim();
+			if (!name.isBlank() && !num.isBlank())
+				caseTitleLabel.setText(name + " — " + num);
+			else if (!name.isBlank())
+				caseTitleLabel.setText(name);
+			else if (!num.isBlank())
+				caseTitleLabel.setText(num);
+			else
+				caseTitleLabel.setText("Case #" + dto.getCaseId());
+		}
+
+		private void renderHeaderTitleFromDetail(CaseDetailDto detail) {
+			if (caseTitleLabel == null)
+				return;
+			String num = safeText(detail.getCaseNumber()).trim();
+			String name = safeText(detail.getCaseName()).trim();
+			if (!name.isBlank() && !num.isBlank())
+				caseTitleLabel.setText(name + " — " + num);
+			else if (!name.isBlank())
+				caseTitleLabel.setText(name);
+			else if (!num.isBlank())
+				caseTitleLabel.setText(num);
+		}
+
+		private void renderLastUpdated(LocalDateTime updatedAt) {
+			applyLastUpdatedLabel(updatedAt);
 		}
 	}
 
