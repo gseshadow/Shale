@@ -286,6 +286,13 @@ public class CaseController {
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 
+	private final CaseOverviewRenderer overviewRenderer = new CaseOverviewRenderer();
+	private final CaseOverviewEditor overviewEditor = new CaseOverviewEditor();
+	private final CaseOverviewSaveCoordinator saveCoordinator = new CaseOverviewSaveCoordinator();
+	private final CaseOverviewLiveUpdateHandler liveUpdateHandler = new CaseOverviewLiveUpdateHandler();
+	private final CaseTeamCoordinator teamCoordinator = new CaseTeamCoordinator();
+	private final CaseUpdatesPanelController updatesPanelController = new CaseUpdatesPanelController();
+
 	public void init(Integer caseId) {
 		this.caseId = caseId;
 		refreshHeader();
@@ -608,6 +615,10 @@ public class CaseController {
 	// ----------------------------
 
 	private void applyOverview(CaseOverviewDto dto) {
+		overviewRenderer.applyOverview(dto);
+	}
+
+	private void applyOverviewInternal(CaseOverviewDto dto) {
 		currentOverview = dto;
 
 		if (caseTitleLabel != null) {
@@ -688,6 +699,10 @@ public class CaseController {
 	}
 
 	private void applyDetail(CaseDetailDto detail) {
+		overviewRenderer.applyDetail(detail);
+	}
+
+	private void applyDetailInternal(CaseDetailDto detail) {
 		if (detail == null)
 			return;
 
@@ -718,6 +733,10 @@ public class CaseController {
 	}
 
 	private void applyOverviewEditSafe(CaseOverviewDto dto) {
+		overviewRenderer.applyOverviewEditSafe(dto);
+	}
+
+	private void applyOverviewEditSafeInternal(CaseOverviewDto dto) {
 		currentOverview = dto;
 
 		// Always safe to refresh these while editing:
@@ -801,6 +820,10 @@ public class CaseController {
 	// ----------------------------
 
 	private void onEdit() {
+		overviewEditor.onEdit();
+	}
+
+	private void onEditInternal() {
 		// snapshot drafts from currentOverview (IMPORTANT: include client too)
 		draftPrimaryStatusId = (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
 
@@ -852,6 +875,10 @@ public class CaseController {
 	}
 
 	private void onCancel() {
+		overviewEditor.onCancel();
+	}
+
+	private void onCancelInternal() {
 		clearDraftState();
 		hideRemoteUpdateBanner();
 		clearError();
@@ -864,6 +891,10 @@ public class CaseController {
 	}
 
 	private void onReloadRemote() {
+		overviewEditor.onReloadRemote();
+	}
+
+	private void onReloadRemoteInternal() {
 		clearDraftState();
 		setEditMode(false);
 		hideRemoteUpdateBanner();
@@ -872,6 +903,10 @@ public class CaseController {
 	}
 
 	private void clearDraftState() {
+		overviewEditor.clearDraftState();
+	}
+
+	private void clearDraftStateInternal() {
 		draft = null;
 
 		draftPrimaryStatusId = null;
@@ -898,6 +933,10 @@ public class CaseController {
 	}
 
 	private void setEditMode(boolean enabled) {
+		overviewEditor.setEditMode(enabled);
+	}
+
+	private void setEditModeInternal(boolean enabled) {
 		this.editMode = enabled;
 
 		setVisibleManaged(ovCaseNameValue, !enabled);
@@ -1455,6 +1494,10 @@ public class CaseController {
 	// ----------------------------
 
 	private void onSave() {
+		saveCoordinator.onSave();
+	}
+
+	private void onSaveInternal() {
 
 		final String oldName = safeText(current.getCaseName()).trim();
 		final String oldDescription = safeText(current.getDescription());
@@ -1772,6 +1815,10 @@ public class CaseController {
 	// ----------------------------
 
 	private void subscribeLiveCaseUpdates() {
+		liveUpdateHandler.subscribeLiveCaseUpdates();
+	}
+
+	private void subscribeLiveCaseUpdatesInternal() {
 		if (runtimeBridge == null)
 			return;
 
@@ -1989,6 +2036,10 @@ public class CaseController {
 	// ----------------------------
 
 	private void loadTeamSectionAsync() {
+		teamCoordinator.loadTeamSectionAsync();
+	}
+
+	private void loadTeamSectionAsyncInternal() {
 		// ✅ If editing and we have a draft, show it (don’t overwrite with DB)
 		if (editMode && draftTeamAssignments != null) {
 			renderTeamFromDraft();
@@ -2022,6 +2073,10 @@ public class CaseController {
 	}
 
 	private void renderTeamCardsFromTeamRows(List<CaseDao.CaseUserTeamRow> rows) {
+		teamCoordinator.renderTeamCardsFromTeamRows(rows);
+	}
+
+	private void renderTeamCardsFromTeamRowsInternal(List<CaseDao.CaseUserTeamRow> rows) {
 		if (teamFlow == null)
 			return;
 
@@ -2081,6 +2136,10 @@ public class CaseController {
 
 	@FXML
 	private void onEditTeam() {
+		teamCoordinator.onEditTeam();
+	}
+
+	private void onEditTeamInternal() {
 		if (caseDao == null || appState == null || caseId == null) {
 			showError("Team edit is unavailable.");
 			return;
@@ -2168,6 +2227,10 @@ public class CaseController {
 	}
 
 	private void renderTeamFromDraft() {
+		teamCoordinator.renderTeamFromDraft();
+	}
+
+	private void renderTeamFromDraftInternal() {
 		if (teamFlow == null)
 			return;
 
@@ -2203,6 +2266,10 @@ public class CaseController {
 	// ----------------------------
 
 	private void loadCaseUpdatesAsync() {
+		updatesPanelController.loadCaseUpdatesAsync();
+	}
+
+	private void loadCaseUpdatesAsyncInternal() {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
@@ -2224,6 +2291,10 @@ public class CaseController {
 	}
 
 	private void renderCaseUpdates(List<CaseUpdateDto> updates) {
+		updatesPanelController.renderCaseUpdates(updates);
+	}
+
+	private void renderCaseUpdatesInternal(List<CaseUpdateDto> updates) {
 		if (caseUpdatesFeedBox == null)
 			return;
 
@@ -2251,6 +2322,10 @@ public class CaseController {
 	}
 
 	private void onSubmitCaseUpdate() {
+		updatesPanelController.onSubmitCaseUpdate();
+	}
+
+	private void onSubmitCaseUpdateInternal() {
 		if (caseDao == null || appState == null || caseId == null) {
 			showError("Case updates are unavailable.");
 			return;
@@ -2314,6 +2389,10 @@ public class CaseController {
 	}
 
 	private Node createCaseUpdateCard(CaseUpdateDto dto) {
+		return updatesPanelController.createCaseUpdateCard(dto);
+	}
+
+	private Node createCaseUpdateCardInternal(CaseUpdateDto dto) {
 		Label authorLabel = new Label(safeAuthorName(dto));
 		authorLabel.setStyle("-fx-font-weight: bold;");
 
@@ -2735,6 +2814,90 @@ public class CaseController {
 
 		javafx.application.Platform.runLater(searchField::requestFocus);
 		return dialog.showAndWait();
+	}
+
+	private final class CaseOverviewRenderer {
+		void applyOverview(CaseOverviewDto dto) {
+			applyOverviewInternal(dto);
+		}
+
+		void applyDetail(CaseDetailDto detail) {
+			applyDetailInternal(detail);
+		}
+
+		void applyOverviewEditSafe(CaseOverviewDto dto) {
+			applyOverviewEditSafeInternal(dto);
+		}
+	}
+
+	private final class CaseOverviewEditor {
+		void onEdit() {
+			onEditInternal();
+		}
+
+		void onCancel() {
+			onCancelInternal();
+		}
+
+		void onReloadRemote() {
+			onReloadRemoteInternal();
+		}
+
+		void setEditMode(boolean enabled) {
+			setEditModeInternal(enabled);
+		}
+
+		void clearDraftState() {
+			clearDraftStateInternal();
+		}
+	}
+
+	private final class CaseOverviewSaveCoordinator {
+		void onSave() {
+			onSaveInternal();
+		}
+	}
+
+	private final class CaseOverviewLiveUpdateHandler {
+		void subscribeLiveCaseUpdates() {
+			subscribeLiveCaseUpdatesInternal();
+		}
+	}
+
+	private final class CaseTeamCoordinator {
+		void loadTeamSectionAsync() {
+			loadTeamSectionAsyncInternal();
+		}
+
+		void renderTeamCardsFromTeamRows(List<CaseDao.CaseUserTeamRow> rows) {
+			renderTeamCardsFromTeamRowsInternal(rows);
+		}
+
+		void onEditTeam() {
+			onEditTeamInternal();
+		}
+
+		void renderTeamFromDraft() {
+			renderTeamFromDraftInternal();
+		}
+	}
+
+	private final class CaseUpdatesPanelController {
+		void loadCaseUpdatesAsync() {
+			loadCaseUpdatesAsyncInternal();
+		}
+
+		void renderCaseUpdates(List<CaseUpdateDto> updates) {
+			renderCaseUpdatesInternal(updates);
+		}
+
+		void onSubmitCaseUpdate() {
+			onSubmitCaseUpdateInternal();
+		}
+
+		Node createCaseUpdateCard(CaseUpdateDto dto) {
+			return createCaseUpdateCardInternal(dto);
+		}
 	}
 
 	private record CaseEditModel(String caseName, String caseNumber, String description) {
