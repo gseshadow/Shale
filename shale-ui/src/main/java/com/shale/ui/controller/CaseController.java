@@ -290,6 +290,7 @@ public class CaseController {
 	private final CaseOverviewEditor overviewEditor = new CaseOverviewEditor();
 	private final CaseOverviewSaveCoordinator saveCoordinator = new CaseOverviewSaveCoordinator();
 	private final CaseOverviewLiveUpdateHandler liveUpdateHandler = new CaseOverviewLiveUpdateHandler();
+	private final CaseOverviewPickerCoordinator overviewPickerCoordinator = new CaseOverviewPickerCoordinator();
 	private final CaseTeamCoordinator teamCoordinator = new CaseTeamCoordinator();
 	private final CaseUpdatesPanelController updatesPanelController = new CaseUpdatesPanelController();
 
@@ -618,202 +619,16 @@ public class CaseController {
 		overviewRenderer.applyOverview(dto);
 	}
 
-	private void applyOverviewInternal(CaseOverviewDto dto) {
-		currentOverview = dto;
-
-		if (caseTitleLabel != null) {
-			String name = safeText(dto.getCaseName()).trim();
-			String num = safeText(dto.getCaseNumber()).trim();
-			if (!name.isBlank() && !num.isBlank())
-				caseTitleLabel.setText(name + " — " + num);
-			else if (!name.isBlank())
-				caseTitleLabel.setText(name);
-			else if (!num.isBlank())
-				caseTitleLabel.setText(num);
-			else
-				caseTitleLabel.setText("Case #" + dto.getCaseId());
-		}
-
-		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()),
-				dto.getResponsibleAttorneyColor());
-
-		if (ovCaseNameValue != null)
-			ovCaseNameValue.setText(safe(dto.getCaseName()));
-		if (ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
-
-		renderPrimaryStatusMini(dto.getPrimaryStatusId(), dto.getCaseStatus(), dto.getPrimaryStatusColor());
-
-		// Caller/Client: ALWAYS render cards (even if id is null)
-		String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
-				? draftPrimaryCallerName
-				: dto.getCaller();
-		Integer callerId = (editMode && draftPrimaryCallerContactId != null)
-				? draftPrimaryCallerContactId
-				: dto.getPrimaryCallerContactId();
-		renderCallerMini(callerId, callerName);
-
-		String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
-				? draftPrimaryClientName
-				: dto.getClient();
-		Integer clientId = (editMode && draftPrimaryClientContactId != null)
-				? draftPrimaryClientContactId
-				: dto.getPrimaryClientContactId();
-		renderClientMini(clientId, clientName);
-
-		String oppName = (editMode && draftPrimaryOpposingCounselName != null && !draftPrimaryOpposingCounselName.isBlank())
-				? draftPrimaryOpposingCounselName
-				: dto.getOpposingCounsel();
-
-		Integer oppId = (editMode && draftPrimaryOpposingCounselContactId != null)
-				? draftPrimaryOpposingCounselContactId
-				: dto.getPrimaryOpposingCounselContactId();
-
-		renderOpposingCounselMini(oppId, oppName);
-
-		// Practice Area: card (draft-aware)
-		Integer paId = (editMode && draftPracticeAreaId != null) ? draftPracticeAreaId : dto.getPracticeAreaId();
-		String paName = (editMode && draftPracticeAreaName != null && !draftPracticeAreaName.isBlank())
-				? draftPracticeAreaName
-				: dto.getPracticeArea();
-		String paColor = (editMode && draftPracticeAreaColor != null && !draftPracticeAreaColor.isBlank())
-				? draftPracticeAreaColor
-				: dto.getPracticeAreaColor();
-		renderPracticeAreaMini(paId, paName, paColor);
-
-		loadTeamSectionAsync();
-
-		if (ovIntakeDateValue != null)
-			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
-		if (ovIncidentDateValue != null)
-			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
-		if (ovIncidentDateEditor != null && !editMode)
-			ovIncidentDateEditor.setValue(dto.getIncidentDate());
-		if (ovSolDateValue != null)
-			ovSolDateValue.setText(formatDate(dto.getSolDate()));
-		if (ovSolDateEditor != null && !editMode)
-			ovSolDateEditor.setValue(dto.getSolDate());
-
-		if (ovDescriptionValue != null)
-			ovDescriptionValue.setText(safeText(dto.getDescription()));
-	}
 
 	private void applyDetail(CaseDetailDto detail) {
 		overviewRenderer.applyDetail(detail);
 	}
 
-	private void applyDetailInternal(CaseDetailDto detail) {
-		if (detail == null)
-			return;
-
-		if (!editMode && ovCaseNameValue != null)
-			ovCaseNameValue.setText(safe(detail.getCaseName()));
-
-		if (!editMode && ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(safeText(detail.getCaseNumber()));
-
-		if (!editMode && ovDescriptionValue != null)
-			ovDescriptionValue.setText(safeText(detail.getDescription()));
-
-		if (statusLabel != null)
-			statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
-
-		applyLastUpdatedLabel(detail.getUpdatedAt());
-
-		if (caseTitleLabel != null) {
-			String num = safeText(detail.getCaseNumber()).trim();
-			String name = safeText(detail.getCaseName()).trim();
-			if (!name.isBlank() && !num.isBlank())
-				caseTitleLabel.setText(name + " — " + num);
-			else if (!name.isBlank())
-				caseTitleLabel.setText(name);
-			else if (!num.isBlank())
-				caseTitleLabel.setText(num);
-		}
-	}
 
 	private void applyOverviewEditSafe(CaseOverviewDto dto) {
 		overviewRenderer.applyOverviewEditSafe(dto);
 	}
 
-	private void applyOverviewEditSafeInternal(CaseOverviewDto dto) {
-		currentOverview = dto;
-
-		// Always safe to refresh these while editing:
-		renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()),
-				dto.getResponsibleAttorneyColor());
-
-		Integer statusId = (editMode && draftPrimaryStatusId != null) ? draftPrimaryStatusId : dto.getPrimaryStatusId();
-		renderPrimaryStatusMini(statusId, dto.getCaseStatus(), dto.getPrimaryStatusColor());
-
-		// Always render contact cards (draft if present, else dto)
-		Integer callerId = (editMode && draftPrimaryCallerContactId != null) ? draftPrimaryCallerContactId
-				: dto.getPrimaryCallerContactId();
-		String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
-				? draftPrimaryCallerName
-				: dto.getCaller();
-		renderCallerMini(callerId, callerName);
-
-		Integer clientId = (editMode && draftPrimaryClientContactId != null) ? draftPrimaryClientContactId
-				: dto.getPrimaryClientContactId();
-		String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
-				? draftPrimaryClientName
-				: dto.getClient();
-		renderClientMini(clientId, clientName);
-
-		// Practice Area card (draft-aware)
-		Integer paId = (editMode && draftPracticeAreaId != null) ? draftPracticeAreaId : dto.getPracticeAreaId();
-		String paName = (editMode && draftPracticeAreaName != null && !draftPracticeAreaName.isBlank())
-				? draftPracticeAreaName
-				: dto.getPracticeArea();
-		String paColor = (editMode && draftPracticeAreaColor != null && !draftPracticeAreaColor.isBlank())
-				? draftPracticeAreaColor
-				: dto.getPracticeAreaColor();
-		renderPracticeAreaMini(paId, paName, paColor);
-
-		String oppName = (editMode && draftPrimaryOpposingCounselName != null && !draftPrimaryOpposingCounselName.isBlank())
-				? draftPrimaryOpposingCounselName
-				: dto.getOpposingCounsel();
-
-		Integer oppId = (editMode && draftPrimaryOpposingCounselContactId != null)
-				? draftPrimaryOpposingCounselContactId
-				: dto.getPrimaryOpposingCounselContactId();
-
-		renderOpposingCounselMini(oppId, oppName);
-
-		// Header title is OK to refresh
-		if (caseTitleLabel != null) {
-			String name = safeText(dto.getCaseName()).trim();
-			String num = safeText(dto.getCaseNumber()).trim();
-			if (!name.isBlank() && !num.isBlank())
-				caseTitleLabel.setText(name + " — " + num);
-			else if (!name.isBlank())
-				caseTitleLabel.setText(name);
-			else if (!num.isBlank())
-				caseTitleLabel.setText(num);
-			else
-				caseTitleLabel.setText("Case #" + dto.getCaseId());
-		}
-
-		// If NOT editing, apply everything
-		if (!editMode) {
-			applyOverview(dto);
-			return;
-		}
-
-		// While editing: refresh only safe labels
-		if (ovCaseNumberValue != null)
-			ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
-
-		loadTeamSectionAsync();
-
-		if (ovIntakeDateValue != null)
-			ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
-		if (ovIncidentDateValue != null)
-			ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
-		if (ovSolDateValue != null)
-			ovSolDateValue.setText(formatDate(dto.getSolDate()));
-	}
 
 	// ----------------------------
 	// Edit lifecycle
@@ -1009,102 +824,7 @@ public class CaseController {
 	// ----------------------------
 
 	private void onChangeResponsibleAttorney() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Responsible attorney change is unavailable.");
-			return;
-		}
-
-		Integer clientId = appState.getShaleClientId();
-		if (clientId == null || clientId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		final long saveCaseId = caseId.longValue();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.UserRow> users = caseDao.listAttorneysForTenant(clientId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (users == null || users.isEmpty()) {
-						showError("No attorneys are configured for this tenant.");
-						return;
-					}
-
-					var labelToRow = new java.util.LinkedHashMap<String, CaseDao.UserRow>();
-
-					Integer currentId = (editMode && draftResponsibleAttorneyUserId != null)
-							? draftResponsibleAttorneyUserId
-							: (currentOverview == null ? null : currentOverview.getResponsibleAttorneyUserId());
-
-					String preselect = null;
-
-					for (var u : users) {
-						String label = u.displayName();
-						if (label == null || label.isBlank())
-							continue;
-
-						// avoid collisions if two users share same display name
-						String key = label;
-						if (labelToRow.containsKey(key)) {
-							key = label + " (ID " + u.id() + ")";
-						}
-
-						labelToRow.put(key, u);
-
-						if (currentId != null && currentId.equals(u.id())) {
-							preselect = key;
-						}
-					}
-
-					if (labelToRow.isEmpty()) {
-						showError("No attorneys are configured for this tenant.");
-						return;
-					}
-
-					if (preselect == null) {
-						preselect = labelToRow.keySet().iterator().next();
-					}
-
-					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
-					dialog.setTitle("Change Responsible Attorney");
-					dialog.setHeaderText("Select the responsible attorney");
-					dialog.setContentText("Attorney:");
-
-					Optional<String> chosen = dialog.showAndWait();
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.UserRow picked = labelToRow.get(chosen.get());
-					if (picked == null)
-						return;
-
-					draftResponsibleAttorneyUserId = picked.id();
-
-					// Update both header + overview card
-					renderResponsibleAttorneyMini(
-							picked.id(),
-							picked.displayName(),
-							picked.color()
-					);
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load attorneys. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-atty-list-" + saveCaseId).start();
+		overviewPickerCoordinator.changeResponsibleAttorney();
 	}
 
 	// ----------------------------
@@ -1112,381 +832,23 @@ public class CaseController {
 	// ----------------------------
 
 	private void onChangeStatus() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Status change is unavailable.");
-			return;
-		}
-		Integer clientId = appState.getShaleClientId();
-		if (clientId == null || clientId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(clientId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (statuses == null || statuses.isEmpty()) {
-						showError("No statuses are configured for this tenant.");
-						return;
-					}
-
-					java.util.Map<String, CaseDao.StatusRow> labelToRow = new java.util.LinkedHashMap<>();
-					String preselect = null;
-
-					Integer currentId = (editMode && draftPrimaryStatusId != null)
-							? draftPrimaryStatusId
-							: (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
-
-					for (CaseDao.StatusRow s : statuses) {
-						String label = s.name() + (s.isClosed() ? " (Closed)" : "");
-						labelToRow.put(label, s);
-						if (currentId != null && currentId == s.id())
-							preselect = label;
-					}
-
-					if (preselect == null)
-						preselect = labelToRow.keySet().iterator().next();
-
-					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
-					dialog.setTitle("Change Status");
-					dialog.setHeaderText("Select the new primary status");
-					dialog.setContentText("Status:");
-
-					Optional<String> chosen = dialog.showAndWait();
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.StatusRow picked = labelToRow.get(chosen.get());
-					if (picked == null)
-						return;
-
-					draftPrimaryStatusId = picked.id();
-					renderPrimaryStatusMini(picked.id(), picked.name(), picked.color());
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load statuses. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-status-list-" + caseId).start();
+		overviewPickerCoordinator.changePrimaryStatus();
 	}
 
 	private void onChangeCaller() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Caller change is unavailable.");
-			return;
-		}
-		Integer clientId = appState.getShaleClientId();
-		if (clientId == null || clientId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(clientId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (contacts == null || contacts.isEmpty()) {
-						showError("No contacts are configured for this tenant.");
-						return;
-					}
-
-					List<CaseDao.ContactRow> cleaned = contacts.stream()
-							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
-							.toList();
-
-					if (cleaned.isEmpty()) {
-						showError("No usable contacts found (all were blank).");
-						return;
-					}
-
-					Integer currentId = (editMode && draftPrimaryCallerContactId != null)
-							? draftPrimaryCallerContactId
-							: (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId());
-
-					CaseDao.ContactRow preselectRow = null;
-					if (currentId != null) {
-						for (CaseDao.ContactRow c : cleaned) {
-							if (c.id() == currentId.intValue()) {
-								preselectRow = c;
-								break;
-							}
-						}
-					}
-
-					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
-							"Change Caller", "Select the primary caller", "Search...", cleaned, preselectRow);
-
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.ContactRow picked = chosen.get();
-					draftPrimaryCallerContactId = picked.id();
-					draftPrimaryCallerName = picked.displayName();
-
-					// update UI immediately
-					renderCallerMini(draftPrimaryCallerContactId, draftPrimaryCallerName);
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load contacts. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-caller-list-" + caseId).start();
+		overviewPickerCoordinator.changeCaller();
 	}
 
 	private void onChangeClient() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Client change is unavailable.");
-			return;
-		}
-		Integer tenantId = appState.getShaleClientId();
-		if (tenantId == null || tenantId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(tenantId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (contacts == null || contacts.isEmpty()) {
-						showError("No contacts are configured for this tenant.");
-						return;
-					}
-
-					List<CaseDao.ContactRow> cleaned = contacts.stream()
-							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
-							.toList();
-
-					if (cleaned.isEmpty()) {
-						showError("No usable contacts found (all were blank).");
-						return;
-					}
-
-					Integer currentId = (editMode && draftPrimaryClientContactId != null)
-							? draftPrimaryClientContactId
-							: (currentOverview == null ? null : currentOverview.getPrimaryClientContactId());
-
-					CaseDao.ContactRow preselectRow = null;
-					if (currentId != null) {
-						for (CaseDao.ContactRow c : cleaned) {
-							if (c.id() == currentId.intValue()) {
-								preselectRow = c;
-								break;
-							}
-						}
-					}
-
-					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
-							"Change Client", "Select the primary client", "Search...", cleaned, preselectRow);
-
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.ContactRow picked = chosen.get();
-					draftPrimaryClientContactId = picked.id();
-					draftPrimaryClientName = picked.displayName();
-
-					// update UI immediately
-					renderClientMini(draftPrimaryClientContactId, draftPrimaryClientName);
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load contacts. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-client-list-" + caseId).start();
+		overviewPickerCoordinator.changeClient();
 	}
 
 	private void onChangePracticeArea() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Practice area change is unavailable.");
-			return;
-		}
-		Integer tenantId = appState.getShaleClientId();
-		if (tenantId == null || tenantId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(tenantId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (areas == null || areas.isEmpty()) {
-						showError("No practice areas are configured for this tenant.");
-						return;
-					}
-
-					java.util.Map<String, CaseDao.PracticeAreaRow> labelToRow = new java.util.LinkedHashMap<>();
-					String preselect = null;
-
-					Integer currentId = (editMode && draftPracticeAreaId != null)
-							? draftPracticeAreaId
-							: (currentOverview == null ? null : currentOverview.getPracticeAreaId());
-
-					for (CaseDao.PracticeAreaRow pa : areas) {
-						String label = (pa.name() == null || pa.name().isBlank())
-								? ("PracticeArea #" + pa.id())
-								: pa.name();
-						labelToRow.put(label, pa);
-						if (currentId != null && currentId == pa.id())
-							preselect = label;
-					}
-
-					if (preselect == null)
-						preselect = labelToRow.keySet().iterator().next();
-
-					ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
-					dialog.setTitle("Change Practice Area");
-					dialog.setHeaderText("Select the practice area");
-					dialog.setContentText("Practice area:");
-
-					Optional<String> chosen = dialog.showAndWait();
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.PracticeAreaRow picked = labelToRow.get(chosen.get());
-					if (picked == null)
-						return;
-
-					draftPracticeAreaId = picked.id();
-					draftPracticeAreaName = picked.name();
-					draftPracticeAreaColor = picked.color();
-
-					renderPracticeAreaMini(picked.id(), picked.name(), picked.color());
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load practice areas. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-practicearea-list-" + caseId).start();
+		overviewPickerCoordinator.changePracticeArea();
 	}
 
 	private void onChangeOpposingCounsel() {
-		if (caseDao == null || appState == null || caseId == null) {
-			showError("Opposing counsel change is unavailable.");
-			return;
-		}
-		Integer tenantId = appState.getShaleClientId();
-		if (tenantId == null || tenantId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-
-		setBusy(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(tenantId);
-
-				runOnFx(() ->
-				{
-					setBusy(false);
-
-					if (contacts == null || contacts.isEmpty()) {
-						showError("No contacts are configured for this tenant.");
-						return;
-					}
-
-					List<CaseDao.ContactRow> cleaned = contacts.stream()
-							.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
-							.toList();
-
-					if (cleaned.isEmpty()) {
-						showError("No usable contacts found (all were blank).");
-						return;
-					}
-
-					Integer currentId = (editMode && draftPrimaryOpposingCounselContactId != null)
-							? draftPrimaryOpposingCounselContactId
-							: (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId());
-
-					CaseDao.ContactRow preselectRow = null;
-					if (currentId != null) {
-						for (CaseDao.ContactRow c : cleaned) {
-							if (c.id() == currentId.intValue()) {
-								preselectRow = c;
-								break;
-							}
-						}
-					}
-
-					Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
-							"Change Opposing Counsel",
-							"Select the primary opposing counsel",
-							"Search...",
-							cleaned,
-							preselectRow
-					);
-
-					if (chosen.isEmpty())
-						return;
-
-					CaseDao.ContactRow picked = chosen.get();
-					draftPrimaryOpposingCounselContactId = picked.id();
-					draftPrimaryOpposingCounselName = picked.displayName();
-
-					renderOpposingCounselMini(draftPrimaryOpposingCounselContactId, draftPrimaryOpposingCounselName);
-				});
-
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					showError("Failed to load contacts. " + ex.getMessage());
-					setBusy(false);
-				});
-			}
-		}, "case-oppcounsel-list-" + caseId).start();
+		overviewPickerCoordinator.changeOpposingCounsel();
 	}
 
 	// ----------------------------
@@ -1522,161 +884,9 @@ public class CaseController {
 	// ----------------------------
 
 	private void subscribeLiveCaseUpdates() {
-		liveUpdateHandler.subscribeLiveCaseUpdates();
+		liveUpdateHandler.subscribe();
 	}
 
-	private void subscribeLiveCaseUpdatesInternal() {
-		if (runtimeBridge == null)
-			return;
-
-		runtimeBridge.subscribeCaseUpdated(event ->
-		{
-			if (caseId == null || event == null || event.caseId() != caseId.intValue())
-				return;
-
-			String mine = runtimeBridge.getClientInstanceId();
-			if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId()))
-				return;
-
-			if (event.newName() != null) {
-				runOnFx(() ->
-				{
-					applyLiveCaseName(event.newName());
-					hideRemoteUpdateBanner();
-					refreshCurrentAfterRemoteUpdateAsync();
-				});
-				return;
-			}
-
-			String rawPatch = event.rawPatchJson();
-			String patchedName = extractPatchString(rawPatch, "name");
-			String patchedNumber = extractPatchString(rawPatch, "caseNumber");
-			String patchedDescription = extractPatchString(rawPatch, "description");
-			boolean incidentDatePatched = hasPatchKey(rawPatch, "incidentDate");
-			boolean solDatePatched = hasPatchKey(rawPatch, "solDate");
-			String patchedIncident = extractPatchString(rawPatch, "incidentDate");
-			String patchedSol = extractPatchString(rawPatch, "solDate");
-			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
-			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
-			Integer patchedPrimaryClientContactId = extractPatchInt(rawPatch, "primaryClientContactId");
-			Integer patchedPracticeAreaId = extractPatchInt(rawPatch, "practiceAreaId");
-			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
-			Integer patchedPrimaryOpposingCounselContactId = extractPatchInt(rawPatch, "primaryOpposingCounselContactId");
-
-			// ✅ team marker (we publish 1)
-			Integer patchedTeamChanged = extractPatchInt(rawPatch, "teamChanged");
-			boolean teamChanged = patchedTeamChanged != null && patchedTeamChanged.intValue() == 1;
-			Integer patchedCaseUpdateAdded = extractPatchInt(rawPatch, "caseUpdateAdded");
-			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
-
-			if (caseUpdateAdded) {
-				runOnFx(() ->
-				{
-					loadCaseUpdatesAsync();
-					refreshLastUpdatedLabelAsync();
-				});
-				return;
-			}
-
-			if (editMode) {
-				runOnFx(() ->
-				{
-					showRemoteUpdateBanner();
-				});
-				return;
-			}
-
-			// Any structural change -> reload
-			if (patchedPrimaryStatusId != null
-					|| patchedPrimaryCallerContactId != null
-					|| patchedPrimaryClientContactId != null
-					|| patchedPracticeAreaId != null
-					|| patchedResponsibleAttorneyUserId != null
-					|| patchedPrimaryOpposingCounselContactId != null
-					|| teamChanged) {
-				runOnFx(() ->
-				{
-					// keep your existing behavior
-					reloadCurrentCaseForViewMode();
-
-					// ✅ ensure team refresh happens even if overview reload is slow/partial
-					if (teamChanged) {
-						loadTeamSectionAsync();
-					}
-
-					hideRemoteUpdateBanner();
-				});
-				return;
-			}
-
-			// Simple text/date patch -> apply inline
-			if (patchedName != null || patchedNumber != null || patchedDescription != null
-					|| incidentDatePatched || solDatePatched) {
-				runOnFx(() ->
-				{
-					if (patchedName != null)
-						applyLiveCaseName(patchedName);
-					if (patchedNumber != null)
-						applyLiveCaseNumber(patchedNumber);
-					if (patchedDescription != null)
-						applyLiveCaseDescription(patchedDescription);
-					LocalDate nextIncidentDate = null;
-					LocalDate nextSolDate = null;
-					boolean incidentApplied = false;
-					boolean solApplied = false;
-
-					if (incidentDatePatched) {
-						if (patchedIncident != null) {
-							LocalDate parsed = parsePatchedDate(patchedIncident);
-							if (parsed != null) {
-								nextIncidentDate = parsed;
-								incidentApplied = true;
-							}
-						} else if (isPatchExplicitNull(rawPatch, "incidentDate")) {
-							nextIncidentDate = null;
-							incidentApplied = true;
-						}
-					}
-
-					if (solDatePatched) {
-						if (patchedSol != null) {
-							LocalDate parsed = parsePatchedDate(patchedSol);
-							if (parsed != null) {
-								nextSolDate = parsed;
-								solApplied = true;
-							}
-						} else if (isPatchExplicitNull(rawPatch, "solDate")) {
-							nextSolDate = null;
-							solApplied = true;
-						}
-					}
-
-					if (incidentApplied && ovIncidentDateValue != null)
-						ovIncidentDateValue.setText(formatDate(nextIncidentDate));
-					if (solApplied && ovSolDateValue != null)
-						ovSolDateValue.setText(formatDate(nextSolDate));
-
-					if (incidentApplied || solApplied) {
-						CaseOverviewDto base = currentOverview;
-						if (base != null) {
-							LocalDate mergedIncident = incidentApplied ? nextIncidentDate : base.getIncidentDate();
-							LocalDate mergedSol = solApplied ? nextSolDate : base.getSolDate();
-							currentOverview = copyOverviewWithDates(base, mergedIncident, mergedSol);
-						}
-					}
-
-					hideRemoteUpdateBanner();
-					refreshCurrentAfterRemoteUpdateAsync();
-				});
-				return;
-			}
-
-			runOnFx(() ->
-			{
-				showRemoteUpdateBanner();
-			});
-		});
-	}
 
 	private void refreshCurrentAfterRemoteUpdateAsync() {
 		if (caseDao == null || caseId == null)
@@ -2525,15 +1735,155 @@ public class CaseController {
 
 	private final class CaseOverviewRenderer {
 		void applyOverview(CaseOverviewDto dto) {
-			applyOverviewInternal(dto);
+			if (dto == null)
+				return;
+			currentOverview = dto;
+			renderHeaderTitleFromOverview(dto);
+			renderOverviewCards(dto);
+			renderOverviewTextFields(dto);
+			renderOverviewDates(dto, false);
+			loadTeamSectionAsync();
 		}
 
 		void applyDetail(CaseDetailDto detail) {
-			applyDetailInternal(detail);
+			if (detail == null)
+				return;
+			if (!editMode && ovCaseNameValue != null)
+				ovCaseNameValue.setText(safe(detail.getCaseName()));
+			if (!editMode && ovCaseNumberValue != null)
+				ovCaseNumberValue.setText(safeText(detail.getCaseNumber()));
+			if (!editMode && ovDescriptionValue != null)
+				ovDescriptionValue.setText(safeText(detail.getDescription()));
+			if (statusLabel != null)
+				statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
+			renderLastUpdated(detail.getUpdatedAt());
+			renderHeaderTitleFromDetail(detail);
 		}
 
 		void applyOverviewEditSafe(CaseOverviewDto dto) {
-			applyOverviewEditSafeInternal(dto);
+			if (dto == null)
+				return;
+			currentOverview = dto;
+			renderOverviewCards(dto);
+			renderHeaderTitleFromOverview(dto);
+			if (!editMode) {
+				applyOverview(dto);
+				return;
+			}
+			if (ovCaseNumberValue != null)
+				ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
+			loadTeamSectionAsync();
+			renderOverviewDates(dto, true);
+		}
+
+		private void renderOverviewCards(CaseOverviewDto dto) {
+			renderResponsibleAttorney(dto);
+			renderStatus(dto);
+			renderContacts(dto);
+			renderPracticeArea(dto);
+		}
+
+		private void renderResponsibleAttorney(CaseOverviewDto dto) {
+			renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()),
+					dto.getResponsibleAttorneyColor());
+		}
+
+		private void renderStatus(CaseOverviewDto dto) {
+			Integer statusId = (editMode && draftPrimaryStatusId != null) ? draftPrimaryStatusId : dto.getPrimaryStatusId();
+			renderPrimaryStatusMini(statusId, dto.getCaseStatus(), dto.getPrimaryStatusColor());
+		}
+
+		private void renderContacts(CaseOverviewDto dto) {
+			String callerName = (editMode && draftPrimaryCallerName != null && !draftPrimaryCallerName.isBlank())
+					? draftPrimaryCallerName
+					: dto.getCaller();
+			Integer callerId = (editMode && draftPrimaryCallerContactId != null)
+					? draftPrimaryCallerContactId
+					: dto.getPrimaryCallerContactId();
+			renderCallerMini(callerId, callerName);
+
+			String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
+					? draftPrimaryClientName
+					: dto.getClient();
+			Integer clientId = (editMode && draftPrimaryClientContactId != null)
+					? draftPrimaryClientContactId
+					: dto.getPrimaryClientContactId();
+			renderClientMini(clientId, clientName);
+
+			String oppName = (editMode && draftPrimaryOpposingCounselName != null && !draftPrimaryOpposingCounselName.isBlank())
+					? draftPrimaryOpposingCounselName
+					: dto.getOpposingCounsel();
+			Integer oppId = (editMode && draftPrimaryOpposingCounselContactId != null)
+					? draftPrimaryOpposingCounselContactId
+					: dto.getPrimaryOpposingCounselContactId();
+			renderOpposingCounselMini(oppId, oppName);
+		}
+
+		private void renderPracticeArea(CaseOverviewDto dto) {
+			Integer paId = (editMode && draftPracticeAreaId != null) ? draftPracticeAreaId : dto.getPracticeAreaId();
+			String paName = (editMode && draftPracticeAreaName != null && !draftPracticeAreaName.isBlank())
+					? draftPracticeAreaName
+					: dto.getPracticeArea();
+			String paColor = (editMode && draftPracticeAreaColor != null && !draftPracticeAreaColor.isBlank())
+					? draftPracticeAreaColor
+					: dto.getPracticeAreaColor();
+			renderPracticeAreaMini(paId, paName, paColor);
+		}
+
+		private void renderOverviewTextFields(CaseOverviewDto dto) {
+			if (ovCaseNameValue != null)
+				ovCaseNameValue.setText(safe(dto.getCaseName()));
+			if (ovCaseNumberValue != null)
+				ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
+			if (ovDescriptionValue != null)
+				ovDescriptionValue.setText(safeText(dto.getDescription()));
+		}
+
+		private void renderOverviewDates(CaseOverviewDto dto, boolean editSafeOnly) {
+			if (ovIntakeDateValue != null)
+				ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
+			if (ovIncidentDateValue != null)
+				ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
+			if (ovSolDateValue != null)
+				ovSolDateValue.setText(formatDate(dto.getSolDate()));
+			if (!editSafeOnly) {
+				if (ovIncidentDateEditor != null && !editMode)
+					ovIncidentDateEditor.setValue(dto.getIncidentDate());
+				if (ovSolDateEditor != null && !editMode)
+					ovSolDateEditor.setValue(dto.getSolDate());
+			}
+		}
+
+		private void renderHeaderTitleFromOverview(CaseOverviewDto dto) {
+			if (caseTitleLabel == null)
+				return;
+			String name = safeText(dto.getCaseName()).trim();
+			String num = safeText(dto.getCaseNumber()).trim();
+			if (!name.isBlank() && !num.isBlank())
+				caseTitleLabel.setText(name + " — " + num);
+			else if (!name.isBlank())
+				caseTitleLabel.setText(name);
+			else if (!num.isBlank())
+				caseTitleLabel.setText(num);
+			else
+				caseTitleLabel.setText("Case #" + dto.getCaseId());
+		}
+
+		private void renderHeaderTitleFromDetail(CaseDetailDto detail) {
+			if (caseTitleLabel == null)
+				return;
+			String num = safeText(detail.getCaseNumber()).trim();
+			String name = safeText(detail.getCaseName()).trim();
+			if (!name.isBlank() && !num.isBlank())
+				caseTitleLabel.setText(name + " — " + num);
+			else if (!name.isBlank())
+				caseTitleLabel.setText(name);
+			else if (!num.isBlank())
+				caseTitleLabel.setText(num);
+		}
+
+		private void renderLastUpdated(LocalDateTime updatedAt) {
+			applyLastUpdatedLabel(updatedAt);
 		}
 	}
 
@@ -2950,10 +2300,590 @@ public class CaseController {
 			boolean opposingCounselChanged) {
 	}
 
-	private final class CaseOverviewLiveUpdateHandler {
-		void subscribeLiveCaseUpdates() {
-			subscribeLiveCaseUpdatesInternal();
+
+	private final class CaseOverviewPickerCoordinator {
+		void changeResponsibleAttorney() {
+			if (!requirePickerContext("Responsible attorney change is unavailable."))
+				return;
+			Integer tenantId = appState.getShaleClientId();
+			if (!requireTenantSelected(tenantId))
+				return;
+
+			setBusy(true);
+			clearError();
+
+			final long activeCaseId = caseId.longValue();
+			new Thread(() ->
+			{
+				try {
+					List<CaseDao.UserRow> users = caseDao.listAttorneysForTenant(tenantId);
+					runOnFx(() -> handleResponsibleAttorneyLoaded(users));
+				} catch (Exception ex) {
+					runOnFx(() ->
+					{
+						showError("Failed to load attorneys. " + ex.getMessage());
+						setBusy(false);
+					});
+				}
+			}, "case-atty-list-" + activeCaseId).start();
 		}
+
+		void changePrimaryStatus() {
+			if (!requirePickerContext("Status change is unavailable."))
+				return;
+			Integer tenantId = appState.getShaleClientId();
+			if (!requireTenantSelected(tenantId))
+				return;
+
+			setBusy(true);
+			clearError();
+
+			new Thread(() ->
+			{
+				try {
+					List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+					runOnFx(() -> handleStatusLoaded(statuses));
+				} catch (Exception ex) {
+					runOnFx(() ->
+					{
+						showError("Failed to load statuses. " + ex.getMessage());
+						setBusy(false);
+					});
+				}
+			}, "case-status-list-" + caseId).start();
+		}
+
+		void changeCaller() {
+			changeContact(
+					"Caller change is unavailable.",
+					"Change Caller",
+					"Select the primary caller",
+					"case-caller-list-",
+					() -> (editMode && draftPrimaryCallerContactId != null)
+							? draftPrimaryCallerContactId
+							: (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId()),
+					picked -> {
+						draftPrimaryCallerContactId = picked.id();
+						draftPrimaryCallerName = picked.displayName();
+						renderCallerMini(draftPrimaryCallerContactId, draftPrimaryCallerName);
+					});
+		}
+
+		void changeClient() {
+			changeContact(
+					"Client change is unavailable.",
+					"Change Client",
+					"Select the primary client",
+					"case-client-list-",
+					() -> (editMode && draftPrimaryClientContactId != null)
+							? draftPrimaryClientContactId
+							: (currentOverview == null ? null : currentOverview.getPrimaryClientContactId()),
+					picked -> {
+						draftPrimaryClientContactId = picked.id();
+						draftPrimaryClientName = picked.displayName();
+						renderClientMini(draftPrimaryClientContactId, draftPrimaryClientName);
+					});
+		}
+
+		void changePracticeArea() {
+			if (!requirePickerContext("Practice area change is unavailable."))
+				return;
+			Integer tenantId = appState.getShaleClientId();
+			if (!requireTenantSelected(tenantId))
+				return;
+
+			setBusy(true);
+			clearError();
+
+			new Thread(() ->
+			{
+				try {
+					List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(tenantId);
+					runOnFx(() -> handlePracticeAreaLoaded(areas));
+				} catch (Exception ex) {
+					runOnFx(() ->
+					{
+						showError("Failed to load practice areas. " + ex.getMessage());
+						setBusy(false);
+					});
+				}
+			}, "case-practicearea-list-" + caseId).start();
+		}
+
+		void changeOpposingCounsel() {
+			changeContact(
+					"Opposing counsel change is unavailable.",
+					"Change Opposing Counsel",
+					"Select the primary opposing counsel",
+					"case-oppcounsel-list-",
+					() -> (editMode && draftPrimaryOpposingCounselContactId != null)
+							? draftPrimaryOpposingCounselContactId
+							: (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId()),
+					picked -> {
+						draftPrimaryOpposingCounselContactId = picked.id();
+						draftPrimaryOpposingCounselName = picked.displayName();
+						renderOpposingCounselMini(draftPrimaryOpposingCounselContactId, draftPrimaryOpposingCounselName);
+					});
+		}
+
+		private boolean requirePickerContext(String unavailableMessage) {
+			if (caseDao == null || appState == null || caseId == null) {
+				showError(unavailableMessage);
+				return false;
+			}
+			return true;
+		}
+
+		private boolean requireTenantSelected(Integer tenantId) {
+			if (tenantId == null || tenantId <= 0) {
+				showError("No tenant is selected.");
+				return false;
+			}
+			return true;
+		}
+
+		private void handleResponsibleAttorneyLoaded(List<CaseDao.UserRow> users) {
+			setBusy(false);
+			if (users == null || users.isEmpty()) {
+				showError("No attorneys are configured for this tenant.");
+				return;
+			}
+
+			Map<String, CaseDao.UserRow> labelToRow = new LinkedHashMap<>();
+			Integer currentId = (editMode && draftResponsibleAttorneyUserId != null)
+					? draftResponsibleAttorneyUserId
+					: (currentOverview == null ? null : currentOverview.getResponsibleAttorneyUserId());
+			String preselect = null;
+			for (CaseDao.UserRow u : users) {
+				String label = u.displayName();
+				if (label == null || label.isBlank())
+					continue;
+				String key = label;
+				if (labelToRow.containsKey(key))
+					key = label + " (ID " + u.id() + ")";
+				labelToRow.put(key, u);
+				if (currentId != null && currentId.equals(u.id()))
+					preselect = key;
+			}
+			if (labelToRow.isEmpty()) {
+				showError("No attorneys are configured for this tenant.");
+				return;
+			}
+			if (preselect == null)
+				preselect = labelToRow.keySet().iterator().next();
+
+			Optional<String> chosen = showChoiceDialog(
+					"Change Responsible Attorney",
+					"Select the responsible attorney",
+					"Attorney:",
+					preselect,
+					labelToRow.keySet());
+			if (chosen.isEmpty())
+				return;
+			CaseDao.UserRow picked = labelToRow.get(chosen.get());
+			if (picked == null)
+				return;
+
+			draftResponsibleAttorneyUserId = picked.id();
+			renderResponsibleAttorneyMini(picked.id(), picked.displayName(), picked.color());
+		}
+
+		private void handleStatusLoaded(List<CaseDao.StatusRow> statuses) {
+			setBusy(false);
+			if (statuses == null || statuses.isEmpty()) {
+				showError("No statuses are configured for this tenant.");
+				return;
+			}
+
+			Map<String, CaseDao.StatusRow> labelToRow = new LinkedHashMap<>();
+			String preselect = null;
+			Integer currentId = (editMode && draftPrimaryStatusId != null)
+					? draftPrimaryStatusId
+					: (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
+			for (CaseDao.StatusRow s : statuses) {
+				String label = s.name() + (s.isClosed() ? " (Closed)" : "");
+				labelToRow.put(label, s);
+				if (currentId != null && currentId == s.id())
+					preselect = label;
+			}
+			if (preselect == null)
+				preselect = labelToRow.keySet().iterator().next();
+
+			Optional<String> chosen = showChoiceDialog(
+					"Change Status",
+					"Select the new primary status",
+					"Status:",
+					preselect,
+					labelToRow.keySet());
+			if (chosen.isEmpty())
+				return;
+			CaseDao.StatusRow picked = labelToRow.get(chosen.get());
+			if (picked == null)
+				return;
+
+			draftPrimaryStatusId = picked.id();
+			renderPrimaryStatusMini(picked.id(), picked.name(), picked.color());
+		}
+
+		private void handlePracticeAreaLoaded(List<CaseDao.PracticeAreaRow> areas) {
+			setBusy(false);
+			if (areas == null || areas.isEmpty()) {
+				showError("No practice areas are configured for this tenant.");
+				return;
+			}
+
+			Map<String, CaseDao.PracticeAreaRow> labelToRow = new LinkedHashMap<>();
+			String preselect = null;
+			Integer currentId = (editMode && draftPracticeAreaId != null)
+					? draftPracticeAreaId
+					: (currentOverview == null ? null : currentOverview.getPracticeAreaId());
+			for (CaseDao.PracticeAreaRow pa : areas) {
+				String label = (pa.name() == null || pa.name().isBlank()) ? ("PracticeArea #" + pa.id()) : pa.name();
+				labelToRow.put(label, pa);
+				if (currentId != null && currentId == pa.id())
+					preselect = label;
+			}
+			if (preselect == null)
+				preselect = labelToRow.keySet().iterator().next();
+
+			Optional<String> chosen = showChoiceDialog(
+					"Change Practice Area",
+					"Select the practice area",
+					"Practice area:",
+					preselect,
+					labelToRow.keySet());
+			if (chosen.isEmpty())
+				return;
+			CaseDao.PracticeAreaRow picked = labelToRow.get(chosen.get());
+			if (picked == null)
+				return;
+
+			draftPracticeAreaId = picked.id();
+			draftPracticeAreaName = picked.name();
+			draftPracticeAreaColor = picked.color();
+			renderPracticeAreaMini(picked.id(), picked.name(), picked.color());
+		}
+
+		private void changeContact(
+				String unavailableMessage,
+				String dialogTitle,
+				String dialogHeader,
+				String threadPrefix,
+				java.util.function.Supplier<Integer> currentIdSupplier,
+				java.util.function.Consumer<CaseDao.ContactRow> applySelection) {
+			if (!requirePickerContext(unavailableMessage))
+				return;
+			Integer tenantId = appState.getShaleClientId();
+			if (!requireTenantSelected(tenantId))
+				return;
+
+			setBusy(true);
+			clearError();
+
+			new Thread(() ->
+			{
+				try {
+					List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(tenantId);
+					runOnFx(() -> handleContactLoaded(contacts, dialogTitle, dialogHeader, currentIdSupplier, applySelection));
+				} catch (Exception ex) {
+					runOnFx(() ->
+					{
+						showError("Failed to load contacts. " + ex.getMessage());
+						setBusy(false);
+					});
+				}
+			}, threadPrefix + caseId).start();
+		}
+
+		private void handleContactLoaded(
+				List<CaseDao.ContactRow> contacts,
+				String dialogTitle,
+				String dialogHeader,
+				java.util.function.Supplier<Integer> currentIdSupplier,
+				java.util.function.Consumer<CaseDao.ContactRow> applySelection) {
+			setBusy(false);
+			if (contacts == null || contacts.isEmpty()) {
+				showError("No contacts are configured for this tenant.");
+				return;
+			}
+
+			List<CaseDao.ContactRow> cleaned = contacts.stream()
+					.filter(c -> c != null && c.displayName() != null && !c.displayName().isBlank())
+					.toList();
+			if (cleaned.isEmpty()) {
+				showError("No usable contacts found (all were blank).");
+				return;
+			}
+
+			CaseDao.ContactRow preselectRow = findContactById(cleaned, currentIdSupplier.get());
+			Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
+					dialogTitle,
+					dialogHeader,
+					"Search...",
+					cleaned,
+					preselectRow);
+			if (chosen.isEmpty())
+				return;
+			applySelection.accept(chosen.get());
+		}
+
+		private CaseDao.ContactRow findContactById(List<CaseDao.ContactRow> contacts, Integer contactId) {
+			if (contactId == null)
+				return null;
+			for (CaseDao.ContactRow c : contacts) {
+				if (c.id() == contactId.intValue())
+					return c;
+			}
+			return null;
+		}
+
+		private Optional<String> showChoiceDialog(
+				String title,
+				String header,
+				String content,
+				String preselect,
+				java.util.Collection<String> options) {
+			ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, options);
+			dialog.setTitle(title);
+			dialog.setHeaderText(header);
+			dialog.setContentText(content);
+			return dialog.showAndWait();
+		}
+	}
+
+	private final class CaseOverviewLiveUpdateHandler {
+		void subscribe() {
+			if (runtimeBridge == null)
+				return;
+
+			runtimeBridge.subscribeCaseUpdated(this::handleEvent);
+		}
+
+		private void handleEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+			if (shouldIgnoreEvent(event))
+				return;
+
+			if (handleLegacyNameEvent(event))
+				return;
+
+			LivePatchData patch = parsePatch(event.rawPatchJson());
+
+			if (handleCaseUpdateAdded(patch))
+				return;
+
+			if (handleEditModeConflict())
+				return;
+
+			if (shouldReloadForStructuralPatch(patch)) {
+				handleStructuralReload(patch);
+				return;
+			}
+
+			if (handleInlineSimplePatch(patch))
+				return;
+
+			handleUnknownRemoteChange();
+		}
+
+		private boolean shouldIgnoreEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+			if (event == null || caseId == null)
+				return true;
+			if (event.caseId() != caseId.intValue())
+				return true;
+			return isOwnEcho(event);
+		}
+
+		private boolean isOwnEcho(UiRuntimeBridge.CaseUpdatedEvent event) {
+			String mine = runtimeBridge.getClientInstanceId();
+			return mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId());
+		}
+
+		private boolean handleLegacyNameEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+			if (event.newName() == null)
+				return false;
+			runOnFx(() ->
+			{
+				applyLiveCaseName(event.newName());
+				hideRemoteUpdateBanner();
+				refreshCurrentAfterRemoteUpdateAsync();
+			});
+			return true;
+		}
+
+		private LivePatchData parsePatch(String rawPatch) {
+			String patchedName = extractPatchString(rawPatch, "name");
+			String patchedNumber = extractPatchString(rawPatch, "caseNumber");
+			String patchedDescription = extractPatchString(rawPatch, "description");
+			boolean incidentDatePatched = hasPatchKey(rawPatch, "incidentDate");
+			boolean solDatePatched = hasPatchKey(rawPatch, "solDate");
+			String patchedIncident = extractPatchString(rawPatch, "incidentDate");
+			String patchedSol = extractPatchString(rawPatch, "solDate");
+			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
+			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
+			Integer patchedPrimaryClientContactId = extractPatchInt(rawPatch, "primaryClientContactId");
+			Integer patchedPracticeAreaId = extractPatchInt(rawPatch, "practiceAreaId");
+			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
+			Integer patchedPrimaryOpposingCounselContactId = extractPatchInt(rawPatch, "primaryOpposingCounselContactId");
+			Integer patchedTeamChanged = extractPatchInt(rawPatch, "teamChanged");
+			boolean teamChanged = patchedTeamChanged != null && patchedTeamChanged.intValue() == 1;
+			Integer patchedCaseUpdateAdded = extractPatchInt(rawPatch, "caseUpdateAdded");
+			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
+
+			return new LivePatchData(
+				rawPatch,
+				patchedName,
+				patchedNumber,
+				patchedDescription,
+				incidentDatePatched,
+				solDatePatched,
+				patchedIncident,
+				patchedSol,
+				patchedPrimaryStatusId,
+				patchedPrimaryCallerContactId,
+				patchedPrimaryClientContactId,
+				patchedPracticeAreaId,
+				patchedResponsibleAttorneyUserId,
+				patchedPrimaryOpposingCounselContactId,
+				teamChanged,
+				caseUpdateAdded
+			);
+		}
+
+		private boolean handleCaseUpdateAdded(LivePatchData patch) {
+			if (!patch.caseUpdateAdded())
+				return false;
+			runOnFx(() ->
+			{
+				loadCaseUpdatesAsync();
+				refreshLastUpdatedLabelAsync();
+			});
+			return true;
+		}
+
+		private boolean handleEditModeConflict() {
+			if (!editMode)
+				return false;
+			runOnFx(() ->
+			{
+				showRemoteUpdateBanner();
+			});
+			return true;
+		}
+
+		private boolean shouldReloadForStructuralPatch(LivePatchData patch) {
+			return patch.patchedPrimaryStatusId() != null
+					|| patch.patchedPrimaryCallerContactId() != null
+					|| patch.patchedPrimaryClientContactId() != null
+					|| patch.patchedPracticeAreaId() != null
+					|| patch.patchedResponsibleAttorneyUserId() != null
+					|| patch.patchedPrimaryOpposingCounselContactId() != null
+					|| patch.teamChanged();
+		}
+
+		private void handleStructuralReload(LivePatchData patch) {
+			runOnFx(() ->
+			{
+				reloadCurrentCaseForViewMode();
+				if (patch.teamChanged())
+					loadTeamSectionAsync();
+				hideRemoteUpdateBanner();
+			});
+		}
+
+		private boolean hasInlineSimplePatch(LivePatchData patch) {
+			return patch.patchedName() != null || patch.patchedNumber() != null || patch.patchedDescription() != null
+					|| patch.incidentDatePatched() || patch.solDatePatched();
+		}
+
+		private boolean handleInlineSimplePatch(LivePatchData patch) {
+			if (!hasInlineSimplePatch(patch))
+				return false;
+			runOnFx(() -> applyInlineSimplePatch(patch));
+			return true;
+		}
+
+		private void applyInlineSimplePatch(LivePatchData patch) {
+			if (patch.patchedName() != null)
+				applyLiveCaseName(patch.patchedName());
+			if (patch.patchedNumber() != null)
+				applyLiveCaseNumber(patch.patchedNumber());
+			if (patch.patchedDescription() != null)
+				applyLiveCaseDescription(patch.patchedDescription());
+
+			LocalDate nextIncidentDate = null;
+			LocalDate nextSolDate = null;
+			boolean incidentApplied = false;
+			boolean solApplied = false;
+
+			if (patch.incidentDatePatched()) {
+				if (patch.patchedIncident() != null) {
+					LocalDate parsed = parsePatchedDate(patch.patchedIncident());
+					if (parsed != null) {
+						nextIncidentDate = parsed;
+						incidentApplied = true;
+					}
+				} else if (isPatchExplicitNull(patch.rawPatch(), "incidentDate")) {
+					nextIncidentDate = null;
+					incidentApplied = true;
+				}
+			}
+
+			if (patch.solDatePatched()) {
+				if (patch.patchedSol() != null) {
+					LocalDate parsed = parsePatchedDate(patch.patchedSol());
+					if (parsed != null) {
+						nextSolDate = parsed;
+						solApplied = true;
+					}
+				} else if (isPatchExplicitNull(patch.rawPatch(), "solDate")) {
+					nextSolDate = null;
+					solApplied = true;
+				}
+			}
+
+			if (incidentApplied && ovIncidentDateValue != null)
+				ovIncidentDateValue.setText(formatDate(nextIncidentDate));
+			if (solApplied && ovSolDateValue != null)
+				ovSolDateValue.setText(formatDate(nextSolDate));
+
+			if (incidentApplied || solApplied) {
+				CaseOverviewDto base = currentOverview;
+				if (base != null) {
+					LocalDate mergedIncident = incidentApplied ? nextIncidentDate : base.getIncidentDate();
+					LocalDate mergedSol = solApplied ? nextSolDate : base.getSolDate();
+					currentOverview = copyOverviewWithDates(base, mergedIncident, mergedSol);
+				}
+			}
+
+			hideRemoteUpdateBanner();
+			refreshCurrentAfterRemoteUpdateAsync();
+		}
+
+		private void handleUnknownRemoteChange() {
+			runOnFx(() ->
+			{
+				showRemoteUpdateBanner();
+			});
+		}
+	}
+
+	private record LivePatchData(
+			String rawPatch,
+			String patchedName,
+			String patchedNumber,
+			String patchedDescription,
+			boolean incidentDatePatched,
+			boolean solDatePatched,
+			String patchedIncident,
+			String patchedSol,
+			Integer patchedPrimaryStatusId,
+			Integer patchedPrimaryCallerContactId,
+			Integer patchedPrimaryClientContactId,
+			Integer patchedPracticeAreaId,
+			Integer patchedResponsibleAttorneyUserId,
+			Integer patchedPrimaryOpposingCounselContactId,
+			boolean teamChanged,
+			boolean caseUpdateAdded) {
 	}
 
 	private final class CaseTeamCoordinator {
