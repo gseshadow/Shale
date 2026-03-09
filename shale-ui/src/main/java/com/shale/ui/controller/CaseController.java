@@ -1517,72 +1517,6 @@ public class CaseController {
 		publishCaseFieldUpdated(caseId, "caseUpdateAdded", 1);
 	}
 
-	private static java.util.Set<String> normalizeTeamRoleRows(List<CaseDao.CaseUserRoleRow> rows) {
-		java.util.Set<String> out = new java.util.HashSet<>();
-		if (rows == null)
-			return out;
-		for (CaseDao.CaseUserRoleRow r : rows) {
-			if (r == null)
-				continue;
-			out.add(r.userId() + ":" + r.roleId());
-		}
-		return out;
-	}
-
-	private static java.util.Set<String> normalizeTeamAssignments(List<CaseDao.TeamAssignmentRow> rows) {
-		java.util.Set<String> out = new java.util.HashSet<>();
-		if (rows == null)
-			return out;
-		for (CaseDao.TeamAssignmentRow r : rows) {
-			if (r == null)
-				continue;
-			out.add(r.userId() + ":" + r.roleId());
-		}
-		return out;
-	}
-
-	private static String buildOverviewChangeLine(String label, String oldValue, String newValue) {
-		String oldSafe = normalizeUpdateValue(oldValue);
-		String newSafe = normalizeUpdateValue(newValue);
-		if (oldSafe.equals(newSafe))
-			return "";
-		return label + " changed: from " + oldSafe + " to " + newSafe;
-	}
-
-	private static String normalizeUpdateValue(String value) {
-		String trimmed = safeText(value).trim().replaceAll("\\s+", " ");
-		return trimmed.isBlank() ? "none" : trimmed;
-	}
-
-	private static String buildImportantOverviewChangesNote(CaseOverviewDto before, CaseOverviewDto after, boolean teamChanged) {
-		if (before == null || after == null)
-			return "";
-
-		java.util.List<String> lines = new java.util.ArrayList<>();
-		addIfPresent(lines, buildOverviewChangeLine("Responsible attorney", before.getResponsibleAttorney(), after.getResponsibleAttorney()));
-		addIfPresent(lines, buildOverviewChangeLine("Practice area", before.getPracticeArea(), after.getPracticeArea()));
-		addIfPresent(lines, buildOverviewChangeLine("Status", before.getCaseStatus(), after.getCaseStatus()));
-		addIfPresent(lines, buildOverviewChangeLine("Caller", before.getCaller(), after.getCaller()));
-		addIfPresent(lines, buildOverviewChangeLine("Client", before.getClient(), after.getClient()));
-		addIfPresent(lines, buildOverviewChangeLine("Opposing counsel", before.getOpposingCounsel(), after.getOpposingCounsel()));
-		if (teamChanged) {
-			String oldTeam = String.join(", ", before.getTeam());
-			String newTeam = String.join(", ", after.getTeam());
-			if (normalizeUpdateValue(oldTeam).equals(normalizeUpdateValue(newTeam)))
-				newTeam = safeText(newTeam).trim() + " roles updated";
-			addIfPresent(lines, buildOverviewChangeLine("Team", oldTeam, newTeam));
-		}
-		return String.join("\n", lines);
-	}
-
-	private static void addIfPresent(List<String> out, String line) {
-		if (out == null)
-			return;
-		String text = safeText(line).trim();
-		if (!text.isBlank())
-			out.add(text);
-	}
-
 	// ----------------------------
 	// Live updates
 	// ----------------------------
@@ -2892,6 +2826,73 @@ public class CaseController {
 
 			if (!importantChangesNote.isBlank())
 				publishCaseUpdateAdded(request.saveCaseId());
+		}
+
+
+		private static java.util.Set<String> normalizeTeamRoleRows(List<CaseDao.CaseUserRoleRow> rows) {
+			java.util.Set<String> out = new java.util.HashSet<>();
+			if (rows == null)
+				return out;
+			for (CaseDao.CaseUserRoleRow r : rows) {
+				if (r == null)
+					continue;
+				out.add(r.userId() + ":" + r.roleId());
+			}
+			return out;
+		}
+
+		private static java.util.Set<String> normalizeTeamAssignments(List<CaseDao.TeamAssignmentRow> rows) {
+			java.util.Set<String> out = new java.util.HashSet<>();
+			if (rows == null)
+				return out;
+			for (CaseDao.TeamAssignmentRow r : rows) {
+				if (r == null)
+					continue;
+				out.add(r.userId() + ":" + r.roleId());
+			}
+			return out;
+		}
+
+		private static String buildOverviewChangeLine(String label, String oldValue, String newValue) {
+			String oldSafe = normalizeUpdateValue(oldValue);
+			String newSafe = normalizeUpdateValue(newValue);
+			if (oldSafe.equals(newSafe))
+				return "";
+			return label + " changed: from " + oldSafe + " to " + newSafe;
+		}
+
+		private static String normalizeUpdateValue(String value) {
+			String trimmed = safeText(value).trim().replaceAll("\\s+", " ");
+			return trimmed.isBlank() ? "none" : trimmed;
+		}
+
+		private static String buildImportantOverviewChangesNote(CaseOverviewDto before, CaseOverviewDto after, boolean teamChanged) {
+			if (before == null || after == null)
+				return "";
+
+			java.util.List<String> lines = new java.util.ArrayList<>();
+			addIfPresent(lines, buildOverviewChangeLine("Responsible attorney", before.getResponsibleAttorney(), after.getResponsibleAttorney()));
+			addIfPresent(lines, buildOverviewChangeLine("Practice area", before.getPracticeArea(), after.getPracticeArea()));
+			addIfPresent(lines, buildOverviewChangeLine("Status", before.getCaseStatus(), after.getCaseStatus()));
+			addIfPresent(lines, buildOverviewChangeLine("Caller", before.getCaller(), after.getCaller()));
+			addIfPresent(lines, buildOverviewChangeLine("Client", before.getClient(), after.getClient()));
+			addIfPresent(lines, buildOverviewChangeLine("Opposing counsel", before.getOpposingCounsel(), after.getOpposingCounsel()));
+			if (teamChanged) {
+				String oldTeam = String.join(", ", before.getTeam());
+				String newTeam = String.join(", ", after.getTeam());
+				if (normalizeUpdateValue(oldTeam).equals(normalizeUpdateValue(newTeam)))
+					newTeam = safeText(newTeam).trim() + " roles updated";
+				addIfPresent(lines, buildOverviewChangeLine("Team", oldTeam, newTeam));
+			}
+			return String.join("\n", lines);
+		}
+
+		private static void addIfPresent(List<String> out, String line) {
+			if (out == null)
+				return;
+			String text = safeText(line).trim();
+			if (!text.isBlank())
+				out.add(text);
 		}
 
 		private void handleConcurrentUpdate() {
