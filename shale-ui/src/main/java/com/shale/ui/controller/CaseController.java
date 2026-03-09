@@ -1522,161 +1522,9 @@ public class CaseController {
 	// ----------------------------
 
 	private void subscribeLiveCaseUpdates() {
-		liveUpdateHandler.subscribeLiveCaseUpdates();
+		liveUpdateHandler.subscribe();
 	}
 
-	private void subscribeLiveCaseUpdatesInternal() {
-		if (runtimeBridge == null)
-			return;
-
-		runtimeBridge.subscribeCaseUpdated(event ->
-		{
-			if (caseId == null || event == null || event.caseId() != caseId.intValue())
-				return;
-
-			String mine = runtimeBridge.getClientInstanceId();
-			if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId()))
-				return;
-
-			if (event.newName() != null) {
-				runOnFx(() ->
-				{
-					applyLiveCaseName(event.newName());
-					hideRemoteUpdateBanner();
-					refreshCurrentAfterRemoteUpdateAsync();
-				});
-				return;
-			}
-
-			String rawPatch = event.rawPatchJson();
-			String patchedName = extractPatchString(rawPatch, "name");
-			String patchedNumber = extractPatchString(rawPatch, "caseNumber");
-			String patchedDescription = extractPatchString(rawPatch, "description");
-			boolean incidentDatePatched = hasPatchKey(rawPatch, "incidentDate");
-			boolean solDatePatched = hasPatchKey(rawPatch, "solDate");
-			String patchedIncident = extractPatchString(rawPatch, "incidentDate");
-			String patchedSol = extractPatchString(rawPatch, "solDate");
-			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
-			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
-			Integer patchedPrimaryClientContactId = extractPatchInt(rawPatch, "primaryClientContactId");
-			Integer patchedPracticeAreaId = extractPatchInt(rawPatch, "practiceAreaId");
-			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
-			Integer patchedPrimaryOpposingCounselContactId = extractPatchInt(rawPatch, "primaryOpposingCounselContactId");
-
-			// ✅ team marker (we publish 1)
-			Integer patchedTeamChanged = extractPatchInt(rawPatch, "teamChanged");
-			boolean teamChanged = patchedTeamChanged != null && patchedTeamChanged.intValue() == 1;
-			Integer patchedCaseUpdateAdded = extractPatchInt(rawPatch, "caseUpdateAdded");
-			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
-
-			if (caseUpdateAdded) {
-				runOnFx(() ->
-				{
-					loadCaseUpdatesAsync();
-					refreshLastUpdatedLabelAsync();
-				});
-				return;
-			}
-
-			if (editMode) {
-				runOnFx(() ->
-				{
-					showRemoteUpdateBanner();
-				});
-				return;
-			}
-
-			// Any structural change -> reload
-			if (patchedPrimaryStatusId != null
-					|| patchedPrimaryCallerContactId != null
-					|| patchedPrimaryClientContactId != null
-					|| patchedPracticeAreaId != null
-					|| patchedResponsibleAttorneyUserId != null
-					|| patchedPrimaryOpposingCounselContactId != null
-					|| teamChanged) {
-				runOnFx(() ->
-				{
-					// keep your existing behavior
-					reloadCurrentCaseForViewMode();
-
-					// ✅ ensure team refresh happens even if overview reload is slow/partial
-					if (teamChanged) {
-						loadTeamSectionAsync();
-					}
-
-					hideRemoteUpdateBanner();
-				});
-				return;
-			}
-
-			// Simple text/date patch -> apply inline
-			if (patchedName != null || patchedNumber != null || patchedDescription != null
-					|| incidentDatePatched || solDatePatched) {
-				runOnFx(() ->
-				{
-					if (patchedName != null)
-						applyLiveCaseName(patchedName);
-					if (patchedNumber != null)
-						applyLiveCaseNumber(patchedNumber);
-					if (patchedDescription != null)
-						applyLiveCaseDescription(patchedDescription);
-					LocalDate nextIncidentDate = null;
-					LocalDate nextSolDate = null;
-					boolean incidentApplied = false;
-					boolean solApplied = false;
-
-					if (incidentDatePatched) {
-						if (patchedIncident != null) {
-							LocalDate parsed = parsePatchedDate(patchedIncident);
-							if (parsed != null) {
-								nextIncidentDate = parsed;
-								incidentApplied = true;
-							}
-						} else if (isPatchExplicitNull(rawPatch, "incidentDate")) {
-							nextIncidentDate = null;
-							incidentApplied = true;
-						}
-					}
-
-					if (solDatePatched) {
-						if (patchedSol != null) {
-							LocalDate parsed = parsePatchedDate(patchedSol);
-							if (parsed != null) {
-								nextSolDate = parsed;
-								solApplied = true;
-							}
-						} else if (isPatchExplicitNull(rawPatch, "solDate")) {
-							nextSolDate = null;
-							solApplied = true;
-						}
-					}
-
-					if (incidentApplied && ovIncidentDateValue != null)
-						ovIncidentDateValue.setText(formatDate(nextIncidentDate));
-					if (solApplied && ovSolDateValue != null)
-						ovSolDateValue.setText(formatDate(nextSolDate));
-
-					if (incidentApplied || solApplied) {
-						CaseOverviewDto base = currentOverview;
-						if (base != null) {
-							LocalDate mergedIncident = incidentApplied ? nextIncidentDate : base.getIncidentDate();
-							LocalDate mergedSol = solApplied ? nextSolDate : base.getSolDate();
-							currentOverview = copyOverviewWithDates(base, mergedIncident, mergedSol);
-						}
-					}
-
-					hideRemoteUpdateBanner();
-					refreshCurrentAfterRemoteUpdateAsync();
-				});
-				return;
-			}
-
-			runOnFx(() ->
-			{
-				showRemoteUpdateBanner();
-			});
-		});
-	}
 
 	private void refreshCurrentAfterRemoteUpdateAsync() {
 		if (caseDao == null || caseId == null)
@@ -2951,9 +2799,238 @@ public class CaseController {
 	}
 
 	private final class CaseOverviewLiveUpdateHandler {
-		void subscribeLiveCaseUpdates() {
-			subscribeLiveCaseUpdatesInternal();
+		void subscribe() {
+			if (runtimeBridge == null)
+				return;
+
+			runtimeBridge.subscribeCaseUpdated(this::handleEvent);
 		}
+
+		private void handleEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+			if (shouldIgnoreEvent(event))
+				return;
+
+			if (handleLegacyNameEvent(event))
+				return;
+
+			LivePatchData patch = parsePatch(event.rawPatchJson());
+
+			if (handleCaseUpdateAdded(patch))
+				return;
+
+			if (handleEditModeConflict())
+				return;
+
+			if (shouldReloadForStructuralPatch(patch)) {
+				handleStructuralReload(patch);
+				return;
+			}
+
+			if (handleInlineSimplePatch(patch))
+				return;
+
+			handleUnknownRemoteChange();
+		}
+
+		private boolean shouldIgnoreEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+			if (event == null || caseId == null)
+				return true;
+			if (event.caseId() != caseId.intValue())
+				return true;
+			return isOwnEcho(event);
+		}
+
+		private boolean isOwnEcho(UiRuntimeBridge.CaseUpdatedEvent event) {
+			String mine = runtimeBridge.getClientInstanceId();
+			return mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId());
+		}
+
+		private boolean handleLegacyNameEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+			if (event.newName() == null)
+				return false;
+			runOnFx(() ->
+			{
+				applyLiveCaseName(event.newName());
+				hideRemoteUpdateBanner();
+				refreshCurrentAfterRemoteUpdateAsync();
+			});
+			return true;
+		}
+
+		private LivePatchData parsePatch(String rawPatch) {
+			String patchedName = extractPatchString(rawPatch, "name");
+			String patchedNumber = extractPatchString(rawPatch, "caseNumber");
+			String patchedDescription = extractPatchString(rawPatch, "description");
+			boolean incidentDatePatched = hasPatchKey(rawPatch, "incidentDate");
+			boolean solDatePatched = hasPatchKey(rawPatch, "solDate");
+			String patchedIncident = extractPatchString(rawPatch, "incidentDate");
+			String patchedSol = extractPatchString(rawPatch, "solDate");
+			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
+			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
+			Integer patchedPrimaryClientContactId = extractPatchInt(rawPatch, "primaryClientContactId");
+			Integer patchedPracticeAreaId = extractPatchInt(rawPatch, "practiceAreaId");
+			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
+			Integer patchedPrimaryOpposingCounselContactId = extractPatchInt(rawPatch, "primaryOpposingCounselContactId");
+			Integer patchedTeamChanged = extractPatchInt(rawPatch, "teamChanged");
+			boolean teamChanged = patchedTeamChanged != null && patchedTeamChanged.intValue() == 1;
+			Integer patchedCaseUpdateAdded = extractPatchInt(rawPatch, "caseUpdateAdded");
+			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
+
+			return new LivePatchData(
+				rawPatch,
+				patchedName,
+				patchedNumber,
+				patchedDescription,
+				incidentDatePatched,
+				solDatePatched,
+				patchedIncident,
+				patchedSol,
+				patchedPrimaryStatusId,
+				patchedPrimaryCallerContactId,
+				patchedPrimaryClientContactId,
+				patchedPracticeAreaId,
+				patchedResponsibleAttorneyUserId,
+				patchedPrimaryOpposingCounselContactId,
+				teamChanged,
+				caseUpdateAdded
+			);
+		}
+
+		private boolean handleCaseUpdateAdded(LivePatchData patch) {
+			if (!patch.caseUpdateAdded())
+				return false;
+			runOnFx(() ->
+			{
+				loadCaseUpdatesAsync();
+				refreshLastUpdatedLabelAsync();
+			});
+			return true;
+		}
+
+		private boolean handleEditModeConflict() {
+			if (!editMode)
+				return false;
+			runOnFx(() ->
+			{
+				showRemoteUpdateBanner();
+			});
+			return true;
+		}
+
+		private boolean shouldReloadForStructuralPatch(LivePatchData patch) {
+			return patch.patchedPrimaryStatusId() != null
+					|| patch.patchedPrimaryCallerContactId() != null
+					|| patch.patchedPrimaryClientContactId() != null
+					|| patch.patchedPracticeAreaId() != null
+					|| patch.patchedResponsibleAttorneyUserId() != null
+					|| patch.patchedPrimaryOpposingCounselContactId() != null
+					|| patch.teamChanged();
+		}
+
+		private void handleStructuralReload(LivePatchData patch) {
+			runOnFx(() ->
+			{
+				reloadCurrentCaseForViewMode();
+				if (patch.teamChanged())
+					loadTeamSectionAsync();
+				hideRemoteUpdateBanner();
+			});
+		}
+
+		private boolean hasInlineSimplePatch(LivePatchData patch) {
+			return patch.patchedName() != null || patch.patchedNumber() != null || patch.patchedDescription() != null
+					|| patch.incidentDatePatched() || patch.solDatePatched();
+		}
+
+		private boolean handleInlineSimplePatch(LivePatchData patch) {
+			if (!hasInlineSimplePatch(patch))
+				return false;
+			runOnFx(() -> applyInlineSimplePatch(patch));
+			return true;
+		}
+
+		private void applyInlineSimplePatch(LivePatchData patch) {
+			if (patch.patchedName() != null)
+				applyLiveCaseName(patch.patchedName());
+			if (patch.patchedNumber() != null)
+				applyLiveCaseNumber(patch.patchedNumber());
+			if (patch.patchedDescription() != null)
+				applyLiveCaseDescription(patch.patchedDescription());
+
+			LocalDate nextIncidentDate = null;
+			LocalDate nextSolDate = null;
+			boolean incidentApplied = false;
+			boolean solApplied = false;
+
+			if (patch.incidentDatePatched()) {
+				if (patch.patchedIncident() != null) {
+					LocalDate parsed = parsePatchedDate(patch.patchedIncident());
+					if (parsed != null) {
+						nextIncidentDate = parsed;
+						incidentApplied = true;
+					}
+				} else if (isPatchExplicitNull(patch.rawPatch(), "incidentDate")) {
+					nextIncidentDate = null;
+					incidentApplied = true;
+				}
+			}
+
+			if (patch.solDatePatched()) {
+				if (patch.patchedSol() != null) {
+					LocalDate parsed = parsePatchedDate(patch.patchedSol());
+					if (parsed != null) {
+						nextSolDate = parsed;
+						solApplied = true;
+					}
+				} else if (isPatchExplicitNull(patch.rawPatch(), "solDate")) {
+					nextSolDate = null;
+					solApplied = true;
+				}
+			}
+
+			if (incidentApplied && ovIncidentDateValue != null)
+				ovIncidentDateValue.setText(formatDate(nextIncidentDate));
+			if (solApplied && ovSolDateValue != null)
+				ovSolDateValue.setText(formatDate(nextSolDate));
+
+			if (incidentApplied || solApplied) {
+				CaseOverviewDto base = currentOverview;
+				if (base != null) {
+					LocalDate mergedIncident = incidentApplied ? nextIncidentDate : base.getIncidentDate();
+					LocalDate mergedSol = solApplied ? nextSolDate : base.getSolDate();
+					currentOverview = copyOverviewWithDates(base, mergedIncident, mergedSol);
+				}
+			}
+
+			hideRemoteUpdateBanner();
+			refreshCurrentAfterRemoteUpdateAsync();
+		}
+
+		private void handleUnknownRemoteChange() {
+			runOnFx(() ->
+			{
+				showRemoteUpdateBanner();
+			});
+		}
+	}
+
+	private record LivePatchData(
+			String rawPatch,
+			String patchedName,
+			String patchedNumber,
+			String patchedDescription,
+			boolean incidentDatePatched,
+			boolean solDatePatched,
+			String patchedIncident,
+			String patchedSol,
+			Integer patchedPrimaryStatusId,
+			Integer patchedPrimaryCallerContactId,
+			Integer patchedPrimaryClientContactId,
+			Integer patchedPracticeAreaId,
+			Integer patchedResponsibleAttorneyUserId,
+			Integer patchedPrimaryOpposingCounselContactId,
+			boolean teamChanged,
+			boolean caseUpdateAdded) {
 	}
 
 	private final class CaseTeamCoordinator {
