@@ -63,8 +63,6 @@ public class CaseController {
 	@FXML
 	private Label lastUpdatedLabel;
 	@FXML
-	private Button addEntryButton;
-	@FXML
 	private Button addTaskButton;
 	@FXML
 	private Button backToCasesButton;
@@ -323,7 +321,6 @@ public class CaseController {
 		this.practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea);
 	}
 
-
 	// ----------------------------
 	// Initialization
 	// ----------------------------
@@ -356,7 +353,8 @@ public class CaseController {
 		if (submitCaseUpdateButton != null)
 			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
 		if (caseUpdatesComposerArea != null) {
-			caseUpdatesComposerArea.setOnKeyPressed(e -> {
+			caseUpdatesComposerArea.setOnKeyPressed(e ->
+			{
 				if (e.isControlDown() && e.getCode() == javafx.scene.input.KeyCode.ENTER) {
 					onSubmitCaseUpdate();
 					e.consume();
@@ -364,7 +362,6 @@ public class CaseController {
 			});
 		}
 	}
-
 
 	private void wireEditButtons() {
 		if (editButton != null)
@@ -465,7 +462,6 @@ public class CaseController {
 		renderCaseUpdates(List.of());
 	}
 
-
 	// ----------------------------
 	// Section navigation
 	// ----------------------------
@@ -483,7 +479,8 @@ public class CaseController {
 	}
 
 	private void setActiveSectionButton(String activeSection) {
-		sectionButtons.forEach((section, button) -> {
+		sectionButtons.forEach((section, button) ->
+		{
 			if (Objects.equals(section, activeSection)) {
 				button.setStyle("-fx-padding: 8 10 8 10; -fx-background-radius: 8; -fx-background-color: rgba(0,0,0,0.12); -fx-font-weight: bold;");
 			} else {
@@ -532,7 +529,6 @@ public class CaseController {
 			placeholderTextArea.setText(sectionName + " view is not implemented yet.");
 		}
 	}
-
 
 	// ----------------------------
 	// Overview loading
@@ -584,13 +580,15 @@ public class CaseController {
 			return;
 		final long activeCaseId = caseId.longValue();
 
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				CaseDetailDto detail = caseDao.getDetail(activeCaseId);
 				if (detail == null)
 					return;
 				LocalDateTime updatedAt = detail.getUpdatedAt();
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId == null || caseId.longValue() != activeCaseId)
 						return;
 					applyLastUpdatedLabel(updatedAt);
@@ -604,7 +602,6 @@ public class CaseController {
 		if (lastUpdatedLabel != null)
 			lastUpdatedLabel.setText("Last updated: " + formatDateTime(updatedAt));
 	}
-
 
 	// ----------------------------
 	// Overview rendering
@@ -799,7 +796,6 @@ public class CaseController {
 			ovSolDateValue.setText(formatDate(dto.getSolDate()));
 	}
 
-
 	// ----------------------------
 	// Edit lifecycle
 	// ----------------------------
@@ -968,7 +964,6 @@ public class CaseController {
 				changeOpposingCounselButton.setDisable(busy);
 		});
 	}
-
 
 	// ----------------------------
 	// Change actions
@@ -1455,7 +1450,6 @@ public class CaseController {
 		}, "case-oppcounsel-list-" + caseId).start();
 	}
 
-
 	// ----------------------------
 	// Save pipeline
 	// ----------------------------
@@ -1645,10 +1639,10 @@ public class CaseController {
 						publishCaseFieldUpdated(saveCaseId, "description", newDesc2);
 					if (incidentChanged)
 						publishCaseFieldUpdated(saveCaseId, "incidentDate",
-							desiredIncidentDate == null ? null : desiredIncidentDate.toString());
+								desiredIncidentDate == null ? null : desiredIncidentDate.toString());
 					if (solChanged)
 						publishCaseFieldUpdated(saveCaseId, "solDate",
-							desiredSolDate == null ? null : desiredSolDate.toString());
+								desiredSolDate == null ? null : desiredSolDate.toString());
 
 					if (statusChanged)
 						publishCaseFieldUpdated(saveCaseId, "primaryStatusId", desiredStatusId);
@@ -1773,9 +1767,6 @@ public class CaseController {
 			out.add(text);
 	}
 
-
-
-
 	// ----------------------------
 	// Live updates
 	// ----------------------------
@@ -1825,7 +1816,8 @@ public class CaseController {
 			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
 
 			if (caseUpdateAdded) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					loadCaseUpdatesAsync();
 					refreshLastUpdatedLabelAsync();
 				});
@@ -1992,11 +1984,9 @@ public class CaseController {
 			ovDescriptionValue.setText(safeText(newDescription));
 	}
 
-
 	// ----------------------------
 	// Team section
 	// ----------------------------
-
 
 	private void loadTeamSectionAsync() {
 		// ✅ If editing and we have a draft, show it (don’t overwrite with DB)
@@ -2208,7 +2198,6 @@ public class CaseController {
 		renderTeamCardsFromTeamRows(rows);
 	}
 
-
 	// ----------------------------
 	// Case updates
 	// ----------------------------
@@ -2218,10 +2207,12 @@ public class CaseController {
 			return;
 		final long activeCaseId = caseId.longValue();
 
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId == null || caseId.longValue() != activeCaseId)
 						return;
 					renderCaseUpdates(updates);
@@ -2289,13 +2280,15 @@ public class CaseController {
 		caseUpdatesComposerArea.setDisable(true);
 		clearError();
 
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseDao.addCaseUpdate(activeCaseId, activeClientId, trimmedText, createdByUserId);
 				runOnFx(() -> applyLastUpdatedLabel(LocalDateTime.now()));
 				publishCaseUpdateAdded(activeCaseId);
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId == null || caseId.longValue() != activeCaseId)
 						return;
 					if (caseUpdatesComposerArea != null) {
@@ -2308,7 +2301,8 @@ public class CaseController {
 						submitCaseUpdateButton.setDisable(false);
 				});
 			} catch (Exception ex) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					showError("Failed to save case update. " + ex.getMessage());
 					if (caseUpdatesComposerArea != null)
 						caseUpdatesComposerArea.setDisable(false);
@@ -2351,7 +2345,6 @@ public class CaseController {
 			return "User #" + dto.getCreatedByUserId();
 		return "Unknown";
 	}
-
 
 	// ----------------------------
 	// Card rendering
@@ -2472,7 +2465,6 @@ public class CaseController {
 		ovOpposingCounselHost.getChildren().setAll(contactCardFactory.createMini(contactId, safe(name)));
 	}
 
-
 	// ----------------------------
 	// Utilities
 	// ----------------------------
@@ -2543,7 +2535,6 @@ public class CaseController {
 	private String formatDateTime(LocalDateTime value) {
 		return value == null ? "—" : value.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
 	}
-
 
 	private static boolean hasPatchKey(String rawPatchJson, String key) {
 		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank())
@@ -2663,7 +2654,6 @@ public class CaseController {
 			return null;
 		}
 	}
-
 
 	private static Optional<CaseDao.ContactRow> showSearchPickerDialog(
 			String title,
