@@ -614,6 +614,128 @@ public final class CaseDao {
 		}
 	}
 
+	public com.shale.core.dto.CaseDetailDto updateCaseDetails(
+			long caseId,
+			String name,
+			String caseNumber,
+			Integer practiceAreaId,
+			String description,
+			LocalDate callerDate,
+			String callerTime,
+			LocalDate acceptedDate,
+			LocalDate closedDate,
+			LocalDate deniedDate,
+			LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			LocalDate discoveryDeadline,
+			String clientEstate,
+			String officePrinterCode,
+			Boolean medicalRecordsReceived,
+			Boolean feeAgreementSigned,
+			LocalDate dateFeeAgreementSigned,
+			Boolean acceptedChronology,
+			Boolean acceptedConsultantExpertSearch,
+			Boolean acceptedTestifyingExpertSearch,
+			Boolean acceptedMedicalLiterature,
+			String acceptedDetail,
+			Boolean deniedChronology,
+			String deniedDetail,
+			String summary,
+			String receivedUpdates,
+			byte[] expectedRowVer) {
+		if (expectedRowVer == null || expectedRowVer.length == 0)
+			throw new IllegalArgumentException("expectedRowVer is required");
+
+		String sql = """
+				UPDATE %s
+				SET Name = ?,
+				    CaseNumber = ?,
+				    PracticeAreaId = ?,
+				    Description = ?,
+				    CallerDate = ?,
+				    CallerTime = ?,
+				    AcceptedDate = ?,
+				    ClosedDate = ?,
+				    DeniedDate = ?,
+				    DateOfMedicalNegligence = ?,
+				    DateMedicalNegligenceWasDiscovered = ?,
+				    DateOfInjury = ?,
+				    StatuteOfLimitations = ?,
+				    TortNoticeDeadline = ?,
+				    DiscoveryDeadline = ?,
+				    ClientEstate = ?,
+				    OfficePrinterCode = ?,
+				    MedicalRecordsReceived = ?,
+				    FeeAgreementSigned = ?,
+				    DateFeeAgreementSigned = ?,
+				    AcceptedChronology = ?,
+				    AcceptedConsultantExpertSearch = ?,
+				    AcceptedTestifyingExpertSearch = ?,
+				    AcceptedMedicalLiterature = ?,
+				    AcceptedDetail = ?,
+				    DeniedChronology = ?,
+				    DeniedDetail = ?,
+				    Summary = ?,
+				    ReceivedUpdates = ?,
+				    UpdatedAt = SYSDATETIME()
+				WHERE Id = ?
+				  AND RowVer = ?
+				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
+				""".formatted(CASES_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setString(idx++, name);
+			ps.setString(idx++, caseNumber);
+			if (practiceAreaId == null)
+				ps.setNull(idx++, java.sql.Types.INTEGER);
+			else
+				ps.setInt(idx++, practiceAreaId);
+			ps.setString(idx++, description);
+			setNullableDate(ps, idx++, callerDate);
+			setNullableString(ps, idx++, callerTime);
+			setNullableDate(ps, idx++, acceptedDate);
+			setNullableDate(ps, idx++, closedDate);
+			setNullableDate(ps, idx++, deniedDate);
+			setNullableDate(ps, idx++, dateOfMedicalNegligence);
+			setNullableDate(ps, idx++, dateMedicalNegligenceWasDiscovered);
+			setNullableDate(ps, idx++, dateOfInjury);
+			setNullableDate(ps, idx++, statuteOfLimitations);
+			setNullableDate(ps, idx++, tortNoticeDeadline);
+			setNullableDate(ps, idx++, discoveryDeadline);
+			setNullableString(ps, idx++, clientEstate);
+			setNullableString(ps, idx++, officePrinterCode);
+			setNullableBoolean(ps, idx++, medicalRecordsReceived);
+			setNullableBoolean(ps, idx++, feeAgreementSigned);
+			setNullableDate(ps, idx++, dateFeeAgreementSigned);
+			setNullableBoolean(ps, idx++, acceptedChronology);
+			setNullableBoolean(ps, idx++, acceptedConsultantExpertSearch);
+			setNullableBoolean(ps, idx++, acceptedTestifyingExpertSearch);
+			setNullableBoolean(ps, idx++, acceptedMedicalLiterature);
+			setNullableString(ps, idx++, acceptedDetail);
+			setNullableBoolean(ps, idx++, deniedChronology);
+			setNullableString(ps, idx++, deniedDetail);
+			setNullableString(ps, idx++, summary);
+			setNullableString(ps, idx++, receivedUpdates);
+			ps.setLong(idx++, caseId);
+			ps.setBytes(idx, expectedRowVer);
+
+			int rows = ps.executeUpdate();
+			if (rows == 0)
+				return null;
+			if (rows == 1)
+				return selectCaseDetail(con, caseId);
+			throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update case details (caseId=" + caseId + ")", e);
+		}
+	}
+
+
 
 	public List<CaseUpdateDto> listCaseUpdates(long caseId) {
 		String sql = """
@@ -749,6 +871,28 @@ public final class CaseDao {
 
 	private static LocalDateTime toLocalDateTime(Timestamp ts) {
 		return ts == null ? null : ts.toLocalDateTime();
+	}
+
+	private static void setNullableDate(PreparedStatement ps, int idx, LocalDate value) throws SQLException {
+		if (value == null)
+			ps.setNull(idx, java.sql.Types.DATE);
+		else
+			ps.setDate(idx, java.sql.Date.valueOf(value));
+	}
+
+	private static void setNullableBoolean(PreparedStatement ps, int idx, Boolean value) throws SQLException {
+		if (value == null)
+			ps.setNull(idx, java.sql.Types.BIT);
+		else
+			ps.setBoolean(idx, value);
+	}
+
+	private static void setNullableString(PreparedStatement ps, int idx, String value) throws SQLException {
+		String trimmed = value == null ? null : value.trim();
+		if (trimmed == null || trimmed.isBlank())
+			ps.setNull(idx, java.sql.Types.NVARCHAR);
+		else
+			ps.setString(idx, trimmed);
 	}
 
 
