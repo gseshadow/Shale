@@ -2006,7 +2006,16 @@ public class CaseController {
 				boolean teamChanged = persistTeamChanges(request);
 
 				CaseOverviewDto updatedOverview = caseDao.getOverview(request.saveCaseId());
-				String importantChangesNote = buildImportantOverviewChangesNote(request.baseline().baseOverview(), updatedOverview, teamChanged);
+				String importantChangesNote = buildImportantOverviewChangesNote(
+						request.baseline().oldName(),
+						request.saveDraft().caseName(),
+						request.baseline().oldNumber(),
+						request.saveDraft().caseNumber(),
+						request.baseline().oldDescription(),
+						request.saveDraft().description(),
+						request.baseline().baseOverview(),
+						updatedOverview,
+						teamChanged);
 				persistImportantChangesNote(request, importantChangesNote);
 
 				runOnFx(() -> finalizeSuccessfulSave(request, updated, computation, teamChanged, importantChangesNote));
@@ -2224,11 +2233,25 @@ public class CaseController {
 			return trimmed.isBlank() ? "none" : trimmed;
 		}
 
-		private static String buildImportantOverviewChangesNote(CaseOverviewDto before, CaseOverviewDto after, boolean teamChanged) {
+		private static String buildImportantOverviewChangesNote(
+				String oldCaseName,
+				String newCaseName,
+				String oldCaseNumber,
+				String newCaseNumber,
+				String oldDescription,
+				String newDescription,
+				CaseOverviewDto before,
+				CaseOverviewDto after,
+				boolean teamChanged) {
 			if (before == null || after == null)
 				return "";
 
 			java.util.List<String> lines = new java.util.ArrayList<>();
+			addIfPresent(lines, buildOverviewChangeLine("Case name", oldCaseName, newCaseName));
+			addIfPresent(lines, buildOverviewChangeLine("Case number", oldCaseNumber, newCaseNumber));
+			if (!normalizeUpdateValue(oldDescription).equals(normalizeUpdateValue(newDescription)))
+				addIfPresent(lines, "Description changed");
+
 			addIfPresent(lines, buildOverviewChangeLine("Responsible attorney", before.getResponsibleAttorney(), after.getResponsibleAttorney()));
 			addIfPresent(lines, buildOverviewChangeLine("Practice area", before.getPracticeArea(), after.getPracticeArea()));
 			addIfPresent(lines, buildOverviewChangeLine("Status", before.getCaseStatus(), after.getCaseStatus()));
