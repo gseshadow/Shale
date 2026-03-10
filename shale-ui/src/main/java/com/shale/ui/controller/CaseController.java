@@ -3102,28 +3102,43 @@ public class CaseController {
 			CaseDetailsDraft d = new CaseDetailsDraft();
 			d.name = detail == null ? "" : safeText(detail.getCaseName());
 			d.caseNumber = detail == null ? "" : safeText(detail.getCaseNumber());
-			d.practiceAreaId = (overview == null || overview.getPracticeAreaId() == null)
-					? ""
-					: String.valueOf(overview.getPracticeAreaId());
-			d.description = detail == null ? "" : safeText(detail.getDescription());
-			d.callerDate = overview == null ? null : overview.getIntakeDate();
-			d.dateOfInjury = overview == null ? null : overview.getIncidentDate();
-			d.statuteOfLimitations = overview == null ? null : overview.getSolDate();
 
-			d.callerTime = "";
-			d.clientEstate = "";
-			d.officePrinterCode = "";
-			d.medicalRecordsReceived = false;
-			d.feeAgreementSigned = false;
-			d.acceptedChronology = false;
-			d.acceptedConsultantExpertSearch = false;
-			d.acceptedTestifyingExpertSearch = false;
-			d.acceptedMedicalLiterature = false;
-			d.acceptedDetail = "";
-			d.deniedChronology = false;
-			d.deniedDetail = "";
-			d.summary = "";
-			d.receivedUpdates = "";
+			Integer practiceAreaId = (detail == null ? null : detail.getPracticeAreaId());
+			if (practiceAreaId == null && overview != null)
+				practiceAreaId = overview.getPracticeAreaId();
+			d.practiceAreaId = practiceAreaId == null ? "" : String.valueOf(practiceAreaId);
+
+			d.description = detail == null ? "" : safeText(detail.getDescription());
+			d.callerDate = detail == null ? null : detail.getCallerDate();
+			d.callerTime = detail == null ? "" : safeText(detail.getCallerTime());
+			d.acceptedDate = detail == null ? null : detail.getAcceptedDate();
+			d.closedDate = detail == null ? null : detail.getClosedDate();
+			d.deniedDate = detail == null ? null : detail.getDeniedDate();
+
+			d.dateOfMedicalNegligence = detail == null ? null : detail.getDateOfMedicalNegligence();
+			d.dateMedicalNegligenceWasDiscovered = detail == null ? null : detail.getDateMedicalNegligenceWasDiscovered();
+			d.dateOfInjury = detail == null ? null : detail.getDateOfInjury();
+			d.statuteOfLimitations = detail == null ? null : detail.getStatuteOfLimitations();
+			d.tortNoticeDeadline = detail == null ? null : detail.getTortNoticeDeadline();
+			d.discoveryDeadline = detail == null ? null : detail.getDiscoveryDeadline();
+
+			d.clientEstate = detail == null ? "" : safeText(detail.getClientEstate());
+			d.officePrinterCode = detail == null ? "" : safeText(detail.getOfficePrinterCode());
+			d.medicalRecordsReceived = detail == null ? null : detail.getMedicalRecordsReceived();
+			d.feeAgreementSigned = detail == null ? null : detail.getFeeAgreementSigned();
+			d.dateFeeAgreementSigned = detail == null ? null : detail.getDateFeeAgreementSigned();
+
+			d.acceptedChronology = detail == null ? null : detail.getAcceptedChronology();
+			d.acceptedConsultantExpertSearch = detail == null ? null : detail.getAcceptedConsultantExpertSearch();
+			d.acceptedTestifyingExpertSearch = detail == null ? null : detail.getAcceptedTestifyingExpertSearch();
+			d.acceptedMedicalLiterature = detail == null ? null : detail.getAcceptedMedicalLiterature();
+			d.acceptedDetail = detail == null ? "" : safeText(detail.getAcceptedDetail());
+
+			d.deniedChronology = detail == null ? null : detail.getDeniedChronology();
+			d.deniedDetail = detail == null ? "" : safeText(detail.getDeniedDetail());
+
+			d.summary = detail == null ? "" : safeText(detail.getSummary());
+			d.receivedUpdates = detail == null ? "" : safeText(detail.getReceivedUpdates());
 			return d;
 		}
 

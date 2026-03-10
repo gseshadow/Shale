@@ -459,7 +459,33 @@ public final class CaseDao {
 				  c.Id,
 				  c.CaseNumber,
 				  c.Name,
+				  c.PracticeAreaId,
 				  c.Description,
+				  c.CallerDate,
+				  c.CallerTime,
+				  c.AcceptedDate,
+				  c.ClosedDate,
+				  c.DeniedDate,
+				  c.DateOfMedicalNegligence,
+				  c.DateMedicalNegligenceWasDiscovered,
+				  c.DateOfInjury,
+				  c.StatuteOfLimitations,
+				  c.TortNoticeDeadline,
+				  c.DiscoveryDeadline,
+				  c.ClientEstate,
+				  c.OfficePrinterCode,
+				  c.MedicalRecordsReceived,
+				  c.FeeAgreementSigned,
+				  c.DateFeeAgreementSigned,
+				  c.AcceptedChronology,
+				  c.AcceptedConsultantExpertSearch,
+				  c.AcceptedTestifyingExpertSearch,
+				  c.AcceptedMedicalLiterature,
+				  c.AcceptedDetail,
+				  c.DeniedChronology,
+				  c.DeniedDetail,
+				  c.Summary,
+				  c.ReceivedUpdates,
 				  c.UpdatedAt,
 				  c.RowVer,
 				  current_status.CurrentStatusName
@@ -497,6 +523,32 @@ public final class CaseDao {
 				rs.getString("Name"),
 				rs.getString("Description"),
 				rs.getString("CurrentStatusName"),
+				getNullableInt(rs, "PracticeAreaId"),
+				toLocalDate(rs.getDate("CallerDate")),
+				rs.getString("CallerTime"),
+				toLocalDate(rs.getDate("AcceptedDate")),
+				toLocalDate(rs.getDate("ClosedDate")),
+				toLocalDate(rs.getDate("DeniedDate")),
+				toLocalDate(rs.getDate("DateOfMedicalNegligence")),
+				toLocalDate(rs.getDate("DateMedicalNegligenceWasDiscovered")),
+				toLocalDate(rs.getDate("DateOfInjury")),
+				toLocalDate(rs.getDate("StatuteOfLimitations")),
+				toLocalDate(rs.getDate("TortNoticeDeadline")),
+				toLocalDate(rs.getDate("DiscoveryDeadline")),
+				rs.getString("ClientEstate"),
+				rs.getString("OfficePrinterCode"),
+				getNullableBoolean(rs, "MedicalRecordsReceived"),
+				getNullableBoolean(rs, "FeeAgreementSigned"),
+				toLocalDate(rs.getDate("DateFeeAgreementSigned")),
+				getNullableBoolean(rs, "AcceptedChronology"),
+				getNullableBoolean(rs, "AcceptedConsultantExpertSearch"),
+				getNullableBoolean(rs, "AcceptedTestifyingExpertSearch"),
+				getNullableBoolean(rs, "AcceptedMedicalLiterature"),
+				rs.getString("AcceptedDetail"),
+				getNullableBoolean(rs, "DeniedChronology"),
+				rs.getString("DeniedDetail"),
+				rs.getString("Summary"),
+				rs.getString("ReceivedUpdates"),
 				toLocalDateTime(rs.getTimestamp("UpdatedAt")),
 				rs.getBytes("RowVer")
 		);
@@ -716,6 +768,17 @@ public final class CaseDao {
 		if (o instanceof Number n)
 			return n.intValue();
 		return Integer.valueOf(o.toString());
+	}
+
+	private static Boolean getNullableBoolean(ResultSet rs, String col) throws SQLException {
+		Object o = rs.getObject(col);
+		if (o == null)
+			return null;
+		if (o instanceof Boolean b)
+			return b;
+		if (o instanceof Number n)
+			return n.intValue() != 0;
+		return Boolean.valueOf(o.toString());
 	}
 
 	private List<String> loadTeamMembers(Connection con, long caseId) throws SQLException {
