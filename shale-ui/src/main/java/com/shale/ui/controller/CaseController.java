@@ -32,6 +32,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -85,6 +86,10 @@ public class CaseController {
 	private VBox sectionButtonsBox;
 	@FXML
 	private VBox overviewPane;
+	@FXML
+	private ScrollPane detailsScrollPane;
+	@FXML
+	private VBox detailsPane;
 	@FXML
 	private VBox tasksTabPane;
 	@FXML
@@ -151,6 +156,13 @@ public class CaseController {
 	private Button cancelButton;
 
 	@FXML
+	private Button detailsEditButton;
+	@FXML
+	private Button detailsSaveButton;
+	@FXML
+	private Button detailsCancelButton;
+
+	@FXML
 	private Label errorLabel;
 	@FXML
 	private HBox remoteUpdateBanner;
@@ -201,6 +213,65 @@ public class CaseController {
 	private ScrollPane caseUpdatesScrollPane;
 	@FXML
 	private VBox caseUpdatesFeedBox;
+
+	@FXML private Label detNameValue;
+	@FXML private TextField detNameEditor;
+	@FXML private Label detCaseNumberValue;
+	@FXML private TextField detCaseNumberEditor;
+	@FXML private Label detPracticeAreaIdValue;
+	@FXML private TextField detPracticeAreaIdEditor;
+	@FXML private Label detDescriptionValue;
+	@FXML private TextArea detDescriptionEditor;
+	@FXML private Label detCallerDateValue;
+	@FXML private DatePicker detCallerDateEditor;
+	@FXML private Label detCallerTimeValue;
+	@FXML private TextField detCallerTimeEditor;
+	@FXML private Label detAcceptedDateValue;
+	@FXML private DatePicker detAcceptedDateEditor;
+	@FXML private Label detClosedDateValue;
+	@FXML private DatePicker detClosedDateEditor;
+	@FXML private Label detDeniedDateValue;
+	@FXML private DatePicker detDeniedDateEditor;
+	@FXML private Label detDateOfMedicalNegligenceValue;
+	@FXML private DatePicker detDateOfMedicalNegligenceEditor;
+	@FXML private Label detDateMedicalNegligenceWasDiscoveredValue;
+	@FXML private DatePicker detDateMedicalNegligenceWasDiscoveredEditor;
+	@FXML private Label detDateOfInjuryValue;
+	@FXML private DatePicker detDateOfInjuryEditor;
+	@FXML private Label detStatuteOfLimitationsValue;
+	@FXML private DatePicker detStatuteOfLimitationsEditor;
+	@FXML private Label detTortNoticeDeadlineValue;
+	@FXML private DatePicker detTortNoticeDeadlineEditor;
+	@FXML private Label detDiscoveryDeadlineValue;
+	@FXML private DatePicker detDiscoveryDeadlineEditor;
+	@FXML private Label detClientEstateValue;
+	@FXML private TextField detClientEstateEditor;
+	@FXML private Label detOfficePrinterCodeValue;
+	@FXML private TextField detOfficePrinterCodeEditor;
+	@FXML private Label detMedicalRecordsReceivedValue;
+	@FXML private CheckBox detMedicalRecordsReceivedEditor;
+	@FXML private Label detFeeAgreementSignedValue;
+	@FXML private CheckBox detFeeAgreementSignedEditor;
+	@FXML private Label detDateFeeAgreementSignedValue;
+	@FXML private DatePicker detDateFeeAgreementSignedEditor;
+	@FXML private Label detAcceptedChronologyValue;
+	@FXML private CheckBox detAcceptedChronologyEditor;
+	@FXML private Label detAcceptedConsultantExpertSearchValue;
+	@FXML private CheckBox detAcceptedConsultantExpertSearchEditor;
+	@FXML private Label detAcceptedTestifyingExpertSearchValue;
+	@FXML private CheckBox detAcceptedTestifyingExpertSearchEditor;
+	@FXML private Label detAcceptedMedicalLiteratureValue;
+	@FXML private CheckBox detAcceptedMedicalLiteratureEditor;
+	@FXML private Label detAcceptedDetailValue;
+	@FXML private TextArea detAcceptedDetailEditor;
+	@FXML private Label detDeniedChronologyValue;
+	@FXML private CheckBox detDeniedChronologyEditor;
+	@FXML private Label detDeniedDetailValue;
+	@FXML private TextArea detDeniedDetailEditor;
+	@FXML private Label detSummaryValue;
+	@FXML private TextArea detSummaryEditor;
+	@FXML private Label detReceivedUpdatesValue;
+	@FXML private TextArea detReceivedUpdatesEditor;
 
 	// ----------------------------
 	// Constants
@@ -264,6 +335,7 @@ public class CaseController {
 	private Integer caseId;
 	private boolean overviewLoaded = false;
 	private boolean editMode = false;
+	private boolean detailsEditMode = false;
 
 	private CaseDetailDto current;
 	private CaseOverviewDto currentOverview;
@@ -307,6 +379,11 @@ public class CaseController {
 	private final CaseOverviewPickerCoordinator overviewPickerCoordinator = new CaseOverviewPickerCoordinator();
 	private final CaseTeamCoordinator teamCoordinator = new CaseTeamCoordinator();
 	private final CaseUpdatesPanelController updatesPanelController = new CaseUpdatesPanelController();
+	private final CaseDetailsEditor detailsEditor = new CaseDetailsEditor();
+	private final CaseDetailsSaveCoordinator detailsSaveCoordinator = new CaseDetailsSaveCoordinator();
+	private CaseDetailsDraft detailsDraft;
+	private CaseDetailsDraft detailsBaseline;
+	private CaseDetailsDraft detailsLocalViewOverride;
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -354,7 +431,9 @@ public class CaseController {
 		setupSections();
 		setupOverviewTasksPanel();
 		wireEditButtons();
+		wireDetailsEditButtons();
 		setEditMode(false);
+		detailsEditor.setEditMode(false);
 		clearError();
 		subscribeLiveCaseUpdates();
 
@@ -394,6 +473,15 @@ public class CaseController {
 			cancelButton.setOnAction(e -> onCancel());
 		if (reloadRemoteButton != null)
 			reloadRemoteButton.setOnAction(e -> onReloadRemote());
+	}
+
+	private void wireDetailsEditButtons() {
+		if (detailsEditButton != null)
+			detailsEditButton.setOnAction(e -> detailsEditor.beginEdit());
+		if (detailsSaveButton != null)
+			detailsSaveButton.setOnAction(e -> onSaveDetails());
+		if (detailsCancelButton != null)
+			detailsCancelButton.setOnAction(e -> detailsEditor.cancelEdit());
 	}
 
 	// ----------------------------
@@ -496,6 +584,7 @@ public class CaseController {
 		switch (sectionName) {
 		case "Overview" -> showOverview();
 		case "Tasks" -> showTasksTab();
+		case "Details" -> showDetails();
 		default -> showGeneric(sectionName);
 		}
 	}
@@ -513,6 +602,7 @@ public class CaseController {
 
 	private void showOverview() {
 		setPaneVisible(overviewPane, true);
+		setVisibleManaged(detailsScrollPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, true);
@@ -523,6 +613,7 @@ public class CaseController {
 
 	private void showTasksTab() {
 		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, false);
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -538,8 +629,20 @@ public class CaseController {
 		}
 	}
 
+	private void showDetails() {
+		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, true);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, false);
+		setPaneVisible(tasksPanel, false);
+		if (contentTitleLabel != null)
+			contentTitleLabel.setText("Details");
+		renderDetailsFromCurrent();
+	}
+
 	private void showGeneric(String sectionName) {
 		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -585,6 +688,8 @@ public class CaseController {
 
 				if (detail != null) {
 					current = detail;
+					detailsLocalViewOverride = null;
+					renderDetailsFromCurrent();
 					if (!editMode)
 						applyDetail(detail);
 					else
@@ -712,6 +817,12 @@ public class CaseController {
 				changeResponsibleAttorneyButton.setDisable(busy);
 			if (changeOpposingCounselButton != null)
 				changeOpposingCounselButton.setDisable(busy);
+			if (detailsEditButton != null)
+				detailsEditButton.setDisable(busy);
+			if (detailsSaveButton != null)
+				detailsSaveButton.setDisable(busy);
+			if (detailsCancelButton != null)
+				detailsCancelButton.setDisable(busy);
 		});
 	}
 
@@ -753,6 +864,10 @@ public class CaseController {
 
 	private void onSave() {
 		saveCoordinator.save();
+	}
+
+	private void onSaveDetails() {
+		detailsSaveCoordinator.save();
 	}
 
 	private void publishCaseFieldUpdated(long caseId, String field, Object newValueOrNull) {
@@ -807,6 +922,28 @@ public class CaseController {
 			} catch (Exception ignored) {
 			}
 		}, "case-refresh-current-" + id).start();
+	}
+
+	private void refreshDetailsBaselineAfterRemoteAsync() {
+		if (caseDao == null || caseId == null)
+			return;
+		final long activeCaseId = caseId.longValue();
+		new Thread(() ->
+		{
+			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
+			CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
+			runOnFx(() ->
+			{
+				if (caseId == null || caseId.longValue() != activeCaseId || !detailsEditMode)
+					return;
+				if (overview != null)
+					currentOverview = overview;
+				if (detail != null) {
+					current = detail;
+					detailsBaseline = CaseDetailsDraft.from(detail, currentOverview);
+				}
+			});
+		}, "case-details-remote-baseline-" + activeCaseId).start();
 	}
 
 	private void applyLiveCaseName(String newName) {
@@ -1356,6 +1493,25 @@ public class CaseController {
 
 		ovOpposingCounselHost.getChildren().setAll(contactCardFactory.createMini(contactId, safe(name)));
 	}
+
+	private void renderDetailsFromCurrent() {
+		if (detailsEditMode && detailsDraft != null)
+			return;
+		detailsEditor.renderView(resolveDetailsViewModel());
+	}
+
+	private CaseDetailsDraft resolveDetailsViewModel() {
+		if (detailsLocalViewOverride != null)
+			return detailsLocalViewOverride.copy();
+		return CaseDetailsDraft.from(current, currentOverview);
+	}
+
+	private static String boolLabel(Boolean value) {
+		if (value == null)
+			return "—";
+		return value ? "Yes" : "No";
+	}
+
 
 	// ----------------------------
 	// Utilities
@@ -2690,7 +2846,7 @@ public class CaseController {
 			if (handleCaseUpdateAdded(patch))
 				return;
 
-			if (handleEditModeConflict())
+			if (handleEditModeConflict(patch))
 				return;
 
 			if (shouldReloadForStructuralPatch(patch)) {
@@ -2747,6 +2903,7 @@ public class CaseController {
 			boolean teamChanged = patchedTeamChanged != null && patchedTeamChanged.intValue() == 1;
 			Integer patchedCaseUpdateAdded = extractPatchInt(rawPatch, "caseUpdateAdded");
 			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
+			boolean detailsTouched = hasDetailsFieldPatch(rawPatch);
 
 			return new LivePatchData(
 				rawPatch,
@@ -2764,8 +2921,28 @@ public class CaseController {
 				patchedResponsibleAttorneyUserId,
 				patchedPrimaryOpposingCounselContactId,
 				teamChanged,
-				caseUpdateAdded
+				caseUpdateAdded,
+				detailsTouched
 			);
+		}
+
+		private boolean hasDetailsFieldPatch(String rawPatch) {
+			if (rawPatch == null || rawPatch.isBlank())
+				return false;
+			String[] keys = {
+				"callerDate", "callerTime", "acceptedDate", "closedDate", "deniedDate",
+				"dateOfMedicalNegligence", "dateMedicalNegligenceWasDiscovered", "dateOfInjury",
+				"statuteOfLimitations", "tortNoticeDeadline", "discoveryDeadline",
+				"clientEstate", "officePrinterCode", "medicalRecordsReceived", "feeAgreementSigned",
+				"dateFeeAgreementSigned", "acceptedChronology", "acceptedConsultantExpertSearch",
+				"acceptedTestifyingExpertSearch", "acceptedMedicalLiterature", "acceptedDetail",
+				"deniedChronology", "deniedDetail", "summary", "receivedUpdates"
+			};
+			for (String key : keys) {
+				if (hasPatchKey(rawPatch, key))
+					return true;
+			}
+			return false;
 		}
 
 		private boolean handleCaseUpdateAdded(LivePatchData patch) {
@@ -2779,14 +2956,20 @@ public class CaseController {
 			return true;
 		}
 
-		private boolean handleEditModeConflict() {
-			if (!editMode)
-				return false;
-			runOnFx(() ->
-			{
-				showRemoteUpdateBanner();
-			});
-			return true;
+		private boolean handleEditModeConflict(LivePatchData patch) {
+			if (editMode) {
+				runOnFx(() ->
+				{
+					showRemoteUpdateBanner();
+				});
+				return true;
+			}
+			if (detailsEditMode && patch.detailsTouched()) {
+				runOnFx(() -> showRemoteUpdateBanner());
+				refreshDetailsBaselineAfterRemoteAsync();
+				return true;
+			}
+			return false;
 		}
 
 		private boolean shouldReloadForStructuralPatch(LivePatchData patch) {
@@ -2796,7 +2979,8 @@ public class CaseController {
 					|| patch.patchedPracticeAreaId() != null
 					|| patch.patchedResponsibleAttorneyUserId() != null
 					|| patch.patchedPrimaryOpposingCounselContactId() != null
-					|| patch.teamChanged();
+					|| patch.teamChanged()
+					|| patch.detailsTouched();
 		}
 
 		private void handleStructuralReload(LivePatchData patch) {
@@ -2902,7 +3086,8 @@ public class CaseController {
 			Integer patchedResponsibleAttorneyUserId,
 			Integer patchedPrimaryOpposingCounselContactId,
 			boolean teamChanged,
-			boolean caseUpdateAdded) {
+			boolean caseUpdateAdded,
+			boolean detailsTouched) {
 	}
 
 	private final class CaseTeamCoordinator {
@@ -2938,6 +3123,742 @@ public class CaseController {
 
 		Node createCaseUpdateCard(CaseUpdateDto dto) {
 			return createCaseUpdateCardInternal(dto);
+		}
+	}
+
+	private static final class CaseDetailsDraft {
+		String name;
+		String caseNumber;
+		String practiceAreaId;
+		String description;
+
+		LocalDate callerDate;
+		String callerTime;
+		LocalDate acceptedDate;
+		LocalDate closedDate;
+		LocalDate deniedDate;
+
+		LocalDate dateOfMedicalNegligence;
+		LocalDate dateMedicalNegligenceWasDiscovered;
+		LocalDate dateOfInjury;
+		LocalDate statuteOfLimitations;
+		LocalDate tortNoticeDeadline;
+		LocalDate discoveryDeadline;
+
+		String clientEstate;
+		String officePrinterCode;
+		Boolean medicalRecordsReceived;
+		Boolean feeAgreementSigned;
+		LocalDate dateFeeAgreementSigned;
+
+		Boolean acceptedChronology;
+		Boolean acceptedConsultantExpertSearch;
+		Boolean acceptedTestifyingExpertSearch;
+		Boolean acceptedMedicalLiterature;
+		String acceptedDetail;
+
+		Boolean deniedChronology;
+		String deniedDetail;
+		String summary;
+		String receivedUpdates;
+
+		static CaseDetailsDraft from(CaseDetailDto detail, CaseOverviewDto overview) {
+			CaseDetailsDraft d = new CaseDetailsDraft();
+			d.name = detail == null ? "" : safeText(detail.getCaseName());
+			d.caseNumber = detail == null ? "" : safeText(detail.getCaseNumber());
+
+			Integer practiceAreaId = (detail == null ? null : detail.getPracticeAreaId());
+			if (practiceAreaId == null && overview != null)
+				practiceAreaId = overview.getPracticeAreaId();
+			d.practiceAreaId = practiceAreaId == null ? "" : String.valueOf(practiceAreaId);
+
+			d.description = detail == null ? "" : safeText(detail.getDescription());
+			d.callerDate = detail == null ? null : detail.getCallerDate();
+			d.callerTime = detail == null ? "" : safeText(detail.getCallerTime());
+			d.acceptedDate = detail == null ? null : detail.getAcceptedDate();
+			d.closedDate = detail == null ? null : detail.getClosedDate();
+			d.deniedDate = detail == null ? null : detail.getDeniedDate();
+
+			d.dateOfMedicalNegligence = detail == null ? null : detail.getDateOfMedicalNegligence();
+			d.dateMedicalNegligenceWasDiscovered = detail == null ? null : detail.getDateMedicalNegligenceWasDiscovered();
+			d.dateOfInjury = detail == null ? null : detail.getDateOfInjury();
+			d.statuteOfLimitations = detail == null ? null : detail.getStatuteOfLimitations();
+			d.tortNoticeDeadline = detail == null ? null : detail.getTortNoticeDeadline();
+			d.discoveryDeadline = detail == null ? null : detail.getDiscoveryDeadline();
+
+			d.clientEstate = detail == null ? "" : safeText(detail.getClientEstate());
+			d.officePrinterCode = detail == null ? "" : safeText(detail.getOfficePrinterCode());
+			d.medicalRecordsReceived = detail == null ? null : detail.getMedicalRecordsReceived();
+			d.feeAgreementSigned = detail == null ? null : detail.getFeeAgreementSigned();
+			d.dateFeeAgreementSigned = detail == null ? null : detail.getDateFeeAgreementSigned();
+
+			d.acceptedChronology = detail == null ? null : detail.getAcceptedChronology();
+			d.acceptedConsultantExpertSearch = detail == null ? null : detail.getAcceptedConsultantExpertSearch();
+			d.acceptedTestifyingExpertSearch = detail == null ? null : detail.getAcceptedTestifyingExpertSearch();
+			d.acceptedMedicalLiterature = detail == null ? null : detail.getAcceptedMedicalLiterature();
+			d.acceptedDetail = detail == null ? "" : safeText(detail.getAcceptedDetail());
+
+			d.deniedChronology = detail == null ? null : detail.getDeniedChronology();
+			d.deniedDetail = detail == null ? "" : safeText(detail.getDeniedDetail());
+
+			d.summary = detail == null ? "" : safeText(detail.getSummary());
+			d.receivedUpdates = detail == null ? "" : safeText(detail.getReceivedUpdates());
+			return d;
+		}
+
+		CaseDetailsDraft copy() {
+			CaseDetailsDraft c = new CaseDetailsDraft();
+			c.name = name;
+			c.caseNumber = caseNumber;
+			c.practiceAreaId = practiceAreaId;
+			c.description = description;
+			c.callerDate = callerDate;
+			c.callerTime = callerTime;
+			c.acceptedDate = acceptedDate;
+			c.closedDate = closedDate;
+			c.deniedDate = deniedDate;
+			c.dateOfMedicalNegligence = dateOfMedicalNegligence;
+			c.dateMedicalNegligenceWasDiscovered = dateMedicalNegligenceWasDiscovered;
+			c.dateOfInjury = dateOfInjury;
+			c.statuteOfLimitations = statuteOfLimitations;
+			c.tortNoticeDeadline = tortNoticeDeadline;
+			c.discoveryDeadline = discoveryDeadline;
+			c.clientEstate = clientEstate;
+			c.officePrinterCode = officePrinterCode;
+			c.medicalRecordsReceived = medicalRecordsReceived;
+			c.feeAgreementSigned = feeAgreementSigned;
+			c.dateFeeAgreementSigned = dateFeeAgreementSigned;
+			c.acceptedChronology = acceptedChronology;
+			c.acceptedConsultantExpertSearch = acceptedConsultantExpertSearch;
+			c.acceptedTestifyingExpertSearch = acceptedTestifyingExpertSearch;
+			c.acceptedMedicalLiterature = acceptedMedicalLiterature;
+			c.acceptedDetail = acceptedDetail;
+			c.deniedChronology = deniedChronology;
+			c.deniedDetail = deniedDetail;
+			c.summary = summary;
+			c.receivedUpdates = receivedUpdates;
+			return c;
+		}
+	}
+
+	private final class CaseDetailsSaveCoordinator {
+		void save() {
+			if (caseDao == null || caseId == null || current == null) {
+				showError("Case is still loading. Please try again.");
+				return;
+			}
+			if (detailsDraft == null)
+				return;
+
+			detailsEditor.captureEditors(detailsDraft);
+			DetailsSaveRequest request;
+			try {
+				request = buildSaveRequest(detailsDraft, current);
+			} catch (IllegalArgumentException ex) {
+				showError(ex.getMessage());
+				return;
+			}
+
+			if (!request.hasChanges()) {
+				detailsLocalViewOverride = null;
+				detailsDraft = null;
+				detailsBaseline = null;
+				detailsEditor.setEditMode(false);
+				renderDetailsFromCurrent();
+				return;
+			}
+
+			setBusy(true);
+			clearError();
+
+			new Thread(() -> runSaveWorker(request), "case-details-save-" + caseId).start();
+		}
+
+		private void runSaveWorker(DetailsSaveRequest request) {
+			try {
+				CaseDetailDto updated = caseDao.updateCaseDetails(
+						request.caseId(),
+						request.name(),
+						request.caseNumber(),
+						request.practiceAreaId(),
+						request.description(),
+						request.callerDate(),
+						request.callerTime(),
+						request.acceptedDate(),
+						request.closedDate(),
+						request.deniedDate(),
+						request.dateOfMedicalNegligence(),
+						request.dateMedicalNegligenceWasDiscovered(),
+						request.dateOfInjury(),
+						request.statuteOfLimitations(),
+						request.tortNoticeDeadline(),
+						request.discoveryDeadline(),
+						request.clientEstate(),
+						request.officePrinterCode(),
+						request.medicalRecordsReceived(),
+						request.feeAgreementSigned(),
+						request.dateFeeAgreementSigned(),
+						request.acceptedChronology(),
+						request.acceptedConsultantExpertSearch(),
+						request.acceptedTestifyingExpertSearch(),
+						request.acceptedMedicalLiterature(),
+						request.acceptedDetail(),
+						request.deniedChronology(),
+						request.deniedDetail(),
+						request.summary(),
+						request.receivedUpdates(),
+						request.expectedRowVer());
+
+				String importantChangesNote = "";
+				if (updated != null)
+					importantChangesNote = buildImportantDetailsChangesNote(request, request.baseline(), updated);
+				persistImportantDetailsChangesNote(request, importantChangesNote);
+
+				String noteForUi = importantChangesNote;
+				runOnFx(() -> handleSaveResult(request, updated, noteForUi));
+			} catch (Exception ex) {
+				runOnFx(() -> {
+					showError("Failed to save case details. " + ex.getMessage());
+					setBusy(false);
+				});
+			}
+		}
+
+		private void handleSaveResult(DetailsSaveRequest request, CaseDetailDto updated, String importantChangesNote) {
+			if (updated == null) {
+				showError("This case was updated elsewhere. Reload and try again.");
+				setBusy(false);
+				return;
+			}
+			current = updated;
+			detailsLocalViewOverride = null;
+			detailsDraft = null;
+			detailsBaseline = null;
+			detailsEditor.setEditMode(false);
+			renderDetailsFromCurrent();
+			applyDetail(updated);
+			clearError();
+			publishDetailsFieldUpdates(request, importantChangesNote);
+			setBusy(false);
+			reloadCurrentCaseForViewMode();
+		}
+
+		private void persistImportantDetailsChangesNote(DetailsSaveRequest request, String importantChangesNote) {
+			if (importantChangesNote.isBlank())
+				return;
+			Integer tenantId = (appState == null ? null : appState.getShaleClientId());
+			if (tenantId == null || tenantId <= 0)
+				return;
+			caseDao.addCaseUpdate(request.caseId(), tenantId, importantChangesNote, (appState == null ? null : appState.getUserId()));
+		}
+
+		private void publishDetailsFieldUpdates(DetailsSaveRequest request, String importantChangesNote) {
+			CaseDetailDto baseline = request.baseline();
+			publishIfChanged(request.caseId(), "name", normalizeRequired(baseline.getCaseName()), request.name());
+			publishIfChanged(request.caseId(), "caseNumber", normalizeNullableText(baseline.getCaseNumber()), request.caseNumber());
+			publishIfChanged(request.caseId(), "practiceAreaId", baseline.getPracticeAreaId(), request.practiceAreaId());
+			publishIfChanged(request.caseId(), "description", normalizeNullableText(baseline.getDescription()), request.description());
+			publishIfChanged(request.caseId(), "callerDate", baseline.getCallerDate(), request.callerDate());
+			publishIfChanged(request.caseId(), "callerTime", normalizeNullableText(baseline.getCallerTime()), request.callerTime());
+			publishIfChanged(request.caseId(), "acceptedDate", baseline.getAcceptedDate(), request.acceptedDate());
+			publishIfChanged(request.caseId(), "closedDate", baseline.getClosedDate(), request.closedDate());
+			publishIfChanged(request.caseId(), "deniedDate", baseline.getDeniedDate(), request.deniedDate());
+			publishIfChanged(request.caseId(), "dateOfMedicalNegligence", baseline.getDateOfMedicalNegligence(), request.dateOfMedicalNegligence());
+			publishIfChanged(request.caseId(), "dateMedicalNegligenceWasDiscovered", baseline.getDateMedicalNegligenceWasDiscovered(), request.dateMedicalNegligenceWasDiscovered());
+			publishIfChanged(request.caseId(), "dateOfInjury", baseline.getDateOfInjury(), request.dateOfInjury());
+			publishIfChanged(request.caseId(), "statuteOfLimitations", baseline.getStatuteOfLimitations(), request.statuteOfLimitations());
+			publishIfChanged(request.caseId(), "tortNoticeDeadline", baseline.getTortNoticeDeadline(), request.tortNoticeDeadline());
+			publishIfChanged(request.caseId(), "discoveryDeadline", baseline.getDiscoveryDeadline(), request.discoveryDeadline());
+			publishIfChanged(request.caseId(), "clientEstate", normalizeNullableText(baseline.getClientEstate()), request.clientEstate());
+			publishIfChanged(request.caseId(), "officePrinterCode", normalizeNullableText(baseline.getOfficePrinterCode()), request.officePrinterCode());
+			publishIfChanged(request.caseId(), "medicalRecordsReceived", baseline.getMedicalRecordsReceived(), request.medicalRecordsReceived());
+			publishIfChanged(request.caseId(), "feeAgreementSigned", baseline.getFeeAgreementSigned(), request.feeAgreementSigned());
+			publishIfChanged(request.caseId(), "dateFeeAgreementSigned", baseline.getDateFeeAgreementSigned(), request.dateFeeAgreementSigned());
+			publishIfChanged(request.caseId(), "acceptedChronology", baseline.getAcceptedChronology(), request.acceptedChronology());
+			publishIfChanged(request.caseId(), "acceptedConsultantExpertSearch", baseline.getAcceptedConsultantExpertSearch(), request.acceptedConsultantExpertSearch());
+			publishIfChanged(request.caseId(), "acceptedTestifyingExpertSearch", baseline.getAcceptedTestifyingExpertSearch(), request.acceptedTestifyingExpertSearch());
+			publishIfChanged(request.caseId(), "acceptedMedicalLiterature", baseline.getAcceptedMedicalLiterature(), request.acceptedMedicalLiterature());
+			publishIfChanged(request.caseId(), "acceptedDetail", normalizeNullableText(baseline.getAcceptedDetail()), request.acceptedDetail());
+			publishIfChanged(request.caseId(), "deniedChronology", baseline.getDeniedChronology(), request.deniedChronology());
+			publishIfChanged(request.caseId(), "deniedDetail", normalizeNullableText(baseline.getDeniedDetail()), request.deniedDetail());
+			publishIfChanged(request.caseId(), "summary", normalizeNullableText(baseline.getSummary()), request.summary());
+			publishIfChanged(request.caseId(), "receivedUpdates", normalizeNullableText(baseline.getReceivedUpdates()), request.receivedUpdates());
+
+			// Keep Overview inline listeners responsive for these two shared fields.
+			publishIfChanged(request.caseId(), "incidentDate", baseline.getDateOfInjury(), request.dateOfInjury());
+			publishIfChanged(request.caseId(), "solDate", baseline.getStatuteOfLimitations(), request.statuteOfLimitations());
+
+			if (!importantChangesNote.isBlank())
+				publishCaseUpdateAdded(request.caseId());
+		}
+
+		private void publishIfChanged(long caseId, String field, Object before, Object after) {
+			if (!Objects.equals(before, after))
+				publishCaseFieldUpdated(caseId, field, after);
+		}
+
+		private String buildImportantDetailsChangesNote(DetailsSaveRequest request, CaseDetailDto before, CaseDetailDto after) {
+			if (before == null || after == null)
+				return "";
+			java.util.List<String> lines = new java.util.ArrayList<>();
+			addDetailIfPresent(lines, buildDetailsChangeLine("Case name", before.getCaseName(), after.getCaseName()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Case number", before.getCaseNumber(), after.getCaseNumber()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Practice area", safePracticeArea(before), safePracticeArea(after)));
+			if (!Objects.equals(normalizeNullableText(before.getDescription()), normalizeNullableText(after.getDescription())))
+				addDetailIfPresent(lines, "Description changed");
+			addDetailIfPresent(lines, buildDetailsChangeLine("Caller date", formatDate(before.getCallerDate()), formatDate(after.getCallerDate())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Caller time", before.getCallerTime(), after.getCallerTime()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted date", formatDate(before.getAcceptedDate()), formatDate(after.getAcceptedDate())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Closed date", formatDate(before.getClosedDate()), formatDate(after.getClosedDate())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Denied date", formatDate(before.getDeniedDate()), formatDate(after.getDeniedDate())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Date of medical negligence", formatDate(before.getDateOfMedicalNegligence()), formatDate(after.getDateOfMedicalNegligence())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Date negligence discovered", formatDate(before.getDateMedicalNegligenceWasDiscovered()), formatDate(after.getDateMedicalNegligenceWasDiscovered())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Date of injury", formatDate(before.getDateOfInjury()), formatDate(after.getDateOfInjury())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Statute of limitations", formatDate(before.getStatuteOfLimitations()), formatDate(after.getStatuteOfLimitations())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Tort notice deadline", formatDate(before.getTortNoticeDeadline()), formatDate(after.getTortNoticeDeadline())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Discovery deadline", formatDate(before.getDiscoveryDeadline()), formatDate(after.getDiscoveryDeadline())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Client estate", before.getClientEstate(), after.getClientEstate()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Office printer code", before.getOfficePrinterCode(), after.getOfficePrinterCode()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Medical records received", boolLabel(before.getMedicalRecordsReceived()), boolLabel(after.getMedicalRecordsReceived())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Fee agreement signed", boolLabel(before.getFeeAgreementSigned()), boolLabel(after.getFeeAgreementSigned())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Date fee agreement signed", formatDate(before.getDateFeeAgreementSigned()), formatDate(after.getDateFeeAgreementSigned())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted chronology", boolLabel(before.getAcceptedChronology()), boolLabel(after.getAcceptedChronology())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted consultant expert search", boolLabel(before.getAcceptedConsultantExpertSearch()), boolLabel(after.getAcceptedConsultantExpertSearch())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted testifying expert search", boolLabel(before.getAcceptedTestifyingExpertSearch()), boolLabel(after.getAcceptedTestifyingExpertSearch())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted medical literature", boolLabel(before.getAcceptedMedicalLiterature()), boolLabel(after.getAcceptedMedicalLiterature())));
+			if (!Objects.equals(normalizeNullableText(before.getAcceptedDetail()), normalizeNullableText(after.getAcceptedDetail())))
+				addDetailIfPresent(lines, "Accepted detail changed");
+			addDetailIfPresent(lines, buildDetailsChangeLine("Denied chronology", boolLabel(before.getDeniedChronology()), boolLabel(after.getDeniedChronology())));
+			if (!Objects.equals(normalizeNullableText(before.getDeniedDetail()), normalizeNullableText(after.getDeniedDetail())))
+				addDetailIfPresent(lines, "Denied detail changed");
+			if (!Objects.equals(normalizeNullableText(before.getSummary()), normalizeNullableText(after.getSummary())))
+				addDetailIfPresent(lines, "Summary changed");
+			if (!Objects.equals(normalizeNullableText(before.getReceivedUpdates()), normalizeNullableText(after.getReceivedUpdates())))
+				addDetailIfPresent(lines, "Received updates changed");
+			return String.join("\n", lines);
+		}
+
+		private String buildDetailsChangeLine(String label, String oldValue, String newValue) {
+			String oldSafe = normalizeUpdateValue(oldValue);
+			String newSafe = normalizeUpdateValue(newValue);
+			if (oldSafe.equals(newSafe))
+				return "";
+			return label + " changed: from " + oldSafe + " to " + newSafe;
+		}
+
+		private String normalizeUpdateValue(String value) {
+			String trimmed = safeText(value).trim().replaceAll("\\s+", " ");
+			return trimmed.isBlank() ? "none" : trimmed;
+		}
+
+		private void addDetailIfPresent(List<String> out, String line) {
+			if (out == null)
+				return;
+			String text = safeText(line).trim();
+			if (!text.isBlank())
+				out.add(text);
+		}
+
+		private String safePracticeArea(CaseDetailDto detail) {
+			if (detail == null || detail.getPracticeAreaId() == null)
+				return "none";
+			return String.valueOf(detail.getPracticeAreaId());
+		}
+
+		private DetailsSaveRequest buildSaveRequest(CaseDetailsDraft source, CaseDetailDto baseline) {
+			String name = normalizeRequired(source.name);
+			if (name.isBlank())
+				throw new IllegalArgumentException("Case Name is required.");
+
+			String caseNumber = normalizeNullableText(source.caseNumber);
+			Integer practiceAreaId = parseNullableInteger(source.practiceAreaId);
+			String description = normalizeNullableText(source.description);
+			String callerTime = normalizeNullableText(source.callerTime);
+			String clientEstate = normalizeNullableText(source.clientEstate);
+			String officePrinterCode = normalizeNullableText(source.officePrinterCode);
+			String acceptedDetail = normalizeNullableText(source.acceptedDetail);
+			String deniedDetail = normalizeNullableText(source.deniedDetail);
+			String summary = normalizeNullableText(source.summary);
+			String receivedUpdates = normalizeNullableText(source.receivedUpdates);
+
+			boolean changed =
+				!Objects.equals(name, normalizeRequired(baseline.getCaseName())) ||
+				!Objects.equals(caseNumber, normalizeNullableText(baseline.getCaseNumber())) ||
+				!Objects.equals(practiceAreaId, baseline.getPracticeAreaId()) ||
+				!Objects.equals(description, normalizeNullableText(baseline.getDescription())) ||
+				!Objects.equals(source.callerDate, baseline.getCallerDate()) ||
+				!Objects.equals(callerTime, normalizeNullableText(baseline.getCallerTime())) ||
+				!Objects.equals(source.acceptedDate, baseline.getAcceptedDate()) ||
+				!Objects.equals(source.closedDate, baseline.getClosedDate()) ||
+				!Objects.equals(source.deniedDate, baseline.getDeniedDate()) ||
+				!Objects.equals(source.dateOfMedicalNegligence, baseline.getDateOfMedicalNegligence()) ||
+				!Objects.equals(source.dateMedicalNegligenceWasDiscovered, baseline.getDateMedicalNegligenceWasDiscovered()) ||
+				!Objects.equals(source.dateOfInjury, baseline.getDateOfInjury()) ||
+				!Objects.equals(source.statuteOfLimitations, baseline.getStatuteOfLimitations()) ||
+				!Objects.equals(source.tortNoticeDeadline, baseline.getTortNoticeDeadline()) ||
+				!Objects.equals(source.discoveryDeadline, baseline.getDiscoveryDeadline()) ||
+				!Objects.equals(clientEstate, normalizeNullableText(baseline.getClientEstate())) ||
+				!Objects.equals(officePrinterCode, normalizeNullableText(baseline.getOfficePrinterCode())) ||
+				!Objects.equals(source.medicalRecordsReceived, baseline.getMedicalRecordsReceived()) ||
+				!Objects.equals(source.feeAgreementSigned, baseline.getFeeAgreementSigned()) ||
+				!Objects.equals(source.dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
+				!Objects.equals(source.acceptedChronology, baseline.getAcceptedChronology()) ||
+				!Objects.equals(source.acceptedConsultantExpertSearch, baseline.getAcceptedConsultantExpertSearch()) ||
+				!Objects.equals(source.acceptedTestifyingExpertSearch, baseline.getAcceptedTestifyingExpertSearch()) ||
+				!Objects.equals(source.acceptedMedicalLiterature, baseline.getAcceptedMedicalLiterature()) ||
+				!Objects.equals(acceptedDetail, normalizeNullableText(baseline.getAcceptedDetail())) ||
+				!Objects.equals(source.deniedChronology, baseline.getDeniedChronology()) ||
+				!Objects.equals(deniedDetail, normalizeNullableText(baseline.getDeniedDetail())) ||
+				!Objects.equals(summary, normalizeNullableText(baseline.getSummary())) ||
+				!Objects.equals(receivedUpdates, normalizeNullableText(baseline.getReceivedUpdates()));
+
+			return new DetailsSaveRequest(
+				caseId.longValue(),
+				name,
+				caseNumber,
+				practiceAreaId,
+				description,
+				source.callerDate,
+				callerTime,
+				source.acceptedDate,
+				source.closedDate,
+				source.deniedDate,
+				source.dateOfMedicalNegligence,
+				source.dateMedicalNegligenceWasDiscovered,
+				source.dateOfInjury,
+				source.statuteOfLimitations,
+				source.tortNoticeDeadline,
+				source.discoveryDeadline,
+				clientEstate,
+				officePrinterCode,
+				source.medicalRecordsReceived,
+				source.feeAgreementSigned,
+				source.dateFeeAgreementSigned,
+				source.acceptedChronology,
+				source.acceptedConsultantExpertSearch,
+				source.acceptedTestifyingExpertSearch,
+				source.acceptedMedicalLiterature,
+				acceptedDetail,
+				source.deniedChronology,
+				deniedDetail,
+				summary,
+				receivedUpdates,
+				baseline.getRowVer(),
+				baseline,
+				changed);
+		}
+
+		private Integer parseNullableInteger(String raw) {
+			String normalized = normalizeNullableText(raw);
+			if (normalized == null)
+				return null;
+			try {
+				return Integer.valueOf(normalized);
+			} catch (NumberFormatException ex) {
+				throw new IllegalArgumentException("PracticeAreaId must be a whole number.");
+			}
+		}
+
+		private String normalizeNullableText(String value) {
+			String trimmed = safeText(value).trim();
+			return trimmed.isBlank() ? null : trimmed;
+		}
+
+		private String normalizeRequired(String value) {
+			return safeText(value).trim();
+		}
+	}
+
+	private record DetailsSaveRequest(
+			long caseId,
+			String name,
+			String caseNumber,
+			Integer practiceAreaId,
+			String description,
+			LocalDate callerDate,
+			String callerTime,
+			LocalDate acceptedDate,
+			LocalDate closedDate,
+			LocalDate deniedDate,
+			LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			LocalDate discoveryDeadline,
+			String clientEstate,
+			String officePrinterCode,
+			Boolean medicalRecordsReceived,
+			Boolean feeAgreementSigned,
+			LocalDate dateFeeAgreementSigned,
+			Boolean acceptedChronology,
+			Boolean acceptedConsultantExpertSearch,
+			Boolean acceptedTestifyingExpertSearch,
+			Boolean acceptedMedicalLiterature,
+			String acceptedDetail,
+			Boolean deniedChronology,
+			String deniedDetail,
+			String summary,
+			String receivedUpdates,
+			byte[] expectedRowVer,
+			CaseDetailDto baseline,
+			boolean hasChanges) {
+	}
+
+	private final class CaseDetailsEditor {
+		void beginEdit() {
+			CaseDetailsDraft base = resolveDetailsViewModel();
+			detailsBaseline = base.copy();
+			detailsDraft = base.copy();
+			renderEditors(detailsDraft);
+			setEditMode(true);
+		}
+
+
+		void cancelEdit() {
+			CaseDetailsDraft restore = detailsBaseline != null ? detailsBaseline : resolveDetailsViewModel();
+			renderView(restore);
+			detailsDraft = null;
+			detailsBaseline = null;
+			setEditMode(false);
+		}
+
+		void setEditMode(boolean enabled) {
+			detailsEditMode = enabled;
+			setVisibleManaged(detailsEditButton, !enabled);
+			setVisibleManaged(detailsSaveButton, enabled);
+			setVisibleManaged(detailsCancelButton, enabled);
+
+			toggleDetailField(detNameValue, detNameEditor, enabled);
+			toggleDetailField(detCaseNumberValue, detCaseNumberEditor, enabled);
+			toggleDetailField(detPracticeAreaIdValue, detPracticeAreaIdEditor, enabled);
+			toggleDetailField(detDescriptionValue, detDescriptionEditor, enabled);
+			toggleDetailField(detCallerDateValue, detCallerDateEditor, enabled);
+			toggleDetailField(detCallerTimeValue, detCallerTimeEditor, enabled);
+			toggleDetailField(detAcceptedDateValue, detAcceptedDateEditor, enabled);
+			toggleDetailField(detClosedDateValue, detClosedDateEditor, enabled);
+			toggleDetailField(detDeniedDateValue, detDeniedDateEditor, enabled);
+			toggleDetailField(detDateOfMedicalNegligenceValue, detDateOfMedicalNegligenceEditor, enabled);
+			toggleDetailField(detDateMedicalNegligenceWasDiscoveredValue, detDateMedicalNegligenceWasDiscoveredEditor, enabled);
+			toggleDetailField(detDateOfInjuryValue, detDateOfInjuryEditor, enabled);
+			toggleDetailField(detStatuteOfLimitationsValue, detStatuteOfLimitationsEditor, enabled);
+			toggleDetailField(detTortNoticeDeadlineValue, detTortNoticeDeadlineEditor, enabled);
+			toggleDetailField(detDiscoveryDeadlineValue, detDiscoveryDeadlineEditor, enabled);
+			toggleDetailField(detClientEstateValue, detClientEstateEditor, enabled);
+			toggleDetailField(detOfficePrinterCodeValue, detOfficePrinterCodeEditor, enabled);
+			toggleDetailField(detMedicalRecordsReceivedValue, detMedicalRecordsReceivedEditor, enabled);
+			toggleDetailField(detFeeAgreementSignedValue, detFeeAgreementSignedEditor, enabled);
+			toggleDetailField(detDateFeeAgreementSignedValue, detDateFeeAgreementSignedEditor, enabled);
+			toggleDetailField(detAcceptedChronologyValue, detAcceptedChronologyEditor, enabled);
+			toggleDetailField(detAcceptedConsultantExpertSearchValue, detAcceptedConsultantExpertSearchEditor, enabled);
+			toggleDetailField(detAcceptedTestifyingExpertSearchValue, detAcceptedTestifyingExpertSearchEditor, enabled);
+			toggleDetailField(detAcceptedMedicalLiteratureValue, detAcceptedMedicalLiteratureEditor, enabled);
+			toggleDetailField(detAcceptedDetailValue, detAcceptedDetailEditor, enabled);
+			toggleDetailField(detDeniedChronologyValue, detDeniedChronologyEditor, enabled);
+			toggleDetailField(detDeniedDetailValue, detDeniedDetailEditor, enabled);
+			toggleDetailField(detSummaryValue, detSummaryEditor, enabled);
+			toggleDetailField(detReceivedUpdatesValue, detReceivedUpdatesEditor, enabled);
+		}
+
+		private void toggleDetailField(Label valueNode, javafx.scene.control.Control editorNode, boolean editEnabled) {
+			setVisibleManaged(valueNode, !editEnabled);
+			setVisibleManaged(editorNode, editEnabled);
+		}
+
+		private void renderNullableBoolean(CheckBox editor, Boolean value) {
+			if (editor == null)
+				return;
+			editor.setAllowIndeterminate(true);
+			if (value == null) {
+				editor.setIndeterminate(true);
+				editor.setSelected(false);
+				return;
+			}
+			editor.setIndeterminate(false);
+			editor.setSelected(value);
+		}
+
+		private Boolean captureNullableBoolean(CheckBox editor) {
+			if (editor == null)
+				return null;
+			if (editor.isIndeterminate())
+				return null;
+			return editor.isSelected();
+		}
+
+		void renderView(CaseDetailsDraft d) {
+			if (d == null)
+				return;
+
+			if (detNameValue != null)
+				detNameValue.setText(safe(d.name));
+			if (detCaseNumberValue != null)
+				detCaseNumberValue.setText(safe(d.caseNumber));
+			if (detPracticeAreaIdValue != null)
+				detPracticeAreaIdValue.setText(safe(d.practiceAreaId));
+			if (detDescriptionValue != null)
+				detDescriptionValue.setText(safe(d.description));
+			if (detCallerDateValue != null)
+				detCallerDateValue.setText(formatDate(d.callerDate));
+			if (detCallerTimeValue != null)
+				detCallerTimeValue.setText(safe(d.callerTime));
+			if (detAcceptedDateValue != null)
+				detAcceptedDateValue.setText(formatDate(d.acceptedDate));
+			if (detClosedDateValue != null)
+				detClosedDateValue.setText(formatDate(d.closedDate));
+			if (detDeniedDateValue != null)
+				detDeniedDateValue.setText(formatDate(d.deniedDate));
+			if (detDateOfMedicalNegligenceValue != null)
+				detDateOfMedicalNegligenceValue.setText(formatDate(d.dateOfMedicalNegligence));
+			if (detDateMedicalNegligenceWasDiscoveredValue != null)
+				detDateMedicalNegligenceWasDiscoveredValue.setText(formatDate(d.dateMedicalNegligenceWasDiscovered));
+			if (detDateOfInjuryValue != null)
+				detDateOfInjuryValue.setText(formatDate(d.dateOfInjury));
+			if (detStatuteOfLimitationsValue != null)
+				detStatuteOfLimitationsValue.setText(formatDate(d.statuteOfLimitations));
+			if (detTortNoticeDeadlineValue != null)
+				detTortNoticeDeadlineValue.setText(formatDate(d.tortNoticeDeadline));
+			if (detDiscoveryDeadlineValue != null)
+				detDiscoveryDeadlineValue.setText(formatDate(d.discoveryDeadline));
+			if (detClientEstateValue != null)
+				detClientEstateValue.setText(safe(d.clientEstate));
+			if (detOfficePrinterCodeValue != null)
+				detOfficePrinterCodeValue.setText(safe(d.officePrinterCode));
+			if (detMedicalRecordsReceivedValue != null)
+				detMedicalRecordsReceivedValue.setText(boolLabel(d.medicalRecordsReceived));
+			if (detFeeAgreementSignedValue != null)
+				detFeeAgreementSignedValue.setText(boolLabel(d.feeAgreementSigned));
+			if (detDateFeeAgreementSignedValue != null)
+				detDateFeeAgreementSignedValue.setText(formatDate(d.dateFeeAgreementSigned));
+			if (detAcceptedChronologyValue != null)
+				detAcceptedChronologyValue.setText(boolLabel(d.acceptedChronology));
+			if (detAcceptedConsultantExpertSearchValue != null)
+				detAcceptedConsultantExpertSearchValue.setText(boolLabel(d.acceptedConsultantExpertSearch));
+			if (detAcceptedTestifyingExpertSearchValue != null)
+				detAcceptedTestifyingExpertSearchValue.setText(boolLabel(d.acceptedTestifyingExpertSearch));
+			if (detAcceptedMedicalLiteratureValue != null)
+				detAcceptedMedicalLiteratureValue.setText(boolLabel(d.acceptedMedicalLiterature));
+			if (detAcceptedDetailValue != null)
+				detAcceptedDetailValue.setText(safe(d.acceptedDetail));
+			if (detDeniedChronologyValue != null)
+				detDeniedChronologyValue.setText(boolLabel(d.deniedChronology));
+			if (detDeniedDetailValue != null)
+				detDeniedDetailValue.setText(safe(d.deniedDetail));
+			if (detSummaryValue != null)
+				detSummaryValue.setText(safe(d.summary));
+			if (detReceivedUpdatesValue != null)
+				detReceivedUpdatesValue.setText(safe(d.receivedUpdates));
+		}
+
+		private void renderEditors(CaseDetailsDraft d) {
+			if (d == null)
+				return;
+
+			if (detNameEditor != null)
+				detNameEditor.setText(d.name);
+			if (detCaseNumberEditor != null)
+				detCaseNumberEditor.setText(d.caseNumber);
+			if (detPracticeAreaIdEditor != null)
+				detPracticeAreaIdEditor.setText(d.practiceAreaId);
+			if (detDescriptionEditor != null)
+				detDescriptionEditor.setText(d.description);
+			if (detCallerDateEditor != null)
+				detCallerDateEditor.setValue(d.callerDate);
+			if (detCallerTimeEditor != null)
+				detCallerTimeEditor.setText(d.callerTime);
+			if (detAcceptedDateEditor != null)
+				detAcceptedDateEditor.setValue(d.acceptedDate);
+			if (detClosedDateEditor != null)
+				detClosedDateEditor.setValue(d.closedDate);
+			if (detDeniedDateEditor != null)
+				detDeniedDateEditor.setValue(d.deniedDate);
+			if (detDateOfMedicalNegligenceEditor != null)
+				detDateOfMedicalNegligenceEditor.setValue(d.dateOfMedicalNegligence);
+			if (detDateMedicalNegligenceWasDiscoveredEditor != null)
+				detDateMedicalNegligenceWasDiscoveredEditor.setValue(d.dateMedicalNegligenceWasDiscovered);
+			if (detDateOfInjuryEditor != null)
+				detDateOfInjuryEditor.setValue(d.dateOfInjury);
+			if (detStatuteOfLimitationsEditor != null)
+				detStatuteOfLimitationsEditor.setValue(d.statuteOfLimitations);
+			if (detTortNoticeDeadlineEditor != null)
+				detTortNoticeDeadlineEditor.setValue(d.tortNoticeDeadline);
+			if (detDiscoveryDeadlineEditor != null)
+				detDiscoveryDeadlineEditor.setValue(d.discoveryDeadline);
+			if (detClientEstateEditor != null)
+				detClientEstateEditor.setText(d.clientEstate);
+			if (detOfficePrinterCodeEditor != null)
+				detOfficePrinterCodeEditor.setText(d.officePrinterCode);
+			renderNullableBoolean(detMedicalRecordsReceivedEditor, d.medicalRecordsReceived);
+			renderNullableBoolean(detFeeAgreementSignedEditor, d.feeAgreementSigned);
+			if (detDateFeeAgreementSignedEditor != null)
+				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
+			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
+			renderNullableBoolean(detAcceptedConsultantExpertSearchEditor, d.acceptedConsultantExpertSearch);
+			renderNullableBoolean(detAcceptedTestifyingExpertSearchEditor, d.acceptedTestifyingExpertSearch);
+			renderNullableBoolean(detAcceptedMedicalLiteratureEditor, d.acceptedMedicalLiterature);
+			if (detAcceptedDetailEditor != null)
+				detAcceptedDetailEditor.setText(d.acceptedDetail);
+			renderNullableBoolean(detDeniedChronologyEditor, d.deniedChronology);
+			if (detDeniedDetailEditor != null)
+				detDeniedDetailEditor.setText(d.deniedDetail);
+			if (detSummaryEditor != null)
+				detSummaryEditor.setText(d.summary);
+			if (detReceivedUpdatesEditor != null)
+				detReceivedUpdatesEditor.setText(d.receivedUpdates);
+		}
+
+		void captureEditors(CaseDetailsDraft d) {
+			if (detNameEditor != null)
+				d.name = safeText(detNameEditor.getText());
+			if (detCaseNumberEditor != null)
+				d.caseNumber = safeText(detCaseNumberEditor.getText());
+			if (detPracticeAreaIdEditor != null)
+				d.practiceAreaId = safeText(detPracticeAreaIdEditor.getText());
+			if (detDescriptionEditor != null)
+				d.description = safeText(detDescriptionEditor.getText());
+			if (detCallerDateEditor != null)
+				d.callerDate = detCallerDateEditor.getValue();
+			if (detCallerTimeEditor != null)
+				d.callerTime = safeText(detCallerTimeEditor.getText());
+			if (detAcceptedDateEditor != null)
+				d.acceptedDate = detAcceptedDateEditor.getValue();
+			if (detClosedDateEditor != null)
+				d.closedDate = detClosedDateEditor.getValue();
+			if (detDeniedDateEditor != null)
+				d.deniedDate = detDeniedDateEditor.getValue();
+			if (detDateOfMedicalNegligenceEditor != null)
+				d.dateOfMedicalNegligence = detDateOfMedicalNegligenceEditor.getValue();
+			if (detDateMedicalNegligenceWasDiscoveredEditor != null)
+				d.dateMedicalNegligenceWasDiscovered = detDateMedicalNegligenceWasDiscoveredEditor.getValue();
+			if (detDateOfInjuryEditor != null)
+				d.dateOfInjury = detDateOfInjuryEditor.getValue();
+			if (detStatuteOfLimitationsEditor != null)
+				d.statuteOfLimitations = detStatuteOfLimitationsEditor.getValue();
+			if (detTortNoticeDeadlineEditor != null)
+				d.tortNoticeDeadline = detTortNoticeDeadlineEditor.getValue();
+			if (detDiscoveryDeadlineEditor != null)
+				d.discoveryDeadline = detDiscoveryDeadlineEditor.getValue();
+			if (detClientEstateEditor != null)
+				d.clientEstate = safeText(detClientEstateEditor.getText());
+			if (detOfficePrinterCodeEditor != null)
+				d.officePrinterCode = safeText(detOfficePrinterCodeEditor.getText());
+			d.medicalRecordsReceived = captureNullableBoolean(detMedicalRecordsReceivedEditor);
+			d.feeAgreementSigned = captureNullableBoolean(detFeeAgreementSignedEditor);
+			if (detDateFeeAgreementSignedEditor != null)
+				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
+			d.acceptedChronology = captureNullableBoolean(detAcceptedChronologyEditor);
+			d.acceptedConsultantExpertSearch = captureNullableBoolean(detAcceptedConsultantExpertSearchEditor);
+			d.acceptedTestifyingExpertSearch = captureNullableBoolean(detAcceptedTestifyingExpertSearchEditor);
+			d.acceptedMedicalLiterature = captureNullableBoolean(detAcceptedMedicalLiteratureEditor);
+			if (detAcceptedDetailEditor != null)
+				d.acceptedDetail = safeText(detAcceptedDetailEditor.getText());
+			d.deniedChronology = captureNullableBoolean(detDeniedChronologyEditor);
+			if (detDeniedDetailEditor != null)
+				d.deniedDetail = safeText(detDeniedDetailEditor.getText());
+			if (detSummaryEditor != null)
+				d.summary = safeText(detSummaryEditor.getText());
+			if (detReceivedUpdatesEditor != null)
+				d.receivedUpdates = safeText(detReceivedUpdatesEditor.getText());
 		}
 	}
 
