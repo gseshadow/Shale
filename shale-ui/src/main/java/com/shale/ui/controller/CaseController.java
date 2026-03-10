@@ -1474,7 +1474,9 @@ public class CaseController {
 	}
 
 	private static String boolLabel(Boolean value) {
-		return Boolean.TRUE.equals(value) ? "Yes" : "No";
+		if (value == null)
+			return "—";
+		return value ? "Yes" : "No";
 	}
 
 
@@ -3248,6 +3250,27 @@ public class CaseController {
 			setVisibleManaged(editorNode, editEnabled);
 		}
 
+		private void renderNullableBoolean(CheckBox editor, Boolean value) {
+			if (editor == null)
+				return;
+			editor.setAllowIndeterminate(true);
+			if (value == null) {
+				editor.setIndeterminate(true);
+				editor.setSelected(false);
+				return;
+			}
+			editor.setIndeterminate(false);
+			editor.setSelected(value);
+		}
+
+		private Boolean captureNullableBoolean(CheckBox editor) {
+			if (editor == null)
+				return null;
+			if (editor.isIndeterminate())
+				return null;
+			return editor.isSelected();
+		}
+
 		void renderView(CaseDetailsDraft d) {
 			if (d == null)
 				return;
@@ -3350,24 +3373,17 @@ public class CaseController {
 				detClientEstateEditor.setText(d.clientEstate);
 			if (detOfficePrinterCodeEditor != null)
 				detOfficePrinterCodeEditor.setText(d.officePrinterCode);
-			if (detMedicalRecordsReceivedEditor != null)
-				detMedicalRecordsReceivedEditor.setSelected(Boolean.TRUE.equals(d.medicalRecordsReceived));
-			if (detFeeAgreementSignedEditor != null)
-				detFeeAgreementSignedEditor.setSelected(Boolean.TRUE.equals(d.feeAgreementSigned));
+			renderNullableBoolean(detMedicalRecordsReceivedEditor, d.medicalRecordsReceived);
+			renderNullableBoolean(detFeeAgreementSignedEditor, d.feeAgreementSigned);
 			if (detDateFeeAgreementSignedEditor != null)
 				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
-			if (detAcceptedChronologyEditor != null)
-				detAcceptedChronologyEditor.setSelected(Boolean.TRUE.equals(d.acceptedChronology));
-			if (detAcceptedConsultantExpertSearchEditor != null)
-				detAcceptedConsultantExpertSearchEditor.setSelected(Boolean.TRUE.equals(d.acceptedConsultantExpertSearch));
-			if (detAcceptedTestifyingExpertSearchEditor != null)
-				detAcceptedTestifyingExpertSearchEditor.setSelected(Boolean.TRUE.equals(d.acceptedTestifyingExpertSearch));
-			if (detAcceptedMedicalLiteratureEditor != null)
-				detAcceptedMedicalLiteratureEditor.setSelected(Boolean.TRUE.equals(d.acceptedMedicalLiterature));
+			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
+			renderNullableBoolean(detAcceptedConsultantExpertSearchEditor, d.acceptedConsultantExpertSearch);
+			renderNullableBoolean(detAcceptedTestifyingExpertSearchEditor, d.acceptedTestifyingExpertSearch);
+			renderNullableBoolean(detAcceptedMedicalLiteratureEditor, d.acceptedMedicalLiterature);
 			if (detAcceptedDetailEditor != null)
 				detAcceptedDetailEditor.setText(d.acceptedDetail);
-			if (detDeniedChronologyEditor != null)
-				detDeniedChronologyEditor.setSelected(Boolean.TRUE.equals(d.deniedChronology));
+			renderNullableBoolean(detDeniedChronologyEditor, d.deniedChronology);
 			if (detDeniedDetailEditor != null)
 				detDeniedDetailEditor.setText(d.deniedDetail);
 			if (detSummaryEditor != null)
@@ -3411,24 +3427,17 @@ public class CaseController {
 				d.clientEstate = safeText(detClientEstateEditor.getText());
 			if (detOfficePrinterCodeEditor != null)
 				d.officePrinterCode = safeText(detOfficePrinterCodeEditor.getText());
-			if (detMedicalRecordsReceivedEditor != null)
-				d.medicalRecordsReceived = detMedicalRecordsReceivedEditor.isSelected();
-			if (detFeeAgreementSignedEditor != null)
-				d.feeAgreementSigned = detFeeAgreementSignedEditor.isSelected();
+			d.medicalRecordsReceived = captureNullableBoolean(detMedicalRecordsReceivedEditor);
+			d.feeAgreementSigned = captureNullableBoolean(detFeeAgreementSignedEditor);
 			if (detDateFeeAgreementSignedEditor != null)
 				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
-			if (detAcceptedChronologyEditor != null)
-				d.acceptedChronology = detAcceptedChronologyEditor.isSelected();
-			if (detAcceptedConsultantExpertSearchEditor != null)
-				d.acceptedConsultantExpertSearch = detAcceptedConsultantExpertSearchEditor.isSelected();
-			if (detAcceptedTestifyingExpertSearchEditor != null)
-				d.acceptedTestifyingExpertSearch = detAcceptedTestifyingExpertSearchEditor.isSelected();
-			if (detAcceptedMedicalLiteratureEditor != null)
-				d.acceptedMedicalLiterature = detAcceptedMedicalLiteratureEditor.isSelected();
+			d.acceptedChronology = captureNullableBoolean(detAcceptedChronologyEditor);
+			d.acceptedConsultantExpertSearch = captureNullableBoolean(detAcceptedConsultantExpertSearchEditor);
+			d.acceptedTestifyingExpertSearch = captureNullableBoolean(detAcceptedTestifyingExpertSearchEditor);
+			d.acceptedMedicalLiterature = captureNullableBoolean(detAcceptedMedicalLiteratureEditor);
 			if (detAcceptedDetailEditor != null)
 				d.acceptedDetail = safeText(detAcceptedDetailEditor.getText());
-			if (detDeniedChronologyEditor != null)
-				d.deniedChronology = detDeniedChronologyEditor.isSelected();
+			d.deniedChronology = captureNullableBoolean(detDeniedChronologyEditor);
 			if (detDeniedDetailEditor != null)
 				d.deniedDetail = safeText(detDeniedDetailEditor.getText());
 			if (detSummaryEditor != null)
