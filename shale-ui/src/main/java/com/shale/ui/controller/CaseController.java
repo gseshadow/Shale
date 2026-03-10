@@ -924,6 +924,28 @@ public class CaseController {
 		}, "case-refresh-current-" + id).start();
 	}
 
+	private void refreshDetailsBaselineAfterRemoteAsync() {
+		if (caseDao == null || caseId == null)
+			return;
+		final long activeCaseId = caseId.longValue();
+		new Thread(() ->
+		{
+			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
+			CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
+			runOnFx(() ->
+			{
+				if (caseId == null || caseId.longValue() != activeCaseId || !detailsEditMode)
+					return;
+				if (overview != null)
+					currentOverview = overview;
+				if (detail != null) {
+					current = detail;
+					detailsBaseline = CaseDetailsDraft.from(detail, currentOverview);
+				}
+			});
+		}, "case-details-remote-baseline-" + activeCaseId).start();
+	}
+
 	private void applyLiveCaseName(String newName) {
 		String safeName = safeText(newName).trim();
 		if (safeName.isBlank())
@@ -2824,7 +2846,7 @@ public class CaseController {
 			if (handleCaseUpdateAdded(patch))
 				return;
 
-			if (handleEditModeConflict())
+			if (handleEditModeConflict(patch))
 				return;
 
 			if (shouldReloadForStructuralPatch(patch)) {
@@ -2881,6 +2903,7 @@ public class CaseController {
 			boolean teamChanged = patchedTeamChanged != null && patchedTeamChanged.intValue() == 1;
 			Integer patchedCaseUpdateAdded = extractPatchInt(rawPatch, "caseUpdateAdded");
 			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
+			boolean detailsTouched = hasDetailsFieldPatch(rawPatch);
 
 			return new LivePatchData(
 				rawPatch,
@@ -2898,8 +2921,28 @@ public class CaseController {
 				patchedResponsibleAttorneyUserId,
 				patchedPrimaryOpposingCounselContactId,
 				teamChanged,
-				caseUpdateAdded
+				caseUpdateAdded,
+				detailsTouched
 			);
+		}
+
+		private boolean hasDetailsFieldPatch(String rawPatch) {
+			if (rawPatch == null || rawPatch.isBlank())
+				return false;
+			String[] keys = {
+				"callerDate", "callerTime", "acceptedDate", "closedDate", "deniedDate",
+				"dateOfMedicalNegligence", "dateMedicalNegligenceWasDiscovered", "dateOfInjury",
+				"statuteOfLimitations", "tortNoticeDeadline", "discoveryDeadline",
+				"clientEstate", "officePrinterCode", "medicalRecordsReceived", "feeAgreementSigned",
+				"dateFeeAgreementSigned", "acceptedChronology", "acceptedConsultantExpertSearch",
+				"acceptedTestifyingExpertSearch", "acceptedMedicalLiterature", "acceptedDetail",
+				"deniedChronology", "deniedDetail", "summary", "receivedUpdates"
+			};
+			for (String key : keys) {
+				if (hasPatchKey(rawPatch, key))
+					return true;
+			}
+			return false;
 		}
 
 		private boolean handleCaseUpdateAdded(LivePatchData patch) {
@@ -2913,14 +2956,20 @@ public class CaseController {
 			return true;
 		}
 
-		private boolean handleEditModeConflict() {
-			if (!editMode)
-				return false;
-			runOnFx(() ->
-			{
-				showRemoteUpdateBanner();
-			});
-			return true;
+		private boolean handleEditModeConflict(LivePatchData patch) {
+			if (editMode) {
+				runOnFx(() ->
+				{
+					showRemoteUpdateBanner();
+				});
+				return true;
+			}
+			if (detailsEditMode && patch.detailsTouched()) {
+				runOnFx(() -> showRemoteUpdateBanner());
+				refreshDetailsBaselineAfterRemoteAsync();
+				return true;
+			}
+			return false;
 		}
 
 		private boolean shouldReloadForStructuralPatch(LivePatchData patch) {
@@ -2930,7 +2979,8 @@ public class CaseController {
 					|| patch.patchedPracticeAreaId() != null
 					|| patch.patchedResponsibleAttorneyUserId() != null
 					|| patch.patchedPrimaryOpposingCounselContactId() != null
-					|| patch.teamChanged();
+					|| patch.teamChanged()
+					|| patch.detailsTouched();
 		}
 
 		private void handleStructuralReload(LivePatchData patch) {
@@ -3036,7 +3086,8 @@ public class CaseController {
 			Integer patchedResponsibleAttorneyUserId,
 			Integer patchedPrimaryOpposingCounselContactId,
 			boolean teamChanged,
-			boolean caseUpdateAdded) {
+			boolean caseUpdateAdded,
+			boolean detailsTouched) {
 	}
 
 	private final class CaseTeamCoordinator {
@@ -3258,7 +3309,13 @@ public class CaseController {
 						request.receivedUpdates(),
 						request.expectedRowVer());
 
-				runOnFx(() -> handleSaveResult(updated));
+				String importantChangesNote = "";
+				if (updated != null)
+					importantChangesNote = buildImportantDetailsChangesNote(request, request.baseline(), updated);
+				persistImportantDetailsChangesNote(request, importantChangesNote);
+
+				String noteForUi = importantChangesNote;
+				runOnFx(() -> handleSaveResult(request, updated, noteForUi));
 			} catch (Exception ex) {
 				runOnFx(() -> {
 					showError("Failed to save case details. " + ex.getMessage());
@@ -3267,7 +3324,7 @@ public class CaseController {
 			}
 		}
 
-		private void handleSaveResult(CaseDetailDto updated) {
+		private void handleSaveResult(DetailsSaveRequest request, CaseDetailDto updated, String importantChangesNote) {
 			if (updated == null) {
 				showError("This case was updated elsewhere. Reload and try again.");
 				setBusy(false);
@@ -3281,8 +3338,131 @@ public class CaseController {
 			renderDetailsFromCurrent();
 			applyDetail(updated);
 			clearError();
+			publishDetailsFieldUpdates(request, importantChangesNote);
 			setBusy(false);
 			reloadCurrentCaseForViewMode();
+		}
+
+		private void persistImportantDetailsChangesNote(DetailsSaveRequest request, String importantChangesNote) {
+			if (importantChangesNote.isBlank())
+				return;
+			Integer tenantId = (appState == null ? null : appState.getShaleClientId());
+			if (tenantId == null || tenantId <= 0)
+				return;
+			caseDao.addCaseUpdate(request.caseId(), tenantId, importantChangesNote, (appState == null ? null : appState.getUserId()));
+		}
+
+		private void publishDetailsFieldUpdates(DetailsSaveRequest request, String importantChangesNote) {
+			CaseDetailDto baseline = request.baseline();
+			publishIfChanged(request.caseId(), "name", normalizeRequired(baseline.getCaseName()), request.name());
+			publishIfChanged(request.caseId(), "caseNumber", normalizeNullableText(baseline.getCaseNumber()), request.caseNumber());
+			publishIfChanged(request.caseId(), "practiceAreaId", baseline.getPracticeAreaId(), request.practiceAreaId());
+			publishIfChanged(request.caseId(), "description", normalizeNullableText(baseline.getDescription()), request.description());
+			publishIfChanged(request.caseId(), "callerDate", baseline.getCallerDate(), request.callerDate());
+			publishIfChanged(request.caseId(), "callerTime", normalizeNullableText(baseline.getCallerTime()), request.callerTime());
+			publishIfChanged(request.caseId(), "acceptedDate", baseline.getAcceptedDate(), request.acceptedDate());
+			publishIfChanged(request.caseId(), "closedDate", baseline.getClosedDate(), request.closedDate());
+			publishIfChanged(request.caseId(), "deniedDate", baseline.getDeniedDate(), request.deniedDate());
+			publishIfChanged(request.caseId(), "dateOfMedicalNegligence", baseline.getDateOfMedicalNegligence(), request.dateOfMedicalNegligence());
+			publishIfChanged(request.caseId(), "dateMedicalNegligenceWasDiscovered", baseline.getDateMedicalNegligenceWasDiscovered(), request.dateMedicalNegligenceWasDiscovered());
+			publishIfChanged(request.caseId(), "dateOfInjury", baseline.getDateOfInjury(), request.dateOfInjury());
+			publishIfChanged(request.caseId(), "statuteOfLimitations", baseline.getStatuteOfLimitations(), request.statuteOfLimitations());
+			publishIfChanged(request.caseId(), "tortNoticeDeadline", baseline.getTortNoticeDeadline(), request.tortNoticeDeadline());
+			publishIfChanged(request.caseId(), "discoveryDeadline", baseline.getDiscoveryDeadline(), request.discoveryDeadline());
+			publishIfChanged(request.caseId(), "clientEstate", normalizeNullableText(baseline.getClientEstate()), request.clientEstate());
+			publishIfChanged(request.caseId(), "officePrinterCode", normalizeNullableText(baseline.getOfficePrinterCode()), request.officePrinterCode());
+			publishIfChanged(request.caseId(), "medicalRecordsReceived", baseline.getMedicalRecordsReceived(), request.medicalRecordsReceived());
+			publishIfChanged(request.caseId(), "feeAgreementSigned", baseline.getFeeAgreementSigned(), request.feeAgreementSigned());
+			publishIfChanged(request.caseId(), "dateFeeAgreementSigned", baseline.getDateFeeAgreementSigned(), request.dateFeeAgreementSigned());
+			publishIfChanged(request.caseId(), "acceptedChronology", baseline.getAcceptedChronology(), request.acceptedChronology());
+			publishIfChanged(request.caseId(), "acceptedConsultantExpertSearch", baseline.getAcceptedConsultantExpertSearch(), request.acceptedConsultantExpertSearch());
+			publishIfChanged(request.caseId(), "acceptedTestifyingExpertSearch", baseline.getAcceptedTestifyingExpertSearch(), request.acceptedTestifyingExpertSearch());
+			publishIfChanged(request.caseId(), "acceptedMedicalLiterature", baseline.getAcceptedMedicalLiterature(), request.acceptedMedicalLiterature());
+			publishIfChanged(request.caseId(), "acceptedDetail", normalizeNullableText(baseline.getAcceptedDetail()), request.acceptedDetail());
+			publishIfChanged(request.caseId(), "deniedChronology", baseline.getDeniedChronology(), request.deniedChronology());
+			publishIfChanged(request.caseId(), "deniedDetail", normalizeNullableText(baseline.getDeniedDetail()), request.deniedDetail());
+			publishIfChanged(request.caseId(), "summary", normalizeNullableText(baseline.getSummary()), request.summary());
+			publishIfChanged(request.caseId(), "receivedUpdates", normalizeNullableText(baseline.getReceivedUpdates()), request.receivedUpdates());
+
+			// Keep Overview inline listeners responsive for these two shared fields.
+			publishIfChanged(request.caseId(), "incidentDate", baseline.getDateOfInjury(), request.dateOfInjury());
+			publishIfChanged(request.caseId(), "solDate", baseline.getStatuteOfLimitations(), request.statuteOfLimitations());
+
+			if (!importantChangesNote.isBlank())
+				publishCaseUpdateAdded(request.caseId());
+		}
+
+		private void publishIfChanged(long caseId, String field, Object before, Object after) {
+			if (!Objects.equals(before, after))
+				publishCaseFieldUpdated(caseId, field, after);
+		}
+
+		private String buildImportantDetailsChangesNote(DetailsSaveRequest request, CaseDetailDto before, CaseDetailDto after) {
+			if (before == null || after == null)
+				return "";
+			java.util.List<String> lines = new java.util.ArrayList<>();
+			addDetailIfPresent(lines, buildDetailsChangeLine("Case name", before.getCaseName(), after.getCaseName()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Case number", before.getCaseNumber(), after.getCaseNumber()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Practice area", safePracticeArea(before), safePracticeArea(after)));
+			if (!Objects.equals(normalizeNullableText(before.getDescription()), normalizeNullableText(after.getDescription())))
+				addDetailIfPresent(lines, "Description changed");
+			addDetailIfPresent(lines, buildDetailsChangeLine("Caller date", formatDate(before.getCallerDate()), formatDate(after.getCallerDate())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Caller time", before.getCallerTime(), after.getCallerTime()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted date", formatDate(before.getAcceptedDate()), formatDate(after.getAcceptedDate())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Closed date", formatDate(before.getClosedDate()), formatDate(after.getClosedDate())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Denied date", formatDate(before.getDeniedDate()), formatDate(after.getDeniedDate())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Date of medical negligence", formatDate(before.getDateOfMedicalNegligence()), formatDate(after.getDateOfMedicalNegligence())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Date negligence discovered", formatDate(before.getDateMedicalNegligenceWasDiscovered()), formatDate(after.getDateMedicalNegligenceWasDiscovered())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Date of injury", formatDate(before.getDateOfInjury()), formatDate(after.getDateOfInjury())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Statute of limitations", formatDate(before.getStatuteOfLimitations()), formatDate(after.getStatuteOfLimitations())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Tort notice deadline", formatDate(before.getTortNoticeDeadline()), formatDate(after.getTortNoticeDeadline())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Discovery deadline", formatDate(before.getDiscoveryDeadline()), formatDate(after.getDiscoveryDeadline())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Client estate", before.getClientEstate(), after.getClientEstate()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Office printer code", before.getOfficePrinterCode(), after.getOfficePrinterCode()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Medical records received", boolLabel(before.getMedicalRecordsReceived()), boolLabel(after.getMedicalRecordsReceived())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Fee agreement signed", boolLabel(before.getFeeAgreementSigned()), boolLabel(after.getFeeAgreementSigned())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Date fee agreement signed", formatDate(before.getDateFeeAgreementSigned()), formatDate(after.getDateFeeAgreementSigned())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted chronology", boolLabel(before.getAcceptedChronology()), boolLabel(after.getAcceptedChronology())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted consultant expert search", boolLabel(before.getAcceptedConsultantExpertSearch()), boolLabel(after.getAcceptedConsultantExpertSearch())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted testifying expert search", boolLabel(before.getAcceptedTestifyingExpertSearch()), boolLabel(after.getAcceptedTestifyingExpertSearch())));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Accepted medical literature", boolLabel(before.getAcceptedMedicalLiterature()), boolLabel(after.getAcceptedMedicalLiterature())));
+			if (!Objects.equals(normalizeNullableText(before.getAcceptedDetail()), normalizeNullableText(after.getAcceptedDetail())))
+				addDetailIfPresent(lines, "Accepted detail changed");
+			addDetailIfPresent(lines, buildDetailsChangeLine("Denied chronology", boolLabel(before.getDeniedChronology()), boolLabel(after.getDeniedChronology())));
+			if (!Objects.equals(normalizeNullableText(before.getDeniedDetail()), normalizeNullableText(after.getDeniedDetail())))
+				addDetailIfPresent(lines, "Denied detail changed");
+			if (!Objects.equals(normalizeNullableText(before.getSummary()), normalizeNullableText(after.getSummary())))
+				addDetailIfPresent(lines, "Summary changed");
+			if (!Objects.equals(normalizeNullableText(before.getReceivedUpdates()), normalizeNullableText(after.getReceivedUpdates())))
+				addDetailIfPresent(lines, "Received updates changed");
+			return String.join("\n", lines);
+		}
+
+		private String buildDetailsChangeLine(String label, String oldValue, String newValue) {
+			String oldSafe = normalizeUpdateValue(oldValue);
+			String newSafe = normalizeUpdateValue(newValue);
+			if (oldSafe.equals(newSafe))
+				return "";
+			return label + " changed: from " + oldSafe + " to " + newSafe;
+		}
+
+		private String normalizeUpdateValue(String value) {
+			String trimmed = safeText(value).trim().replaceAll("\\s+", " ");
+			return trimmed.isBlank() ? "none" : trimmed;
+		}
+
+		private void addDetailIfPresent(List<String> out, String line) {
+			if (out == null)
+				return;
+			String text = safeText(line).trim();
+			if (!text.isBlank())
+				out.add(text);
+		}
+
+		private String safePracticeArea(CaseDetailDto detail) {
+			if (detail == null || detail.getPracticeAreaId() == null)
+				return "none";
+			return String.valueOf(detail.getPracticeAreaId());
 		}
 
 		private DetailsSaveRequest buildSaveRequest(CaseDetailsDraft source, CaseDetailDto baseline) {
@@ -3364,6 +3544,7 @@ public class CaseController {
 				summary,
 				receivedUpdates,
 				baseline.getRowVer(),
+				baseline,
 				changed);
 		}
 
@@ -3420,6 +3601,7 @@ public class CaseController {
 			String summary,
 			String receivedUpdates,
 			byte[] expectedRowVer,
+			CaseDetailDto baseline,
 			boolean hasChanges) {
 	}
 
