@@ -2006,7 +2006,7 @@ public class CaseController {
 				boolean teamChanged = persistTeamChanges(request);
 
 				CaseOverviewDto updatedOverview = caseDao.getOverview(request.saveCaseId());
-				String importantChangesNote = buildImportantOverviewChangesNote(request.baseline().baseOverview(), updatedOverview, teamChanged);
+				String importantChangesNote = buildImportantOverviewChangesNote(request, updatedOverview, teamChanged);
 				persistImportantChangesNote(request, importantChangesNote);
 
 				runOnFx(() -> finalizeSuccessfulSave(request, updated, computation, teamChanged, importantChangesNote));
@@ -2222,6 +2222,17 @@ public class CaseController {
 		private static String normalizeUpdateValue(String value) {
 			String trimmed = safeText(value).trim().replaceAll("\\s+", " ");
 			return trimmed.isBlank() ? "none" : trimmed;
+		}
+
+		private static String buildImportantOverviewChangesNote(SaveRequest request, CaseOverviewDto updatedOverview, boolean teamChanged) {
+			java.util.List<String> lines = new java.util.ArrayList<>();
+			addIfPresent(lines, buildOverviewChangeLine("Case name", request.baseline().oldName(), request.saveDraft().caseName()));
+			addIfPresent(lines, buildOverviewChangeLine("Case number", request.baseline().oldNumber(), request.saveDraft().caseNumber()));
+			if (!normalizeUpdateValue(request.baseline().oldDescription()).equals(normalizeUpdateValue(request.saveDraft().description())))
+				addIfPresent(lines, "Description changed");
+
+			addIfPresent(lines, buildImportantOverviewChangesNote(request.baseline().baseOverview(), updatedOverview, teamChanged));
+			return String.join("\n", lines);
 		}
 
 		private static String buildImportantOverviewChangesNote(CaseOverviewDto before, CaseOverviewDto after, boolean teamChanged) {
