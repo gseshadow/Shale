@@ -1497,7 +1497,7 @@ public class CaseController {
 		detPracticeAreaHost.getChildren().setAll(practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI));
 	}
 
-	private static Boolean parseEstateCase(String raw) {
+	private static Boolean parseNullableBooleanStorage(String raw) {
 		String v = safeText(raw).trim();
 		if (v.isBlank())
 			return null;
@@ -1508,7 +1508,7 @@ public class CaseController {
 		return null;
 	}
 
-	private static String estateCaseToStorageValue(Boolean value) {
+	private static String toNullableBooleanStorage(Boolean value) {
 		if (value == null)
 			return null;
 		return value ? "1" : "0";
@@ -3323,7 +3323,7 @@ public class CaseController {
 			d.deniedDetail = detail == null ? "" : safeText(detail.getDeniedDetail());
 
 			d.summary = detail == null ? "" : safeText(detail.getSummary());
-			d.receivedUpdates = detail == null ? null : parseEstateCase(detail.getReceivedUpdates());
+			d.receivedUpdates = detail == null ? null : parseNullableBooleanStorage(detail.getReceivedUpdates());
 			return d;
 		}
 
@@ -3550,7 +3550,7 @@ public class CaseController {
 			addDetailIfPresent(lines, buildDetailsChangeLine("Statute of limitations", formatDate(before.getStatuteOfLimitations()), formatDate(after.getStatuteOfLimitations())));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Tort notice deadline", formatDate(before.getTortNoticeDeadline()), formatDate(after.getTortNoticeDeadline())));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Discovery deadline", formatDate(before.getDiscoveryDeadline()), formatDate(after.getDiscoveryDeadline())));
-			addDetailIfPresent(lines, buildDetailsChangeLine("Estate case", boolLabel(parseEstateCase(before.getClientEstate())), boolLabel(parseEstateCase(after.getClientEstate()))));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Estate case", boolLabel(parseNullableBooleanStorage(before.getClientEstate())), boolLabel(parseNullableBooleanStorage(after.getClientEstate()))));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Office printer code", before.getOfficePrinterCode(), after.getOfficePrinterCode()));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Medical records received", boolLabel(before.getMedicalRecordsReceived()), boolLabel(after.getMedicalRecordsReceived())));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Fee agreement signed", boolLabel(before.getFeeAgreementSigned()), boolLabel(after.getFeeAgreementSigned())));
@@ -3566,7 +3566,7 @@ public class CaseController {
 				addDetailIfPresent(lines, "Denied detail changed");
 			if (!Objects.equals(normalizeNullableText(before.getSummary()), normalizeNullableText(after.getSummary())))
 				addDetailIfPresent(lines, "Summary changed");
-			addDetailIfPresent(lines, buildDetailsChangeLine("Received updates", boolLabel(parseEstateCase(before.getReceivedUpdates())), boolLabel(parseEstateCase(after.getReceivedUpdates()))));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Received updates", boolLabel(parseNullableBooleanStorage(before.getReceivedUpdates())), boolLabel(parseNullableBooleanStorage(after.getReceivedUpdates()))));
 			return String.join("\n", lines);
 		}
 
@@ -3616,12 +3616,12 @@ public class CaseController {
 			Integer practiceAreaId = source.practiceAreaId;
 			String description = normalizeNullableText(source.description);
 			String callerTime = normalizeCallerTimeInput(source.callerTime);
-			String clientEstate = estateCaseToStorageValue(parseEstateCase(source.clientEstate));
+			String clientEstate = toNullableBooleanStorage(parseNullableBooleanStorage(source.clientEstate));
 			String officePrinterCode = normalizeNullableText(source.officePrinterCode);
 			String acceptedDetail = normalizeNullableText(source.acceptedDetail);
 			String deniedDetail = normalizeNullableText(source.deniedDetail);
 			String summary = normalizeNullableText(source.summary);
-			String receivedUpdates = estateCaseToStorageValue(source.receivedUpdates);
+			String receivedUpdates = toNullableBooleanStorage(source.receivedUpdates);
 
 			boolean statusChanged = !Objects.equals(source.primaryStatusId, currentOverview == null ? null : currentOverview.getPrimaryStatusId());
 			boolean changed =
@@ -3868,7 +3868,7 @@ public class CaseController {
 			if (detDiscoveryDeadlineValue != null)
 				detDiscoveryDeadlineValue.setText(formatDate(d.discoveryDeadline));
 			if (detClientEstateValue != null)
-				detClientEstateValue.setText(boolLabel(parseEstateCase(d.clientEstate)));
+				detClientEstateValue.setText(boolLabel(parseNullableBooleanStorage(d.clientEstate)));
 			if (detOfficePrinterCodeValue != null)
 				detOfficePrinterCodeValue.setText(safe(d.officePrinterCode));
 			if (detMedicalRecordsReceivedValue != null)
@@ -3941,7 +3941,7 @@ public class CaseController {
 				detTortNoticeDeadlineEditor.setValue(d.tortNoticeDeadline);
 			if (detDiscoveryDeadlineEditor != null)
 				detDiscoveryDeadlineEditor.setValue(d.discoveryDeadline);
-			renderNullableBoolean(detClientEstateEditor, parseEstateCase(d.clientEstate));
+			renderNullableBoolean(detClientEstateEditor, parseNullableBooleanStorage(d.clientEstate));
 			if (detOfficePrinterCodeEditor != null)
 				detOfficePrinterCodeEditor.setText(d.officePrinterCode);
 			renderNullableBoolean(detMedicalRecordsReceivedEditor, d.medicalRecordsReceived);
@@ -3994,7 +3994,7 @@ public class CaseController {
 				d.tortNoticeDeadline = detTortNoticeDeadlineEditor.getValue();
 			if (detDiscoveryDeadlineEditor != null)
 				d.discoveryDeadline = detDiscoveryDeadlineEditor.getValue();
-			d.clientEstate = estateCaseToStorageValue(captureNullableBoolean(detClientEstateEditor));
+			d.clientEstate = toNullableBooleanStorage(captureNullableBoolean(detClientEstateEditor));
 			if (detOfficePrinterCodeEditor != null)
 				d.officePrinterCode = safeText(detOfficePrinterCodeEditor.getText());
 			d.medicalRecordsReceived = captureNullableBoolean(detMedicalRecordsReceivedEditor);
