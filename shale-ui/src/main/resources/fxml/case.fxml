@@ -218,88 +218,91 @@
 			<!-- DETAILS PANE -->
 			<ScrollPane fx:id="detailsScrollPane" fitToWidth="true" hbarPolicy="NEVER" visible="false" managed="false"
 				style="-fx-background-color: transparent;">
-				<VBox fx:id="detailsPane" spacing="12" maxWidth="980">
+				<VBox fx:id="detailsPane" spacing="14" maxWidth="980">
 					<padding>
-						<Insets top="12" right="12" bottom="12" left="12" />
+						<Insets top="14" right="14" bottom="14" left="14" />
 					</padding>
-					<HBox alignment="CENTER_LEFT" spacing="8">
-						<Label text="Details" style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+					<HBox alignment="CENTER_LEFT" spacing="10">
+						<Label text="Details" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-opacity: 0.92;" />
 						<Region HBox.hgrow="ALWAYS" />
 						<Button fx:id="detailsEditButton" text="Edit" />
 						<Button fx:id="detailsSaveButton" text="Save" visible="false" managed="false" />
 						<Button fx:id="detailsCancelButton" text="Cancel" visible="false" managed="false" />
 					</HBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
-						<Label text="Core" style="-fx-font-weight: bold;" />
-						<GridPane hgap="14" vgap="8">
+					<VBox spacing="12" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+						<Label text="Core" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="16" vgap="10">
 							<columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
 							<Label text="Name:" GridPane.rowIndex="0" /><Label fx:id="detNameValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><TextField fx:id="detNameEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="CaseNumber:" GridPane.rowIndex="1" /><Label fx:id="detCaseNumberValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextField fx:id="detCaseNumberEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="PracticeAreaId:" GridPane.rowIndex="2" /><Label fx:id="detPracticeAreaIdValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><TextField fx:id="detPracticeAreaIdEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="Description:" GridPane.rowIndex="3" /><Label fx:id="detDescriptionValue" text="—" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" /><TextArea fx:id="detDescriptionEditor" prefRowCount="4" wrapText="true" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<Label text="Case Number:" GridPane.rowIndex="1" /><Label fx:id="detCaseNumberValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextField fx:id="detCaseNumberEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Status:" GridPane.rowIndex="2" /><Label fx:id="detCaseStatusValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="1" fx:id="detCaseStatusEditorRow" visible="false" managed="false"><StackPane fx:id="detCaseStatusHost" /><Button fx:id="detChangeStatusButton" text="Change" /></HBox>
+							<Label text="Practice Area:" GridPane.rowIndex="3" /><Label fx:id="detPracticeAreaIdValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.columnIndex="1" fx:id="detPracticeAreaEditorRow" visible="false" managed="false"><StackPane fx:id="detPracticeAreaHost" /><Button fx:id="detChangePracticeAreaButton" text="Change" /></HBox>
+							<Label text="Description:" GridPane.rowIndex="4" /><Label fx:id="detDescriptionValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" /><TextArea fx:id="detDescriptionEditor" prefRowCount="4" wrapText="true" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
-						<Label text="Lifecycle" style="-fx-font-weight: bold;" />
-						<GridPane hgap="14" vgap="8">
+					<VBox spacing="12" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+						<Label text="Lifecycle" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="16" vgap="10">
 							<columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
-							<Label text="CallerDate:" GridPane.rowIndex="0" /><Label fx:id="detCallerDateValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><DatePicker fx:id="detCallerDateEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="CallerTime:" GridPane.rowIndex="1" /><Label fx:id="detCallerTimeValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextField fx:id="detCallerTimeEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="AcceptedDate:" GridPane.rowIndex="2" /><Label fx:id="detAcceptedDateValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><DatePicker fx:id="detAcceptedDateEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="ClosedDate:" GridPane.rowIndex="3" /><Label fx:id="detClosedDateValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><DatePicker fx:id="detClosedDateEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<Label text="DeniedDate:" GridPane.rowIndex="4" /><Label fx:id="detDeniedDateValue" text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" /><DatePicker fx:id="detDeniedDateEditor" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<Label text="Date of Intake:" GridPane.rowIndex="0" /><Label fx:id="detCallerDateValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><DatePicker fx:id="detCallerDateEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Time of Intake:" GridPane.rowIndex="1" /><Label fx:id="detCallerTimeValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextField fx:id="detCallerTimeEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Date Accepted:" GridPane.rowIndex="2" /><Label fx:id="detAcceptedDateValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><DatePicker fx:id="detAcceptedDateEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<Label text="Date Closed:" GridPane.rowIndex="3" /><Label fx:id="detClosedDateValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><DatePicker fx:id="detClosedDateEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<Label text="Date Denied:" GridPane.rowIndex="4" /><Label fx:id="detDeniedDateValue" text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" /><DatePicker fx:id="detDeniedDateEditor" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
-						<Label text="Incident &amp; Deadlines" style="-fx-font-weight: bold;" />
-						<GridPane hgap="14" vgap="8"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
-							<Label text="DateOfMedicalNegligence:" GridPane.rowIndex="0" /><Label fx:id="detDateOfMedicalNegligenceValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><DatePicker fx:id="detDateOfMedicalNegligenceEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="DateMedicalNegligenceWasDiscovered:" GridPane.rowIndex="1" /><Label fx:id="detDateMedicalNegligenceWasDiscoveredValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><DatePicker fx:id="detDateMedicalNegligenceWasDiscoveredEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="DateOfInjury:" GridPane.rowIndex="2" /><Label fx:id="detDateOfInjuryValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><DatePicker fx:id="detDateOfInjuryEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="StatuteOfLimitations:" GridPane.rowIndex="3" /><Label fx:id="detStatuteOfLimitationsValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><DatePicker fx:id="detStatuteOfLimitationsEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<Label text="TortNoticeDeadline:" GridPane.rowIndex="4" /><Label fx:id="detTortNoticeDeadlineValue" text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" /><DatePicker fx:id="detTortNoticeDeadlineEditor" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-							<Label text="DiscoveryDeadline:" GridPane.rowIndex="5" /><Label fx:id="detDiscoveryDeadlineValue" text="—" GridPane.rowIndex="5" GridPane.columnIndex="1" /><DatePicker fx:id="detDiscoveryDeadlineEditor" visible="false" managed="false" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+					<VBox spacing="12" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+						<Label text="Incident &amp; Deadlines" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="16" vgap="10"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
+							<Label text="Date of Medical Negligence:" GridPane.rowIndex="0" /><Label fx:id="detDateOfMedicalNegligenceValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><DatePicker fx:id="detDateOfMedicalNegligenceEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Date Medical Negligence Was Discovered:" GridPane.rowIndex="1" /><Label fx:id="detDateMedicalNegligenceWasDiscoveredValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><DatePicker fx:id="detDateMedicalNegligenceWasDiscoveredEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Date of Injury:" GridPane.rowIndex="2" /><Label fx:id="detDateOfInjuryValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><DatePicker fx:id="detDateOfInjuryEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<Label text="Statute of Limitations:" GridPane.rowIndex="3" /><Label fx:id="detStatuteOfLimitationsValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><DatePicker fx:id="detStatuteOfLimitationsEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<Label text="Tort Notice Deadline:" GridPane.rowIndex="4" /><Label fx:id="detTortNoticeDeadlineValue" text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" /><DatePicker fx:id="detTortNoticeDeadlineEditor" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<Label text="Discovery Deadline:" GridPane.rowIndex="5" /><Label fx:id="detDiscoveryDeadlineValue" text="—" GridPane.rowIndex="5" GridPane.columnIndex="1" /><DatePicker fx:id="detDiscoveryDeadlineEditor" visible="false" managed="false" GridPane.rowIndex="5" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
-						<Label text="Administrative" style="-fx-font-weight: bold;" />
-						<GridPane hgap="14" vgap="8"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
-							<Label text="ClientEstate:" GridPane.rowIndex="0" /><Label fx:id="detClientEstateValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><TextField fx:id="detClientEstateEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="OfficePrinterCode:" GridPane.rowIndex="1" /><Label fx:id="detOfficePrinterCodeValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextField fx:id="detOfficePrinterCodeEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="MedicalRecordsReceived:" GridPane.rowIndex="2" /><Label fx:id="detMedicalRecordsReceivedValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><CheckBox fx:id="detMedicalRecordsReceivedEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="FeeAgreementSigned:" GridPane.rowIndex="3" /><Label fx:id="detFeeAgreementSignedValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><CheckBox fx:id="detFeeAgreementSignedEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<Label text="DateFeeAgreementSigned:" GridPane.rowIndex="4" /><Label fx:id="detDateFeeAgreementSignedValue" text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" /><DatePicker fx:id="detDateFeeAgreementSignedEditor" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+					<VBox spacing="12" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+						<Label text="Administrative" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="16" vgap="10"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
+							<Label text="Estate Case:" GridPane.rowIndex="0" /><Label fx:id="detClientEstateValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detClientEstateEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Office Case Code:" GridPane.rowIndex="1" /><Label fx:id="detOfficePrinterCodeValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextField fx:id="detOfficePrinterCodeEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Medical Records Received:" GridPane.rowIndex="2" /><Label fx:id="detMedicalRecordsReceivedValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><CheckBox fx:id="detMedicalRecordsReceivedEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<Label text="Fee Agreement Signed:" GridPane.rowIndex="3" /><Label fx:id="detFeeAgreementSignedValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><CheckBox fx:id="detFeeAgreementSignedEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<Label text="Fee Agreement Date:" GridPane.rowIndex="4" /><Label fx:id="detDateFeeAgreementSignedValue" text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" /><DatePicker fx:id="detDateFeeAgreementSignedEditor" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
-						<Label text="Accepted" style="-fx-font-weight: bold;" />
-						<GridPane hgap="14" vgap="8"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
-							<Label text="AcceptedChronology:" GridPane.rowIndex="0" /><Label fx:id="detAcceptedChronologyValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedChronologyEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="AcceptedConsultantExpertSearch:" GridPane.rowIndex="1" /><Label fx:id="detAcceptedConsultantExpertSearchValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedConsultantExpertSearchEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="AcceptedTestifyingExpertSearch:" GridPane.rowIndex="2" /><Label fx:id="detAcceptedTestifyingExpertSearchValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedTestifyingExpertSearchEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="AcceptedMedicalLiterature:" GridPane.rowIndex="3" /><Label fx:id="detAcceptedMedicalLiteratureValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedMedicalLiteratureEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<Label text="AcceptedDetail:" GridPane.rowIndex="4" /><Label fx:id="detAcceptedDetailValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" /><TextArea fx:id="detAcceptedDetailEditor" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+					<VBox spacing="12" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+						<Label text="Accepted" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="16" vgap="10"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
+							<Label text="Chronology:" GridPane.rowIndex="0" /><Label fx:id="detAcceptedChronologyValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedChronologyEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Consultant Expert Search:" GridPane.rowIndex="1" /><Label fx:id="detAcceptedConsultantExpertSearchValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedConsultantExpertSearchEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Testifying Expert Search:" GridPane.rowIndex="2" /><Label fx:id="detAcceptedTestifyingExpertSearchValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedTestifyingExpertSearchEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<Label text="Medical Literature:" GridPane.rowIndex="3" /><Label fx:id="detAcceptedMedicalLiteratureValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedMedicalLiteratureEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<Label text="Detail:" GridPane.rowIndex="4" /><Label fx:id="detAcceptedDetailValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" /><TextArea fx:id="detAcceptedDetailEditor" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
-						<Label text="Denied" style="-fx-font-weight: bold;" />
-						<GridPane hgap="14" vgap="8"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
-							<Label text="DeniedChronology:" GridPane.rowIndex="0" /><Label fx:id="detDeniedChronologyValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detDeniedChronologyEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="DeniedDetail:" GridPane.rowIndex="1" /><Label fx:id="detDeniedDetailValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextArea fx:id="detDeniedDetailEditor" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+					<VBox spacing="12" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+						<Label text="Denied" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="16" vgap="10"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
+							<Label text="Chronology:" GridPane.rowIndex="0" /><Label fx:id="detDeniedChronologyValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detDeniedChronologyEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Detail:" GridPane.rowIndex="1" /><Label fx:id="detDeniedDetailValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextArea fx:id="detDeniedDetailEditor" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
-						<Label text="Notes" style="-fx-font-weight: bold;" />
-						<GridPane hgap="14" vgap="8"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
+					<VBox spacing="12" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+						<Label text="Notes" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="16" vgap="10"><columnConstraints><ColumnConstraints minWidth="220" prefWidth="240" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
 							<Label text="Summary:" GridPane.rowIndex="0" /><Label fx:id="detSummaryValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" /><TextArea fx:id="detSummaryEditor" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="ReceivedUpdates:" GridPane.rowIndex="1" /><Label fx:id="detReceivedUpdatesValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextArea fx:id="detReceivedUpdatesEditor" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Received Updates:" GridPane.rowIndex="1" /><Label fx:id="detReceivedUpdatesValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><CheckBox fx:id="detReceivedUpdatesEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 				</VBox>
