@@ -165,6 +165,8 @@ public class CaseController {
 	@FXML
 	private Label errorLabel;
 	@FXML
+	private Label detailsErrorLabel;
+	@FXML
 	private HBox remoteUpdateBanner;
 	@FXML
 	private Button reloadRemoteButton;
@@ -1604,19 +1606,28 @@ public class CaseController {
 	}
 
 	private void clearError() {
-		if (errorLabel != null) {
-			errorLabel.setText("");
-			errorLabel.setVisible(false);
-			errorLabel.setManaged(false);
-		}
+		setErrorLabel(errorLabel, "");
+		setErrorLabel(detailsErrorLabel, "");
 	}
 
 	private void showError(String message) {
-		if (errorLabel != null) {
-			errorLabel.setText(message == null ? "" : message);
-			errorLabel.setVisible(message != null && !message.isBlank());
-			errorLabel.setManaged(message != null && !message.isBlank());
+		boolean detailsVisible = detailsScrollPane != null && detailsScrollPane.isVisible();
+		if (detailsVisible) {
+			setErrorLabel(detailsErrorLabel, message);
+			setErrorLabel(errorLabel, "");
+			return;
 		}
+		setErrorLabel(errorLabel, message);
+		setErrorLabel(detailsErrorLabel, "");
+	}
+
+	private void setErrorLabel(Label target, String message) {
+		if (target == null)
+			return;
+		target.setText(message == null ? "" : message);
+		boolean visible = message != null && !message.isBlank();
+		target.setVisible(visible);
+		target.setManaged(visible);
 	}
 
 	private static void runOnFx(Runnable runnable) {
@@ -3391,6 +3402,7 @@ public class CaseController {
 				detailsBaseline = null;
 				detailsEditor.setEditMode(false);
 				renderDetailsFromCurrent();
+				showError("No changes to save.");
 				return;
 			}
 
