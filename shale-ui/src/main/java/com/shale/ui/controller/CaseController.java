@@ -277,7 +277,7 @@ public class CaseController {
 	@FXML private Label detSummaryValue;
 	@FXML private TextArea detSummaryEditor;
 	@FXML private Label detReceivedUpdatesValue;
-	@FXML private TextArea detReceivedUpdatesEditor;
+	@FXML private CheckBox detReceivedUpdatesEditor;
 
 	// ----------------------------
 	// Constants
@@ -3275,7 +3275,7 @@ public class CaseController {
 		Boolean deniedChronology;
 		String deniedDetail;
 		String summary;
-		String receivedUpdates;
+		Boolean receivedUpdates;
 
 		static CaseDetailsDraft from(CaseDetailDto detail, CaseOverviewDto overview) {
 			CaseDetailsDraft d = new CaseDetailsDraft();
@@ -3323,7 +3323,7 @@ public class CaseController {
 			d.deniedDetail = detail == null ? "" : safeText(detail.getDeniedDetail());
 
 			d.summary = detail == null ? "" : safeText(detail.getSummary());
-			d.receivedUpdates = detail == null ? "" : safeText(detail.getReceivedUpdates());
+			d.receivedUpdates = detail == null ? null : parseEstateCase(detail.getReceivedUpdates());
 			return d;
 		}
 
@@ -3566,8 +3566,7 @@ public class CaseController {
 				addDetailIfPresent(lines, "Denied detail changed");
 			if (!Objects.equals(normalizeNullableText(before.getSummary()), normalizeNullableText(after.getSummary())))
 				addDetailIfPresent(lines, "Summary changed");
-			if (!Objects.equals(normalizeNullableText(before.getReceivedUpdates()), normalizeNullableText(after.getReceivedUpdates())))
-				addDetailIfPresent(lines, "Received updates changed");
+			addDetailIfPresent(lines, buildDetailsChangeLine("Received updates", boolLabel(parseEstateCase(before.getReceivedUpdates())), boolLabel(parseEstateCase(after.getReceivedUpdates()))));
 			return String.join("\n", lines);
 		}
 
@@ -3622,7 +3621,7 @@ public class CaseController {
 			String acceptedDetail = normalizeNullableText(source.acceptedDetail);
 			String deniedDetail = normalizeNullableText(source.deniedDetail);
 			String summary = normalizeNullableText(source.summary);
-			String receivedUpdates = normalizeNullableText(source.receivedUpdates);
+			String receivedUpdates = estateCaseToStorageValue(source.receivedUpdates);
 
 			boolean statusChanged = !Objects.equals(source.primaryStatusId, currentOverview == null ? null : currentOverview.getPrimaryStatusId());
 			boolean changed =
@@ -3895,7 +3894,7 @@ public class CaseController {
 			if (detSummaryValue != null)
 				detSummaryValue.setText(safe(d.summary));
 			if (detReceivedUpdatesValue != null)
-				detReceivedUpdatesValue.setText(safe(d.receivedUpdates));
+				detReceivedUpdatesValue.setText(boolLabel(d.receivedUpdates));
 		}
 
 
@@ -3963,8 +3962,7 @@ public class CaseController {
 				detDeniedDetailEditor.setText(d.deniedDetail);
 			if (detSummaryEditor != null)
 				detSummaryEditor.setText(d.summary);
-			if (detReceivedUpdatesEditor != null)
-				detReceivedUpdatesEditor.setText(d.receivedUpdates);
+			renderNullableBoolean(detReceivedUpdatesEditor, d.receivedUpdates);
 		}
 
 		void captureEditors(CaseDetailsDraft d) {
@@ -4016,8 +4014,7 @@ public class CaseController {
 				d.deniedDetail = safeText(detDeniedDetailEditor.getText());
 			if (detSummaryEditor != null)
 				d.summary = safeText(detSummaryEditor.getText());
-			if (detReceivedUpdatesEditor != null)
-				d.receivedUpdates = safeText(detReceivedUpdatesEditor.getText());
+			d.receivedUpdates = captureNullableBoolean(detReceivedUpdatesEditor);
 		}
 	}
 
