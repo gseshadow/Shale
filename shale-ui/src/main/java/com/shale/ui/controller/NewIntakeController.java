@@ -13,6 +13,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 public final class NewIntakeController {
 
 	private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+	private static final DateTimeFormatter TIME_PARSE_FORMAT = DateTimeFormatter.ofPattern("H:mm");
 
 	@FXML private Label validationLabel;
 
@@ -86,7 +88,10 @@ public final class NewIntakeController {
 		dateOfIntakePicker.setValue(LocalDate.now());
 		timeOfIntakeField.setText(LocalTime.now().format(TIME_FORMAT));
 
-		callerIsClientCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> applyCallerMode(Boolean.TRUE.equals(newVal)));
+		callerIsClientCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+			applyCallerMode(Boolean.TRUE.equals(newVal));
+			hideValidation();
+		});
 		applyCallerMode(false);
 
 		clientFirstNameField.textProperty().addListener((obs, oldVal, newVal) -> autoGenerateCaseName());
@@ -154,6 +159,10 @@ public final class NewIntakeController {
 			dialog.setTitle("Select Practice Area");
 			dialog.setHeaderText("Select Practice Area");
 			dialog.setContentText("Practice Area:");
+			Window owner = stage == null ? null : stage;
+			if (owner != null) {
+				dialog.initOwner(owner);
+			}
 
 			Optional<String> picked = dialog.showAndWait();
 			if (picked.isPresent()) {
@@ -185,6 +194,10 @@ public final class NewIntakeController {
 			dialog.setTitle("Select Status");
 			dialog.setHeaderText("Select Status");
 			dialog.setContentText("Status:");
+			Window owner = stage == null ? null : stage;
+			if (owner != null) {
+				dialog.initOwner(owner);
+			}
 
 			Optional<String> picked = dialog.showAndWait();
 			if (picked.isPresent()) {
@@ -222,8 +235,7 @@ public final class NewIntakeController {
 				+ ", statusId=" + (selectedStatus == null ? null : selectedStatus.id())
 				+ ", descriptionLen=" + description.length()
 				+ ", summaryLen=" + summary.length());
-		showValidation("Draft intake validated. Step 1 does not yet persist to the database.");
-		validationLabel.setTextFill(javafx.scene.paint.Paint.valueOf("#157347"));
+		showSuccess("Draft intake validated. Step 1 does not yet persist to the database.");
 	}
 
 	@FXML
@@ -239,6 +251,7 @@ public final class NewIntakeController {
 				required(clientLastNameField.getText(), "Client Last Name is required."),
 				selectedPracticeArea == null ? "Practice Area is required." : null,
 				selectedStatus == null ? "Status is required." : null,
+				validateIntakeTime(),
 				requireDescriptionOrSummary(),
 				callerRequiredWhenNotClient(callerFirstNameField.getText(), "Caller First Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked.")
@@ -247,6 +260,19 @@ public final class NewIntakeController {
 
 	private String required(String value, String message) {
 		return safeTrim(value).isEmpty() ? message : null;
+	}
+
+	private String validateIntakeTime() {
+		String value = safeTrim(timeOfIntakeField.getText());
+		if (value.isEmpty()) {
+			return "Time of Intake is required.";
+		}
+		try {
+			LocalTime.parse(value, TIME_PARSE_FORMAT);
+			return null;
+		} catch (Exception e) {
+			return "Time of Intake must use HH:mm format.";
+		}
 	}
 
 	private String requireDescriptionOrSummary() {
@@ -266,6 +292,13 @@ public final class NewIntakeController {
 	private void showValidation(String message) {
 		validationLabel.setText(message);
 		validationLabel.setTextFill(javafx.scene.paint.Paint.valueOf("#b42318"));
+		validationLabel.setVisible(true);
+		validationLabel.setManaged(true);
+	}
+
+	private void showSuccess(String message) {
+		validationLabel.setText(message);
+		validationLabel.setTextFill(javafx.scene.paint.Paint.valueOf("#157347"));
 		validationLabel.setVisible(true);
 		validationLabel.setManaged(true);
 	}
