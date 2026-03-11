@@ -1,12 +1,14 @@
 package com.shale.data.dao;
 
 import java.sql.Connection;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -64,6 +66,345 @@ public final class CaseDao {
 	}
 
 	public record ContactRow(int id, String displayName) {
+	}
+
+
+	public record NewIntakeCreateRequest(
+			int shaleClientId,
+			String caseName,
+			LocalDate intakeDate,
+			LocalTime intakeTime,
+			boolean estateCase,
+			int practiceAreaId,
+			int statusId,
+			String description,
+			String summary,
+			LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortClaimsNotice,
+			String clientFirstName,
+			String clientLastName,
+			String clientAddress,
+			String clientPhone,
+			String clientEmail,
+			LocalDate clientDateOfBirth,
+			boolean clientDeceased,
+			String clientCondition,
+			boolean callerIsClient,
+			String callerFirstName,
+			String callerLastName,
+			String callerPhone,
+			Integer createdByUserId
+	) {
+	}
+
+	public record NewIntakeCreateResult(long caseId, int clientContactId, int callerContactId) {
+	}
+
+	public NewIntakeCreateResult createIntake(NewIntakeCreateRequest request) {
+		Objects.requireNonNull(request, "request");
+		if (request.shaleClientId() <= 0)
+			throw new IllegalArgumentException("shaleClientId is required.");
+
+		Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+		Connection con = null;
+		try {
+			con = db.requireConnection();
+			con.setAutoCommit(false);
+
+			int clientContactId = insertContact(con,
+					buildFullName(request.clientFirstName(), request.clientLastName()),
+					request.clientFirstName(),
+					request.clientLastName(),
+					request.clientAddress(),
+					request.clientPhone(),
+					request.clientEmail(),
+					request.clientDateOfBirth(),
+					request.clientCondition(),
+					request.clientDeceased(),
+					true,
+					request.shaleClientId(),
+					now);
+
+			int callerContactId = clientContactId;
+			if (!request.callerIsClient()) {
+				callerContactId = insertContact(con,
+						buildFullName(request.callerFirstName(), request.callerLastName()),
+						request.callerFirstName(),
+						request.callerLastName(),
+						null,
+						request.callerPhone(),
+						null,
+						null,
+						null,
+						false,
+						false,
+						request.shaleClientId(),
+						now);
+			}
+
+			long caseId = insertCase(con, request, now);
+			insertCaseContact(con, caseId, clientContactId, ROLE_CASECONTACT_CLIENT, now);
+			insertCaseContact(con, caseId, callerContactId, ROLE_CASECONTACT_CALLER, now);
+			insertCaseStatus(con, caseId, request.statusId(), now);
+			insertInitialCaseUpdate(con, caseId, request, now);
+
+			con.commit();
+			return new NewIntakeCreateResult(caseId, clientContactId, callerContactId);
+		} catch (SQLException e) {
+			if (con != null) {
+				try {
+					con.rollback();
+				} catch (SQLException ignored) {
+				}
+			}
+			throw new RuntimeException("Failed to create intake.", e);
+		} finally {
+			if (con != null) {
+				try {
+					con.setAutoCommit(true);
+				} catch (SQLException ignored) {
+				}
+				try {
+					con.close();
+				} catch (SQLException ignored) {
+				}
+			}
+		}
+	}
+
+	private int insertContact(Connection con,
+			String name,
+			String firstName,
+			String lastName,
+			String addressHome,
+			String phoneCell,
+			String emailPersonal,
+			LocalDate dateOfBirth,
+			String condition,
+			boolean isDeceased,
+			boolean isClient,
+			int shaleClientId,
+			Timestamp now) throws SQLException {
+		String sql = """
+				INSERT INTO dbo.Contacts (
+				  Name,
+				  FirstName,
+				  LastName,
+				  AddressHome,
+				  PhoneCell,
+				  EmailPersonal,
+				  DateOfBirth,
+				  Condition,
+				  IsDeceased,
+				  IsClient,
+				  IsDeleted,
+				  CreatedAt,
+				  UpdatedAt,
+				  ShaleClientId
+				)
+				OUTPUT INSERTED.Id
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?);
+				""";
+
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			setNullableString(ps, i++, name);
+			setNullableString(ps, i++, firstName);
+			setNullableString(ps, i++, lastName);
+			setNullableString(ps, i++, addressHome);
+			setNullableString(ps, i++, phoneCell);
+			setNullableString(ps, i++, emailPersonal);
+			setNullableDate(ps, i++, dateOfBirth);
+			setNullableString(ps, i++, condition);
+			ps.setBoolean(i++, isDeceased);
+			ps.setBoolean(i++, isClient);
+			ps.setTimestamp(i++, now);
+			ps.setTimestamp(i++, now);
+			ps.setInt(i++, shaleClientId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next())
+					throw new RuntimeException("Failed to create contact.");
+				return rs.getInt(1);
+			}
+		}
+	}
+
+	private long insertCase(Connection con, NewIntakeCreateRequest request, Timestamp now) throws SQLException {
+		String sql = """
+				INSERT INTO dbo.Cases (
+				  Name,
+				  CallerDate,
+				  CallerTime,
+				  PracticeAreaId,
+				  ClientEstate,
+				  Description,
+				  Summary,
+				  DateOfMedicalNegligence,
+				  DateMedicalNegligenceWasDiscovered,
+				  DateOfInjury,
+				  StatuteOfLimitations,
+				  TortNoticeDeadline,
+				  FollowUpMeetWithClient,
+				  FollowUpNurseReview,
+				  FollowUpExpertReview,
+				  FollowUpCaseTransferred,
+				  AcceptedChronology,
+				  AcceptedConsultantExpertSearch,
+				  AcceptedTestifyingExpertSearch,
+				  AcceptedMedicalLiterature,
+				  DeniedChronology,
+				  FeeAgreementSigned,
+				  MedicalRecordsReceived,
+				  IsDeleted,
+				  CreatedAt,
+				  UpdatedAt,
+				  ShaleClientId
+				)
+				OUTPUT INSERTED.Id
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?);
+				""";
+
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			setNullableString(ps, i++, request.caseName());
+			setNullableDate(ps, i++, request.intakeDate());
+			setNullableTime(ps, i++, request.intakeTime());
+			ps.setInt(i++, request.practiceAreaId());
+			ps.setBoolean(i++, request.estateCase());
+			setNullableString(ps, i++, request.description());
+			setNullableString(ps, i++, request.summary());
+			setNullableDate(ps, i++, request.dateOfMedicalNegligence());
+			setNullableDate(ps, i++, request.dateMedicalNegligenceWasDiscovered());
+			setNullableDate(ps, i++, request.dateOfInjury());
+			setNullableDate(ps, i++, request.statuteOfLimitations());
+			setNullableDate(ps, i++, request.tortClaimsNotice());
+			ps.setTimestamp(i++, now);
+			ps.setTimestamp(i++, now);
+			ps.setInt(i++, request.shaleClientId());
+
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next())
+					throw new RuntimeException("Failed to create case.");
+				return rs.getLong(1);
+			}
+		}
+	}
+
+	private void insertCaseContact(Connection con, long caseId, int contactId, int role, Timestamp now) throws SQLException {
+		String sql = """
+				INSERT INTO dbo.CaseContacts (
+				  CaseId,
+				  ContactId,
+				  Role,
+				  Side,
+				  IsPrimary,
+				  Notes,
+				  AddedAt,
+				  CreatedAt,
+				  UpdatedAt
+				)
+				VALUES (?, ?, ?, NULL, 1, NULL, ?, ?, ?);
+				""";
+
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, contactId);
+			ps.setInt(3, role);
+			ps.setTimestamp(4, now);
+			ps.setTimestamp(5, now);
+			ps.setTimestamp(6, now);
+			int rows = ps.executeUpdate();
+			if (rows != 1)
+				throw new RuntimeException("Failed to create case contact (role=" + role + ").");
+		}
+	}
+
+	private void insertCaseStatus(Connection con, long caseId, int statusId, Timestamp now) throws SQLException {
+		String sql = """
+				INSERT INTO dbo.CaseStatuses (
+				  CaseId,
+				  StatusId,
+				  EffectiveDate,
+				  EndDate,
+				  Notes,
+				  CreatedAt,
+				  UpdatedAt,
+				  IsPrimary
+				)
+				VALUES (?, ?, ?, NULL, NULL, ?, ?, 1);
+				""";
+
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, statusId);
+			ps.setTimestamp(3, now);
+			ps.setTimestamp(4, now);
+			ps.setTimestamp(5, now);
+			int rows = ps.executeUpdate();
+			if (rows != 1)
+				throw new RuntimeException("Failed to create case status.");
+		}
+	}
+
+	private void insertInitialCaseUpdate(Connection con, long caseId, NewIntakeCreateRequest request, Timestamp now) throws SQLException {
+		String sql = """
+				INSERT INTO dbo.CaseUpdates (
+				  CaseId,
+				  ShaleClientId,
+				  NoteText,
+				  CreatedAt,
+				  CreatedByUserId,
+				  UpdatedAt,
+				  EditedByUserId
+				)
+				VALUES (?, ?, ?, ?, ?, ?, NULL);
+				""";
+
+		String noteText = buildInitialIntakeNote(request.clientFirstName(), request.clientLastName());
+
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, request.shaleClientId());
+			ps.setString(3, noteText);
+			ps.setTimestamp(4, now);
+			if (request.createdByUserId() == null)
+				ps.setNull(5, java.sql.Types.INTEGER);
+			else
+				ps.setInt(5, request.createdByUserId());
+			ps.setTimestamp(6, now);
+
+			int rows = ps.executeUpdate();
+			if (rows != 1)
+				throw new RuntimeException("Failed to create initial case update.");
+		}
+	}
+
+	private static String buildInitialIntakeNote(String firstName, String lastName) {
+		String first = firstName == null ? "" : firstName.trim();
+		String last = lastName == null ? "" : lastName.trim();
+		if (first.isBlank() && last.isBlank())
+			return "Intake created";
+		if (first.isBlank())
+			return "Intake created for " + last;
+		if (last.isBlank())
+			return "Intake created for " + first;
+		return "Intake created for " + last + ", " + first;
+	}
+
+	private static String buildFullName(String firstName, String lastName) {
+		String first = firstName == null ? "" : firstName.trim();
+		String last = lastName == null ? "" : lastName.trim();
+		if (first.isBlank() && last.isBlank())
+			return null;
+		if (first.isBlank())
+			return last;
+		if (last.isBlank())
+			return first;
+		return first + " " + last;
 	}
 
 	/** page is 0-based */
@@ -878,6 +1219,13 @@ public final class CaseDao {
 			ps.setNull(idx, java.sql.Types.DATE);
 		else
 			ps.setDate(idx, java.sql.Date.valueOf(value));
+	}
+
+	private static void setNullableTime(PreparedStatement ps, int idx, LocalTime value) throws SQLException {
+		if (value == null)
+			ps.setNull(idx, java.sql.Types.TIME);
+		else
+			ps.setTime(idx, Time.valueOf(value));
 	}
 
 	private static void setNullableBoolean(PreparedStatement ps, int idx, Boolean value) throws SQLException {
