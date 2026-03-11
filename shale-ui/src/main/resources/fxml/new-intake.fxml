@@ -78,7 +78,7 @@
                             <CheckBox fx:id="clientDeceasedCheckBox" GridPane.rowIndex="6" GridPane.columnIndex="1" />
 
                             <Label text="Client Condition" GridPane.rowIndex="7" />
-                            <TextField fx:id="clientConditionField" GridPane.rowIndex="7" GridPane.columnIndex="1" />
+                            <TextArea fx:id="clientConditionArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" />
                         </GridPane>
                     </VBox>
 
@@ -113,15 +113,15 @@
                             </columnConstraints>
 
                             <Label text="Practice Area" GridPane.rowIndex="0" />
-                            <HBox spacing="8" GridPane.rowIndex="0" GridPane.columnIndex="1">
-                                <TextField fx:id="practiceAreaField" editable="false" HBox.hgrow="ALWAYS" />
-                                <Button fx:id="selectPracticeAreaButton" text="Select" />
+                            <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="1">
+                                <StackPane fx:id="practiceAreaHost" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="selectPracticeAreaButton" text="Change" />
                             </HBox>
 
                             <Label text="Status" GridPane.rowIndex="1" />
-                            <HBox spacing="8" GridPane.rowIndex="1" GridPane.columnIndex="1">
-                                <TextField fx:id="statusField" editable="false" HBox.hgrow="ALWAYS" />
-                                <Button fx:id="selectStatusButton" text="Select" />
+                            <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="1">
+                                <StackPane fx:id="statusHost" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="selectStatusButton" text="Change" />
                             </HBox>
 
                             <Label text="Description" GridPane.rowIndex="2" />

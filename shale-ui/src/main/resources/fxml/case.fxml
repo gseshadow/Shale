@@ -230,6 +230,8 @@
 						<Button fx:id="detailsCancelButton" text="Cancel" visible="false" managed="false" />
 					</HBox>
 
+					<Label fx:id="detailsErrorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
+
 					<VBox spacing="12" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
 						<Label text="Core" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
 						<GridPane hgap="16" vgap="10">

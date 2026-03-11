@@ -95,7 +95,8 @@ public final class CaseDao {
 			boolean callerIsClient,
 			String callerFirstName,
 			String callerLastName,
-			String callerPhone
+			String callerPhone,
+			Integer createdByUserId
 	) {
 	}
 
@@ -148,6 +149,7 @@ public final class CaseDao {
 			insertCaseContact(con, caseId, clientContactId, ROLE_CASECONTACT_CLIENT, now);
 			insertCaseContact(con, caseId, callerContactId, ROLE_CASECONTACT_CALLER, now);
 			insertCaseStatus(con, caseId, request.statusId(), now);
+			insertInitialCaseUpdate(con, caseId, request, now);
 
 			con.commit();
 			return new NewIntakeCreateResult(caseId, clientContactId, callerContactId);
@@ -346,6 +348,51 @@ public final class CaseDao {
 			if (rows != 1)
 				throw new RuntimeException("Failed to create case status.");
 		}
+	}
+
+	private void insertInitialCaseUpdate(Connection con, long caseId, NewIntakeCreateRequest request, Timestamp now) throws SQLException {
+		String sql = """
+				INSERT INTO dbo.CaseUpdates (
+				  CaseId,
+				  ShaleClientId,
+				  NoteText,
+				  CreatedAt,
+				  CreatedByUserId,
+				  UpdatedAt,
+				  EditedByUserId
+				)
+				VALUES (?, ?, ?, ?, ?, ?, NULL);
+				""";
+
+		String noteText = buildInitialIntakeNote(request.clientFirstName(), request.clientLastName());
+
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, request.shaleClientId());
+			ps.setString(3, noteText);
+			ps.setTimestamp(4, now);
+			if (request.createdByUserId() == null)
+				ps.setNull(5, java.sql.Types.INTEGER);
+			else
+				ps.setInt(5, request.createdByUserId());
+			ps.setTimestamp(6, now);
+
+			int rows = ps.executeUpdate();
+			if (rows != 1)
+				throw new RuntimeException("Failed to create initial case update.");
+		}
+	}
+
+	private static String buildInitialIntakeNote(String firstName, String lastName) {
+		String first = firstName == null ? "" : firstName.trim();
+		String last = lastName == null ? "" : lastName.trim();
+		if (first.isBlank() && last.isBlank())
+			return "Intake created";
+		if (first.isBlank())
+			return "Intake created for " + last;
+		if (last.isBlank())
+			return "Intake created for " + first;
+		return "Intake created for " + last + ", " + first;
 	}
 
 	private static String buildFullName(String firstName, String lastName) {

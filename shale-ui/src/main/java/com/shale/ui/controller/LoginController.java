@@ -53,12 +53,12 @@ public final class LoginController {
 
 		// DEV ONLY: auto login shortcut
 		// TODO REMOVE BEFORE PRODUCTION
-
-		Platform.runLater(() ->
-		{
-			emailField.setText("brian@curtislawfirm.org");
-			passwordField.setText("Quazi1der@");
-		});
+//
+//		Platform.runLater(() ->
+//		{
+//			emailField.setText("brian@curtislawfirm.org");
+//			passwordField.setText("Quazi1der@");
+//		});
 
 	}
 

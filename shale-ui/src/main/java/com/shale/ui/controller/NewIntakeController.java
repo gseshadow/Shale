@@ -1,6 +1,10 @@
 package com.shale.ui.controller;
 
 import com.shale.data.dao.CaseDao;
+import com.shale.ui.component.factory.PracticeAreaCardFactory;
+import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
+import com.shale.ui.component.factory.StatusCardFactory;
+import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -12,6 +16,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -44,7 +49,7 @@ public final class NewIntakeController {
 	@FXML private TextField clientEmailField;
 	@FXML private DatePicker clientDateOfBirthPicker;
 	@FXML private CheckBox clientDeceasedCheckBox;
-	@FXML private TextField clientConditionField;
+	@FXML private TextArea clientConditionArea;
 
 	@FXML private CheckBox callerIsClientCheckBox;
 	@FXML private Label callerReuseLabel;
@@ -53,9 +58,9 @@ public final class NewIntakeController {
 	@FXML private TextField callerLastNameField;
 	@FXML private TextField callerPhoneField;
 
-	@FXML private TextField practiceAreaField;
+	@FXML private StackPane practiceAreaHost;
 	@FXML private Button selectPracticeAreaButton;
-	@FXML private TextField statusField;
+	@FXML private StackPane statusHost;
 	@FXML private Button selectStatusButton;
 	@FXML private TextArea descriptionArea;
 	@FXML private TextArea summaryArea;
@@ -79,6 +84,8 @@ public final class NewIntakeController {
 
 	private CaseDao.PracticeAreaRow selectedPracticeArea;
 	private CaseDao.StatusRow selectedStatus;
+	private PracticeAreaCardFactory practiceAreaCardFactory;
+	private StatusCardFactory statusCardFactory;
 
 	public void init(AppState appState, CaseDao caseDao, Stage stage, Consumer<Integer> onCaseCreated) {
 		this.appState = appState;
@@ -109,6 +116,8 @@ public final class NewIntakeController {
 
 		selectPracticeAreaButton.setOnAction(e -> onSelectPracticeArea());
 		selectStatusButton.setOnAction(e -> onSelectStatus());
+		renderPracticeAreaMini(null, "—", null);
+		renderStatusMini(null, "—", null);
 
 		Platform.runLater(this::autoGenerateCaseName);
 	}
@@ -171,7 +180,7 @@ public final class NewIntakeController {
 			Optional<String> picked = dialog.showAndWait();
 			if (picked.isPresent()) {
 				selectedPracticeArea = labelToRow.get(picked.get());
-				practiceAreaField.setText(picked.get());
+				renderPracticeAreaMini(selectedPracticeArea.id(), selectedPracticeArea.name(), selectedPracticeArea.color());
 				hideValidation();
 			}
 		} catch (RuntimeException ex) {
@@ -206,12 +215,44 @@ public final class NewIntakeController {
 			Optional<String> picked = dialog.showAndWait();
 			if (picked.isPresent()) {
 				selectedStatus = labelToRow.get(picked.get());
-				statusField.setText(picked.get());
+				renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
 				hideValidation();
 			}
 		} catch (RuntimeException ex) {
 			showValidation("Unable to load statuses.");
 		}
+	}
+
+	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorCss) {
+		if (practiceAreaHost == null)
+			return;
+		if (practiceAreaCardFactory == null) {
+			practiceAreaCardFactory = new PracticeAreaCardFactory(id -> {
+			});
+		}
+		PracticeAreaCardModel model = new PracticeAreaCardModel(
+				practiceAreaId,
+				(name == null || name.isBlank()) ? "—" : name,
+				colorCss
+		);
+		practiceAreaHost.getChildren().setAll(practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI));
+	}
+
+	private void renderStatusMini(Integer statusId, String statusName, String statusColorCss) {
+		if (statusHost == null)
+			return;
+		if (statusCardFactory == null) {
+			statusCardFactory = new StatusCardFactory(id -> {
+			});
+		}
+		StatusCardModel model = new StatusCardModel(
+				statusId,
+				(statusName == null || statusName.isBlank()) ? "—" : statusName,
+				false,
+				null,
+				statusColorCss
+		);
+		statusHost.getChildren().setAll(statusCardFactory.create(model, StatusCardFactory.Variant.MINI));
 	}
 
 	private int requireClientId() {
@@ -257,11 +298,12 @@ public final class NewIntakeController {
 				safeTrim(clientEmailField.getText()),
 				clientDateOfBirthPicker.getValue(),
 				clientDeceasedCheckBox.isSelected(),
-				safeTrim(clientConditionField.getText()),
+				safeTrim(clientConditionArea.getText()),
 				callerIsClientCheckBox.isSelected(),
 				safeTrim(callerFirstNameField.getText()),
 				safeTrim(callerLastNameField.getText()),
-				safeTrim(callerPhoneField.getText())
+				safeTrim(callerPhoneField.getText()),
+				appState == null ? null : appState.getUserId()
 			);
 
 			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
