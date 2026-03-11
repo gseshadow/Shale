@@ -218,8 +218,14 @@ public class CaseController {
 	@FXML private TextField detNameEditor;
 	@FXML private Label detCaseNumberValue;
 	@FXML private TextField detCaseNumberEditor;
+	@FXML private Label detCaseStatusValue;
+	@FXML private StackPane detCaseStatusHost;
+	@FXML private HBox detCaseStatusEditorRow;
+	@FXML private Button detChangeStatusButton;
 	@FXML private Label detPracticeAreaIdValue;
-	@FXML private TextField detPracticeAreaIdEditor;
+	@FXML private StackPane detPracticeAreaHost;
+	@FXML private HBox detPracticeAreaEditorRow;
+	@FXML private Button detChangePracticeAreaButton;
 	@FXML private Label detDescriptionValue;
 	@FXML private TextArea detDescriptionEditor;
 	@FXML private Label detCallerDateValue;
@@ -245,7 +251,7 @@ public class CaseController {
 	@FXML private Label detDiscoveryDeadlineValue;
 	@FXML private DatePicker detDiscoveryDeadlineEditor;
 	@FXML private Label detClientEstateValue;
-	@FXML private TextField detClientEstateEditor;
+	@FXML private CheckBox detClientEstateEditor;
 	@FXML private Label detOfficePrinterCodeValue;
 	@FXML private TextField detOfficePrinterCodeEditor;
 	@FXML private Label detMedicalRecordsReceivedValue;
@@ -447,6 +453,10 @@ public class CaseController {
 			changeClientButton.setOnAction(e -> onChangeClient());
 		if (changePracticeAreaButton != null)
 			changePracticeAreaButton.setOnAction(e -> onChangePracticeArea());
+		if (detChangeStatusButton != null)
+			detChangeStatusButton.setOnAction(e -> onDetailsChangeStatus());
+		if (detChangePracticeAreaButton != null)
+			detChangePracticeAreaButton.setOnAction(e -> onDetailsChangePracticeArea());
 		if (changeOpposingCounselButton != null)
 			changeOpposingCounselButton.setOnAction(e -> onChangeOpposingCounsel());
 		if (btnEditTeam != null)
@@ -852,6 +862,14 @@ public class CaseController {
 
 	private void onChangePracticeArea() {
 		overviewPickerCoordinator.changePracticeArea();
+	}
+
+	private void onDetailsChangeStatus() {
+		overviewPickerCoordinator.changePrimaryStatusForDetails();
+	}
+
+	private void onDetailsChangePracticeArea() {
+		overviewPickerCoordinator.changePracticeAreaForDetails();
 	}
 
 	private void onChangeOpposingCounsel() {
@@ -1450,6 +1468,60 @@ public class CaseController {
 		ovPracticeAreaHost.getChildren().setAll(
 				practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI)
 		);
+	}
+
+
+	private void renderDetailsStatusMini(Integer statusId, String statusName, String statusColorCss) {
+		if (detCaseStatusHost == null)
+			return;
+		if (statusCardFactory == null) {
+			statusCardFactory = new StatusCardFactory(onOpenStatus == null ? id -> { } : onOpenStatus);
+		}
+		StatusCardModel model = new StatusCardModel(statusId,
+				(statusName == null || statusName.isBlank()) ? "—" : statusName,
+				false,
+				null,
+				statusColorCss);
+		detCaseStatusHost.getChildren().setAll(statusCardFactory.create(model, StatusCardFactory.Variant.MINI));
+	}
+
+	private void renderDetailsPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {
+		if (detPracticeAreaHost == null)
+			return;
+		if (practiceAreaCardFactory == null) {
+			practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea == null ? id -> { } : onOpenPracticeArea);
+		}
+		PracticeAreaCardModel model = new PracticeAreaCardModel(practiceAreaId,
+				(name == null || name.isBlank()) ? "—" : name,
+				colorHex);
+		detPracticeAreaHost.getChildren().setAll(practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI));
+	}
+
+	private static Boolean parseEstateCase(String raw) {
+		String v = safeText(raw).trim();
+		if (v.isBlank())
+			return null;
+		if ("1".equals(v) || "true".equalsIgnoreCase(v) || "yes".equalsIgnoreCase(v) || "y".equalsIgnoreCase(v))
+			return Boolean.TRUE;
+		if ("0".equals(v) || "false".equalsIgnoreCase(v) || "no".equalsIgnoreCase(v) || "n".equalsIgnoreCase(v))
+			return Boolean.FALSE;
+		return null;
+	}
+
+	private static String estateCaseToStorageValue(Boolean value) {
+		if (value == null)
+			return null;
+		return value ? "1" : "0";
+	}
+
+	private static String normalizeCallerTimeInput(String value) {
+		String trimmed = safeText(value).trim();
+		if (trimmed.isBlank())
+			return null;
+		if (!trimmed.matches("^(?:[01]?\\d|2[0-3]):[0-5]\\d$"))
+			throw new IllegalArgumentException("Time of Intake must be in HH:mm format.");
+		String[] parts = trimmed.split(":");
+		return String.format("%02d:%02d", Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
 	}
 
 	private void renderCallerMini(Integer contactId, String name) {
@@ -2504,6 +2576,14 @@ public class CaseController {
 		}
 
 		void changePrimaryStatus() {
+			changePrimaryStatusInternal(false);
+		}
+
+		void changePrimaryStatusForDetails() {
+			changePrimaryStatusInternal(true);
+		}
+
+		private void changePrimaryStatusInternal(boolean detailsMode) {
 			if (!requirePickerContext("Status change is unavailable."))
 				return;
 			Integer tenantId = appState.getShaleClientId();
@@ -2517,7 +2597,7 @@ public class CaseController {
 			{
 				try {
 					List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
-					runOnFx(() -> handleStatusLoaded(statuses));
+					runOnFx(() -> handleStatusLoaded(statuses, detailsMode));
 				} catch (Exception ex) {
 					runOnFx(() ->
 					{
@@ -2561,6 +2641,14 @@ public class CaseController {
 		}
 
 		void changePracticeArea() {
+			changePracticeAreaInternal(false);
+		}
+
+		void changePracticeAreaForDetails() {
+			changePracticeAreaInternal(true);
+		}
+
+		private void changePracticeAreaInternal(boolean detailsMode) {
 			if (!requirePickerContext("Practice area change is unavailable."))
 				return;
 			Integer tenantId = appState.getShaleClientId();
@@ -2574,7 +2662,7 @@ public class CaseController {
 			{
 				try {
 					List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(tenantId);
-					runOnFx(() -> handlePracticeAreaLoaded(areas));
+					runOnFx(() -> handlePracticeAreaLoaded(areas, detailsMode));
 				} catch (Exception ex) {
 					runOnFx(() ->
 					{
@@ -2663,7 +2751,7 @@ public class CaseController {
 			renderResponsibleAttorneyMini(picked.id(), picked.displayName(), picked.color());
 		}
 
-		private void handleStatusLoaded(List<CaseDao.StatusRow> statuses) {
+		private void handleStatusLoaded(List<CaseDao.StatusRow> statuses, boolean detailsMode) {
 			setBusy(false);
 			if (statuses == null || statuses.isEmpty()) {
 				showError("No statuses are configured for this tenant.");
@@ -2672,9 +2760,13 @@ public class CaseController {
 
 			Map<String, CaseDao.StatusRow> labelToRow = new LinkedHashMap<>();
 			String preselect = null;
-			Integer currentId = (editMode && draftPrimaryStatusId != null)
-					? draftPrimaryStatusId
-					: (currentOverview == null ? null : currentOverview.getPrimaryStatusId());
+			Integer currentId = detailsMode
+					? ((detailsEditMode && detailsDraft != null && detailsDraft.primaryStatusId != null)
+							? detailsDraft.primaryStatusId
+							: (currentOverview == null ? null : currentOverview.getPrimaryStatusId()))
+					: ((editMode && draftPrimaryStatusId != null)
+							? draftPrimaryStatusId
+							: (currentOverview == null ? null : currentOverview.getPrimaryStatusId()));
 			for (CaseDao.StatusRow s : statuses) {
 				String label = s.name() + (s.isClosed() ? " (Closed)" : "");
 				labelToRow.put(label, s);
@@ -2696,11 +2788,18 @@ public class CaseController {
 			if (picked == null)
 				return;
 
-			draftPrimaryStatusId = picked.id();
-			renderPrimaryStatusMini(picked.id(), picked.name(), picked.color());
+			if (detailsMode && detailsEditMode && detailsDraft != null) {
+				detailsDraft.primaryStatusId = picked.id();
+				detailsDraft.primaryStatusName = picked.name();
+				detailsDraft.primaryStatusColor = picked.color();
+				renderDetailsStatusMini(picked.id(), picked.name(), picked.color());
+			} else {
+				draftPrimaryStatusId = picked.id();
+				renderPrimaryStatusMini(picked.id(), picked.name(), picked.color());
+			}
 		}
 
-		private void handlePracticeAreaLoaded(List<CaseDao.PracticeAreaRow> areas) {
+		private void handlePracticeAreaLoaded(List<CaseDao.PracticeAreaRow> areas, boolean detailsMode) {
 			setBusy(false);
 			if (areas == null || areas.isEmpty()) {
 				showError("No practice areas are configured for this tenant.");
@@ -2709,9 +2808,13 @@ public class CaseController {
 
 			Map<String, CaseDao.PracticeAreaRow> labelToRow = new LinkedHashMap<>();
 			String preselect = null;
-			Integer currentId = (editMode && draftPracticeAreaId != null)
-					? draftPracticeAreaId
-					: (currentOverview == null ? null : currentOverview.getPracticeAreaId());
+			Integer currentId = detailsMode
+					? ((detailsEditMode && detailsDraft != null && detailsDraft.practiceAreaId != null)
+							? detailsDraft.practiceAreaId
+							: (currentOverview == null ? null : currentOverview.getPracticeAreaId()))
+					: ((editMode && draftPracticeAreaId != null)
+							? draftPracticeAreaId
+							: (currentOverview == null ? null : currentOverview.getPracticeAreaId()));
 			for (CaseDao.PracticeAreaRow pa : areas) {
 				String label = (pa.name() == null || pa.name().isBlank()) ? ("PracticeArea #" + pa.id()) : pa.name();
 				labelToRow.put(label, pa);
@@ -2733,10 +2836,17 @@ public class CaseController {
 			if (picked == null)
 				return;
 
-			draftPracticeAreaId = picked.id();
-			draftPracticeAreaName = picked.name();
-			draftPracticeAreaColor = picked.color();
-			renderPracticeAreaMini(picked.id(), picked.name(), picked.color());
+			if (detailsMode && detailsEditMode && detailsDraft != null) {
+				detailsDraft.practiceAreaId = picked.id();
+				detailsDraft.practiceAreaName = picked.name();
+				detailsDraft.practiceAreaColor = picked.color();
+				renderDetailsPracticeAreaMini(picked.id(), picked.name(), picked.color());
+			} else {
+				draftPracticeAreaId = picked.id();
+				draftPracticeAreaName = picked.name();
+				draftPracticeAreaColor = picked.color();
+				renderPracticeAreaMini(picked.id(), picked.name(), picked.color());
+			}
 		}
 
 		private void changeContact(
@@ -3129,7 +3239,12 @@ public class CaseController {
 	private static final class CaseDetailsDraft {
 		String name;
 		String caseNumber;
-		String practiceAreaId;
+		Integer primaryStatusId;
+		String primaryStatusName;
+		String primaryStatusColor;
+		Integer practiceAreaId;
+		String practiceAreaName;
+		String practiceAreaColor;
 		String description;
 
 		LocalDate callerDate;
@@ -3167,10 +3282,16 @@ public class CaseController {
 			d.name = detail == null ? "" : safeText(detail.getCaseName());
 			d.caseNumber = detail == null ? "" : safeText(detail.getCaseNumber());
 
+			d.primaryStatusId = overview == null ? null : overview.getPrimaryStatusId();
+			d.primaryStatusName = overview == null ? "" : safeText(overview.getCaseStatus());
+			d.primaryStatusColor = overview == null ? null : overview.getPrimaryStatusColor();
+
 			Integer practiceAreaId = (detail == null ? null : detail.getPracticeAreaId());
 			if (practiceAreaId == null && overview != null)
 				practiceAreaId = overview.getPracticeAreaId();
-			d.practiceAreaId = practiceAreaId == null ? "" : String.valueOf(practiceAreaId);
+			d.practiceAreaId = practiceAreaId;
+			d.practiceAreaName = overview == null ? "" : safeText(overview.getPracticeArea());
+			d.practiceAreaColor = overview == null ? null : overview.getPracticeAreaColor();
 
 			d.description = detail == null ? "" : safeText(detail.getDescription());
 			d.callerDate = detail == null ? null : detail.getCallerDate();
@@ -3210,7 +3331,12 @@ public class CaseController {
 			CaseDetailsDraft c = new CaseDetailsDraft();
 			c.name = name;
 			c.caseNumber = caseNumber;
+			c.primaryStatusId = primaryStatusId;
+			c.primaryStatusName = primaryStatusName;
+			c.primaryStatusColor = primaryStatusColor;
 			c.practiceAreaId = practiceAreaId;
+			c.practiceAreaName = practiceAreaName;
+			c.practiceAreaColor = practiceAreaColor;
 			c.description = description;
 			c.callerDate = callerDate;
 			c.callerTime = callerTime;
@@ -3309,6 +3435,11 @@ public class CaseController {
 						request.receivedUpdates(),
 						request.expectedRowVer());
 
+				if (updated != null && request.statusChanged() && request.primaryStatusId() != null)
+					caseDao.setPrimaryStatus(request.caseId(), request.primaryStatusId(), null);
+				if (updated != null)
+					currentOverview = caseDao.getOverview(request.caseId());
+
 				String importantChangesNote = "";
 				if (updated != null)
 					importantChangesNote = buildImportantDetailsChangesNote(request, request.baseline(), updated);
@@ -3356,6 +3487,7 @@ public class CaseController {
 			CaseDetailDto baseline = request.baseline();
 			publishIfChanged(request.caseId(), "name", normalizeRequired(baseline.getCaseName()), request.name());
 			publishIfChanged(request.caseId(), "caseNumber", normalizeNullableText(baseline.getCaseNumber()), request.caseNumber());
+			publishIfChanged(request.caseId(), "primaryStatusId", request.baselinePrimaryStatusId(), request.primaryStatusId());
 			publishIfChanged(request.caseId(), "practiceAreaId", baseline.getPracticeAreaId(), request.practiceAreaId());
 			publishIfChanged(request.caseId(), "description", normalizeNullableText(baseline.getDescription()), request.description());
 			publishIfChanged(request.caseId(), "callerDate", baseline.getCallerDate(), request.callerDate());
@@ -3403,6 +3535,7 @@ public class CaseController {
 			java.util.List<String> lines = new java.util.ArrayList<>();
 			addDetailIfPresent(lines, buildDetailsChangeLine("Case name", before.getCaseName(), after.getCaseName()));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Case number", before.getCaseNumber(), after.getCaseNumber()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Status", safeStatus(request.baselinePrimaryStatusId()), safeStatus(request.primaryStatusId())));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Practice area", safePracticeArea(before), safePracticeArea(after)));
 			if (!Objects.equals(normalizeNullableText(before.getDescription()), normalizeNullableText(after.getDescription())))
 				addDetailIfPresent(lines, "Description changed");
@@ -3417,7 +3550,7 @@ public class CaseController {
 			addDetailIfPresent(lines, buildDetailsChangeLine("Statute of limitations", formatDate(before.getStatuteOfLimitations()), formatDate(after.getStatuteOfLimitations())));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Tort notice deadline", formatDate(before.getTortNoticeDeadline()), formatDate(after.getTortNoticeDeadline())));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Discovery deadline", formatDate(before.getDiscoveryDeadline()), formatDate(after.getDiscoveryDeadline())));
-			addDetailIfPresent(lines, buildDetailsChangeLine("Client estate", before.getClientEstate(), after.getClientEstate()));
+			addDetailIfPresent(lines, buildDetailsChangeLine("Estate case", boolLabel(parseEstateCase(before.getClientEstate())), boolLabel(parseEstateCase(after.getClientEstate()))));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Office printer code", before.getOfficePrinterCode(), after.getOfficePrinterCode()));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Medical records received", boolLabel(before.getMedicalRecordsReceived()), boolLabel(after.getMedicalRecordsReceived())));
 			addDetailIfPresent(lines, buildDetailsChangeLine("Fee agreement signed", boolLabel(before.getFeeAgreementSigned()), boolLabel(after.getFeeAgreementSigned())));
@@ -3459,9 +3592,19 @@ public class CaseController {
 				out.add(text);
 		}
 
+		private String safeStatus(Integer statusId) {
+			if (statusId == null)
+				return "none";
+			if (currentOverview != null && Objects.equals(currentOverview.getPrimaryStatusId(), statusId))
+				return safeText(currentOverview.getCaseStatus());
+			return String.valueOf(statusId);
+		}
+
 		private String safePracticeArea(CaseDetailDto detail) {
 			if (detail == null || detail.getPracticeAreaId() == null)
 				return "none";
+			if (currentOverview != null && Objects.equals(currentOverview.getPracticeAreaId(), detail.getPracticeAreaId()))
+				return safeText(currentOverview.getPracticeArea());
 			return String.valueOf(detail.getPracticeAreaId());
 		}
 
@@ -3471,17 +3614,19 @@ public class CaseController {
 				throw new IllegalArgumentException("Case Name is required.");
 
 			String caseNumber = normalizeNullableText(source.caseNumber);
-			Integer practiceAreaId = parseNullableInteger(source.practiceAreaId);
+			Integer practiceAreaId = source.practiceAreaId;
 			String description = normalizeNullableText(source.description);
-			String callerTime = normalizeNullableText(source.callerTime);
-			String clientEstate = normalizeNullableText(source.clientEstate);
+			String callerTime = normalizeCallerTimeInput(source.callerTime);
+			String clientEstate = estateCaseToStorageValue(parseEstateCase(source.clientEstate));
 			String officePrinterCode = normalizeNullableText(source.officePrinterCode);
 			String acceptedDetail = normalizeNullableText(source.acceptedDetail);
 			String deniedDetail = normalizeNullableText(source.deniedDetail);
 			String summary = normalizeNullableText(source.summary);
 			String receivedUpdates = normalizeNullableText(source.receivedUpdates);
 
+			boolean statusChanged = !Objects.equals(source.primaryStatusId, currentOverview == null ? null : currentOverview.getPrimaryStatusId());
 			boolean changed =
+				statusChanged ||
 				!Objects.equals(name, normalizeRequired(baseline.getCaseName())) ||
 				!Objects.equals(caseNumber, normalizeNullableText(baseline.getCaseNumber())) ||
 				!Objects.equals(practiceAreaId, baseline.getPracticeAreaId()) ||
@@ -3514,6 +3659,8 @@ public class CaseController {
 
 			return new DetailsSaveRequest(
 				caseId.longValue(),
+				currentOverview == null ? null : currentOverview.getPrimaryStatusId(),
+				source.primaryStatusId,
 				name,
 				caseNumber,
 				practiceAreaId,
@@ -3545,19 +3692,10 @@ public class CaseController {
 				receivedUpdates,
 				baseline.getRowVer(),
 				baseline,
+				statusChanged,
 				changed);
 		}
 
-		private Integer parseNullableInteger(String raw) {
-			String normalized = normalizeNullableText(raw);
-			if (normalized == null)
-				return null;
-			try {
-				return Integer.valueOf(normalized);
-			} catch (NumberFormatException ex) {
-				throw new IllegalArgumentException("PracticeAreaId must be a whole number.");
-			}
-		}
 
 		private String normalizeNullableText(String value) {
 			String trimmed = safeText(value).trim();
@@ -3571,6 +3709,8 @@ public class CaseController {
 
 	private record DetailsSaveRequest(
 			long caseId,
+			Integer baselinePrimaryStatusId,
+			Integer primaryStatusId,
 			String name,
 			String caseNumber,
 			Integer practiceAreaId,
@@ -3602,6 +3742,7 @@ public class CaseController {
 			String receivedUpdates,
 			byte[] expectedRowVer,
 			CaseDetailDto baseline,
+			boolean statusChanged,
 			boolean hasChanges) {
 	}
 
@@ -3631,7 +3772,10 @@ public class CaseController {
 
 			toggleDetailField(detNameValue, detNameEditor, enabled);
 			toggleDetailField(detCaseNumberValue, detCaseNumberEditor, enabled);
-			toggleDetailField(detPracticeAreaIdValue, detPracticeAreaIdEditor, enabled);
+			setVisibleManaged(detCaseStatusValue, !enabled);
+			setVisibleManaged(detCaseStatusEditorRow, enabled);
+			setVisibleManaged(detPracticeAreaIdValue, !enabled);
+			setVisibleManaged(detPracticeAreaEditorRow, enabled);
 			toggleDetailField(detDescriptionValue, detDescriptionEditor, enabled);
 			toggleDetailField(detCallerDateValue, detCallerDateEditor, enabled);
 			toggleDetailField(detCallerTimeValue, detCallerTimeEditor, enabled);
@@ -3694,8 +3838,12 @@ public class CaseController {
 				detNameValue.setText(safe(d.name));
 			if (detCaseNumberValue != null)
 				detCaseNumberValue.setText(safe(d.caseNumber));
+			if (detCaseStatusValue != null)
+				detCaseStatusValue.setText(safe(d.primaryStatusName));
+			renderDetailsStatusMini(d.primaryStatusId, d.primaryStatusName, d.primaryStatusColor);
 			if (detPracticeAreaIdValue != null)
-				detPracticeAreaIdValue.setText(safe(d.practiceAreaId));
+				detPracticeAreaIdValue.setText(safe(d.practiceAreaName));
+			renderDetailsPracticeAreaMini(d.practiceAreaId, d.practiceAreaName, d.practiceAreaColor);
 			if (detDescriptionValue != null)
 				detDescriptionValue.setText(safe(d.description));
 			if (detCallerDateValue != null)
@@ -3721,7 +3869,7 @@ public class CaseController {
 			if (detDiscoveryDeadlineValue != null)
 				detDiscoveryDeadlineValue.setText(formatDate(d.discoveryDeadline));
 			if (detClientEstateValue != null)
-				detClientEstateValue.setText(safe(d.clientEstate));
+				detClientEstateValue.setText(boolLabel(parseEstateCase(d.clientEstate)));
 			if (detOfficePrinterCodeValue != null)
 				detOfficePrinterCodeValue.setText(safe(d.officePrinterCode));
 			if (detMedicalRecordsReceivedValue != null)
@@ -3750,6 +3898,16 @@ public class CaseController {
 				detReceivedUpdatesValue.setText(safe(d.receivedUpdates));
 		}
 
+
+		private void refreshFeeAgreementDateState() {
+			if (detFeeAgreementSignedEditor == null || detDateFeeAgreementSignedEditor == null)
+				return;
+			boolean disable = !detFeeAgreementSignedEditor.isIndeterminate() && !detFeeAgreementSignedEditor.isSelected();
+			detDateFeeAgreementSignedEditor.setDisable(disable);
+			if (disable)
+				detDateFeeAgreementSignedEditor.setValue(null);
+		}
+
 		private void renderEditors(CaseDetailsDraft d) {
 			if (d == null)
 				return;
@@ -3758,8 +3916,8 @@ public class CaseController {
 				detNameEditor.setText(d.name);
 			if (detCaseNumberEditor != null)
 				detCaseNumberEditor.setText(d.caseNumber);
-			if (detPracticeAreaIdEditor != null)
-				detPracticeAreaIdEditor.setText(d.practiceAreaId);
+			renderDetailsStatusMini(d.primaryStatusId, d.primaryStatusName, d.primaryStatusColor);
+			renderDetailsPracticeAreaMini(d.practiceAreaId, d.practiceAreaName, d.practiceAreaColor);
 			if (detDescriptionEditor != null)
 				detDescriptionEditor.setText(d.description);
 			if (detCallerDateEditor != null)
@@ -3784,14 +3942,16 @@ public class CaseController {
 				detTortNoticeDeadlineEditor.setValue(d.tortNoticeDeadline);
 			if (detDiscoveryDeadlineEditor != null)
 				detDiscoveryDeadlineEditor.setValue(d.discoveryDeadline);
-			if (detClientEstateEditor != null)
-				detClientEstateEditor.setText(d.clientEstate);
+			renderNullableBoolean(detClientEstateEditor, parseEstateCase(d.clientEstate));
 			if (detOfficePrinterCodeEditor != null)
 				detOfficePrinterCodeEditor.setText(d.officePrinterCode);
 			renderNullableBoolean(detMedicalRecordsReceivedEditor, d.medicalRecordsReceived);
 			renderNullableBoolean(detFeeAgreementSignedEditor, d.feeAgreementSigned);
 			if (detDateFeeAgreementSignedEditor != null)
 				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
+			if (detFeeAgreementSignedEditor != null)
+				detFeeAgreementSignedEditor.setOnAction(e -> refreshFeeAgreementDateState());
+			refreshFeeAgreementDateState();
 			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
 			renderNullableBoolean(detAcceptedConsultantExpertSearchEditor, d.acceptedConsultantExpertSearch);
 			renderNullableBoolean(detAcceptedTestifyingExpertSearchEditor, d.acceptedTestifyingExpertSearch);
@@ -3812,8 +3972,6 @@ public class CaseController {
 				d.name = safeText(detNameEditor.getText());
 			if (detCaseNumberEditor != null)
 				d.caseNumber = safeText(detCaseNumberEditor.getText());
-			if (detPracticeAreaIdEditor != null)
-				d.practiceAreaId = safeText(detPracticeAreaIdEditor.getText());
 			if (detDescriptionEditor != null)
 				d.description = safeText(detDescriptionEditor.getText());
 			if (detCallerDateEditor != null)
@@ -3838,14 +3996,15 @@ public class CaseController {
 				d.tortNoticeDeadline = detTortNoticeDeadlineEditor.getValue();
 			if (detDiscoveryDeadlineEditor != null)
 				d.discoveryDeadline = detDiscoveryDeadlineEditor.getValue();
-			if (detClientEstateEditor != null)
-				d.clientEstate = safeText(detClientEstateEditor.getText());
+			d.clientEstate = estateCaseToStorageValue(captureNullableBoolean(detClientEstateEditor));
 			if (detOfficePrinterCodeEditor != null)
 				d.officePrinterCode = safeText(detOfficePrinterCodeEditor.getText());
 			d.medicalRecordsReceived = captureNullableBoolean(detMedicalRecordsReceivedEditor);
 			d.feeAgreementSigned = captureNullableBoolean(detFeeAgreementSignedEditor);
 			if (detDateFeeAgreementSignedEditor != null)
 				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
+			if (Boolean.FALSE.equals(d.feeAgreementSigned))
+				d.dateFeeAgreementSigned = null;
 			d.acceptedChronology = captureNullableBoolean(detAcceptedChronologyEditor);
 			d.acceptedConsultantExpertSearch = captureNullableBoolean(detAcceptedConsultantExpertSearchEditor);
 			d.acceptedTestifyingExpertSearch = captureNullableBoolean(detAcceptedTestifyingExpertSearchEditor);
