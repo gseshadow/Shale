@@ -1526,6 +1526,24 @@ public class CaseController {
 		return String.format("%02d:%02d", Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
 	}
 
+	private static String normalizeCallerTimeDisplay(String raw) {
+		String trimmed = safeText(raw).trim();
+		if (trimmed.isBlank())
+			return "";
+
+		if (trimmed.matches("^(?:[01]?\\d|2[0-3]):[0-5]\\d$")) {
+			String[] parts = trimmed.split(":");
+			return String.format("%02d:%02d", Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
+		}
+
+		if (trimmed.matches("^(?:[01]?\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?$")) {
+			String[] parts = trimmed.split(":");
+			return String.format("%02d:%02d", Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
+		}
+
+		return trimmed;
+	}
+
 	private void renderCallerMini(Integer contactId, String name) {
 		if (ovCallerHost == null)
 			return;
@@ -3306,7 +3324,7 @@ public class CaseController {
 
 			d.description = detail == null ? "" : safeText(detail.getDescription());
 			d.callerDate = detail == null ? null : detail.getCallerDate();
-			d.callerTime = detail == null ? "" : safeText(detail.getCallerTime());
+			d.callerTime = detail == null ? "" : normalizeCallerTimeDisplay(detail.getCallerTime());
 			d.acceptedDate = detail == null ? null : detail.getAcceptedDate();
 			d.closedDate = detail == null ? null : detail.getClosedDate();
 			d.deniedDate = detail == null ? null : detail.getDeniedDate();
@@ -3503,7 +3521,7 @@ public class CaseController {
 			publishIfChanged(request.caseId(), "practiceAreaId", baseline.getPracticeAreaId(), request.practiceAreaId());
 			publishIfChanged(request.caseId(), "description", normalizeNullableText(baseline.getDescription()), request.description());
 			publishIfChanged(request.caseId(), "callerDate", baseline.getCallerDate(), request.callerDate());
-			publishIfChanged(request.caseId(), "callerTime", normalizeNullableText(baseline.getCallerTime()), request.callerTime());
+			publishIfChanged(request.caseId(), "callerTime", normalizeCallerTimeInput(normalizeCallerTimeDisplay(baseline.getCallerTime())), request.callerTime());
 			publishIfChanged(request.caseId(), "acceptedDate", baseline.getAcceptedDate(), request.acceptedDate());
 			publishIfChanged(request.caseId(), "closedDate", baseline.getClosedDate(), request.closedDate());
 			publishIfChanged(request.caseId(), "deniedDate", baseline.getDeniedDate(), request.deniedDate());
@@ -3643,7 +3661,7 @@ public class CaseController {
 				!Objects.equals(practiceAreaId, baseline.getPracticeAreaId()) ||
 				!Objects.equals(description, normalizeNullableText(baseline.getDescription())) ||
 				!Objects.equals(source.callerDate, baseline.getCallerDate()) ||
-				!Objects.equals(callerTime, normalizeNullableText(baseline.getCallerTime())) ||
+				!Objects.equals(callerTime, normalizeCallerTimeInput(normalizeCallerTimeDisplay(baseline.getCallerTime()))) ||
 				!Objects.equals(source.acceptedDate, baseline.getAcceptedDate()) ||
 				!Objects.equals(source.closedDate, baseline.getClosedDate()) ||
 				!Objects.equals(source.deniedDate, baseline.getDeniedDate()) ||
