@@ -6,12 +6,14 @@ import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
+import com.shale.ui.controller.NewIntakeController;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.IOException;
@@ -99,6 +101,35 @@ public final class SceneManager {
 			return c;
 		});
 	}
+
+
+	public void showNewIntakeDialog() {
+		try {
+			URL url = Objects.requireNonNull(getClass().getResource("/fxml/new-intake.fxml"), "Missing FXML: /fxml/new-intake.fxml");
+			FXMLLoader loader = new FXMLLoader(url);
+			Parent root = loader.load();
+
+			Stage dialog = new Stage();
+			dialog.initOwner(stage);
+			dialog.initModality(Modality.WINDOW_MODAL);
+			dialog.setTitle("New Intake");
+
+			NewIntakeController controller = loader.getController();
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			controller.init(appState, caseDao, dialog);
+
+			Scene dialogScene = new Scene(root);
+			dialogScene.getStylesheets().add(Objects.requireNonNull(
+					getClass().getResource("/css/app.css")).toExternalForm());
+			dialog.setScene(dialogScene);
+			dialog.setMinWidth(860);
+			dialog.setMinHeight(760);
+			dialog.showAndWait();
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to open New Intake dialog", e);
+		}
+	}
+
 
 	private void openUserProfile(Integer userId) {
 		System.out.println("Navigate to User Profile: " + userId);

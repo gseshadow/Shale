@@ -22,6 +22,9 @@ public final class MainController {
 	@FXML
 	private Button globalSearchButton;
 
+	@FXML
+	private Button newIntakeButton;
+
 	// Sidebar nav buttons
 	@FXML
 	private Button navMyShaleButton;
@@ -173,6 +176,11 @@ public final class MainController {
 		sectionTitleLabel.setText("Settings");
 		sectionSubtitleLabel.setText("Configure Shale preferences and system settings.");
 		setSectionContentText("Settings tab is not implemented yet.");
+	}
+
+	@FXML
+	private void onNewIntake() {
+		sceneManager.showNewIntakeDialog();
 	}
 
 	@FXML

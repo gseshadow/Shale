@@ -19,6 +19,9 @@
 				<Button fx:id="globalSearchButton" text="Search"
 					onAction="#onGlobalSearch" />
 
+				<Button fx:id="newIntakeButton" text="New Intake"
+					onAction="#onNewIntake" />
+
 				<Region HBox.hgrow="ALWAYS" />
 
 				<Label text="Signed in as:" />
