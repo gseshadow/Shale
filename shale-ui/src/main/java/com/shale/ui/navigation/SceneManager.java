@@ -103,7 +103,7 @@ public final class SceneManager {
 	}
 
 
-	public void showNewIntakeDialog() {
+	public void showNewIntakeDialog(Consumer<Integer> onCaseCreated) {
 		try {
 			URL url = Objects.requireNonNull(getClass().getResource("/fxml/new-intake.fxml"), "Missing FXML: /fxml/new-intake.fxml");
 			FXMLLoader loader = new FXMLLoader(url);
@@ -116,7 +116,7 @@ public final class SceneManager {
 
 			NewIntakeController controller = loader.getController();
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			controller.init(appState, caseDao, dialog);
+			controller.init(appState, caseDao, dialog, onCaseCreated);
 
 			Scene dialogScene = new Scene(root);
 			dialogScene.getStylesheets().add(Objects.requireNonNull(

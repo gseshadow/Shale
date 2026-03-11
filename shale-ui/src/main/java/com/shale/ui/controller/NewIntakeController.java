@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public final class NewIntakeController {
@@ -70,6 +71,8 @@ public final class NewIntakeController {
 	private AppState appState;
 	private CaseDao caseDao;
 	private Stage stage;
+	private Consumer<Integer> onCaseCreated;
+	private boolean saving;
 
 	private boolean caseNameManuallyOverridden;
 	private boolean updatingCaseNameProgrammatically;
@@ -77,10 +80,11 @@ public final class NewIntakeController {
 	private CaseDao.PracticeAreaRow selectedPracticeArea;
 	private CaseDao.StatusRow selectedStatus;
 
-	public void init(AppState appState, CaseDao caseDao, Stage stage) {
+	public void init(AppState appState, CaseDao caseDao, Stage stage, Consumer<Integer> onCaseCreated) {
 		this.appState = appState;
 		this.caseDao = caseDao;
 		this.stage = stage;
+		this.onCaseCreated = onCaseCreated;
 	}
 
 	@FXML
@@ -220,22 +224,57 @@ public final class NewIntakeController {
 
 	@FXML
 	private void onCreateIntake() {
+		if (saving)
+			return;
+
 		List<String> errors = validate();
 		if (!errors.isEmpty()) {
 			showValidation(errors.stream().collect(Collectors.joining("\n")));
 			return;
 		}
 
-		String description = safeTrim(descriptionArea.getText());
-		String summary = safeTrim(summaryArea.getText());
-		System.out.println("[New Intake - Step 1 placeholder] validated draft: "
-				+ " caseName=" + safeTrim(caseNameField.getText())
-				+ ", client=" + safeTrim(clientLastNameField.getText()) + ", " + safeTrim(clientFirstNameField.getText())
-				+ ", practiceAreaId=" + (selectedPracticeArea == null ? null : selectedPracticeArea.id())
-				+ ", statusId=" + (selectedStatus == null ? null : selectedStatus.id())
-				+ ", descriptionLen=" + description.length()
-				+ ", summaryLen=" + summary.length());
-		showSuccess("Draft intake validated. Step 1 does not yet persist to the database.");
+		setSaving(true);
+		try {
+			CaseDao.NewIntakeCreateRequest request = new CaseDao.NewIntakeCreateRequest(
+				requireClientId(),
+				safeTrim(caseNameField.getText()),
+				dateOfIntakePicker.getValue(),
+				LocalTime.parse(safeTrim(timeOfIntakeField.getText()), TIME_PARSE_FORMAT),
+				estateCaseCheckBox.isSelected(),
+				selectedPracticeArea.id(),
+				selectedStatus.id(),
+				safeTrim(descriptionArea.getText()),
+				safeTrim(summaryArea.getText()),
+				dateMedicalNegligencePicker.getValue(),
+				dateMedicalNegligenceDiscoveredPicker.getValue(),
+				dateOfInjuryPicker.getValue(),
+				statuteOfLimitationsPicker.getValue(),
+				tortClaimsNoticePicker.getValue(),
+				safeTrim(clientFirstNameField.getText()),
+				safeTrim(clientLastNameField.getText()),
+				safeTrim(clientAddressField.getText()),
+				safeTrim(clientPhoneField.getText()),
+				safeTrim(clientEmailField.getText()),
+				clientDateOfBirthPicker.getValue(),
+				clientDeceasedCheckBox.isSelected(),
+				safeTrim(clientConditionField.getText()),
+				callerIsClientCheckBox.isSelected(),
+				safeTrim(callerFirstNameField.getText()),
+				safeTrim(callerLastNameField.getText()),
+				safeTrim(callerPhoneField.getText())
+			);
+
+			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
+			showSuccess("Intake created successfully.");
+			if (stage != null)
+				stage.close();
+			if (onCaseCreated != null)
+				onCaseCreated.accept(Math.toIntExact(result.caseId()));
+		} catch (RuntimeException ex) {
+			showValidation("Create intake failed: " + firstMeaningfulMessage(ex));
+		} finally {
+			setSaving(false);
+		}
 	}
 
 	@FXML
@@ -243,6 +282,29 @@ public final class NewIntakeController {
 		if (stage != null) {
 			stage.close();
 		}
+	}
+
+	private void setSaving(boolean saving) {
+		this.saving = saving;
+		if (createIntakeButton != null)
+			createIntakeButton.setDisable(saving);
+		if (cancelButton != null)
+			cancelButton.setDisable(saving);
+		if (selectPracticeAreaButton != null)
+			selectPracticeAreaButton.setDisable(saving);
+		if (selectStatusButton != null)
+			selectStatusButton.setDisable(saving);
+	}
+
+	private String firstMeaningfulMessage(Throwable throwable) {
+		Throwable current = throwable;
+		while (current != null) {
+			String message = current.getMessage();
+			if (message != null && !message.isBlank())
+				return message;
+			current = current.getCause();
+		}
+		return "Unexpected error";
 	}
 
 	private List<String> validate() {

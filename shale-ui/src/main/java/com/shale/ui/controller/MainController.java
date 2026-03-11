@@ -180,7 +180,7 @@ public final class MainController {
 
 	@FXML
 	private void onNewIntake() {
-		sceneManager.showNewIntakeDialog();
+		sceneManager.showNewIntakeDialog(this::openCase);
 	}
 
 	@FXML
