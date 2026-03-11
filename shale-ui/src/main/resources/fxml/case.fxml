@@ -335,7 +335,8 @@
 
 	<right>
 		<VBox spacing="10.0" prefWidth="320.0"
-			style="-fx-background-color: rgba(0,0,0,0.03);" BorderPane.alignment="TOP_LEFT">
+			style="-fx-background-color: rgba(0,0,0,0.03);"
+			BorderPane.alignment="TOP_LEFT">
 			<padding>
 				<Insets top="10" right="12" bottom="12" left="10" />
 			</padding>
@@ -349,8 +350,8 @@
 			<Button fx:id="submitCaseUpdateButton" text="Submit"
 				maxWidth="Infinity" />
 
-			<ScrollPane fx:id="caseUpdatesScrollPane" fitToWidth="true"
-				hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
+			<ScrollPane fx:id="caseUpdatesScrollPane"
+				fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
 				<VBox fx:id="caseUpdatesFeedBox" spacing="8.0">
 					<padding>
 						<Insets top="2" right="2" bottom="2" left="2" />
