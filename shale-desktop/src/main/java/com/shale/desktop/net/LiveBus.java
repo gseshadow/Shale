@@ -75,7 +75,7 @@ public final class LiveBus {
 		this.negotiate = Objects.requireNonNull(negotiate);
 		this.shaleClientId = shaleClientId;
 		this.userId = userId;
-		this.publishEndpointUrl = System.getenv("LIVE_PUBLISH_ENDPOINT_URL");
+		this.publishEndpointUrl = getConfig("LIVE_PUBLISH_ENDPOINT_URL");
 	}
 
 	public CompletableFuture<Void> connectAndJoin() {
@@ -129,12 +129,11 @@ public final class LiveBus {
 				+ ",\"entityId\":" + entityId
 				+ ",\"shaleClientId\":" + shaleClientId
 				+ ",\"updatedByUserId\":" + updatedByUserId
-				+ ",\"updatedByUserId\":" + updatedByUserId
 				+ ",\"clientInstanceId\":\"" + clientInstanceId + "\""
 				+ ",\"timestamp\":\"" + Instant.now() + "\""
 				+ (patchJsonOrNull == null || patchJsonOrNull.isBlank() ? "" : ",\"patch\":" + patchJsonOrNull)
 				+ "}";
-		System.out.println("[LIVE] LIVE_PUBLISH_ENDPOINT_URL:" + System.getenv("LIVE_PUBLISH_ENDPOINT_URL"));
+		System.out.println("[LIVE] LIVE_PUBLISH_ENDPOINT_URL:" + getConfig("LIVE_PUBLISH_ENDPOINT_URL"));
 		System.out.println("[LIVE] server publish requested: entityType=" + entityType
 				+ " entityId=" + entityId
 				+ " clientId=" + shaleClientId
@@ -147,7 +146,7 @@ public final class LiveBus {
 				.header("Accept", "application/json, text/plain; q=0.8")
 				.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
 
-		String functionKey = System.getenv("FUNCTION_KEY");
+		String functionKey = getConfig("FUNCTION_KEY");
 		if (functionKey != null && !functionKey.isBlank() && !publishEndpointUrl.contains("code=")) {
 			builder.header("x-functions-key", functionKey);
 		}
@@ -238,6 +237,14 @@ public final class LiveBus {
 				type, entityType, entityId, by, tenantId, patchRaw, inboundClientInstanceId, raw);
 		for (var l : listeners)
 			l.accept(ev);
+	}
+
+	private static String getConfig(String key) {
+		String v = System.getProperty(key);
+		if (v == null || v.isBlank()) {
+			v = System.getenv(key);
+		}
+		return v;
 	}
 
 	private static String extractFirstJsonObject(String s) {
