@@ -35,6 +35,7 @@
 		<module>shale-data</module>
 		<module>shale-ui</module>
 		<module>shale-desktop</module>
+		<module>shale-updater</module>
 	</modules>
 
 	<dependencyManagement>

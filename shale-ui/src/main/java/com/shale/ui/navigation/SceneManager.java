@@ -22,6 +22,8 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import com.shale.ui.services.UiUpdateLauncher;
+
 public final class SceneManager {
 
 	private final Stage stage;
@@ -31,17 +33,20 @@ public final class SceneManager {
 
 	private final DbSessionProvider dbSessionProvider;
 
+	private final UiUpdateLauncher updateLauncher;
+
 	public SceneManager(Stage stage,
 			AppState appState,
 			UiAuthService authService,
 			UiRuntimeBridge runtimeBridge,
-			DbSessionProvider dbSessionProvider) {
+			DbSessionProvider dbSessionProvider,
+			UiUpdateLauncher updateLauncher) {
 		this.stage = stage;
 		this.appState = appState;
 		this.authService = authService;
 		this.runtimeBridge = runtimeBridge;
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
-
+		this.updateLauncher = Objects.requireNonNull(updateLauncher);
 	}
 
 	public void showLogin() {
@@ -59,6 +64,7 @@ public final class SceneManager {
 		{
 			MainController c = (MainController) controller;
 			c.init(this, appState, runtimeBridge);
+			c.setUpdateLauncher(updateLauncher);
 			return c;
 		});
 		setScene(root, "Shale");
@@ -102,7 +108,6 @@ public final class SceneManager {
 		});
 	}
 
-
 	public void showNewIntakeDialog(Consumer<Integer> onCaseCreated) {
 		try {
 			URL url = Objects.requireNonNull(getClass().getResource("/fxml/new-intake.fxml"), "Missing FXML: /fxml/new-intake.fxml");
@@ -129,7 +134,6 @@ public final class SceneManager {
 			throw new RuntimeException("Failed to open New Intake dialog", e);
 		}
 	}
-
 
 	private void openUserProfile(Integer userId) {
 		System.out.println("Navigate to User Profile: " + userId);

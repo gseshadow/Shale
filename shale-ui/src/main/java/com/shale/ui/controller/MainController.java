@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.state.AppState;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
@@ -24,6 +25,9 @@ public final class MainController {
 
 	@FXML
 	private Button newIntakeButton;
+
+	@FXML
+	private Button updateButton;
 
 	// Sidebar nav buttons
 	@FXML
@@ -66,6 +70,7 @@ public final class MainController {
 	private SceneManager sceneManager;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
+	private UiUpdateLauncher updateLauncher;
 
 	public MainController() {
 		System.out.println("MainController()");// TODO remove
@@ -184,6 +189,15 @@ public final class MainController {
 	}
 
 	@FXML
+	private void onUpdate() {
+		if (updateLauncher != null) {
+			updateLauncher.launchUpdater();
+		} else {
+			System.out.println("Update launcher not configured.");
+		}
+	}
+
+	@FXML
 	private void onLogout() {
 		System.out.println("MainController.onLogout()");// TODO remove
 
@@ -233,5 +247,9 @@ public final class MainController {
 		navTeamButton.setDisable(false);
 		navSettingsButton.setDisable(false);
 
+	}
+
+	public void setUpdateLauncher(UiUpdateLauncher updateLauncher) {
+		this.updateLauncher = updateLauncher;
 	}
 }

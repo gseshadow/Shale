@@ -68,13 +68,39 @@
 			<artifactId>gson</artifactId>
 			<version>2.11.0</version>
 		</dependency>
-
-
 	</dependencies>
 
 	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.eclipse.m2e</groupId>
+					<artifactId>lifecycle-mapping</artifactId>
+					<version>1.0.0</version>
+					<configuration>
+						<lifecycleMappingMetadata>
+							<pluginExecutions>
+								<pluginExecution>
+									<pluginExecutionFilter>
+										<groupId>org.apache.maven.plugins</groupId>
+										<artifactId>maven-dependency-plugin</artifactId>
+										<versionRange>[3.6.1,)</versionRange>
+										<goals>
+											<goal>copy-dependencies</goal>
+										</goals>
+									</pluginExecutionFilter>
+									<action>
+										<ignore />
+									</action>
+								</pluginExecution>
+							</pluginExecutions>
+						</lifecycleMappingMetadata>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+
 		<plugins>
-			<!-- JavaFX Maven Plugin (simplifies run: javafx:run) -->
 			<plugin>
 				<groupId>org.openjfx</groupId>
 				<artifactId>javafx-maven-plugin</artifactId>
@@ -84,33 +110,34 @@
 				</configuration>
 			</plugin>
 
-			<!-- Standard compiler settings -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.13.0</version>
 				<configuration>
 					<release>21</release>
 				</configuration>
 			</plugin>
+
 			<plugin>
-    <groupId>org.apache.maven.plugins</groupId>
-    <artifactId>maven-dependency-plugin</artifactId>
-    <version>3.6.1</version>
-    <executions>
-        <execution>
-            <id>copy-runtime-dependencies</id>
-            <phase>package</phase>
-            <goals>
-                <goal>copy-dependencies</goal>
-            </goals>
-            <configuration>
-                <includeScope>runtime</includeScope>
-                <outputDirectory>${project.build.directory}/lib</outputDirectory>
-            </configuration>
-        </execution>
-    </executions>
-</plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.6.1</version>
+				<executions>
+					<execution>
+						<id>copy-runtime-dependencies</id>
+						<phase>package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<includeScope>runtime</includeScope>
+							<outputDirectory>${project.build.directory}/lib</outputDirectory>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
-	
+
 </project>
