@@ -13,3 +13,27 @@
 .DS_Store
 Thumbs.db
 *.log
+
+#Environment Variables
+shale-desktop/src/main/resources/application.properties
+
+# Maven
+target/
+
+# jpackage build output
+dist/
+dist-appimage/
+dist-updater/
+
+# updater staging if present
+updater-dist/
+
+# runtime bundles
+runtime/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# logs
+*.log

@@ -45,6 +45,8 @@ public final class DesktopConfig {
 
 		// Bridge properties/env into system properties for shale-data Config
 		pushToSystemProperty("APP_ENV", env);
+		pushToSystemProperty("APP_VERSION", env);
+		
 		pushToSystemProperty("NEGOTIATE_ENDPOINT_URL", env);
 		pushToSystemProperty("LIVE_NEGOTIATE_ENDPOINT_URL", env);
 		pushToSystemProperty("LIVE_PUBLISH_ENDPOINT_URL", env);
@@ -132,5 +134,9 @@ public final class DesktopConfig {
 
 	public AuthService getAuthService() {
 		return authService;
+	}
+	
+	public static String appVersion() {
+		return System.getProperty("APP_VERSION", "0.0.0");
 	}
 }

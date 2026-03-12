@@ -11,6 +11,8 @@ import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.stage.Stage;
 
+import com.shale.desktop.update.DesktopUiUpdateLauncher;
+
 import java.util.Objects;
 
 public final class SceneRouter {
@@ -47,12 +49,15 @@ public final class SceneRouter {
 		var runtimeBridge = new DesktopUiRuntimeBridge(dispatcher, dbProvider, negotiateEndpointUrl);
 		runtimeBridge.setRuntimeSessionService(runtimeSessionService);
 
+		var updateLauncher = new DesktopUiUpdateLauncher();
+
 		this.sceneManager = new SceneManager(
 				stage,
 				appState,
 				uiAuthService,
 				runtimeBridge,
-				dbProvider // passed as DbSessionProvider to shale-ui
+				dbProvider,
+				updateLauncher
 		);
 	}
 
