@@ -9,7 +9,6 @@ for %%I in ("%ROOT%") do set ROOT=%%~fI
 for /f %%i in ('powershell -NoProfile -Command "$m = [regex]::Match((Get-Content \"%ROOT%\pom.xml\" -Raw), '<version>([^<]+)</version>'); if ($m.Success) { $m.Groups[1].Value }"') do set VERSION=%%i
 if "%VERSION%"=="" (
     echo Failed to resolve version from pom.xml
-    
     exit /b 1
 )
 
@@ -26,10 +25,15 @@ set JMODS_DIR=%ASSETS_DIR%\javafx-jmods-21.0.10
 if not exist "%DIST%" mkdir "%DIST%"
 if not exist "%DIST_APP%" mkdir "%DIST_APP%"
 
+echo Cleaning dist folders...
+if exist "%DIST%\*" del /q "%DIST%\*" 2>nul
+if exist "%DIST_APP%\Shale" rmdir /s /q "%DIST_APP%\Shale" 2>nul
+if exist "%ROOT%\dist-updater\ShaleUpdater" rmdir /s /q "%ROOT%\dist-updater\ShaleUpdater" 2>nul
+echo Dist cleanup complete.
+echo.
+
 call mvn -f "%ROOT%\pom.xml" -pl shale-desktop -am clean package || goto :fail
 call "%ROOT%\build\scripts\build-updater.bat" || goto :fail
-
-rmdir /s /q "%DIST_APP%\Shale" 2>nul
 
 jpackage ^
   --type app-image ^
@@ -42,10 +46,8 @@ jpackage ^
   --add-modules javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec ^
   --icon "%ASSETS_DIR%\Shale.ico" || goto :fail
 
-del /q "%DIST%\ShaleApp-%VERSION%.zip" 2>nul
 powershell -NoProfile -Command "Compress-Archive -Path '%DIST_APP%\Shale\*' -DestinationPath '%DIST%\ShaleApp-%VERSION%.zip' -Force" || goto :fail
 
-del /q "%DIST%\Shale-%VERSION%.exe" 2>nul
 jpackage ^
   --type exe ^
   --name Shale ^
