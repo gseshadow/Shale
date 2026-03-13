@@ -18,21 +18,52 @@ public final class DesktopInstallLocator {
 							.getLocation()
 							.toURI());
 
-			Path path = codeSource.toPath().toAbsolutePath();
+			Path path = codeSource.toPath().toAbsolutePath().normalize();
 			System.out.println("Code source path: " + path);
 
-			// Example packaged layout often puts jars under app/
-			// ...\Shale\app\shale-desktop-1.0.0.jar
 			Path parent = path.getParent();
-			if (parent != null && parent.getFileName() != null && "app".equalsIgnoreCase(parent.getFileName().toString())) {
-				Path installDir = parent.getParent();
-				if (installDir != null) {
-					return installDir;
+			if (parent != null && parent.getFileName() != null) {
+				String parentName = parent.getFileName().toString();
+
+				// Packaged app: ...\Shale\app\some.jar
+				if ("app".equalsIgnoreCase(parentName)) {
+					Path installDir = parent.getParent();
+					if (installDir != null) {
+						System.out.println("Detected packaged install dir (jar in app): " + installDir);
+						return installDir;
+					}
+				}
+
+				// Packaged app: ...\Shale\app\classes
+				if ("classes".equalsIgnoreCase(parentName)) {
+					Path appDir = parent.getParent();
+					if (appDir != null
+							&& appDir.getFileName() != null
+							&& "app".equalsIgnoreCase(appDir.getFileName().toString())) {
+						Path installDir = appDir.getParent();
+						if (installDir != null) {
+							System.out.println("Detected packaged install dir (classes under app): " + installDir);
+							return installDir;
+						}
+					}
 				}
 			}
 
-			// fallback for dev mode or unexpected layout
-			return path.getParent();
+			// Dev mode: ...\target\classes
+			if (parent != null
+					&& parent.getFileName() != null
+					&& "classes".equalsIgnoreCase(parent.getFileName().toString())) {
+				Path maybeTarget = parent.getParent();
+				if (maybeTarget != null
+						&& maybeTarget.getFileName() != null
+						&& "target".equalsIgnoreCase(maybeTarget.getFileName().toString())) {
+					System.out.println("Detected dev-mode install dir: " + maybeTarget);
+					return maybeTarget;
+				}
+			}
+
+			System.out.println("Falling back to parent dir: " + parent);
+			return parent;
 		} catch (URISyntaxException ex) {
 			throw new IllegalStateException("Unable to detect install directory", ex);
 		}
