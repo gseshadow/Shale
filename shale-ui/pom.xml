@@ -6,9 +6,9 @@
   <parent>
     <groupId>com.shale</groupId>
     <artifactId>shale-parent</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <relativePath>../pom.xml</relativePath>
-  </parent>
+</parent>
 
   <artifactId>shale-ui</artifactId>
   <name>shale-ui</name>
@@ -19,13 +19,11 @@
     <dependency>
       <groupId>com.shale</groupId>
       <artifactId>shale-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     
     <dependency>
       <groupId>com.shale</groupId>
       <artifactId>shale-data</artifactId>
-      <version>${project.version}</version>
     </dependency>
 
 		<!-- JavaFX (UI-only pieces needed here) -->

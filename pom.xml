@@ -1,135 +1,177 @@
 <!-- shale-parent/pom.xml -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.shale</groupId>
-	<artifactId>shale-parent</artifactId>
-	<version>1.0.0</version>
-	<packaging>pom</packaging>
-	<name>Shale</name>
-	<description>Parent POM for the Shale application</description>
+    <groupId>com.shale</groupId>
+    <artifactId>shale-parent</artifactId>
+    <version>1.0.1</version>
+    <packaging>pom</packaging>
 
-	<properties>
-		<!-- Java / build -->
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven.compiler.release>21</maven.compiler.release>
+    <name>Shale</name>
+    <description>Parent POM for the Shale application</description>
 
-		<!-- Library versions -->
-		<javafx.version>21.0.4</javafx.version>
-		<mssql.jdbc.version>12.6.1.jre11</mssql.jdbc.version>
-		<hikari.version>5.1.0</hikari.version>
-		<slf4j.version>2.0.12</slf4j.version>
-		<logback.version>1.5.6</logback.version>
-		<httpclient5.version>5.3.1</httpclient5.version>
+    <properties>
+        <!-- Java / build -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
 
-		<!-- Plugin versions -->
-		<surefire.version>3.2.5</surefire.version>
-		<failsafe.version>3.2.5</failsafe.version>
-		<javafx.maven.plugin.version>0.0.10</javafx.maven.plugin.version>
-	</properties>
+        <!-- Library versions -->
+        <javafx.version>21.0.4</javafx.version>
+        <mssql.jdbc.version>12.6.1.jre11</mssql.jdbc.version>
+        <hikari.version>5.1.0</hikari.version>
+        <slf4j.version>2.0.12</slf4j.version>
+        <logback.version>1.5.6</logback.version>
+        <httpclient5.version>5.3.1</httpclient5.version>
+        <spring.security.version>6.3.3</spring.security.version>
+        <jbcrypt.version>0.4</jbcrypt.version>
+        <gson.version>2.11.0</gson.version>
 
-	<modules>
-		<module>shale-core</module>
-		<module>shale-data</module>
-		<module>shale-ui</module>
-		<module>shale-desktop</module>
-		<module>shale-updater</module>
-	</modules>
+        <!-- Plugin versions -->
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+        <surefire.version>3.2.5</surefire.version>
+        <failsafe.version>3.2.5</failsafe.version>
+        <javafx.maven.plugin.version>0.0.8</javafx.maven.plugin.version>
+        <maven.dependency.plugin.version>3.6.1</maven.dependency.plugin.version>
+    </properties>
 
-	<dependencyManagement>
-		<dependencies>
-			<!-- DB + pools -->
-			<dependency>
-				<groupId>com.microsoft.sqlserver</groupId>
-				<artifactId>mssql-jdbc</artifactId>
-				<version>${mssql.jdbc.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>com.zaxxer</groupId>
-				<artifactId>HikariCP</artifactId>
-				<version>${hikari.version}</version>
-			</dependency>
+    <modules>
+        <module>shale-core</module>
+        <module>shale-data</module>
+        <module>shale-ui</module>
+        <module>shale-desktop</module>
+        <module>shale-updater</module>
+    </modules>
 
-			<!-- Logging -->
-			<dependency>
-				<groupId>org.slf4j</groupId>
-				<artifactId>slf4j-api</artifactId>
-				<version>${slf4j.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>ch.qos.logback</groupId>
-				<artifactId>logback-classic</artifactId>
-				<version>${logback.version}</version>
-			</dependency>
+    <dependencyManagement>
+        <dependencies>
+            <!-- Internal modules -->
+            <dependency>
+                <groupId>com.shale</groupId>
+                <artifactId>shale-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.shale</groupId>
+                <artifactId>shale-data</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.shale</groupId>
+                <artifactId>shale-ui</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.shale</groupId>
+                <artifactId>shale-desktop</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.shale</groupId>
+                <artifactId>shale-updater</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
-			<!-- JavaFX (children omit versions) -->
-			<dependency>
-				<groupId>org.openjfx</groupId>
-				<artifactId>javafx-controls</artifactId>
-				<version>${javafx.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.openjfx</groupId>
-				<artifactId>javafx-fxml</artifactId>
-				<version>${javafx.version}</version>
-			</dependency>
+            <!-- External libraries -->
+            <dependency>
+                <groupId>com.microsoft.sqlserver</groupId>
+                <artifactId>mssql-jdbc</artifactId>
+                <version>${mssql.jdbc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zaxxer</groupId>
+                <artifactId>HikariCP</artifactId>
+                <version>${hikari.version}</version>
+            </dependency>
 
-			<!-- HTTP client (for negotiate endpoint) -->
-			<dependency>
-				<groupId>org.apache.httpcomponents.client5</groupId>
-				<artifactId>httpclient5</artifactId>
-				<version>${httpclient5.version}</version>
-			</dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
 
-			<dependency>
-				<groupId>org.springframework.security</groupId>
-				<artifactId>spring-security-crypto</artifactId>
-				<version>6.3.3</version>
-			</dependency>
+            <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-controls</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-fxml</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
 
-			<dependency>
-				<groupId>org.mindrot</groupId>
-				<artifactId>jbcrypt</artifactId>
-				<version>0.4</version>
-			</dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>${httpclient5.version}</version>
+            </dependency>
 
-		</dependencies>
-	</dependencyManagement>
+            <dependency>
+                <groupId>org.springframework.security</groupId>
+                <artifactId>spring-security-crypto</artifactId>
+                <version>${spring.security.version}</version>
+            </dependency>
 
-	<build>
-		<pluginManagement>
-			<plugins>
-				<!-- Java compiler -->
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-compiler-plugin</artifactId>
-					<version>3.13.0</version>
-					<configuration>
-						<release>${maven.compiler.release}</release>
-					</configuration>
-				</plugin>
+            <dependency>
+                <groupId>org.mindrot</groupId>
+                <artifactId>jbcrypt</artifactId>
+                <version>${jbcrypt.version}</version>
+            </dependency>
 
-				<!-- Tests -->
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-surefire-plugin</artifactId>
-					<version>${surefire.version}</version>
-				</plugin>
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-failsafe-plugin</artifactId>
-					<version>${failsafe.version}</version>
-				</plugin>
+            <dependency>
+                <groupId>com.google.code.gson</groupId>
+                <artifactId>gson</artifactId>
+                <version>${gson.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
-				<!-- JavaFX plugin (NOTE: separate version from libraries) -->
-				<plugin>
-					<groupId>org.openjfx</groupId>
-					<artifactId>javafx-maven-plugin</artifactId>
-					<version>${javafx.maven.plugin.version}</version>
-				</plugin>
-			</plugins>
-		</pluginManagement>
-	</build>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Java compiler -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven.compiler.plugin.version}</version>
+                    <configuration>
+                        <release>${maven.compiler.release}</release>
+                    </configuration>
+                </plugin>
+
+                <!-- Tests -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${surefire.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${failsafe.version}</version>
+                </plugin>
+
+                <!-- JavaFX plugin -->
+                <plugin>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-maven-plugin</artifactId>
+                    <version>${javafx.maven.plugin.version}</version>
+                </plugin>
+
+                <!-- Dependency plugin -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>${maven.dependency.plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

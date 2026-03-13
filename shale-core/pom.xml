@@ -4,10 +4,11 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>com.shale</groupId>
-		<artifactId>shale-parent</artifactId>
-		<version>1.0.0</version>
-	</parent>
+    <groupId>com.shale</groupId>
+    <artifactId>shale-parent</artifactId>
+    <version>1.0.1</version>
+    <relativePath>../pom.xml</relativePath>
+</parent>
 
 	<artifactId>shale-core</artifactId>
 	<name>Shale :: Core</name>
