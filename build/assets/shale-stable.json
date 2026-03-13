@@ -1,10 +1,10 @@
 ﻿{
-    "version":  "1.0.2",
+    "version":  "1.0.8",
     "channel":  "stable",
-    "zipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.2.zip",
-    "installerUrl":  "https://shalestorage.z13.web.core.windows.net/Shale-1.0.2.exe",
-    "notes":  "Release 1.0.2",
+    "zipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.8.zip",
+    "installerUrl":  "https://shalestorage.z13.web.core.windows.net/Shale-1.0.8.exe",
+    "notes":  "Release 1.0.8",
     "mandatory":  false,
-    "sha256":  "",
-    "publishedAt":  "2026-03-13T18:20:30Z"
+    "sha256":  "a82a742a06973e28002a6ffe0412eab6f32f5188722bc1a57103dba536f58d53",
+    "publishedAt":  "2026-03-13T23:42:51Z"
 }

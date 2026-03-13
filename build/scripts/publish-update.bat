@@ -31,18 +31,23 @@ call az account show || exit /b 1
 echo.
 
 echo Uploading installer...
-call az storage blob upload --account-name "%STORAGE_ACCOUNT%" --container-name "%CONTAINER%" --name "Shale-%VERSION%.exe" --file "%EXE_FILE%" --overwrite true --auth-mode login --no-progress || exit /b 1
+call az storage blob upload --account-name "%STORAGE_ACCOUNT%" --container-name "%CONTAINER%" --name "Shale-%VERSION%.exe" --file "%EXE_FILE%" --overwrite true --auth-mode login --no-progress --only-show-errors --output none || exit /b 1
 echo Installer uploaded.
 echo.
 
 echo Uploading update zip...
-call az storage blob upload --account-name "%STORAGE_ACCOUNT%" --container-name "%CONTAINER%" --name "ShaleApp-%VERSION%.zip" --file "%ZIP_FILE%" --overwrite true --auth-mode login --no-progress || exit /b 1
+call az storage blob upload --account-name "%STORAGE_ACCOUNT%" --container-name "%CONTAINER%" --name "ShaleApp-%VERSION%.zip" --file "%ZIP_FILE%" --overwrite true --auth-mode login --no-progress --only-show-errors --output none || exit /b 1
 echo Zip uploaded.
 echo.
 
 echo Uploading manifest...
-call az storage blob upload --account-name "%STORAGE_ACCOUNT%" --container-name "%CONTAINER%" --name "shale-stable.json" --file "%JSON_FILE%" --overwrite true --auth-mode login --no-progress || exit /b 1
+call az storage blob upload --account-name "%STORAGE_ACCOUNT%" --container-name "%CONTAINER%" --name "shale-stable.json" --file "%JSON_FILE%" --overwrite true --auth-mode login --no-progress --only-show-errors --output none || exit /b 1
 echo Manifest uploaded.
+echo.
+
+echo Pruning old installers and zips (keeping newest 2)...
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; $acct='%STORAGE_ACCOUNT%'; $container='%CONTAINER%'; $blobs = az storage blob list --account-name $acct --container-name $container --auth-mode login | ConvertFrom-Json; $installers = $blobs | Where-Object { $_.name -like 'Shale-*.exe' } | Sort-Object lastModified -Descending; $zips = $blobs | Where-Object { $_.name -like 'ShaleApp-*.zip' } | Sort-Object lastModified -Descending; $installers | Select-Object -Skip 2 | ForEach-Object { Write-Host ('Deleting ' + $_.name); az storage blob delete --account-name $acct --container-name $container --name $_.name --auth-mode login --only-show-errors --output none | Out-Null }; $zips | Select-Object -Skip 2 | ForEach-Object { Write-Host ('Deleting ' + $_.name); az storage blob delete --account-name $acct --container-name $container --name $_.name --auth-mode login --only-show-errors --output none | Out-Null }" || exit /b 1
+echo Prune complete.
 echo.
 
 echo Verifying blobs:

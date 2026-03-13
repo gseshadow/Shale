@@ -54,7 +54,12 @@ public class Main {
 					DownloadService downloader = new DownloadService();
 					Path downloaded = downloader.downloadToTemp(
 							manifest.getZipUrl(),
-							"ShaleApp-" + manifest.getVersion() + ".zip");
+							"ShaleUpdate.zip",
+							manifest.getSha256()
+					);
+//					Path downloaded = downloader.downloadToTemp(
+//							manifest.getZipUrl(),
+//							"ShaleApp-" + manifest.getVersion() + ".zip");
 
 					System.out.println("Downloaded to: " + downloaded);
 
