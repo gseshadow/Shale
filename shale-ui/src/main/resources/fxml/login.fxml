@@ -11,7 +11,8 @@
 	<center>
 		<VBox spacing="18" alignment="CENTER" maxWidth="360">
 			<children>
-				<ImageView fx:id="logoImage" fitWidth="220" preserveRatio="true" smooth="true" pickOnBounds="true">
+				<ImageView fx:id="logoImage" fitWidth="440"
+					preserveRatio="true" smooth="true" pickOnBounds="true">
 					<image>
 						<Image url="@/images/shale.png" />
 					</image>
