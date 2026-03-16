@@ -15,7 +15,7 @@
 			</padding>
 			<TextField fx:id="casesSearchField"
 				promptText="Search cases…" HBox.hgrow="ALWAYS" />
-			<CheckBox fx:id="includeClosedDeniedCheckBox" text="Closed/Denied" selected="false" />
+			<MenuButton fx:id="statusFilterMenuButton" text="Status (8/8)" />
 			<ChoiceBox fx:id="casesSortChoice" prefWidth="220" />
 		</HBox>
 	</top>
