@@ -45,14 +45,12 @@
 
 	<!-- LEFT: Case navigation -->
 	<left>
-		<VBox spacing="8.0" BorderPane.alignment="TOP_LEFT"
-			style="-fx-background-color: rgba(0,0,0,0.03);">
+		<VBox spacing="8.0" BorderPane.alignment="TOP_LEFT" styleClass="case-nav-pane">
 			<padding>
 				<Insets top="10" right="10" bottom="10" left="12" />
 			</padding>
 
-			<Label text="Sections"
-				style="-fx-font-weight: bold; -fx-opacity: 0.8;" />
+			<Label text="Sections" styleClass="sidebar-header" />
 			<VBox fx:id="sectionButtonsBox" spacing="6.0" prefWidth="200.0" />
 		</VBox>
 	</left>
@@ -66,8 +64,8 @@
 
 			<!-- OVERVIEW PANE -->
 			<ScrollPane fx:id="overviewScrollPane" fitToWidth="true"
-				hbarPolicy="NEVER" style="-fx-background-color: transparent;">
-				<VBox fx:id="overviewPane" spacing="10" maxWidth="980">
+				hbarPolicy="NEVER" styleClass="surface-scroll">
+				<VBox fx:id="overviewPane" spacing="10" maxWidth="980" styleClass="case-main-surface">
 					<padding>
 						<Insets top="12" right="12" bottom="12" left="12" />
 					</padding>
@@ -209,8 +207,8 @@
 
 			<!-- DETAILS PANE -->
 			<ScrollPane fx:id="detailsScrollPane" fitToWidth="true" hbarPolicy="NEVER" visible="false" managed="false"
-				style="-fx-background-color: transparent;">
-				<VBox fx:id="detailsPane" spacing="10" maxWidth="980">
+				styleClass="surface-scroll">
+				<VBox fx:id="detailsPane" spacing="10" maxWidth="980" styleClass="case-main-surface">
 					<padding>
 						<Insets top="12" right="12" bottom="12" left="12" />
 					</padding>
@@ -226,7 +224,7 @@
 							<Label fx:id="detailsErrorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
 						</HBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
+					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Core" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
 						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
 								<columnConstraints>
@@ -264,7 +262,7 @@
 							</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
+					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Lifecycle" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
 						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
 							<columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
@@ -276,7 +274,7 @@
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
+					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Incident &amp; Deadlines" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
 						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
 							<Label text="Date of Medical Negligence:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detDateOfMedicalNegligenceValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><DatePicker fx:id="detDateOfMedicalNegligenceEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
@@ -288,7 +286,7 @@
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
+					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Administrative" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
 						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
 							<Label text="Estate Case:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detClientEstateValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detClientEstateEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
@@ -299,7 +297,7 @@
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
+					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Accepted" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
 						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
 							<Label text="Chronology:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detAcceptedChronologyValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedChronologyEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
@@ -310,7 +308,7 @@
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
+					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Denied" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
 						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
 							<Label text="Chronology:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detDeniedChronologyValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detDeniedChronologyEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
@@ -318,7 +316,7 @@
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 12;">
+					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Notes" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
 						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
 							<Label text="Summary:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detSummaryValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" /><TextArea fx:id="detSummaryEditor" maxWidth="1.7976931348623157E308" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
@@ -328,7 +326,7 @@
 				</VBox>
 			</ScrollPane>
 			<!-- TASKS TAB PANE (center) -->
-			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980"
+			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980" styleClass="case-main-surface"
 				visible="false" managed="false">
 				<Label text="Tasks"
 					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
@@ -340,7 +338,7 @@
 			</VBox>
 
 			<!-- GENERIC PLACEHOLDER PANE -->
-			<VBox fx:id="genericPane" spacing="10" maxWidth="980"
+			<VBox fx:id="genericPane" spacing="10" maxWidth="980" styleClass="case-main-surface"
 				visible="false" managed="false">
 				<Label fx:id="genericTitleLabel" text="Section"
 					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
@@ -352,8 +350,7 @@
 	</center>
 
 	<right>
-		<VBox spacing="10.0" prefWidth="320.0"
-			style="-fx-background-color: rgba(0,0,0,0.03);" BorderPane.alignment="TOP_LEFT">
+		<VBox spacing="10.0" prefWidth="320.0" styleClass="case-right-pane" BorderPane.alignment="TOP_LEFT">
 			<padding>
 				<Insets top="10" right="12" bottom="12" left="10" />
 			</padding>
