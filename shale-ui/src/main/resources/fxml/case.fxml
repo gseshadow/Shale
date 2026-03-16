@@ -5,7 +5,7 @@
 <?import javafx.scene.layout.*?>
 
 <BorderPane xmlns:fx="http://javafx.com/fxml"
-	fx:controller="com.shale.ui.controller.CaseController">
+	fx:controller="com.shale.ui.controller.CaseController" styleClass="app-shell">
 
 	<!-- TOP: Header / Command Bar (slightly tighter) -->
 	<top>
@@ -45,7 +45,7 @@
 
 	<!-- LEFT: Case navigation -->
 	<left>
-		<VBox spacing="8.0" BorderPane.alignment="TOP_LEFT" styleClass="case-nav-pane">
+		<VBox spacing="8.0" BorderPane.alignment="TOP_LEFT" styleClass="case-nav-pane nav-rail">
 			<padding>
 				<Insets top="10" right="10" bottom="10" left="12" />
 			</padding>
@@ -350,7 +350,7 @@
 	</center>
 
 	<right>
-		<VBox spacing="10.0" prefWidth="320.0" styleClass="case-right-pane" BorderPane.alignment="TOP_LEFT">
+		<VBox spacing="10.0" prefWidth="320.0" styleClass="case-right-pane strong-panel" BorderPane.alignment="TOP_LEFT">
 			<padding>
 				<Insets top="10" right="12" bottom="12" left="10" />
 			</padding>
