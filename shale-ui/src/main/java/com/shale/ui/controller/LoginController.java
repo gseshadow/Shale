@@ -1,6 +1,5 @@
 package com.shale.ui.controller;
 
-import java.util.Objects;
 import java.util.Optional;
 
 import com.shale.ui.navigation.SceneManager;
@@ -8,17 +7,18 @@ import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.state.AppState;
+
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
-import javafx.geometry.Pos;
-import javafx.scene.control.ContentDisplay;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
@@ -33,6 +33,8 @@ public final class LoginController {
 	private Button signInButton;
 	@FXML
 	private Label errorLabel;
+	@FXML
+	private ImageView logoImage;
 
 	private SceneManager sceneManager;
 	private AppState appState;
@@ -57,15 +59,67 @@ public final class LoginController {
 
 	@FXML
 	private void initialize() {
-		System.out.println("LoginController.initialize()");// TODO
+		java.nio.file.Path logPath = java.nio.file.Path.of(
+				System.getenv("LOCALAPPDATA"), "Shale", "startup.log");
+
+		try {
+			java.nio.file.Files.createDirectories(logPath.getParent());
+
+			java.nio.file.Files.writeString(
+					logPath,
+					"LoginController.initialize() called\n",
+					java.nio.file.StandardOpenOption.CREATE,
+					java.nio.file.StandardOpenOption.APPEND
+			);
+		} catch (Exception ignored) {
+		}
+
 		errorLabel.setText("");
 
-		// Make the sign-in button the default button for the form
 		signInButton.setDefaultButton(true);
 
-		// Hitting Enter in either field will trigger sign-in
 		emailField.setOnAction(e -> onSignIn());
 		passwordField.setOnAction(e -> onSignIn());
+
+		try {
+			var logoUrl = getClass().getResource("/images/Shale.png");
+
+			java.nio.file.Files.writeString(
+					logPath,
+					"Logo resource URL: " + logoUrl + "\n",
+					java.nio.file.StandardOpenOption.CREATE,
+					java.nio.file.StandardOpenOption.APPEND
+			);
+
+			if (logoUrl != null) {
+				logoImage.setImage(new Image(logoUrl.toExternalForm()));
+
+				java.nio.file.Files.writeString(
+						logPath,
+						"Logo image successfully loaded\n",
+						java.nio.file.StandardOpenOption.CREATE,
+						java.nio.file.StandardOpenOption.APPEND
+				);
+			} else {
+				java.nio.file.Files.writeString(
+						logPath,
+						"Logo resource NOT FOUND at /images/Shale.png\n",
+						java.nio.file.StandardOpenOption.CREATE,
+						java.nio.file.StandardOpenOption.APPEND
+				);
+			}
+
+		} catch (Exception ex) {
+			try {
+				java.nio.file.Files.writeString(
+						logPath,
+						"Exception loading logo: " + ex + "\n",
+						java.nio.file.StandardOpenOption.CREATE,
+						java.nio.file.StandardOpenOption.APPEND
+				);
+			} catch (Exception ignored) {
+			}
+		}
 	}
 
 	@FXML
@@ -164,24 +218,25 @@ public final class LoginController {
 		progress.setTitle("Update Started");
 		progress.setHeaderText("Updating…");
 
-		ImageView loadingImage = new ImageView(
-				new Image(
-						Objects.requireNonNull(
-								getClass().getResourceAsStream("/images/ShaleLoading.gif")
-						)
-				)
-		);
-		loadingImage.setFitWidth(120);
-		loadingImage.setPreserveRatio(true);
-		loadingImage.setSmooth(true);
+		VBox content = new VBox();
+		content.setAlignment(Pos.CENTER);
+		content.setSpacing(15);
+
+		var gifStream = getClass().getResourceAsStream("/images/ShaleLoading.gif");
+		if (gifStream != null) {
+			ImageView loadingImage = new ImageView(new Image(gifStream));
+			loadingImage.setFitWidth(120);
+			loadingImage.setPreserveRatio(true);
+			loadingImage.setSmooth(true);
+			content.getChildren().add(loadingImage);
+		} else {
+			System.out.println("Loading gif resource not found: /images/ShaleLoading.gif");
+		}
 
 		Label messageLabel = new Label("Shale is launching the updater and will close shortly.");
 		messageLabel.setWrapText(true);
 		messageLabel.setContentDisplay(ContentDisplay.TEXT_ONLY);
-
-		VBox content = new VBox(loadingImage, messageLabel);
-		content.setAlignment(Pos.CENTER);
-		content.setSpacing(15);
+		content.getChildren().add(messageLabel);
 
 		progress.getDialogPane().setContent(content);
 		progress.getButtonTypes().setAll();

@@ -21,9 +21,6 @@
 				<Button fx:id="newIntakeButton" text="New Intake"
 					onAction="#onNewIntake" />
 				
-				<Button fx:id="updateButton" text="Update"
-					onAction="#onUpdate" />
-
 
 				<Region HBox.hgrow="ALWAYS" />
 				<Label text="Signed in as:" />
