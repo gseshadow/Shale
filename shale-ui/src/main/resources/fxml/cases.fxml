@@ -6,7 +6,7 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
 	xmlns:fx="http://javafx.com/fxml/1"
-	fx:controller="com.shale.ui.controller.CasesController" styleClass="app-shell cases-page">
+	fx:controller="com.shale.ui.controller.CasesController" styleClass="app-shell">
 
 	<top>
 		<HBox spacing="10" styleClass="cases-filter-bar strong-panel">

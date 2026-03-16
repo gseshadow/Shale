@@ -18,6 +18,7 @@
 .app-shell,
 .shell-transparent {
     -fx-background-color: transparent;
+    -fx-border-color: transparent;
 }
 
 .glass-container {
@@ -87,12 +88,16 @@
     -fx-border-width: 1;
 }
 
-.cases-page,
+.cases-page {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
 .cases-content-surface {
-    -fx-background-color: rgba(238, 247, 255, 0.10);
+    -fx-background-color: rgba(238, 247, 255, 0.06);
     -fx-background-radius: 12;
     -fx-border-radius: 12;
-    -fx-border-color: rgba(222, 239, 255, 0.2);
+    -fx-border-color: rgba(222, 239, 255, 0.16);
     -fx-border-width: 1;
 }
 
