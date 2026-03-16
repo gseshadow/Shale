@@ -74,7 +74,7 @@ public final class MyShaleController {
 	private void initialize() {
 		if (myCasesSortChoice != null) {
 			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
-			myCasesSortChoice.getSelectionModel().select(SORT_INTAKE);
+			myCasesSortChoice.getSelectionModel().select(SORT_NAME);
 			myCasesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> loadFirstPage());
 		}
 
@@ -164,7 +164,7 @@ public final class MyShaleController {
 		}
 
 		String q = normalizedSearchQuery();
-		Comparator<CaseCardVm> comp = comparatorFor(myCasesSortChoice == null ? SORT_INTAKE : myCasesSortChoice.getValue());
+		Comparator<CaseCardVm> comp = comparatorFor(myCasesSortChoice == null ? SORT_NAME : myCasesSortChoice.getValue());
 
 		List<CaseCardVm> filtered = loaded.stream()
 				.filter(vm -> matchesQuery(vm, q) && matchesSelectedStatus(vm))
@@ -180,7 +180,7 @@ public final class MyShaleController {
 	}
 
 	private CaseSort selectedSort() {
-		String value = myCasesSortChoice == null ? SORT_INTAKE : myCasesSortChoice.getValue();
+		String value = myCasesSortChoice == null ? SORT_NAME : myCasesSortChoice.getValue();
 		if (SORT_NAME.equals(value)) {
 			return CaseSort.CASE_NAME_ASC;
 		}
@@ -197,7 +197,10 @@ public final class MyShaleController {
 		if (SORT_SOL.equals(sortOption)) {
 			return Comparator.comparing((CaseCardVm v) -> v.solDate, this::nullsLastDate);
 		}
-		return Comparator.comparing((CaseCardVm v) -> v.intakeDate, this::nullsLastDate).reversed();
+		if (SORT_INTAKE.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm v) -> v.intakeDate, this::nullsLastDate).reversed();
+		}
+		return Comparator.comparing((CaseCardVm v) -> v.name, this::nullsLastString);
 	}
 
 	private boolean matchesSelectedStatus(CaseCardVm vm) {
