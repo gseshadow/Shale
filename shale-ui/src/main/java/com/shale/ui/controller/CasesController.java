@@ -3,9 +3,13 @@ package com.shale.ui.controller;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -20,8 +24,11 @@ import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.control.CheckBox;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
@@ -34,7 +41,7 @@ public final class CasesController {
 	@FXML
 	private ChoiceBox<String> casesSortChoice;
 	@FXML
-	private CheckBox includeClosedDeniedCheckBox;
+	private MenuButton statusFilterMenuButton;
 
 	// NEW: FlowPane layout (add these IDs in FXML)
 	@FXML
@@ -57,6 +64,30 @@ public final class CasesController {
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 
 	private CaseCardFactory caseCardFactory;
+
+	private static final int STATUS_POTENTIAL = 6;
+	private static final int STATUS_ACTIVE = 7;
+	private static final int STATUS_MEDIATION = 8;
+	private static final int STATUS_TRIAL = 9;
+	private static final int STATUS_SETTLEMENT = 10;
+	private static final int STATUS_DENIED = 11;
+	private static final int STATUS_CLOSED = 12;
+	private static final int STATUS_ACCEPTED = 14;
+
+	private static final Map<Integer, String> STATUS_FILTER_OPTIONS = new LinkedHashMap<>();
+
+	static {
+		STATUS_FILTER_OPTIONS.put(STATUS_POTENTIAL, "Potential");
+		STATUS_FILTER_OPTIONS.put(STATUS_ACTIVE, "Active");
+		STATUS_FILTER_OPTIONS.put(STATUS_MEDIATION, "Mediation");
+		STATUS_FILTER_OPTIONS.put(STATUS_TRIAL, "Trial");
+		STATUS_FILTER_OPTIONS.put(STATUS_SETTLEMENT, "Settlement");
+		STATUS_FILTER_OPTIONS.put(STATUS_DENIED, "Denied");
+		STATUS_FILTER_OPTIONS.put(STATUS_CLOSED, "Closed");
+		STATUS_FILTER_OPTIONS.put(STATUS_ACCEPTED, "Accepted");
+	}
+
+	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>(STATUS_FILTER_OPTIONS.keySet());
 
 	// Background DB executor (so UI doesn’t freeze)
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
@@ -107,10 +138,7 @@ public final class CasesController {
 			casesSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
 		}
 
-		if (includeClosedDeniedCheckBox != null) {
-			includeClosedDeniedCheckBox.setSelected(false);
-			includeClosedDeniedCheckBox.selectedProperty().addListener((obs, oldV, newV) -> loadFirstPage());
-		}
+		initializeStatusFilter();
 
 		Platform.runLater(() ->
 		{
@@ -210,7 +238,7 @@ public final class CasesController {
 					if (safeVal.equals(vm.name)) {
 						return false; // no change
 					}
-					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.responsibleAttorney, vm.responsibleAttorneyColor));
+					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor));
 					return true;
 				}
 
@@ -256,7 +284,7 @@ public final class CasesController {
 		for (int i = 0; i < loaded.size(); i++) {
 			CaseCardVm vm = loaded.get(i);
 			if (vm.id == caseId) {
-				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.responsibleAttorney, vm.responsibleAttorneyColor));
+				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor));
 				rerender();
 				return;
 			}
@@ -302,7 +330,7 @@ public final class CasesController {
 		dbExec.submit(() ->
 		{
 			try {
-				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort(), includeClosedDenied());
+				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort());
 
 				// map DAO rows into UI VM
 				List<CaseCardVm> newItems = page.items().stream()
@@ -311,6 +339,7 @@ public final class CasesController {
 								safe(r.name()),
 								r.intakeDate(),
 								r.statuteOfLimitationsDate(),
+								r.primaryStatusId(),
 								safe(r.responsibleAttorneyName()),
 								safe(r.responsibleAttorneyColor())
 						))
@@ -359,7 +388,7 @@ public final class CasesController {
 		Comparator<CaseCardVm> comp = comparatorFor(sort);
 
 		List<CaseCardVm> filtered = loaded.stream()
-				.filter(vm -> matchesQuery(vm, q))
+				.filter(vm -> matchesQuery(vm, q) && matchesSelectedStatus(vm))
 				.sorted(comp)
 				.toList();
 
@@ -372,8 +401,90 @@ public final class CasesController {
 		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
 	}
 
-	private boolean includeClosedDenied() {
-		return includeClosedDeniedCheckBox != null && includeClosedDeniedCheckBox.isSelected();
+	private void initializeStatusFilter() {
+		if (statusFilterMenuButton == null) {
+			return;
+		}
+
+		statusFilterMenuButton.getItems().clear();
+
+		MenuItem selectAll = new MenuItem("Select All");
+		selectAll.setOnAction(event -> {
+			selectedStatusIds.clear();
+			selectedStatusIds.addAll(STATUS_FILTER_OPTIONS.keySet());
+			updateStatusMenuItemsFromSelection();
+			refreshStatusFilter();
+		});
+
+		MenuItem clearAll = new MenuItem("Clear All");
+		clearAll.setOnAction(event -> {
+			selectedStatusIds.clear();
+			updateStatusMenuItemsFromSelection();
+			refreshStatusFilter();
+		});
+
+		statusFilterMenuButton.getItems().addAll(selectAll, clearAll, new SeparatorMenuItem());
+
+		for (Map.Entry<Integer, String> entry : STATUS_FILTER_OPTIONS.entrySet()) {
+			Integer statusId = entry.getKey();
+			CheckMenuItem item = new CheckMenuItem(entry.getValue());
+			item.setSelected(selectedStatusIds.contains(statusId));
+			item.setOnAction(event -> {
+				if (item.isSelected()) {
+					selectedStatusIds.add(statusId);
+				} else {
+					selectedStatusIds.remove(statusId);
+				}
+				updateStatusMenuButtonText();
+				rerender();
+			});
+			statusFilterMenuButton.getItems().add(item);
+		}
+
+		updateStatusMenuButtonText();
+	}
+
+	private void updateStatusMenuItemsFromSelection() {
+		if (statusFilterMenuButton == null) {
+			return;
+		}
+		for (MenuItem item : statusFilterMenuButton.getItems()) {
+			if (item instanceof CheckMenuItem checkItem) {
+				Integer statusId = statusIdForLabel(checkItem.getText());
+				if (statusId != null) {
+					checkItem.setSelected(selectedStatusIds.contains(statusId));
+				}
+			}
+		}
+		updateStatusMenuButtonText();
+	}
+
+	private Integer statusIdForLabel(String label) {
+		for (Map.Entry<Integer, String> entry : STATUS_FILTER_OPTIONS.entrySet()) {
+			if (entry.getValue().equals(label)) {
+				return entry.getKey();
+			}
+		}
+		return null;
+	}
+
+	private void updateStatusMenuButtonText() {
+		if (statusFilterMenuButton == null) {
+			return;
+		}
+		statusFilterMenuButton.setText("Status (" + selectedStatusIds.size() + "/" + STATUS_FILTER_OPTIONS.size() + ")");
+	}
+
+	private void refreshStatusFilter() {
+		updateStatusMenuButtonText();
+		rerender();
+	}
+
+	private boolean matchesSelectedStatus(CaseCardVm vm) {
+		if (vm.primaryStatusId == null) {
+			return true;
+		}
+		return selectedStatusIds.contains(vm.primaryStatusId);
 	}
 
 	private boolean isSearchActive() {
@@ -490,15 +601,17 @@ public final class CasesController {
 		final String name;
 		final LocalDate intakeDate;
 		final LocalDate solDate;
+		final Integer primaryStatusId;
 		final String responsibleAttorney;
 		final String responsibleAttorneyColor;
 
-		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney,
+		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId, String responsibleAttorney,
 				String responsibleAttorneyColor) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
 			this.solDate = solDate;
+			this.primaryStatusId = primaryStatusId;
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
 		}
@@ -589,6 +702,7 @@ public final class CasesController {
 						newName,
 						r.intakeDate(),
 						r.statuteOfLimitationsDate(),
+						r.primaryStatusId(),
 						newAtty,
 						newColor
 				));
