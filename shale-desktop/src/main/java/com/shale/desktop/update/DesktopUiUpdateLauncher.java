@@ -14,12 +14,12 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 	private final UpdateService updateService = new UpdateService();
 
 	@Override
-	public UpdateCheckResult checkForUpdate() {
+	public UiUpdateLauncher.UpdateCheckResult checkForUpdate() {
 		try {
 			UpdateManifest manifest = updateService.fetchManifest(MANIFEST_URL);
 			boolean updateAvailable = updateService.isUpdateAvailable(DesktopConfig.appVersion(), manifest);
 			boolean mandatory = updateAvailable && manifest != null && manifest.isMandatory();
-			return new UpdateCheckResult(updateAvailable, mandatory);
+			return new UiUpdateLauncher.UpdateCheckResult(updateAvailable, mandatory);
 		} catch (IOException | InterruptedException ex) {
 			throw new RuntimeException("Failed to check for updates", ex);
 		}
