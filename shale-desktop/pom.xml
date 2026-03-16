@@ -35,6 +35,11 @@
             <artifactId>shale-ui</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.shale</groupId>
+            <artifactId>shale-updater</artifactId>
+        </dependency>
+
         <!-- JavaFX modules -->
         <dependency>
             <groupId>org.openjfx</groupId>
