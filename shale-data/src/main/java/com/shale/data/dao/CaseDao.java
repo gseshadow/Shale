@@ -56,6 +56,7 @@ public final class CaseDao {
 			String name,
 			LocalDate intakeDate, // CallerDate
 			LocalDate statuteOfLimitationsDate, // IncidentStatuteOfLimitations
+			Integer primaryStatusId,
 			Integer responsibleAttorneyId,
 			String responsibleAttorneyName,
 			String responsibleAttorneyColor
@@ -441,6 +442,7 @@ public final class CaseDao {
 				  c.Name,
 				  c.CallerDate,
 				  c.StatuteOfLimitations,
+				  current_status.PrimaryStatusId,
 				  ra.UserId AS ResponsibleAttorneyId,
 				  u.color AS ResponsibleAttorneyColor,
 				  LTRIM(RTRIM(
@@ -449,6 +451,17 @@ public final class CaseDao {
 				    COALESCE(u.name_last, '')
 				  )) AS ResponsibleAttorneyName
 				FROM %s c
+				OUTER APPLY (
+				    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+				    FROM %s cs
+				    INNER JOIN %s s ON s.Id = cs.StatusId
+				    WHERE cs.CaseId = c.Id
+				    ORDER BY
+				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+				      cs.UpdatedAt DESC,
+				      cs.CreatedAt DESC,
+				      cs.Id DESC
+				) current_status
 				OUTER APPLY (
 				    SELECT TOP (1) cu.UserId
 				    FROM %s cu
@@ -460,17 +473,6 @@ public final class CaseDao {
 				      cu.CreatedAt DESC,
 				      cu.Id DESC
 				) ra
-				OUTER APPLY (
-				    SELECT TOP (1) s.Name AS CurrentStatusName
-				    FROM %s cs
-				    INNER JOIN %s s ON s.Id = cs.StatusId
-				    WHERE cs.CaseId = c.Id
-				    ORDER BY
-				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-				      cs.UpdatedAt DESC,
-				      cs.CreatedAt DESC,
-				      cs.Id DESC
-				) current_status
 				LEFT JOIN %s u
 				  ON u.id = ra.UserId
 				WHERE (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
@@ -482,7 +484,7 @@ public final class CaseDao {
 				ORDER BY
 				  %s
 				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-				""".formatted(CASES_TABLE, CASE_USERS_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, USERS_TABLE,
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
 				orderByClause);
 
 		List<CaseRow> out = new ArrayList<>(pageSize);
@@ -503,6 +505,7 @@ public final class CaseDao {
 							rs.getString("Name"),
 							toLocalDate(rs.getDate("CallerDate")),
 							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							getNullableInt(rs, "PrimaryStatusId"),
 							getNullableInt(rs, "ResponsibleAttorneyId"),
 							rs.getString("ResponsibleAttorneyName"),
 							rs.getString("ResponsibleAttorneyColor")
@@ -1779,6 +1782,7 @@ public final class CaseDao {
 				  c.Name,
 				  c.CallerDate,
 				  c.StatuteOfLimitations,
+				  current_status.PrimaryStatusId,
 				  ra.UserId AS ResponsibleAttorneyId,
 				  u.color AS ResponsibleAttorneyColor,
 				  LTRIM(RTRIM(
@@ -1787,6 +1791,17 @@ public final class CaseDao {
 				    COALESCE(u.name_last, '')
 				  )) AS ResponsibleAttorneyName
 				FROM %s c
+				OUTER APPLY (
+				    SELECT TOP (1) s.Id AS PrimaryStatusId
+				    FROM %s cs
+				    INNER JOIN %s s ON s.Id = cs.StatusId
+				    WHERE cs.CaseId = c.Id
+				    ORDER BY
+				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+				      cs.UpdatedAt DESC,
+				      cs.CreatedAt DESC,
+				      cs.Id DESC
+				) current_status
 				OUTER APPLY (
 				    SELECT TOP (1) cu.UserId
 				    FROM %s cu
@@ -1799,7 +1814,7 @@ public final class CaseDao {
 				  ON u.id = ra.UserId
 				WHERE c.Id = ?
 				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
-				""".formatted(CASES_TABLE, CASE_USERS_TABLE, USERS_TABLE);
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE);
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
@@ -1816,6 +1831,7 @@ public final class CaseDao {
 						rs.getString("Name"),
 						toLocalDate(rs.getDate("CallerDate")),
 						toLocalDate(rs.getDate("StatuteOfLimitations")),
+						getNullableInt(rs, "PrimaryStatusId"),
 						getNullableInt(rs, "ResponsibleAttorneyId"),
 						rs.getString("ResponsibleAttorneyName"),
 						rs.getString("ResponsibleAttorneyColor")
