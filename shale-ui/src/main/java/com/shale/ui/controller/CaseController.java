@@ -521,7 +521,7 @@ public class CaseController {
 		Button button = new Button(section);
 		button.setMaxWidth(Double.MAX_VALUE);
 		button.setAlignment(Pos.CENTER_LEFT);
-		button.setStyle("-fx-padding: 8 10 8 10; -fx-background-radius: 8; -fx-background-color: rgba(0,0,0,0.06);");
+		button.getStyleClass().add("section-nav-button");
 		return button;
 	}
 
@@ -604,10 +604,9 @@ public class CaseController {
 	private void setActiveSectionButton(String activeSection) {
 		sectionButtons.forEach((section, button) ->
 		{
+			button.getStyleClass().remove("section-nav-button-active");
 			if (Objects.equals(section, activeSection)) {
-				button.setStyle("-fx-padding: 8 10 8 10; -fx-background-radius: 8; -fx-background-color: rgba(0,0,0,0.12); -fx-font-weight: bold;");
-			} else {
-				button.setStyle("-fx-padding: 8 10 8 10; -fx-background-radius: 8; -fx-background-color: rgba(0,0,0,0.06);");
+				button.getStyleClass().add("section-nav-button-active");
 			}
 		});
 	}

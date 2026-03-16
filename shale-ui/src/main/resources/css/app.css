@@ -1,4 +1,155 @@
-.root { -fx-font-size: 14px; }
+.root {
+    -fx-font-size: 14px;
+    -fx-background-color:
+        radial-gradient(
+            center 70% 20%,
+            radius 120%,
+            #4cc3b5 0%,
+            #2b6a82 35%,
+            #1b2b4a 70%,
+            #0e1023 100%
+        );
+}
+
 .title { -fx-font-size: 20px; -fx-font-weight: bold; }
 .error { -fx-text-fill: #c62828; }
-.header { -fx-background-color: -fx-outer-border, -fx-control-inner-background; }
+
+/* Surface hierarchy */
+.app-shell {
+    -fx-border-color: transparent;
+}
+
+.shell-transparent {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.glass-container {
+    -fx-background-color: rgba(238, 247, 255, 0.10);
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(222, 239, 255, 0.18);
+    -fx-border-width: 1;
+}
+
+.glass-panel {
+    -fx-background-color: rgba(236, 246, 255, 0.16);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(223, 239, 255, 0.24);
+    -fx-border-width: 1;
+}
+
+.strong-panel {
+    -fx-background-color: rgba(245, 249, 253, 0.78);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(16, 34, 62, 0.18);
+    -fx-border-width: 1;
+}
+
+/* App header */
+.app-header,
+.top-bar {
+    -fx-background-color: rgba(8, 19, 41, 0.26);
+    -fx-background-radius: 0 0 14 14;
+    -fx-border-color: rgba(235, 245, 255, 0.14);
+    -fx-border-width: 0 0 1 0;
+}
+.top-bar .label {
+    -fx-text-fill: #e9f1ff;
+}
+.app-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: 700;
+}
+.user-email {
+    -fx-font-weight: 600;
+}
+
+/* Navigation rail and shell wrappers */
+.nav-rail,
+.sidebar,
+.case-nav-pane {
+    -fx-background-color: rgba(238, 248, 255, 0.08);
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(223, 240, 255, 0.18);
+    -fx-border-width: 1;
+}
+
+.content-root {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.case-right-pane {
+    -fx-background-color: rgba(242, 248, 255, 0.64);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(15, 35, 66, 0.16);
+    -fx-border-width: 1;
+}
+
+.cases-page {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.cases-content-surface {
+    -fx-background-color: rgba(238, 247, 255, 0.06);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(222, 239, 255, 0.16);
+    -fx-border-width: 1;
+}
+
+.cases-filter-bar {
+    -fx-background-color: rgba(245, 249, 253, 0.74);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(17, 36, 67, 0.16);
+    -fx-border-width: 1;
+}
+
+.sidebar-header,
+.section-title {
+    -fx-font-weight: 700;
+    -fx-text-fill: #e8f2ff;
+}
+
+.case-main-surface,
+.form-surface {
+    -fx-background-color: rgba(245, 249, 253, 0.78);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(15, 34, 65, 0.18);
+    -fx-border-width: 1;
+}
+
+.secondary-panel {
+    -fx-background-color: rgba(232, 241, 251, 0.62);
+    -fx-background-radius: 10;
+    -fx-padding: 12;
+}
+
+.section-nav-button {
+    -fx-padding: 8 10 8 10;
+    -fx-background-radius: 8;
+    -fx-background-color: rgba(14, 34, 65, 0.62);
+    -fx-text-fill: #f4f8ff;
+    -fx-font-weight: 600;
+}
+.section-nav-button:hover {
+    -fx-background-color: rgba(31, 64, 108, 0.82);
+}
+.section-nav-button-active {
+    -fx-background-color: rgba(72, 122, 193, 0.95);
+    -fx-text-fill: white;
+    -fx-font-weight: 700;
+}
+
+.surface-scroll,
+.surface-scroll > .viewport {
+    -fx-background-color: transparent;
+}
