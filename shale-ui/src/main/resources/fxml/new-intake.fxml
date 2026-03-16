@@ -9,7 +9,7 @@
       fx:controller="com.shale.ui.controller.NewIntakeController"
       spacing="12"
       prefWidth="860" prefHeight="760"
-      style="-fx-background-color: white;">
+      styleClass="form-surface">
 
     <padding>
         <Insets top="14" right="14" bottom="14" left="14" />
@@ -26,7 +26,7 @@
                         <Insets top="8" right="4" bottom="8" left="4" />
                     </padding>
 
-                    <VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+                    <VBox spacing="10" styleClass="secondary-panel">
                         <Label text="Case" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                         <GridPane hgap="16" vgap="10">
                             <columnConstraints>
@@ -48,7 +48,7 @@
                         </GridPane>
                     </VBox>
 
-                    <VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+                    <VBox spacing="10" styleClass="secondary-panel">
                         <Label text="Client" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                         <GridPane hgap="16" vgap="10">
                             <columnConstraints>
@@ -82,7 +82,7 @@
                         </GridPane>
                     </VBox>
 
-                    <VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+                    <VBox spacing="10" styleClass="secondary-panel">
                         <Label text="Caller" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                         <CheckBox fx:id="callerIsClientCheckBox" text="Caller is Client" />
                         <Label fx:id="callerReuseLabel" text="Client information will be reused for caller details." style="-fx-opacity: 0.75;" visible="false" managed="false" />
@@ -104,7 +104,7 @@
                         </GridPane>
                     </VBox>
 
-                    <VBox spacing="10" style="-fx-background-color: rgba(0,0,0,0.03); -fx-background-radius: 10; -fx-padding: 14;">
+                    <VBox spacing="10" styleClass="secondary-panel">
                         <Label text="Incident" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                         <GridPane hgap="16" vgap="10">
                             <columnConstraints>

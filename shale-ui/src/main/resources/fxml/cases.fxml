@@ -6,10 +6,10 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
 	xmlns:fx="http://javafx.com/fxml/1"
-	fx:controller="com.shale.ui.controller.CasesController">
+	fx:controller="com.shale.ui.controller.CasesController" styleClass="app-shell cases-page">
 
 	<top>
-		<HBox spacing="10">
+		<HBox spacing="10" styleClass="cases-filter-bar strong-panel">
 			<padding>
 				<Insets top="10" right="10" bottom="10" left="10" />
 			</padding>
@@ -22,10 +22,10 @@
 
 	<center>
 		<ScrollPane fx:id="casesScroll" fitToWidth="true"
-			pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED">
+			pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
 			<content>
 				<FlowPane fx:id="casesFlow" hgap="10" vgap="10"
-					prefWrapLength="900">
+					prefWrapLength="900" styleClass="cases-content-surface glass-panel">
 					<padding>
 						<Insets top="10" right="10" bottom="10" left="10" />
 					</padding>
