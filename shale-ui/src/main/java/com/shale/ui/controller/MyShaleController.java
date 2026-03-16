@@ -49,6 +49,8 @@ public final class MyShaleController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private CaseCardFactory caseCardFactory;
+	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private boolean liveSubscribed;
 
 	private int currentPage = 0;
 	private final int pageSize = 100;
@@ -91,23 +93,62 @@ public final class MyShaleController {
 			loadFirstPage();
 		});
 
+		if (myCasesFlow != null) {
+			myCasesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				System.out.println("[DEBUG LIVE][MY_CASES] scene changed old=" + (oldScene != null) + " new=" + (newScene != null));
+				if (newScene == null) {
+					unsubscribeLiveCaseUpdates();
+				} else {
+					subscribeLiveCaseUpdates();
+				}
+			});
+		}
+
 		subscribeLiveCaseUpdates();
 	}
 
-
 	private void subscribeLiveCaseUpdates() {
 		if (runtimeBridge == null) {
+			System.out.println("[DEBUG LIVE][MY_CASES] subscribe skipped: runtimeBridge is null");
+			return;
+		}
+		if (liveSubscribed) {
+			System.out.println("[DEBUG LIVE][MY_CASES] subscribe skipped: already subscribed");
 			return;
 		}
 
-		runtimeBridge.subscribeCaseUpdated(event -> {
-			String mine = runtimeBridge.getClientInstanceId();
+		liveCaseUpdatedHandler = this::handleLiveCaseUpdatedEvent;
+		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = true;
+		System.out.println("[DEBUG LIVE][MY_CASES] subscribed to case updates");
+	}
 
-			if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId())) {
-				return;
-			}
+	private void unsubscribeLiveCaseUpdates() {
+		if (!liveSubscribed || runtimeBridge == null || liveCaseUpdatedHandler == null) {
+			return;
+		}
+		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = false;
+		System.out.println("[DEBUG LIVE][MY_CASES] unsubscribed from case updates");
+	}
 
-			runOnFx(this::loadFirstPage);
+	private void handleLiveCaseUpdatedEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+		System.out.println("[DEBUG LIVE][MY_CASES] event received caseId=" + event.caseId()
+				+ " updatedBy=" + event.updatedByUserId()
+				+ " mineInstance=" + mine
+				+ " eventInstance=" + event.clientInstanceId()
+				+ " patchLen=" + (event.rawPatchJson() == null ? 0 : event.rawPatchJson().length()));
+
+		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
+			System.out.println("[DEBUG LIVE][MY_CASES] event ignored: own echo");
+			return;
+		}
+
+		System.out.println("[DEBUG LIVE][MY_CASES] event accepted -> scheduling refresh");
+		runOnFx(() -> {
+			System.out.println("[DEBUG LIVE][MY_CASES] executing refresh on FX thread");
+			loadFirstPage();
 		});
 	}
 
@@ -123,6 +164,7 @@ public final class MyShaleController {
 
 	private void loadFirstPage() {
 		loadGeneration++;
+		System.out.println("[DEBUG LIVE][MY_CASES] loadFirstPage generation=" + loadGeneration + " sort=" + (myCasesSortChoice == null ? "<null>" : myCasesSortChoice.getValue()) + " query='" + normalizedSearchQuery() + "' selectedStatuses=" + selectedStatusIds.size());
 		currentPage = 0;
 		loading = false;
 		hasMore = true;
@@ -163,6 +205,7 @@ public final class MyShaleController {
 						return;
 					}
 					loaded.addAll(newItems);
+					System.out.println("[DEBUG LIVE][MY_CASES] page loaded page=" + pageToLoad + " items=" + newItems.size() + " total=" + page.total());
 					currentPage++;
 					hasMore = loaded.size() < page.total();
 					loading = false;
@@ -172,6 +215,7 @@ public final class MyShaleController {
 				Platform.runLater(() -> {
 					if (generationAtSubmit == loadGeneration) {
 						loading = false;
+						System.out.println("[DEBUG LIVE][MY_CASES] load failed generation=" + generationAtSubmit + " message=" + ex.getMessage());
 						ex.printStackTrace();
 					}
 				});
