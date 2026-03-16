@@ -3,6 +3,7 @@ package com.shale.ui.component.dialog;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -109,7 +110,10 @@ public final class ContactPickerDialog<T> {
 		root.setPadding(new Insets(12));
 		root.setPrefSize(520, 600);
 
-		stage.setScene(new Scene(root));
+		Scene scene = new Scene(root);
+		scene.getStylesheets().add(Objects.requireNonNull(
+				getClass().getResource("/css/app.css")).toExternalForm());
+		stage.setScene(scene);
 	}
 
 	public Optional<T> showAndWait() {

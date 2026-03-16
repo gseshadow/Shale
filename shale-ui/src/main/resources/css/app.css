@@ -1,4 +1,15 @@
-.root { -fx-font-size: 14px; }
+.root {
+    -fx-font-size: 14px;
+    -fx-background-color:
+        radial-gradient(
+            center 70% 20%,
+            radius 120%,
+            #4cc3b5 0%,
+            #2b6a82 35%,
+            #1b2b4a 70%,
+            #0e1023 100%
+        );
+}
 .title { -fx-font-size: 20px; -fx-font-weight: bold; }
 .error { -fx-text-fill: #c62828; }
 .header { -fx-background-color: -fx-outer-border, -fx-control-inner-background; }

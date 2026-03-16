@@ -301,7 +301,10 @@ public final class TeamEditorDialog {
 		VBox root = new VBox(12, lists, bottom);
 		root.setPadding(new Insets(12));
 
-		stage.setScene(new Scene(root, 780, 540));
+		Scene scene = new Scene(root, 780, 540);
+		scene.getStylesheets().add(Objects.requireNonNull(
+				getClass().getResource("/css/app.css")).toExternalForm());
+		stage.setScene(scene);
 	}
 
 	public Optional<Result> showAndWaitForResult() {
