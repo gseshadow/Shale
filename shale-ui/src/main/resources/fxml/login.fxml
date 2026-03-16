@@ -1,14 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.*?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
 	xmlns:fx="http://javafx.com/fxml/1"
 	fx:controller="com.shale.ui.controller.LoginController">
 	<center>
-		<VBox spacing="12" alignment="CENTER" maxWidth="360">
+		<VBox spacing="18" alignment="CENTER" maxWidth="360">
 			<children>
+				<ImageView fx:id="logoImage" fitWidth="220" preserveRatio="true" smooth="true" pickOnBounds="true">
+					<image>
+						<Image url="@/images/shale.png" />
+					</image>
+				</ImageView>
 				<Label text="Sign in to Shale" styleClass="title" />
 				<TextField fx:id="emailField" promptText="Email" />
 				<PasswordField fx:id="passwordField"
