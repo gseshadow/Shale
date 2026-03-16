@@ -3,11 +3,9 @@ package com.shale.ui.controller;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -18,17 +16,15 @@ import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.controller.support.CaseListUiSupport;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.MenuButton;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
@@ -65,29 +61,7 @@ public final class CasesController {
 
 	private CaseCardFactory caseCardFactory;
 
-	private static final int STATUS_POTENTIAL = 6;
-	private static final int STATUS_ACTIVE = 7;
-	private static final int STATUS_MEDIATION = 8;
-	private static final int STATUS_TRIAL = 9;
-	private static final int STATUS_SETTLEMENT = 10;
-	private static final int STATUS_DENIED = 11;
-	private static final int STATUS_CLOSED = 12;
-	private static final int STATUS_ACCEPTED = 14;
-
-	private static final Map<Integer, String> STATUS_FILTER_OPTIONS = new LinkedHashMap<>();
-
-	static {
-		STATUS_FILTER_OPTIONS.put(STATUS_POTENTIAL, "Potential");
-		STATUS_FILTER_OPTIONS.put(STATUS_ACTIVE, "Active");
-		STATUS_FILTER_OPTIONS.put(STATUS_MEDIATION, "Mediation");
-		STATUS_FILTER_OPTIONS.put(STATUS_TRIAL, "Trial");
-		STATUS_FILTER_OPTIONS.put(STATUS_SETTLEMENT, "Settlement");
-		STATUS_FILTER_OPTIONS.put(STATUS_DENIED, "Denied");
-		STATUS_FILTER_OPTIONS.put(STATUS_CLOSED, "Closed");
-		STATUS_FILTER_OPTIONS.put(STATUS_ACCEPTED, "Accepted");
-	}
-
-	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>(STATUS_FILTER_OPTIONS.keySet());
+	private final Set<Integer> selectedStatusIds = CaseListUiSupport.defaultSelectedStatuses();
 
 	// Background DB executor (so UI doesn’t freeze)
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
@@ -402,82 +376,7 @@ public final class CasesController {
 	}
 
 	private void initializeStatusFilter() {
-		if (statusFilterMenuButton == null) {
-			return;
-		}
-
-		statusFilterMenuButton.getItems().clear();
-
-		MenuItem selectAll = new MenuItem("Select All");
-		selectAll.setOnAction(event -> {
-			selectedStatusIds.clear();
-			selectedStatusIds.addAll(STATUS_FILTER_OPTIONS.keySet());
-			updateStatusMenuItemsFromSelection();
-			refreshStatusFilter();
-		});
-
-		MenuItem clearAll = new MenuItem("Clear All");
-		clearAll.setOnAction(event -> {
-			selectedStatusIds.clear();
-			updateStatusMenuItemsFromSelection();
-			refreshStatusFilter();
-		});
-
-		statusFilterMenuButton.getItems().addAll(selectAll, clearAll, new SeparatorMenuItem());
-
-		for (Map.Entry<Integer, String> entry : STATUS_FILTER_OPTIONS.entrySet()) {
-			Integer statusId = entry.getKey();
-			CheckMenuItem item = new CheckMenuItem(entry.getValue());
-			item.setSelected(selectedStatusIds.contains(statusId));
-			item.setOnAction(event -> {
-				if (item.isSelected()) {
-					selectedStatusIds.add(statusId);
-				} else {
-					selectedStatusIds.remove(statusId);
-				}
-				updateStatusMenuButtonText();
-				rerender();
-			});
-			statusFilterMenuButton.getItems().add(item);
-		}
-
-		updateStatusMenuButtonText();
-	}
-
-	private void updateStatusMenuItemsFromSelection() {
-		if (statusFilterMenuButton == null) {
-			return;
-		}
-		for (MenuItem item : statusFilterMenuButton.getItems()) {
-			if (item instanceof CheckMenuItem checkItem) {
-				Integer statusId = statusIdForLabel(checkItem.getText());
-				if (statusId != null) {
-					checkItem.setSelected(selectedStatusIds.contains(statusId));
-				}
-			}
-		}
-		updateStatusMenuButtonText();
-	}
-
-	private Integer statusIdForLabel(String label) {
-		for (Map.Entry<Integer, String> entry : STATUS_FILTER_OPTIONS.entrySet()) {
-			if (entry.getValue().equals(label)) {
-				return entry.getKey();
-			}
-		}
-		return null;
-	}
-
-	private void updateStatusMenuButtonText() {
-		if (statusFilterMenuButton == null) {
-			return;
-		}
-		statusFilterMenuButton.setText("Status (" + selectedStatusIds.size() + "/" + STATUS_FILTER_OPTIONS.size() + ")");
-	}
-
-	private void refreshStatusFilter() {
-		updateStatusMenuButtonText();
-		rerender();
+		CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, this::rerender);
 	}
 
 	private boolean matchesSelectedStatus(CaseCardVm vm) {

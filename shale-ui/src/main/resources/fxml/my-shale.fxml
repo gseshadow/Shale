@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.MenuButton?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+	fx:controller="com.shale.ui.controller.MyShaleController" spacing="10">
+	<padding>
+		<Insets top="0" right="0" bottom="0" left="0" />
+	</padding>
+
+	<VBox spacing="8" styleClass="strong-panel">
+		<padding>
+			<Insets top="10" right="10" bottom="10" left="10" />
+		</padding>
+		<Label text="My Cases" styleClass="page-heading" />
+		<BorderPane>
+			<top>
+				<HBox spacing="10" styleClass="cases-filter-bar">
+					<TextField fx:id="myCasesSearchField" promptText="Search my cases…" HBox.hgrow="ALWAYS" />
+					<MenuButton fx:id="myCasesStatusFilterMenuButton" text="Status (8/8)" />
+					<ChoiceBox fx:id="myCasesSortChoice" prefWidth="220" />
+				</HBox>
+			</top>
+			<center>
+				<ScrollPane fx:id="myCasesScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
+					vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
+					<content>
+						<FlowPane fx:id="myCasesFlow" hgap="10" vgap="10" prefWrapLength="900"
+							styleClass="cases-content-surface glass-panel">
+							<padding>
+								<Insets top="10" right="10" bottom="10" left="10" />
+							</padding>
+						</FlowPane>
+					</content>
+				</ScrollPane>
+			</center>
+		</BorderPane>
+	</VBox>
+</VBox>
