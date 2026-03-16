@@ -47,6 +47,7 @@ public final class MyShaleController {
 
 	private CaseDao caseDao;
 	private AppState appState;
+	private UiRuntimeBridge runtimeBridge;
 	private CaseCardFactory caseCardFactory;
 
 	private int currentPage = 0;
@@ -67,6 +68,7 @@ public final class MyShaleController {
 	public void init(AppState appState, UiRuntimeBridge runtimeBridge, CaseDao caseDao, Consumer<Integer> onOpenCase) {
 		this.caseDao = caseDao;
 		this.appState = appState;
+		this.runtimeBridge = runtimeBridge;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 	}
 
@@ -87,6 +89,25 @@ public final class MyShaleController {
 		Platform.runLater(() -> {
 			wireInfiniteScroll();
 			loadFirstPage();
+		});
+
+		subscribeLiveCaseUpdates();
+	}
+
+
+	private void subscribeLiveCaseUpdates() {
+		if (runtimeBridge == null) {
+			return;
+		}
+
+		runtimeBridge.subscribeCaseUpdated(event -> {
+			String mine = runtimeBridge.getClientInstanceId();
+
+			if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId())) {
+				return;
+			}
+
+			runOnFx(this::loadFirstPage);
 		});
 	}
 
@@ -252,6 +273,15 @@ public final class MyShaleController {
 				vm.solDate,
 				vm.responsibleAttorney,
 				vm.responsibleAttorneyColor));
+	}
+
+
+	private static void runOnFx(Runnable runnable) {
+		if (Platform.isFxApplicationThread()) {
+			runnable.run();
+		} else {
+			Platform.runLater(runnable);
+		}
 	}
 
 	private static String safe(String s) {
