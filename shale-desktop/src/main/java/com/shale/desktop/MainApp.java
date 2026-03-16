@@ -17,13 +17,14 @@ public final class MainApp extends Application {
 	@Override
 	public void start(Stage primaryStage) {
 		System.out.println("MainApp.start()");// TODO remove
-
-		Image icon = new Image(
-				Objects.requireNonNull(
-						MainApp.class.getResourceAsStream("/images/shalenotext.png")
-				)
-		);
-		primaryStage.getIcons().add(icon);
+ 
+		var iconStream = MainApp.class.getResourceAsStream("/images/ShaleNoText.png");
+		if (iconStream != null) {
+			Image icon = new Image(iconStream);
+			primaryStage.getIcons().add(icon);
+		} else {
+			System.out.println("Icon resource not found: /images/ShaleNoText.png");
+		}
 
 		DesktopConfig config = DesktopConfig.load(); // builds AuthService, db config, etc.
 

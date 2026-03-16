@@ -13,9 +13,6 @@
 			<children>
 				<ImageView fx:id="logoImage" fitWidth="440"
 					preserveRatio="true" smooth="true" pickOnBounds="true">
-					<image>
-						<Image url="@/images/shale.png" />
-					</image>
 				</ImageView>
 				<Label text="Sign in to Shale" styleClass="title" />
 				<TextField fx:id="emailField" promptText="Email" />
