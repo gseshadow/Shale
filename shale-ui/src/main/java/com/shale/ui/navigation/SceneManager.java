@@ -53,7 +53,7 @@ public final class SceneManager {
 		var root = load("/fxml/login.fxml", controller ->
 		{
 			LoginController c = (LoginController) controller;
-			c.init(this, appState, authService, runtimeBridge);
+			c.init(this, appState, authService, runtimeBridge, updateLauncher);
 			return c;
 		});
 		setScene(root, "Shale — Sign in");
