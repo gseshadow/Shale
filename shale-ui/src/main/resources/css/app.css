@@ -15,7 +15,10 @@
 .error { -fx-text-fill: #c62828; }
 
 /* Surface hierarchy */
-.app-shell,
+.app-shell {
+    -fx-border-color: transparent;
+}
+
 .shell-transparent {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
