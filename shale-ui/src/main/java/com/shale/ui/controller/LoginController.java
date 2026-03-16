@@ -1,5 +1,6 @@
 package com.shale.ui.controller;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import com.shale.ui.navigation.SceneManager;
@@ -16,6 +17,11 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.geometry.Pos;
+import javafx.scene.control.ContentDisplay;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 
 public final class LoginController {
@@ -157,7 +163,27 @@ public final class LoginController {
 		Alert progress = new Alert(Alert.AlertType.INFORMATION);
 		progress.setTitle("Update Started");
 		progress.setHeaderText("Updating…");
-		progress.setContentText("Shale is launching the updater and will close shortly.");
+
+		ImageView loadingImage = new ImageView(
+				new Image(
+						Objects.requireNonNull(
+								getClass().getResourceAsStream("/images/ShaleLoading.gif")
+						)
+				)
+		);
+		loadingImage.setFitWidth(120);
+		loadingImage.setPreserveRatio(true);
+		loadingImage.setSmooth(true);
+
+		Label messageLabel = new Label("Shale is launching the updater and will close shortly.");
+		messageLabel.setWrapText(true);
+		messageLabel.setContentDisplay(ContentDisplay.TEXT_ONLY);
+
+		VBox content = new VBox(loadingImage, messageLabel);
+		content.setAlignment(Pos.CENTER);
+		content.setSpacing(15);
+
+		progress.getDialogPane().setContent(content);
 		progress.getButtonTypes().setAll();
 		progress.initModality(Modality.APPLICATION_MODAL);
 		progress.show();
