@@ -5,11 +5,11 @@
 
 <BorderPane xmlns="http://javafx.com/javafx"
 	xmlns:fx="http://javafx.com/fxml"
-	fx:controller="com.shale.ui.controller.MainController">
+	fx:controller="com.shale.ui.controller.MainController" styleClass="app-shell">
 
 	<!-- Top bar -->
 	<top>
-		<HBox spacing="12" styleClass="top-bar">
+		<HBox spacing="12" styleClass="top-bar app-header">
 			<children>
 				<Label text="Shale" styleClass="app-title" />
 				<!-- Global search -->
@@ -41,7 +41,7 @@
 
 	<!-- Left navigation sidebar -->
 	<left>
-		<VBox spacing="6" styleClass="sidebar">
+		<VBox spacing="6" styleClass="sidebar nav-rail">
 			<children>
 				<Label text="Navigation" styleClass="sidebar-header" />
 
@@ -74,7 +74,7 @@
 
 	<!-- Main content area (shell-controlled) -->
 	<center>
-		<VBox spacing="10" styleClass="content-root">
+		<VBox spacing="10" styleClass="content-root shell-transparent">
 			<children>
 				<Label fx:id="sectionTitleLabel" text="My Shale"
 					styleClass="section-title" />
