@@ -102,7 +102,7 @@ public final class MainController {
 			}
 		}
 
-		showMyShalePlaceholder();
+		showMyShale();
 	}
 
 	// === Global search (shell-level for now) ===
@@ -129,7 +129,7 @@ public final class MainController {
 		highlightNav(navMyShaleButton);
 		sectionTitleLabel.setText("My Shale");
 		sectionSubtitleLabel.setText("Overview of your tasks, assigned cases, and recent activity.");
-		showMyShalePlaceholder();
+		showMyShale();
 	}
 
 	@FXML
@@ -222,8 +222,9 @@ public final class MainController {
 		sectionContent.getChildren().setAll(caseRoot);
 	}
 
-	private void showMyShalePlaceholder() {
-		setSectionContentText("My Shale dashboard is not implemented yet.");
+	private void showMyShale() {
+		Node myShaleRoot = sceneManager.createMyShaleView(this::openCase);
+		sectionContent.getChildren().setAll(myShaleRoot);
 	}
 
 	private void setSectionContentText(String text) {
