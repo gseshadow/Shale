@@ -774,7 +774,13 @@ public class CaseController {
 		{
 			CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
 			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
-			List<CaseDao.RelatedOrganizationRow> organizations = caseDao.findRelatedOrganizations(activeCaseId);
+			List<CaseDao.RelatedOrganizationRow> loadedOrganizations = List.of();
+			try {
+				loadedOrganizations = caseDao.findRelatedOrganizations(activeCaseId);
+			} catch (Exception orgLoadError) {
+				System.err.println("Case organizations load failed for caseId=" + activeCaseId + ": " + orgLoadError.getMessage());
+			}
+			final List<CaseDao.RelatedOrganizationRow> organizations = loadedOrganizations;
 
 			runOnFx(() ->
 			{

@@ -1490,8 +1490,7 @@ public final class CaseDao {
 				  o.State,
 				  o.PostalCode,
 				  o.Country,
-				  o.Notes,
-				  o.Color
+				  o.Notes
 				FROM CaseOrganizations co
 				INNER JOIN Organizations o
 				  ON o.Id = co.OrganizationId
@@ -1529,7 +1528,7 @@ public final class CaseDao {
 						rs.getString("PostalCode"),
 						rs.getString("Country"),
 						rs.getString("Notes"),
-						rs.getString("Color")
+						null
 					));
 				}
 			}
