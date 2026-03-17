@@ -134,7 +134,6 @@ public final class OrganizationController {
 		dbExec.submit(() -> {
 			try {
 				Organization loaded = organizationDao.findById(organizationId);
-				List<OrganizationDao.RelatedCaseRow> loadedRelatedCases = organizationDao.findRelatedCases(organizationId);
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (loaded == null) {
@@ -144,15 +143,39 @@ public final class OrganizationController {
 						return;
 					}
 					currentOrganization = loaded;
-					relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
 					renderFromCurrent();
-					renderRelatedCases();
 					clearError();
+					loadRelatedCasesSafe();
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
 					setBusy(false);
 					setError("Failed to load organization details.");
+				});
+			}
+		});
+	}
+
+
+	private void loadRelatedCasesSafe() {
+		if (organizationDao == null || organizationId == null) {
+			relatedCases = List.of();
+			renderRelatedCases();
+			return;
+		}
+
+		dbExec.submit(() -> {
+			try {
+				List<OrganizationDao.RelatedCaseRow> loadedRelatedCases = organizationDao.findRelatedCases(organizationId);
+				Platform.runLater(() -> {
+					relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
+					renderRelatedCases();
+				});
+			} catch (Exception ex) {
+				System.out.println("Failed to load related cases for organization id=" + organizationId + ": " + ex.getMessage());
+				Platform.runLater(() -> {
+					relatedCases = List.of();
+					renderRelatedCases();
 				});
 			}
 		});

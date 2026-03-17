@@ -254,7 +254,6 @@ public final class OrganizationDao {
 				LEFT JOIN Users u
 				  ON u.Id = ra.UserId
 				WHERE co.OrganizationId = ?
-				  AND co.ShaleClientId = ?
 				  AND c.ShaleClientId = ?
 				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
 				ORDER BY c.Name ASC, c.Id ASC;
@@ -266,7 +265,6 @@ public final class OrganizationDao {
 			int shaleClientId = requireCurrentShaleClientId(con);
 			int idx = 1;
 			ps.setInt(idx++, organizationId);
-			ps.setInt(idx++, shaleClientId);
 			ps.setInt(idx++, shaleClientId);
 
 			List<RelatedCaseRow> out = new ArrayList<>();
