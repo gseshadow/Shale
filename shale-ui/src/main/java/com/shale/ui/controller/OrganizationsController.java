@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
@@ -34,6 +35,7 @@ public final class OrganizationsController {
 	private UiRuntimeBridge runtimeBridge;
 	private OrganizationDao organizationDao;
 	private OrganizationCardFactory organizationCardFactory;
+	private Consumer<Integer> onOpenOrganization;
 
 	private int currentPage = 0;
 	private final int pageSize = 100;
@@ -49,10 +51,11 @@ public final class OrganizationsController {
 		return t;
 	});
 
-	public void init(AppState appState, UiRuntimeBridge runtimeBridge, OrganizationDao organizationDao) {
+	public void init(AppState appState, UiRuntimeBridge runtimeBridge, OrganizationDao organizationDao, Consumer<Integer> onOpenOrganization) {
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.organizationDao = organizationDao;
+		this.onOpenOrganization = onOpenOrganization;
 		this.organizationCardFactory = new OrganizationCardFactory(this::openOrganization);
 	}
 
@@ -183,6 +186,8 @@ public final class OrganizationsController {
 		if (organizationId == null) {
 			return;
 		}
-		System.out.println("Navigate to Organization: " + organizationId);
+		if (onOpenOrganization != null) {
+			onOpenOrganization.accept(organizationId);
+		}
 	}
 }
