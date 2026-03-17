@@ -131,7 +131,6 @@ public final class OrganizationController {
 		}
 
 		setBusy(true);
-		System.out.println("[ORG RELATED] loading for organizationId=" + organizationId);
 		dbExec.submit(() -> {
 			try {
 				Organization loaded = organizationDao.findById(organizationId);
@@ -143,6 +142,7 @@ public final class OrganizationController {
 						setError("Organization not found.");
 						return;
 					}
+
 					currentOrganization = loaded;
 					renderFromCurrent();
 					clearError();
@@ -158,22 +158,19 @@ public final class OrganizationController {
 	}
 
 
+
 	private void loadRelatedCasesSafe() {
 		if (organizationDao == null || organizationId == null) {
-			System.out.println("[ORG RELATED] skip load: dao or organizationId missing");
 			relatedCases = List.of();
 			renderRelatedCases();
 			return;
 		}
 
-		System.out.println("[ORG RELATED] loading for organizationId=" + organizationId);
 		dbExec.submit(() -> {
 			try {
 				List<OrganizationDao.RelatedCaseRow> loadedRelatedCases = organizationDao.findRelatedCases(organizationId);
-				System.out.println("[ORG RELATED] dao returned rows=" + (loadedRelatedCases == null ? -1 : loadedRelatedCases.size()));
 				Platform.runLater(() -> {
 					relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
-					System.out.println("[ORG RELATED] assigned relatedCases.size=" + relatedCases.size());
 					renderRelatedCases();
 				});
 			} catch (Exception ex) {
@@ -185,6 +182,7 @@ public final class OrganizationController {
 			}
 		});
 	}
+
 
 	private void onEdit() {
 		if (currentOrganization == null) {
@@ -411,7 +409,6 @@ public final class OrganizationController {
 		}
 
 		if (relatedCasesFlow == null) {
-			System.out.println("[ORG RELATED] render skipped: relatedCasesFlow is null");
 			return;
 		}
 
@@ -430,24 +427,21 @@ public final class OrganizationController {
 				)))
 				.toList();
 
-		System.out.println("[ORG RELATED] render relatedCases.size=" + relatedCases.size() + " cards.size=" + cards.size());
 		relatedCasesFlow.getChildren().setAll(cards);
-		relatedCasesFlow.setVisible(true);
-		relatedCasesFlow.setManaged(true);
-		relatedCasesFlow.requestLayout();
 
 		boolean empty = cards.isEmpty();
 		if (relatedCasesEmptyLabel != null) {
 			relatedCasesEmptyLabel.setVisible(empty);
 			relatedCasesEmptyLabel.setManaged(empty);
+			// StackPane overlays both nodes; keep the active one on top.
 			if (empty) {
 				relatedCasesEmptyLabel.toFront();
 			} else {
 				relatedCasesFlow.toFront();
 			}
-			System.out.println("[ORG RELATED] empty label visible=" + empty);
 		}
 	}
+
 
 	private void setEditMode(boolean enabled) {
 		this.editMode = enabled;
