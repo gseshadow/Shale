@@ -47,7 +47,10 @@ public final class MyShaleController {
 
 	private CaseDao caseDao;
 	private AppState appState;
+	private UiRuntimeBridge runtimeBridge;
 	private CaseCardFactory caseCardFactory;
+	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private boolean liveSubscribed;
 
 	private int currentPage = 0;
 	private final int pageSize = 100;
@@ -67,6 +70,7 @@ public final class MyShaleController {
 	public void init(AppState appState, UiRuntimeBridge runtimeBridge, CaseDao caseDao, Consumer<Integer> onOpenCase) {
 		this.caseDao = caseDao;
 		this.appState = appState;
+		this.runtimeBridge = runtimeBridge;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 	}
 
@@ -88,6 +92,136 @@ public final class MyShaleController {
 			wireInfiniteScroll();
 			loadFirstPage();
 		});
+
+		if (myCasesFlow != null) {
+			myCasesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				System.out.println("[DEBUG LIVE][MY_CASES] scene changed old=" + (oldScene != null) + " new=" + (newScene != null));
+				if (newScene == null) {
+					unsubscribeLiveCaseUpdates();
+				} else {
+					subscribeLiveCaseUpdates();
+				}
+			});
+		}
+
+		subscribeLiveCaseUpdates();
+	}
+
+	private void subscribeLiveCaseUpdates() {
+		if (runtimeBridge == null) {
+			System.out.println("[DEBUG LIVE][MY_CASES] subscribe skipped: runtimeBridge is null");
+			return;
+		}
+		if (liveSubscribed) {
+			System.out.println("[DEBUG LIVE][MY_CASES] subscribe skipped: already subscribed");
+			return;
+		}
+
+		liveCaseUpdatedHandler = this::handleLiveCaseUpdatedEvent;
+		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = true;
+		System.out.println("[DEBUG LIVE][MY_CASES] subscribed to case updates");
+	}
+
+	private void unsubscribeLiveCaseUpdates() {
+		if (!liveSubscribed || runtimeBridge == null || liveCaseUpdatedHandler == null) {
+			return;
+		}
+		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = false;
+		System.out.println("[DEBUG LIVE][MY_CASES] unsubscribed from case updates");
+	}
+
+	private void handleLiveCaseUpdatedEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+		System.out.println("[DEBUG LIVE][MY_CASES] event received caseId=" + event.caseId()
+				+ " updatedBy=" + event.updatedByUserId()
+				+ " mineInstance=" + mine
+				+ " eventInstance=" + event.clientInstanceId()
+				+ " patchLen=" + (event.rawPatchJson() == null ? 0 : event.rawPatchJson().length()));
+
+		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
+			System.out.println("[DEBUG LIVE][MY_CASES] event ignored: own echo");
+			return;
+		}
+
+		System.out.println("[DEBUG LIVE][MY_CASES] event accepted -> scheduling targeted refresh");
+		refreshCaseIncremental(event.caseId());
+	}
+
+
+	private void refreshCaseIncremental(long caseId) {
+		if (caseDao == null || appState == null || appState.getUserId() == null || appState.getUserId() <= 0) {
+			System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh skipped: missing dependencies");
+			return;
+		}
+
+		final int userId = appState.getUserId();
+		final int generationAtSubmit = loadGeneration;
+		dbExec.submit(() -> {
+			try {
+				CaseDao.CaseRow row = caseDao.getMyCaseRow(userId, caseId);
+				Platform.runLater(() -> {
+					if (generationAtSubmit != loadGeneration) {
+						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh ignored due to generation mismatch");
+						return;
+					}
+
+					boolean changed;
+					if (row == null) {
+						changed = removeLoadedCase(caseId);
+						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh row missing -> removed=" + changed + " caseId=" + caseId);
+					} else {
+						changed = upsertLoadedCase(toVm(row));
+						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh upsert changed=" + changed + " caseId=" + caseId);
+					}
+
+					if (changed) {
+						rerender();
+					}
+				});
+			} catch (Exception ex) {
+				System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh failed caseId=" + caseId + " message=" + ex.getMessage());
+				runOnFx(this::loadFirstPage);
+			}
+		});
+	}
+
+	private boolean removeLoadedCase(long caseId) {
+		for (int i = 0; i < loaded.size(); i++) {
+			if (loaded.get(i).id == caseId) {
+				loaded.remove(i);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean upsertLoadedCase(CaseCardVm vm) {
+		for (int i = 0; i < loaded.size(); i++) {
+			CaseCardVm existing = loaded.get(i);
+			if (existing.id == vm.id) {
+				if (existing.sameContent(vm)) {
+					return false;
+				}
+				loaded.set(i, vm);
+				return true;
+			}
+		}
+		loaded.add(vm);
+		return true;
+	}
+
+	private CaseCardVm toVm(CaseDao.CaseRow r) {
+		return new CaseCardVm(
+			r.id(),
+			safe(r.name()),
+			r.intakeDate(),
+			r.statuteOfLimitationsDate(),
+			r.primaryStatusId(),
+			safe(r.responsibleAttorneyName()),
+			safe(r.responsibleAttorneyColor())
+		);
 	}
 
 	private void wireInfiniteScroll() {
@@ -102,6 +236,7 @@ public final class MyShaleController {
 
 	private void loadFirstPage() {
 		loadGeneration++;
+		System.out.println("[DEBUG LIVE][MY_CASES] loadFirstPage generation=" + loadGeneration + " sort=" + (myCasesSortChoice == null ? "<null>" : myCasesSortChoice.getValue()) + " query='" + normalizedSearchQuery() + "' selectedStatuses=" + selectedStatusIds.size());
 		currentPage = 0;
 		loading = false;
 		hasMore = true;
@@ -126,14 +261,7 @@ public final class MyShaleController {
 			try {
 				var page = caseDao.findMyCasesPage(userId, pageToLoad, pageSize, selectedSort(), false);
 				List<CaseCardVm> newItems = page.items().stream()
-						.map(r -> new CaseCardVm(
-								r.id(),
-								safe(r.name()),
-								r.intakeDate(),
-								r.statuteOfLimitationsDate(),
-								r.primaryStatusId(),
-								safe(r.responsibleAttorneyName()),
-								safe(r.responsibleAttorneyColor())))
+						.map(this::toVm)
 						.toList();
 
 				Platform.runLater(() -> {
@@ -141,7 +269,10 @@ public final class MyShaleController {
 						loading = false;
 						return;
 					}
-					loaded.addAll(newItems);
+					for (CaseCardVm vm : newItems) {
+						upsertLoadedCase(vm);
+					}
+					System.out.println("[DEBUG LIVE][MY_CASES] page loaded page=" + pageToLoad + " items=" + newItems.size() + " total=" + page.total() + " loadedUnique=" + loaded.size());
 					currentPage++;
 					hasMore = loaded.size() < page.total();
 					loading = false;
@@ -151,6 +282,7 @@ public final class MyShaleController {
 				Platform.runLater(() -> {
 					if (generationAtSubmit == loadGeneration) {
 						loading = false;
+						System.out.println("[DEBUG LIVE][MY_CASES] load failed generation=" + generationAtSubmit + " message=" + ex.getMessage());
 						ex.printStackTrace();
 					}
 				});
@@ -254,6 +386,15 @@ public final class MyShaleController {
 				vm.responsibleAttorneyColor));
 	}
 
+
+	private static void runOnFx(Runnable runnable) {
+		if (Platform.isFxApplicationThread()) {
+			runnable.run();
+		} else {
+			Platform.runLater(runnable);
+		}
+	}
+
 	private static String safe(String s) {
 		return s == null ? "" : s;
 	}
@@ -276,6 +417,19 @@ public final class MyShaleController {
 			this.primaryStatusId = primaryStatusId;
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
+		}
+
+		boolean sameContent(CaseCardVm other) {
+			if (other == null) {
+				return false;
+			}
+			return id == other.id
+					&& Objects.equals(name, other.name)
+					&& Objects.equals(intakeDate, other.intakeDate)
+					&& Objects.equals(solDate, other.solDate)
+					&& Objects.equals(primaryStatusId, other.primaryStatusId)
+					&& Objects.equals(responsibleAttorney, other.responsibleAttorney)
+					&& Objects.equals(responsibleAttorneyColor, other.responsibleAttorneyColor);
 		}
 	}
 }
