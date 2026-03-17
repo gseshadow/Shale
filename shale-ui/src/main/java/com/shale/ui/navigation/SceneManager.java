@@ -8,6 +8,7 @@ import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
 import com.shale.ui.controller.MyShaleController;
 import com.shale.ui.controller.NewIntakeController;
+import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -90,6 +91,16 @@ public final class SceneManager {
 
 			// NOTE: this requires you to update CasesController.init(...) to accept the callback
 			c.init(appState, runtimeBridge, caseDao, onOpenCase);
+			return c;
+		});
+	}
+
+
+	public Parent createOrganizationsView() {
+		return load("/fxml/organizations.fxml", controller ->
+		{
+			OrganizationsController c = (OrganizationsController) controller;
+			c.init(appState, runtimeBridge);
 			return c;
 		});
 	}

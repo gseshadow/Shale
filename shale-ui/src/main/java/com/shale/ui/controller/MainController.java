@@ -163,8 +163,10 @@ public final class MainController {
 	private void onNavOrganizations() {
 		highlightNav(navOrganizationsButton);
 		sectionTitleLabel.setText("Organizations");
-		sectionSubtitleLabel.setText("Manage organizations and firms.");
-		setSectionContentText("Organizations tab is not implemented yet.");
+		sectionSubtitleLabel.setText("Browse, search, and manage organizations.");
+
+		Node organizationsRoot = sceneManager.createOrganizationsView();
+		sectionContent.getChildren().setAll(organizationsRoot);
 	}
 
 	@FXML
