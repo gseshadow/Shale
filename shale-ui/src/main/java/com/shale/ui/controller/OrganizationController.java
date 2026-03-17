@@ -17,14 +17,21 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.Node;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+import javafx.scene.layout.Priority;
 import javafx.stage.Window;
 
 public final class OrganizationController {
@@ -45,6 +52,7 @@ public final class OrganizationController {
 	@FXML private Label nameValue;
 	@FXML private TextField nameEditor;
 	@FXML private Label typeValue;
+	@FXML private ComboBox<OrganizationDao.OrganizationTypeRow> typeEditor;
 	@FXML private Label phoneValue;
 	@FXML private TextField phoneEditor;
 	@FXML private Label faxValue;
@@ -78,6 +86,7 @@ public final class OrganizationController {
 	private boolean liveSubscribed;
 	private boolean pendingRemoteUpdate;
 	private List<OrganizationDao.RelatedCaseRow> relatedCases = List.of();
+	private List<OrganizationDao.OrganizationTypeRow> organizationTypeOptions = List.of();
 	private CaseCardFactory caseCardFactory;
 	private Consumer<Integer> onOpenCase;
 
@@ -114,6 +123,23 @@ public final class OrganizationController {
 			addCaseButton.setOnAction(e -> onAddCase());
 		}
 
+		if (typeEditor != null) {
+			typeEditor.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
+				@Override
+				protected void updateItem(OrganizationDao.OrganizationTypeRow item, boolean empty) {
+					super.updateItem(item, empty);
+					setText(empty || item == null ? null : fallback(item.name()));
+				}
+			});
+			typeEditor.setButtonCell(new javafx.scene.control.ListCell<>() {
+				@Override
+				protected void updateItem(OrganizationDao.OrganizationTypeRow item, boolean empty) {
+					super.updateItem(item, empty);
+					setText(empty || item == null ? null : fallback(item.name()));
+				}
+			});
+		}
+
 		setEditMode(false);
 		hideRemoteUpdateBanner();
 
@@ -141,6 +167,7 @@ public final class OrganizationController {
 		dbExec.submit(() -> {
 			try {
 				Organization loaded = organizationDao.findById(organizationId);
+				List<OrganizationDao.OrganizationTypeRow> loadedTypeOptions = organizationDao.findOrganizationTypes();
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (loaded == null) {
@@ -151,6 +178,7 @@ public final class OrganizationController {
 					}
 
 					currentOrganization = loaded;
+					organizationTypeOptions = loadedTypeOptions == null ? List.of() : loadedTypeOptions;
 					renderFromCurrent();
 					clearError();
 					loadRelatedCasesSafe();
@@ -241,6 +269,42 @@ public final class OrganizationController {
 		});
 	}
 
+
+	private void onRemoveCase(OrganizationDao.RelatedCaseRow row) {
+		if (row == null || organizationDao == null || organizationId == null) {
+			return;
+		}
+
+		if (!confirmUnlink(row)) {
+			return;
+		}
+
+		dbExec.submit(() -> {
+			try {
+				organizationDao.unlinkCaseFromOrganization(organizationId, row.id());
+				Platform.runLater(() -> {
+					clearError();
+					loadRelatedCasesSafe();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> setError("Failed to remove case from organization."));
+			}
+		});
+	}
+
+	private boolean confirmUnlink(OrganizationDao.RelatedCaseRow row) {
+		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+		if (addCaseButton != null && addCaseButton.getScene() != null) {
+			alert.initOwner(addCaseButton.getScene().getWindow());
+		}
+		alert.setTitle("Remove Case");
+		alert.setHeaderText("Remove this case from the organization?");
+		alert.setContentText(fallback(row.name()) + " (#" + row.id() + ")");
+
+		Optional<ButtonType> choice = alert.showAndWait();
+		return choice.isPresent() && choice.get() == ButtonType.OK;
+	}
+
 	private void onEdit() {
 		if (currentOrganization == null) {
 			return;
@@ -273,7 +337,7 @@ public final class OrganizationController {
 		Organization updated = Organization.builder()
 				.id(currentOrganization.getId())
 				.shaleClientId(currentOrganization.getShaleClientId())
-				.organizationTypeId(currentOrganization.getOrganizationTypeId())
+				.organizationTypeId(resolveSelectedOrganizationTypeId())
 				.organizationTypeName(currentOrganization.getOrganizationTypeName())
 				.name(safeText(nameEditor.getText()))
 				.phone(safeText(phoneEditor.getText()))
@@ -444,6 +508,10 @@ public final class OrganizationController {
 	}
 
 	private void writeEditorsFromOrganization(Organization o) {
+		if (typeEditor != null) {
+			typeEditor.setItems(FXCollections.observableArrayList(organizationTypeOptions));
+			typeEditor.getSelectionModel().select(findOrganizationTypeRow(o.getOrganizationTypeId()));
+		}
 		nameEditor.setText(safeText(o.getName()));
 		phoneEditor.setText(safeText(o.getPhone()));
 		faxEditor.setText(safeText(o.getFax()));
@@ -458,6 +526,26 @@ public final class OrganizationController {
 		notesEditor.setText(safeText(o.getNotes()));
 	}
 
+
+	private Integer resolveSelectedOrganizationTypeId() {
+		OrganizationDao.OrganizationTypeRow selected = typeEditor == null ? null : typeEditor.getSelectionModel().getSelectedItem();
+		if (selected != null && selected.organizationTypeId() > 0) {
+			return selected.organizationTypeId();
+		}
+		return currentOrganization == null ? null : currentOrganization.getOrganizationTypeId();
+	}
+
+	private OrganizationDao.OrganizationTypeRow findOrganizationTypeRow(Integer organizationTypeId) {
+		if (organizationTypeId == null) {
+			return null;
+		}
+		for (OrganizationDao.OrganizationTypeRow row : organizationTypeOptions) {
+			if (row != null && row.organizationTypeId() == organizationTypeId.intValue()) {
+				return row;
+			}
+		}
+		return null;
+	}
 
 	private void renderRelatedCases() {
 		if (!Platform.isFxApplicationThread()) {
@@ -474,14 +562,7 @@ public final class OrganizationController {
 		}
 
 		List<Node> cards = relatedCases.stream()
-				.map(c -> caseCardFactory.create(new CaseCardModel(
-						c.id(),
-						c.name(),
-						c.intakeDate(),
-						c.statuteOfLimitationsDate(),
-						c.responsibleAttorneyName(),
-						c.responsibleAttorneyColor()
-				)))
+				.map(this::createRelatedCaseCardContainer)
 				.toList();
 
 		relatedCasesFlow.getChildren().setAll(cards);
@@ -499,6 +580,29 @@ public final class OrganizationController {
 		}
 	}
 
+	private Node createRelatedCaseCardContainer(OrganizationDao.RelatedCaseRow row) {
+		Node card = caseCardFactory.create(new CaseCardModel(
+				row.id(),
+				row.name(),
+				row.intakeDate(),
+				row.statuteOfLimitationsDate(),
+				row.responsibleAttorneyName(),
+				row.responsibleAttorneyColor()
+		));
+
+		Button removeButton = new Button("Remove");
+		removeButton.getStyleClass().add("button-secondary");
+		removeButton.setOnAction(e -> onRemoveCase(row));
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox actions = new HBox(8, spacer, removeButton);
+
+		VBox container = new VBox(6, card, actions);
+		container.setPrefWidth(280);
+		return container;
+	}
+
 
 	private void setEditMode(boolean enabled) {
 		this.editMode = enabled;
@@ -507,6 +611,7 @@ public final class OrganizationController {
 		setVisibleManaged(cancelButton, enabled);
 
 		toggleField(nameValue, nameEditor, enabled);
+		toggleField(typeValue, typeEditor, enabled);
 		toggleField(phoneValue, phoneEditor, enabled);
 		toggleField(faxValue, faxEditor, enabled);
 		toggleField(emailValue, emailEditor, enabled);

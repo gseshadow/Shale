@@ -40,6 +40,9 @@ public final class OrganizationDao {
 	public record SelectableCaseRow(long id, String name) {
 	}
 
+	public record OrganizationTypeRow(int organizationTypeId, String name) {
+	}
+
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize) {
 		return findPage(page, pageSize, null);
@@ -181,6 +184,7 @@ public final class OrganizationDao {
 				UPDATE %s
 				SET
 				  Name = ?,
+				  OrganizationTypeId = ?,
 				  Phone = ?,
 				  Fax = ?,
 				  Email = ?,
@@ -202,6 +206,11 @@ public final class OrganizationDao {
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			int idx = 1;
 			ps.setString(idx++, organization.getName());
+			if (organization.getOrganizationTypeId() == null) {
+				ps.setNull(idx++, java.sql.Types.INTEGER);
+			} else {
+				ps.setInt(idx++, organization.getOrganizationTypeId());
+			}
 			ps.setString(idx++, organization.getPhone());
 			ps.setString(idx++, organization.getFax());
 			ps.setString(idx++, organization.getEmail());
@@ -329,6 +338,49 @@ public final class OrganizationDao {
 		}
 	}
 
+
+	public boolean unlinkCaseFromOrganization(int organizationId, long caseId) {
+		if (organizationId <= 0)
+			throw new IllegalArgumentException("organizationId must be > 0");
+		if (caseId <= 0)
+			throw new IllegalArgumentException("caseId must be > 0");
+
+		String sql = """
+				DELETE co
+				FROM CaseOrganizations co
+				WHERE co.OrganizationId = ?
+				  AND co.CaseId = ?
+				  AND EXISTS (
+				    SELECT 1
+				    FROM Cases c
+				    WHERE c.Id = co.CaseId
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  )
+				  AND EXISTS (
+				    SELECT 1
+				    FROM Organizations o
+				    WHERE o.Id = co.OrganizationId
+				      AND o.ShaleClientId = ?
+				      AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				  );
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setInt(idx++, organizationId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, shaleClientId);
+
+			return ps.executeUpdate() > 0;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to unlink case from organization (orgId=" + organizationId + ", caseId=" + caseId + ")", e);
+		}
+	}
+
 	public List<RelatedCaseRow> findRelatedCases(int organizationId) {
 		if (organizationId <= 0) {
 			throw new IllegalArgumentException("organizationId must be > 0");
@@ -389,6 +441,31 @@ public final class OrganizationDao {
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related cases for organization (id=" + organizationId + ")", e);
+		}
+	}
+
+
+	public List<OrganizationTypeRow> findOrganizationTypes() {
+		String sql = """
+				SELECT ot.OrganizationTypeId, ot.Name
+				FROM %s ot
+				WHERE ot.ShaleClientId = ?
+				ORDER BY ot.Name ASC, ot.OrganizationTypeId ASC;
+				""".formatted(ORGANIZATION_TYPES_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, requireCurrentShaleClientId(con));
+
+			List<OrganizationTypeRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new OrganizationTypeRow(rs.getInt("OrganizationTypeId"), rs.getString("Name")));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load organization types", e);
 		}
 	}
 
