@@ -129,7 +129,7 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createCaseView(int caseId) {
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
 		return load("/fxml/case.fxml", controller ->
 		{
 			CaseController c = (CaseController) controller;
@@ -139,7 +139,8 @@ public final class SceneManager {
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
-			c.setOnOpenContact(this::openContactProfile); // ✅ add
+			c.setOnOpenContact(this::openContactProfile);
+			c.setOnOpenOrganization(onOpenOrganization);
 			return c;
 		});
 	}
@@ -187,6 +188,7 @@ public final class SceneManager {
 		System.out.println("Navigate to Contact: " + contactId);
 		// TODO later: navigate to contacts page / contact detail
 	}
+
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {
 		try {

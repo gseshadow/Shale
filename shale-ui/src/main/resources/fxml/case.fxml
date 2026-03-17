@@ -342,6 +342,14 @@
 				visible="false" managed="false">
 				<Label fx:id="genericTitleLabel" text="Section"
 					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+				<Label fx:id="organizationsEmptyLabel" text="No organizations"
+					visible="false" managed="false" style="-fx-opacity: 0.75;" />
+				<FlowPane fx:id="organizationsFlow" hgap="12" vgap="12" prefWrapLength="760"
+					visible="false" managed="false">
+					<padding>
+						<Insets top="4" right="2" bottom="4" left="2" />
+					</padding>
+				</FlowPane>
 				<TextArea fx:id="placeholderTextArea"
 					promptText="Placeholder notes / testing area" prefRowCount="12" />
 			</VBox>
