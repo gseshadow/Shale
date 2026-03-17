@@ -420,12 +420,28 @@ public final class CaseDao {
 
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, null);
+	}
+
+	/** page is 0-based */
+	public PagedResult<CaseRow> findMyCasesPage(int userId, int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
+		if (userId <= 0) {
+			throw new IllegalArgumentException("userId must be > 0");
+		}
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId);
+	}
+
+	private PagedResult<CaseRow> findPageInternal(int page,
+			int pageSize,
+			CaseSort sort,
+			boolean includeClosedDenied,
+			Integer restrictToUserId) {
 		if (page < 0)
 			throw new IllegalArgumentException("page must be >= 0");
 		if (pageSize <= 0)
 			throw new IllegalArgumentException("pageSize must be > 0");
 
-		long total = countAll(includeClosedDenied);
+		long total = countAll(includeClosedDenied, restrictToUserId);
 		if (total == 0) {
 			return new PagedResult<>(List.of(), page, pageSize, 0);
 		}
@@ -436,6 +452,17 @@ public final class CaseDao {
 
 		// Pick ONE PRIMARY responsible attorney row per case.
 		// If none is marked primary, return null attorney/color so UI remains white.
+		String userMembershipFilter = restrictToUserId == null
+				? ""
+				: """
+				  AND EXISTS (
+				    SELECT 1
+				    FROM %s cu_scope
+				    WHERE cu_scope.CaseId = c.Id
+				      AND cu_scope.UserId = ?
+				  )
+				""".formatted(CASE_USERS_TABLE);
+
 		String sql = """
 				SELECT
 				  c.Id,
@@ -481,11 +508,12 @@ public final class CaseDao {
 				    OR current_status.CurrentStatusName IS NULL
 				    OR LOWER(current_status.CurrentStatusName) NOT IN ('closed', 'denied')
 				  )
+				  %s
 				ORDER BY
 				  %s
 				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
 				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
-				orderByClause);
+				userMembershipFilter, orderByClause);
 
 		List<CaseRow> out = new ArrayList<>(pageSize);
 
@@ -495,6 +523,9 @@ public final class CaseDao {
 			int idx = 1;
 			ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 			ps.setInt(idx++, includeClosedDenied ? 1 : 0);
+			if (restrictToUserId != null) {
+				ps.setInt(idx++, restrictToUserId);
+			}
 			ps.setInt(idx++, offset);
 			ps.setInt(idx++, pageSize);
 
@@ -541,6 +572,28 @@ public final class CaseDao {
 	}
 
 	public long countAll(boolean includeClosedDenied) {
+		return countAll(includeClosedDenied, null);
+	}
+
+	public long countMyCases(int userId, boolean includeClosedDenied) {
+		if (userId <= 0) {
+			throw new IllegalArgumentException("userId must be > 0");
+		}
+		return countAll(includeClosedDenied, userId);
+	}
+
+	private long countAll(boolean includeClosedDenied, Integer restrictToUserId) {
+		String userMembershipFilter = restrictToUserId == null
+				? ""
+				: """
+				  AND EXISTS (
+				    SELECT 1
+				    FROM %s cu_scope
+				    WHERE cu_scope.CaseId = c.Id
+				      AND cu_scope.UserId = ?
+				  )
+				""".formatted(CASE_USERS_TABLE);
+
 		String sql = """
 				SELECT COUNT(1)
 				FROM %s c
@@ -560,13 +613,18 @@ public final class CaseDao {
 				    ? = 1
 				    OR current_status.CurrentStatusName IS NULL
 				    OR LOWER(current_status.CurrentStatusName) NOT IN ('closed', 'denied')
-				  );
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE);
+				  )
+				  %s;
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, userMembershipFilter);
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 
-			ps.setInt(1, includeClosedDenied ? 1 : 0);
+			int idx = 1;
+			ps.setInt(idx++, includeClosedDenied ? 1 : 0);
+			if (restrictToUserId != null) {
+				ps.setInt(idx++, restrictToUserId);
+			}
 
 			try (ResultSet rs = ps.executeQuery()) {
 				rs.next();
@@ -1840,6 +1898,85 @@ public final class CaseDao {
 
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load case row (caseId=" + caseId + ")", e);
+		}
+	}
+
+
+	public CaseRow getMyCaseRow(int userId, long caseId) {
+		if (userId <= 0) {
+			throw new IllegalArgumentException("userId must be > 0");
+		}
+		String sql = """
+				SELECT
+				  c.Id,
+				  c.Name,
+				  c.CallerDate,
+				  c.StatuteOfLimitations,
+				  current_status.PrimaryStatusId,
+				  ra.UserId AS ResponsibleAttorneyId,
+				  u.color AS ResponsibleAttorneyColor,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS ResponsibleAttorneyName
+				FROM %s c
+				OUTER APPLY (
+				    SELECT TOP (1) s.Id AS PrimaryStatusId
+				    FROM %s cs
+				    INNER JOIN %s s ON s.Id = cs.StatusId
+				    WHERE cs.CaseId = c.Id
+				    ORDER BY
+				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+				      cs.UpdatedAt DESC,
+				      cs.CreatedAt DESC,
+				      cs.Id DESC
+				) current_status
+				OUTER APPLY (
+				    SELECT TOP (1) cu.UserId
+				    FROM %s cu
+				    WHERE cu.CaseId = c.Id
+				      AND cu.RoleId = ?
+				      AND cu.IsPrimary = 1
+				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+				) ra
+				LEFT JOIN %s u
+				  ON u.id = ra.UserId
+				WHERE c.Id = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM %s cu_scope
+				    WHERE cu_scope.CaseId = c.Id
+				      AND cu_scope.UserId = ?
+				  );
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, CASE_USERS_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setLong(2, caseId);
+			ps.setInt(3, userId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next())
+					return null;
+
+				return new CaseRow(
+						rs.getLong("Id"),
+						rs.getString("Name"),
+						toLocalDate(rs.getDate("CallerDate")),
+						toLocalDate(rs.getDate("StatuteOfLimitations")),
+						getNullableInt(rs, "PrimaryStatusId"),
+						getNullableInt(rs, "ResponsibleAttorneyId"),
+						rs.getString("ResponsibleAttorneyName"),
+						rs.getString("ResponsibleAttorneyColor")
+				);
+			}
+
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load my case row (userId=" + userId + ", caseId=" + caseId + ")", e);
 		}
 	}
 
