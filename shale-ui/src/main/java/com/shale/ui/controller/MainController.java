@@ -165,7 +165,7 @@ public final class MainController {
 		sectionTitleLabel.setText("Organizations");
 		sectionSubtitleLabel.setText("Browse, search, and manage organizations.");
 
-		Node organizationsRoot = sceneManager.createOrganizationsView();
+		Node organizationsRoot = sceneManager.createOrganizationsView(this::openOrganization);
 		sectionContent.getChildren().setAll(organizationsRoot);
 	}
 
@@ -222,6 +222,16 @@ public final class MainController {
 
 		Node caseRoot = sceneManager.createCaseView(caseId);
 		sectionContent.getChildren().setAll(caseRoot);
+	}
+
+
+	public void openOrganization(int organizationId) {
+		highlightNav(navOrganizationsButton);
+		sectionTitleLabel.setText("Organization");
+		sectionSubtitleLabel.setText("Organization #" + organizationId);
+
+		Node organizationRoot = sceneManager.createOrganizationView(organizationId);
+		sectionContent.getChildren().setAll(organizationRoot);
 	}
 
 	private void showMyShale() {

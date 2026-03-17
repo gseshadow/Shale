@@ -106,6 +106,112 @@ public final class OrganizationDao {
 		return countAll(null);
 	}
 
+	public Organization findById(int organizationId) {
+		if (organizationId <= 0) {
+			throw new IllegalArgumentException("organizationId must be > 0");
+		}
+
+		String sql = """
+				SELECT
+				  o.Id,
+				  o.ShaleClientId,
+				  o.OrganizationTypeId,
+				  ot.Name AS OrganizationTypeName,
+				  o.Name,
+				  o.Phone,
+				  o.Fax,
+				  o.Email,
+				  o.Website,
+				  o.Address1,
+				  o.Address2,
+				  o.City,
+				  o.State,
+				  o.PostalCode,
+				  o.Country,
+				  o.Notes,
+				  o.IsDeleted,
+				  o.CreatedAt,
+				  o.UpdatedAt
+				FROM %s o
+				LEFT JOIN %s ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE o.Id = ?
+				  AND o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL);
+				""".formatted(ORGANIZATIONS_TABLE, ORGANIZATION_TYPES_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setInt(idx++, organizationId);
+			ps.setInt(idx++, requireCurrentShaleClientId(con));
+
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) {
+					return null;
+				}
+				return mapOrganization(rs);
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load organization by id (id=" + organizationId + ")", e);
+		}
+	}
+
+	public void update(Organization organization) {
+		Objects.requireNonNull(organization, "organization");
+		if (organization.getId() == null || organization.getId() <= 0) {
+			throw new IllegalArgumentException("organization.id is required");
+		}
+
+		String sql = """
+				UPDATE %s
+				SET
+				  Name = ?,
+				  Phone = ?,
+				  Fax = ?,
+				  Email = ?,
+				  Website = ?,
+				  Address1 = ?,
+				  Address2 = ?,
+				  City = ?,
+				  State = ?,
+				  PostalCode = ?,
+				  Country = ?,
+				  Notes = ?,
+				  UpdatedAt = SYSUTCDATETIME()
+				WHERE Id = ?
+				  AND ShaleClientId = ?
+				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
+				""".formatted(ORGANIZATIONS_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setString(idx++, organization.getName());
+			ps.setString(idx++, organization.getPhone());
+			ps.setString(idx++, organization.getFax());
+			ps.setString(idx++, organization.getEmail());
+			ps.setString(idx++, organization.getWebsite());
+			ps.setString(idx++, organization.getAddress1());
+			ps.setString(idx++, organization.getAddress2());
+			ps.setString(idx++, organization.getCity());
+			ps.setString(idx++, organization.getState());
+			ps.setString(idx++, organization.getPostalCode());
+			ps.setString(idx++, organization.getCountry());
+			ps.setString(idx++, organization.getNotes());
+			ps.setInt(idx++, organization.getId());
+			ps.setInt(idx++, requireCurrentShaleClientId(con));
+
+			int affected = ps.executeUpdate();
+			if (affected == 0) {
+				throw new RuntimeException("Organization not found or cannot be updated (id=" + organization.getId() + ")");
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update organization (id=" + organization.getId() + ")", e);
+		}
+	}
+
 	public long countAll(String searchName) {
 		String normalizedSearch = normalizeSearch(searchName);
 
