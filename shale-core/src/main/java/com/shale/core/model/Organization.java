@@ -6,6 +6,7 @@ public final class Organization {
 	private final Integer id;
 	private final Integer shaleClientId;
 	private final Integer organizationTypeId;
+	private final String organizationTypeName;
 	private final String name;
 	private final String phone;
 	private final String fax;
@@ -26,6 +27,7 @@ public final class Organization {
 		this.id = b.id;
 		this.shaleClientId = b.shaleClientId;
 		this.organizationTypeId = b.organizationTypeId;
+		this.organizationTypeName = b.organizationTypeName;
 		this.name = b.name;
 		this.phone = b.phone;
 		this.fax = b.fax;
@@ -57,6 +59,10 @@ public final class Organization {
 
 	public Integer getOrganizationTypeId() {
 		return organizationTypeId;
+	}
+
+	public String getOrganizationTypeName() {
+		return organizationTypeName;
 	}
 
 	public String getName() {
@@ -123,6 +129,7 @@ public final class Organization {
 		private Integer id;
 		private Integer shaleClientId;
 		private Integer organizationTypeId;
+		private String organizationTypeName;
 		private String name;
 		private String phone;
 		private String fax;
@@ -151,6 +158,11 @@ public final class Organization {
 
 		public Builder organizationTypeId(Integer v) {
 			this.organizationTypeId = v;
+			return this;
+		}
+
+		public Builder organizationTypeName(String v) {
+			this.organizationTypeName = v;
 			return this;
 		}
 

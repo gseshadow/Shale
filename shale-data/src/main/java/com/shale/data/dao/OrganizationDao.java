@@ -16,6 +16,7 @@ import com.shale.core.runtime.DbSessionProvider;
 public final class OrganizationDao {
 
 	private static final String ORGANIZATIONS_TABLE = "Organizations";
+	private static final String ORGANIZATION_TYPES_TABLE = "OrganizationTypes";
 
 	private final DbSessionProvider db;
 
@@ -50,6 +51,7 @@ public final class OrganizationDao {
 				  o.Id,
 				  o.ShaleClientId,
 				  o.OrganizationTypeId,
+				  ot.Name AS OrganizationTypeName,
 				  o.Name,
 				  o.Phone,
 				  o.Fax,
@@ -66,11 +68,14 @@ public final class OrganizationDao {
 				  o.CreatedAt,
 				  o.UpdatedAt
 				FROM %s o
+				LEFT JOIN %s ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
 				WHERE (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 				  AND (? = '' OR o.Name LIKE ?)
 				ORDER BY o.Name ASC, o.Id ASC
 				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-				""".formatted(ORGANIZATIONS_TABLE);
+				""".formatted(ORGANIZATIONS_TABLE, ORGANIZATION_TYPES_TABLE);
 
 		List<Organization> items = new ArrayList<>(pageSize);
 
@@ -129,6 +134,7 @@ public final class OrganizationDao {
 				.id(getNullableInt(rs, "Id"))
 				.shaleClientId(getNullableInt(rs, "ShaleClientId"))
 				.organizationTypeId(getNullableInt(rs, "OrganizationTypeId"))
+				.organizationTypeName(rs.getString("OrganizationTypeName"))
 				.name(rs.getString("Name"))
 				.phone(rs.getString("Phone"))
 				.fax(rs.getString("Fax"))

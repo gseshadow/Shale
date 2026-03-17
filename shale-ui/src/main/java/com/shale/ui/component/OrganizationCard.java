@@ -44,8 +44,14 @@ public class OrganizationCard extends HBox {
 		nameLabel.setText(fallback(name));
 	}
 
-	public void setOrganizationTypeId(Integer organizationTypeId) {
-		typeLabel.setText(organizationTypeId == null ? "Type: —" : "Type: " + organizationTypeId);
+	public void setOrganizationType(Integer organizationTypeId, String organizationTypeName) {
+		String resolvedName = organizationTypeName == null ? "" : organizationTypeName.trim();
+		if (!resolvedName.isEmpty()) {
+			typeLabel.setText("Type: " + resolvedName);
+			return;
+		}
+
+		typeLabel.setText(organizationTypeId == null ? "Type: Unknown" : "Type: " + organizationTypeId);
 	}
 
 	public void setPhone(String phone) {
