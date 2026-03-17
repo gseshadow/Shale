@@ -16,6 +16,7 @@ import com.shale.core.runtime.DbSessionProvider;
 public final class OrganizationDao {
 
 	private static final String ORGANIZATIONS_TABLE = "Organizations";
+	private static final String ORGANIZATION_TYPES_TABLE = "OrganizationTypes";
 
 	private final DbSessionProvider db;
 
@@ -50,6 +51,7 @@ public final class OrganizationDao {
 				  o.Id,
 				  o.ShaleClientId,
 				  o.OrganizationTypeId,
+				  ot.Name AS OrganizationTypeName,
 				  o.Name,
 				  o.Phone,
 				  o.Fax,
@@ -66,11 +68,15 @@ public final class OrganizationDao {
 				  o.CreatedAt,
 				  o.UpdatedAt
 				FROM %s o
-				WHERE (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				LEFT JOIN %s ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 				  AND (? = '' OR o.Name LIKE ?)
 				ORDER BY o.Name ASC, o.Id ASC
 				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-				""".formatted(ORGANIZATIONS_TABLE);
+				""".formatted(ORGANIZATIONS_TABLE, ORGANIZATION_TYPES_TABLE);
 
 		List<Organization> items = new ArrayList<>(pageSize);
 
@@ -78,6 +84,7 @@ public final class OrganizationDao {
 				PreparedStatement ps = con.prepareStatement(sql)) {
 
 			int idx = 1;
+			ps.setInt(idx++, requireCurrentShaleClientId(con));
 			ps.setString(idx++, normalizedSearch);
 			ps.setString(idx++, containsPattern(normalizedSearch));
 			ps.setInt(idx++, offset);
@@ -105,15 +112,18 @@ public final class OrganizationDao {
 		String sql = """
 				SELECT COUNT(1)
 				FROM %s o
-				WHERE (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 				  AND (? = '' OR o.Name LIKE ?);
 				""".formatted(ORGANIZATIONS_TABLE);
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 
-			ps.setString(1, normalizedSearch);
-			ps.setString(2, containsPattern(normalizedSearch));
+			int idx = 1;
+			ps.setInt(idx++, requireCurrentShaleClientId(con));
+			ps.setString(idx++, normalizedSearch);
+			ps.setString(idx++, containsPattern(normalizedSearch));
 
 			try (ResultSet rs = ps.executeQuery()) {
 				rs.next();
@@ -129,6 +139,7 @@ public final class OrganizationDao {
 				.id(getNullableInt(rs, "Id"))
 				.shaleClientId(getNullableInt(rs, "ShaleClientId"))
 				.organizationTypeId(getNullableInt(rs, "OrganizationTypeId"))
+				.organizationTypeName(rs.getString("OrganizationTypeName"))
 				.name(rs.getString("Name"))
 				.phone(rs.getString("Phone"))
 				.fax(rs.getString("Fax"))
@@ -161,8 +172,31 @@ public final class OrganizationDao {
 		return "%" + normalizedSearch + "%";
 	}
 
+
+	private static int requireCurrentShaleClientId(Connection con) throws SQLException {
+		String sql = "SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT);";
+		try (PreparedStatement ps = con.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+			if (!rs.next()) {
+				throw new IllegalStateException("ShaleClientId session context is missing.");
+			}
+
+			Integer shaleClientId = getNullableInt(rs, 1);
+			if (shaleClientId == null || shaleClientId <= 0) {
+				throw new IllegalStateException("ShaleClientId session context is missing.");
+			}
+			return shaleClientId;
+		}
+	}
+
 	private static Integer getNullableInt(ResultSet rs, String col) throws SQLException {
 		int value = rs.getInt(col);
+		return rs.wasNull() ? null : value;
+	}
+
+
+	private static Integer getNullableInt(ResultSet rs, int colIndex) throws SQLException {
+		int value = rs.getInt(colIndex);
 		return rs.wasNull() ? null : value;
 	}
 
