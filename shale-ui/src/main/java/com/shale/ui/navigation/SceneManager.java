@@ -129,7 +129,7 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createCaseView(int caseId) {
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
 		return load("/fxml/case.fxml", controller ->
 		{
 			CaseController c = (CaseController) controller;
@@ -140,7 +140,7 @@ public final class SceneManager {
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
 			c.setOnOpenContact(this::openContactProfile);
-			c.setOnOpenOrganization(this::openOrganizationProfile);
+			c.setOnOpenOrganization(onOpenOrganization);
 			return c;
 		});
 	}
@@ -189,12 +189,6 @@ public final class SceneManager {
 		// TODO later: navigate to contacts page / contact detail
 	}
 
-	private void openOrganizationProfile(Integer organizationId) {
-		if (organizationId == null)
-			return;
-		Parent root = createOrganizationView(organizationId, null);
-		setScene(root, "Shale — Organization #" + organizationId);
-	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {
 		try {

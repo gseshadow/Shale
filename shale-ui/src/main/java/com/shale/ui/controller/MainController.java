@@ -220,7 +220,7 @@ public final class MainController {
 		sectionTitleLabel.setText("Case");
 		sectionSubtitleLabel.setText("Case #" + caseId);
 
-		Node caseRoot = sceneManager.createCaseView(caseId);
+		Node caseRoot = sceneManager.createCaseView(caseId, this::openOrganization);
 		sectionContent.getChildren().setAll(caseRoot);
 	}
 
