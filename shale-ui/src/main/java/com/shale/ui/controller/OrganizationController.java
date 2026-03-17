@@ -4,6 +4,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
@@ -16,6 +17,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
 
 public final class OrganizationController {
 
@@ -26,6 +28,8 @@ public final class OrganizationController {
 	@FXML private Button editButton;
 	@FXML private Button saveButton;
 	@FXML private Button cancelButton;
+	@FXML private HBox remoteUpdateBanner;
+	@FXML private Button reloadRemoteButton;
 
 	@FXML private Label nameValue;
 	@FXML private TextField nameEditor;
@@ -59,6 +63,9 @@ public final class OrganizationController {
 	private boolean editMode;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
+	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> liveOrganizationUpdatedHandler;
+	private boolean liveSubscribed;
+	private boolean pendingRemoteUpdate;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "organization-detail-loader");
@@ -84,8 +91,24 @@ public final class OrganizationController {
 		if (cancelButton != null) {
 			cancelButton.setOnAction(e -> onCancel());
 		}
+		if (reloadRemoteButton != null) {
+			reloadRemoteButton.setOnAction(e -> onReloadRemote());
+		}
 
 		setEditMode(false);
+		hideRemoteUpdateBanner();
+
+		if (organizationTitleLabel != null) {
+			organizationTitleLabel.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (newScene == null) {
+					unsubscribeLiveOrganizationUpdates();
+				} else {
+					subscribeLiveOrganizationUpdates();
+				}
+			});
+		}
+
+		subscribeLiveOrganizationUpdates();
 		Platform.runLater(this::loadOrganization);
 	}
 
@@ -127,6 +150,12 @@ public final class OrganizationController {
 	}
 
 	private void onCancel() {
+		if (pendingRemoteUpdate) {
+			setEditMode(false);
+			onReloadRemote();
+			return;
+		}
+
 		if (currentOrganization != null) {
 			writeEditorsFromOrganization(currentOrganization);
 			renderFromCurrent();
@@ -176,6 +205,8 @@ public final class OrganizationController {
 						return;
 					}
 					currentOrganization = reloaded;
+					pendingRemoteUpdate = false;
+					hideRemoteUpdateBanner();
 					renderFromCurrent();
 					setEditMode(false);
 					clearError();
@@ -189,6 +220,78 @@ public final class OrganizationController {
 		});
 	}
 
+
+	private void onReloadRemote() {
+		pendingRemoteUpdate = false;
+		hideRemoteUpdateBanner();
+		loadOrganization();
+	}
+
+	private void subscribeLiveOrganizationUpdates() {
+		if (runtimeBridge == null || liveSubscribed) {
+			return;
+		}
+
+		liveOrganizationUpdatedHandler = this::handleLiveOrganizationUpdatedEvent;
+		runtimeBridge.subscribeEntityUpdated(liveOrganizationUpdatedHandler);
+		liveSubscribed = true;
+	}
+
+	private void unsubscribeLiveOrganizationUpdates() {
+		if (!liveSubscribed || runtimeBridge == null || liveOrganizationUpdatedHandler == null) {
+			return;
+		}
+
+		runtimeBridge.unsubscribeEntityUpdated(liveOrganizationUpdatedHandler);
+		liveSubscribed = false;
+	}
+
+	private void handleLiveOrganizationUpdatedEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (shouldIgnoreLiveEvent(event)) {
+			return;
+		}
+
+		runOnFx(() -> {
+			if (editMode) {
+				pendingRemoteUpdate = true;
+				showRemoteUpdateBanner();
+				return;
+			}
+
+			onReloadRemote();
+		});
+	}
+
+	private boolean shouldIgnoreLiveEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (event == null || organizationId == null || event.entityType() == null) {
+			return true;
+		}
+		if (!"Organization".equals(event.entityType())) {
+			return true;
+		}
+		if (event.entityId() != organizationId.longValue()) {
+			return true;
+		}
+		return isOwnEcho(event);
+	}
+
+	private boolean isOwnEcho(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (runtimeBridge == null) {
+			return false;
+		}
+		String mine = runtimeBridge.getClientInstanceId();
+		return mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId());
+	}
+
+	private void showRemoteUpdateBanner() {
+		setVisibleManaged(remoteUpdateBanner, true);
+		setVisibleManaged(reloadRemoteButton, true);
+	}
+
+	private void hideRemoteUpdateBanner() {
+		setVisibleManaged(remoteUpdateBanner, false);
+		setVisibleManaged(reloadRemoteButton, false);
+	}
 
 	private void publishOrganizationUpdated(Organization organization) {
 		if (organization == null || organization.getId() == null || appState == null || runtimeBridge == null
@@ -290,6 +393,14 @@ public final class OrganizationController {
 	private static void toggleField(Label valueNode, javafx.scene.Node editorNode, boolean editMode) {
 		setVisibleManaged(valueNode, !editMode);
 		setVisibleManaged(editorNode, editMode);
+	}
+
+	private static void runOnFx(Runnable runnable) {
+		if (Platform.isFxApplicationThread()) {
+			runnable.run();
+		} else {
+			Platform.runLater(runnable);
+		}
 	}
 
 	private static void setVisibleManaged(javafx.scene.Node node, boolean visible) {

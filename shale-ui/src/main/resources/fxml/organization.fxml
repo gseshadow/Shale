@@ -45,6 +45,11 @@
 
                     <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
 
+                    <HBox fx:id="remoteUpdateBanner" spacing="8" alignment="CENTER_LEFT" visible="false" managed="false">
+                        <Label text="This organization was updated elsewhere." style="-fx-text-fill: #b42318;" />
+                        <Button fx:id="reloadRemoteButton" text="Reload" />
+                    </HBox>
+
                     <GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
                         <columnConstraints>
                             <ColumnConstraints minWidth="160" prefWidth="180" />
