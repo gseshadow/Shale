@@ -69,6 +69,25 @@ public final class CaseDao {
 	public record ContactRow(int id, String displayName) {
 	}
 
+	public record RelatedOrganizationRow(
+			int id,
+			String name,
+			Integer organizationTypeId,
+			String organizationTypeName,
+			String phone,
+			String email,
+			String website,
+			String address1,
+			String address2,
+			String city,
+			String state,
+			String postalCode,
+			String country,
+			String notes,
+			String color
+	) {
+	}
+
 
 	public record NewIntakeCreateRequest(
 			int shaleClientId,
@@ -1323,6 +1342,29 @@ public final class CaseDao {
 		return Integer.valueOf(o.toString());
 	}
 
+	private static Integer getNullableInt(ResultSet rs, int colIndex) throws SQLException {
+		Object o = rs.getObject(colIndex);
+		if (o == null)
+			return null;
+		if (o instanceof Number n)
+			return n.intValue();
+		return Integer.valueOf(o.toString());
+	}
+
+
+	private static int requireCurrentShaleClientId(Connection con) throws SQLException {
+		String sql = "SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT);";
+		try (PreparedStatement ps = con.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+			if (!rs.next())
+				throw new IllegalStateException("ShaleClientId session context is missing.");
+			Integer shaleClientId = getNullableInt(rs, 1);
+			if (shaleClientId == null || shaleClientId <= 0)
+				throw new IllegalStateException("ShaleClientId session context is missing.");
+			return shaleClientId;
+		}
+	}
+
 	private static Boolean getNullableBoolean(ResultSet rs, String col) throws SQLException {
 		Object o = rs.getObject(col);
 		if (o == null)
@@ -1425,6 +1467,74 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list contacts (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public List<RelatedOrganizationRow> findRelatedOrganizations(long caseId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+
+		String sql = """
+				SELECT
+				  o.Id,
+				  o.Name,
+				  o.OrganizationTypeId,
+				  ot.Name AS OrganizationTypeName,
+				  o.Phone,
+				  o.Email,
+				  o.Website,
+				  o.Address1,
+				  o.Address2,
+				  o.City,
+				  o.State,
+				  o.PostalCode,
+				  o.Country,
+				  o.Notes
+				FROM CaseOrganizations co
+				INNER JOIN Organizations o
+				  ON o.Id = co.OrganizationId
+				LEFT JOIN OrganizationTypes ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE co.CaseId = ?
+				  AND o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				ORDER BY o.Name ASC, o.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+
+			List<RelatedOrganizationRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new RelatedOrganizationRow(
+						rs.getInt("Id"),
+						rs.getString("Name"),
+						(Integer) rs.getObject("OrganizationTypeId"),
+						rs.getString("OrganizationTypeName"),
+						rs.getString("Phone"),
+						rs.getString("Email"),
+						rs.getString("Website"),
+						rs.getString("Address1"),
+						rs.getString("Address2"),
+						rs.getString("City"),
+						rs.getString("State"),
+						rs.getString("PostalCode"),
+						rs.getString("Country"),
+						rs.getString("Notes"),
+						null
+					));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load related organizations for case (id=" + caseId + ")", e);
 		}
 	}
 
