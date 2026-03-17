@@ -9,6 +9,7 @@ import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
 import com.shale.ui.controller.MyShaleController;
 import com.shale.ui.controller.NewIntakeController;
+import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -97,12 +98,22 @@ public final class SceneManager {
 	}
 
 
-	public Parent createOrganizationsView() {
+	public Parent createOrganizationsView(Consumer<Integer> onOpenOrganization) {
 		return load("/fxml/organizations.fxml", controller ->
 		{
 			OrganizationsController c = (OrganizationsController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(appState, runtimeBridge, organizationDao);
+			c.init(appState, runtimeBridge, organizationDao, onOpenOrganization);
+			return c;
+		});
+	}
+
+	public Parent createOrganizationView(int organizationId) {
+		return load("/fxml/organization.fxml", controller ->
+		{
+			OrganizationController c = (OrganizationController) controller;
+			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
+			c.init(organizationId, organizationDao, appState, runtimeBridge);
 			return c;
 		});
 	}

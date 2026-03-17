@@ -4,11 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UiRuntimeBridge.EntityUpdatedEvent;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
@@ -34,6 +36,9 @@ public final class OrganizationsController {
 	private UiRuntimeBridge runtimeBridge;
 	private OrganizationDao organizationDao;
 	private OrganizationCardFactory organizationCardFactory;
+	private Consumer<Integer> onOpenOrganization;
+	private Consumer<EntityUpdatedEvent> liveOrganizationUpdatedHandler;
+	private boolean liveSubscribed;
 
 	private int currentPage = 0;
 	private final int pageSize = 100;
@@ -49,10 +54,11 @@ public final class OrganizationsController {
 		return t;
 	});
 
-	public void init(AppState appState, UiRuntimeBridge runtimeBridge, OrganizationDao organizationDao) {
+	public void init(AppState appState, UiRuntimeBridge runtimeBridge, OrganizationDao organizationDao, Consumer<Integer> onOpenOrganization) {
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.organizationDao = organizationDao;
+		this.onOpenOrganization = onOpenOrganization;
 		this.organizationCardFactory = new OrganizationCardFactory(this::openOrganization);
 	}
 
@@ -71,6 +77,54 @@ public final class OrganizationsController {
 			wireInfiniteScroll();
 			loadFirstPage();
 		});
+
+		if (organizationsFlow != null) {
+			organizationsFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (newScene == null) {
+					unsubscribeLiveOrganizationUpdates();
+				} else {
+					subscribeLiveOrganizationUpdates();
+				}
+			});
+		}
+
+		subscribeLiveOrganizationUpdates();
+	}
+
+
+	private void subscribeLiveOrganizationUpdates() {
+		if (runtimeBridge == null || liveSubscribed) {
+			return;
+		}
+
+		liveOrganizationUpdatedHandler = this::handleLiveOrganizationUpdated;
+		runtimeBridge.subscribeEntityUpdated(liveOrganizationUpdatedHandler);
+		liveSubscribed = true;
+	}
+
+	private void unsubscribeLiveOrganizationUpdates() {
+		if (!liveSubscribed || runtimeBridge == null || liveOrganizationUpdatedHandler == null) {
+			return;
+		}
+
+		runtimeBridge.unsubscribeEntityUpdated(liveOrganizationUpdatedHandler);
+		liveSubscribed = false;
+	}
+
+	private void handleLiveOrganizationUpdated(EntityUpdatedEvent event) {
+		if (event == null || event.entityType() == null) {
+			return;
+		}
+		if (!"Organization".equals(event.entityType())) {
+			return;
+		}
+
+		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
+			return;
+		}
+
+		Platform.runLater(this::loadFirstPage);
 	}
 
 	private void wireInfiniteScroll() {
@@ -183,6 +237,8 @@ public final class OrganizationsController {
 		if (organizationId == null) {
 			return;
 		}
-		System.out.println("Navigate to Organization: " + organizationId);
+		if (onOpenOrganization != null) {
+			onOpenOrganization.accept(organizationId);
+		}
 	}
 }
