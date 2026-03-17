@@ -7,6 +7,8 @@ import java.util.concurrent.Executors;
 
 import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -55,6 +57,8 @@ public final class OrganizationController {
 	private OrganizationDao organizationDao;
 	private Organization currentOrganization;
 	private boolean editMode;
+	private AppState appState;
+	private UiRuntimeBridge runtimeBridge;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "organization-detail-loader");
@@ -62,9 +66,11 @@ public final class OrganizationController {
 		return t;
 	});
 
-	public void init(int organizationId, OrganizationDao organizationDao) {
+	public void init(int organizationId, OrganizationDao organizationDao, AppState appState, UiRuntimeBridge runtimeBridge) {
 		this.organizationId = organizationId;
 		this.organizationDao = organizationDao;
+		this.appState = appState;
+		this.runtimeBridge = runtimeBridge;
 	}
 
 	@FXML
@@ -161,6 +167,7 @@ public final class OrganizationController {
 		dbExec.submit(() -> {
 			try {
 				organizationDao.update(updated);
+				publishOrganizationUpdated(updated);
 				Organization reloaded = organizationDao.findById(currentOrganization.getId());
 				Platform.runLater(() -> {
 					setBusy(false);
@@ -180,6 +187,22 @@ public final class OrganizationController {
 				});
 			}
 		});
+	}
+
+
+	private void publishOrganizationUpdated(Organization organization) {
+		if (organization == null || organization.getId() == null || appState == null || runtimeBridge == null
+				|| appState.getShaleClientId() == null || appState.getUserId() == null) {
+			return;
+		}
+
+		try {
+			int clientId = appState.getShaleClientId();
+			int userId = appState.getUserId();
+			runtimeBridge.publishOrganizationUpdated(organization.getId(), clientId, userId);
+		} catch (Exception ex) {
+			System.out.println("OrganizationUpdated publish skipped: " + ex.getMessage());
+		}
 	}
 
 	private void renderFromCurrent() {

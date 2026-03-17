@@ -113,7 +113,7 @@ public final class SceneManager {
 		{
 			OrganizationController c = (OrganizationController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(organizationId, organizationDao);
+			c.init(organizationId, organizationDao, appState, runtimeBridge);
 			return c;
 		});
 	}
