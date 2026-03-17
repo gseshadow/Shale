@@ -18,13 +18,18 @@ import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.Node;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+import javafx.scene.layout.Priority;
 import javafx.stage.Window;
 
 public final class OrganizationController {
@@ -239,6 +244,42 @@ public final class OrganizationController {
 				Platform.runLater(() -> setError("Failed to link case to organization."));
 			}
 		});
+	}
+
+
+	private void onRemoveCase(OrganizationDao.RelatedCaseRow row) {
+		if (row == null || organizationDao == null || organizationId == null) {
+			return;
+		}
+
+		if (!confirmUnlink(row)) {
+			return;
+		}
+
+		dbExec.submit(() -> {
+			try {
+				organizationDao.unlinkCaseFromOrganization(organizationId, row.id());
+				Platform.runLater(() -> {
+					clearError();
+					loadRelatedCasesSafe();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> setError("Failed to remove case from organization."));
+			}
+		});
+	}
+
+	private boolean confirmUnlink(OrganizationDao.RelatedCaseRow row) {
+		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+		if (addCaseButton != null && addCaseButton.getScene() != null) {
+			alert.initOwner(addCaseButton.getScene().getWindow());
+		}
+		alert.setTitle("Remove Case");
+		alert.setHeaderText("Remove this case from the organization?");
+		alert.setContentText(fallback(row.name()) + " (#" + row.id() + ")");
+
+		Optional<ButtonType> choice = alert.showAndWait();
+		return choice.isPresent() && choice.get() == ButtonType.OK;
 	}
 
 	private void onEdit() {
@@ -474,14 +515,7 @@ public final class OrganizationController {
 		}
 
 		List<Node> cards = relatedCases.stream()
-				.map(c -> caseCardFactory.create(new CaseCardModel(
-						c.id(),
-						c.name(),
-						c.intakeDate(),
-						c.statuteOfLimitationsDate(),
-						c.responsibleAttorneyName(),
-						c.responsibleAttorneyColor()
-				)))
+				.map(this::createRelatedCaseCardContainer)
 				.toList();
 
 		relatedCasesFlow.getChildren().setAll(cards);
@@ -497,6 +531,29 @@ public final class OrganizationController {
 				relatedCasesFlow.toFront();
 			}
 		}
+	}
+
+	private Node createRelatedCaseCardContainer(OrganizationDao.RelatedCaseRow row) {
+		Node card = caseCardFactory.create(new CaseCardModel(
+				row.id(),
+				row.name(),
+				row.intakeDate(),
+				row.statuteOfLimitationsDate(),
+				row.responsibleAttorneyName(),
+				row.responsibleAttorneyColor()
+		));
+
+		Button removeButton = new Button("Remove");
+		removeButton.getStyleClass().add("button-secondary");
+		removeButton.setOnAction(e -> onRemoveCase(row));
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox actions = new HBox(8, spacer, removeButton);
+
+		VBox container = new VBox(6, card, actions);
+		container.setPrefWidth(280);
+		return container;
 	}
 
 
