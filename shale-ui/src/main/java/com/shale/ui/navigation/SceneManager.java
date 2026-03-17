@@ -108,12 +108,12 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createOrganizationView(int organizationId) {
+	public Parent createOrganizationView(int organizationId, Consumer<Integer> onOpenCase) {
 		return load("/fxml/organization.fxml", controller ->
 		{
 			OrganizationController c = (OrganizationController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(organizationId, organizationDao, appState, runtimeBridge);
+			c.init(organizationId, organizationDao, appState, runtimeBridge, onOpenCase);
 			return c;
 		});
 	}

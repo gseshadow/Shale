@@ -107,6 +107,14 @@
                         <Label fx:id="notesValue" text="—" wrapText="true" GridPane.rowIndex="12" GridPane.columnIndex="1" />
                         <TextArea fx:id="notesEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" GridPane.rowIndex="12" GridPane.columnIndex="1" />
                     </GridPane>
+
+                    <VBox spacing="8" styleClass="secondary-panel">
+                        <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                        <StackPane>
+                            <FlowPane fx:id="relatedCasesFlow" hgap="10" vgap="10" prefWrapLength="900" />
+                            <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
+                        </StackPane>
+                    </VBox>
                 </VBox>
             </ScrollPane>
         </StackPane>

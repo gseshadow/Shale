@@ -2,12 +2,15 @@ package com.shale.ui.controller;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.ui.component.factory.CaseCardFactory;
+import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 
@@ -17,6 +20,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.Node;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 
 public final class OrganizationController {
@@ -30,6 +35,8 @@ public final class OrganizationController {
 	@FXML private Button cancelButton;
 	@FXML private HBox remoteUpdateBanner;
 	@FXML private Button reloadRemoteButton;
+	@FXML private FlowPane relatedCasesFlow;
+	@FXML private Label relatedCasesEmptyLabel;
 
 	@FXML private Label nameValue;
 	@FXML private TextField nameEditor;
@@ -66,6 +73,9 @@ public final class OrganizationController {
 	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> liveOrganizationUpdatedHandler;
 	private boolean liveSubscribed;
 	private boolean pendingRemoteUpdate;
+	private List<OrganizationDao.RelatedCaseRow> relatedCases = List.of();
+	private CaseCardFactory caseCardFactory;
+	private Consumer<Integer> onOpenCase;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "organization-detail-loader");
@@ -73,11 +83,13 @@ public final class OrganizationController {
 		return t;
 	});
 
-	public void init(int organizationId, OrganizationDao organizationDao, AppState appState, UiRuntimeBridge runtimeBridge) {
+	public void init(int organizationId, OrganizationDao organizationDao, AppState appState, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase) {
 		this.organizationId = organizationId;
 		this.organizationDao = organizationDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
+		this.onOpenCase = onOpenCase;
+		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 	}
 
 	@FXML
@@ -122,14 +134,19 @@ public final class OrganizationController {
 		dbExec.submit(() -> {
 			try {
 				Organization loaded = organizationDao.findById(organizationId);
+				List<OrganizationDao.RelatedCaseRow> loadedRelatedCases = organizationDao.findRelatedCases(organizationId);
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (loaded == null) {
+						relatedCases = List.of();
+						renderRelatedCases();
 						setError("Organization not found.");
 						return;
 					}
 					currentOrganization = loaded;
+					relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
 					renderFromCurrent();
+					renderRelatedCases();
 					clearError();
 				});
 			} catch (Exception ex) {
@@ -356,6 +373,35 @@ public final class OrganizationController {
 		postalCodeEditor.setText(safeText(o.getPostalCode()));
 		countryEditor.setText(safeText(o.getCountry()));
 		notesEditor.setText(safeText(o.getNotes()));
+	}
+
+
+	private void renderRelatedCases() {
+		if (relatedCasesFlow == null) {
+			return;
+		}
+
+		if (caseCardFactory == null) {
+			caseCardFactory = new CaseCardFactory(onOpenCase);
+		}
+
+		List<Node> cards = relatedCases.stream()
+				.map(c -> caseCardFactory.create(new CaseCardModel(
+						c.id(),
+						c.name(),
+						c.intakeDate(),
+						c.statuteOfLimitationsDate(),
+						c.responsibleAttorneyName(),
+						c.responsibleAttorneyColor()
+				)))
+				.toList();
+
+		relatedCasesFlow.getChildren().setAll(cards);
+		boolean empty = cards.isEmpty();
+		if (relatedCasesEmptyLabel != null) {
+			relatedCasesEmptyLabel.setVisible(empty);
+			relatedCasesEmptyLabel.setManaged(empty);
+		}
 	}
 
 	private void setEditMode(boolean enabled) {

@@ -230,7 +230,7 @@ public final class MainController {
 		sectionTitleLabel.setText("Organization");
 		sectionSubtitleLabel.setText("Organization #" + organizationId);
 
-		Node organizationRoot = sceneManager.createOrganizationView(organizationId);
+		Node organizationRoot = sceneManager.createOrganizationView(organizationId, this::openCase);
 		sectionContent.getChildren().setAll(organizationRoot);
 	}
 

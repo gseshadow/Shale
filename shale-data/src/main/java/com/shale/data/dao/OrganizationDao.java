@@ -27,6 +27,16 @@ public final class OrganizationDao {
 	public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
 	}
 
+	public record RelatedCaseRow(
+			long id,
+			String name,
+			java.time.LocalDate intakeDate,
+			java.time.LocalDate statuteOfLimitationsDate,
+			String responsibleAttorneyName,
+			String responsibleAttorneyColor
+	) {
+	}
+
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize) {
 		return findPage(page, pageSize, null);
@@ -212,6 +222,72 @@ public final class OrganizationDao {
 		}
 	}
 
+
+	public List<RelatedCaseRow> findRelatedCases(int organizationId) {
+		if (organizationId <= 0) {
+			throw new IllegalArgumentException("organizationId must be > 0");
+		}
+
+		String sql = """
+				SELECT
+				  c.Id,
+				  c.Name,
+				  c.CallerDate,
+				  c.StatuteOfLimitations,
+				  u.color AS ResponsibleAttorneyColor,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS ResponsibleAttorneyName
+				FROM CaseOrganizations co
+				INNER JOIN Cases c
+				  ON c.Id = co.CaseId
+				OUTER APPLY (
+				    SELECT TOP (1) cu.UserId
+				    FROM CaseUsers cu
+				    WHERE cu.CaseId = c.Id
+				      AND cu.RoleId = 4
+				      AND cu.IsPrimary = 1
+				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+				) ra
+				LEFT JOIN Users u
+				  ON u.Id = ra.UserId
+				WHERE co.OrganizationId = ?
+				  AND co.ShaleClientId = ?
+				  AND c.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				ORDER BY c.Name ASC, c.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setInt(idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, shaleClientId);
+
+			List<RelatedCaseRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new RelatedCaseRow(
+						rs.getLong("Id"),
+						rs.getString("Name"),
+						toLocalDate(rs.getDate("CallerDate")),
+						toLocalDate(rs.getDate("StatuteOfLimitations")),
+						rs.getString("ResponsibleAttorneyName"),
+						rs.getString("ResponsibleAttorneyColor")
+					));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load related cases for organization (id=" + organizationId + ")", e);
+		}
+	}
+
 	public long countAll(String searchName) {
 		String normalizedSearch = normalizeSearch(searchName);
 
@@ -308,5 +384,9 @@ public final class OrganizationDao {
 
 	private static Instant toInstant(Timestamp ts) {
 		return ts == null ? null : ts.toInstant();
+	}
+
+	private static java.time.LocalDate toLocalDate(java.sql.Date d) {
+		return d == null ? null : d.toLocalDate();
 	}
 }
