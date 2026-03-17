@@ -40,6 +40,9 @@ public final class OrganizationDao {
 	public record SelectableCaseRow(long id, String name) {
 	}
 
+	public record OrganizationTypeRow(int organizationTypeId, String name) {
+	}
+
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize) {
 		return findPage(page, pageSize, null);
@@ -181,6 +184,7 @@ public final class OrganizationDao {
 				UPDATE %s
 				SET
 				  Name = ?,
+				  OrganizationTypeId = ?,
 				  Phone = ?,
 				  Fax = ?,
 				  Email = ?,
@@ -202,6 +206,11 @@ public final class OrganizationDao {
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			int idx = 1;
 			ps.setString(idx++, organization.getName());
+			if (organization.getOrganizationTypeId() == null) {
+				ps.setNull(idx++, java.sql.Types.INTEGER);
+			} else {
+				ps.setInt(idx++, organization.getOrganizationTypeId());
+			}
 			ps.setString(idx++, organization.getPhone());
 			ps.setString(idx++, organization.getFax());
 			ps.setString(idx++, organization.getEmail());
@@ -432,6 +441,31 @@ public final class OrganizationDao {
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related cases for organization (id=" + organizationId + ")", e);
+		}
+	}
+
+
+	public List<OrganizationTypeRow> findOrganizationTypes() {
+		String sql = """
+				SELECT ot.OrganizationTypeId, ot.Name
+				FROM %s ot
+				WHERE ot.ShaleClientId = ?
+				ORDER BY ot.Name ASC, ot.OrganizationTypeId ASC;
+				""".formatted(ORGANIZATION_TYPES_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, requireCurrentShaleClientId(con));
+
+			List<OrganizationTypeRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new OrganizationTypeRow(rs.getInt("OrganizationTypeId"), rs.getString("Name")));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load organization types", e);
 		}
 	}
 

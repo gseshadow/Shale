@@ -62,6 +62,7 @@
 
                         <Label text="Organization Type:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
                         <Label fx:id="typeValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+                        <ComboBox fx:id="typeEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
                         <Label text="Phone:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
                         <Label fx:id="phoneValue" text="—" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1" />
