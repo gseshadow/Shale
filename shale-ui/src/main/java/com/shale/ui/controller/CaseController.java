@@ -15,6 +15,7 @@ import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.ui.component.factory.ContactCardFactory;
+import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
@@ -100,6 +101,11 @@ public class CaseController {
 	private Label genericTitleLabel;
 	@FXML
 	private TextArea placeholderTextArea;
+
+	@FXML
+	private FlowPane organizationsFlow;
+	@FXML
+	private Label organizationsEmptyLabel;
 
 	@FXML
 	private Label ovCaseStatusValue;
@@ -332,6 +338,9 @@ public class CaseController {
 	private PracticeAreaCardFactory practiceAreaCardFactory;
 	private Consumer<Integer> onOpenPracticeArea;
 
+	private OrganizationCardFactory organizationCardFactory;
+	private Consumer<Integer> onOpenOrganization;
+
 	private CaseDao caseDao;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
@@ -377,6 +386,7 @@ public class CaseController {
 	private LocalDate draftIncidentDate;
 	private LocalDate draftSolDate;
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
+	private List<CaseDao.RelatedOrganizationRow> relatedOrganizations = List.of();
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 
@@ -426,6 +436,11 @@ public class CaseController {
 	public void setOnOpenPracticeArea(Consumer<Integer> onOpenPracticeArea) {
 		this.onOpenPracticeArea = onOpenPracticeArea;
 		this.practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea);
+	}
+
+	public void setOnOpenOrganization(Consumer<Integer> onOpenOrganization) {
+		this.onOpenOrganization = onOpenOrganization;
+		this.organizationCardFactory = new OrganizationCardFactory(onOpenOrganization);
 	}
 
 	// ----------------------------
@@ -597,6 +612,7 @@ public class CaseController {
 		case "Overview" -> showOverview();
 		case "Tasks" -> showTasksTab();
 		case "Details" -> showDetails();
+		case "Organizations" -> showOrganizations();
 		default -> showGeneric(sectionName);
 		}
 	}
@@ -661,8 +677,75 @@ public class CaseController {
 		if (genericTitleLabel != null)
 			genericTitleLabel.setText(sectionName);
 
-		if (placeholderTextArea != null && (placeholderTextArea.getText() == null || placeholderTextArea.getText().isBlank())) {
+		setVisibleManaged(placeholderTextArea, true);
+		setVisibleManaged(organizationsFlow, false);
+		setVisibleManaged(organizationsEmptyLabel, false);
+
+		if (placeholderTextArea != null) {
 			placeholderTextArea.setText(sectionName + " view is not implemented yet.");
+		}
+	}
+
+
+	private void showOrganizations() {
+		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, true);
+		setPaneVisible(tasksPanel, false);
+
+		if (genericTitleLabel != null)
+			genericTitleLabel.setText("Organizations");
+
+		setVisibleManaged(placeholderTextArea, false);
+		renderOrganizationsSection();
+	}
+
+	private void renderOrganizationsSection() {
+		if (organizationsFlow == null || organizationsEmptyLabel == null)
+			return;
+
+		organizationsFlow.getChildren().clear();
+		if (relatedOrganizations == null || relatedOrganizations.isEmpty()) {
+			setVisibleManaged(organizationsFlow, false);
+			setVisibleManaged(organizationsEmptyLabel, true);
+			organizationsEmptyLabel.setText("No organizations");
+			return;
+		}
+
+		OrganizationCardFactory factory = organizationCardFactory != null
+				? organizationCardFactory
+				: new OrganizationCardFactory(this::openOrganization);
+		for (CaseDao.RelatedOrganizationRow org : relatedOrganizations) {
+			OrganizationCardFactory.OrganizationCardModel model = new OrganizationCardFactory.OrganizationCardModel(
+					org.id(),
+					org.name(),
+					org.organizationTypeId(),
+					org.organizationTypeName(),
+					org.phone(),
+					org.email(),
+					org.website(),
+					org.address1(),
+					org.address2(),
+					org.city(),
+					org.state(),
+					org.postalCode(),
+					org.country(),
+					org.notes(),
+					org.color()
+			);
+			organizationsFlow.getChildren().add(factory.create(model, OrganizationCardFactory.Variant.COMPACT));
+		}
+
+		setVisibleManaged(organizationsFlow, true);
+		setVisibleManaged(organizationsEmptyLabel, false);
+	}
+
+	private void openOrganization(Integer organizationId) {
+		if (organizationId == null)
+			return;
+		if (onOpenOrganization != null) {
+			onOpenOrganization.accept(organizationId);
 		}
 	}
 
@@ -691,11 +774,21 @@ public class CaseController {
 		{
 			CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
 			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
+			List<CaseDao.RelatedOrganizationRow> loadedOrganizations = List.of();
+			try {
+				loadedOrganizations = caseDao.findRelatedOrganizations(activeCaseId);
+			} catch (Exception orgLoadError) {
+				System.err.println("Case organizations load failed for caseId=" + activeCaseId + ": " + orgLoadError.getMessage());
+			}
+			final List<CaseDao.RelatedOrganizationRow> organizations = loadedOrganizations;
 
 			runOnFx(() ->
 			{
 				if (overview != null)
 					applyOverviewEditSafe(overview);
+
+				relatedOrganizations = organizations == null ? List.of() : organizations;
+				renderOrganizationsSection();
 
 				if (detail != null) {
 					current = detail;
