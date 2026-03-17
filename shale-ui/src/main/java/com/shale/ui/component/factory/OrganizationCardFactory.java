@@ -17,6 +17,7 @@ public class OrganizationCardFactory {
 			Integer organizationId,
 			String name,
 			Integer organizationTypeId,
+			String organizationTypeName,
 			String phone,
 			String email,
 			String website,
@@ -46,7 +47,7 @@ public class OrganizationCardFactory {
 		card.setOnOpen(onOpenOrganization);
 
 		card.setName(model.name());
-		card.setOrganizationTypeId(model.organizationTypeId());
+		card.setOrganizationType(model.organizationTypeId(), model.organizationTypeName());
 		card.setPhone(model.phone());
 		card.setEmail(model.email());
 		card.setWebsite(model.website());
@@ -69,6 +70,7 @@ public class OrganizationCardFactory {
 				organization.getId(),
 				organization.getName(),
 				organization.getOrganizationTypeId(),
+				organization.getOrganizationTypeName(),
 				organization.getPhone(),
 				organization.getEmail(),
 				organization.getWebsite(),
