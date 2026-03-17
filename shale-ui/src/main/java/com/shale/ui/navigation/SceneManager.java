@@ -139,7 +139,8 @@ public final class SceneManager {
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
-			c.setOnOpenContact(this::openContactProfile); // ✅ add
+			c.setOnOpenContact(this::openContactProfile);
+			c.setOnOpenOrganization(this::openOrganizationProfile);
 			return c;
 		});
 	}
@@ -186,6 +187,13 @@ public final class SceneManager {
 	private void openContactProfile(Integer contactId) {
 		System.out.println("Navigate to Contact: " + contactId);
 		// TODO later: navigate to contacts page / contact detail
+	}
+
+	private void openOrganizationProfile(Integer organizationId) {
+		if (organizationId == null)
+			return;
+		Parent root = createOrganizationView(organizationId, null);
+		setScene(root, "Shale — Organization #" + organizationId);
 	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {
