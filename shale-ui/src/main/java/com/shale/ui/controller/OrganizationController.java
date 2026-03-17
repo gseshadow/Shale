@@ -3,12 +3,14 @@ package com.shale.ui.controller;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -23,6 +25,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.Node;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.stage.Window;
 
 public final class OrganizationController {
 
@@ -37,6 +40,7 @@ public final class OrganizationController {
 	@FXML private Button reloadRemoteButton;
 	@FXML private FlowPane relatedCasesFlow;
 	@FXML private Label relatedCasesEmptyLabel;
+	@FXML private Button addCaseButton;
 
 	@FXML private Label nameValue;
 	@FXML private TextField nameEditor;
@@ -105,6 +109,9 @@ public final class OrganizationController {
 		}
 		if (reloadRemoteButton != null) {
 			reloadRemoteButton.setOnAction(e -> onReloadRemote());
+		}
+		if (addCaseButton != null) {
+			addCaseButton.setOnAction(e -> onAddCase());
 		}
 
 		setEditMode(false);
@@ -183,6 +190,56 @@ public final class OrganizationController {
 		});
 	}
 
+
+
+	private void onAddCase() {
+		if (organizationDao == null || organizationId == null || addCaseButton == null) {
+			return;
+		}
+
+		Window owner = addCaseButton.getScene() == null ? null : addCaseButton.getScene().getWindow();
+		dbExec.submit(() -> {
+			try {
+				List<OrganizationDao.SelectableCaseRow> selectable = organizationDao.findLinkableCases(organizationId);
+				Platform.runLater(() -> showAddCasePicker(owner, selectable));
+			} catch (Exception ex) {
+				Platform.runLater(() -> setError("Failed to load cases for linking."));
+			}
+		});
+	}
+
+	private void showAddCasePicker(Window owner, List<OrganizationDao.SelectableCaseRow> selectable) {
+		List<OrganizationDao.SelectableCaseRow> options = selectable == null ? List.of() : selectable;
+		if (options.isEmpty()) {
+			setError("No available cases to link.");
+			return;
+		}
+
+		ContactPickerDialog<OrganizationDao.SelectableCaseRow> picker = new ContactPickerDialog<>(
+				owner,
+				"Add Case",
+				options,
+				row -> row == null ? "" : fallback(row.name()) + " (#" + row.id() + ")",
+				null);
+
+		Optional<OrganizationDao.SelectableCaseRow> selected = picker.showAndWait();
+		if (selected.isEmpty()) {
+			return;
+		}
+
+		OrganizationDao.SelectableCaseRow chosen = selected.get();
+		dbExec.submit(() -> {
+			try {
+				organizationDao.linkCaseToOrganization(organizationId, chosen.id());
+				Platform.runLater(() -> {
+					clearError();
+					loadRelatedCasesSafe();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> setError("Failed to link case to organization."));
+			}
+		});
+	}
 
 	private void onEdit() {
 		if (currentOrganization == null) {
