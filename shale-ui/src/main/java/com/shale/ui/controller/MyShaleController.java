@@ -145,11 +145,83 @@ public final class MyShaleController {
 			return;
 		}
 
-		System.out.println("[DEBUG LIVE][MY_CASES] event accepted -> scheduling refresh");
-		runOnFx(() -> {
-			System.out.println("[DEBUG LIVE][MY_CASES] executing refresh on FX thread");
-			loadFirstPage();
+		System.out.println("[DEBUG LIVE][MY_CASES] event accepted -> scheduling targeted refresh");
+		refreshCaseIncremental(event.caseId());
+	}
+
+
+	private void refreshCaseIncremental(long caseId) {
+		if (caseDao == null || appState == null || appState.getUserId() == null || appState.getUserId() <= 0) {
+			System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh skipped: missing dependencies");
+			return;
+		}
+
+		final int userId = appState.getUserId();
+		final int generationAtSubmit = loadGeneration;
+		dbExec.submit(() -> {
+			try {
+				CaseDao.CaseRow row = caseDao.getMyCaseRow(userId, caseId);
+				Platform.runLater(() -> {
+					if (generationAtSubmit != loadGeneration) {
+						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh ignored due to generation mismatch");
+						return;
+					}
+
+					boolean changed;
+					if (row == null) {
+						changed = removeLoadedCase(caseId);
+						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh row missing -> removed=" + changed + " caseId=" + caseId);
+					} else {
+						changed = upsertLoadedCase(toVm(row));
+						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh upsert changed=" + changed + " caseId=" + caseId);
+					}
+
+					if (changed) {
+						rerender();
+					}
+				});
+			} catch (Exception ex) {
+				System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh failed caseId=" + caseId + " message=" + ex.getMessage());
+				runOnFx(this::loadFirstPage);
+			}
 		});
+	}
+
+	private boolean removeLoadedCase(long caseId) {
+		for (int i = 0; i < loaded.size(); i++) {
+			if (loaded.get(i).id == caseId) {
+				loaded.remove(i);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean upsertLoadedCase(CaseCardVm vm) {
+		for (int i = 0; i < loaded.size(); i++) {
+			CaseCardVm existing = loaded.get(i);
+			if (existing.id == vm.id) {
+				if (existing.sameContent(vm)) {
+					return false;
+				}
+				loaded.set(i, vm);
+				return true;
+			}
+		}
+		loaded.add(vm);
+		return true;
+	}
+
+	private CaseCardVm toVm(CaseDao.CaseRow r) {
+		return new CaseCardVm(
+			r.id(),
+			safe(r.name()),
+			r.intakeDate(),
+			r.statuteOfLimitationsDate(),
+			r.primaryStatusId(),
+			safe(r.responsibleAttorneyName()),
+			safe(r.responsibleAttorneyColor())
+		);
 	}
 
 	private void wireInfiniteScroll() {
@@ -189,14 +261,7 @@ public final class MyShaleController {
 			try {
 				var page = caseDao.findMyCasesPage(userId, pageToLoad, pageSize, selectedSort(), false);
 				List<CaseCardVm> newItems = page.items().stream()
-						.map(r -> new CaseCardVm(
-								r.id(),
-								safe(r.name()),
-								r.intakeDate(),
-								r.statuteOfLimitationsDate(),
-								r.primaryStatusId(),
-								safe(r.responsibleAttorneyName()),
-								safe(r.responsibleAttorneyColor())))
+						.map(this::toVm)
 						.toList();
 
 				Platform.runLater(() -> {
@@ -204,8 +269,10 @@ public final class MyShaleController {
 						loading = false;
 						return;
 					}
-					loaded.addAll(newItems);
-					System.out.println("[DEBUG LIVE][MY_CASES] page loaded page=" + pageToLoad + " items=" + newItems.size() + " total=" + page.total());
+					for (CaseCardVm vm : newItems) {
+						upsertLoadedCase(vm);
+					}
+					System.out.println("[DEBUG LIVE][MY_CASES] page loaded page=" + pageToLoad + " items=" + newItems.size() + " total=" + page.total() + " loadedUnique=" + loaded.size());
 					currentPage++;
 					hasMore = loaded.size() < page.total();
 					loading = false;
@@ -350,6 +417,19 @@ public final class MyShaleController {
 			this.primaryStatusId = primaryStatusId;
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
+		}
+
+		boolean sameContent(CaseCardVm other) {
+			if (other == null) {
+				return false;
+			}
+			return id == other.id
+					&& Objects.equals(name, other.name)
+					&& Objects.equals(intakeDate, other.intakeDate)
+					&& Objects.equals(solDate, other.solDate)
+					&& Objects.equals(primaryStatusId, other.primaryStatusId)
+					&& Objects.equals(responsibleAttorney, other.responsibleAttorney)
+					&& Objects.equals(responsibleAttorneyColor, other.responsibleAttorneyColor);
 		}
 	}
 }
