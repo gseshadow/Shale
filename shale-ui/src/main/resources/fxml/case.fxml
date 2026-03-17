@@ -340,6 +340,9 @@
 			<!-- GENERIC PLACEHOLDER PANE -->
 			<VBox fx:id="genericPane" spacing="10" maxWidth="980" styleClass="case-main-surface"
 				visible="false" managed="false">
+				<padding>
+					<Insets top="12" right="12" bottom="12" left="12" />
+				</padding>
 				<Label fx:id="genericTitleLabel" text="Section"
 					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 				<Label fx:id="organizationsEmptyLabel" text="No organizations"
@@ -347,7 +350,7 @@
 				<FlowPane fx:id="organizationsFlow" hgap="12" vgap="12" prefWrapLength="760"
 					visible="false" managed="false">
 					<padding>
-						<Insets top="4" right="2" bottom="4" left="2" />
+						<Insets top="0" right="0" bottom="0" left="0" />
 					</padding>
 				</FlowPane>
 				<TextArea fx:id="placeholderTextArea"
