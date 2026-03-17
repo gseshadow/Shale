@@ -2,6 +2,7 @@ package com.shale.ui.navigation;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.LoginController;
@@ -100,7 +101,8 @@ public final class SceneManager {
 		return load("/fxml/organizations.fxml", controller ->
 		{
 			OrganizationsController c = (OrganizationsController) controller;
-			c.init(appState, runtimeBridge);
+			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
+			c.init(appState, runtimeBridge, organizationDao);
 			return c;
 		});
 	}
