@@ -107,6 +107,11 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	}
 
 	@Override
+	public void publishOrganizationUpdated(int organizationId, int shaleClientId, int updatedByUserId) {
+		publishEntityUpdated("Organization", organizationId, shaleClientId, updatedByUserId, null);
+	}
+
+	@Override
 	public void publishEntityUpdated(String entityType, long entityId,
 			int shaleClientId, int updatedByUserId,
 			String patchJsonOrNull) {
