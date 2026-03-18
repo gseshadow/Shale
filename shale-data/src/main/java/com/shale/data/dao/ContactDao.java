@@ -64,6 +64,16 @@ public final class ContactDao {
     ) {
     }
 
+    public record CreateContactRequest(
+            int shaleClientId,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            boolean client
+    ) {
+    }
+
     private final DbSessionProvider db;
 
     public ContactDao(DbSessionProvider db) {
@@ -310,6 +320,92 @@ public final class ContactDao {
         }
     }
 
+    public int createContact(CreateContactRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.shaleClientId() <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        String normalizedFirstName = normalizeOptional(request.firstName());
+        String normalizedLastName = normalizeOptional(request.lastName());
+        if (normalizedFirstName == null && normalizedLastName == null) {
+            throw new IllegalArgumentException("At least a first or last name is required.");
+        }
+
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, request.shaleClientId());
+            ContactSchema schema = ContactSchema.load(con);
+            logDetectedCoreColumns(schema);
+
+            List<String> columns = new ArrayList<>();
+            List<Object> values = new ArrayList<>();
+
+            if (schema.nameColumn() != null) {
+                columns.add(schema.nameColumn());
+                values.add(buildDisplayName(normalizedFirstName, normalizedLastName));
+            }
+            if (schema.firstNameColumn() != null) {
+                columns.add(schema.firstNameColumn());
+                values.add(normalizedFirstName);
+            }
+            if (schema.lastNameColumn() != null) {
+                columns.add(schema.lastNameColumn());
+                values.add(normalizedLastName);
+            }
+            if (schema.emailColumn() != null) {
+                columns.add(schema.emailColumn());
+                values.add(normalizeOptional(request.email()));
+            }
+            if (schema.phoneColumn() != null) {
+                columns.add(schema.phoneColumn());
+                values.add(normalizeOptional(request.phone()));
+            }
+            if (schema.clientColumn() != null) {
+                columns.add(schema.clientColumn());
+                values.add(request.client());
+            }
+            if (schema.deletedColumn() != null) {
+                columns.add(schema.deletedColumn());
+                values.add(false);
+            }
+            Timestamp now = Timestamp.from(Instant.now());
+            if (schema.createdAtColumn() != null) {
+                columns.add(schema.createdAtColumn());
+                values.add(now);
+            }
+            if (schema.updatedAtColumn() != null) {
+                columns.add(schema.updatedAtColumn());
+                values.add(now);
+            }
+            columns.add(schema.tenantColumn());
+            values.add(request.shaleClientId());
+
+            String placeholders = String.join(", ", java.util.Collections.nCopies(columns.size(), "?"));
+            String joinedColumns = String.join(",\n  ", columns);
+            String sql = """
+                    INSERT INTO dbo.Contacts (
+                      %s
+                    )
+                    OUTPUT INSERTED.Id
+                    VALUES (%s);
+                    """.formatted(joinedColumns, placeholders);
+
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                int idx = 1;
+                for (Object value : values) {
+                    setStatementValue(ps, idx++, value);
+                }
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        throw new RuntimeException("Failed to create contact.");
+                    }
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to create contact", e);
+        }
+    }
+
     private ContactDetailRow findById(Connection con, int contactId, int shaleClientId) throws SQLException {
         ContactSchema schema = ContactSchema.load(con);
         logDetectedCoreColumns(schema);
@@ -551,6 +647,54 @@ public final class ContactDao {
         return true;
     }
 
+    private static String normalizeOptional(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String buildDisplayName(String firstName, String lastName) {
+        String first = normalizeOptional(firstName);
+        String last = normalizeOptional(lastName);
+        if (first == null) {
+            return last == null ? null : last;
+        }
+        if (last == null) {
+            return first;
+        }
+        return first + " " + last;
+    }
+
+    private static void setStatementValue(PreparedStatement ps, int index, Object value) throws SQLException {
+        if (value == null) {
+            ps.setObject(index, null);
+            return;
+        }
+        if (value instanceof String s) {
+            ps.setString(index, s);
+            return;
+        }
+        if (value instanceof Boolean b) {
+            ps.setBoolean(index, b);
+            return;
+        }
+        if (value instanceof Timestamp ts) {
+            ps.setTimestamp(index, ts);
+            return;
+        }
+        if (value instanceof LocalDate d) {
+            ps.setDate(index, Date.valueOf(d));
+            return;
+        }
+        if (value instanceof Integer i) {
+            ps.setInt(index, i);
+            return;
+        }
+        ps.setObject(index, value);
+    }
+
     private static String activeFilter(String deletedColumn, String alias) {
         if (deletedColumn == null || deletedColumn.isBlank()) {
             return "";
@@ -588,6 +732,7 @@ public final class ContactDao {
             String deceasedColumn,
             String clientColumn,
             String deletedColumn,
+            String createdAtColumn,
             String updatedAtColumn
     ) {
         private static ContactSchema load(Connection con) throws SQLException {
@@ -604,6 +749,7 @@ public final class ContactDao {
                     existingColumn(con, "Contacts", List.of("IsDeceased", "is_deceased")),
                     existingColumn(con, "Contacts", List.of("IsClient", "is_client")),
                     existingColumn(con, "Contacts", List.of("IsDeleted", "is_deleted")),
+                    existingColumn(con, "Contacts", List.of("CreatedAt", "created_at")),
                     existingColumn(con, "Contacts", List.of("UpdatedAt", "updated_at")));
         }
     }
