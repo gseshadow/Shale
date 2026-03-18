@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+    xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="com.shale.ui.controller.ContactsController" styleClass="app-shell">
+
+    <top>
+        <HBox spacing="10" styleClass="cases-filter-bar strong-panel">
+            <padding>
+                <Insets top="14" right="14" bottom="14" left="14" />
+            </padding>
+            <TextField fx:id="contactsSearchField"
+                promptText="Search contacts…" HBox.hgrow="ALWAYS" />
+        </HBox>
+    </top>
+
+    <center>
+        <StackPane>
+            <children>
+                <ScrollPane fx:id="contactsScroll" fitToWidth="true"
+                    pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
+                    <content>
+                        <FlowPane fx:id="contactsFlow" hgap="14" vgap="14"
+                            prefWrapLength="1040" styleClass="cases-content-surface glass-panel">
+                            <padding>
+                                <Insets top="14" right="14" bottom="14" left="14" />
+                            </padding>
+                        </FlowPane>
+                    </content>
+                </ScrollPane>
+
+                <Label fx:id="contactsEmptyStateLabel"
+                    text="No contacts to display yet."
+                    visible="false" managed="false" />
+            </children>
+        </StackPane>
+    </center>
+
+</BorderPane>

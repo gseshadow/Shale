@@ -2,10 +2,13 @@ package com.shale.ui.navigation;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
+import com.shale.ui.controller.ContactViewController;
+import com.shale.ui.controller.ContactsController;
 import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
 import com.shale.ui.controller.MyShaleController;
@@ -112,6 +115,16 @@ public final class SceneManager {
 		});
 	}
 
+	public Parent createContactsView(Consumer<Integer> onOpenContact) {
+		return load("/fxml/contacts.fxml", controller ->
+		{
+			ContactsController c = (ContactsController) controller;
+			ContactDao contactDao = new ContactDao(dbSessionProvider);
+			c.init(appState, contactDao, onOpenContact);
+			return c;
+		});
+	}
+
 	public Parent createTeamView(Consumer<Integer> onOpenUser) {
 		return load("/fxml/team.fxml", controller ->
 		{
@@ -130,6 +143,16 @@ public final class SceneManager {
 			UserController c = (UserController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			c.init(userId, userDao, appState);
+			return c;
+		});
+	}
+
+	public Parent createContactView(int contactId) {
+		return load("/fxml/contact.fxml", controller ->
+		{
+			ContactViewController c = (ContactViewController) controller;
+			ContactDao contactDao = new ContactDao(dbSessionProvider);
+			c.init(contactId, contactDao, appState);
 			return c;
 		});
 	}
@@ -251,9 +274,23 @@ public final class SceneManager {
 		// navigate to status manager / filter view / status editor
 	}
 
-	private void openContactProfile(Integer contactId) {
-		System.out.println("Navigate to Contact: " + contactId);
-		// TODO later: navigate to contacts page / contact detail
+	public void openContactProfile(Integer contactId) {
+		if (contactId == null || contactId <= 0) {
+			System.err.println("Ignoring contact navigation for invalid contactId: " + contactId);
+			return;
+		}
+
+		try {
+			Parent contactRoot = createContactView(contactId);
+			MainController mainController = resolveMainController();
+			if (mainController == null) {
+				System.err.println("Unable to navigate to contact profile; main controller is unavailable.");
+				return;
+			}
+			mainController.showContactView(contactId, contactRoot);
+		} catch (RuntimeException ex) {
+			System.err.println("Failed to open contact profile for contactId " + contactId + ": " + ex.getMessage());
+		}
 	}
 
 
