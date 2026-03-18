@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+	fx:controller="com.shale.ui.controller.UserController" spacing="12" styleClass="strong-panel">
+	<padding>
+		<Insets top="16" right="16" bottom="16" left="16" />
+	</padding>
+
+	<Label fx:id="userStubTitleLabel" text="User" styleClass="page-heading" />
+	<Label fx:id="userStubMessageLabel" wrapText="true"
+		text="User profile view is not implemented yet." />
+</VBox>
