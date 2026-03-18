@@ -7,47 +7,28 @@ import com.shale.ui.component.ContactCard;
 
 public class ContactCardFactory {
 
-    public enum Variant {
-        FULL, COMPACT, MINI
-    }
+	private final Consumer<Integer> onOpenContact;
 
-    public record ContactCardModel(
-            Integer contactId,
-            String displayName,
-            String role,
-            String email,
-            String phone
-    ) {
-    }
+	public ContactCardFactory(Consumer<Integer> onOpenContact) {
+		this.onOpenContact = onOpenContact;
+	}
 
-    private final Consumer<Integer> onOpenContact;
+	public ContactCard createMini(Integer contactId, String displayName) {
+		return create(contactId, displayName, ContactCard.Variant.MINI);
+	}
 
-    public ContactCardFactory(Consumer<Integer> onOpenContact) {
-        this.onOpenContact = onOpenContact;
-    }
+	public ContactCard createCompact(Integer contactId, String displayName) {
+		return create(contactId, displayName, ContactCard.Variant.COMPACT);
+	}
 
-    public ContactCard create(ContactCardModel model, Variant variant) {
-        Objects.requireNonNull(model, "model");
+	private ContactCard create(Integer contactId, String displayName, ContactCard.Variant variant) {
+		ContactCard card = new ContactCard(contactId, displayName, variant);
 
-        ContactCard card = new ContactCard();
-        card.setContactId(model.contactId());
-        card.setOnOpen(onOpenContact);
-        card.setName(model.displayName());
-        card.setRole(model.role());
-        card.setEmail(model.email());
-        card.setPhone(model.phone());
-        card.setBackgroundCssColor(null);
+		// ✅ only clickable when there's a real id + handler
+		if (contactId != null && onOpenContact != null) {
+			card.setOnOpen(onOpenContact);
+		}
 
-        switch (variant) {
-        case FULL -> card.applyFull();
-        case COMPACT -> card.applyCompact();
-        case MINI -> card.applyMini();
-        }
-
-        return card;
-    }
-
-    public ContactCard createMini(Integer contactId, String displayName) {
-        return create(new ContactCardModel(contactId, displayName, null, null, null), Variant.MINI);
-    }
+		return card;
+	}
 }

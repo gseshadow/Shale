@@ -153,7 +153,12 @@ public final class MainController {
 
 	@FXML
 	private void onNavContacts() {
-		showContactsList();
+		highlightNav(navContactsButton);
+		sectionTitleLabel.setText("Contacts");
+		sectionSubtitleLabel.setText("Manage clients, experts, and other contacts.");
+
+		Node contactsRoot = sceneManager.createContactsView(this::openContact);
+		sectionContent.getChildren().setAll(contactsRoot);
 	}
 
 	@FXML
@@ -220,8 +225,17 @@ public final class MainController {
 		sectionTitleLabel.setText("Case");
 		sectionSubtitleLabel.setText("Case #" + caseId);
 
-		Node caseRoot = sceneManager.createCaseView(caseId, this::openOrganization);
+		Node caseRoot = sceneManager.createCaseView(caseId, this::openContact);
 		sectionContent.getChildren().setAll(caseRoot);
+	}
+
+	public void openContact(int contactId) {
+		highlightNav(navContactsButton);
+		sectionTitleLabel.setText("Contact");
+		sectionSubtitleLabel.setText("Contact #" + contactId);
+
+		Node contactRoot = sceneManager.createContactView(contactId);
+		sectionContent.getChildren().setAll(contactRoot);
 	}
 
 

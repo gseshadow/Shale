@@ -8,6 +8,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public final class ContactDao {
@@ -31,6 +33,94 @@ public final class ContactDao {
 			boolean deleted,
 			Instant updatedAt
 	) {
+		public String displayName() {
+			String first = firstName == null ? "" : firstName.trim();
+			String last = lastName == null ? "" : lastName.trim();
+			String full = (first + " " + last).trim();
+			if (!full.isBlank()) {
+				return full;
+			}
+			if (name == null || name.isBlank()) {
+				return "—";
+			}
+			return name;
+		}
+	}
+
+	public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
+	}
+
+	/** page is 0-based */
+	public PagedResult<ContactRow> findPage(int page, int pageSize, String searchQuery) {
+		if (page < 0) {
+			throw new IllegalArgumentException("page must be >= 0");
+		}
+		if (pageSize <= 0) {
+			throw new IllegalArgumentException("pageSize must be > 0");
+		}
+
+		String normalizedSearch = normalizeSearch(searchQuery);
+		long total = countAll(normalizedSearch);
+		if (total == 0) {
+			return new PagedResult<>(List.of(), page, pageSize, 0);
+		}
+
+		int offset = page * pageSize;
+		String sql = """
+				SELECT
+				  c.Id,
+				  c.ShaleClientId,
+				  c.Name,
+				  c.FirstName,
+				  c.LastName,
+				  c.Email,
+				  c.Phone,
+				  c.IsDeleted,
+				  c.UpdatedAt
+				FROM %s c
+				WHERE c.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND (
+				    ? = ''
+				    OR COALESCE(c.Name, '') LIKE ?
+				    OR COALESCE(c.FirstName, '') LIKE ?
+				    OR COALESCE(c.LastName, '') LIKE ?
+				    OR COALESCE(c.Email, '') LIKE ?
+				    OR COALESCE(c.Phone, '') LIKE ?
+				  )
+				ORDER BY
+				  COALESCE(NULLIF(LTRIM(RTRIM(c.LastName)), ''), NULLIF(LTRIM(RTRIM(c.Name)), ''), '') ASC,
+				  COALESCE(NULLIF(LTRIM(RTRIM(c.FirstName)), ''), '') ASC,
+				  c.Id ASC
+				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
+				""".formatted(CONTACTS_TABLE);
+
+		List<ContactRow> items = new ArrayList<>(pageSize);
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int currentShaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			String likePattern = containsPattern(normalizedSearch);
+			ps.setInt(idx++, currentShaleClientId);
+			ps.setString(idx++, normalizedSearch);
+			ps.setString(idx++, likePattern);
+			ps.setString(idx++, likePattern);
+			ps.setString(idx++, likePattern);
+			ps.setString(idx++, likePattern);
+			ps.setString(idx++, likePattern);
+			ps.setInt(idx++, offset);
+			ps.setInt(idx++, pageSize);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					items.add(mapContact(rs));
+				}
+			}
+
+			return new PagedResult<>(items, page, pageSize, total);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load contacts page (page=" + page + ", pageSize=" + pageSize + ")", e);
+		}
 	}
 
 	public ContactRow findById(int contactId) {
@@ -58,8 +148,6 @@ public final class ContactDao {
 		try (Connection con = db.requireConnection();
 				 PreparedStatement ps = con.prepareStatement(sql)) {
 			int currentShaleClientId = requireCurrentShaleClientId(con);
-			System.out.println("[ContactDao.findById] requestedContactId=" + contactId
-					+ ", requestedShaleClientId=" + currentShaleClientId);
 
 			int idx = 1;
 			ps.setInt(idx++, contactId);
@@ -67,61 +155,68 @@ public final class ContactDao {
 
 			try (ResultSet rs = ps.executeQuery()) {
 				if (!rs.next()) {
-					System.out.println("[ContactDao.findById] rowReturned=false");
-					logExistenceDiagnostics(con, contactId, currentShaleClientId);
 					return null;
 				}
 
-				ContactRow row = new ContactRow(
-						rs.getInt("Id"),
-						rs.getInt("ShaleClientId"),
-						rs.getString("Name"),
-						rs.getString("FirstName"),
-						rs.getString("LastName"),
-						rs.getString("Email"),
-						rs.getString("Phone"),
-						toBoolean(rs.getObject("IsDeleted")),
-						toInstant(rs.getTimestamp("UpdatedAt"))
-				);
-
-				System.out.println("[ContactDao.findById] rowReturned=true, rowShaleClientId=" + row.shaleClientId());
-				return row;
+				return mapContact(rs);
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load contact by id (id=" + contactId + ")", e);
 		}
 	}
 
-	private void logExistenceDiagnostics(Connection con, int contactId, int currentShaleClientId) throws SQLException {
+	private long countAll(String normalizedSearch) {
 		String sql = """
-				SELECT
-				  CASE WHEN EXISTS (SELECT 1 FROM %s WHERE Id = ?) THEN 1 ELSE 0 END AS ExistsAny,
-				  CASE WHEN EXISTS (SELECT 1 FROM %s WHERE Id = ? AND ShaleClientId = ?) THEN 1 ELSE 0 END AS ExistsWithTenant,
-				  CASE WHEN EXISTS (
-				    SELECT 1
-				    FROM %s
-				    WHERE Id = ?
-				      AND ShaleClientId = ?
-				      AND (IsDeleted = 0 OR IsDeleted IS NULL)
-				  ) THEN 1 ELSE 0 END AS ExistsWithTenantAndActive;
-				""".formatted(CONTACTS_TABLE, CONTACTS_TABLE, CONTACTS_TABLE);
+				SELECT COUNT(*)
+				FROM %s c
+				WHERE c.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND (
+				    ? = ''
+				    OR COALESCE(c.Name, '') LIKE ?
+				    OR COALESCE(c.FirstName, '') LIKE ?
+				    OR COALESCE(c.LastName, '') LIKE ?
+				    OR COALESCE(c.Email, '') LIKE ?
+				    OR COALESCE(c.Phone, '') LIKE ?
+				  );
+				""".formatted(CONTACTS_TABLE);
 
-		try (PreparedStatement ps = con.prepareStatement(sql)) {
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int currentShaleClientId = requireCurrentShaleClientId(con);
 			int idx = 1;
-			ps.setInt(idx++, contactId);
-			ps.setInt(idx++, contactId);
+			String likePattern = containsPattern(normalizedSearch);
 			ps.setInt(idx++, currentShaleClientId);
-			ps.setInt(idx++, contactId);
-			ps.setInt(idx++, currentShaleClientId);
+			ps.setString(idx++, normalizedSearch);
+			ps.setString(idx++, likePattern);
+			ps.setString(idx++, likePattern);
+			ps.setString(idx++, likePattern);
+			ps.setString(idx++, likePattern);
+			ps.setString(idx++, likePattern);
 
 			try (ResultSet rs = ps.executeQuery()) {
 				if (rs.next()) {
-					System.out.println("[ContactDao.findById] diagnostics: existsAny=" + (rs.getInt("ExistsAny") == 1)
-							+ ", existsWithTenant=" + (rs.getInt("ExistsWithTenant") == 1)
-							+ ", existsWithTenantAndActive=" + (rs.getInt("ExistsWithTenantAndActive") == 1));
+					return rs.getLong(1);
 				}
+				return 0;
 			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to count contacts", e);
 		}
+	}
+
+	private static ContactRow mapContact(ResultSet rs) throws SQLException {
+		return new ContactRow(
+				rs.getInt("Id"),
+				rs.getInt("ShaleClientId"),
+				rs.getString("Name"),
+				rs.getString("FirstName"),
+				rs.getString("LastName"),
+				rs.getString("Email"),
+				rs.getString("Phone"),
+				toBoolean(rs.getObject("IsDeleted")),
+				toInstant(rs.getTimestamp("UpdatedAt"))
+		);
 	}
 
 	private static int requireCurrentShaleClientId(Connection con) throws SQLException {
@@ -143,6 +238,20 @@ public final class ContactDao {
 	private static Integer getNullableInt(ResultSet rs, int colIndex) throws SQLException {
 		int value = rs.getInt(colIndex);
 		return rs.wasNull() ? null : value;
+	}
+
+	private static String normalizeSearch(String searchQuery) {
+		if (searchQuery == null) {
+			return "";
+		}
+		return searchQuery.trim();
+	}
+
+	private static String containsPattern(String normalizedSearch) {
+		if (normalizedSearch == null || normalizedSearch.isBlank()) {
+			return "%";
+		}
+		return "%" + normalizedSearch + "%";
 	}
 
 	private static boolean toBoolean(Object value) {

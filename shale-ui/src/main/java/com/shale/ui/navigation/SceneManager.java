@@ -7,6 +7,7 @@ import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.ContactController;
+import com.shale.ui.controller.ContactsController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.ContactViewController;
 import com.shale.ui.controller.ContactsController;
@@ -115,6 +116,26 @@ public final class SceneManager {
 		});
 	}
 
+	public Parent createContactsView(Consumer<Integer> onOpenContact) {
+		return load("/fxml/contacts.fxml", controller ->
+		{
+			ContactsController c = (ContactsController) controller;
+			ContactDao contactDao = new ContactDao(dbSessionProvider);
+			c.init(contactDao, onOpenContact);
+			return c;
+		});
+	}
+
+	public Parent createContactView(int contactId) {
+		return load("/fxml/contact.fxml", controller ->
+		{
+			ContactController c = (ContactController) controller;
+			ContactDao contactDao = new ContactDao(dbSessionProvider);
+			c.init(contactId, contactDao);
+			return c;
+		});
+	}
+
 	public Parent createOrganizationView(int organizationId, Consumer<Integer> onOpenCase) {
 		return load("/fxml/organization.fxml", controller ->
 		{
@@ -136,7 +157,11 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
+	public Parent createCaseView(int caseId) {
+		return createCaseView(caseId, null);
+	}
+
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenContact) {
 		return load("/fxml/case.fxml", controller ->
 		{
 			CaseController c = (CaseController) controller;
@@ -147,8 +172,7 @@ public final class SceneManager {
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
-			c.setOnOpenContact(this::openContactProfile);
-			c.setOnOpenOrganization(onOpenOrganization);
+			c.setOnOpenContact(onOpenContact);
 			return c;
 		});
 	}
@@ -230,39 +254,6 @@ public final class SceneManager {
 		System.out.println("Navigate to Status: " + statusId);
 		// TODO later:
 		// navigate to status manager / filter view / status editor
-	}
-
-	private void openContactProfile(Integer contactId) {
-		System.out.println("[SceneManager.openContactProfile] requestedContactId=" + contactId);
-		if (contactId == null || contactId <= 0) {
-			System.out.println("[SceneManager.openContactProfile] ignored invalid contactId");
-			return;
-		}
-
-		try {
-			URL url = Objects.requireNonNull(getClass().getResource("/fxml/contact.fxml"), "Missing FXML: /fxml/contact.fxml");
-			FXMLLoader loader = new FXMLLoader(url);
-			Parent root = loader.load();
-
-			ContactController controller = loader.getController();
-			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			controller.init(contactId, contactDao);
-
-			Stage dialog = new Stage();
-			dialog.initOwner(stage);
-			dialog.initModality(Modality.WINDOW_MODAL);
-			dialog.setTitle("Contact #" + contactId);
-
-			Scene dialogScene = new Scene(root);
-			dialogScene.getStylesheets().add(Objects.requireNonNull(
-					getClass().getResource("/css/app.css")).toExternalForm());
-			dialog.setScene(dialogScene);
-			dialog.setMinWidth(760);
-			dialog.setMinHeight(520);
-			dialog.show();
-		} catch (IOException e) {
-			throw new RuntimeException("Failed to open contact detail", e);
-		}
 	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {

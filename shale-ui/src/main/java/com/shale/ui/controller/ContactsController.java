@@ -1,10 +1,13 @@
 package com.shale.ui.controller;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+
 import com.shale.data.dao.ContactDao;
-import com.shale.data.dao.ContactDao.DirectoryContactRow;
 import com.shale.ui.component.factory.ContactCardFactory;
-import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
-import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -13,190 +16,187 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
-
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.function.Consumer;
+import javafx.scene.layout.VBox;
 
 public final class ContactsController {
 
-    private static final ContactCardFactory.Variant CONTACTS_CARD_VARIANT = ContactCardFactory.Variant.FULL;
-    private static final double CONTACT_CARD_WIDTH = 340;
-    private static final double CONTACT_CARD_HEIGHT = 78;
+	@FXML
+	private TextField contactsSearchField;
+	@FXML
+	private ScrollPane contactsScroll;
+	@FXML
+	private FlowPane contactsFlow;
+	@FXML
+	private Label contactsEmptyStateLabel;
 
-    @FXML
-    private TextField contactsSearchField;
-    @FXML
-    private ScrollPane contactsScroll;
-    @FXML
-    private FlowPane contactsFlow;
-    @FXML
-    private Label contactsEmptyStateLabel;
+	private ContactDao contactDao;
+	private ContactCardFactory contactCardFactory;
+	private Consumer<Integer> onOpenContact;
 
-    private AppState appState;
-    private ContactDao contactDao;
-    private ContactCardFactory contactCardFactory;
-    private List<DirectoryContactRow> loadedContacts = List.of();
-    private String emptyStateMessage = "No contacts to display yet.";
-    private int loadGeneration = 0;
+	private int currentPage = 0;
+	private final int pageSize = 100;
+	private boolean loading = false;
+	private boolean hasMore = true;
+	private int loadGeneration = 0;
 
-    private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "contacts-directory-loader");
-        t.setDaemon(true);
-        return t;
-    });
+	private final List<ContactDao.ContactRow> loaded = new ArrayList<>();
 
-    public void init(AppState appState, ContactDao contactDao, Consumer<Integer> onOpenContact) {
-        this.appState = appState;
-        this.contactDao = contactDao;
-        this.contactCardFactory = new ContactCardFactory(onOpenContact == null ? id -> {
-        } : onOpenContact);
-    }
+	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
+		Thread t = new Thread(r, "contacts-loader");
+		t.setDaemon(true);
+		return t;
+	});
 
-    @FXML
-    private void initialize() {
-        if (contactsSearchField != null) {
-            contactsSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
-        }
-        if (contactsFlow != null) {
-            contactsFlow.setHgap(14);
-            contactsFlow.setVgap(14);
-            contactsFlow.setPrefWrapLength(1040);
-        }
+	public void init(ContactDao contactDao, Consumer<Integer> onOpenContact) {
+		this.contactDao = contactDao;
+		this.onOpenContact = onOpenContact;
+		this.contactCardFactory = new ContactCardFactory(this::openContact);
+	}
 
-        Platform.runLater(this::loadContacts);
-    }
+	@FXML
+	private void initialize() {
+		if (contactsSearchField != null) {
+			contactsSearchField.textProperty().addListener((obs, oldV, newV) -> loadFirstPage());
+		}
 
-    private void loadContacts() {
-        loadGeneration++;
-        final int generationAtSubmit = loadGeneration;
+		Platform.runLater(() -> {
+			if (contactDao == null) {
+				updateEmptyState(true);
+				return;
+			}
+			wireInfiniteScroll();
+			loadFirstPage();
+		});
+	}
 
-        if (contactDao == null) {
-            loadedContacts = List.of();
-            setEmptyStateMessage("Contacts are unavailable right now.");
-            rerender();
-            return;
-        }
+	private void wireInfiniteScroll() {
+		if (contactsScroll == null) {
+			return;
+		}
+		contactsScroll.vvalueProperty().addListener((obs, oldV, newV) -> {
+			if (newV != null && newV.doubleValue() >= 0.95) {
+				loadNextPage();
+			}
+		});
+	}
 
-        Integer tenantId = appState == null ? null : appState.getShaleClientId();
-        if (tenantId == null || tenantId <= 0) {
-            loadedContacts = List.of();
-            setEmptyStateMessage("No tenant is selected.");
-            rerender();
-            return;
-        }
+	private void loadFirstPage() {
+		loadGeneration++;
+		currentPage = 0;
+		loading = false;
+		hasMore = true;
+		loaded.clear();
 
-        dbExec.submit(() -> {
-            try {
-                List<DirectoryContactRow> contacts = new ArrayList<>(contactDao.listContactsForTenant(tenantId));
-                contacts.sort(Comparator.comparing((DirectoryContactRow row) -> safe(row.displayName()), String.CASE_INSENSITIVE_ORDER)
-                        .thenComparingInt(DirectoryContactRow::id));
+		if (contactsFlow != null) {
+			contactsFlow.getChildren().clear();
+		}
 
-                Platform.runLater(() -> {
-                    if (generationAtSubmit != loadGeneration) {
-                        return;
-                    }
-                    loadedContacts = List.copyOf(contacts);
-                    setEmptyStateMessage("No contacts to display yet.");
-                    rerender();
-                });
-            } catch (RuntimeException ex) {
-                Platform.runLater(() -> {
-                    if (generationAtSubmit != loadGeneration) {
-                        return;
-                    }
-                    loadedContacts = List.of();
-                    setEmptyStateMessage("Unable to load contacts.");
-                    rerender();
-                });
-            }
-        });
-    }
+		updateEmptyState(false);
+		loadNextPage();
+	}
 
-    private void rerender() {
-        if (contactsFlow == null) {
-            return;
-        }
+	private void loadNextPage() {
+		if (loading || !hasMore || contactDao == null) {
+			return;
+		}
 
-        List<DirectoryContactRow> filteredContacts = loadedContacts.stream()
-                .filter(Objects::nonNull)
-                .filter(this::matchesSearch)
-                .toList();
+		loading = true;
+		final int pageToLoad = currentPage;
+		final int generationAtSubmit = loadGeneration;
+		final String search = normalizedQuery();
 
-        List<Node> cards = filteredContacts.stream()
-                .map(this::buildCard)
-                .toList();
+		dbExec.submit(() -> {
+			try {
+				ContactDao.PagedResult<ContactDao.ContactRow> page = contactDao.findPage(pageToLoad, pageSize, search);
+				Platform.runLater(() -> {
+					if (generationAtSubmit != loadGeneration) {
+						loading = false;
+						return;
+					}
 
-        contactsFlow.getChildren().setAll(cards);
+					loaded.addAll(page.items());
+					currentPage++;
+					hasMore = loaded.size() < page.total();
+					loading = false;
+					rerender();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> {
+					if (generationAtSubmit != loadGeneration) {
+						return;
+					}
+					loading = false;
+					updateEmptyState(loaded.isEmpty());
+				});
+			}
+		});
+	}
 
-        boolean empty = cards.isEmpty();
-        String query = normalizedQuery();
-        if (empty && !query.isBlank() && !loadedContacts.isEmpty()) {
-            setEmptyStateMessage("No contacts match your search.");
-        } else if (empty && loadedContacts.isEmpty()) {
-            setEmptyStateMessage(emptyStateMessage);
-        }
-        updateEmptyState(empty);
-    }
+	private void rerender() {
+		if (contactsFlow == null) {
+			return;
+		}
 
-    private Node buildCard(DirectoryContactRow row) {
-        String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
-        var card = contactCardFactory.create(new ContactCardModel(
-                row.id(),
-                displayName,
-                null,
-                row.email(),
-                row.phone()), CONTACTS_CARD_VARIANT);
-        card.setMinHeight(CONTACT_CARD_HEIGHT);
-        card.setPrefHeight(CONTACT_CARD_HEIGHT);
-        card.setPrefWidth(CONTACT_CARD_WIDTH);
-        card.setMaxWidth(CONTACT_CARD_WIDTH);
-        return card;
-    }
+		List<Node> cards = loaded.stream()
+				.map(this::buildCard)
+				.toList();
 
-    private boolean matchesSearch(DirectoryContactRow row) {
-        String query = normalizedQuery();
-        if (query.isBlank()) {
-            return true;
-        }
+		contactsFlow.getChildren().setAll(cards);
+		updateEmptyState(cards.isEmpty());
+	}
 
-        String displayName = safe(row.displayName()).toLowerCase(Locale.ROOT);
-        String email = safe(row.email()).toLowerCase(Locale.ROOT);
-        String phone = safe(row.phone()).toLowerCase(Locale.ROOT);
-        return displayName.contains(query) || email.contains(query) || phone.contains(query);
-    }
+	private Node buildCard(ContactDao.ContactRow row) {
+		VBox container = new VBox(6);
+		container.getChildren().add(contactCardFactory.createCompact(row.id(), row.displayName()));
 
-    private void updateEmptyState(boolean empty) {
-        if (contactsEmptyStateLabel != null) {
-            contactsEmptyStateLabel.setVisible(empty);
-            contactsEmptyStateLabel.setManaged(empty);
-        }
-        if (contactsScroll != null) {
-            contactsScroll.setVisible(!empty);
-            contactsScroll.setManaged(!empty);
-        }
-    }
+		Label subtext = new Label(composeSubtext(row));
+		subtext.setWrapText(true);
+		subtext.setStyle("-fx-opacity: 0.75;");
+		container.getChildren().add(subtext);
 
-    private void setEmptyStateMessage(String message) {
-        emptyStateMessage = safe(message);
-        if (contactsEmptyStateLabel != null) {
-            contactsEmptyStateLabel.setText(emptyStateMessage);
-        }
-    }
+		container.getStyleClass().add("secondary-panel");
+		container.setPrefWidth(280);
+		return container;
+	}
 
-    private String normalizedQuery() {
-        if (contactsSearchField == null || contactsSearchField.getText() == null) {
-            return "";
-        }
-        return contactsSearchField.getText().trim().toLowerCase(Locale.ROOT);
-    }
+	private static String composeSubtext(ContactDao.ContactRow row) {
+		List<String> parts = new ArrayList<>(2);
+		if (row.email() != null && !row.email().isBlank()) {
+			parts.add(row.email().trim());
+		}
+		if (row.phone() != null && !row.phone().isBlank()) {
+			parts.add(row.phone().trim());
+		}
+		if (parts.isEmpty()) {
+			return "No email or phone";
+		}
+		return String.join(" • ", parts);
+	}
 
-    private static String safe(String value) {
-        return value == null ? "" : value;
-    }
+	private void updateEmptyState(boolean empty) {
+		if (contactsEmptyStateLabel != null) {
+			contactsEmptyStateLabel.setVisible(empty);
+			contactsEmptyStateLabel.setManaged(empty);
+		}
+		if (contactsScroll != null) {
+			contactsScroll.setVisible(!empty);
+			contactsScroll.setManaged(!empty);
+		}
+	}
+
+	private String normalizedQuery() {
+		if (contactsSearchField == null || contactsSearchField.getText() == null) {
+			return "";
+		}
+		return contactsSearchField.getText().trim();
+	}
+
+	private void openContact(Integer contactId) {
+		if (contactId == null) {
+			return;
+		}
+		if (onOpenContact != null) {
+			onOpenContact.accept(contactId);
+		}
+	}
 }

@@ -18,7 +18,6 @@ public final class ContactController {
 	@FXML private Label nameValue;
 	@FXML private Label emailValue;
 	@FXML private Label phoneValue;
-	@FXML private Label tenantValue;
 	@FXML private Label lastUpdatedValue;
 
 	private Integer contactId;
@@ -34,7 +33,6 @@ public final class ContactController {
 	public void init(int contactId, ContactDao contactDao) {
 		this.contactId = contactId;
 		this.contactDao = contactDao;
-		System.out.println("[ContactController.init] contactId=" + contactId);
 		Platform.runLater(this::loadContact);
 	}
 
@@ -44,7 +42,6 @@ public final class ContactController {
 			return;
 		}
 
-		System.out.println("[ContactController.loadContact] contactId=" + contactId);
 		dbExec.submit(() -> {
 			try {
 				ContactDao.ContactRow loaded = contactDao.findById(contactId);
@@ -68,7 +65,7 @@ public final class ContactController {
 			return;
 		}
 
-		String displayName = buildDisplayName(currentContact);
+		String displayName = currentContact.displayName();
 		if (contactTitleLabel != null) {
 			contactTitleLabel.setText(displayName);
 		}
@@ -80,9 +77,6 @@ public final class ContactController {
 		}
 		if (phoneValue != null) {
 			phoneValue.setText(fallback(currentContact.phone()));
-		}
-		if (tenantValue != null) {
-			tenantValue.setText(Integer.toString(currentContact.shaleClientId()));
 		}
 		if (lastUpdatedValue != null) {
 			if (currentContact.updatedAt() == null) {
@@ -109,16 +103,6 @@ public final class ContactController {
 			errorLabel.setVisible(false);
 			errorLabel.setManaged(false);
 		}
-	}
-
-	private static String buildDisplayName(ContactDao.ContactRow row) {
-		String first = row.firstName() == null ? "" : row.firstName().trim();
-		String last = row.lastName() == null ? "" : row.lastName().trim();
-		String full = (first + " " + last).trim();
-		if (!full.isBlank()) {
-			return full;
-		}
-		return fallback(row.name());
 	}
 
 	private static String fallback(String value) {

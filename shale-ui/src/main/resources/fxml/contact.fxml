@@ -45,11 +45,8 @@
                 <Label text="Phone:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
                 <Label fx:id="phoneValue" text="—" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1" />
 
-                <Label text="Tenant (debug):" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
-                <Label fx:id="tenantValue" text="—" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-
-                <Label text="Updated:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
-                <Label fx:id="lastUpdatedValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+                <Label text="Updated:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
+                <Label fx:id="lastUpdatedValue" text="—" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" />
             </GridPane>
         </VBox>
     </center>
