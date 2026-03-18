@@ -127,8 +127,7 @@ public final class SceneManager {
 		{
 			UserController c = (UserController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
-			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(userId, userDao, organizationDao, appState);
+			c.init(userId, userDao, appState);
 			return c;
 		});
 	}
