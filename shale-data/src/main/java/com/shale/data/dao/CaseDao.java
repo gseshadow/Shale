@@ -1559,21 +1559,15 @@ public final class CaseDao {
 				LEFT JOIN OrganizationTypes ot
 				  ON ot.OrganizationTypeId = o.OrganizationTypeId
 				 AND ot.ShaleClientId = o.ShaleClientId
-				LEFT JOIN CaseOrganizations co
-				  ON co.OrganizationId = o.Id
-				 AND co.CaseId = ?
 				WHERE o.ShaleClientId = ?
 				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-				  AND co.OrganizationId IS NULL
 				ORDER BY o.Name ASC, o.Id ASC;
 				""";
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			int shaleClientId = requireCurrentShaleClientId(con);
-			int idx = 1;
-			ps.setLong(idx++, caseId);
-			ps.setInt(idx++, shaleClientId);
+			ps.setInt(1, shaleClientId);
 
 			List<SelectableOrganizationRow> out = new ArrayList<>();
 			try (ResultSet rs = ps.executeQuery()) {
