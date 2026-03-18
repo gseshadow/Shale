@@ -185,7 +185,8 @@ public final class SceneManager {
 
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(caseId, caseDao, organizationDao, appState, runtimeBridge);
+			ContactDao contactDao = new ContactDao(dbSessionProvider);
+			c.init(caseId, caseDao, organizationDao, contactDao, appState, runtimeBridge);
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
