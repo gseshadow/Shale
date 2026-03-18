@@ -13,9 +13,13 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 public final class ContactDao {
+
+    public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
+    }
 
     public record DirectoryContactRow(
             int id,
@@ -111,6 +115,89 @@ public final class ContactDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to list contacts for tenant (clientId=" + shaleClientId + ")", e);
+        }
+    }
+
+    public PagedResult<DirectoryContactRow> findDirectoryContactsPage(int shaleClientId, int page, int pageSize, String searchQuery) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (page < 0) {
+            throw new IllegalArgumentException("page must be >= 0");
+        }
+        if (pageSize <= 0) {
+            throw new IllegalArgumentException("pageSize must be > 0");
+        }
+
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+
+            ContactSchema schema = ContactSchema.load(con);
+            logDetectedCoreColumns(schema);
+
+            long total = countDirectoryContacts(con, schema, shaleClientId, searchQuery);
+            if (total == 0) {
+                return new PagedResult<>(List.of(), page, pageSize, 0);
+            }
+
+            String searchClause = searchClause(schema, "c");
+            String sql = """
+                    SELECT
+                      c.Id,
+                      %s AS DisplayName,
+                      %s,
+                      %s
+                    FROM dbo.Contacts c
+                    WHERE c.%s = ?
+                      AND NULLIF(LTRIM(RTRIM(%s)), '') IS NOT NULL
+                    %s
+                    %s
+                    ORDER BY DisplayName ASC, c.Id ASC
+                    OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
+                    """.formatted(
+                    displayNameExpression(schema, "c"),
+                    optionalColumnExpression(schema.emailColumn(), "c", "Email"),
+                    optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    schema.tenantColumn(),
+                    displayNameExpression(schema, "c"),
+                    activeFilter(schema.deletedColumn(), "c"),
+                    searchClause);
+
+            List<DirectoryContactRow> out = new ArrayList<>(pageSize);
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                int idx = 1;
+                idx = bindDirectoryQuery(ps, idx, shaleClientId, schema, searchQuery);
+                ps.setInt(idx++, page * pageSize);
+                ps.setInt(idx, pageSize);
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(new DirectoryContactRow(
+                                rs.getInt("Id"),
+                                rs.getString("DisplayName"),
+                                rs.getString("Email"),
+                                rs.getString("Phone")));
+                    }
+                }
+            }
+            return new PagedResult<>(List.copyOf(out), page, pageSize, total);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load contacts page for tenant (clientId=" + shaleClientId + ", page=" + page + ")", e);
+        }
+    }
+
+    public long countDirectoryContacts(int shaleClientId, String searchQuery) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+            ContactSchema schema = ContactSchema.load(con);
+            logDetectedCoreColumns(schema);
+            return countDirectoryContacts(con, schema, shaleClientId, searchQuery);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to count contacts for tenant (clientId=" + shaleClientId + ")", e);
         }
     }
 
@@ -381,6 +468,74 @@ public final class ContactDao {
             return "CAST(NULL AS DATETIME2) AS UpdatedAt";
         }
         return alias + "." + column + " AS UpdatedAt";
+    }
+
+    private static String searchClause(ContactSchema schema, String alias) {
+        return """
+                  AND (
+                    ? = ''
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                  )
+                """.formatted(
+                displayNameExpression(schema, alias),
+                coreTextExpression(schema.emailColumn(), alias),
+                coreTextExpression(schema.phoneColumn(), alias));
+    }
+
+    private static int bindDirectoryQuery(PreparedStatement ps,
+                                          int idx,
+                                          int shaleClientId,
+                                          ContactSchema schema,
+                                          String searchQuery) throws SQLException {
+        ps.setInt(idx++, shaleClientId);
+        String normalizedSearch = normalizeSearchQuery(searchQuery);
+        String likeValue = likeParameter(normalizedSearch);
+        ps.setString(idx++, normalizedSearch);
+        ps.setString(idx++, likeValue);
+        ps.setString(idx++, likeValue);
+        ps.setString(idx++, likeValue);
+        return idx;
+    }
+
+    private static long countDirectoryContacts(Connection con,
+                                               ContactSchema schema,
+                                               int shaleClientId,
+                                               String searchQuery) throws SQLException {
+        String sql = """
+                SELECT COUNT_BIG(*)
+                FROM dbo.Contacts c
+                WHERE c.%s = ?
+                  AND NULLIF(LTRIM(RTRIM(%s)), '') IS NOT NULL
+                %s
+                %s;
+                """.formatted(
+                schema.tenantColumn(),
+                displayNameExpression(schema, "c"),
+                activeFilter(schema.deletedColumn(), "c"),
+                searchClause(schema, "c"));
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            bindDirectoryQuery(ps, 1, shaleClientId, schema, searchQuery);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return 0;
+                }
+                return rs.getLong(1);
+            }
+        }
+    }
+
+    private static String normalizeSearchQuery(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String likeParameter(String normalizedQuery) {
+        return "%" + normalizedQuery + "%";
     }
 
     private static boolean appendAssignment(StringBuilder sql, boolean hasAssignments, String column) {

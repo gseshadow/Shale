@@ -41,6 +41,10 @@
                 <Label fx:id="contactsEmptyStateLabel"
                     text="No contacts to display yet."
                     visible="false" managed="false" />
+
+                <Label fx:id="contactsLoadingStateLabel"
+                    text="Loading contacts…"
+                    visible="false" managed="false" />
             </children>
         </StackPane>
     </center>
