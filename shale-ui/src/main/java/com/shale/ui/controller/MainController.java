@@ -153,12 +153,7 @@ public final class MainController {
 
 	@FXML
 	private void onNavContacts() {
-		highlightNav(navContactsButton);
-		sectionTitleLabel.setText("Contacts");
-		sectionSubtitleLabel.setText("Manage clients, experts, and other contacts.");
-
-		Node contactsRoot = sceneManager.createContactsView(this::openContact);
-		sectionContent.getChildren().setAll(contactsRoot);
+		showContactsList();
 	}
 
 	@FXML
@@ -259,6 +254,15 @@ public final class MainController {
 		sectionTitleLabel.setText("Contact");
 		sectionSubtitleLabel.setText("Contact #" + contactId);
 		sectionContent.getChildren().setAll(contactRoot);
+	}
+
+	private void showContactsList() {
+		highlightNav(navContactsButton);
+		sectionTitleLabel.setText("Contacts");
+		sectionSubtitleLabel.setText("Manage clients, experts, and other contacts.");
+
+		Node contactsRoot = sceneManager.createContactsView(this::openContact);
+		sectionContent.getChildren().setAll(contactsRoot);
 	}
 
 	private void showOrganizationsList() {
