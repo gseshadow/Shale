@@ -92,9 +92,17 @@ public final class CaseDao {
 			int id,
 			String displayName,
 			Integer roleId,
+			String roleName,
 			boolean primary,
 			String email,
 			String phone
+	) {
+	}
+
+	public record CaseContactRoleOption(
+			int id,
+			String name,
+			String description
 	) {
 	}
 
@@ -1516,6 +1524,7 @@ public final class CaseDao {
 				    END
 				  )) AS DisplayName,
 				  cc.Role AS RoleId,
+				  NULLIF(LTRIM(RTRIM(COALESCE(r.Name, ''))), '') AS RoleName,
 				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
 				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
 				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
@@ -1524,6 +1533,9 @@ public final class CaseDao {
 				  ON c.Id = cc.CaseId
 				INNER JOIN dbo.Contacts ct
 				  ON ct.Id = cc.ContactId
+				LEFT JOIN dbo.Roles r
+				  ON r.Id = cc.Role
+				 AND r.ShaleClientId = c.ShaleClientId
 				WHERE cc.CaseId = ?
 				  AND c.ShaleClientId = ?
 				  AND ct.ShaleClientId = ?
@@ -1567,6 +1579,7 @@ public final class CaseDao {
 							rs.getInt("Id"),
 							rs.getString("DisplayName"),
 							(Integer) rs.getObject("RoleId"),
+							rs.getString("RoleName"),
 							rs.getBoolean("IsPrimary"),
 							rs.getString("Email"),
 							rs.getString("Phone")));
@@ -1576,6 +1589,37 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related contacts for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public List<CaseContactRoleOption> findActiveCaseContactRoles() {
+		String sql = """
+				SELECT
+				  r.Id,
+				  r.Name,
+				  r.Description
+				FROM dbo.Roles r
+				WHERE r.ShaleClientId = ?
+				  AND r.IsActive = 1
+				ORDER BY r.Name ASC, r.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			ps.setInt(1, shaleClientId);
+			List<CaseContactRoleOption> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new CaseContactRoleOption(
+						rs.getInt("Id"),
+						rs.getString("Name"),
+						rs.getString("Description")));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load active case contact roles", e);
 		}
 	}
 
@@ -1657,12 +1701,15 @@ public final class CaseDao {
 		}
 	}
 
-	public boolean linkContactToCase(long caseId, int contactId) {
+	public boolean linkContactToCase(long caseId, int contactId, int roleId) {
 		if (caseId <= 0) {
 			throw new IllegalArgumentException("caseId must be > 0");
 		}
 		if (contactId <= 0) {
 			throw new IllegalArgumentException("contactId must be > 0");
+		}
+		if (roleId <= 0) {
+			throw new IllegalArgumentException("roleId must be > 0");
 		}
 
 		String sql = """
@@ -1670,7 +1717,6 @@ public final class CaseDao {
 				  CaseId,
 				  ContactId,
 				  Role,
-				  Side,
 				  IsPrimary,
 				  Notes,
 				  AddedAt,
@@ -1680,8 +1726,7 @@ public final class CaseDao {
 				SELECT
 				  ?,
 				  ?,
-				  NULL,
-				  NULL,
+				  ?,
 				  0,
 				  NULL,
 				  SYSUTCDATETIME(),
@@ -1701,6 +1746,13 @@ public final class CaseDao {
 				      AND ct.ShaleClientId = ?
 				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 				)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.Roles r
+				    WHERE r.Id = ?
+				      AND r.ShaleClientId = ?
+				      AND r.IsActive = 1
+				)
 				  AND NOT EXISTS (
 				    SELECT 1
 				    FROM dbo.CaseContacts cc
@@ -1715,15 +1767,18 @@ public final class CaseDao {
 			int idx = 1;
 			ps.setLong(idx++, caseId);
 			ps.setInt(idx++, contactId);
+			ps.setInt(idx++, roleId);
 			ps.setLong(idx++, caseId);
 			ps.setInt(idx++, shaleClientId);
 			ps.setInt(idx++, contactId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, roleId);
 			ps.setInt(idx++, shaleClientId);
 			ps.setLong(idx++, caseId);
 			ps.setInt(idx++, contactId);
 			return ps.executeUpdate() > 0;
 		} catch (SQLException e) {
-			throw new RuntimeException("Failed to link contact to case (caseId=" + caseId + ", contactId=" + contactId + ")", e);
+			throw new RuntimeException("Failed to link contact to case (caseId=" + caseId + ", contactId=" + contactId + ", roleId=" + roleId + ")", e);
 		}
 	}
 
