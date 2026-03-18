@@ -9,12 +9,14 @@ import com.shale.data.dao.UserDao.UserRoleRow;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.ColorUtil;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ColorPicker;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -24,6 +26,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.stage.Window;
 
 import java.util.List;
@@ -32,6 +35,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class UserController {
+
+	private static final Color DEFAULT_USER_COLOR = Color.WHITE;
+	private static final String COLOR_SWATCH_BASE_STYLE = "-fx-min-width: 22px; -fx-pref-width: 22px; -fx-max-width: 22px; "
+			+ "-fx-min-height: 22px; -fx-pref-height: 22px; -fx-max-height: 22px; "
+			+ "-fx-background-radius: 11px; -fx-border-radius: 11px; "
+			+ "-fx-border-color: rgba(0,0,0,0.18); -fx-border-width: 1px;";
 
 	@FXML private Label userTitleLabel;
 	@FXML private Label userSubtitleLabel;
@@ -55,6 +64,12 @@ public final class UserController {
 	@FXML private TextField phoneEditor;
 	@FXML private Label initialsValue;
 	@FXML private TextField initialsEditor;
+	@FXML private HBox colorValueContainer;
+	@FXML private Region colorPreview;
+	@FXML private Label colorValue;
+	@FXML private HBox colorEditorContainer;
+	@FXML private ColorPicker colorEditor;
+	@FXML private Label colorEditorValue;
 	@FXML private Label defaultOrganizationValue;
 	@FXML private ComboBox<OrganizationOptionRow> defaultOrganizationEditor;
 
@@ -67,6 +82,7 @@ public final class UserController {
 	private List<UserRoleRow> assignableRoles = List.of();
 	private List<OrganizationOptionRow> defaultOrganizationOptions = List.of();
 	private boolean editMode;
+	private boolean colorEditedInSession;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "user-detail-loader");
@@ -96,6 +112,7 @@ public final class UserController {
 			addRoleButton.setOnAction(e -> onAddRole());
 		}
 		configureDefaultOrganizationEditor();
+		configureColorEditor();
 
 		setEditMode(false);
 		Platform.runLater(this::loadUser);
@@ -215,6 +232,7 @@ public final class UserController {
 				safeText(emailEditor == null ? null : emailEditor.getText()),
 				safeText(phoneEditor == null ? null : phoneEditor.getText()),
 				safeText(initialsEditor == null ? null : initialsEditor.getText()),
+				selectedStoredColor(),
 				selectedOrganizationId());
 
 		setBusy(true);
@@ -368,6 +386,7 @@ public final class UserController {
 		setLabel(emailValue, currentUser.email());
 		setLabel(phoneValue, currentUser.phone());
 		setLabel(initialsValue, currentUser.initials());
+		renderColorValue(currentUser.color());
 		setLabel(defaultOrganizationValue, defaultOrganizationDisplay(currentUser));
 		writeEditorsFromCurrent();
 		refreshActionVisibility();
@@ -431,6 +450,7 @@ public final class UserController {
 		if (initialsEditor != null) {
 			initialsEditor.setText(safeText(currentUser.initials()));
 		}
+		setEditorColor(currentUser.color());
 		selectDefaultOrganization(currentUser.defaultOrganizationId());
 	}
 
@@ -443,6 +463,7 @@ public final class UserController {
 		toggleEditableField(emailValue, emailEditor, this.editMode);
 		toggleEditableField(phoneValue, phoneEditor, this.editMode);
 		toggleEditableField(initialsValue, initialsEditor, this.editMode);
+		toggleEditableField(colorValueContainer, colorEditorContainer, this.editMode);
 		toggleEditableField(defaultOrganizationValue, defaultOrganizationEditor, this.editMode);
 	}
 
@@ -481,6 +502,9 @@ public final class UserController {
 		}
 		if (initialsEditor != null) {
 			initialsEditor.setDisable(busy);
+		}
+		if (colorEditor != null) {
+			colorEditor.setDisable(busy);
 		}
 		if (defaultOrganizationEditor != null) {
 			defaultOrganizationEditor.setDisable(busy);
@@ -549,6 +573,20 @@ public final class UserController {
 		refreshDefaultOrganizationOptions();
 	}
 
+	private void configureColorEditor() {
+		if (colorPreview != null) {
+			colorPreview.setStyle(COLOR_SWATCH_BASE_STYLE + " -fx-background-color: white;");
+		}
+		if (colorEditor != null) {
+			colorEditor.setValue(DEFAULT_USER_COLOR);
+			colorEditor.setOnAction(e -> {
+				colorEditedInSession = true;
+				updateColorEditorValueLabel(colorEditor.getValue());
+			});
+		}
+		updateColorEditorValueLabel(colorEditor == null ? DEFAULT_USER_COLOR : colorEditor.getValue());
+	}
+
 	private void refreshDefaultOrganizationOptions() {
 		if (defaultOrganizationEditor == null) {
 			return;
@@ -580,7 +618,45 @@ public final class UserController {
 		return selected == null ? null : selected.organizationId();
 	}
 
-	private static void toggleEditableField(Label valueNode, Node editorNode, boolean editMode) {
+	private void renderColorValue(String storedColor) {
+		if (colorValue != null) {
+			colorValue.setText(ColorUtil.toDisplayValue(storedColor));
+		}
+		updateColorPreview(colorPreview, ColorUtil.toFxColor(storedColor));
+	}
+
+	private void setEditorColor(String storedColor) {
+		colorEditedInSession = false;
+		Color fxColor = ColorUtil.toFxColor(storedColor);
+		if (colorEditor != null) {
+			colorEditor.setValue(fxColor);
+		}
+		updateColorEditorValueLabel(fxColor);
+	}
+
+	private void updateColorEditorValueLabel(Color color) {
+		if (colorEditorValue != null) {
+			colorEditorValue.setText(color == null ? "—" : "#" + ColorUtil.toStoredColor(color));
+		}
+	}
+
+	private String selectedStoredColor() {
+		if (!colorEditedInSession && currentUser != null) {
+			return currentUser.color();
+		}
+		Color selected = colorEditor == null ? DEFAULT_USER_COLOR : colorEditor.getValue();
+		return ColorUtil.toStoredColor(selected == null ? DEFAULT_USER_COLOR : selected);
+	}
+
+	private static void updateColorPreview(Region preview, Color color) {
+		if (preview == null) {
+			return;
+		}
+		Color resolved = color == null ? DEFAULT_USER_COLOR : color;
+		preview.setStyle(COLOR_SWATCH_BASE_STYLE + " -fx-background-color: " + ColorUtil.toCssBackgroundColor(ColorUtil.toStoredColor(resolved)) + ";");
+	}
+
+	private static void toggleEditableField(Node valueNode, Node editorNode, boolean editMode) {
 		setVisibleManaged(valueNode, !editMode);
 		setVisibleManaged(editorNode, editMode);
 	}
