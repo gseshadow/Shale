@@ -3,6 +3,7 @@ package com.shale.ui.navigation;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.data.dao.UserDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.LoginController;
@@ -12,6 +13,8 @@ import com.shale.ui.controller.NewIntakeController;
 import com.shale.ui.controller.NewOrganizationController;
 import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
+import com.shale.ui.controller.TeamController;
+import com.shale.ui.controller.UserController;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -105,6 +108,27 @@ public final class SceneManager {
 			OrganizationsController c = (OrganizationsController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
 			c.init(appState, runtimeBridge, organizationDao, onOpenOrganization, this);
+			return c;
+		});
+	}
+
+	public Parent createTeamView(Consumer<Integer> onOpenUser) {
+		return load("/fxml/team.fxml", controller ->
+		{
+			TeamController c = (TeamController) controller;
+			UserDao userDao = new UserDao(dbSessionProvider);
+			c.init(appState, userDao, onOpenUser);
+			return c;
+		});
+	}
+
+	public Parent createUserView(int userId) {
+		return load("/fxml/user.fxml", controller ->
+		{
+			UserController c = (UserController) controller;
+			UserDao userDao = new UserDao(dbSessionProvider);
+			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
+			c.init(userId, userDao, organizationDao, appState);
 			return c;
 		});
 	}

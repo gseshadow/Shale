@@ -43,6 +43,9 @@ public final class OrganizationDao {
 	public record OrganizationTypeRow(int organizationTypeId, String name) {
 	}
 
+	public record OrganizationOptionRow(Integer organizationId, String name) {
+	}
+
 	public record OrganizationCreateRequest(
 			int shaleClientId,
 			int organizationTypeId,
@@ -591,6 +594,31 @@ public final class OrganizationDao {
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load organization types", e);
+		}
+	}
+
+	public List<OrganizationOptionRow> findSelectableOrganizations() {
+		String sql = """
+				SELECT o.Id, o.Name
+				FROM %s o
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				ORDER BY o.Name ASC, o.Id ASC;
+				""".formatted(ORGANIZATIONS_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, requireCurrentShaleClientId(con));
+
+			List<OrganizationOptionRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new OrganizationOptionRow(getNullableInt(rs, "Id"), rs.getString("Name")));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load organization options", e);
 		}
 	}
 
