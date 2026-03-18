@@ -47,6 +47,7 @@ public class ContactCard extends StackPane {
 			setCursor(Cursor.HAND);
 			setOnMouseClicked(e ->
 			{
+				System.out.println("[ContactCard] click contactId=" + contactId);
 				if (onOpen != null) {
 					onOpen.accept(contactId);
 				}

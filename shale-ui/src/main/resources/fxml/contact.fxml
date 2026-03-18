@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.shale.ui.controller.ContactController"
+            styleClass="app-shell">
+
+    <top>
+        <VBox spacing="6.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets top="10" right="12" bottom="8" left="12" />
+            </padding>
+            <Label fx:id="contactTitleLabel" text="Contact" style="-fx-font-size: 18px; -fx-font-weight: bold;" />
+            <Label text="Contact details" style="-fx-opacity: 0.7;" />
+        </VBox>
+    </top>
+
+    <center>
+        <VBox spacing="10" styleClass="case-main-surface" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets top="12" right="12" bottom="12" left="12" />
+            </padding>
+
+            <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
+
+            <GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
+                <columnConstraints>
+                    <ColumnConstraints minWidth="140" prefWidth="170" />
+                    <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
+                </columnConstraints>
+
+                <Label text="Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
+                <Label fx:id="nameValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+
+                <Label text="Email:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
+                <Label fx:id="emailValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+
+                <Label text="Phone:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
+                <Label fx:id="phoneValue" text="—" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+
+                <Label text="Tenant (debug):" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
+                <Label fx:id="tenantValue" text="—" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+
+                <Label text="Updated:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
+                <Label fx:id="lastUpdatedValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+            </GridPane>
+        </VBox>
+    </center>
+
+</BorderPane>

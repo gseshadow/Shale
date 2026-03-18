@@ -2,13 +2,16 @@ package com.shale.ui.navigation;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.controller.CaseController;
+import com.shale.ui.controller.ContactController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
 import com.shale.ui.controller.MyShaleController;
 import com.shale.ui.controller.NewIntakeController;
+import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -97,12 +100,22 @@ public final class SceneManager {
 	}
 
 
-	public Parent createOrganizationsView() {
+	public Parent createOrganizationsView(Consumer<Integer> onOpenOrganization) {
 		return load("/fxml/organizations.fxml", controller ->
 		{
 			OrganizationsController c = (OrganizationsController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(appState, runtimeBridge, organizationDao);
+			c.init(appState, runtimeBridge, organizationDao, onOpenOrganization);
+			return c;
+		});
+	}
+
+	public Parent createOrganizationView(int organizationId, Consumer<Integer> onOpenCase) {
+		return load("/fxml/organization.fxml", controller ->
+		{
+			OrganizationController c = (OrganizationController) controller;
+			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
+			c.init(organizationId, organizationDao, appState, runtimeBridge, onOpenCase);
 			return c;
 		});
 	}
@@ -173,8 +186,36 @@ public final class SceneManager {
 	}
 
 	private void openContactProfile(Integer contactId) {
-		System.out.println("Navigate to Contact: " + contactId);
-		// TODO later: navigate to contacts page / contact detail
+		System.out.println("[SceneManager.openContactProfile] requestedContactId=" + contactId);
+		if (contactId == null || contactId <= 0) {
+			System.out.println("[SceneManager.openContactProfile] ignored invalid contactId");
+			return;
+		}
+
+		try {
+			URL url = Objects.requireNonNull(getClass().getResource("/fxml/contact.fxml"), "Missing FXML: /fxml/contact.fxml");
+			FXMLLoader loader = new FXMLLoader(url);
+			Parent root = loader.load();
+
+			ContactController controller = loader.getController();
+			ContactDao contactDao = new ContactDao(dbSessionProvider);
+			controller.init(contactId, contactDao);
+
+			Stage dialog = new Stage();
+			dialog.initOwner(stage);
+			dialog.initModality(Modality.WINDOW_MODAL);
+			dialog.setTitle("Contact #" + contactId);
+
+			Scene dialogScene = new Scene(root);
+			dialogScene.getStylesheets().add(Objects.requireNonNull(
+					getClass().getResource("/css/app.css")).toExternalForm());
+			dialog.setScene(dialogScene);
+			dialog.setMinWidth(760);
+			dialog.setMinHeight(520);
+			dialog.show();
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to open contact detail", e);
+		}
 	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {
