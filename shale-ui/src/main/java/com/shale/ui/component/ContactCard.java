@@ -8,19 +8,15 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-public class ContactCard extends StackPane {
+public final class ContactCard extends StackPane {
 
 	public enum Variant {
 		MINI, COMPACT, FULL
 	}
 
 	private final Label nameLabel = new Label();
-	private final Integer contactId;
-	private Consumer<Integer> onOpen;
 
-	public ContactCard(Integer contactId, String displayName, Variant variant) {
-		this.contactId = contactId;
-
+	public ContactCard(Integer contactId, String displayName, Variant variant, Consumer<Integer> onOpen) {
 		setAlignment(Pos.CENTER_LEFT);
 
 		// ✅ IMPORTANT: use a real paint value (not -color-bg-subtle) to avoid ClassCastException
@@ -43,18 +39,9 @@ public class ContactCard extends StackPane {
 		VBox box = new VBox(nameLabel);
 		getChildren().add(box);
 
-		if (contactId != null) {
+		if (contactId != null && onOpen != null) {
 			setCursor(Cursor.HAND);
-			setOnMouseClicked(e ->
-			{
-				if (onOpen != null) {
-					onOpen.accept(contactId);
-				}
-			});
+			setOnMouseClicked(e -> onOpen.accept(contactId));
 		}
-	}
-
-	public void setOnOpen(Consumer<Integer> onOpen) {
-		this.onOpen = onOpen;
 	}
 }

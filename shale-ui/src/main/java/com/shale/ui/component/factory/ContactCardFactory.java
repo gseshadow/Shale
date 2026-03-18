@@ -13,13 +13,14 @@ public class ContactCardFactory {
 	}
 
 	public ContactCard createMini(Integer contactId, String displayName) {
-		ContactCard card = new ContactCard(contactId, displayName, ContactCard.Variant.MINI);
+		return create(contactId, displayName, ContactCard.Variant.MINI);
+	}
 
-		// ✅ only clickable when there's a real id + handler
-		if (contactId != null && onOpenContact != null) {
-			card.setOnOpen(onOpenContact);
-		}
+	public ContactCard createCompact(Integer contactId, String displayName) {
+		return create(contactId, displayName, ContactCard.Variant.COMPACT);
+	}
 
-		return card;
+	private ContactCard create(Integer contactId, String displayName, ContactCard.Variant variant) {
+		return new ContactCard(contactId, displayName, variant, onOpenContact);
 	}
 }

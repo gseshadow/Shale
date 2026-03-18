@@ -2,13 +2,17 @@ package com.shale.ui.navigation;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.controller.CaseController;
+import com.shale.ui.controller.ContactController;
+import com.shale.ui.controller.ContactsController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
 import com.shale.ui.controller.MyShaleController;
 import com.shale.ui.controller.NewIntakeController;
+import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -97,12 +101,42 @@ public final class SceneManager {
 	}
 
 
-	public Parent createOrganizationsView() {
+	public Parent createOrganizationsView(Consumer<Integer> onOpenOrganization) {
 		return load("/fxml/organizations.fxml", controller ->
 		{
 			OrganizationsController c = (OrganizationsController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(appState, runtimeBridge, organizationDao);
+			c.init(appState, runtimeBridge, organizationDao, onOpenOrganization);
+			return c;
+		});
+	}
+
+	public Parent createContactsView(Consumer<Integer> onOpenContact) {
+		return load("/fxml/contacts.fxml", controller ->
+		{
+			ContactsController c = (ContactsController) controller;
+			ContactDao contactDao = new ContactDao(dbSessionProvider);
+			c.init(contactDao, onOpenContact);
+			return c;
+		});
+	}
+
+	public Parent createContactView(int contactId) {
+		return load("/fxml/contact.fxml", controller ->
+		{
+			ContactController c = (ContactController) controller;
+			ContactDao contactDao = new ContactDao(dbSessionProvider);
+			c.init(contactId, contactDao);
+			return c;
+		});
+	}
+
+	public Parent createOrganizationView(int organizationId, Consumer<Integer> onOpenCase) {
+		return load("/fxml/organization.fxml", controller ->
+		{
+			OrganizationController c = (OrganizationController) controller;
+			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
+			c.init(organizationId, organizationDao, appState, runtimeBridge, onOpenCase);
 			return c;
 		});
 	}
@@ -119,6 +153,10 @@ public final class SceneManager {
 	}
 
 	public Parent createCaseView(int caseId) {
+		return createCaseView(caseId, null);
+	}
+
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenContact) {
 		return load("/fxml/case.fxml", controller ->
 		{
 			CaseController c = (CaseController) controller;
@@ -128,7 +166,7 @@ public final class SceneManager {
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
-			c.setOnOpenContact(this::openContactProfile); // ✅ add
+			c.setOnOpenContact(onOpenContact);
 			return c;
 		});
 	}
@@ -170,11 +208,6 @@ public final class SceneManager {
 		System.out.println("Navigate to Status: " + statusId);
 		// TODO later:
 		// navigate to status manager / filter view / status editor
-	}
-
-	private void openContactProfile(Integer contactId) {
-		System.out.println("Navigate to Contact: " + contactId);
-		// TODO later: navigate to contacts page / contact detail
 	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {
