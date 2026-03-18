@@ -343,8 +343,13 @@
 				<padding>
 					<Insets top="12" right="12" bottom="12" left="12" />
 				</padding>
-				<Label fx:id="genericTitleLabel" text="Section"
-					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+				<HBox alignment="CENTER_LEFT" spacing="8">
+					<Label fx:id="genericTitleLabel" text="Section"
+						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+					<Region HBox.hgrow="ALWAYS" />
+					<Button fx:id="addOrganizationButton" text="Add Organization"
+						visible="false" managed="false" />
+				</HBox>
 				<Label fx:id="organizationsEmptyLabel" text="No organizations"
 					visible="false" managed="false" style="-fx-opacity: 0.75;" />
 				<FlowPane fx:id="organizationsFlow" hgap="12" vgap="12" prefWrapLength="760"

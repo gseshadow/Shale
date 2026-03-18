@@ -136,7 +136,8 @@ public final class SceneManager {
 			CaseController c = (CaseController) controller;
 
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			c.init(caseId, caseDao, appState, runtimeBridge);
+			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
+			c.init(caseId, caseDao, organizationDao, appState, runtimeBridge);
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);

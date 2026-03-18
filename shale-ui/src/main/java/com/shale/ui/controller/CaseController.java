@@ -1,5 +1,7 @@
 package com.shale.ui.controller;
 
+import java.io.IOException;
+import java.net.URL;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -14,12 +16,14 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
+import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.component.factory.UserCardFactory.Variant;
@@ -29,9 +33,15 @@ import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar.ButtonData;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
@@ -46,7 +56,9 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 
 /**
  * FXML controller for the Case scene and top-level coordinator for case view/edit flows.
@@ -106,6 +118,8 @@ public class CaseController {
 	private FlowPane organizationsFlow;
 	@FXML
 	private Label organizationsEmptyLabel;
+	@FXML
+	private Button addOrganizationButton;
 
 	@FXML
 	private Label ovCaseStatusValue;
@@ -342,6 +356,7 @@ public class CaseController {
 	private Consumer<Integer> onOpenOrganization;
 
 	private CaseDao caseDao;
+	private OrganizationDao organizationDao;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 
@@ -409,9 +424,10 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 	}
 
-	public void init(Integer caseId, CaseDao caseDao, AppState appState, UiRuntimeBridge runtimeBridge) {
+	public void init(Integer caseId, CaseDao caseDao, OrganizationDao organizationDao, AppState appState, UiRuntimeBridge runtimeBridge) {
 		this.caseId = caseId;
 		this.caseDao = caseDao;
+		this.organizationDao = organizationDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		refreshHeader();
@@ -480,6 +496,8 @@ public class CaseController {
 			btnEditTeam.setOnAction(e -> onEditTeam());
 		if (submitCaseUpdateButton != null)
 			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
+		if (addOrganizationButton != null)
+			addOrganizationButton.setOnAction(e -> onAddOrganization());
 		if (caseUpdatesComposerArea != null) {
 			caseUpdatesComposerArea.setOnKeyPressed(e ->
 			{
@@ -678,6 +696,7 @@ public class CaseController {
 			genericTitleLabel.setText(sectionName);
 
 		setVisibleManaged(placeholderTextArea, true);
+		setVisibleManaged(addOrganizationButton, false);
 		setVisibleManaged(organizationsFlow, false);
 		setVisibleManaged(organizationsEmptyLabel, false);
 
@@ -697,6 +716,7 @@ public class CaseController {
 		if (genericTitleLabel != null)
 			genericTitleLabel.setText("Organizations");
 
+		setVisibleManaged(addOrganizationButton, true);
 		setVisibleManaged(placeholderTextArea, false);
 		renderOrganizationsSection();
 	}
@@ -747,6 +767,183 @@ public class CaseController {
 		if (onOpenOrganization != null) {
 			onOpenOrganization.accept(organizationId);
 		}
+	}
+
+
+	private void onAddOrganization() {
+		if (caseDao == null || organizationDao == null || caseId == null || addOrganizationButton == null) {
+			return;
+		}
+
+		Window owner = addOrganizationButton.getScene() == null ? null : addOrganizationButton.getScene().getWindow();
+		ButtonType selectExisting = new ButtonType("Select Existing Organization");
+		ButtonType createNew = new ButtonType("Create New Organization");
+		ButtonType cancel = new ButtonType("Cancel", ButtonData.CANCEL_CLOSE);
+
+		Alert chooser = new Alert(Alert.AlertType.CONFIRMATION);
+		if (owner != null) {
+			chooser.initOwner(owner);
+		}
+		chooser.initModality(Modality.WINDOW_MODAL);
+		chooser.setTitle("Add Organization");
+		chooser.setHeaderText("Add an organization to this case");
+		chooser.setContentText("Choose whether to link an existing organization or create a new one.");
+		chooser.getButtonTypes().setAll(selectExisting, createNew, cancel);
+
+		Optional<ButtonType> choice = chooser.showAndWait();
+		if (choice.isEmpty() || choice.get() == cancel) {
+			return;
+		}
+
+		if (choice.get() == selectExisting) {
+			loadLinkableOrganizationsAndShowPicker(owner);
+			return;
+		}
+
+		showCreateOrganizationDialog(owner);
+	}
+
+	private void loadLinkableOrganizationsAndShowPicker(Window owner) {
+		if (caseDao == null || caseId == null) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				List<CaseDao.SelectableOrganizationRow> selectable = caseDao.findLinkableOrganizations(activeCaseId);
+				runOnFx(() -> showLinkOrganizationPicker(owner, selectable));
+			} catch (Exception ex) {
+				runOnFx(() -> showOrganizationActionError("Failed to load organizations for linking."));
+			}
+		}, "case-linkable-organizations-" + activeCaseId).start();
+	}
+
+	private void showLinkOrganizationPicker(Window owner, List<CaseDao.SelectableOrganizationRow> selectable) {
+		List<CaseDao.SelectableOrganizationRow> options = selectable == null ? List.of() : selectable;
+		if (options.isEmpty()) {
+			showOrganizationActionInfo("No available organizations to link.");
+			return;
+		}
+
+		ContactPickerDialog<CaseDao.SelectableOrganizationRow> picker = new ContactPickerDialog<>(
+				owner,
+				"Add Organization",
+				options,
+				this::formatSelectableOrganization,
+				null);
+
+		Optional<CaseDao.SelectableOrganizationRow> selected = picker.showAndWait();
+		if (selected.isEmpty()) {
+			return;
+		}
+
+		linkOrganizationToCurrentCase(selected.get().id(), false);
+	}
+
+	private void showCreateOrganizationDialog(Window owner) {
+		try {
+			URL url = Objects.requireNonNull(getClass().getResource("/fxml/new-organization.fxml"), "Missing FXML: /fxml/new-organization.fxml");
+			FXMLLoader loader = new FXMLLoader(url);
+			Parent root = loader.load();
+
+			Stage dialog = new Stage();
+			if (owner != null) {
+				dialog.initOwner(owner);
+			}
+			dialog.initModality(Modality.WINDOW_MODAL);
+			dialog.setTitle("New Organization");
+
+			NewOrganizationController controller = loader.getController();
+			controller.init(appState, organizationDao, dialog, organizationId -> linkOrganizationToCurrentCase(organizationId, true));
+
+			Scene dialogScene = new Scene(root);
+			dialogScene.getStylesheets().add(Objects.requireNonNull(
+					getClass().getResource("/css/app.css")).toExternalForm());
+			dialog.setScene(dialogScene);
+			dialog.setMinWidth(760);
+			dialog.setMinHeight(720);
+			dialog.showAndWait();
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to open New Organization dialog", e);
+		}
+	}
+
+	private void linkOrganizationToCurrentCase(int organizationId, boolean createdFlow) {
+		if (caseDao == null || caseId == null || organizationId <= 0) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				boolean inserted = caseDao.linkOrganizationToCase(activeCaseId, organizationId);
+				runOnFx(() -> {
+					if (!inserted) {
+						showOrganizationActionInfo(createdFlow
+								? "Organization was created, but it is already linked to this case."
+								: "That organization is already linked to this case.");
+						refreshOrganizationsSectionAsync();
+						return;
+					}
+					refreshOrganizationsSectionAsync();
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showOrganizationActionError(createdFlow
+						? "Organization was created, but linking it to the case failed."
+						: "Failed to link organization to this case."));
+			}
+		}, "case-link-organization-" + activeCaseId + "-" + organizationId).start();
+	}
+
+	private void refreshOrganizationsSectionAsync() {
+		if (caseDao == null || caseId == null) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				List<CaseDao.RelatedOrganizationRow> organizations = caseDao.findRelatedOrganizations(activeCaseId);
+				runOnFx(() -> {
+					relatedOrganizations = organizations == null ? List.of() : organizations;
+					renderOrganizationsSection();
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showOrganizationActionError("Failed to refresh organizations for this case."));
+			}
+		}, "case-refresh-organizations-" + activeCaseId).start();
+	}
+
+	private void showOrganizationActionInfo(String message) {
+		showOrganizationActionAlert(Alert.AlertType.INFORMATION, message);
+	}
+
+	private void showOrganizationActionError(String message) {
+		showOrganizationActionAlert(Alert.AlertType.ERROR, message);
+	}
+
+	private void showOrganizationActionAlert(Alert.AlertType type, String message) {
+		Alert alert = new Alert(type);
+		if (addOrganizationButton != null && addOrganizationButton.getScene() != null) {
+			alert.initOwner(addOrganizationButton.getScene().getWindow());
+		}
+		alert.setTitle("Organizations");
+		alert.setHeaderText(null);
+		alert.setContentText(message);
+		alert.showAndWait();
+	}
+
+	private String formatSelectableOrganization(CaseDao.SelectableOrganizationRow row) {
+		if (row == null) {
+			return "";
+		}
+		String name = safe(row.name());
+		String type = row.organizationTypeName() == null ? "" : row.organizationTypeName().trim();
+		if (type.isBlank()) {
+			return name + " (#" + row.id() + ")";
+		}
+		return name + " — " + type + " (#" + row.id() + ")";
 	}
 
 	// ----------------------------
