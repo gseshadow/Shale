@@ -88,6 +88,13 @@ public final class CaseDao {
 	) {
 	}
 
+	public record SelectableOrganizationRow(
+			int id,
+			String name,
+			String organizationTypeName
+	) {
+	}
+
 
 	public record NewIntakeCreateRequest(
 			int shaleClientId,
@@ -1535,6 +1542,112 @@ public final class CaseDao {
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related organizations for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public List<SelectableOrganizationRow> findLinkableOrganizations(long caseId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+
+		String sql = """
+				SELECT
+				  o.Id,
+				  o.Name,
+				  ot.Name AS OrganizationTypeName
+				FROM Organizations o
+				LEFT JOIN OrganizationTypes ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				ORDER BY o.Name ASC, o.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			ps.setInt(1, shaleClientId);
+
+			List<SelectableOrganizationRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new SelectableOrganizationRow(
+						rs.getInt("Id"),
+						rs.getString("Name"),
+						rs.getString("OrganizationTypeName")
+					));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load linkable organizations for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public boolean linkOrganizationToCase(long caseId, int organizationId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+		if (organizationId <= 0) {
+			throw new IllegalArgumentException("organizationId must be > 0");
+		}
+
+		String sql = """
+				INSERT INTO CaseOrganizations (
+				  CaseId,
+				  OrganizationId,
+				  RoleId,
+				  IsPrimary,
+				  Notes,
+				  CreatedAt,
+				  UpdatedAt
+				)
+				SELECT
+				  ?,
+				  ?,
+				  NULL,
+				  0,
+				  NULL,
+				  SYSUTCDATETIME(),
+				  SYSUTCDATETIME()
+				WHERE EXISTS (
+				    SELECT 1
+				    FROM Cases c
+				    WHERE c.Id = ?
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM Organizations o
+				    WHERE o.Id = ?
+				      AND o.ShaleClientId = ?
+				      AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				)
+				  AND NOT EXISTS (
+				    SELECT 1
+				    FROM CaseOrganizations co
+				    WHERE co.CaseId = ?
+				      AND co.OrganizationId = ?
+				  );
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, organizationId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, organizationId);
+			return ps.executeUpdate() > 0;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to link organization to case (caseId=" + caseId + ", orgId=" + organizationId + ")", e);
 		}
 	}
 
