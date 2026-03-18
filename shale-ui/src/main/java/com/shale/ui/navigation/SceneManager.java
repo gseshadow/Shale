@@ -4,15 +4,20 @@ import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.data.dao.UserDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.ContactController;
 import com.shale.ui.controller.CasesController;
+import com.shale.ui.controller.ContactViewController;
+import com.shale.ui.controller.ContactsController;
 import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
 import com.shale.ui.controller.MyShaleController;
 import com.shale.ui.controller.NewIntakeController;
 import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
+import com.shale.ui.controller.TeamController;
+import com.shale.ui.controller.UserController;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -131,19 +136,48 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createCaseView(int caseId) {
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
 		return load("/fxml/case.fxml", controller ->
 		{
 			CaseController c = (CaseController) controller;
 
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			c.init(caseId, caseDao, appState, runtimeBridge);
+			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
+			c.init(caseId, caseDao, organizationDao, appState, runtimeBridge);
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
-			c.setOnOpenContact(this::openContactProfile); // ✅ add
+			c.setOnOpenContact(this::openContactProfile);
+			c.setOnOpenOrganization(onOpenOrganization);
 			return c;
 		});
+	}
+
+	public void showNewOrganizationDialog(Consumer<Integer> onOrganizationCreated) {
+		try {
+			URL url = Objects.requireNonNull(getClass().getResource("/fxml/new-organization.fxml"), "Missing FXML: /fxml/new-organization.fxml");
+			FXMLLoader loader = new FXMLLoader(url);
+			Parent root = loader.load();
+
+			Stage dialog = new Stage();
+			dialog.initOwner(stage);
+			dialog.initModality(Modality.WINDOW_MODAL);
+			dialog.setTitle("New Organization");
+
+			NewOrganizationController controller = loader.getController();
+			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
+			controller.init(appState, organizationDao, dialog, onOrganizationCreated);
+
+			Scene dialogScene = new Scene(root);
+			dialogScene.getStylesheets().add(Objects.requireNonNull(
+					getClass().getResource("/css/app.css")).toExternalForm());
+			dialog.setScene(dialogScene);
+			dialog.setMinWidth(760);
+			dialog.setMinHeight(720);
+			dialog.showAndWait();
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to open New Organization dialog", e);
+		}
 	}
 
 	public void showNewIntakeDialog(Consumer<Integer> onCaseCreated) {
@@ -173,10 +207,23 @@ public final class SceneManager {
 		}
 	}
 
-	private void openUserProfile(Integer userId) {
-		System.out.println("Navigate to User Profile: " + userId);
-		// TODO: when you have user view:
-		// set center content to user view / or navigate
+	public void openUserProfile(Integer userId) {
+		if (userId == null || userId <= 0) {
+			System.err.println("Ignoring user navigation for invalid userId: " + userId);
+			return;
+		}
+
+		try {
+			Parent userRoot = createUserView(userId);
+			MainController mainController = resolveMainController();
+			if (mainController == null) {
+				System.err.println("Unable to navigate to user profile; main controller is unavailable.");
+				return;
+			}
+			mainController.showUserView(userId, userRoot);
+		} catch (RuntimeException ex) {
+			System.err.println("Failed to open user profile for userId " + userId + ": " + ex.getMessage());
+		}
 	}
 
 	private void openStatusProfile(Integer statusId) {
@@ -234,7 +281,9 @@ public final class SceneManager {
 				}
 			});
 
-			return loader.load();
+			Parent root = loader.load();
+			root.getProperties().put(ROOT_CONTROLLER_KEY, loader.getController());
+			return root;
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to load FXML: " + fxmlPath, e);
 		}

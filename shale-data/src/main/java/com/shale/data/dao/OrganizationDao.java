@@ -552,6 +552,14 @@ public final class OrganizationDao {
 		}
 	}
 
+	private static void setNullableString(PreparedStatement ps, int index, String value) throws SQLException {
+		if (value == null || value.isBlank()) {
+			ps.setNull(index, java.sql.Types.NVARCHAR);
+			return;
+		}
+		ps.setString(index, value.trim());
+	}
+
 	private static Integer getNullableInt(ResultSet rs, String col) throws SQLException {
 		int value = rs.getInt(col);
 		return rs.wasNull() ? null : value;

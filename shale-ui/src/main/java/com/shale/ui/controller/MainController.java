@@ -153,10 +153,7 @@ public final class MainController {
 
 	@FXML
 	private void onNavContacts() {
-		highlightNav(navContactsButton);
-		sectionTitleLabel.setText("Contacts");
-		sectionSubtitleLabel.setText("Manage clients, experts, and other contacts.");
-		setSectionContentText("Contacts tab is not implemented yet.");
+		showContactsList();
 	}
 
 	@FXML
@@ -174,7 +171,9 @@ public final class MainController {
 		highlightNav(navTeamButton);
 		sectionTitleLabel.setText("Team");
 		sectionSubtitleLabel.setText("See and manage your team members.");
-		setSectionContentText("Team tab is not implemented yet.");
+
+		Node teamRoot = sceneManager.createTeamView(sceneManager::openUserProfile);
+		sectionContent.getChildren().setAll(teamRoot);
 	}
 
 	@FXML
@@ -209,6 +208,7 @@ public final class MainController {
 			appState.setUserId(0);
 			appState.setShaleClientId(0);
 			appState.setUserEmail(null);
+			appState.setAdmin(false);
 		}
 
 		sceneManager.showLogin();
@@ -220,7 +220,7 @@ public final class MainController {
 		sectionTitleLabel.setText("Case");
 		sectionSubtitleLabel.setText("Case #" + caseId);
 
-		Node caseRoot = sceneManager.createCaseView(caseId);
+		Node caseRoot = sceneManager.createCaseView(caseId, this::openOrganization);
 		sectionContent.getChildren().setAll(caseRoot);
 	}
 
