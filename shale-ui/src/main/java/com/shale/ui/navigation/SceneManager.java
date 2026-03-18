@@ -9,6 +9,7 @@ import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
 import com.shale.ui.controller.MyShaleController;
 import com.shale.ui.controller.NewIntakeController;
+import com.shale.ui.controller.NewOrganizationController;
 import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.services.UiAuthService;
@@ -103,7 +104,7 @@ public final class SceneManager {
 		{
 			OrganizationsController c = (OrganizationsController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(appState, runtimeBridge, organizationDao, onOpenOrganization);
+			c.init(appState, runtimeBridge, organizationDao, onOpenOrganization, this);
 			return c;
 		});
 	}
@@ -143,6 +144,33 @@ public final class SceneManager {
 			c.setOnOpenOrganization(onOpenOrganization);
 			return c;
 		});
+	}
+
+	public void showNewOrganizationDialog(Consumer<Integer> onOrganizationCreated) {
+		try {
+			URL url = Objects.requireNonNull(getClass().getResource("/fxml/new-organization.fxml"), "Missing FXML: /fxml/new-organization.fxml");
+			FXMLLoader loader = new FXMLLoader(url);
+			Parent root = loader.load();
+
+			Stage dialog = new Stage();
+			dialog.initOwner(stage);
+			dialog.initModality(Modality.WINDOW_MODAL);
+			dialog.setTitle("New Organization");
+
+			NewOrganizationController controller = loader.getController();
+			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
+			controller.init(appState, organizationDao, dialog, onOrganizationCreated);
+
+			Scene dialogScene = new Scene(root);
+			dialogScene.getStylesheets().add(Objects.requireNonNull(
+					getClass().getResource("/css/app.css")).toExternalForm());
+			dialog.setScene(dialogScene);
+			dialog.setMinWidth(760);
+			dialog.setMinHeight(720);
+			dialog.showAndWait();
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to open New Organization dialog", e);
+		}
 	}
 
 	public void showNewIntakeDialog(Consumer<Integer> onCaseCreated) {

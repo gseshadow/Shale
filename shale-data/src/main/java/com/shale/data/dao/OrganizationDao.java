@@ -43,6 +43,24 @@ public final class OrganizationDao {
 	public record OrganizationTypeRow(int organizationTypeId, String name) {
 	}
 
+	public record OrganizationCreateRequest(
+			int shaleClientId,
+			int organizationTypeId,
+			String name,
+			String phone,
+			String fax,
+			String email,
+			String website,
+			String address1,
+			String address2,
+			String city,
+			String state,
+			String postalCode,
+			String country,
+			String notes
+	) {
+	}
+
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize) {
 		return findPage(page, pageSize, null);
@@ -171,6 +189,79 @@ public final class OrganizationDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load organization by id (id=" + organizationId + ")", e);
+		}
+	}
+
+	public int create(OrganizationCreateRequest request) {
+		Objects.requireNonNull(request, "request");
+		if (request.shaleClientId() <= 0) {
+			throw new IllegalArgumentException("shaleClientId is required");
+		}
+		if (request.organizationTypeId() <= 0) {
+			throw new IllegalArgumentException("organizationTypeId is required");
+		}
+		if (request.name() == null || request.name().isBlank()) {
+			throw new IllegalArgumentException("name is required");
+		}
+
+		String sql = """
+				INSERT INTO %s (
+				  ShaleClientId,
+				  OrganizationTypeId,
+				  Name,
+				  Phone,
+				  Fax,
+				  Email,
+				  Website,
+				  Address1,
+				  Address2,
+				  City,
+				  State,
+				  PostalCode,
+				  Country,
+				  Notes,
+				  IsDeleted,
+				  CreatedAt,
+				  UpdatedAt
+				)
+				OUTPUT INSERTED.Id
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?);
+				""".formatted(ORGANIZATIONS_TABLE);
+
+		Timestamp now = Timestamp.from(Instant.now());
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int currentShaleClientId = requireCurrentShaleClientId(con);
+			if (request.shaleClientId() != currentShaleClientId) {
+				throw new IllegalArgumentException("shaleClientId does not match current session");
+			}
+
+			int idx = 1;
+			ps.setInt(idx++, request.shaleClientId());
+			ps.setInt(idx++, request.organizationTypeId());
+			setNullableString(ps, idx++, request.name());
+			setNullableString(ps, idx++, request.phone());
+			setNullableString(ps, idx++, request.fax());
+			setNullableString(ps, idx++, request.email());
+			setNullableString(ps, idx++, request.website());
+			setNullableString(ps, idx++, request.address1());
+			setNullableString(ps, idx++, request.address2());
+			setNullableString(ps, idx++, request.city());
+			setNullableString(ps, idx++, request.state());
+			setNullableString(ps, idx++, request.postalCode());
+			setNullableString(ps, idx++, request.country());
+			setNullableString(ps, idx++, request.notes());
+			ps.setTimestamp(idx++, now);
+			ps.setTimestamp(idx++, now);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) {
+					throw new RuntimeException("Failed to create organization");
+				}
+				return rs.getInt(1);
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create organization", e);
 		}
 	}
 
@@ -550,6 +641,14 @@ public final class OrganizationDao {
 			}
 			return shaleClientId;
 		}
+	}
+
+	private static void setNullableString(PreparedStatement ps, int index, String value) throws SQLException {
+		if (value == null || value.isBlank()) {
+			ps.setNull(index, java.sql.Types.NVARCHAR);
+			return;
+		}
+		ps.setString(index, value.trim());
 	}
 
 	private static Integer getNullableInt(ResultSet rs, String col) throws SQLException {
