@@ -53,6 +53,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.Node;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -737,28 +738,45 @@ public class CaseController {
 				? organizationCardFactory
 				: new OrganizationCardFactory(this::openOrganization);
 		for (CaseDao.RelatedOrganizationRow org : relatedOrganizations) {
-			OrganizationCardFactory.OrganizationCardModel model = new OrganizationCardFactory.OrganizationCardModel(
-					org.id(),
-					org.name(),
-					org.organizationTypeId(),
-					org.organizationTypeName(),
-					org.phone(),
-					org.email(),
-					org.website(),
-					org.address1(),
-					org.address2(),
-					org.city(),
-					org.state(),
-					org.postalCode(),
-					org.country(),
-					org.notes(),
-					org.color()
-			);
-			organizationsFlow.getChildren().add(factory.create(model, OrganizationCardFactory.Variant.COMPACT));
+			organizationsFlow.getChildren().add(createRelatedOrganizationCardContainer(factory, org));
 		}
 
 		setVisibleManaged(organizationsFlow, true);
 		setVisibleManaged(organizationsEmptyLabel, false);
+	}
+
+	private Node createRelatedOrganizationCardContainer(OrganizationCardFactory factory, CaseDao.RelatedOrganizationRow org) {
+		OrganizationCardFactory.OrganizationCardModel model = new OrganizationCardFactory.OrganizationCardModel(
+				org.id(),
+				org.name(),
+				org.organizationTypeId(),
+				org.organizationTypeName(),
+				org.phone(),
+				org.email(),
+				org.website(),
+				org.address1(),
+				org.address2(),
+				org.city(),
+				org.state(),
+				org.postalCode(),
+				org.country(),
+				org.notes(),
+				org.color()
+		);
+
+		Node card = factory.create(model, OrganizationCardFactory.Variant.COMPACT);
+
+		Button removeButton = new Button("Remove");
+		removeButton.getStyleClass().add("button-secondary");
+		removeButton.setOnAction(e -> onRemoveOrganization(org));
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox actions = new HBox(8, spacer, removeButton);
+
+		VBox container = new VBox(6, card, actions);
+		container.setPrefWidth(280);
+		return container;
 	}
 
 	private void openOrganization(Integer organizationId) {
@@ -896,6 +914,39 @@ public class CaseController {
 		}, "case-link-organization-" + activeCaseId + "-" + organizationId).start();
 	}
 
+	private void onRemoveOrganization(CaseDao.RelatedOrganizationRow org) {
+		if (org == null || caseDao == null || caseId == null) {
+			return;
+		}
+
+		if (!confirmOrganizationUnlink(org)) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				caseDao.unlinkOrganizationFromCase(activeCaseId, org.id());
+				runOnFx(this::refreshOrganizationsSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showOrganizationActionError("Failed to remove organization from this case."));
+			}
+		}, "case-unlink-organization-" + activeCaseId + "-" + org.id()).start();
+	}
+
+	private boolean confirmOrganizationUnlink(CaseDao.RelatedOrganizationRow org) {
+		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+		if (addOrganizationButton != null && addOrganizationButton.getScene() != null) {
+			alert.initOwner(addOrganizationButton.getScene().getWindow());
+		}
+		alert.setTitle("Remove Organization");
+		alert.setHeaderText("Remove this organization from the case?");
+		alert.setContentText(formatRelatedOrganization(org));
+
+		Optional<ButtonType> choice = alert.showAndWait();
+		return choice.isPresent() && choice.get() == ButtonType.OK;
+	}
+
 	private void refreshOrganizationsSectionAsync() {
 		if (caseDao == null || caseId == null) {
 			return;
@@ -935,6 +986,18 @@ public class CaseController {
 	}
 
 	private String formatSelectableOrganization(CaseDao.SelectableOrganizationRow row) {
+		if (row == null) {
+			return "";
+		}
+		String name = safe(row.name());
+		String type = row.organizationTypeName() == null ? "" : row.organizationTypeName().trim();
+		if (type.isBlank()) {
+			return name + " (#" + row.id() + ")";
+		}
+		return name + " — " + type + " (#" + row.id() + ")";
+	}
+
+	private String formatRelatedOrganization(CaseDao.RelatedOrganizationRow row) {
 		if (row == null) {
 			return "";
 		}
