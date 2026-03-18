@@ -10,6 +10,7 @@ import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.UiRuntimeBridge.EntityUpdatedEvent;
 import com.shale.ui.state.AppState;
 
@@ -26,6 +27,8 @@ public final class OrganizationsController {
 	@FXML
 	private TextField organizationsSearchField;
 	@FXML
+	private javafx.scene.control.Button addOrganizationButton;
+	@FXML
 	private ScrollPane organizationsScroll;
 	@FXML
 	private FlowPane organizationsFlow;
@@ -37,6 +40,7 @@ public final class OrganizationsController {
 	private OrganizationDao organizationDao;
 	private OrganizationCardFactory organizationCardFactory;
 	private Consumer<Integer> onOpenOrganization;
+	private SceneManager sceneManager;
 	private Consumer<EntityUpdatedEvent> liveOrganizationUpdatedHandler;
 	private boolean liveSubscribed;
 
@@ -54,11 +58,12 @@ public final class OrganizationsController {
 		return t;
 	});
 
-	public void init(AppState appState, UiRuntimeBridge runtimeBridge, OrganizationDao organizationDao, Consumer<Integer> onOpenOrganization) {
+	public void init(AppState appState, UiRuntimeBridge runtimeBridge, OrganizationDao organizationDao, Consumer<Integer> onOpenOrganization, SceneManager sceneManager) {
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.organizationDao = organizationDao;
 		this.onOpenOrganization = onOpenOrganization;
+		this.sceneManager = sceneManager;
 		this.organizationCardFactory = new OrganizationCardFactory(this::openOrganization);
 	}
 
@@ -66,6 +71,9 @@ public final class OrganizationsController {
 	private void initialize() {
 		if (organizationsSearchField != null) {
 			organizationsSearchField.textProperty().addListener((obs, oldV, newV) -> loadFirstPage());
+		}
+		if (addOrganizationButton != null) {
+			addOrganizationButton.setOnAction(e -> onAddOrganization());
 		}
 
 		Platform.runLater(() -> {
@@ -231,6 +239,35 @@ public final class OrganizationsController {
 			return "";
 		}
 		return organizationsSearchField.getText().trim();
+	}
+
+	private void onAddOrganization() {
+		if (sceneManager == null) {
+			return;
+		}
+		sceneManager.showNewOrganizationDialog(this::handleOrganizationCreated);
+	}
+
+	private void handleOrganizationCreated(Integer organizationId) {
+		if (organizationId == null || organizationId <= 0) {
+			return;
+		}
+		loadFirstPage();
+		publishOrganizationUpdated(organizationId);
+		openOrganization(organizationId);
+	}
+
+	private void publishOrganizationUpdated(Integer organizationId) {
+		if (organizationId == null || organizationId <= 0 || appState == null || runtimeBridge == null
+				|| appState.getShaleClientId() == null || appState.getUserId() == null) {
+			return;
+		}
+
+		try {
+			runtimeBridge.publishOrganizationUpdated(organizationId, appState.getShaleClientId(), appState.getUserId());
+		} catch (Exception ex) {
+			System.out.println("OrganizationUpdated publish skipped: " + ex.getMessage());
+		}
 	}
 
 	private void openOrganization(Integer organizationId) {
