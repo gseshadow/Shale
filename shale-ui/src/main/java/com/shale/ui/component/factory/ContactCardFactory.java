@@ -1,5 +1,6 @@
 package com.shale.ui.component.factory;
 
+import java.util.Objects;
 import java.util.function.Consumer;
 
 import com.shale.ui.component.ContactCard;

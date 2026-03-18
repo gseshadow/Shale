@@ -176,7 +176,9 @@ public final class MainController {
 		highlightNav(navTeamButton);
 		sectionTitleLabel.setText("Team");
 		sectionSubtitleLabel.setText("See and manage your team members.");
-		setSectionContentText("Team tab is not implemented yet.");
+
+		Node teamRoot = sceneManager.createTeamView(sceneManager::openUserProfile);
+		sectionContent.getChildren().setAll(teamRoot);
 	}
 
 	@FXML
@@ -211,6 +213,7 @@ public final class MainController {
 			appState.setUserId(0);
 			appState.setShaleClientId(0);
 			appState.setUserEmail(null);
+			appState.setAdmin(false);
 		}
 
 		sceneManager.showLogin();
