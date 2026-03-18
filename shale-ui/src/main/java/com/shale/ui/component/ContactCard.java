@@ -11,131 +11,54 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
-public class ContactCard extends HBox {
+public class ContactCard extends StackPane {
 
-    public enum Variant {
-        FULL, COMPACT, MINI
-    }
+	public enum Variant {
+		MINI, COMPACT, FULL
+	}
 
-    private final Label nameLabel = new Label();
-    private final Label roleLabel = new Label();
-    private final Label emailLabel = new Label();
-    private final Label phoneLabel = new Label();
+	private final Label nameLabel = new Label();
+	private final Integer contactId;
+	private Consumer<Integer> onOpen;
 
-    private Integer contactId;
-    private Consumer<Integer> onOpen;
+	public ContactCard(Integer contactId, String displayName, Variant variant) {
+		this.contactId = contactId;
 
-    public ContactCard() {
-        buildUiMiniDefaults();
-        wireEvents();
-    }
+		setAlignment(Pos.CENTER_LEFT);
 
-    public void setContactId(Integer contactId) {
-        this.contactId = contactId;
-    }
+		// ✅ IMPORTANT: use a real paint value (not -color-bg-subtle) to avoid ClassCastException
+		// Also make it "pill" shaped like your status/user mini chips.
+		setStyle("-fx-background-radius: 999; "
+				+ "-fx-padding: 4 10 4 10; "
+				+ "-fx-background-color: rgba(0,0,0,0.03);");
 
-    public void setOnOpen(Consumer<Integer> onOpen) {
-        this.onOpen = onOpen;
-    }
+		String text = (displayName == null || displayName.isBlank()) ? "—" : displayName;
+		nameLabel.setText(text);
 
-    public void setName(String name) {
-        nameLabel.setText(name == null || name.isBlank() ? "—" : name);
-    }
+		if (variant == Variant.MINI) {
+			nameLabel.setStyle("-fx-font-size: 12;");
+		} else if (variant == Variant.COMPACT) {
+			nameLabel.setStyle("-fx-font-size: 13;");
+		} else {
+			nameLabel.setStyle("-fx-font-size: 14;");
+		}
 
-    public void setRole(String role) {
-        String normalized = role == null ? "" : role.trim();
-        roleLabel.setText(normalized);
-        roleLabel.setVisible(!normalized.isBlank());
-        roleLabel.setManaged(!normalized.isBlank());
-    }
+		VBox box = new VBox(nameLabel);
+		getChildren().add(box);
 
-    public void setEmail(String email) {
-        emailLabel.setText(normalizeOptional(email));
-    }
+		if (contactId != null) {
+			setCursor(Cursor.HAND);
+			setOnMouseClicked(e ->
+			{
+				System.out.println("[ContactCard] click contactId=" + contactId);
+				if (onOpen != null) {
+					onOpen.accept(contactId);
+				}
+			});
+		}
+	}
 
-    public void setPhone(String phone) {
-        phoneLabel.setText(normalizeOptional(phone));
-    }
-
-    public void setBackgroundCssColor(String css) {
-        String bg = (css == null || css.isBlank()) ? "rgba(0,0,0,0.03)" : css;
-        setStyle(("""
-                -fx-background-color: %s;
-                -fx-background-radius: 14;
-                -fx-border-radius: 14;
-                -fx-border-color: rgba(0,0,0,0.08);
-                """).formatted(bg));
-    }
-
-    public void applyMini() {
-        getChildren().clear();
-
-        setPadding(new Insets(4, 10, 4, 10));
-        setSpacing(6);
-
-        nameLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600;");
-
-        getChildren().add(nameLabel);
-    }
-
-    public void applyCompact() {
-        getChildren().clear();
-
-        setPadding(new Insets(8, 10, 8, 10));
-        setSpacing(8);
-
-        nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 600;");
-        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(0,0,0,0.56);");
-        emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(0,0,0,0.62);");
-
-        VBox text = new VBox(2, nameLabel);
-        if (roleLabel.isManaged()) {
-            text.getChildren().add(roleLabel);
-        }
-        text.getChildren().add(emailLabel);
-        getChildren().add(text);
-    }
-
-    public void applyFull() {
-        getChildren().clear();
-
-        setPadding(new Insets(10, 12, 10, 12));
-        setSpacing(12);
-
-        nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700;");
-        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(0,0,0,0.56);");
-        emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(0,0,0,0.68);");
-        phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(0,0,0,0.68);");
-
-        VBox text = new VBox(4, nameLabel);
-        if (roleLabel.isManaged()) {
-            text.getChildren().add(roleLabel);
-        }
-        text.getChildren().add(emailLabel);
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        getChildren().addAll(text, spacer, phoneLabel);
-    }
-
-    private void buildUiMiniDefaults() {
-        setCursor(Cursor.HAND);
-        setBackgroundCssColor(null);
-        applyMini();
-    }
-
-    private void wireEvents() {
-        setOnMouseClicked(e -> {
-            if (onOpen != null && contactId != null) {
-                onOpen.accept(contactId);
-            }
-        });
-    }
-
-    public Node asNode() {
-        return this;
-    }
-
-    private static String normalizeOptional(String value) {
-        return value == null || value.isBlank() ? "—" : value;
-    }
+	public void setOnOpen(Consumer<Integer> onOpen) {
+		this.onOpen = onOpen;
+	}
 }

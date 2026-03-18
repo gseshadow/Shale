@@ -10,7 +10,6 @@ import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.services.UiRuntimeBridge;
-import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.UiRuntimeBridge.EntityUpdatedEvent;
 import com.shale.ui.state.AppState;
 
@@ -40,7 +39,6 @@ public final class OrganizationsController {
 	private OrganizationDao organizationDao;
 	private OrganizationCardFactory organizationCardFactory;
 	private Consumer<Integer> onOpenOrganization;
-	private SceneManager sceneManager;
 	private Consumer<EntityUpdatedEvent> liveOrganizationUpdatedHandler;
 	private boolean liveSubscribed;
 
@@ -58,12 +56,11 @@ public final class OrganizationsController {
 		return t;
 	});
 
-	public void init(AppState appState, UiRuntimeBridge runtimeBridge, OrganizationDao organizationDao, Consumer<Integer> onOpenOrganization, SceneManager sceneManager) {
+	public void init(AppState appState, UiRuntimeBridge runtimeBridge, OrganizationDao organizationDao, Consumer<Integer> onOpenOrganization) {
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.organizationDao = organizationDao;
 		this.onOpenOrganization = onOpenOrganization;
-		this.sceneManager = sceneManager;
 		this.organizationCardFactory = new OrganizationCardFactory(this::openOrganization);
 	}
 

@@ -43,27 +43,6 @@ public final class OrganizationDao {
 	public record OrganizationTypeRow(int organizationTypeId, String name) {
 	}
 
-	public record OrganizationOptionRow(Integer organizationId, String name) {
-	}
-
-	public record OrganizationCreateRequest(
-			int shaleClientId,
-			int organizationTypeId,
-			String name,
-			String phone,
-			String fax,
-			String email,
-			String website,
-			String address1,
-			String address2,
-			String city,
-			String state,
-			String postalCode,
-			String country,
-			String notes
-	) {
-	}
-
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize) {
 		return findPage(page, pageSize, null);
@@ -195,79 +174,6 @@ public final class OrganizationDao {
 		}
 	}
 
-	public int create(OrganizationCreateRequest request) {
-		Objects.requireNonNull(request, "request");
-		if (request.shaleClientId() <= 0) {
-			throw new IllegalArgumentException("shaleClientId is required");
-		}
-		if (request.organizationTypeId() <= 0) {
-			throw new IllegalArgumentException("organizationTypeId is required");
-		}
-		if (request.name() == null || request.name().isBlank()) {
-			throw new IllegalArgumentException("name is required");
-		}
-
-		String sql = """
-				INSERT INTO %s (
-				  ShaleClientId,
-				  OrganizationTypeId,
-				  Name,
-				  Phone,
-				  Fax,
-				  Email,
-				  Website,
-				  Address1,
-				  Address2,
-				  City,
-				  State,
-				  PostalCode,
-				  Country,
-				  Notes,
-				  IsDeleted,
-				  CreatedAt,
-				  UpdatedAt
-				)
-				OUTPUT INSERTED.Id
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?);
-				""".formatted(ORGANIZATIONS_TABLE);
-
-		Timestamp now = Timestamp.from(Instant.now());
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			int currentShaleClientId = requireCurrentShaleClientId(con);
-			if (request.shaleClientId() != currentShaleClientId) {
-				throw new IllegalArgumentException("shaleClientId does not match current session");
-			}
-
-			int idx = 1;
-			ps.setInt(idx++, request.shaleClientId());
-			ps.setInt(idx++, request.organizationTypeId());
-			setNullableString(ps, idx++, request.name());
-			setNullableString(ps, idx++, request.phone());
-			setNullableString(ps, idx++, request.fax());
-			setNullableString(ps, idx++, request.email());
-			setNullableString(ps, idx++, request.website());
-			setNullableString(ps, idx++, request.address1());
-			setNullableString(ps, idx++, request.address2());
-			setNullableString(ps, idx++, request.city());
-			setNullableString(ps, idx++, request.state());
-			setNullableString(ps, idx++, request.postalCode());
-			setNullableString(ps, idx++, request.country());
-			setNullableString(ps, idx++, request.notes());
-			ps.setTimestamp(idx++, now);
-			ps.setTimestamp(idx++, now);
-
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next()) {
-					throw new RuntimeException("Failed to create organization");
-				}
-				return rs.getInt(1);
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to create organization", e);
-		}
-	}
-
 	public void update(Organization organization) {
 		Objects.requireNonNull(organization, "organization");
 		if (organization.getId() == null || organization.getId() <= 0) {
@@ -329,40 +235,6 @@ public final class OrganizationDao {
 	}
 
 
-
-	public boolean softDeleteOrganization(int organizationId, Integer shaleClientId) {
-		if (organizationId <= 0) {
-			throw new IllegalArgumentException("organizationId must be > 0");
-		}
-		if (shaleClientId == null || shaleClientId <= 0) {
-			throw new IllegalArgumentException("shaleClientId must be > 0");
-		}
-
-		String sql = """
-				UPDATE %s
-				SET
-				  IsDeleted = 1,
-				  UpdatedAt = SYSUTCDATETIME()
-				WHERE Id = ?
-				  AND ShaleClientId = ?
-				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
-				""".formatted(ORGANIZATIONS_TABLE);
-
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			int currentShaleClientId = requireCurrentShaleClientId(con);
-			if (shaleClientId.intValue() != currentShaleClientId) {
-				throw new IllegalArgumentException("shaleClientId does not match current session");
-			}
-
-			int idx = 1;
-			ps.setInt(idx++, organizationId);
-			ps.setInt(idx++, shaleClientId);
-			return ps.executeUpdate() > 0;
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to soft delete organization (id=" + organizationId + ")", e);
-		}
-	}
 
 	public List<SelectableCaseRow> findLinkableCases(int organizationId) {
 		if (organizationId <= 0) {
@@ -594,31 +466,6 @@ public final class OrganizationDao {
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load organization types", e);
-		}
-	}
-
-	public List<OrganizationOptionRow> findSelectableOrganizations() {
-		String sql = """
-				SELECT o.Id, o.Name
-				FROM %s o
-				WHERE o.ShaleClientId = ?
-				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-				ORDER BY o.Name ASC, o.Id ASC;
-				""".formatted(ORGANIZATIONS_TABLE);
-
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, requireCurrentShaleClientId(con));
-
-			List<OrganizationOptionRow> out = new ArrayList<>();
-			try (ResultSet rs = ps.executeQuery()) {
-				while (rs.next()) {
-					out.add(new OrganizationOptionRow(getNullableInt(rs, "Id"), rs.getString("Name")));
-				}
-			}
-			return out;
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to load organization options", e);
 		}
 	}
 

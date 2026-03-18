@@ -230,48 +230,8 @@ public final class MainController {
 		sectionTitleLabel.setText("Organization");
 		sectionSubtitleLabel.setText("Organization #" + organizationId);
 
-		Node organizationRoot = sceneManager.createOrganizationView(organizationId, this::openCase, this::showOrganizationsList);
+		Node organizationRoot = sceneManager.createOrganizationView(organizationId, this::openCase);
 		sectionContent.getChildren().setAll(organizationRoot);
-	}
-
-	public void openUser(int userId) {
-		sceneManager.openUserProfile(userId);
-	}
-
-	public void showUserView(int userId, Node userRoot) {
-		highlightNav(navTeamButton);
-		sectionTitleLabel.setText("User");
-		sectionSubtitleLabel.setText("User #" + userId);
-		sectionContent.getChildren().setAll(userRoot);
-	}
-
-	public void openContact(int contactId) {
-		sceneManager.openContactProfile(contactId);
-	}
-
-	public void showContactView(int contactId, Node contactRoot) {
-		highlightNav(navContactsButton);
-		sectionTitleLabel.setText("Contact");
-		sectionSubtitleLabel.setText("Contact #" + contactId);
-		sectionContent.getChildren().setAll(contactRoot);
-	}
-
-	private void showContactsList() {
-		highlightNav(navContactsButton);
-		sectionTitleLabel.setText("Contacts");
-		sectionSubtitleLabel.setText("Manage clients, experts, and other contacts.");
-
-		Node contactsRoot = sceneManager.createContactsView(this::openContact);
-		sectionContent.getChildren().setAll(contactsRoot);
-	}
-
-	private void showOrganizationsList() {
-		highlightNav(navOrganizationsButton);
-		sectionTitleLabel.setText("Organizations");
-		sectionSubtitleLabel.setText("Browse, search, and manage organizations.");
-
-		Node organizationsRoot = sceneManager.createOrganizationsView(this::openOrganization);
-		sectionContent.getChildren().setAll(organizationsRoot);
 	}
 
 	private void showMyShale() {

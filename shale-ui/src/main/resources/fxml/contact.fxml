@@ -1,114 +1,57 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.DatePicker?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ScrollPane?>
-<?import javafx.scene.control.TextArea?>
-<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Region?>
-<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
-    xmlns:fx="http://javafx.com/fxml/1"
-    fx:controller="com.shale.ui.controller.ContactViewController" styleClass="app-shell">
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.shale.ui.controller.ContactController"
+            styleClass="app-shell">
 
     <top>
         <VBox spacing="6.0" BorderPane.alignment="CENTER">
             <padding>
                 <Insets top="10" right="12" bottom="8" left="12" />
             </padding>
-
-            <HBox spacing="8.0" alignment="CENTER_LEFT">
-                <Label fx:id="contactTitleLabel" text="Contact"
-                    style="-fx-font-size: 18px; -fx-font-weight: bold;" />
-                <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="editButton" text="Edit" />
-                <Button fx:id="saveButton" text="Save" visible="false" managed="false" />
-                <Button fx:id="cancelButton" text="Cancel" visible="false" managed="false" />
-            </HBox>
-
-            <HBox spacing="10.0" alignment="CENTER_LEFT">
-                <Label fx:id="contactSubtitleLabel" text="Contact #—" style="-fx-opacity: 0.8;" />
-                <Region HBox.hgrow="ALWAYS" />
-                <Label fx:id="lastUpdatedLabel" text="Last updated: —" style="-fx-opacity: 0.7;" />
-            </HBox>
+            <Label fx:id="contactTitleLabel" text="Contact" style="-fx-font-size: 18px; -fx-font-weight: bold;" />
+            <Label text="Contact details" style="-fx-opacity: 0.7;" />
         </VBox>
     </top>
 
     <center>
-        <StackPane BorderPane.alignment="CENTER">
+        <VBox spacing="10" styleClass="case-main-surface" BorderPane.alignment="CENTER">
             <padding>
-                <Insets top="10" right="12" bottom="12" left="12" />
+                <Insets top="12" right="12" bottom="12" left="12" />
             </padding>
 
-            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll">
-                <VBox spacing="10" maxWidth="980" styleClass="case-main-surface">
-                    <padding>
-                        <Insets top="12" right="12" bottom="12" left="12" />
-                    </padding>
+            <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
 
-                    <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
+            <GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
+                <columnConstraints>
+                    <ColumnConstraints minWidth="140" prefWidth="170" />
+                    <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
+                </columnConstraints>
 
-                    <GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
-                        <columnConstraints>
-                            <ColumnConstraints minWidth="160" prefWidth="180" />
-                            <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
-                        </columnConstraints>
+                <Label text="Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
+                <Label fx:id="nameValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
-                        <Label text="Display Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
-                        <Label fx:id="displayNameValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+                <Label text="Email:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
+                <Label fx:id="emailValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
-                        <Label text="Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
-                        <Label fx:id="nameValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-                        <TextField fx:id="nameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+                <Label text="Phone:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
+                <Label fx:id="phoneValue" text="—" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1" />
 
-                        <Label text="First Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
-                        <Label fx:id="firstNameValue" text="—" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-                        <TextField fx:id="firstNameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+                <Label text="Tenant (debug):" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
+                <Label fx:id="tenantValue" text="—" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" />
 
-                        <Label text="Last Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
-                        <Label fx:id="lastNameValue" text="—" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-                        <TextField fx:id="lastNameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-
-                        <Label text="Email:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
-                        <Label fx:id="emailValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-                        <TextField fx:id="emailEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-
-                        <Label text="Phone:" style="-fx-opacity: 0.8;" GridPane.rowIndex="5" />
-                        <Label fx:id="phoneValue" text="—" wrapText="true" GridPane.rowIndex="5" GridPane.columnIndex="1" />
-                        <TextField fx:id="phoneEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="5" GridPane.columnIndex="1" />
-
-                        <Label text="Home Address:" style="-fx-opacity: 0.8;" GridPane.rowIndex="6" />
-                        <Label fx:id="addressHomeValue" text="—" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1" />
-                        <TextArea fx:id="addressHomeEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="3" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1" />
-
-                        <Label text="Date of Birth:" style="-fx-opacity: 0.8;" GridPane.rowIndex="7" />
-                        <Label fx:id="dateOfBirthValue" text="—" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" />
-                        <DatePicker fx:id="dateOfBirthEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="7" GridPane.columnIndex="1" />
-
-                        <Label text="Condition:" style="-fx-opacity: 0.8;" GridPane.rowIndex="8" />
-                        <Label fx:id="conditionValue" text="—" wrapText="true" GridPane.rowIndex="8" GridPane.columnIndex="1" />
-                        <TextArea fx:id="conditionEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" GridPane.rowIndex="8" GridPane.columnIndex="1" />
-
-                        <Label text="Client:" style="-fx-opacity: 0.8;" GridPane.rowIndex="9" />
-                        <Label fx:id="clientValue" text="—" wrapText="true" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-                        <CheckBox fx:id="clientEditor" text="Is Client" visible="false" managed="false" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-
-                        <Label text="Deceased:" style="-fx-opacity: 0.8;" GridPane.rowIndex="10" />
-                        <Label fx:id="deceasedValue" text="—" wrapText="true" GridPane.rowIndex="10" GridPane.columnIndex="1" />
-                        <CheckBox fx:id="deceasedEditor" text="Is Deceased" visible="false" managed="false" GridPane.rowIndex="10" GridPane.columnIndex="1" />
-                    </GridPane>
-                </VBox>
-            </ScrollPane>
-        </StackPane>
+                <Label text="Updated:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
+                <Label fx:id="lastUpdatedValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+            </GridPane>
+        </VBox>
     </center>
 
 </BorderPane>

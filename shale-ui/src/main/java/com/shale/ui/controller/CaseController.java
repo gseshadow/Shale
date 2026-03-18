@@ -446,8 +446,13 @@ public class CaseController {
 	}
 
 	public void setOnOpenContact(Consumer<Integer> onOpenContact) {
-		this.onOpenContact = onOpenContact;
-		this.contactCardFactory = new ContactCardFactory(onOpenContact);
+		this.onOpenContact = contactId -> {
+			System.out.println("[CaseController.setOnOpenContact] card requested contactId=" + contactId);
+			if (onOpenContact != null) {
+				onOpenContact.accept(contactId);
+			}
+		};
+		this.contactCardFactory = new ContactCardFactory(this.onOpenContact);
 	}
 
 	/** Optional - if you don’t set this, card click will Sys.out for now */
@@ -2374,6 +2379,7 @@ public class CaseController {
 			Integer callerId = (editMode && draftPrimaryCallerContactId != null)
 					? draftPrimaryCallerContactId
 					: dto.getPrimaryCallerContactId();
+			System.out.println("[CaseController.renderContacts] callerId=" + callerId + ", callerName=" + safe(callerName));
 			renderCallerMini(callerId, callerName);
 
 			String clientName = (editMode && draftPrimaryClientName != null && !draftPrimaryClientName.isBlank())
@@ -2382,6 +2388,7 @@ public class CaseController {
 			Integer clientId = (editMode && draftPrimaryClientContactId != null)
 					? draftPrimaryClientContactId
 					: dto.getPrimaryClientContactId();
+			System.out.println("[CaseController.renderContacts] clientId=" + clientId + ", clientName=" + safe(clientName));
 			renderClientMini(clientId, clientName);
 
 			String oppName = (editMode && draftPrimaryOpposingCounselName != null && !draftPrimaryOpposingCounselName.isBlank())
@@ -2390,6 +2397,7 @@ public class CaseController {
 			Integer oppId = (editMode && draftPrimaryOpposingCounselContactId != null)
 					? draftPrimaryOpposingCounselContactId
 					: dto.getPrimaryOpposingCounselContactId();
+			System.out.println("[CaseController.renderContacts] opposingCounselId=" + oppId + ", opposingCounselName=" + safe(oppName));
 			renderOpposingCounselMini(oppId, oppName);
 		}
 
