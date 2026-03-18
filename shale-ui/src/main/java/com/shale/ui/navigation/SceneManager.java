@@ -126,7 +126,8 @@ public final class SceneManager {
 		return load("/fxml/user.fxml", controller ->
 		{
 			UserController c = (UserController) controller;
-			c.init(userId);
+			UserDao userDao = new UserDao(dbSessionProvider);
+			c.init(userId, userDao, appState);
 			return c;
 		});
 	}
