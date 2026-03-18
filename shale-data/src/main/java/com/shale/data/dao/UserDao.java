@@ -35,10 +35,7 @@ public final class UserDao {
 			String initials,
 			boolean admin,
 			boolean attorney,
-			boolean deleted,
-			String defaultOrganizationName,
-			Integer defaultOrganizationId,
-			Integer organizationId) {
+			boolean deleted) {
 	}
 
 	public record UserProfileUpdateRequest(
@@ -49,8 +46,7 @@ public final class UserDao {
 			String email,
 			String phone,
 			String initials,
-			String color,
-			Integer defaultOrganizationId) {
+			String color) {
 	}
 
 	public record UserRoleRow(int roleId, String roleName) {
@@ -168,15 +164,8 @@ public final class UserDao {
 					  COALESCE(u.Initials, '') AS Initials,
 					  COALESCE(u.is_admin, 0) AS IsAdmin,
 					  COALESCE(u.is_attorney, 0) AS IsAttorney,
-					  COALESCE(u.is_deleted, 0) AS IsDeleted,
-					  defaultOrg.Name AS DefaultOrganizationName,
-					  u.default_organization AS DefaultOrganizationId,
-					  u.organization_id AS OrganizationId
+					  COALESCE(u.is_deleted, 0) AS IsDeleted
 					FROM dbo.Users u
-					LEFT JOIN dbo.Organizations defaultOrg
-					  ON defaultOrg.Id = u.default_organization
-					 AND defaultOrg.ShaleClientId = u.ShaleClientId
-					 AND (defaultOrg.IsDeleted = 0 OR defaultOrg.IsDeleted IS NULL)
 					WHERE u.Id = ?
 					  AND u.ShaleClientId = ?
 					""");
@@ -202,10 +191,7 @@ public final class UserDao {
 							rs.getString("Initials"),
 							rs.getBoolean("IsAdmin"),
 							rs.getBoolean("IsAttorney"),
-							rs.getBoolean("IsDeleted"),
-							rs.getString("DefaultOrganizationName"),
-							getNullableInt(rs, "DefaultOrganizationId"),
-							getNullableInt(rs, "OrganizationId"));
+							rs.getBoolean("IsDeleted"));
 				}
 			}
 		} catch (SQLException e) {
@@ -232,8 +218,7 @@ public final class UserDao {
 					    name_last = ?,
 					    email = ?,
 					    Initials = ?,
-					    Color = ?,
-					    default_organization = ?
+					    Color = ?
 					""");
 			if (phoneColumn != null) {
 				sql.append(",\n    ").append(phoneColumn).append(" = ?");
@@ -249,7 +234,6 @@ public final class UserDao {
 				setNullableString(ps, idx++, request.email());
 				setNullableString(ps, idx++, request.initials());
 				setNullableString(ps, idx++, request.color());
-				setNullableInteger(ps, idx++, request.defaultOrganizationId());
 				if (phoneColumn != null) {
 					setNullableString(ps, idx++, request.phone());
 				}

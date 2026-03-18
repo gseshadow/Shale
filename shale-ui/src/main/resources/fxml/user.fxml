@@ -3,7 +3,6 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ColorPicker?>
-<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
@@ -96,9 +95,6 @@
                             <Label fx:id="colorEditorValue" text="—" style="-fx-opacity: 0.8;" />
                         </HBox>
 
-                        <Label text="Default Organization:" style="-fx-opacity: 0.8;" GridPane.rowIndex="7" />
-                        <Label fx:id="defaultOrganizationValue" text="—" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" />
-                        <ComboBox fx:id="defaultOrganizationEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="7" GridPane.columnIndex="1" />
                     </GridPane>
 
                     <VBox spacing="8" styleClass="secondary-panel">

@@ -1,7 +1,5 @@
 package com.shale.ui.controller;
 
-import com.shale.data.dao.OrganizationDao;
-import com.shale.data.dao.OrganizationDao.OrganizationOptionRow;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserDao.UserDetailRow;
 import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
@@ -12,14 +10,11 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.util.ColorUtil;
 
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ColorPicker;
-import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -30,7 +25,6 @@ import javafx.scene.paint.Color;
 import javafx.stage.Window;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -70,17 +64,13 @@ public final class UserController {
 	@FXML private HBox colorEditorContainer;
 	@FXML private ColorPicker colorEditor;
 	@FXML private Label colorEditorValue;
-	@FXML private Label defaultOrganizationValue;
-	@FXML private ComboBox<OrganizationOptionRow> defaultOrganizationEditor;
 
 	private Integer userId;
 	private UserDao userDao;
-	private OrganizationDao organizationDao;
 	private AppState appState;
 	private UserDetailRow currentUser;
 	private List<UserRoleRow> assignedRoles = List.of();
 	private List<UserRoleRow> assignableRoles = List.of();
-	private List<OrganizationOptionRow> defaultOrganizationOptions = List.of();
 	private boolean editMode;
 	private boolean colorEditedInSession;
 
@@ -90,10 +80,9 @@ public final class UserController {
 		return t;
 	});
 
-	public void init(int userId, UserDao userDao, OrganizationDao organizationDao, AppState appState) {
+	public void init(int userId, UserDao userDao, AppState appState) {
 		this.userId = userId;
 		this.userDao = userDao;
-		this.organizationDao = organizationDao;
 		this.appState = appState;
 	}
 
@@ -111,7 +100,6 @@ public final class UserController {
 		if (addRoleButton != null) {
 			addRoleButton.setOnAction(e -> onAddRole());
 		}
-		configureDefaultOrganizationEditor();
 		configureColorEditor();
 
 		setEditMode(false);
@@ -133,9 +121,6 @@ public final class UserController {
 		dbExec.submit(() -> {
 			try {
 				UserDetailRow loaded = userDao.findById(userId, shaleClientId);
-				List<OrganizationOptionRow> organizationOptions = organizationDao == null
-						? List.of()
-						: organizationDao.findSelectableOrganizations();
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (loaded == null) {
@@ -143,8 +128,6 @@ public final class UserController {
 						return;
 					}
 					currentUser = loaded;
-					defaultOrganizationOptions = organizationOptions == null ? List.of() : List.copyOf(organizationOptions);
-					refreshDefaultOrganizationOptions();
 					renderFromCurrent();
 					setEditMode(false);
 					clearError();
@@ -232,8 +215,7 @@ public final class UserController {
 				safeText(emailEditor == null ? null : emailEditor.getText()),
 				safeText(phoneEditor == null ? null : phoneEditor.getText()),
 				safeText(initialsEditor == null ? null : initialsEditor.getText()),
-				selectedStoredColor(),
-				selectedOrganizationId());
+				selectedStoredColor());
 
 		setBusy(true);
 		dbExec.submit(() -> {
@@ -387,7 +369,6 @@ public final class UserController {
 		setLabel(phoneValue, currentUser.phone());
 		setLabel(initialsValue, currentUser.initials());
 		renderColorValue(currentUser.color());
-		setLabel(defaultOrganizationValue, defaultOrganizationDisplay(currentUser));
 		writeEditorsFromCurrent();
 		refreshActionVisibility();
 		renderRoles();
@@ -451,7 +432,6 @@ public final class UserController {
 			initialsEditor.setText(safeText(currentUser.initials()));
 		}
 		setEditorColor(currentUser.color());
-		selectDefaultOrganization(currentUser.defaultOrganizationId());
 	}
 
 	private void setEditMode(boolean enabled) {
@@ -464,7 +444,6 @@ public final class UserController {
 		toggleEditableField(phoneValue, phoneEditor, this.editMode);
 		toggleEditableField(initialsValue, initialsEditor, this.editMode);
 		toggleEditableField(colorValueContainer, colorEditorContainer, this.editMode);
-		toggleEditableField(defaultOrganizationValue, defaultOrganizationEditor, this.editMode);
 	}
 
 	private void refreshActionVisibility() {
@@ -505,9 +484,6 @@ public final class UserController {
 		}
 		if (colorEditor != null) {
 			colorEditor.setDisable(busy);
-		}
-		if (defaultOrganizationEditor != null) {
-			defaultOrganizationEditor.setDisable(busy);
 		}
 	}
 
@@ -552,27 +528,6 @@ public final class UserController {
 		return null;
 	}
 
-	private void configureDefaultOrganizationEditor() {
-		if (defaultOrganizationEditor == null) {
-			return;
-		}
-		defaultOrganizationEditor.setCellFactory(listView -> new ListCell<>() {
-			@Override
-			protected void updateItem(OrganizationOptionRow item, boolean empty) {
-				super.updateItem(item, empty);
-				setText(empty ? null : organizationOptionLabel(item));
-			}
-		});
-		defaultOrganizationEditor.setButtonCell(new ListCell<>() {
-			@Override
-			protected void updateItem(OrganizationOptionRow item, boolean empty) {
-				super.updateItem(item, empty);
-				setText(empty ? null : organizationOptionLabel(item));
-			}
-		});
-		refreshDefaultOrganizationOptions();
-	}
-
 	private void configureColorEditor() {
 		if (colorPreview != null) {
 			colorPreview.setStyle(COLOR_SWATCH_BASE_STYLE + " -fx-background-color: white;");
@@ -585,37 +540,6 @@ public final class UserController {
 			});
 		}
 		updateColorEditorValueLabel(colorEditor == null ? DEFAULT_USER_COLOR : colorEditor.getValue());
-	}
-
-	private void refreshDefaultOrganizationOptions() {
-		if (defaultOrganizationEditor == null) {
-			return;
-		}
-		List<OrganizationOptionRow> items = new java.util.ArrayList<>();
-		items.add(new OrganizationOptionRow(null, "— None —"));
-		items.addAll(defaultOrganizationOptions);
-		defaultOrganizationEditor.setItems(FXCollections.observableArrayList(items));
-		selectDefaultOrganization(currentUser == null ? null : currentUser.defaultOrganizationId());
-	}
-
-	private void selectDefaultOrganization(Integer organizationId) {
-		if (defaultOrganizationEditor == null) {
-			return;
-		}
-		for (OrganizationOptionRow option : defaultOrganizationEditor.getItems()) {
-			if (Objects.equals(option == null ? null : option.organizationId(), organizationId)) {
-				defaultOrganizationEditor.getSelectionModel().select(option);
-				return;
-			}
-		}
-		defaultOrganizationEditor.getSelectionModel().selectFirst();
-	}
-
-	private Integer selectedOrganizationId() {
-		OrganizationOptionRow selected = defaultOrganizationEditor == null
-				? null
-				: defaultOrganizationEditor.getSelectionModel().getSelectedItem();
-		return selected == null ? null : selected.organizationId();
 	}
 
 	private void renderColorValue(String storedColor) {
@@ -701,30 +625,6 @@ public final class UserController {
 
 	private static String safeText(String value) {
 		return value == null ? "" : value.trim();
-	}
-
-	private static String defaultOrganizationDisplay(UserDetailRow user) {
-		if (user == null) {
-			return "—";
-		}
-		String name = fallback(user.defaultOrganizationName());
-		if (!"—".equals(name)) {
-			return name;
-		}
-		Integer organizationId = user.defaultOrganizationId();
-		return organizationId == null ? "—" : "Organization #" + organizationId;
-	}
-
-	private static String organizationOptionLabel(OrganizationOptionRow option) {
-		if (option == null) {
-			return "—";
-		}
-		String name = fallback(option.name());
-		if (!"—".equals(name)) {
-			return name;
-		}
-		Integer organizationId = option.organizationId();
-		return organizationId == null ? "— None —" : "Organization #" + organizationId;
 	}
 
 	private static String fallback(String value) {
