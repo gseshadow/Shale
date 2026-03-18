@@ -142,9 +142,8 @@ public final class UserDao {
 		try (Connection con = db.requireConnection()) {
 			verifyTenantMatchesSession(con, shaleClientId);
 
-			List<String> phoneColumns = existingPhoneColumns(con);
-			String phoneSelect = phoneSelectExpression(phoneColumns, "u");
-			System.out.println("[TEMP DIAG][USER_DAO] load userId=" + userId + " phoneColumns=" + phoneColumns);
+			String phoneColumn = existingPhoneColumn(con);
+			String phoneSelect = phoneSelectExpression(phoneColumn, "u");
 
 			StringBuilder sql = new StringBuilder("""
 					SELECT
@@ -216,15 +215,14 @@ public final class UserDao {
 		try (Connection con = db.requireConnection()) {
 			verifyTenantMatchesSession(con, request.shaleClientId());
 
-			List<String> phoneColumns = existingPhoneColumns(con);
-			System.out.println("[TEMP DIAG][USER_DAO] save userId=" + request.userId() + " phone='" + safeLogValue(request.phone()) + "' phoneColumns=" + phoneColumns);
+			String phoneColumn = existingPhoneColumn(con);
 			StringBuilder sql = new StringBuilder("""
 					UPDATE dbo.Users
 					SET name_first = ?,
 					    name_last = ?,
 					    email = ?
 					""");
-			for (String phoneColumn : phoneColumns) {
+			if (phoneColumn != null) {
 				sql.append(",\n    ").append(phoneColumn).append(" = ?");
 			}
 			sql.append("\nWHERE Id = ?\n  AND ShaleClientId = ?");
@@ -236,7 +234,7 @@ public final class UserDao {
 				setNullableString(ps, idx++, request.firstName());
 				setNullableString(ps, idx++, request.lastName());
 				setNullableString(ps, idx++, request.email());
-				for (int i = 0; i < phoneColumns.size(); i++) {
+				if (phoneColumn != null) {
 					setNullableString(ps, idx++, request.phone());
 				}
 				ps.setInt(idx++, request.userId());
@@ -353,34 +351,21 @@ public final class UserDao {
 		};
 	}
 
-	private static List<String> existingPhoneColumns(Connection con) throws SQLException {
-		List<String> columns = new ArrayList<>();
-		for (String column : List.of("PhoneCell", "phone_cell", "Phone", "phone", "PhoneNumber", "phone_number")) {
+	private static String existingPhoneColumn(Connection con) throws SQLException {
+		for (String column : List.of("Phone", "PhoneCell", "phone_cell", "PhoneNumber", "phone", "phone_number")) {
 			if (tableHasColumn(con, "Users", column)) {
-				columns.add(column);
+				return column;
 			}
 		}
-		return columns;
+		return null;
 	}
 
-	private static String phoneSelectExpression(List<String> phoneColumns, String alias) {
+	private static String phoneSelectExpression(String phoneColumn, String alias) {
 		String prefix = (alias == null || alias.isBlank()) ? "" : alias + ".";
-		if (phoneColumns == null || phoneColumns.isEmpty()) {
+		if (phoneColumn == null || phoneColumn.isBlank()) {
 			return "CAST(NULL AS NVARCHAR(255)) AS Phone";
 		}
-		StringBuilder expr = new StringBuilder("COALESCE(");
-		for (int i = 0; i < phoneColumns.size(); i++) {
-			if (i > 0) {
-				expr.append(", ");
-			}
-			expr.append("NULLIF(LTRIM(RTRIM(").append(prefix).append(phoneColumns.get(i)).append(")), '')");
-		}
-		expr.append(") AS Phone");
-		return expr.toString();
-	}
-
-	private static String safeLogValue(String value) {
-		return value == null ? "<null>" : value.trim();
+		return "NULLIF(LTRIM(RTRIM(" + prefix + phoneColumn + ")), '') AS Phone";
 	}
 
 	private static void appendUserVisibilityFilters(StringBuilder sql, Connection con, String alias) throws SQLException {
