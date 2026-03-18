@@ -88,6 +88,16 @@ public final class CaseDao {
 	) {
 	}
 
+	public record RelatedContactRow(
+			int id,
+			String displayName,
+			int roleId,
+			boolean primary,
+			String email,
+			String phone
+	) {
+	}
+
 	public record SelectableOrganizationRow(
 			int id,
 			String name,
@@ -1474,6 +1484,90 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list contacts (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public List<RelatedContactRow> findRelatedContacts(long caseId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+
+		String baseSql = """
+				SELECT
+				  ct.Id,
+				  LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )) AS DisplayName,
+				  cc.Role AS RoleId,
+				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				FROM dbo.CaseContacts cc
+				INNER JOIN dbo.Cases c
+				  ON c.Id = cc.CaseId
+				INNER JOIN dbo.Contacts ct
+				  ON ct.Id = cc.ContactId
+				WHERE cc.CaseId = ?
+				  AND c.ShaleClientId = ?
+				  AND ct.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND NULLIF(LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )), '') IS NOT NULL
+				""";
+
+		String orderSql = """
+				ORDER BY DisplayName ASC, cc.Role ASC, ct.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			boolean hasIsDeleted = contactsHasIsDeletedColumn(con);
+
+			String sql = hasIsDeleted
+					? baseSql + "\n  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)\n" + orderSql
+					: baseSql + "\n" + orderSql;
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setLong(idx++, caseId);
+				ps.setInt(idx++, shaleClientId);
+				ps.setInt(idx++, shaleClientId);
+
+				List<RelatedContactRow> out = new ArrayList<>();
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						out.add(new RelatedContactRow(
+							rs.getInt("Id"),
+							rs.getString("DisplayName"),
+							rs.getInt("RoleId"),
+							rs.getBoolean("IsPrimary"),
+							rs.getString("Email"),
+							rs.getString("Phone")));
+					}
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load related contacts for case (id=" + caseId + ")", e);
 		}
 	}
 
