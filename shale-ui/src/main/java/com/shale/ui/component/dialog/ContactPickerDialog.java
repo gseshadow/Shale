@@ -2,14 +2,16 @@ package com.shale.ui.component.dialog;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
@@ -40,9 +42,12 @@ public final class ContactPickerDialog<T> {
 		this.allItems = FXCollections.observableArrayList(items);
 		this.labelFn = labelFn;
 
-		stage.initOwner(owner);
-		stage.initModality(Modality.APPLICATION_MODAL);
+		if (owner != null) {
+			stage.initOwner(owner);
+		}
+		stage.initModality(Modality.WINDOW_MODAL);
 		stage.setTitle(title);
+		stage.setResizable(true);
 
 		searchField.setPromptText("Search...");
 		listView.setItems(FXCollections.observableArrayList(allItems));
@@ -97,18 +102,34 @@ public final class ContactPickerDialog<T> {
 			}
 		});
 
-		VBox root = new VBox(10,
-				new Label("Select contact"),
-				searchField,
-				listView,
-				new HBox(10, new Region(), cancelButton, okButton)
-		);
-		VBox.setVgrow(listView, Priority.ALWAYS);
-		((HBox) root.getChildren().get(root.getChildren().size() - 1)).setHgrow(((HBox) root.getChildren().get(root.getChildren().size() - 1)).getChildren().get(0),
-				Priority.ALWAYS);
+		Label titleLabel = new Label(title);
+		titleLabel.getStyleClass().add("app-dialog-title");
 
-		root.setPadding(new Insets(12));
+		Label instructionsLabel = new Label("Search and select an item.");
+		instructionsLabel.getStyleClass().add("app-dialog-message");
+		instructionsLabel.setWrapText(true);
+
+		VBox header = new VBox(8, titleLabel, instructionsLabel);
+		header.getStyleClass().add("app-dialog-header");
+
+		searchField.getStyleClass().add("app-dialog-search-field");
+		listView.getStyleClass().add("app-dialog-list");
+		okButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+		cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+
+		Region spacer = new Region();
+		HBox actions = new HBox(10, spacer, cancelButton, okButton);
+		actions.setAlignment(Pos.CENTER_RIGHT);
+		actions.getStyleClass().add("app-dialog-actions");
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+
+		VBox root = new VBox(16, header, searchField, listView, actions);
+		root.getStyleClass().add("app-dialog-root");
+		VBox.setVgrow(listView, Priority.ALWAYS);
+
+		root.setPadding(new Insets(18));
 		root.setPrefSize(520, 600);
+		root.setMinWidth(460);
 
 		Scene scene = new Scene(root);
 		scene.getStylesheets().add(Objects.requireNonNull(

@@ -174,7 +174,9 @@ public final class MainController {
 		highlightNav(navTeamButton);
 		sectionTitleLabel.setText("Team");
 		sectionSubtitleLabel.setText("See and manage your team members.");
-		setSectionContentText("Team tab is not implemented yet.");
+
+		Node teamRoot = sceneManager.createTeamView(sceneManager::openUserProfile);
+		sectionContent.getChildren().setAll(teamRoot);
 	}
 
 	@FXML
@@ -233,6 +235,17 @@ public final class MainController {
 
 		Node organizationRoot = sceneManager.createOrganizationView(organizationId, this::openCase, this::showOrganizationsList);
 		sectionContent.getChildren().setAll(organizationRoot);
+	}
+
+	public void openUser(int userId) {
+		sceneManager.openUserProfile(userId);
+	}
+
+	public void showUserView(int userId, Node userRoot) {
+		highlightNav(navTeamButton);
+		sectionTitleLabel.setText("User");
+		sectionSubtitleLabel.setText("User #" + userId);
+		sectionContent.getChildren().setAll(userRoot);
 	}
 
 	private void showOrganizationsList() {

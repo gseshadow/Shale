@@ -23,6 +23,7 @@ import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
+import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
@@ -38,7 +39,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
@@ -794,26 +794,20 @@ public class CaseController {
 		}
 
 		Window owner = addOrganizationButton.getScene() == null ? null : addOrganizationButton.getScene().getWindow();
-		ButtonType selectExisting = new ButtonType("Select Existing Organization");
-		ButtonType createNew = new ButtonType("Create New Organization");
-		ButtonType cancel = new ButtonType("Cancel", ButtonData.CANCEL_CLOSE);
-
-		Alert chooser = new Alert(Alert.AlertType.CONFIRMATION);
-		if (owner != null) {
-			chooser.initOwner(owner);
-		}
-		chooser.initModality(Modality.WINDOW_MODAL);
-		chooser.setTitle("Add Organization");
-		chooser.setHeaderText("Add an organization to this case");
-		chooser.setContentText("Choose whether to link an existing organization or create a new one.");
-		chooser.getButtonTypes().setAll(selectExisting, createNew, cancel);
-
-		Optional<ButtonType> choice = chooser.showAndWait();
-		if (choice.isEmpty() || choice.get() == cancel) {
+		Optional<String> choice = AppDialogs.showChoice(
+				owner,
+				"Add Organization",
+				"Add an organization to this case",
+				"Choose whether to link an existing organization or create a new one.",
+				List.of(
+						AppDialogs.DialogAction.cancel("Cancel", null),
+						AppDialogs.DialogAction.of("Select Existing Organization", "existing", AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.of("Create New Organization", "create", AppDialogs.DialogActionKind.PRIMARY, true, false)));
+		if (choice.isEmpty()) {
 			return;
 		}
 
-		if (choice.get() == selectExisting) {
+		if ("existing".equals(choice.get())) {
 			loadLinkableOrganizationsAndShowPicker(owner);
 			return;
 		}
@@ -935,16 +929,13 @@ public class CaseController {
 	}
 
 	private boolean confirmOrganizationUnlink(CaseDao.RelatedOrganizationRow org) {
-		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-		if (addOrganizationButton != null && addOrganizationButton.getScene() != null) {
-			alert.initOwner(addOrganizationButton.getScene().getWindow());
-		}
-		alert.setTitle("Remove Organization");
-		alert.setHeaderText("Remove this organization from the case?");
-		alert.setContentText(formatRelatedOrganization(org));
-
-		Optional<ButtonType> choice = alert.showAndWait();
-		return choice.isPresent() && choice.get() == ButtonType.OK;
+		return AppDialogs.showConfirmation(
+				organizationDialogOwner(),
+				"Remove Organization",
+				"Remove this organization from the case?",
+				formatRelatedOrganization(org),
+				"Remove Organization",
+				AppDialogs.DialogActionKind.DANGER);
 	}
 
 	private void refreshOrganizationsSectionAsync() {
@@ -967,22 +958,26 @@ public class CaseController {
 	}
 
 	private void showOrganizationActionInfo(String message) {
-		showOrganizationActionAlert(Alert.AlertType.INFORMATION, message);
+		showOrganizationActionAlert(AppDialogs.DialogActionKind.PRIMARY, message);
 	}
 
 	private void showOrganizationActionError(String message) {
-		showOrganizationActionAlert(Alert.AlertType.ERROR, message);
+		showOrganizationActionAlert(AppDialogs.DialogActionKind.DANGER, message);
 	}
 
-	private void showOrganizationActionAlert(Alert.AlertType type, String message) {
-		Alert alert = new Alert(type);
-		if (addOrganizationButton != null && addOrganizationButton.getScene() != null) {
-			alert.initOwner(addOrganizationButton.getScene().getWindow());
+	private void showOrganizationActionAlert(AppDialogs.DialogActionKind type, String message) {
+		if (type == AppDialogs.DialogActionKind.DANGER) {
+			AppDialogs.showError(organizationDialogOwner(), "Organizations", message);
+			return;
 		}
-		alert.setTitle("Organizations");
-		alert.setHeaderText(null);
-		alert.setContentText(message);
-		alert.showAndWait();
+		AppDialogs.showInfo(organizationDialogOwner(), "Organizations", message);
+	}
+
+	private Window organizationDialogOwner() {
+		if (addOrganizationButton != null && addOrganizationButton.getScene() != null) {
+			return addOrganizationButton.getScene().getWindow();
+		}
+		return null;
 	}
 
 	private String formatSelectableOrganization(CaseDao.SelectableOrganizationRow row) {

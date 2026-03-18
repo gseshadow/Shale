@@ -3,6 +3,7 @@ package com.shale.ui.navigation;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.data.dao.UserDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.LoginController;
@@ -12,6 +13,8 @@ import com.shale.ui.controller.NewIntakeController;
 import com.shale.ui.controller.NewOrganizationController;
 import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
+import com.shale.ui.controller.TeamController;
+import com.shale.ui.controller.UserController;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -109,6 +112,28 @@ public final class SceneManager {
 		});
 	}
 
+	public Parent createTeamView(Consumer<Integer> onOpenUser) {
+		return load("/fxml/team.fxml", controller ->
+		{
+			TeamController c = (TeamController) controller;
+			UserDao userDao = new UserDao(dbSessionProvider);
+			c.init(appState, userDao, onOpenUser);
+			return c;
+		});
+	}
+
+	private static final String ROOT_CONTROLLER_KEY = "sceneManager.controller";
+
+	public Parent createUserView(int userId) {
+		return load("/fxml/user.fxml", controller ->
+		{
+			UserController c = (UserController) controller;
+			UserDao userDao = new UserDao(dbSessionProvider);
+			c.init(userId, userDao, appState);
+			return c;
+		});
+	}
+
 	public Parent createOrganizationView(int organizationId, Consumer<Integer> onOpenCase, Runnable onOrganizationDeleted) {
 		return load("/fxml/organization.fxml", controller ->
 		{
@@ -201,10 +226,23 @@ public final class SceneManager {
 		}
 	}
 
-	private void openUserProfile(Integer userId) {
-		System.out.println("Navigate to User Profile: " + userId);
-		// TODO: when you have user view:
-		// set center content to user view / or navigate
+	public void openUserProfile(Integer userId) {
+		if (userId == null || userId <= 0) {
+			System.err.println("Ignoring user navigation for invalid userId: " + userId);
+			return;
+		}
+
+		try {
+			Parent userRoot = createUserView(userId);
+			MainController mainController = resolveMainController();
+			if (mainController == null) {
+				System.err.println("Unable to navigate to user profile; main controller is unavailable.");
+				return;
+			}
+			mainController.showUserView(userId, userRoot);
+		} catch (RuntimeException ex) {
+			System.err.println("Failed to open user profile for userId " + userId + ": " + ex.getMessage());
+		}
 	}
 
 	private void openStatusProfile(Integer statusId) {
@@ -218,6 +256,25 @@ public final class SceneManager {
 		// TODO later: navigate to contacts page / contact detail
 	}
 
+
+	private MainController resolveMainController() {
+		Scene scene = stage.getScene();
+		if (scene == null) {
+			return null;
+		}
+
+		Parent root = scene.getRoot();
+		if (root == null) {
+			return null;
+		}
+
+		Object controller = root.getProperties().get(ROOT_CONTROLLER_KEY);
+		if (controller instanceof MainController mainController) {
+			return mainController;
+		}
+
+		return null;
+	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {
 		try {
@@ -235,7 +292,9 @@ public final class SceneManager {
 				}
 			});
 
-			return loader.load();
+			Parent root = loader.load();
+			root.getProperties().put(ROOT_CONTROLLER_KEY, loader.getController());
+			return root;
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to load FXML: " + fxmlPath, e);
 		}
