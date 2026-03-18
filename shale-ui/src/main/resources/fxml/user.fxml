@@ -7,6 +7,7 @@
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
@@ -94,6 +95,18 @@
                         <Label text="Organization Id:" style="-fx-opacity: 0.8;" GridPane.rowIndex="9" />
                         <Label fx:id="organizationValue" text="—" wrapText="true" GridPane.rowIndex="9" GridPane.columnIndex="1" />
                     </GridPane>
+
+                    <VBox spacing="8" styleClass="secondary-panel">
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="Roles" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                            <Region HBox.hgrow="ALWAYS" />
+                            <Button fx:id="addRoleButton" text="Add Role" visible="false" managed="false" />
+                        </HBox>
+                        <StackPane>
+                            <FlowPane fx:id="rolesFlow" hgap="10" vgap="10" prefWrapLength="900" />
+                            <Label fx:id="rolesEmptyLabel" text="No roles assigned" visible="false" managed="false" />
+                        </StackPane>
+                    </VBox>
                 </VBox>
             </ScrollPane>
         </StackPane>

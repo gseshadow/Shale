@@ -3,6 +3,9 @@ package com.shale.ui.controller;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserDao.UserDetailRow;
 import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
+import com.shale.data.dao.UserDao.UserRoleRow;
+import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
@@ -11,7 +14,14 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
 
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -24,6 +34,9 @@ public final class UserController {
 	@FXML private Button editButton;
 	@FXML private Button saveButton;
 	@FXML private Button cancelButton;
+	@FXML private Button addRoleButton;
+	@FXML private FlowPane rolesFlow;
+	@FXML private Label rolesEmptyLabel;
 
 	@FXML private Label displayNameValue;
 	@FXML private Label firstNameValue;
@@ -44,6 +57,8 @@ public final class UserController {
 	private UserDao userDao;
 	private AppState appState;
 	private UserDetailRow currentUser;
+	private List<UserRoleRow> assignedRoles = List.of();
+	private List<UserRoleRow> assignableRoles = List.of();
 	private boolean editMode;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
@@ -68,6 +83,9 @@ public final class UserController {
 		}
 		if (cancelButton != null) {
 			cancelButton.setOnAction(e -> onCancel());
+		}
+		if (addRoleButton != null) {
+			addRoleButton.setOnAction(e -> onAddRole());
 		}
 
 		setEditMode(false);
@@ -99,11 +117,44 @@ public final class UserController {
 					renderFromCurrent();
 					setEditMode(false);
 					clearError();
+					refreshRolesAsync();
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
 					setBusy(false);
 					setError("Failed to load user details.");
+				});
+			}
+		});
+	}
+
+	private void refreshRolesAsync() {
+		if (userDao == null || currentUser == null) {
+			assignedRoles = List.of();
+			assignableRoles = List.of();
+			renderRoles();
+			return;
+		}
+
+		final int targetUserId = currentUser.id();
+		final int shaleClientId = currentUser.shaleClientId();
+		dbExec.submit(() -> {
+			try {
+				List<UserRoleRow> loadedAssigned = userDao.listAssignedRoles(targetUserId, shaleClientId);
+				List<UserRoleRow> loadedAssignable = canManageRoles()
+						? userDao.listAssignableRoles(targetUserId, shaleClientId)
+						: List.of();
+				Platform.runLater(() -> {
+					assignedRoles = loadedAssigned == null ? List.of() : List.copyOf(loadedAssigned);
+					assignableRoles = loadedAssignable == null ? List.of() : List.copyOf(loadedAssignable);
+					renderRoles();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> {
+					assignedRoles = List.of();
+					assignableRoles = List.of();
+					renderRoles();
+					setError("Failed to load roles for this user.");
 				});
 			}
 		});
@@ -186,6 +237,99 @@ public final class UserController {
 		});
 	}
 
+	private void onAddRole() {
+		if (!canManageRoles()) {
+			setError("Only admin users can manage roles.");
+			return;
+		}
+		if (currentUser == null || userDao == null) {
+			setError("User details are unavailable.");
+			return;
+		}
+		if (assignableRoles.isEmpty()) {
+			AppDialogs.showInfo(dialogOwner(addRoleButton), "Roles", "No additional roles are available for this user.");
+			return;
+		}
+
+		ContactPickerDialog<UserRoleRow> picker = new ContactPickerDialog<>(
+				dialogOwner(addRoleButton),
+				"Add Role",
+				assignableRoles,
+				role -> role == null ? "" : fallback(role.roleName()),
+				null);
+
+		var selected = picker.showAndWait();
+		if (selected.isEmpty()) {
+			return;
+		}
+
+		UserRoleRow chosen = selected.get();
+		setBusy(true);
+		dbExec.submit(() -> {
+			try {
+				boolean added = userDao.addRoleToUser(currentUser.id(), chosen.roleId(), currentUser.shaleClientId());
+				Platform.runLater(() -> {
+					setBusy(false);
+					if (!added) {
+						setError("Role could not be added. It may already be assigned.");
+						refreshRolesAsync();
+						return;
+					}
+					clearError();
+					refreshRolesAsync();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> {
+					setBusy(false);
+					setError("Failed to add role to this user.");
+				});
+			}
+		});
+	}
+
+	private void onRemoveRole(UserRoleRow role) {
+		if (!canManageRoles()) {
+			setError("Only admin users can manage roles.");
+			return;
+		}
+		if (currentUser == null || role == null || userDao == null) {
+			setError("Role details are unavailable.");
+			return;
+		}
+		boolean confirmed = AppDialogs.showConfirmation(
+				dialogOwner(addRoleButton),
+				"Remove Role",
+				"Remove this role from the user?",
+				fallback(role.roleName()),
+				"Remove Role",
+				AppDialogs.DialogActionKind.DANGER);
+		if (!confirmed) {
+			return;
+		}
+
+		setBusy(true);
+		dbExec.submit(() -> {
+			try {
+				boolean removed = userDao.removeRoleFromUser(currentUser.id(), role.roleId(), currentUser.shaleClientId());
+				Platform.runLater(() -> {
+					setBusy(false);
+					if (!removed) {
+						setError("Role could not be removed from this user.");
+						refreshRolesAsync();
+						return;
+					}
+					clearError();
+					refreshRolesAsync();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> {
+					setBusy(false);
+					setError("Failed to remove role from this user.");
+				});
+			}
+		});
+	}
+
 	private void renderFromCurrent() {
 		if (currentUser == null) {
 			return;
@@ -214,6 +358,45 @@ public final class UserController {
 		setLabel(organizationValue, nullableId(currentUser.organizationId()));
 		writeEditorsFromCurrent();
 		refreshActionVisibility();
+		renderRoles();
+	}
+
+	private void renderRoles() {
+		if (rolesFlow == null) {
+			return;
+		}
+		List<Node> cards = assignedRoles.stream()
+				.map(this::createRoleNode)
+				.toList();
+		rolesFlow.getChildren().setAll(cards);
+
+		boolean empty = cards.isEmpty();
+		if (rolesEmptyLabel != null) {
+			rolesEmptyLabel.setVisible(empty);
+			rolesEmptyLabel.setManaged(empty);
+		}
+		setVisibleManaged(addRoleButton, canManageRoles());
+	}
+
+	private Node createRoleNode(UserRoleRow role) {
+		Label roleLabel = new Label(fallback(role == null ? null : role.roleName()));
+		roleLabel.setStyle("-fx-font-weight: 600;");
+
+		HBox row;
+		if (canManageRoles()) {
+			Button removeButton = new Button("Remove");
+			removeButton.getStyleClass().add("button-secondary");
+			removeButton.setOnAction(e -> onRemoveRole(role));
+			Region spacer = new Region();
+			HBox.setHgrow(spacer, Priority.ALWAYS);
+			row = new HBox(8, roleLabel, spacer, removeButton);
+		} else {
+			row = new HBox(roleLabel);
+		}
+		VBox container = new VBox(row);
+		container.getStyleClass().add("secondary-panel");
+		container.setPrefWidth(280);
+		return container;
 	}
 
 	private void writeEditorsFromCurrent() {
@@ -249,6 +432,7 @@ public final class UserController {
 		setVisibleManaged(editButton, canEdit && !editMode);
 		setVisibleManaged(saveButton, canEdit && editMode);
 		setVisibleManaged(cancelButton, canEdit && editMode);
+		setVisibleManaged(addRoleButton, canManageRoles());
 	}
 
 	private void setBusy(boolean busy) {
@@ -260,6 +444,9 @@ public final class UserController {
 		}
 		if (cancelButton != null) {
 			cancelButton.setDisable(busy);
+		}
+		if (addRoleButton != null) {
+			addRoleButton.setDisable(busy);
 		}
 		if (firstNameEditor != null) {
 			firstNameEditor.setDisable(busy);
@@ -279,6 +466,10 @@ public final class UserController {
 		return currentUser != null && (isAdminViewer() || isViewingSelf());
 	}
 
+	private boolean canManageRoles() {
+		return currentUser != null && isAdminViewer();
+	}
+
 	private boolean isAdminViewer() {
 		return appState != null && appState.isAdmin();
 	}
@@ -295,12 +486,21 @@ public final class UserController {
 			return "Read only";
 		}
 		if (isAdminViewer()) {
-			return isViewingSelf() ? "Admin access: you can edit your profile." : "Admin access: you can edit this user.";
+			return isViewingSelf()
+					? "Admin access: you can edit this profile and manage roles."
+					: "Admin access: you can edit this user and manage roles.";
 		}
 		if (isViewingSelf()) {
-			return "You can edit your basic profile fields.";
+			return "You can edit your basic profile fields. Roles are read only.";
 		}
 		return "Read only: only admins or the user themselves can edit this profile.";
+	}
+
+	private Window dialogOwner(Button button) {
+		if (button != null && button.getScene() != null) {
+			return button.getScene().getWindow();
+		}
+		return null;
 	}
 
 	private static void toggleEditableField(Label valueNode, Node editorNode, boolean editMode) {
