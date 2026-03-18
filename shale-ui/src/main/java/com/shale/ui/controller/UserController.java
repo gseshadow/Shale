@@ -147,6 +147,7 @@ public final class UserController {
 				Platform.runLater(() -> {
 					assignedRoles = loadedAssigned == null ? List.of() : List.copyOf(loadedAssigned);
 					assignableRoles = loadedAssignable == null ? List.of() : List.copyOf(loadedAssignable);
+					System.out.println("[TEMP DIAG][USER_ROLES] userId=" + targetUserId + " assigned=" + assignedRoles.size() + " available=" + assignableRoles.size());
 					renderRoles();
 				});
 			} catch (Exception ex) {

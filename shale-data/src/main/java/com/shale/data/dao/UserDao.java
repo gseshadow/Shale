@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.Objects;
 
 public final class UserDao {
+	private static final int ROLE_ADMIN = 1;
+	private static final int ROLE_ATTORNEY = 7;
+
 	public record DirectoryUserRow(
 			int id,
 			String displayName,
@@ -139,10 +142,9 @@ public final class UserDao {
 		try (Connection con = db.requireConnection()) {
 			verifyTenantMatchesSession(con, shaleClientId);
 
-			String phoneColumn = firstExistingColumn(con, "Users", "Phone", "phone", "PhoneCell", "phone_cell");
-			String phoneSelect = (phoneColumn == null)
-					? "CAST(NULL AS NVARCHAR(255)) AS Phone"
-					: "u." + phoneColumn + " AS Phone";
+			List<String> phoneColumns = existingPhoneColumns(con);
+			String phoneSelect = phoneSelectExpression(phoneColumns, "u");
+			System.out.println("[TEMP DIAG][USER_DAO] load userId=" + userId + " phoneColumns=" + phoneColumns);
 
 			StringBuilder sql = new StringBuilder("""
 					SELECT
@@ -214,14 +216,15 @@ public final class UserDao {
 		try (Connection con = db.requireConnection()) {
 			verifyTenantMatchesSession(con, request.shaleClientId());
 
-			String phoneColumn = firstExistingColumn(con, "Users", "Phone", "phone", "PhoneCell", "phone_cell");
+			List<String> phoneColumns = existingPhoneColumns(con);
+			System.out.println("[TEMP DIAG][USER_DAO] save userId=" + request.userId() + " phone='" + safeLogValue(request.phone()) + "' phoneColumns=" + phoneColumns);
 			StringBuilder sql = new StringBuilder("""
 					UPDATE dbo.Users
 					SET name_first = ?,
 					    name_last = ?,
 					    email = ?
 					""");
-			if (phoneColumn != null) {
+			for (String phoneColumn : phoneColumns) {
 				sql.append(",\n    ").append(phoneColumn).append(" = ?");
 			}
 			sql.append("\nWHERE Id = ?\n  AND ShaleClientId = ?");
@@ -233,7 +236,7 @@ public final class UserDao {
 				setNullableString(ps, idx++, request.firstName());
 				setNullableString(ps, idx++, request.lastName());
 				setNullableString(ps, idx++, request.email());
-				if (phoneColumn != null) {
+				for (int i = 0; i < phoneColumns.size(); i++) {
 					setNullableString(ps, idx++, request.phone());
 				}
 				ps.setInt(idx++, request.userId());
@@ -252,29 +255,29 @@ public final class UserDao {
 
 		try (Connection con = db.requireConnection()) {
 			verifyTenantMatchesSession(con, shaleClientId);
-			RoleSchema schema = resolveRoleSchema(con);
-
-			StringBuilder sql = new StringBuilder();
-			sql.append("SELECT r.").append(schema.rolesIdColumn()).append(" AS RoleId, ")
-					.append("r.").append(schema.rolesNameColumn()).append(" AS RoleName\n")
-					.append("FROM dbo.").append(schema.userRolesTable()).append(" ur\n")
-					.append("INNER JOIN dbo.Users u ON u.Id = ur.").append(schema.userRolesUserIdColumn()).append("\n")
-					.append("INNER JOIN dbo.").append(schema.rolesTable()).append(" r ON r.")
-					.append(schema.rolesIdColumn()).append(" = ur.").append(schema.userRolesRoleIdColumn()).append("\n")
-					.append("WHERE ur.").append(schema.userRolesUserIdColumn()).append(" = ?\n")
-					.append("  AND u.ShaleClientId = ?");
-			appendUserVisibilityFilters(sql, con, "u");
-			appendRoleVisibilityFilters(sql, con, schema, "r", shaleClientId);
-			sql.append("\nORDER BY r.").append(schema.rolesNameColumn()).append(" ASC, r.")
-					.append(schema.rolesIdColumn()).append(" ASC;");
-
-			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+			String sql = """
+					SELECT
+					  COALESCE(u.is_admin, 0) AS IsAdmin,
+					  COALESCE(u.is_attorney, 0) AS IsAttorney
+					FROM dbo.Users u
+					WHERE u.Id = ?
+					  AND u.ShaleClientId = ?
+					""";
+			StringBuilder sqlBuilder = new StringBuilder(sql);
+			appendUserVisibilityFilters(sqlBuilder, con, "u");
+			try (PreparedStatement ps = con.prepareStatement(sqlBuilder.toString())) {
 				ps.setInt(1, userId);
 				ps.setInt(2, shaleClientId);
 				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next()) {
+						return List.of();
+					}
 					List<UserRoleRow> out = new ArrayList<>();
-					while (rs.next()) {
-						out.add(new UserRoleRow(rs.getInt("RoleId"), rs.getString("RoleName")));
+					if (rs.getBoolean("IsAdmin")) {
+						out.add(new UserRoleRow(ROLE_ADMIN, "Admin"));
+					}
+					if (rs.getBoolean("IsAttorney")) {
+						out.add(new UserRoleRow(ROLE_ATTORNEY, "Attorney"));
 					}
 					return out;
 				}
@@ -289,171 +292,95 @@ public final class UserDao {
 			throw new IllegalArgumentException("userId and shaleClientId must be > 0");
 		}
 
-		try (Connection con = db.requireConnection()) {
-			verifyTenantMatchesSession(con, shaleClientId);
-			RoleSchema schema = resolveRoleSchema(con);
-
-			StringBuilder sql = new StringBuilder();
-			sql.append("SELECT r.").append(schema.rolesIdColumn()).append(" AS RoleId, ")
-					.append("r.").append(schema.rolesNameColumn()).append(" AS RoleName\n")
-					.append("FROM dbo.").append(schema.rolesTable()).append(" r\n")
-					.append("WHERE NOT EXISTS (\n")
-					.append("  SELECT 1 FROM dbo.").append(schema.userRolesTable()).append(" ur\n")
-					.append("  WHERE ur.").append(schema.userRolesUserIdColumn()).append(" = ?\n")
-					.append("    AND ur.").append(schema.userRolesRoleIdColumn()).append(" = r.")
-					.append(schema.rolesIdColumn()).append("\n")
-					.append(")");
-			appendRoleVisibilityFilters(sql, con, schema, "r", shaleClientId);
-			sql.append("\nORDER BY r.").append(schema.rolesNameColumn()).append(" ASC, r.")
-					.append(schema.rolesIdColumn()).append(" ASC;");
-
-			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
-				ps.setInt(1, userId);
-				try (ResultSet rs = ps.executeQuery()) {
-					List<UserRoleRow> out = new ArrayList<>();
-					while (rs.next()) {
-						out.add(new UserRoleRow(rs.getInt("RoleId"), rs.getString("RoleName")));
-					}
-					return out;
-				}
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to list assignable roles for user (id=" + userId + ")", e);
+		List<UserRoleRow> assigned = listAssignedRoles(userId, shaleClientId);
+		java.util.Set<Integer> assignedIds = new java.util.HashSet<>();
+		for (UserRoleRow row : assigned) {
+			assignedIds.add(row.roleId());
 		}
+		List<UserRoleRow> available = new ArrayList<>();
+		if (!assignedIds.contains(ROLE_ADMIN)) {
+			available.add(new UserRoleRow(ROLE_ADMIN, "Admin"));
+		}
+		if (!assignedIds.contains(ROLE_ATTORNEY)) {
+			available.add(new UserRoleRow(ROLE_ATTORNEY, "Attorney"));
+		}
+		return available;
 	}
 
 	public boolean addRoleToUser(int userId, int roleId, int shaleClientId) {
-		if (userId <= 0 || roleId <= 0 || shaleClientId <= 0) {
-			throw new IllegalArgumentException("userId, roleId, and shaleClientId must be > 0");
-		}
-
-		try (Connection con = db.requireConnection()) {
-			verifyTenantMatchesSession(con, shaleClientId);
-			RoleSchema schema = resolveRoleSchema(con);
-
-			StringBuilder sql = new StringBuilder();
-			sql.append("INSERT INTO dbo.").append(schema.userRolesTable()).append(" (")
-					.append(schema.userRolesUserIdColumn()).append(", ")
-					.append(schema.userRolesRoleIdColumn()).append(")\n")
-					.append("SELECT ?, ?\n")
-					.append("WHERE EXISTS (\n")
-					.append("  SELECT 1 FROM dbo.Users u\n")
-					.append("  WHERE u.Id = ?\n")
-					.append("    AND u.ShaleClientId = ?");
-			appendUserVisibilityFilters(sql, con, "u");
-			sql.append("\n)\n")
-					.append("AND EXISTS (\n")
-					.append("  SELECT 1 FROM dbo.").append(schema.rolesTable()).append(" r\n")
-					.append("  WHERE r.").append(schema.rolesIdColumn()).append(" = ?");
-			appendRoleVisibilityFilters(sql, con, schema, "r", shaleClientId);
-			sql.append("\n)\n")
-					.append("AND NOT EXISTS (\n")
-					.append("  SELECT 1 FROM dbo.").append(schema.userRolesTable()).append(" ur\n")
-					.append("  WHERE ur.").append(schema.userRolesUserIdColumn()).append(" = ?\n")
-					.append("    AND ur.").append(schema.userRolesRoleIdColumn()).append(" = ?\n")
-					.append(");");
-
-			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
-				int idx = 1;
-				ps.setInt(idx++, userId);
-				ps.setInt(idx++, roleId);
-				ps.setInt(idx++, userId);
-				ps.setInt(idx++, shaleClientId);
-				ps.setInt(idx++, roleId);
-				ps.setInt(idx++, userId);
-				ps.setInt(idx++, roleId);
-				return ps.executeUpdate() > 0;
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to add role to user (userId=" + userId + ", roleId=" + roleId + ")", e);
-		}
+		return updateUserRoleFlag(userId, roleId, shaleClientId, true);
 	}
 
 	public boolean removeRoleFromUser(int userId, int roleId, int shaleClientId) {
+		return updateUserRoleFlag(userId, roleId, shaleClientId, false);
+	}
+
+	private boolean updateUserRoleFlag(int userId, int roleId, int shaleClientId, boolean enabled) {
 		if (userId <= 0 || roleId <= 0 || shaleClientId <= 0) {
 			throw new IllegalArgumentException("userId, roleId, and shaleClientId must be > 0");
 		}
 
+		String column = roleFlagColumn(roleId);
 		try (Connection con = db.requireConnection()) {
 			verifyTenantMatchesSession(con, shaleClientId);
-			RoleSchema schema = resolveRoleSchema(con);
+			if (!tableHasColumn(con, "Users", column)) {
+				throw new IllegalStateException("User role column is not available: " + column);
+			}
 
-			StringBuilder sql = new StringBuilder();
-			sql.append("DELETE ur\n")
-					.append("FROM dbo.").append(schema.userRolesTable()).append(" ur\n")
-					.append("INNER JOIN dbo.Users u ON u.Id = ur.").append(schema.userRolesUserIdColumn()).append("\n")
-					.append("WHERE ur.").append(schema.userRolesUserIdColumn()).append(" = ?\n")
-					.append("  AND ur.").append(schema.userRolesRoleIdColumn()).append(" = ?\n")
-					.append("  AND u.ShaleClientId = ?");
-			appendUserVisibilityFilters(sql, con, "u");
+			StringBuilder sql = new StringBuilder("UPDATE dbo.Users SET ")
+					.append(column).append(" = ?\n")
+					.append("WHERE Id = ?\n")
+					.append("  AND ShaleClientId = ?");
+			appendUserVisibilityFilters(sql, con, null);
 			sql.append(";");
 
 			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
-				ps.setInt(1, userId);
-				ps.setInt(2, roleId);
+				ps.setBoolean(1, enabled);
+				ps.setInt(2, userId);
 				ps.setInt(3, shaleClientId);
 				return ps.executeUpdate() > 0;
 			}
 		} catch (SQLException e) {
-			throw new RuntimeException("Failed to remove role from user (userId=" + userId + ", roleId=" + roleId + ")", e);
+			throw new RuntimeException("Failed to update user role flag (userId=" + userId + ", roleId=" + roleId + ")", e);
 		}
 	}
 
-	private static void appendRoleVisibilityFilters(StringBuilder sql, Connection con, RoleSchema schema, String alias, int shaleClientId) throws SQLException {
+	private static String roleFlagColumn(int roleId) {
+		return switch (roleId) {
+		case ROLE_ADMIN -> "is_admin";
+		case ROLE_ATTORNEY -> "is_attorney";
+		default -> throw new IllegalArgumentException("Unsupported role id: " + roleId);
+		};
+	}
+
+	private static List<String> existingPhoneColumns(Connection con) throws SQLException {
+		List<String> columns = new ArrayList<>();
+		for (String column : List.of("PhoneCell", "phone_cell", "Phone", "phone", "PhoneNumber", "phone_number")) {
+			if (tableHasColumn(con, "Users", column)) {
+				columns.add(column);
+			}
+		}
+		return columns;
+	}
+
+	private static String phoneSelectExpression(List<String> phoneColumns, String alias) {
 		String prefix = (alias == null || alias.isBlank()) ? "" : alias + ".";
-		if (schema.rolesTenantScoped()) {
-			sql.append("\n  AND ").append(prefix).append("ShaleClientId = ").append(shaleClientId);
+		if (phoneColumns == null || phoneColumns.isEmpty()) {
+			return "CAST(NULL AS NVARCHAR(255)) AS Phone";
 		}
-		if (schema.rolesHasIsActive()) {
-			sql.append("\n  AND (").append(prefix).append("IsActive = 1 OR ").append(prefix).append("IsActive IS NULL)");
+		StringBuilder expr = new StringBuilder("COALESCE(");
+		for (int i = 0; i < phoneColumns.size(); i++) {
+			if (i > 0) {
+				expr.append(", ");
+			}
+			expr.append("NULLIF(LTRIM(RTRIM(").append(prefix).append(phoneColumns.get(i)).append(")), '')");
 		}
-		if (schema.rolesHasIsDeleted()) {
-			sql.append("\n  AND (").append(prefix).append("IsDeleted = 0 OR ").append(prefix).append("IsDeleted IS NULL)");
-		}
-		if (schema.rolesHasIsDeletedLower()) {
-			sql.append("\n  AND (").append(prefix).append("is_deleted = 0 OR ").append(prefix).append("is_deleted IS NULL)");
-		}
+		expr.append(") AS Phone");
+		return expr.toString();
 	}
 
-	private static RoleSchema resolveRoleSchema(Connection con) throws SQLException {
-		String userRolesTable = firstExistingTable(con, "UserRoles", "UsersRoles");
-		String rolesTable = firstExistingTable(con, "Roles", "UserRoleTypes");
-		if (userRolesTable == null || rolesTable == null) {
-			throw new IllegalStateException("Role management tables are not available.");
-		}
-
-		String userRolesUserIdColumn = firstExistingColumn(con, userRolesTable, "UserId", "UsersId");
-		String userRolesRoleIdColumn = firstExistingColumn(con, userRolesTable, "RoleId", "RolesId");
-		String rolesIdColumn = firstExistingColumn(con, rolesTable, "Id", "RoleId");
-		String rolesNameColumn = firstExistingColumn(con, rolesTable, "Name", "RoleName");
-		if (userRolesUserIdColumn == null || userRolesRoleIdColumn == null || rolesIdColumn == null || rolesNameColumn == null) {
-			throw new IllegalStateException("Role management schema is missing required columns.");
-		}
-
-		return new RoleSchema(
-				userRolesTable,
-				userRolesUserIdColumn,
-				userRolesRoleIdColumn,
-				rolesTable,
-				rolesIdColumn,
-				rolesNameColumn,
-				tableHasColumn(con, rolesTable, "ShaleClientId"),
-				tableHasColumn(con, rolesTable, "IsActive"),
-				tableHasColumn(con, rolesTable, "IsDeleted"),
-				tableHasColumn(con, rolesTable, "is_deleted"));
-	}
-
-	private record RoleSchema(
-			String userRolesTable,
-			String userRolesUserIdColumn,
-			String userRolesRoleIdColumn,
-			String rolesTable,
-			String rolesIdColumn,
-			String rolesNameColumn,
-			boolean rolesTenantScoped,
-			boolean rolesHasIsActive,
-			boolean rolesHasIsDeleted,
-			boolean rolesHasIsDeletedLower) {
+	private static String safeLogValue(String value) {
+		return value == null ? "<null>" : value.trim();
 	}
 
 	private static void appendUserVisibilityFilters(StringBuilder sql, Connection con, String alias) throws SQLException {
