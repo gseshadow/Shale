@@ -246,7 +246,12 @@ public final class MainController {
 	}
 
 	public void openContact(int contactId) {
-		sceneManager.openContactProfile(contactId);
+		highlightNav(navContactsButton);
+		sectionTitleLabel.setText("Contact");
+		sectionSubtitleLabel.setText("Contact #" + contactId);
+
+		Node contactRoot = sceneManager.createContactView(contactId);
+		sectionContent.getChildren().setAll(contactRoot);
 	}
 
 	public void showContactView(int contactId, Node contactRoot) {
