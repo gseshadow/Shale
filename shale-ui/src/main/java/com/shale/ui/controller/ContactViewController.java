@@ -87,6 +87,7 @@ public final class ContactViewController {
 
     private void loadContact() {
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
+        System.out.println("[TEMP][ContactViewController] loadContact contactId=" + contactId + ", shaleClientId=" + tenantId);
         if (contactDao == null || tenantId == null || tenantId <= 0 || contactId <= 0) {
             setError("Contact details are unavailable right now.");
             return;
@@ -108,6 +109,7 @@ public final class ContactViewController {
                     clearError();
                 });
             } catch (RuntimeException ex) {
+                System.err.println("[TEMP][ContactViewController] contact load failed for contactId=" + contactId + ", shaleClientId=" + tenantId + ": " + ex.getMessage());
                 Platform.runLater(() -> {
                     setBusy(false);
                     setError("Unable to load this contact.");

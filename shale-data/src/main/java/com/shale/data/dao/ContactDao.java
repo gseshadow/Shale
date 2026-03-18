@@ -226,6 +226,7 @@ public final class ContactDao {
     private ContactDetailRow findById(Connection con, int contactId, int shaleClientId) throws SQLException {
         ContactSchema schema = ContactSchema.load(con);
         logDetectedCoreColumns(schema);
+        logFindByIdAttempt(contactId, shaleClientId);
 
         String sql = """
                 SELECT
@@ -267,10 +268,10 @@ public final class ContactDao {
             ps.setInt(2, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
-                    logFindByIdResult(contactId, false);
+                    logFindByIdResult(contactId, shaleClientId, false);
                     return null;
                 }
-                logFindByIdResult(contactId, true);
+                logFindByIdResult(contactId, shaleClientId, true);
                 Date dob = rs.getDate("DateOfBirth");
                 Timestamp updatedAt = rs.getTimestamp("UpdatedAt");
                 return new ContactDetailRow(
@@ -301,14 +302,14 @@ public final class ContactDao {
     }
 
     private static int requireCurrentShaleClientId(Connection con) throws SQLException {
-        String sql = "SELECT dbo.fn_CurrentShaleClientId()";
+        String sql = "SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT);";
         try (PreparedStatement ps = con.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
             if (!rs.next()) {
-                throw new IllegalStateException("Current tenant is unavailable");
+                throw new IllegalStateException("ShaleClientId session context is missing.");
             }
             int clientId = rs.getInt(1);
-            if (clientId <= 0) {
-                throw new IllegalStateException("Current tenant is unavailable");
+            if (rs.wasNull() || clientId <= 0) {
+                throw new IllegalStateException("ShaleClientId session context is missing.");
             }
             return clientId;
         }
@@ -469,8 +470,12 @@ public final class ContactDao {
                 + ", phone=" + schema.phoneColumn());
     }
 
-    private static void logFindByIdResult(int contactId, boolean found) {
-        System.out.println("[TEMP][ContactDao] findById(" + contactId + ") returnedRow=" + found);
+    private static void logFindByIdAttempt(int contactId, int shaleClientId) {
+        System.out.println("[TEMP][ContactDao] findById contactId=" + contactId + ", shaleClientId=" + shaleClientId);
+    }
+
+    private static void logFindByIdResult(int contactId, int shaleClientId, boolean found) {
+        System.out.println("[TEMP][ContactDao] findById contactId=" + contactId + ", shaleClientId=" + shaleClientId + ", returnedRow=" + found);
     }
 
     public static String formatTimestamp(Instant timestamp) {
