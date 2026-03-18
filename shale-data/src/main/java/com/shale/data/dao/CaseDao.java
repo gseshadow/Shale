@@ -1956,6 +1956,49 @@ public final class CaseDao {
 		}
 	}
 
+	public boolean unlinkContactFromCase(long caseId, int contactId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+		if (contactId <= 0) {
+			throw new IllegalArgumentException("contactId must be > 0");
+		}
+
+		String sql = """
+				DELETE cc
+				FROM dbo.CaseContacts cc
+				WHERE cc.CaseId = ?
+				  AND cc.ContactId = ?
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.Cases c
+				    WHERE c.Id = cc.CaseId
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  )
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.Contacts ct
+				    WHERE ct.Id = cc.ContactId
+				      AND ct.ShaleClientId = ?
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				  );
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, contactId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, shaleClientId);
+			return ps.executeUpdate() > 0;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to unlink contact from case (caseId=" + caseId + ", contactId=" + contactId + ")", e);
+		}
+	}
+
 	public boolean unlinkOrganizationFromCase(long caseId, int organizationId) {
 		if (caseId <= 0) {
 			throw new IllegalArgumentException("caseId must be > 0");

@@ -765,7 +765,18 @@ public class CaseController {
 		card.setPrefWidth(340);
 		card.setMaxWidth(340);
 		card.setMinHeight(84);
-		return card;
+
+		Button removeButton = new Button("Remove");
+		removeButton.getStyleClass().add("button-secondary");
+		removeButton.setOnAction(e -> onRemoveContact(contact));
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox actions = new HBox(8, spacer, removeButton);
+
+		VBox container = new VBox(6, card, actions);
+		container.setPrefWidth(340);
+		return container;
 	}
 
 	private String caseContactRoleLabel(String roleName, Integer roleId, boolean primary) {
@@ -1063,6 +1074,48 @@ public class CaseController {
 				runOnFx(() -> showContactActionError("Failed to refresh contacts for this case."));
 			}
 		}, "case-refresh-contacts-" + activeCaseId).start();
+	}
+
+	private void onRemoveContact(CaseDao.RelatedContactRow contact) {
+		if (contact == null || caseDao == null || caseId == null) {
+			return;
+		}
+
+		if (!confirmContactUnlink(contact)) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				caseDao.unlinkContactFromCase(activeCaseId, contact.id());
+				runOnFx(this::refreshContactsSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showContactActionError("Failed to remove contact from this case."));
+			}
+		}, "case-unlink-contact-" + activeCaseId + "-" + contact.id()).start();
+	}
+
+	private boolean confirmContactUnlink(CaseDao.RelatedContactRow contact) {
+		return AppDialogs.showConfirmation(
+				organizationDialogOwner(),
+				"Remove Contact",
+				"Remove this contact from the case?",
+				formatRelatedContact(contact),
+				"Remove Contact",
+				AppDialogs.DialogActionKind.DANGER);
+	}
+
+	private String formatRelatedContact(CaseDao.RelatedContactRow contact) {
+		if (contact == null) {
+			return "";
+		}
+		String name = safe(contact.displayName());
+		String role = caseContactRoleLabel(contact.roleName(), contact.roleId(), contact.primary());
+		if (role.isBlank()) {
+			return name;
+		}
+		return name + " — " + role;
 	}
 
 	private void showContactActionInfo(String message) {
