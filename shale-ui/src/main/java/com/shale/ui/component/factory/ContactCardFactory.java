@@ -14,6 +14,7 @@ public class ContactCardFactory {
     public record ContactCardModel(
             Integer contactId,
             String displayName,
+            String role,
             String email,
             String phone
     ) {
@@ -32,6 +33,7 @@ public class ContactCardFactory {
         card.setContactId(model.contactId());
         card.setOnOpen(onOpenContact);
         card.setName(model.displayName());
+        card.setRole(model.role());
         card.setEmail(model.email());
         card.setPhone(model.phone());
         card.setBackgroundCssColor(null);
@@ -46,6 +48,6 @@ public class ContactCardFactory {
     }
 
     public ContactCard createMini(Integer contactId, String displayName) {
-        return create(new ContactCardModel(contactId, displayName, null, null), Variant.MINI);
+        return create(new ContactCardModel(contactId, displayName, null, null, null), Variant.MINI);
     }
 }

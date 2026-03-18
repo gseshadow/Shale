@@ -332,7 +332,7 @@ public class CaseController {
 			"Tasks",
 			"Timeline",
 			"Details",
-			"People",
+			"Contacts",
 			"Organizations",
 			"Documents"
 	);
@@ -402,6 +402,7 @@ public class CaseController {
 	private LocalDate draftIncidentDate;
 	private LocalDate draftSolDate;
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
+	private List<CaseDao.RelatedContactRow> relatedContacts = List.of();
 	private List<CaseDao.RelatedOrganizationRow> relatedOrganizations = List.of();
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
@@ -631,6 +632,7 @@ public class CaseController {
 		case "Overview" -> showOverview();
 		case "Tasks" -> showTasksTab();
 		case "Details" -> showDetails();
+		case "Contacts" -> showContacts();
 		case "Organizations" -> showOrganizations();
 		default -> showGeneric(sectionName);
 		}
@@ -706,6 +708,68 @@ public class CaseController {
 		}
 	}
 
+
+	private void showContacts() {
+		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, true);
+		setPaneVisible(tasksPanel, false);
+
+		if (genericTitleLabel != null)
+			genericTitleLabel.setText("Contacts");
+
+		setVisibleManaged(addOrganizationButton, false);
+		setVisibleManaged(placeholderTextArea, false);
+		renderContactsSection();
+	}
+
+	private void renderContactsSection() {
+		if (organizationsFlow == null || organizationsEmptyLabel == null)
+			return;
+
+		organizationsFlow.getChildren().clear();
+		if (relatedContacts == null || relatedContacts.isEmpty()) {
+			setVisibleManaged(organizationsFlow, false);
+			setVisibleManaged(organizationsEmptyLabel, true);
+			organizationsEmptyLabel.setText("No contacts");
+			return;
+		}
+
+		ContactCardFactory factory = contactCardFactory != null
+				? contactCardFactory
+				: new ContactCardFactory(onOpenContact == null ? id -> {
+				} : onOpenContact);
+		for (CaseDao.RelatedContactRow contact : relatedContacts) {
+			organizationsFlow.getChildren().add(createRelatedContactCard(factory, contact));
+		}
+
+		setVisibleManaged(organizationsFlow, true);
+		setVisibleManaged(organizationsEmptyLabel, false);
+	}
+
+	private Node createRelatedContactCard(ContactCardFactory factory, CaseDao.RelatedContactRow contact) {
+		var card = factory.create(new com.shale.ui.component.factory.ContactCardFactory.ContactCardModel(
+				contact.id(),
+				safe(contact.displayName()).isBlank() ? "—" : contact.displayName(),
+				caseContactRoleLabel(contact.roleId(), contact.primary()),
+				contact.email(),
+				contact.phone()), ContactCardFactory.Variant.FULL);
+		card.setPrefWidth(340);
+		card.setMaxWidth(340);
+		card.setMinHeight(84);
+		return card;
+	}
+
+	private String caseContactRoleLabel(int roleId, boolean primary) {
+		String base = switch (roleId) {
+		case ROLE_CASECONTACT_CLIENT -> "Client";
+		case ROLE_CASECONTACT_CALLER -> "Caller";
+		case ROLE_CASECONTACT_OPPOSING_COUNSEL -> "Opposing Counsel";
+		default -> "Role " + roleId;
+		};
+		return primary ? base + " (Primary)" : base;
+	}
 
 	private void showOrganizations() {
 		setPaneVisible(overviewPane, false);
@@ -1029,18 +1093,28 @@ public class CaseController {
 		{
 			CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
 			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
+			List<CaseDao.RelatedContactRow> loadedContacts = List.of();
 			List<CaseDao.RelatedOrganizationRow> loadedOrganizations = List.of();
+			try {
+				loadedContacts = caseDao.findRelatedContacts(activeCaseId);
+			} catch (Exception contactLoadError) {
+				System.err.println("Case contacts load failed for caseId=" + activeCaseId + ": " + contactLoadError.getMessage());
+			}
 			try {
 				loadedOrganizations = caseDao.findRelatedOrganizations(activeCaseId);
 			} catch (Exception orgLoadError) {
 				System.err.println("Case organizations load failed for caseId=" + activeCaseId + ": " + orgLoadError.getMessage());
 			}
+			final List<CaseDao.RelatedContactRow> contacts = loadedContacts;
 			final List<CaseDao.RelatedOrganizationRow> organizations = loadedOrganizations;
 
 			runOnFx(() ->
 			{
 				if (overview != null)
 					applyOverviewEditSafe(overview);
+
+				relatedContacts = contacts == null ? List.of() : contacts;
+				renderContactsSection();
 
 				relatedOrganizations = organizations == null ? List.of() : organizations;
 				renderOrganizationsSection();

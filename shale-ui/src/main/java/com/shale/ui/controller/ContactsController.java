@@ -149,6 +149,7 @@ public final class ContactsController {
         var card = contactCardFactory.create(new ContactCardModel(
                 row.id(),
                 displayName,
+                null,
                 row.email(),
                 row.phone()), CONTACTS_CARD_VARIANT);
         card.setMinHeight(CONTACT_CARD_HEIGHT);

@@ -18,6 +18,7 @@ public class ContactCard extends HBox {
     }
 
     private final Label nameLabel = new Label();
+    private final Label roleLabel = new Label();
     private final Label emailLabel = new Label();
     private final Label phoneLabel = new Label();
 
@@ -39,6 +40,13 @@ public class ContactCard extends HBox {
 
     public void setName(String name) {
         nameLabel.setText(name == null || name.isBlank() ? "—" : name);
+    }
+
+    public void setRole(String role) {
+        String normalized = role == null ? "" : role.trim();
+        roleLabel.setText(normalized);
+        roleLabel.setVisible(!normalized.isBlank());
+        roleLabel.setManaged(!normalized.isBlank());
     }
 
     public void setEmail(String email) {
@@ -77,9 +85,14 @@ public class ContactCard extends HBox {
         setSpacing(8);
 
         nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 600;");
+        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(0,0,0,0.56);");
         emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(0,0,0,0.62);");
 
-        VBox text = new VBox(2, nameLabel, emailLabel);
+        VBox text = new VBox(2, nameLabel);
+        if (roleLabel.isManaged()) {
+            text.getChildren().add(roleLabel);
+        }
+        text.getChildren().add(emailLabel);
         getChildren().add(text);
     }
 
@@ -90,10 +103,15 @@ public class ContactCard extends HBox {
         setSpacing(12);
 
         nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700;");
+        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(0,0,0,0.56);");
         emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(0,0,0,0.68);");
         phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(0,0,0,0.68);");
 
-        VBox text = new VBox(4, nameLabel, emailLabel);
+        VBox text = new VBox(4, nameLabel);
+        if (roleLabel.isManaged()) {
+            text.getChildren().add(roleLabel);
+        }
+        text.getChildren().add(emailLabel);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         getChildren().addAll(text, spacer, phoneLabel);
