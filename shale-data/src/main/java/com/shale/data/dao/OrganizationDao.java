@@ -327,6 +327,40 @@ public final class OrganizationDao {
 
 
 
+	public boolean softDeleteOrganization(int organizationId, Integer shaleClientId) {
+		if (organizationId <= 0) {
+			throw new IllegalArgumentException("organizationId must be > 0");
+		}
+		if (shaleClientId == null || shaleClientId <= 0) {
+			throw new IllegalArgumentException("shaleClientId must be > 0");
+		}
+
+		String sql = """
+				UPDATE %s
+				SET
+				  IsDeleted = 1,
+				  UpdatedAt = SYSUTCDATETIME()
+				WHERE Id = ?
+				  AND ShaleClientId = ?
+				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
+				""".formatted(ORGANIZATIONS_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int currentShaleClientId = requireCurrentShaleClientId(con);
+			if (shaleClientId.intValue() != currentShaleClientId) {
+				throw new IllegalArgumentException("shaleClientId does not match current session");
+			}
+
+			int idx = 1;
+			ps.setInt(idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
+			return ps.executeUpdate() > 0;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to soft delete organization (id=" + organizationId + ")", e);
+		}
+	}
+
 	public List<SelectableCaseRow> findLinkableCases(int organizationId) {
 		if (organizationId <= 0) {
 			throw new IllegalArgumentException("organizationId must be > 0");

@@ -19,6 +19,7 @@ import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -26,12 +27,11 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.Node;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.layout.Priority;
 import javafx.stage.Window;
 
 public final class OrganizationController {
@@ -43,6 +43,7 @@ public final class OrganizationController {
 	@FXML private Button editButton;
 	@FXML private Button saveButton;
 	@FXML private Button cancelButton;
+	@FXML private Button deleteOrganizationButton;
 	@FXML private HBox remoteUpdateBanner;
 	@FXML private Button reloadRemoteButton;
 	@FXML private FlowPane relatedCasesFlow;
@@ -89,6 +90,7 @@ public final class OrganizationController {
 	private List<OrganizationDao.OrganizationTypeRow> organizationTypeOptions = List.of();
 	private CaseCardFactory caseCardFactory;
 	private Consumer<Integer> onOpenCase;
+	private Runnable onOrganizationDeleted;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "organization-detail-loader");
@@ -96,12 +98,19 @@ public final class OrganizationController {
 		return t;
 	});
 
-	public void init(int organizationId, OrganizationDao organizationDao, AppState appState, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase) {
+	public void init(
+			int organizationId,
+			OrganizationDao organizationDao,
+			AppState appState,
+			UiRuntimeBridge runtimeBridge,
+			Consumer<Integer> onOpenCase,
+			Runnable onOrganizationDeleted) {
 		this.organizationId = organizationId;
 		this.organizationDao = organizationDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.onOpenCase = onOpenCase;
+		this.onOrganizationDeleted = onOrganizationDeleted;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 	}
 
@@ -115,6 +124,10 @@ public final class OrganizationController {
 		}
 		if (cancelButton != null) {
 			cancelButton.setOnAction(e -> onCancel());
+		}
+		if (deleteOrganizationButton != null) {
+			deleteOrganizationButton.setOnAction(e -> onDeleteOrganization());
+			setVisibleManaged(deleteOrganizationButton, false);
 		}
 		if (reloadRemoteButton != null) {
 			reloadRemoteButton.setOnAction(e -> onReloadRemote());
@@ -142,6 +155,7 @@ public final class OrganizationController {
 
 		setEditMode(false);
 		hideRemoteUpdateBanner();
+		refreshAdminActions();
 
 		if (organizationTitleLabel != null) {
 			organizationTitleLabel.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -192,8 +206,6 @@ public final class OrganizationController {
 		});
 	}
 
-
-
 	private void loadRelatedCasesSafe() {
 		if (organizationDao == null || organizationId == null) {
 			relatedCases = List.of();
@@ -217,8 +229,6 @@ public final class OrganizationController {
 			}
 		});
 	}
-
-
 
 	private void onAddCase() {
 		if (organizationDao == null || organizationId == null || addCaseButton == null) {
@@ -268,7 +278,6 @@ public final class OrganizationController {
 			}
 		});
 	}
-
 
 	private void onRemoveCase(OrganizationDao.RelatedCaseRow row) {
 		if (row == null || organizationDao == null || organizationId == null) {
@@ -360,7 +369,7 @@ public final class OrganizationController {
 		dbExec.submit(() -> {
 			try {
 				organizationDao.update(updated);
-				publishOrganizationUpdated(updated);
+				publishOrganizationUpdated(updated.getId());
 				Organization reloaded = organizationDao.findById(currentOrganization.getId());
 				Platform.runLater(() -> {
 					setBusy(false);
@@ -384,6 +393,67 @@ public final class OrganizationController {
 		});
 	}
 
+	private void onDeleteOrganization() {
+		if (organizationDao == null || currentOrganization == null || currentOrganization.getId() == null) {
+			setError("Organization details are unavailable.");
+			return;
+		}
+		if (!isAdminUser()) {
+			setError("Only admin users can delete organizations.");
+			return;
+		}
+		if (!confirmDeleteOrganization()) {
+			return;
+		}
+
+		setBusy(true);
+		dbExec.submit(() -> {
+			try {
+				boolean deleted = organizationDao.softDeleteOrganization(currentOrganization.getId(), appState.getShaleClientId());
+				Platform.runLater(() -> {
+					setBusy(false);
+					if (!deleted) {
+						setError("Organization could not be deleted.");
+						return;
+					}
+					publishOrganizationUpdated(currentOrganization.getId());
+					pendingRemoteUpdate = false;
+					hideRemoteUpdateBanner();
+					clearError();
+					navigateAfterDelete();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> {
+					setBusy(false);
+					setError("Failed to delete organization.");
+				});
+			}
+		});
+	}
+
+	private boolean confirmDeleteOrganization() {
+		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+		Window owner = null;
+		if (deleteOrganizationButton != null && deleteOrganizationButton.getScene() != null) {
+			owner = deleteOrganizationButton.getScene().getWindow();
+		} else if (editButton != null && editButton.getScene() != null) {
+			owner = editButton.getScene().getWindow();
+		}
+		if (owner != null) {
+			alert.initOwner(owner);
+		}
+		alert.setTitle("Delete Organization");
+		alert.setHeaderText("Delete this organization?");
+		alert.setContentText("This will remove it from active lists.");
+		Optional<ButtonType> choice = alert.showAndWait();
+		return choice.isPresent() && choice.get() == ButtonType.OK;
+	}
+
+	private void navigateAfterDelete() {
+		if (onOrganizationDeleted != null) {
+			onOrganizationDeleted.run();
+		}
+	}
 
 	private void onReloadRemote() {
 		pendingRemoteUpdate = false;
@@ -457,8 +527,8 @@ public final class OrganizationController {
 		setVisibleManaged(reloadRemoteButton, false);
 	}
 
-	private void publishOrganizationUpdated(Organization organization) {
-		if (organization == null || organization.getId() == null || appState == null || runtimeBridge == null
+	private void publishOrganizationUpdated(Integer organizationId) {
+		if (organizationId == null || organizationId <= 0 || appState == null || runtimeBridge == null
 				|| appState.getShaleClientId() == null || appState.getUserId() == null) {
 			return;
 		}
@@ -466,7 +536,7 @@ public final class OrganizationController {
 		try {
 			int clientId = appState.getShaleClientId();
 			int userId = appState.getUserId();
-			runtimeBridge.publishOrganizationUpdated(organization.getId(), clientId, userId);
+			runtimeBridge.publishOrganizationUpdated(organizationId, clientId, userId);
 		} catch (Exception ex) {
 			System.out.println("OrganizationUpdated publish skipped: " + ex.getMessage());
 		}
@@ -505,6 +575,7 @@ public final class OrganizationController {
 		}
 
 		writeEditorsFromOrganization(o);
+		refreshAdminActions();
 	}
 
 	private void writeEditorsFromOrganization(Organization o) {
@@ -525,7 +596,6 @@ public final class OrganizationController {
 		countryEditor.setText(safeText(o.getCountry()));
 		notesEditor.setText(safeText(o.getNotes()));
 	}
-
 
 	private Integer resolveSelectedOrganizationTypeId() {
 		OrganizationDao.OrganizationTypeRow selected = typeEditor == null ? null : typeEditor.getSelectionModel().getSelectedItem();
@@ -571,7 +641,6 @@ public final class OrganizationController {
 		if (relatedCasesEmptyLabel != null) {
 			relatedCasesEmptyLabel.setVisible(empty);
 			relatedCasesEmptyLabel.setManaged(empty);
-			// StackPane overlays both nodes; keep the active one on top.
 			if (empty) {
 				relatedCasesEmptyLabel.toFront();
 			} else {
@@ -603,12 +672,12 @@ public final class OrganizationController {
 		return container;
 	}
 
-
 	private void setEditMode(boolean enabled) {
 		this.editMode = enabled;
 		setVisibleManaged(editButton, !enabled);
 		setVisibleManaged(saveButton, enabled);
 		setVisibleManaged(cancelButton, enabled);
+		refreshAdminActions();
 
 		toggleField(nameValue, nameEditor, enabled);
 		toggleField(typeValue, typeEditor, enabled);
@@ -635,6 +704,18 @@ public final class OrganizationController {
 		if (cancelButton != null) {
 			cancelButton.setDisable(busy);
 		}
+		if (deleteOrganizationButton != null) {
+			deleteOrganizationButton.setDisable(busy);
+		}
+	}
+
+	private void refreshAdminActions() {
+		boolean showDelete = isAdminUser() && !editMode && currentOrganization != null;
+		setVisibleManaged(deleteOrganizationButton, showDelete);
+	}
+
+	private boolean isAdminUser() {
+		return appState != null && appState.isAdmin();
 	}
 
 	private static void toggleField(Label valueNode, javafx.scene.Node editorNode, boolean editMode) {

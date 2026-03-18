@@ -209,6 +209,7 @@ public final class MainController {
 			appState.setUserId(0);
 			appState.setShaleClientId(0);
 			appState.setUserEmail(null);
+			appState.setAdmin(false);
 		}
 
 		sceneManager.showLogin();
@@ -230,8 +231,17 @@ public final class MainController {
 		sectionTitleLabel.setText("Organization");
 		sectionSubtitleLabel.setText("Organization #" + organizationId);
 
-		Node organizationRoot = sceneManager.createOrganizationView(organizationId, this::openCase);
+		Node organizationRoot = sceneManager.createOrganizationView(organizationId, this::openCase, this::showOrganizationsList);
 		sectionContent.getChildren().setAll(organizationRoot);
+	}
+
+	private void showOrganizationsList() {
+		highlightNav(navOrganizationsButton);
+		sectionTitleLabel.setText("Organizations");
+		sectionSubtitleLabel.setText("Browse, search, and manage organizations.");
+
+		Node organizationsRoot = sceneManager.createOrganizationsView(this::openOrganization);
+		sectionContent.getChildren().setAll(organizationsRoot);
 	}
 
 	private void showMyShale() {

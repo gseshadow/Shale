@@ -25,7 +25,8 @@ public final class DesktopUiAuthService implements UiAuthService {
 		return new Result(
 				user.getId(), // userId
 				user.getShaleClientId(), // tenant identifier for RLS
-				user.getEmail() // email
+				user.getEmail(), // email
+				user.isAdmin() // admin
 		);
 	}
 }
