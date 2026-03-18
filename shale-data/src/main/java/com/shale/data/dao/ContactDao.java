@@ -75,6 +75,7 @@ public final class ContactDao {
             verifyTenantMatchesSession(con, shaleClientId);
 
             ContactSchema schema = ContactSchema.load(con);
+            logDetectedCoreColumns(schema);
             String sql = """
                     SELECT
                       c.Id,
@@ -82,7 +83,7 @@ public final class ContactDao {
                       %s,
                       %s
                     FROM dbo.Contacts c
-                    WHERE c.ShaleClientId = ?
+                    WHERE c.%s = ?
                       AND NULLIF(LTRIM(RTRIM(%s)), '') IS NOT NULL
                     %s
                     ORDER BY DisplayName ASC, c.Id ASC;
@@ -90,6 +91,7 @@ public final class ContactDao {
                     displayNameExpression(schema, "c"),
                     optionalColumnExpression(schema.emailColumn(), "c", "Email"),
                     optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    schema.tenantColumn(),
                     displayNameExpression(schema, "c"),
                     activeFilter(schema.deletedColumn(), "c"));
 
@@ -152,46 +154,42 @@ public final class ContactDao {
         try (Connection con = db.requireConnection()) {
             verifyTenantMatchesSession(con, request.shaleClientId());
             ContactSchema schema = ContactSchema.load(con);
+            logDetectedCoreColumns(schema);
 
             StringBuilder sql = new StringBuilder("""
                     UPDATE dbo.Contacts
-                    SET Name = ?,
-                        FirstName = ?,
-                        LastName = ?
+                    SET
                     """);
-            if (schema.emailColumn() != null) {
-                sql.append(",\n    ").append(schema.emailColumn()).append(" = ?");
+            boolean hasAssignments = false;
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.nameColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.firstNameColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.lastNameColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.emailColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.phoneColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.addressHomeColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.dateOfBirthColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.conditionColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.deceasedColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.clientColumn());
+            hasAssignments = appendAssignment(sql, hasAssignments, schema.updatedAtColumn());
+            if (!hasAssignments) {
+                throw new SQLException("No updatable contact columns were detected.");
             }
-            if (schema.phoneColumn() != null) {
-                sql.append(",\n    ").append(schema.phoneColumn()).append(" = ?");
-            }
-            if (schema.addressHomeColumn() != null) {
-                sql.append(",\n    ").append(schema.addressHomeColumn()).append(" = ?");
-            }
-            if (schema.dateOfBirthColumn() != null) {
-                sql.append(",\n    ").append(schema.dateOfBirthColumn()).append(" = ?");
-            }
-            if (schema.conditionColumn() != null) {
-                sql.append(",\n    ").append(schema.conditionColumn()).append(" = ?");
-            }
-            if (schema.deceasedColumn() != null) {
-                sql.append(",\n    ").append(schema.deceasedColumn()).append(" = ?");
-            }
-            if (schema.clientColumn() != null) {
-                sql.append(",\n    ").append(schema.clientColumn()).append(" = ?");
-            }
-            if (schema.updatedAtColumn() != null) {
-                sql.append(",\n    ").append(schema.updatedAtColumn()).append(" = ?");
-            }
-            sql.append("\nWHERE Id = ?\n  AND ShaleClientId = ?");
+            sql.append("\nWHERE Id = ?\n  AND ").append(schema.tenantColumn()).append(" = ?");
             sql.append(activeFilter(schema.deletedColumn(), null));
             sql.append(';');
 
             try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
                 int idx = 1;
-                setNullableString(ps, idx++, request.name());
-                setNullableString(ps, idx++, request.firstName());
-                setNullableString(ps, idx++, request.lastName());
+                if (schema.nameColumn() != null) {
+                    setNullableString(ps, idx++, request.name());
+                }
+                if (schema.firstNameColumn() != null) {
+                    setNullableString(ps, idx++, request.firstName());
+                }
+                if (schema.lastNameColumn() != null) {
+                    setNullableString(ps, idx++, request.lastName());
+                }
                 if (schema.emailColumn() != null) {
                     setNullableString(ps, idx++, request.email());
                 }
@@ -227,14 +225,14 @@ public final class ContactDao {
 
     private ContactDetailRow findById(Connection con, int contactId, int shaleClientId) throws SQLException {
         ContactSchema schema = ContactSchema.load(con);
+        logDetectedCoreColumns(schema);
 
         String sql = """
                 SELECT
                   c.Id,
-                  c.ShaleClientId,
-                  COALESCE(c.Name, '') AS Name,
-                  COALESCE(c.FirstName, '') AS FirstName,
-                  COALESCE(c.LastName, '') AS LastName,
+                  %s,
+                  %s,
+                  %s,
                   %s AS DisplayName,
                   %s,
                   %s,
@@ -246,9 +244,12 @@ public final class ContactDao {
                   %s
                 FROM dbo.Contacts c
                 WHERE c.Id = ?
-                  AND c.ShaleClientId = ?
+                  AND c.%s = ?
                 %s;
                 """.formatted(
+                optionalColumnExpression(schema.nameColumn(), "c", "Name"),
+                optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
+                optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
                 displayNameExpression(schema, "c"),
                 optionalColumnExpression(schema.emailColumn(), "c", "Email"),
                 optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
@@ -258,6 +259,7 @@ public final class ContactDao {
                 optionalBooleanExpression(schema.deceasedColumn(), "c", "IsDeceased"),
                 optionalBooleanExpression(schema.clientColumn(), "c", "IsClient"),
                 updatedAtExpression(schema.updatedAtColumn(), "c"),
+                schema.tenantColumn(),
                 activeFilter(schema.deletedColumn(), "c"));
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -265,13 +267,15 @@ public final class ContactDao {
             ps.setInt(2, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
+                    logFindByIdResult(contactId, false);
                     return null;
                 }
+                logFindByIdResult(contactId, true);
                 Date dob = rs.getDate("DateOfBirth");
                 Timestamp updatedAt = rs.getTimestamp("UpdatedAt");
                 return new ContactDetailRow(
                         rs.getInt("Id"),
-                        rs.getInt("ShaleClientId"),
+                        shaleClientId,
                         rs.getString("Name"),
                         rs.getString("FirstName"),
                         rs.getString("LastName"),
@@ -311,10 +315,12 @@ public final class ContactDao {
     }
 
     private static String displayNameExpression(ContactSchema schema, String alias) {
-        return "LTRIM(RTRIM(CASE WHEN (NULLIF(LTRIM(RTRIM(COALESCE(" + alias + ".FirstName, ''))), '') IS NOT NULL) "
-                + "OR (NULLIF(LTRIM(RTRIM(COALESCE(" + alias + ".LastName, ''))), '') IS NOT NULL) THEN "
-                + "COALESCE(" + alias + ".FirstName, '') + CASE WHEN COALESCE(" + alias + ".FirstName, '') = '' OR COALESCE(" + alias + ".LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(" + alias + ".LastName, '') "
-                + "ELSE COALESCE(" + alias + ".Name, '') END))";
+        String first = coreTextExpression(schema.firstNameColumn(), alias);
+        String last = coreTextExpression(schema.lastNameColumn(), alias);
+        String name = coreTextExpression(schema.nameColumn(), alias);
+        return "LTRIM(RTRIM(CASE WHEN (" + first + " IS NOT NULL) OR (" + last + " IS NOT NULL) THEN "
+                + "COALESCE(" + first + ", '') + CASE WHEN COALESCE(" + first + ", '') = '' OR COALESCE(" + last + ", '') = '' THEN '' ELSE ' ' END + COALESCE(" + last + ", '') "
+                + "ELSE COALESCE(" + name + ", '') END))";
     }
 
     private static String existingColumn(Connection con, String table, List<String> candidates) throws SQLException {
@@ -348,6 +354,13 @@ public final class ContactDao {
         return "NULLIF(LTRIM(RTRIM(" + alias + "." + column + ")), '') AS " + resultAlias;
     }
 
+    private static String coreTextExpression(String column, String alias) {
+        if (column == null || column.isBlank()) {
+            return "CAST(NULL AS NVARCHAR(255))";
+        }
+        return "NULLIF(LTRIM(RTRIM(" + alias + "." + column + ")), '')";
+    }
+
     private static String optionalDateColumnExpression(String column, String alias, String resultAlias) {
         if (column == null || column.isBlank()) {
             return "CAST(NULL AS DATE) AS " + resultAlias;
@@ -367,6 +380,19 @@ public final class ContactDao {
             return "CAST(NULL AS DATETIME2) AS UpdatedAt";
         }
         return alias + "." + column + " AS UpdatedAt";
+    }
+
+    private static boolean appendAssignment(StringBuilder sql, boolean hasAssignments, String column) {
+        if (column == null || column.isBlank()) {
+            return hasAssignments;
+        }
+        if (hasAssignments) {
+            sql.append(",\n");
+        } else {
+            sql.append('\n');
+        }
+        sql.append("    ").append(column).append(" = ?");
+        return true;
     }
 
     private static String activeFilter(String deletedColumn, String alias) {
@@ -394,6 +420,10 @@ public final class ContactDao {
     }
 
     private record ContactSchema(
+            String tenantColumn,
+            String nameColumn,
+            String firstNameColumn,
+            String lastNameColumn,
             String emailColumn,
             String phoneColumn,
             String addressHomeColumn,
@@ -406,6 +436,10 @@ public final class ContactDao {
     ) {
         private static ContactSchema load(Connection con) throws SQLException {
             return new ContactSchema(
+                    requiredColumn(con, "Contacts", List.of("ShaleClientId", "shale_client_id", "ClientId", "client_id")),
+                    existingColumn(con, "Contacts", List.of("Name", "FullName", "DisplayName", "name")),
+                    existingColumn(con, "Contacts", List.of("FirstName", "NameFirst", "name_first", "first_name")),
+                    existingColumn(con, "Contacts", List.of("LastName", "NameLast", "name_last", "last_name")),
                     existingColumn(con, "Contacts", List.of("Email", "EmailPersonal", "email_personal", "email")),
                     existingColumn(con, "Contacts", List.of("Phone", "PhoneCell", "phone_cell", "PhoneNumber", "phone", "phone_number")),
                     existingColumn(con, "Contacts", List.of("AddressHome", "address_home", "Address", "HomeAddress")),
@@ -416,6 +450,27 @@ public final class ContactDao {
                     existingColumn(con, "Contacts", List.of("IsDeleted", "is_deleted")),
                     existingColumn(con, "Contacts", List.of("UpdatedAt", "updated_at")));
         }
+    }
+
+    private static String requiredColumn(Connection con, String table, List<String> candidates) throws SQLException {
+        String column = existingColumn(con, table, candidates);
+        if (column == null || column.isBlank()) {
+            throw new SQLException("Required column not found for " + table + ": one of " + candidates);
+        }
+        return column;
+    }
+
+    private static void logDetectedCoreColumns(ContactSchema schema) {
+        System.out.println("[TEMP][ContactDao] detected columns: tenant=" + schema.tenantColumn()
+                + ", name=" + schema.nameColumn()
+                + ", firstName=" + schema.firstNameColumn()
+                + ", lastName=" + schema.lastNameColumn()
+                + ", email=" + schema.emailColumn()
+                + ", phone=" + schema.phoneColumn());
+    }
+
+    private static void logFindByIdResult(int contactId, boolean found) {
+        System.out.println("[TEMP][ContactDao] findById(" + contactId + ") returnedRow=" + found);
     }
 
     public static String formatTimestamp(Instant timestamp) {
