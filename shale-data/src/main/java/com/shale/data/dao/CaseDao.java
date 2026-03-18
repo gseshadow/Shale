@@ -1651,6 +1651,49 @@ public final class CaseDao {
 		}
 	}
 
+	public boolean unlinkOrganizationFromCase(long caseId, int organizationId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+		if (organizationId <= 0) {
+			throw new IllegalArgumentException("organizationId must be > 0");
+		}
+
+		String sql = """
+				DELETE co
+				FROM CaseOrganizations co
+				WHERE co.CaseId = ?
+				  AND co.OrganizationId = ?
+				  AND EXISTS (
+				    SELECT 1
+				    FROM Cases c
+				    WHERE c.Id = co.CaseId
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  )
+				  AND EXISTS (
+				    SELECT 1
+				    FROM Organizations o
+				    WHERE o.Id = co.OrganizationId
+				      AND o.ShaleClientId = ?
+				      AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				  );
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, shaleClientId);
+			return ps.executeUpdate() > 0;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to unlink organization from case (caseId=" + caseId + ", orgId=" + organizationId + ")", e);
+		}
+	}
+
 	private static boolean contactsHasIsDeletedColumn(Connection con) throws SQLException {
 		String sql = """
 				SELECT 1
