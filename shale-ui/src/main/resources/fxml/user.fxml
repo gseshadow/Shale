@@ -2,6 +2,7 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
@@ -80,20 +81,13 @@
                         <Label fx:id="phoneValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
                         <TextField fx:id="phoneEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 
-                        <Label text="Is Admin:" style="-fx-opacity: 0.8;" GridPane.rowIndex="5" />
-                        <Label fx:id="isAdminValue" text="—" wrapText="true" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+                        <Label text="Initials:" style="-fx-opacity: 0.8;" GridPane.rowIndex="5" />
+                        <Label fx:id="initialsValue" text="—" wrapText="true" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+                        <TextField fx:id="initialsEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="5" GridPane.columnIndex="1" />
 
-                        <Label text="Attorney:" style="-fx-opacity: 0.8;" GridPane.rowIndex="6" />
-                        <Label fx:id="isAttorneyValue" text="—" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1" />
-
-                        <Label text="Initials:" style="-fx-opacity: 0.8;" GridPane.rowIndex="7" />
-                        <Label fx:id="initialsValue" text="—" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" />
-
-                        <Label text="Default Organization:" style="-fx-opacity: 0.8;" GridPane.rowIndex="8" />
-                        <Label fx:id="defaultOrganizationValue" text="—" wrapText="true" GridPane.rowIndex="8" GridPane.columnIndex="1" />
-
-                        <Label text="Organization Id:" style="-fx-opacity: 0.8;" GridPane.rowIndex="9" />
-                        <Label fx:id="organizationValue" text="—" wrapText="true" GridPane.rowIndex="9" GridPane.columnIndex="1" />
+                        <Label text="Default Organization:" style="-fx-opacity: 0.8;" GridPane.rowIndex="6" />
+                        <Label fx:id="defaultOrganizationValue" text="—" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1" />
+                        <ComboBox fx:id="defaultOrganizationEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="6" GridPane.columnIndex="1" />
                     </GridPane>
 
                     <VBox spacing="8" styleClass="secondary-panel">

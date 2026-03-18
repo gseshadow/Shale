@@ -36,6 +36,7 @@ public final class UserDao {
 			boolean admin,
 			boolean attorney,
 			boolean deleted,
+			String defaultOrganizationName,
 			Integer defaultOrganizationId,
 			Integer organizationId) {
 	}
@@ -46,7 +47,9 @@ public final class UserDao {
 			String firstName,
 			String lastName,
 			String email,
-			String phone) {
+			String phone,
+			String initials,
+			Integer defaultOrganizationId) {
 	}
 
 	public record UserRoleRow(int roleId, String roleName) {
@@ -165,9 +168,14 @@ public final class UserDao {
 					  COALESCE(u.is_admin, 0) AS IsAdmin,
 					  COALESCE(u.is_attorney, 0) AS IsAttorney,
 					  COALESCE(u.is_deleted, 0) AS IsDeleted,
+					  defaultOrg.Name AS DefaultOrganizationName,
 					  u.default_organization AS DefaultOrganizationId,
 					  u.organization_id AS OrganizationId
 					FROM dbo.Users u
+					LEFT JOIN dbo.Organizations defaultOrg
+					  ON defaultOrg.Id = u.default_organization
+					 AND defaultOrg.ShaleClientId = u.ShaleClientId
+					 AND (defaultOrg.IsDeleted = 0 OR defaultOrg.IsDeleted IS NULL)
 					WHERE u.Id = ?
 					  AND u.ShaleClientId = ?
 					""");
@@ -194,6 +202,7 @@ public final class UserDao {
 							rs.getBoolean("IsAdmin"),
 							rs.getBoolean("IsAttorney"),
 							rs.getBoolean("IsDeleted"),
+							rs.getString("DefaultOrganizationName"),
 							getNullableInt(rs, "DefaultOrganizationId"),
 							getNullableInt(rs, "OrganizationId"));
 				}
@@ -220,7 +229,9 @@ public final class UserDao {
 					UPDATE dbo.Users
 					SET name_first = ?,
 					    name_last = ?,
-					    email = ?
+					    email = ?,
+					    Initials = ?,
+					    default_organization = ?
 					""");
 			if (phoneColumn != null) {
 				sql.append(",\n    ").append(phoneColumn).append(" = ?");
@@ -234,6 +245,8 @@ public final class UserDao {
 				setNullableString(ps, idx++, request.firstName());
 				setNullableString(ps, idx++, request.lastName());
 				setNullableString(ps, idx++, request.email());
+				setNullableString(ps, idx++, request.initials());
+				setNullableInteger(ps, idx++, request.defaultOrganizationId());
 				if (phoneColumn != null) {
 					setNullableString(ps, idx++, request.phone());
 				}
@@ -463,6 +476,14 @@ public final class UserDao {
 			return;
 		}
 		ps.setString(index, value.trim());
+	}
+
+	private static void setNullableInteger(PreparedStatement ps, int index, Integer value) throws SQLException {
+		if (value == null) {
+			ps.setNull(index, java.sql.Types.INTEGER);
+			return;
+		}
+		ps.setInt(index, value);
 	}
 
 	private static Integer getNullableInt(ResultSet rs, String col) throws SQLException {

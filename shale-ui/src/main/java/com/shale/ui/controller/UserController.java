@@ -1,5 +1,7 @@
 package com.shale.ui.controller;
 
+import com.shale.data.dao.OrganizationDao;
+import com.shale.data.dao.OrganizationDao.OrganizationOptionRow;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserDao.UserDetailRow;
 import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
@@ -9,10 +11,13 @@ import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -22,6 +27,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -47,18 +53,19 @@ public final class UserController {
 	@FXML private TextField emailEditor;
 	@FXML private Label phoneValue;
 	@FXML private TextField phoneEditor;
-	@FXML private Label isAdminValue;
-	@FXML private Label isAttorneyValue;
 	@FXML private Label initialsValue;
+	@FXML private TextField initialsEditor;
 	@FXML private Label defaultOrganizationValue;
-	@FXML private Label organizationValue;
+	@FXML private ComboBox<OrganizationOptionRow> defaultOrganizationEditor;
 
 	private Integer userId;
 	private UserDao userDao;
+	private OrganizationDao organizationDao;
 	private AppState appState;
 	private UserDetailRow currentUser;
 	private List<UserRoleRow> assignedRoles = List.of();
 	private List<UserRoleRow> assignableRoles = List.of();
+	private List<OrganizationOptionRow> defaultOrganizationOptions = List.of();
 	private boolean editMode;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
@@ -67,9 +74,10 @@ public final class UserController {
 		return t;
 	});
 
-	public void init(int userId, UserDao userDao, AppState appState) {
+	public void init(int userId, UserDao userDao, OrganizationDao organizationDao, AppState appState) {
 		this.userId = userId;
 		this.userDao = userDao;
+		this.organizationDao = organizationDao;
 		this.appState = appState;
 	}
 
@@ -87,6 +95,7 @@ public final class UserController {
 		if (addRoleButton != null) {
 			addRoleButton.setOnAction(e -> onAddRole());
 		}
+		configureDefaultOrganizationEditor();
 
 		setEditMode(false);
 		Platform.runLater(this::loadUser);
@@ -107,6 +116,9 @@ public final class UserController {
 		dbExec.submit(() -> {
 			try {
 				UserDetailRow loaded = userDao.findById(userId, shaleClientId);
+				List<OrganizationOptionRow> organizationOptions = organizationDao == null
+						? List.of()
+						: organizationDao.findSelectableOrganizations();
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (loaded == null) {
@@ -114,6 +126,8 @@ public final class UserController {
 						return;
 					}
 					currentUser = loaded;
+					defaultOrganizationOptions = organizationOptions == null ? List.of() : List.copyOf(organizationOptions);
+					refreshDefaultOrganizationOptions();
 					renderFromCurrent();
 					setEditMode(false);
 					clearError();
@@ -147,7 +161,6 @@ public final class UserController {
 				Platform.runLater(() -> {
 					assignedRoles = loadedAssigned == null ? List.of() : List.copyOf(loadedAssigned);
 					assignableRoles = loadedAssignable == null ? List.of() : List.copyOf(loadedAssignable);
-					System.out.println("[TEMP DIAG][USER_ROLES] userId=" + targetUserId + " assigned=" + assignedRoles.size() + " available=" + assignableRoles.size());
 					renderRoles();
 				});
 			} catch (Exception ex) {
@@ -200,7 +213,9 @@ public final class UserController {
 				safeText(firstNameEditor == null ? null : firstNameEditor.getText()),
 				safeText(lastNameEditor == null ? null : lastNameEditor.getText()),
 				safeText(emailEditor == null ? null : emailEditor.getText()),
-				safeText(phoneEditor == null ? null : phoneEditor.getText()));
+				safeText(phoneEditor == null ? null : phoneEditor.getText()),
+				safeText(initialsEditor == null ? null : initialsEditor.getText()),
+				selectedOrganizationId());
 
 		setBusy(true);
 		dbExec.submit(() -> {
@@ -352,11 +367,8 @@ public final class UserController {
 		setLabel(lastNameValue, currentUser.lastName());
 		setLabel(emailValue, currentUser.email());
 		setLabel(phoneValue, currentUser.phone());
-		setLabel(isAdminValue, yesNo(currentUser.admin()));
-		setLabel(isAttorneyValue, yesNo(currentUser.attorney()));
 		setLabel(initialsValue, currentUser.initials());
-		setLabel(defaultOrganizationValue, nullableId(currentUser.defaultOrganizationId()));
-		setLabel(organizationValue, nullableId(currentUser.organizationId()));
+		setLabel(defaultOrganizationValue, defaultOrganizationDisplay(currentUser));
 		writeEditorsFromCurrent();
 		refreshActionVisibility();
 		renderRoles();
@@ -416,6 +428,10 @@ public final class UserController {
 		if (phoneEditor != null) {
 			phoneEditor.setText(safeText(currentUser.phone()));
 		}
+		if (initialsEditor != null) {
+			initialsEditor.setText(safeText(currentUser.initials()));
+		}
+		selectDefaultOrganization(currentUser.defaultOrganizationId());
 	}
 
 	private void setEditMode(boolean enabled) {
@@ -426,6 +442,8 @@ public final class UserController {
 		toggleEditableField(lastNameValue, lastNameEditor, this.editMode);
 		toggleEditableField(emailValue, emailEditor, this.editMode);
 		toggleEditableField(phoneValue, phoneEditor, this.editMode);
+		toggleEditableField(initialsValue, initialsEditor, this.editMode);
+		toggleEditableField(defaultOrganizationValue, defaultOrganizationEditor, this.editMode);
 	}
 
 	private void refreshActionVisibility() {
@@ -460,6 +478,12 @@ public final class UserController {
 		}
 		if (phoneEditor != null) {
 			phoneEditor.setDisable(busy);
+		}
+		if (initialsEditor != null) {
+			initialsEditor.setDisable(busy);
+		}
+		if (defaultOrganizationEditor != null) {
+			defaultOrganizationEditor.setDisable(busy);
 		}
 	}
 
@@ -502,6 +526,58 @@ public final class UserController {
 			return button.getScene().getWindow();
 		}
 		return null;
+	}
+
+	private void configureDefaultOrganizationEditor() {
+		if (defaultOrganizationEditor == null) {
+			return;
+		}
+		defaultOrganizationEditor.setCellFactory(listView -> new ListCell<>() {
+			@Override
+			protected void updateItem(OrganizationOptionRow item, boolean empty) {
+				super.updateItem(item, empty);
+				setText(empty ? null : organizationOptionLabel(item));
+			}
+		});
+		defaultOrganizationEditor.setButtonCell(new ListCell<>() {
+			@Override
+			protected void updateItem(OrganizationOptionRow item, boolean empty) {
+				super.updateItem(item, empty);
+				setText(empty ? null : organizationOptionLabel(item));
+			}
+		});
+		refreshDefaultOrganizationOptions();
+	}
+
+	private void refreshDefaultOrganizationOptions() {
+		if (defaultOrganizationEditor == null) {
+			return;
+		}
+		List<OrganizationOptionRow> items = new java.util.ArrayList<>();
+		items.add(new OrganizationOptionRow(null, "— None —"));
+		items.addAll(defaultOrganizationOptions);
+		defaultOrganizationEditor.setItems(FXCollections.observableArrayList(items));
+		selectDefaultOrganization(currentUser == null ? null : currentUser.defaultOrganizationId());
+	}
+
+	private void selectDefaultOrganization(Integer organizationId) {
+		if (defaultOrganizationEditor == null) {
+			return;
+		}
+		for (OrganizationOptionRow option : defaultOrganizationEditor.getItems()) {
+			if (Objects.equals(option == null ? null : option.organizationId(), organizationId)) {
+				defaultOrganizationEditor.getSelectionModel().select(option);
+				return;
+			}
+		}
+		defaultOrganizationEditor.getSelectionModel().selectFirst();
+	}
+
+	private Integer selectedOrganizationId() {
+		OrganizationOptionRow selected = defaultOrganizationEditor == null
+				? null
+				: defaultOrganizationEditor.getSelectionModel().getSelectedItem();
+		return selected == null ? null : selected.organizationId();
 	}
 
 	private static void toggleEditableField(Label valueNode, Node editorNode, boolean editMode) {
@@ -547,16 +623,32 @@ public final class UserController {
 		return "—".equals(email) ? "User #" + user.id() : email;
 	}
 
-	private static String nullableId(Integer value) {
-		return value == null ? "—" : Integer.toString(value);
-	}
-
-	private static String yesNo(boolean value) {
-		return value ? "Yes" : "No";
-	}
-
 	private static String safeText(String value) {
 		return value == null ? "" : value.trim();
+	}
+
+	private static String defaultOrganizationDisplay(UserDetailRow user) {
+		if (user == null) {
+			return "—";
+		}
+		String name = fallback(user.defaultOrganizationName());
+		if (!"—".equals(name)) {
+			return name;
+		}
+		Integer organizationId = user.defaultOrganizationId();
+		return organizationId == null ? "—" : "Organization #" + organizationId;
+	}
+
+	private static String organizationOptionLabel(OrganizationOptionRow option) {
+		if (option == null) {
+			return "—";
+		}
+		String name = fallback(option.name());
+		if (!"—".equals(name)) {
+			return name;
+		}
+		Integer organizationId = option.organizationId();
+		return organizationId == null ? "— None —" : "Organization #" + organizationId;
 	}
 
 	private static String fallback(String value) {
