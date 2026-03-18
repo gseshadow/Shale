@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+    xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="com.shale.ui.controller.ContactViewController"
+    spacing="12" styleClass="cases-content-surface glass-panel">
+
+    <padding>
+        <Insets top="18" right="18" bottom="18" left="18" />
+    </padding>
+
+    <children>
+        <Label fx:id="contactNameLabel" style="-fx-font-size: 20px; -fx-font-weight: 700;" text="Contact" />
+        <Label fx:id="contactMetaLabel" style="-fx-font-size: 13px; -fx-opacity: 0.72;" text="" wrapText="true" />
+        <Label fx:id="contactPlaceholderLabel" style="-fx-font-size: 14px;" wrapText="true"
+            text="Contact detail view is coming soon." />
+    </children>
+
+</VBox>
