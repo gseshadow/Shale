@@ -4,7 +4,6 @@ import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserDao.DirectoryUserRow;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
-import com.shale.ui.component.factory.UserCardFactory.Variant;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
@@ -25,6 +24,10 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 public final class TeamController {
+
+	private static final UserCardFactory.Variant TEAM_CARD_VARIANT = UserCardFactory.Variant.FULL;
+	private static final double TEAM_CARD_WIDTH = 320;
+	private static final double TEAM_CARD_HEIGHT = 72;
 
 	@FXML
 	private TextField teamSearchField;
@@ -59,6 +62,11 @@ public final class TeamController {
 	private void initialize() {
 		if (teamSearchField != null) {
 			teamSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
+		}
+		if (teamFlow != null) {
+			teamFlow.setHgap(14);
+			teamFlow.setVgap(14);
+			teamFlow.setPrefWrapLength(1040);
 		}
 
 		Platform.runLater(this::loadUsers);
@@ -142,9 +150,11 @@ public final class TeamController {
 				row.id(),
 				displayName,
 				row.color(),
-				row.initials()), Variant.FULL);
-		card.setPrefWidth(260);
-		card.setMaxWidth(260);
+				row.initials()), TEAM_CARD_VARIANT);
+		card.setMinHeight(TEAM_CARD_HEIGHT);
+		card.setPrefHeight(TEAM_CARD_HEIGHT);
+		card.setPrefWidth(TEAM_CARD_WIDTH);
+		card.setMaxWidth(TEAM_CARD_WIDTH);
 		return card;
 	}
 
