@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 
 import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
@@ -20,7 +21,6 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
@@ -302,16 +302,13 @@ public final class OrganizationController {
 	}
 
 	private boolean confirmUnlink(OrganizationDao.RelatedCaseRow row) {
-		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-		if (addCaseButton != null && addCaseButton.getScene() != null) {
-			alert.initOwner(addCaseButton.getScene().getWindow());
-		}
-		alert.setTitle("Remove Case");
-		alert.setHeaderText("Remove this case from the organization?");
-		alert.setContentText(fallback(row.name()) + " (#" + row.id() + ")");
-
-		Optional<ButtonType> choice = alert.showAndWait();
-		return choice.isPresent() && choice.get() == ButtonType.OK;
+		return AppDialogs.showConfirmation(
+				dialogOwner(addCaseButton),
+				"Remove Case",
+				"Remove this case from the organization?",
+				fallback(row.name()) + " (#" + row.id() + ")",
+				"Remove Case",
+				AppDialogs.DialogActionKind.DANGER);
 	}
 
 	private void onEdit() {
@@ -432,21 +429,24 @@ public final class OrganizationController {
 	}
 
 	private boolean confirmDeleteOrganization() {
-		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-		Window owner = null;
-		if (deleteOrganizationButton != null && deleteOrganizationButton.getScene() != null) {
-			owner = deleteOrganizationButton.getScene().getWindow();
-		} else if (editButton != null && editButton.getScene() != null) {
-			owner = editButton.getScene().getWindow();
+		Window owner = dialogOwner(deleteOrganizationButton);
+		if (owner == null) {
+			owner = dialogOwner(editButton);
 		}
-		if (owner != null) {
-			alert.initOwner(owner);
+		return AppDialogs.showConfirmation(
+				owner,
+				"Delete Organization",
+				"Delete this organization?",
+				"This will remove it from active lists.",
+				"Delete Organization",
+				AppDialogs.DialogActionKind.DANGER);
+	}
+
+	private Window dialogOwner(Button button) {
+		if (button != null && button.getScene() != null) {
+			return button.getScene().getWindow();
 		}
-		alert.setTitle("Delete Organization");
-		alert.setHeaderText("Delete this organization?");
-		alert.setContentText("This will remove it from active lists.");
-		Optional<ButtonType> choice = alert.showAndWait();
-		return choice.isPresent() && choice.get() == ButtonType.OK;
+		return null;
 	}
 
 	private void navigateAfterDelete() {
