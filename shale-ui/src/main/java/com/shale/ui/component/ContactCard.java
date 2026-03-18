@@ -2,10 +2,13 @@ package com.shale.ui.component;
 
 import java.util.function.Consumer;
 
-import javafx.geometry.Pos;
+import javafx.geometry.Insets;
 import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.layout.StackPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 public class ContactCard extends StackPane {
@@ -47,6 +50,7 @@ public class ContactCard extends StackPane {
 			setCursor(Cursor.HAND);
 			setOnMouseClicked(e ->
 			{
+				System.out.println("[ContactCard] click contactId=" + contactId);
 				if (onOpen != null) {
 					onOpen.accept(contactId);
 				}

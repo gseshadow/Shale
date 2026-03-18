@@ -69,6 +69,42 @@ public final class CaseDao {
 	public record ContactRow(int id, String displayName) {
 	}
 
+	public record RelatedOrganizationRow(
+			int id,
+			String name,
+			Integer organizationTypeId,
+			String organizationTypeName,
+			String phone,
+			String email,
+			String website,
+			String address1,
+			String address2,
+			String city,
+			String state,
+			String postalCode,
+			String country,
+			String notes,
+			String color
+	) {
+	}
+
+	public record RelatedContactRow(
+			int id,
+			String displayName,
+			int roleId,
+			boolean primary,
+			String email,
+			String phone
+	) {
+	}
+
+	public record SelectableOrganizationRow(
+			int id,
+			String name,
+			String organizationTypeName
+	) {
+	}
+
 
 	public record NewIntakeCreateRequest(
 			int shaleClientId,
@@ -1329,6 +1365,29 @@ public final class CaseDao {
 		return Integer.valueOf(o.toString());
 	}
 
+	private static Integer getNullableInt(ResultSet rs, int colIndex) throws SQLException {
+		Object o = rs.getObject(colIndex);
+		if (o == null)
+			return null;
+		if (o instanceof Number n)
+			return n.intValue();
+		return Integer.valueOf(o.toString());
+	}
+
+
+	private static int requireCurrentShaleClientId(Connection con) throws SQLException {
+		String sql = "SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT);";
+		try (PreparedStatement ps = con.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+			if (!rs.next())
+				throw new IllegalStateException("ShaleClientId session context is missing.");
+			Integer shaleClientId = getNullableInt(rs, 1);
+			if (shaleClientId == null || shaleClientId <= 0)
+				throw new IllegalStateException("ShaleClientId session context is missing.");
+			return shaleClientId;
+		}
+	}
+
 	private static Boolean getNullableBoolean(ResultSet rs, String col) throws SQLException {
 		Object o = rs.getObject(col);
 		if (o == null)
@@ -1431,6 +1490,307 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list contacts (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public List<RelatedContactRow> findRelatedContacts(long caseId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+
+		String baseSql = """
+				SELECT
+				  ct.Id,
+				  LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )) AS DisplayName,
+				  cc.Role AS RoleId,
+				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				FROM dbo.CaseContacts cc
+				INNER JOIN dbo.Cases c
+				  ON c.Id = cc.CaseId
+				INNER JOIN dbo.Contacts ct
+				  ON ct.Id = cc.ContactId
+				WHERE cc.CaseId = ?
+				  AND c.ShaleClientId = ?
+				  AND ct.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND NULLIF(LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )), '') IS NOT NULL
+				""";
+
+		String orderSql = """
+				ORDER BY DisplayName ASC, cc.Role ASC, ct.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			boolean hasIsDeleted = contactsHasIsDeletedColumn(con);
+
+			String sql = hasIsDeleted
+					? baseSql + "\n  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)\n" + orderSql
+					: baseSql + "\n" + orderSql;
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setLong(idx++, caseId);
+				ps.setInt(idx++, shaleClientId);
+				ps.setInt(idx++, shaleClientId);
+
+				List<RelatedContactRow> out = new ArrayList<>();
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						out.add(new RelatedContactRow(
+							rs.getInt("Id"),
+							rs.getString("DisplayName"),
+							rs.getInt("RoleId"),
+							rs.getBoolean("IsPrimary"),
+							rs.getString("Email"),
+							rs.getString("Phone")));
+					}
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load related contacts for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public List<RelatedOrganizationRow> findRelatedOrganizations(long caseId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+
+		String sql = """
+				SELECT
+				  o.Id,
+				  o.Name,
+				  o.OrganizationTypeId,
+				  ot.Name AS OrganizationTypeName,
+				  o.Phone,
+				  o.Email,
+				  o.Website,
+				  o.Address1,
+				  o.Address2,
+				  o.City,
+				  o.State,
+				  o.PostalCode,
+				  o.Country,
+				  o.Notes
+				FROM CaseOrganizations co
+				INNER JOIN Organizations o
+				  ON o.Id = co.OrganizationId
+				LEFT JOIN OrganizationTypes ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE co.CaseId = ?
+				  AND o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				ORDER BY o.Name ASC, o.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+
+			List<RelatedOrganizationRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new RelatedOrganizationRow(
+						rs.getInt("Id"),
+						rs.getString("Name"),
+						(Integer) rs.getObject("OrganizationTypeId"),
+						rs.getString("OrganizationTypeName"),
+						rs.getString("Phone"),
+						rs.getString("Email"),
+						rs.getString("Website"),
+						rs.getString("Address1"),
+						rs.getString("Address2"),
+						rs.getString("City"),
+						rs.getString("State"),
+						rs.getString("PostalCode"),
+						rs.getString("Country"),
+						rs.getString("Notes"),
+						null
+					));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load related organizations for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public List<SelectableOrganizationRow> findLinkableOrganizations(long caseId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+
+		String sql = """
+				SELECT
+				  o.Id,
+				  o.Name,
+				  ot.Name AS OrganizationTypeName
+				FROM Organizations o
+				LEFT JOIN OrganizationTypes ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				ORDER BY o.Name ASC, o.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			ps.setInt(1, shaleClientId);
+
+			List<SelectableOrganizationRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new SelectableOrganizationRow(
+						rs.getInt("Id"),
+						rs.getString("Name"),
+						rs.getString("OrganizationTypeName")
+					));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load linkable organizations for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public boolean linkOrganizationToCase(long caseId, int organizationId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+		if (organizationId <= 0) {
+			throw new IllegalArgumentException("organizationId must be > 0");
+		}
+
+		String sql = """
+				INSERT INTO CaseOrganizations (
+				  CaseId,
+				  OrganizationId,
+				  RoleId,
+				  IsPrimary,
+				  Notes,
+				  CreatedAt,
+				  UpdatedAt
+				)
+				SELECT
+				  ?,
+				  ?,
+				  NULL,
+				  0,
+				  NULL,
+				  SYSUTCDATETIME(),
+				  SYSUTCDATETIME()
+				WHERE EXISTS (
+				    SELECT 1
+				    FROM Cases c
+				    WHERE c.Id = ?
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM Organizations o
+				    WHERE o.Id = ?
+				      AND o.ShaleClientId = ?
+				      AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				)
+				  AND NOT EXISTS (
+				    SELECT 1
+				    FROM CaseOrganizations co
+				    WHERE co.CaseId = ?
+				      AND co.OrganizationId = ?
+				  );
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, organizationId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, organizationId);
+			return ps.executeUpdate() > 0;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to link organization to case (caseId=" + caseId + ", orgId=" + organizationId + ")", e);
+		}
+	}
+
+	public boolean unlinkOrganizationFromCase(long caseId, int organizationId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+		if (organizationId <= 0) {
+			throw new IllegalArgumentException("organizationId must be > 0");
+		}
+
+		String sql = """
+				DELETE co
+				FROM CaseOrganizations co
+				WHERE co.CaseId = ?
+				  AND co.OrganizationId = ?
+				  AND EXISTS (
+				    SELECT 1
+				    FROM Cases c
+				    WHERE c.Id = co.CaseId
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  )
+				  AND EXISTS (
+				    SELECT 1
+				    FROM Organizations o
+				    WHERE o.Id = co.OrganizationId
+				      AND o.ShaleClientId = ?
+				      AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				  );
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, shaleClientId);
+			return ps.executeUpdate() > 0;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to unlink organization from case (caseId=" + caseId + ", orgId=" + organizationId + ")", e);
 		}
 	}
 

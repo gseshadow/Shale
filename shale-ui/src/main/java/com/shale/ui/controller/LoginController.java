@@ -142,6 +142,7 @@ public final class LoginController {
 				appState.setUserId(result.userId());
 				appState.setShaleClientId(result.shaleClientId());
 				appState.setUserEmail(result.email());
+				appState.setAdmin(result.admin());
 
 				runtimeBridge.onLoginSuccess(result.userId(), result.shaleClientId(), result.email());
 
