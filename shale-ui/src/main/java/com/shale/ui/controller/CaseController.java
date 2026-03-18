@@ -16,6 +16,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.OrganizationCardFactory;
@@ -25,6 +26,7 @@ import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
+import com.shale.ui.component.dialog.CreateContactDialog;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.component.factory.UserCardFactory.Variant;
@@ -358,6 +360,7 @@ public class CaseController {
 
 	private CaseDao caseDao;
 	private OrganizationDao organizationDao;
+	private ContactDao contactDao;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 
@@ -426,10 +429,11 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 	}
 
-	public void init(Integer caseId, CaseDao caseDao, OrganizationDao organizationDao, AppState appState, UiRuntimeBridge runtimeBridge) {
+	public void init(Integer caseId, CaseDao caseDao, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge) {
 		this.caseId = caseId;
 		this.caseDao = caseDao;
 		this.organizationDao = organizationDao;
+		this.contactDao = contactDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		refreshHeader();
@@ -499,7 +503,7 @@ public class CaseController {
 		if (submitCaseUpdateButton != null)
 			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
 		if (addOrganizationButton != null)
-			addOrganizationButton.setOnAction(e -> onAddOrganization());
+			addOrganizationButton.setOnAction(e -> onAddRelatedEntity());
 		if (caseUpdatesComposerArea != null) {
 			caseUpdatesComposerArea.setOnKeyPressed(e ->
 			{
@@ -719,7 +723,10 @@ public class CaseController {
 		if (genericTitleLabel != null)
 			genericTitleLabel.setText("Contacts");
 
-		setVisibleManaged(addOrganizationButton, false);
+		setVisibleManaged(addOrganizationButton, true);
+		if (addOrganizationButton != null) {
+			addOrganizationButton.setText("Add Contact");
+		}
 		setVisibleManaged(placeholderTextArea, false);
 		renderContactsSection();
 	}
@@ -752,7 +759,7 @@ public class CaseController {
 		var card = factory.create(new com.shale.ui.component.factory.ContactCardFactory.ContactCardModel(
 				contact.id(),
 				safe(contact.displayName()).isBlank() ? "—" : contact.displayName(),
-				caseContactRoleLabel(contact.roleId(), contact.primary()),
+				caseContactRoleLabel(contact.roleName(), contact.roleId(), contact.primary()),
 				contact.email(),
 				contact.phone()), ContactCardFactory.Variant.FULL);
 		card.setPrefWidth(340);
@@ -761,13 +768,20 @@ public class CaseController {
 		return card;
 	}
 
-	private String caseContactRoleLabel(int roleId, boolean primary) {
-		String base = switch (roleId) {
-		case ROLE_CASECONTACT_CLIENT -> "Client";
-		case ROLE_CASECONTACT_CALLER -> "Caller";
-		case ROLE_CASECONTACT_OPPOSING_COUNSEL -> "Opposing Counsel";
-		default -> "Role " + roleId;
-		};
+	private String caseContactRoleLabel(String roleName, Integer roleId, boolean primary) {
+		String base = safe(roleName).trim();
+		if (base.isBlank()) {
+			if (roleId == null) {
+				base = "No role assigned";
+			} else {
+				base = switch (roleId.intValue()) {
+				case ROLE_CASECONTACT_CLIENT -> "Client";
+				case ROLE_CASECONTACT_CALLER -> "Caller";
+				case ROLE_CASECONTACT_OPPOSING_COUNSEL -> "Opposing Counsel";
+				default -> "Role " + roleId;
+				};
+			}
+		}
 		return primary ? base + " (Primary)" : base;
 	}
 
@@ -782,6 +796,9 @@ public class CaseController {
 			genericTitleLabel.setText("Organizations");
 
 		setVisibleManaged(addOrganizationButton, true);
+		if (addOrganizationButton != null) {
+			addOrganizationButton.setText("Add Organization");
+		}
 		setVisibleManaged(placeholderTextArea, false);
 		renderOrganizationsSection();
 	}
@@ -841,6 +858,253 @@ public class CaseController {
 		VBox container = new VBox(6, card, actions);
 		container.setPrefWidth(280);
 		return container;
+	}
+
+	private void onAddRelatedEntity() {
+		String section = genericTitleLabel == null ? "" : safe(genericTitleLabel.getText());
+		if ("Contacts".equalsIgnoreCase(section)) {
+			onAddContact();
+			return;
+		}
+		onAddOrganization();
+	}
+
+	private void onAddContact() {
+		if (caseDao == null || contactDao == null || caseId == null || addOrganizationButton == null) {
+			return;
+		}
+
+		Window owner = organizationDialogOwner();
+		Optional<String> choice = AppDialogs.showChoice(
+				owner,
+				"Add Contact",
+				"Add a contact to this case",
+				"Choose whether to link an existing contact or create a new one.",
+				List.of(
+						AppDialogs.DialogAction.cancel("Cancel", null),
+						AppDialogs.DialogAction.of("Select Existing Contact", "existing", AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.of("Create New Contact", "create", AppDialogs.DialogActionKind.PRIMARY, true, false)));
+		if (choice.isEmpty()) {
+			return;
+		}
+
+		if ("existing".equals(choice.get())) {
+			loadLinkableContactsAndShowPicker(owner);
+			return;
+		}
+
+		showCreateContactDialog(owner);
+	}
+
+	private void loadLinkableContactsAndShowPicker(Window owner) {
+		if (caseDao == null || caseId == null) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				List<CaseDao.SelectableContactRow> selectable = caseDao.findLinkableContacts(activeCaseId);
+				runOnFx(() -> showLinkContactPicker(owner, selectable));
+			} catch (Exception ex) {
+				runOnFx(() -> showContactActionError("Failed to load contacts for linking."));
+			}
+		}, "case-linkable-contacts-" + activeCaseId).start();
+	}
+
+	private void showLinkContactPicker(Window owner, List<CaseDao.SelectableContactRow> selectable) {
+		List<CaseDao.SelectableContactRow> options = selectable == null ? List.of() : selectable;
+		if (options.isEmpty()) {
+			showContactActionInfo("No available contacts to link.");
+			return;
+		}
+
+		ContactPickerDialog<CaseDao.SelectableContactRow> picker = new ContactPickerDialog<>(
+				owner,
+				"Add Contact",
+				options,
+				this::formatSelectableContact,
+				null);
+
+		Optional<CaseDao.SelectableContactRow> selected = picker.showAndWait();
+		if (selected.isEmpty()) {
+			return;
+		}
+
+		promptForRoleAndLinkContact(owner, selected.get().id(), false);
+	}
+
+	private void showCreateContactDialog(Window owner) {
+		if (appState == null || appState.getShaleClientId() == null || appState.getShaleClientId() <= 0) {
+			showContactActionError("A tenant must be selected before creating a contact.");
+			return;
+		}
+
+		CreateContactDialog dialog = new CreateContactDialog(owner);
+		Optional<ContactDao.CreateContactRequest> request = dialog.showAndWait(appState.getShaleClientId());
+		if (request.isEmpty()) {
+			return;
+		}
+
+		createAndLinkContact(owner, request.get());
+	}
+
+	private void createAndLinkContact(Window owner, ContactDao.CreateContactRequest request) {
+		if (contactDao == null || caseDao == null || caseId == null || request == null) {
+			return;
+		}
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				int contactId = contactDao.createContact(request);
+				runOnFx(() -> promptForRoleAndLinkContact(owner, contactId, true));
+			} catch (Exception ex) {
+				runOnFx(() -> showContactActionError("Failed to create contact for this case."));
+			}
+		}, "case-create-contact-" + activeCaseId).start();
+	}
+
+	private void promptForRoleAndLinkContact(Window owner, int contactId, boolean createdFlow) {
+		if (caseDao == null || contactId <= 0) {
+			return;
+		}
+		new Thread(() -> {
+			try {
+				List<CaseDao.CaseContactRoleOption> roles = caseDao.findActiveCaseContactRoles();
+				runOnFx(() -> showCaseContactRolePicker(owner, contactId, roles, createdFlow));
+			} catch (Exception ex) {
+				runOnFx(() -> showContactActionError(createdFlow
+						? "Contact was created, but loading case contact roles failed."
+						: "Failed to load case contact roles."));
+			}
+		}, "case-contact-roles-" + contactId).start();
+	}
+
+	private void showCaseContactRolePicker(Window owner, int contactId, List<CaseDao.CaseContactRoleOption> roles, boolean createdFlow) {
+		List<CaseDao.CaseContactRoleOption> options = roles == null ? List.of() : roles;
+		if (options.isEmpty()) {
+			showContactActionError(createdFlow
+					? "Contact was created, but no active case contact roles are configured."
+					: "No active case contact roles are configured.");
+			return;
+		}
+
+		CaseDao.CaseContactRoleOption preselect = findPreferredCaseContactRole(options);
+		ContactPickerDialog<CaseDao.CaseContactRoleOption> picker = new ContactPickerDialog<>(
+				owner,
+				"Select Contact Role",
+				options,
+				this::formatCaseContactRole,
+				preselect);
+		Optional<CaseDao.CaseContactRoleOption> selected = picker.showAndWait();
+		if (selected.isEmpty()) {
+			if (createdFlow) {
+				showContactActionInfo("Contact was created, but it was not linked because no role was selected.");
+			}
+			return;
+		}
+
+		linkContactToCurrentCase(contactId, selected.get().id(), createdFlow);
+	}
+
+	private CaseDao.CaseContactRoleOption findPreferredCaseContactRole(List<CaseDao.CaseContactRoleOption> roles) {
+		if (roles == null || roles.isEmpty()) {
+			return null;
+		}
+		for (CaseDao.CaseContactRoleOption role : roles) {
+			if (role != null && "contact".equalsIgnoreCase(safe(role.name()).trim())) {
+				return role;
+			}
+		}
+		return roles.get(0);
+	}
+
+	private void linkContactToCurrentCase(int contactId, int roleId, boolean createdFlow) {
+		if (caseDao == null || caseId == null || contactId <= 0 || roleId <= 0) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				boolean inserted = caseDao.linkContactToCase(activeCaseId, contactId, roleId);
+				runOnFx(() -> {
+					if (!inserted) {
+						showContactActionInfo(createdFlow
+								? "Contact was created, but it is already linked to this case."
+								: "That contact is already linked to this case.");
+						refreshContactsSectionAsync();
+						return;
+					}
+					refreshContactsSectionAsync();
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showContactActionError(createdFlow
+						? "Contact was created, but linking it to the case failed."
+						: "Failed to link contact to this case."));
+			}
+		}, "case-link-contact-" + activeCaseId + "-" + contactId + "-" + roleId).start();
+	}
+
+	private void refreshContactsSectionAsync() {
+		if (caseDao == null || caseId == null) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				List<CaseDao.RelatedContactRow> contacts = caseDao.findRelatedContacts(activeCaseId);
+				runOnFx(() -> {
+					relatedContacts = contacts == null ? List.of() : contacts;
+					renderContactsSection();
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showContactActionError("Failed to refresh contacts for this case."));
+			}
+		}, "case-refresh-contacts-" + activeCaseId).start();
+	}
+
+	private void showContactActionInfo(String message) {
+		showContactActionAlert(AppDialogs.DialogActionKind.PRIMARY, message);
+	}
+
+	private void showContactActionError(String message) {
+		showContactActionAlert(AppDialogs.DialogActionKind.DANGER, message);
+	}
+
+	private void showContactActionAlert(AppDialogs.DialogActionKind type, String message) {
+		if (type == AppDialogs.DialogActionKind.DANGER) {
+			AppDialogs.showError(organizationDialogOwner(), "Contacts", message);
+			return;
+		}
+		AppDialogs.showInfo(organizationDialogOwner(), "Contacts", message);
+	}
+
+	private String formatCaseContactRole(CaseDao.CaseContactRoleOption role) {
+		if (role == null) {
+			return "";
+		}
+		String name = safe(role.name());
+		String description = safe(role.description()).trim();
+		if (description.isBlank()) {
+			return name + " (#" + role.id() + ")";
+		}
+		return name + " — " + description + " (#" + role.id() + ")";
+	}
+
+	private String formatSelectableContact(CaseDao.SelectableContactRow row) {
+		if (row == null) {
+			return "";
+		}
+		String name = safe(row.displayName());
+		String email = safe(row.email());
+		String phone = safe(row.phone());
+		String detail = !email.isBlank() ? email : phone;
+		if (detail.isBlank()) {
+			return name + " (#" + row.id() + ")";
+		}
+		return name + " — " + detail + " (#" + row.id() + ")";
 	}
 
 	private void openOrganization(Integer organizationId) {

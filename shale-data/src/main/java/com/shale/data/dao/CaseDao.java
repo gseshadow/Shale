@@ -91,8 +91,24 @@ public final class CaseDao {
 	public record RelatedContactRow(
 			int id,
 			String displayName,
-			int roleId,
+			Integer roleId,
+			String roleName,
 			boolean primary,
+			String email,
+			String phone
+	) {
+	}
+
+	public record CaseContactRoleOption(
+			int id,
+			String name,
+			String description
+	) {
+	}
+
+	public record SelectableContactRow(
+			int id,
+			String displayName,
 			String email,
 			String phone
 	) {
@@ -1508,6 +1524,7 @@ public final class CaseDao {
 				    END
 				  )) AS DisplayName,
 				  cc.Role AS RoleId,
+				  NULLIF(LTRIM(RTRIM(COALESCE(r.Name, ''))), '') AS RoleName,
 				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
 				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
 				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
@@ -1516,6 +1533,9 @@ public final class CaseDao {
 				  ON c.Id = cc.CaseId
 				INNER JOIN dbo.Contacts ct
 				  ON ct.Id = cc.ContactId
+				LEFT JOIN dbo.Roles r
+				  ON r.Id = cc.Role
+				 AND r.ShaleClientId = c.ShaleClientId
 				WHERE cc.CaseId = ?
 				  AND c.ShaleClientId = ?
 				  AND ct.ShaleClientId = ?
@@ -1558,7 +1578,8 @@ public final class CaseDao {
 						out.add(new RelatedContactRow(
 							rs.getInt("Id"),
 							rs.getString("DisplayName"),
-							rs.getInt("RoleId"),
+							(Integer) rs.getObject("RoleId"),
+							rs.getString("RoleName"),
 							rs.getBoolean("IsPrimary"),
 							rs.getString("Email"),
 							rs.getString("Phone")));
@@ -1568,6 +1589,196 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related contacts for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public List<CaseContactRoleOption> findActiveCaseContactRoles() {
+		String sql = """
+				SELECT
+				  r.Id,
+				  r.Name,
+				  r.Description
+				FROM dbo.Roles r
+				WHERE r.ShaleClientId = ?
+				  AND r.IsActive = 1
+				ORDER BY r.Name ASC, r.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			ps.setInt(1, shaleClientId);
+			List<CaseContactRoleOption> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new CaseContactRoleOption(
+						rs.getInt("Id"),
+						rs.getString("Name"),
+						rs.getString("Description")));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load active case contact roles", e);
+		}
+	}
+
+	public List<SelectableContactRow> findLinkableContacts(long caseId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+
+		String sql = """
+				SELECT
+				  ct.Id,
+				  LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )) AS DisplayName,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				FROM dbo.Contacts ct
+				WHERE ct.ShaleClientId = ?
+				  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				  AND NULLIF(LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )), '') IS NOT NULL
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.Cases c
+				    WHERE c.Id = ?
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  )
+				  AND NOT EXISTS (
+				    SELECT 1
+				    FROM dbo.CaseContacts cc
+				    WHERE cc.CaseId = ?
+				      AND cc.ContactId = ct.Id
+				  )
+				ORDER BY DisplayName ASC, ct.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, caseId);
+
+			List<SelectableContactRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new SelectableContactRow(
+						rs.getInt("Id"),
+						rs.getString("DisplayName"),
+						rs.getString("Email"),
+						rs.getString("Phone")));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load linkable contacts for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public boolean linkContactToCase(long caseId, int contactId, int roleId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+		if (contactId <= 0) {
+			throw new IllegalArgumentException("contactId must be > 0");
+		}
+		if (roleId <= 0) {
+			throw new IllegalArgumentException("roleId must be > 0");
+		}
+
+		String sql = """
+				INSERT INTO dbo.CaseContacts (
+				  CaseId,
+				  ContactId,
+				  Role,
+				  IsPrimary,
+				  Notes,
+				  AddedAt,
+				  CreatedAt,
+				  UpdatedAt
+				)
+				SELECT
+				  ?,
+				  ?,
+				  ?,
+				  0,
+				  NULL,
+				  SYSUTCDATETIME(),
+				  SYSUTCDATETIME(),
+				  SYSUTCDATETIME()
+				WHERE EXISTS (
+				    SELECT 1
+				    FROM dbo.Cases c
+				    WHERE c.Id = ?
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.Contacts ct
+				    WHERE ct.Id = ?
+				      AND ct.ShaleClientId = ?
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.Roles r
+				    WHERE r.Id = ?
+				      AND r.ShaleClientId = ?
+				      AND r.IsActive = 1
+				)
+				  AND NOT EXISTS (
+				    SELECT 1
+				    FROM dbo.CaseContacts cc
+				    WHERE cc.CaseId = ?
+				      AND cc.ContactId = ?
+				  );
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, contactId);
+			ps.setInt(idx++, roleId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, contactId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, roleId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, contactId);
+			return ps.executeUpdate() > 0;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to link contact to case (caseId=" + caseId + ", contactId=" + contactId + ", roleId=" + roleId + ")", e);
 		}
 	}
 
