@@ -122,6 +122,8 @@ public final class SceneManager {
 		});
 	}
 
+	private static final String ROOT_CONTROLLER_KEY = "sceneManager.controller";
+
 	public Parent createUserView(int userId) {
 		return load("/fxml/user.fxml", controller ->
 		{
@@ -224,10 +226,23 @@ public final class SceneManager {
 		}
 	}
 
-	private void openUserProfile(Integer userId) {
-		System.out.println("Navigate to User Profile: " + userId);
-		// TODO: when you have user view:
-		// set center content to user view / or navigate
+	public void openUserProfile(Integer userId) {
+		if (userId == null || userId <= 0) {
+			System.err.println("Ignoring user navigation for invalid userId: " + userId);
+			return;
+		}
+
+		try {
+			Parent userRoot = createUserView(userId);
+			MainController mainController = resolveMainController();
+			if (mainController == null) {
+				System.err.println("Unable to navigate to user profile; main controller is unavailable.");
+				return;
+			}
+			mainController.showUserView(userId, userRoot);
+		} catch (RuntimeException ex) {
+			System.err.println("Failed to open user profile for userId " + userId + ": " + ex.getMessage());
+		}
 	}
 
 	private void openStatusProfile(Integer statusId) {
@@ -241,6 +256,25 @@ public final class SceneManager {
 		// TODO later: navigate to contacts page / contact detail
 	}
 
+
+	private MainController resolveMainController() {
+		Scene scene = stage.getScene();
+		if (scene == null) {
+			return null;
+		}
+
+		Parent root = scene.getRoot();
+		if (root == null) {
+			return null;
+		}
+
+		Object controller = root.getProperties().get(ROOT_CONTROLLER_KEY);
+		if (controller instanceof MainController mainController) {
+			return mainController;
+		}
+
+		return null;
+	}
 
 	private Parent load(String fxmlPath, Function<Object, Object> controllerConfigurer) {
 		try {
@@ -258,7 +292,9 @@ public final class SceneManager {
 				}
 			});
 
-			return loader.load();
+			Parent root = loader.load();
+			root.getProperties().put(ROOT_CONTROLLER_KEY, loader.getController());
+			return root;
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to load FXML: " + fxmlPath, e);
 		}

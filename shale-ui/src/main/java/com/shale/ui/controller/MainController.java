@@ -175,7 +175,7 @@ public final class MainController {
 		sectionTitleLabel.setText("Team");
 		sectionSubtitleLabel.setText("See and manage your team members.");
 
-		Node teamRoot = sceneManager.createTeamView(this::openUser);
+		Node teamRoot = sceneManager.createTeamView(sceneManager::openUserProfile);
 		sectionContent.getChildren().setAll(teamRoot);
 	}
 
@@ -238,11 +238,13 @@ public final class MainController {
 	}
 
 	public void openUser(int userId) {
+		sceneManager.openUserProfile(userId);
+	}
+
+	public void showUserView(int userId, Node userRoot) {
 		highlightNav(navTeamButton);
 		sectionTitleLabel.setText("User");
 		sectionSubtitleLabel.setText("User #" + userId);
-
-		Node userRoot = sceneManager.createUserView(userId);
 		sectionContent.getChildren().setAll(userRoot);
 	}
 
