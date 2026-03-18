@@ -49,6 +49,7 @@ public final class UserDao {
 			String email,
 			String phone,
 			String initials,
+			String color,
 			Integer defaultOrganizationId) {
 	}
 
@@ -231,6 +232,7 @@ public final class UserDao {
 					    name_last = ?,
 					    email = ?,
 					    Initials = ?,
+					    Color = ?,
 					    default_organization = ?
 					""");
 			if (phoneColumn != null) {
@@ -246,6 +248,7 @@ public final class UserDao {
 				setNullableString(ps, idx++, request.lastName());
 				setNullableString(ps, idx++, request.email());
 				setNullableString(ps, idx++, request.initials());
+				setNullableString(ps, idx++, request.color());
 				setNullableInteger(ps, idx++, request.defaultOrganizationId());
 				if (phoneColumn != null) {
 					setNullableString(ps, idx++, request.phone());
