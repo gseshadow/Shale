@@ -92,7 +92,8 @@ public final class LiveEventDispatcher {
 				event.updatedByUserId,
 				timestamp,
 				event.patchRaw,
-				patchMap
+				patchMap,
+				event.clientInstanceId
 		);
 
 		for (var handler : entityUpdatedSubscribers) {
