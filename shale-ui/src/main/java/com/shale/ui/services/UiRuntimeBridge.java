@@ -34,6 +34,10 @@ public interface UiRuntimeBridge {
 		publishEntityFieldUpdated("Case", caseId, shaleClientId, updatedByUserId, "name", newName);
 	}
 
+	default void publishOrganizationUpdated(int organizationId, int shaleClientId, int updatedByUserId) {
+		publishEntityUpdated("Organization", organizationId, shaleClientId, updatedByUserId, null);
+	}
+
 	// --- Generic subscriptions (recommended)
 	default void subscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
 	}
@@ -67,7 +71,8 @@ public interface UiRuntimeBridge {
 			int updatedByUserId,
 			String timestamp,
 			String patchRaw,
-			Map<String, Object> patch
+			Map<String, Object> patch,
+			String clientInstanceId
 	) {
 	}
 

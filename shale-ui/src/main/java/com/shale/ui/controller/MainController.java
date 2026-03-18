@@ -156,7 +156,9 @@ public final class MainController {
 		highlightNav(navContactsButton);
 		sectionTitleLabel.setText("Contacts");
 		sectionSubtitleLabel.setText("Manage clients, experts, and other contacts.");
-		setSectionContentText("Contacts tab is not implemented yet.");
+
+		Node contactsRoot = sceneManager.createContactsView(this::openContact);
+		sectionContent.getChildren().setAll(contactsRoot);
 	}
 
 	@FXML
@@ -165,7 +167,7 @@ public final class MainController {
 		sectionTitleLabel.setText("Organizations");
 		sectionSubtitleLabel.setText("Browse, search, and manage organizations.");
 
-		Node organizationsRoot = sceneManager.createOrganizationsView();
+		Node organizationsRoot = sceneManager.createOrganizationsView(this::openOrganization);
 		sectionContent.getChildren().setAll(organizationsRoot);
 	}
 
@@ -220,8 +222,27 @@ public final class MainController {
 		sectionTitleLabel.setText("Case");
 		sectionSubtitleLabel.setText("Case #" + caseId);
 
-		Node caseRoot = sceneManager.createCaseView(caseId);
+		Node caseRoot = sceneManager.createCaseView(caseId, this::openContact);
 		sectionContent.getChildren().setAll(caseRoot);
+	}
+
+	public void openContact(int contactId) {
+		highlightNav(navContactsButton);
+		sectionTitleLabel.setText("Contact");
+		sectionSubtitleLabel.setText("Contact #" + contactId);
+
+		Node contactRoot = sceneManager.createContactView(contactId);
+		sectionContent.getChildren().setAll(contactRoot);
+	}
+
+
+	public void openOrganization(int organizationId) {
+		highlightNav(navOrganizationsButton);
+		sectionTitleLabel.setText("Organization");
+		sectionSubtitleLabel.setText("Organization #" + organizationId);
+
+		Node organizationRoot = sceneManager.createOrganizationView(organizationId, this::openCase);
+		sectionContent.getChildren().setAll(organizationRoot);
 	}
 
 	private void showMyShale() {
