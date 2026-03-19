@@ -69,6 +69,59 @@ public final class OrganizationDao {
 		return findPage(page, pageSize, null);
 	}
 
+	public List<Organization> searchOrganizationsByName(String query) {
+		String normalizedSearch = normalizeSearch(query);
+		if (normalizedSearch.isBlank()) {
+			return List.of();
+		}
+
+		String sql = """
+				SELECT
+				  o.Id,
+				  o.ShaleClientId,
+				  o.OrganizationTypeId,
+				  ot.Name AS OrganizationTypeName,
+				  o.Name,
+				  o.Phone,
+				  o.Fax,
+				  o.Email,
+				  o.Website,
+				  o.Address1,
+				  o.Address2,
+				  o.City,
+				  o.State,
+				  o.PostalCode,
+				  o.Country,
+				  o.Notes,
+				  o.IsDeleted,
+				  o.CreatedAt,
+				  o.UpdatedAt
+				FROM %s o
+				LEFT JOIN %s ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				  AND LOWER(COALESCE(o.Name, '')) LIKE ?
+				ORDER BY o.Name ASC, o.Id ASC;
+				""".formatted(ORGANIZATIONS_TABLE, ORGANIZATION_TYPES_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, requireCurrentShaleClientId(con));
+			ps.setString(2, containsPattern(normalizedSearch.toLowerCase(java.util.Locale.ROOT)));
+			try (ResultSet rs = ps.executeQuery()) {
+				List<Organization> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(mapOrganization(rs));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to search organizations by name", e);
+		}
+	}
+
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize, String searchName) {
 		if (page < 0)

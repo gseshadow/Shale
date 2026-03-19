@@ -68,6 +68,79 @@ public final class UserDao {
 		});
 	}
 
+	public List<DirectoryUserRow> searchUsersByName(int shaleClientId, String query) {
+		if (shaleClientId <= 0) {
+			throw new IllegalArgumentException("shaleClientId must be > 0");
+		}
+		String normalizedQuery = normalizeSearchQuery(query);
+		if (normalizedQuery.isBlank()) {
+			return List.of();
+		}
+
+		String baseSql = """
+				SELECT
+				  u.Id,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS DisplayName,
+				  COALESCE(u.email, '') AS Email,
+				  u.Color,
+				  u.Initials
+				FROM dbo.Users u
+				WHERE u.ShaleClientId = ?
+				  AND NULLIF(LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )), '') IS NOT NULL
+				  AND (
+				    LOWER(COALESCE(u.name_first, '')) LIKE ?
+				    OR LOWER(COALESCE(u.name_last, '')) LIKE ?
+				    OR LOWER(LTRIM(RTRIM(
+				      COALESCE(u.name_first, '') +
+				      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				      COALESCE(u.name_last, '')
+				    ))) LIKE ?
+				  )
+				""";
+
+		String orderSql = """
+				ORDER BY DisplayName ASC, u.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection()) {
+			verifyTenantMatchesSession(con, shaleClientId);
+
+			StringBuilder sql = new StringBuilder(baseSql);
+			appendUserVisibilityFilters(sql, con, "u");
+			sql.append(orderSql);
+
+			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+				String likeValue = containsPattern(normalizedQuery);
+				ps.setInt(1, shaleClientId);
+				ps.setString(2, likeValue);
+				ps.setString(3, likeValue);
+				ps.setString(4, likeValue);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<DirectoryUserRow> out = new ArrayList<>();
+					while (rs.next()) {
+						out.add(new DirectoryUserRow(
+							rs.getInt("Id"),
+							rs.getString("DisplayName"),
+							rs.getString("Email"),
+							rs.getString("Color"),
+							rs.getString("Initials")));
+					}
+					return out;
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to search tenant users by name (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
 	/** Returns the count of visible (tenant-filtered) users. */
 	public int countActiveUsers() throws Exception {
 		String sql = "SELECT COUNT(*) FROM dbo.Users WHERE is_deleted = 0";
@@ -358,6 +431,18 @@ public final class UserDao {
 			}
 		}
 		return null;
+	}
+
+
+	private static String normalizeSearchQuery(String query) {
+		if (query == null) {
+			return "";
+		}
+		return query.trim().toLowerCase(java.util.Locale.ROOT);
+	}
+
+	private static String containsPattern(String normalizedQuery) {
+		return "%" + normalizedQuery + "%";
 	}
 
 	private static String phoneSelectExpression(String phoneColumn, String alias) {
