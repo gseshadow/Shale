@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -26,6 +27,8 @@ public class OrganizationCard extends HBox {
 
 	private Integer organizationId;
 	private Consumer<Integer> onOpen;
+	private String backgroundCss;
+	private boolean hovered;
 
 	public OrganizationCard() {
 		buildUiMiniDefaults();
@@ -102,18 +105,15 @@ public class OrganizationCard extends HBox {
 	}
 
 	public void setBackgroundCssColor(String css) {
-		String bg = (css == null || css.isBlank()) ? "rgba(0,0,0,0.06)" : css;
-		setStyle(("""
-				-fx-background-color: %s;
-				-fx-background-radius: 14;
-				-fx-border-radius: 14;
-				-fx-border-color: rgba(0,0,0,0.08);
-				""").formatted(bg));
+		backgroundCss = css;
+		refreshSurfaceStyle();
 	}
 
 	public void applyMini() {
 		getChildren().clear();
 
+		setPrefWidth(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
+		setMaxWidth(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
 		setPadding(new Insets(4, 10, 4, 10));
 		setSpacing(6);
 
@@ -124,36 +124,45 @@ public class OrganizationCard extends HBox {
 	public void applyCompact() {
 		getChildren().clear();
 
-		setPadding(new Insets(8, 10, 8, 10));
-		setSpacing(8);
+		setAlignment(Pos.TOP_LEFT);
+		setPadding(new Insets(10, 12, 10, 12));
+		setSpacing(12);
 
 		Node avatar = buildAvatar(18);
 
-		nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 600;");
-		typeLabel.setStyle("-fx-font-size: 11px; -fx-opacity: 0.78;");
-		phoneLabel.setStyle("-fx-font-size: 11px; -fx-opacity: 0.78;");
+		nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		typeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
+		phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
 
-		VBox text = new VBox(1, nameLabel, typeLabel, phoneLabel);
+		VBox text = new VBox(4, nameLabel, typeLabel, phoneLabel);
 		getChildren().addAll(avatar, text);
 	}
 
 	public void applyFull() {
 		getChildren().clear();
 
-		setPadding(new Insets(10, 12, 10, 12));
-		setSpacing(10);
+		setAlignment(Pos.TOP_LEFT);
+		setMinWidth(320);
+		setPrefWidth(340);
+		setMaxWidth(340);
+		setPadding(new Insets(14, 16, 14, 16));
+		setSpacing(14);
 
-		Node avatar = buildAvatar(26);
+		Node avatar = buildAvatar(28);
 
-		nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700;");
-		typeLabel.setStyle("-fx-font-size: 12px; -fx-opacity: 0.82;");
-		phoneLabel.setStyle("-fx-font-size: 12px; -fx-opacity: 0.82;");
-		emailLabel.setStyle("-fx-font-size: 12px; -fx-opacity: 0.82;");
-		websiteLabel.setStyle("-fx-font-size: 12px; -fx-opacity: 0.82;");
-		addressLabel.setStyle("-fx-font-size: 12px; -fx-opacity: 0.82;");
-		notesLabel.setStyle("-fx-font-size: 11px; -fx-opacity: 0.72;");
+		nameLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		typeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
+		phoneLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.82);");
+		emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.76);");
+		websiteLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
+		addressLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
+		notesLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.66);");
+		emailLabel.setWrapText(true);
+		websiteLabel.setWrapText(true);
+		addressLabel.setWrapText(true);
+		notesLabel.setWrapText(true);
 
-		VBox text = new VBox(2, nameLabel, typeLabel, phoneLabel, emailLabel, websiteLabel, addressLabel);
+		VBox text = new VBox(5, nameLabel, typeLabel, phoneLabel, emailLabel, websiteLabel, addressLabel);
 		if (!notesLabel.getText().isBlank()) {
 			text.getChildren().add(notesLabel);
 		}
@@ -167,10 +176,21 @@ public class OrganizationCard extends HBox {
 
 	private void buildUiMiniDefaults() {
 		setCursor(Cursor.HAND);
+		setBackgroundCssColor(null);
 		applyMini();
 	}
 
 	private void wireEvents() {
+		setOnMouseEntered(e -> {
+			hovered = true;
+			setTranslateY(-1.5);
+			refreshSurfaceStyle();
+		});
+		setOnMouseExited(e -> {
+			hovered = false;
+			setTranslateY(0);
+			refreshSurfaceStyle();
+		});
 		setOnMouseClicked(e -> {
 			if (onOpen != null && organizationId != null) {
 				onOpen.accept(organizationId);
@@ -183,6 +203,10 @@ public class OrganizationCard extends HBox {
 		c.setStyle("-fx-fill: rgba(255,255,255,0.55); -fx-stroke: rgba(0,0,0,0.10);");
 		avatarHolder.getChildren().setAll(c);
 		return avatarHolder;
+	}
+
+	private void refreshSurfaceStyle() {
+		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
 	}
 
 	private static String fallback(String value) {

@@ -14,6 +14,11 @@ public final class ColorUtil {
 		return normalized == null ? "rgba(0,0,0,0.06)" : "#" + normalized;
 	}
 
+	public static String toCssBackgroundColorOrNull(String storedColor) {
+		String normalized = normalizeStoredColor(storedColor);
+		return normalized == null ? null : "#" + normalized;
+	}
+
 	public static String normalizeStoredColor(String storedColor) {
 		if (storedColor == null)
 			return null;

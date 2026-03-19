@@ -16,6 +16,8 @@ public class UserCard extends HBox {
 
     private Integer userId;
     private Consumer<Integer> onOpen;
+    private String backgroundCss;
+    private boolean hovered;
 
     public UserCard() {
         buildUiMiniDefaults();
@@ -35,13 +37,8 @@ public class UserCard extends HBox {
     }
 
     public void setBackgroundCssColor(String css) {
-        String bg = (css == null || css.isBlank()) ? "rgba(0,0,0,0.06)" : css;
-        setStyle(("""
-                -fx-background-color: %s;
-                -fx-background-radius: 14;
-                -fx-border-radius: 14;
-                -fx-border-color: rgba(0,0,0,0.08);
-                """).formatted(bg));
+        backgroundCss = css;
+        refreshSurfaceStyle();
     }
 
     // --- Variants ---
@@ -93,10 +90,21 @@ public class UserCard extends HBox {
 
     private void buildUiMiniDefaults() {
         setCursor(Cursor.HAND);
+        setBackgroundCssColor(null);
         applyMini();
     }
 
     private void wireEvents() {
+        setOnMouseEntered(e -> {
+            hovered = true;
+            setTranslateY(-1.5);
+            refreshSurfaceStyle();
+        });
+        setOnMouseExited(e -> {
+            hovered = false;
+            setTranslateY(0);
+            refreshSurfaceStyle();
+        });
         setOnMouseClicked(e -> {
             if (onOpen != null && userId != null) {
                 onOpen.accept(userId);
@@ -106,5 +114,9 @@ public class UserCard extends HBox {
 
     public Node asNode() {
         return this;
+    }
+
+    private void refreshSurfaceStyle() {
+        setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
     }
 }

@@ -3,6 +3,7 @@ package com.shale.ui.component;
 import java.util.function.Consumer;
 
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -24,6 +25,8 @@ public class ContactCard extends HBox {
 
     private Integer contactId;
     private Consumer<Integer> onOpen;
+    private String backgroundCss;
+    private boolean hovered;
 
     public ContactCard() {
         buildUiMiniDefaults();
@@ -58,18 +61,15 @@ public class ContactCard extends HBox {
     }
 
     public void setBackgroundCssColor(String css) {
-        String bg = (css == null || css.isBlank()) ? "rgba(0,0,0,0.03)" : css;
-        setStyle(("""
-                -fx-background-color: %s;
-                -fx-background-radius: 14;
-                -fx-border-radius: 14;
-                -fx-border-color: rgba(0,0,0,0.08);
-                """).formatted(bg));
+        backgroundCss = css;
+        refreshSurfaceStyle();
     }
 
     public void applyMini() {
         getChildren().clear();
 
+        setPrefWidth(Region.USE_COMPUTED_SIZE);
+        setMaxWidth(Region.USE_COMPUTED_SIZE);
         setPadding(new Insets(4, 10, 4, 10));
         setSpacing(6);
 
@@ -81,14 +81,18 @@ public class ContactCard extends HBox {
     public void applyCompact() {
         getChildren().clear();
 
-        setPadding(new Insets(8, 10, 8, 10));
-        setSpacing(8);
+        setAlignment(Pos.TOP_LEFT);
+        setPrefWidth(280);
+        setMaxWidth(280);
+        setPadding(new Insets(10, 12, 10, 12));
+        setSpacing(10);
 
-        nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 600;");
-        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(0,0,0,0.56);");
-        emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(0,0,0,0.62);");
+        nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
+        emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
+        emailLabel.setWrapText(true);
 
-        VBox text = new VBox(2, nameLabel);
+        VBox text = new VBox(4, nameLabel);
         if (roleLabel.isManaged()) {
             text.getChildren().add(roleLabel);
         }
@@ -99,15 +103,21 @@ public class ContactCard extends HBox {
     public void applyFull() {
         getChildren().clear();
 
-        setPadding(new Insets(10, 12, 10, 12));
-        setSpacing(12);
+        setAlignment(Pos.TOP_LEFT);
+        setMinWidth(296);
+        setPrefWidth(312);
+        setMaxWidth(312);
+        setPadding(new Insets(14, 16, 14, 16));
+        setSpacing(16);
 
-        nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700;");
-        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(0,0,0,0.56);");
-        emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(0,0,0,0.68);");
-        phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(0,0,0,0.68);");
+        nameLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
+        emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.76);");
+        phoneLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.82);");
+        emailLabel.setWrapText(true);
+        phoneLabel.setWrapText(true);
 
-        VBox text = new VBox(4, nameLabel);
+        VBox text = new VBox(6, nameLabel);
         if (roleLabel.isManaged()) {
             text.getChildren().add(roleLabel);
         }
@@ -124,6 +134,16 @@ public class ContactCard extends HBox {
     }
 
     private void wireEvents() {
+        setOnMouseEntered(e -> {
+            hovered = true;
+            setTranslateY(-1.5);
+            refreshSurfaceStyle();
+        });
+        setOnMouseExited(e -> {
+            hovered = false;
+            setTranslateY(0);
+            refreshSurfaceStyle();
+        });
         setOnMouseClicked(e -> {
             if (onOpen != null && contactId != null) {
                 onOpen.accept(contactId);
@@ -137,5 +157,9 @@ public class ContactCard extends HBox {
 
     private static String normalizeOptional(String value) {
         return value == null || value.isBlank() ? "—" : value;
+    }
+
+    private void refreshSurfaceStyle() {
+        setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
     }
 }
