@@ -526,7 +526,7 @@ public class CaseController {
 		Runnable refreshWrapLength = () -> {
 			double viewportWidth = organizationsScrollPane.getViewportBounds().getWidth();
 			double contentWidth = viewportWidth > 0 ? viewportWidth : organizationsScrollPane.getWidth();
-			double wrapWidth = Math.max(0, contentWidth - 2);
+			double wrapWidth = Math.max(0, contentWidth - 8);
 			organizationsFlow.setPrefWrapLength(wrapWidth);
 			organizationsFlow.setPrefWidth(wrapWidth);
 		};
@@ -799,7 +799,9 @@ public class CaseController {
 		HBox actions = new HBox(8, spacer, removeButton);
 
 		VBox container = new VBox(6, card, actions);
+		container.setMinWidth(340);
 		container.setPrefWidth(340);
+		container.setMaxWidth(340);
 		return container;
 	}
 
@@ -893,7 +895,9 @@ public class CaseController {
 		HBox actions = new HBox(8, spacer, removeButton);
 
 		VBox container = new VBox(6, card, actions);
+		container.setMinWidth(280);
 		container.setPrefWidth(280);
+		container.setMaxWidth(280);
 		return container;
 	}
 
