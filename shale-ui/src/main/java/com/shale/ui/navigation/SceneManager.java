@@ -19,6 +19,7 @@ import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.controller.SearchController;
 import com.shale.ui.controller.TeamController;
 import com.shale.ui.controller.UserController;
+import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UiAuthService;
@@ -151,7 +152,7 @@ public final class SceneManager {
 					new ContactDao(dbSessionProvider),
 					new OrganizationDao(dbSessionProvider),
 					new UserDao(dbSessionProvider));
-			c.init(appState, searchService, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
+			c.init(appState, searchService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
 			return c;
 		});
 	}
@@ -208,7 +209,7 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {
 		return load("/fxml/case.fxml", controller ->
 		{
 			CaseController c = (CaseController) controller;
@@ -216,7 +217,8 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			c.init(caseId, caseDao, organizationDao, contactDao, appState, runtimeBridge);
+			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
+			c.init(caseId, caseDao, caseDetailService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
@@ -224,6 +226,10 @@ public final class SceneManager {
 			c.setOnOpenOrganization(onOpenOrganization);
 			return c;
 		});
+	}
+
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
+		return createCaseView(caseId, onOpenOrganization, null);
 	}
 
 	public void showNewOrganizationDialog(Consumer<Integer> onOrganizationCreated) {

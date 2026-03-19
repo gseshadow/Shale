@@ -121,6 +121,9 @@ public final class CaseDao {
 	) {
 	}
 
+	private record CaseSchema(String deletedColumn) {
+	}
+
 
 	public record NewIntakeCreateRequest(
 			int shaleClientId,
@@ -489,7 +492,9 @@ public final class CaseDao {
 			return List.of();
 		}
 
-		String sql = """
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
 				SELECT
 				  c.Id,
 				  c.Name,
@@ -529,34 +534,34 @@ public final class CaseDao {
 				LEFT JOIN %s u
 				  ON u.id = ra.UserId
 				WHERE c.ShaleClientId = ?
-				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND %s
 				  AND LOWER(COALESCE(c.Name, '')) LIKE ?
 				ORDER BY c.Name ASC, c.Id ASC;
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE);
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"));
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			int idx = 1;
-			ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-			ps.setInt(idx++, requireCurrentShaleClientId(con));
-			ps.setString(idx, containsPattern(normalizedQuery));
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, requireCurrentShaleClientId(con));
+				ps.setString(idx, containsPattern(normalizedQuery));
 
-			List<CaseRow> out = new ArrayList<>();
-			try (ResultSet rs = ps.executeQuery()) {
-				while (rs.next()) {
-					out.add(new CaseRow(
-						rs.getLong("Id"),
-						rs.getString("Name"),
-						toLocalDate(rs.getDate("CallerDate")),
-						toLocalDate(rs.getDate("StatuteOfLimitations")),
-						getNullableInt(rs, "PrimaryStatusId"),
-						getNullableInt(rs, "ResponsibleAttorneyId"),
-						rs.getString("ResponsibleAttorneyName"),
-						rs.getString("ResponsibleAttorneyColor")
-					));
+				List<CaseRow> out = new ArrayList<>();
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						out.add(new CaseRow(
+							rs.getLong("Id"),
+							rs.getString("Name"),
+							toLocalDate(rs.getDate("CallerDate")),
+							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							getNullableInt(rs, "PrimaryStatusId"),
+							getNullableInt(rs, "ResponsibleAttorneyId"),
+							rs.getString("ResponsibleAttorneyName"),
+							rs.getString("ResponsibleAttorneyColor")
+						));
+					}
 				}
+				return out;
 			}
-			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to search cases by name", e);
 		}
@@ -581,8 +586,6 @@ public final class CaseDao {
 		CaseSort effectiveSort = sort == null ? CaseSort.INTAKE_NEWEST : sort;
 		String orderByClause = orderByClauseFor(effectiveSort);
 
-		// Pick ONE PRIMARY responsible attorney row per case.
-		// If none is marked primary, return null attorney/color so UI remains white.
 		String userMembershipFilter = restrictToUserId == null
 				? ""
 				: """
@@ -594,7 +597,11 @@ public final class CaseDao {
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
-		String sql = """
+		List<CaseRow> out = new ArrayList<>(pageSize);
+
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
 				SELECT
 				  c.Id,
 				  c.Name,
@@ -633,7 +640,7 @@ public final class CaseDao {
 				) ra
 				LEFT JOIN %s u
 				  ON u.id = ra.UserId
-				WHERE (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				WHERE %s
 				  AND (
 				    ? = 1
 				    OR current_status.CurrentStatusName IS NULL
@@ -643,26 +650,21 @@ public final class CaseDao {
 				ORDER BY
 				  %s
 				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
-				userMembershipFilter, orderByClause);
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter, orderByClause);
 
-		List<CaseRow> out = new ArrayList<>(pageSize);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
+				if (restrictToUserId != null) {
+					ps.setInt(idx++, restrictToUserId);
+				}
+				ps.setInt(idx++, offset);
+				ps.setInt(idx++, pageSize);
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-
-			int idx = 1;
-			ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-			ps.setInt(idx++, includeClosedDenied ? 1 : 0);
-			if (restrictToUserId != null) {
-				ps.setInt(idx++, restrictToUserId);
-			}
-			ps.setInt(idx++, offset);
-			ps.setInt(idx++, pageSize);
-
-			try (ResultSet rs = ps.executeQuery()) {
-				while (rs.next()) {
-					out.add(new CaseRow(
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						out.add(new CaseRow(
 							rs.getLong("Id"),
 							rs.getString("Name"),
 							toLocalDate(rs.getDate("CallerDate")),
@@ -671,12 +673,12 @@ public final class CaseDao {
 							getNullableInt(rs, "ResponsibleAttorneyId"),
 							rs.getString("ResponsibleAttorneyName"),
 							rs.getString("ResponsibleAttorneyColor")
-					));
+						));
+					}
 				}
 			}
 
 			return new PagedResult<>(out, page, pageSize, total);
-
 		} catch (SQLException e) {
 			throw new RuntimeException(
 					"Failed to load cases page (page=" + page + ", pageSize=" + pageSize + ")",
@@ -684,7 +686,6 @@ public final class CaseDao {
 			);
 		}
 	}
-
 
 	private static String normalizeSearchQuery(String query) {
 		if (query == null) {
@@ -737,7 +738,9 @@ public final class CaseDao {
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
-		String sql = """
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
 				SELECT COUNT(1)
 				FROM %s c
 				OUTER APPLY (
@@ -751,29 +754,27 @@ public final class CaseDao {
 				      cs.CreatedAt DESC,
 				      cs.Id DESC
 				) current_status
-				WHERE (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				WHERE %s
 				  AND (
 				    ? = 1
 				    OR current_status.CurrentStatusName IS NULL
 				    OR LOWER(current_status.CurrentStatusName) NOT IN ('closed', 'denied')
 				  )
 				  %s;
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, userMembershipFilter);
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter);
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
+				if (restrictToUserId != null) {
+					ps.setInt(idx++, restrictToUserId);
+				}
 
-			int idx = 1;
-			ps.setInt(idx++, includeClosedDenied ? 1 : 0);
-			if (restrictToUserId != null) {
-				ps.setInt(idx++, restrictToUserId);
+				try (ResultSet rs = ps.executeQuery()) {
+					rs.next();
+					return rs.getLong(1);
+				}
 			}
-
-			try (ResultSet rs = ps.executeQuery()) {
-				rs.next();
-				return rs.getLong(1);
-			}
-
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to count cases", e);
 		}
@@ -781,7 +782,9 @@ public final class CaseDao {
 
 	public com.shale.core.dto.CaseOverviewDto getOverview(long caseId) {
 
-		String sql = """
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
 				SELECT
 				  c.Id,
 				  c.Name,
@@ -791,12 +794,10 @@ public final class CaseDao {
 				  c.DateOfInjury,
 				  c.StatuteOfLimitations,
 
-				  -- Practice Area
 				  pa.Id    AS PracticeAreaId,
 				  pa.Name  AS PracticeAreaName,
 				  pa.Color AS PracticeAreaColor,
 
-				  -- Responsible Attorney (primary)
 				  ra.UserId AS ResponsibleAttorneyUserId,
 				  u.color AS ResponsibleAttorneyColor,
 				  LTRIM(RTRIM(
@@ -805,12 +806,10 @@ public final class CaseDao {
 				    COALESCE(u.name_last, '')
 				  )) AS ResponsibleAttorneyName,
 
-				  -- Current Status (primary-first)
 				  current_status.CurrentStatusName,
 				  current_status.PrimaryStatusId,
 				  current_status.PrimaryStatusColor,
 
-				  -- Primary Caller / Client / Opposing Counsel
 				  callerContact.PrimaryCallerContactId,
 				  callerContact.CallerName,
 
@@ -821,11 +820,7 @@ public final class CaseDao {
 				  oppContact.FullName AS OpposingCounselName
 
 				FROM %s c
-
-				LEFT JOIN PracticeAreas pa
-				  ON pa.Id = c.PracticeAreaId
-
-				-- Primary Responsible Attorney
+				LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 				OUTER APPLY (
 				    SELECT TOP (1) cu.UserId
 				    FROM %s cu
@@ -834,11 +829,7 @@ public final class CaseDao {
 				      AND cu.IsPrimary = 1
 				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
 				) ra
-
-				LEFT JOIN %s u
-				  ON u.id = ra.UserId
-
-				-- Current Status (primary-first)
+				LEFT JOIN %s u ON u.id = ra.UserId
 				OUTER APPLY (
 				    SELECT TOP (1)
 				      s.Id    AS PrimaryStatusId,
@@ -853,8 +844,6 @@ public final class CaseDao {
 				      cs.CreatedAt DESC,
 				      cs.Id DESC
 				) current_status
-
-				-- Caller (primary)
 				OUTER APPLY (
 				    SELECT TOP (1)
 				      cc.ContactId AS PrimaryCallerContactId,
@@ -876,8 +865,6 @@ public final class CaseDao {
 				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
 				) callerContact
-
-				-- Client (primary)
 				OUTER APPLY (
 				    SELECT TOP (1)
 				      cc.ContactId AS PrimaryClientContactId,
@@ -899,8 +886,6 @@ public final class CaseDao {
 				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
 				) clientContact
-
-				-- Opposing Counsel (primary)
 				OUTER APPLY (
 				    SELECT TOP (1)
 				      cc.ContactId AS PrimaryOpposingCounselContactId,
@@ -922,72 +907,49 @@ public final class CaseDao {
 				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
 				) oppContact
-
 				WHERE c.Id = ?
-				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
-				""".formatted(
-				CASES_TABLE,
-				CASE_USERS_TABLE,
-				USERS_TABLE,
-				CASE_STATUSES_TABLE,
-				STATUSES_TABLE
-		);
+				  AND %s;
+				""".formatted(CASES_TABLE, CASE_USERS_TABLE, USERS_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"));
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, ROLE_CASECONTACT_CALLER);
+				ps.setInt(idx++, ROLE_CASECONTACT_CLIENT);
+				ps.setInt(idx++, ROLE_CASECONTACT_OPPOSING_COUNSEL);
+				ps.setLong(idx++, caseId);
 
-			int idx = 1;
-
-			ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-
-			ps.setInt(idx++, ROLE_CASECONTACT_CALLER);
-			ps.setInt(idx++, ROLE_CASECONTACT_CLIENT);
-			ps.setInt(idx++, ROLE_CASECONTACT_OPPOSING_COUNSEL);
-
-			ps.setLong(idx++, caseId);
-
-			try (ResultSet rs = ps.executeQuery()) {
-
-				if (!rs.next())
-					return null;
-
-				List<String> team = loadTeamMembers(con, caseId);
-
-				return new com.shale.core.dto.CaseOverviewDto(
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next())
+						return null;
+					List<String> team = loadTeamMembers(con, caseId);
+					return new com.shale.core.dto.CaseOverviewDto(
 						rs.getLong("Id"),
 						rs.getString("CaseNumber"),
 						rs.getString("Name"),
-
 						rs.getString("CurrentStatusName"),
 						getNullableInt(rs, "PrimaryStatusId"),
 						rs.getString("PrimaryStatusColor"),
-
 						getNullableInt(rs, "ResponsibleAttorneyUserId"),
 						rs.getString("ResponsibleAttorneyName"),
 						rs.getString("ResponsibleAttorneyColor"),
-
-						// Practice Area (updated)
 						getNullableInt(rs, "PracticeAreaId"),
 						rs.getString("PracticeAreaName"),
 						rs.getString("PracticeAreaColor"),
-
 						toLocalDate(rs.getDate("CallerDate")),
 						toLocalDate(rs.getDate("DateOfInjury")),
 						toLocalDate(rs.getDate("StatuteOfLimitations")),
-
 						getNullableInt(rs, "PrimaryCallerContactId"),
 						getNullableInt(rs, "PrimaryClientContactId"),
-						getNullableInt(rs, "PrimaryOpposingCounselContactId"), // NEW
-
+						getNullableInt(rs, "PrimaryOpposingCounselContactId"),
 						rs.getString("CallerName"),
 						rs.getString("ClientName"),
 						rs.getString("OpposingCounselName"),
-
 						team,
 						rs.getString("Description")
-				);
+					);
+				}
 			}
-
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load case overview (caseId=" + caseId + ")", e);
 		}
@@ -1002,6 +964,7 @@ public final class CaseDao {
 	}
 
 	private com.shale.core.dto.CaseDetailDto selectCaseDetail(Connection con, long caseId) throws SQLException {
+		CaseSchema schema = resolveCaseSchema(con);
 		String sql = """
 				SELECT
 				  c.Id,
@@ -1050,8 +1013,8 @@ public final class CaseDao {
 				      cs.Id DESC
 				) current_status
 				WHERE c.Id = ?
-				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE);
+				  AND %s;
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"));
 
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId);
@@ -1114,48 +1077,50 @@ public final class CaseDao {
 			throw new IllegalArgumentException("expectedRowVer is required");
 		}
 
-		String sql = """
-				UPDATE %s
-				SET Name = ?,
-				    CaseNumber = ?,
-				    Description = ?,
-				    DateOfInjury = ?,
-				    StatuteOfLimitations = ?,
-				    UpdatedAt = SYSDATETIME()
-				WHERE Id = ?
-				  AND RowVer = ?
-				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
-				""".formatted(CASES_TABLE);
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
+					UPDATE %s
+					SET Name = ?,
+					    CaseNumber = ?,
+					    Description = ?,
+					    DateOfInjury = ?,
+					    StatuteOfLimitations = ?,
+					    UpdatedAt = SYSDATETIME()
+					WHERE Id = ?
+					  AND RowVer = ?
+					  AND %s;
+					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
 
-			ps.setString(1, name);
-			ps.setString(2, caseNumber);
-			ps.setString(3, description);
-			if (incidentDate == null)
-				ps.setNull(4, java.sql.Types.DATE);
-			else
-				ps.setDate(4, java.sql.Date.valueOf(incidentDate));
-			if (solDate == null)
-				ps.setNull(5, java.sql.Types.DATE);
-			else
-				ps.setDate(5, java.sql.Date.valueOf(solDate));
-			ps.setLong(6, caseId);
-			ps.setBytes(7, expectedRowVer);
+				ps.setString(1, name);
+				ps.setString(2, caseNumber);
+				ps.setString(3, description);
+				if (incidentDate == null)
+					ps.setNull(4, java.sql.Types.DATE);
+				else
+					ps.setDate(4, java.sql.Date.valueOf(incidentDate));
+				if (solDate == null)
+					ps.setNull(5, java.sql.Types.DATE);
+				else
+					ps.setDate(5, java.sql.Date.valueOf(solDate));
+				ps.setLong(6, caseId);
+				ps.setBytes(7, expectedRowVer);
 
-			int rows = ps.executeUpdate();
-			if (rows == 0) {
-				return null;
-			}
-			if (rows == 1) {
-				com.shale.core.dto.CaseDetailDto updated = selectCaseDetail(con, caseId);
-				if (updated == null) {
-					throw new RuntimeException("Case updated but detail row was not found (caseId=" + caseId + ")");
+				int rows = ps.executeUpdate();
+				if (rows == 0) {
+					return null;
 				}
-				return updated;
+				if (rows == 1) {
+					com.shale.core.dto.CaseDetailDto updated = selectCaseDetail(con, caseId);
+					if (updated == null) {
+						throw new RuntimeException("Case updated but detail row was not found (caseId=" + caseId + ")");
+					}
+					return updated;
+				}
+				throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
 			}
-			throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
 
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update case (caseId=" + caseId + ")", e);
@@ -1197,45 +1162,46 @@ public final class CaseDao {
 		if (expectedRowVer == null || expectedRowVer.length == 0)
 			throw new IllegalArgumentException("expectedRowVer is required");
 
-		String sql = """
-				UPDATE %s
-				SET Name = ?,
-				    CaseNumber = ?,
-				    PracticeAreaId = ?,
-				    Description = ?,
-				    CallerDate = ?,
-				    CallerTime = ?,
-				    AcceptedDate = ?,
-				    ClosedDate = ?,
-				    DeniedDate = ?,
-				    DateOfMedicalNegligence = ?,
-				    DateMedicalNegligenceWasDiscovered = ?,
-				    DateOfInjury = ?,
-				    StatuteOfLimitations = ?,
-				    TortNoticeDeadline = ?,
-				    DiscoveryDeadline = ?,
-				    ClientEstate = ?,
-				    OfficePrinterCode = ?,
-				    MedicalRecordsReceived = ?,
-				    FeeAgreementSigned = ?,
-				    DateFeeAgreementSigned = ?,
-				    AcceptedChronology = ?,
-				    AcceptedConsultantExpertSearch = ?,
-				    AcceptedTestifyingExpertSearch = ?,
-				    AcceptedMedicalLiterature = ?,
-				    AcceptedDetail = ?,
-				    DeniedChronology = ?,
-				    DeniedDetail = ?,
-				    Summary = ?,
-				    ReceivedUpdates = ?,
-				    UpdatedAt = SYSDATETIME()
-				WHERE Id = ?
-				  AND RowVer = ?
-				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
-				""".formatted(CASES_TABLE);
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
+					UPDATE %s
+					SET Name = ?,
+					    CaseNumber = ?,
+					    PracticeAreaId = ?,
+					    Description = ?,
+					    CallerDate = ?,
+					    CallerTime = ?,
+					    AcceptedDate = ?,
+					    ClosedDate = ?,
+					    DeniedDate = ?,
+					    DateOfMedicalNegligence = ?,
+					    DateMedicalNegligenceWasDiscovered = ?,
+					    DateOfInjury = ?,
+					    StatuteOfLimitations = ?,
+					    TortNoticeDeadline = ?,
+					    DiscoveryDeadline = ?,
+					    ClientEstate = ?,
+					    OfficePrinterCode = ?,
+					    MedicalRecordsReceived = ?,
+					    FeeAgreementSigned = ?,
+					    DateFeeAgreementSigned = ?,
+					    AcceptedChronology = ?,
+					    AcceptedConsultantExpertSearch = ?,
+					    AcceptedTestifyingExpertSearch = ?,
+					    AcceptedMedicalLiterature = ?,
+					    AcceptedDetail = ?,
+					    DeniedChronology = ?,
+					    DeniedDetail = ?,
+					    Summary = ?,
+					    ReceivedUpdates = ?,
+					    UpdatedAt = SYSDATETIME()
+					WHERE Id = ?
+					  AND RowVer = ?
+					  AND %s;
+					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
 			int idx = 1;
 			ps.setString(idx++, name);
 			ps.setString(idx++, caseNumber);
@@ -1278,8 +1244,47 @@ public final class CaseDao {
 			if (rows == 1)
 				return selectCaseDetail(con, caseId);
 			throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
+			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update case details (caseId=" + caseId + ")", e);
+		}
+	}
+
+	public boolean softDeleteCase(long caseId, Integer shaleClientId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+		if (shaleClientId == null || shaleClientId <= 0) {
+			throw new IllegalArgumentException("shaleClientId must be > 0");
+		}
+
+		try (Connection con = db.requireConnection()) {
+			int currentShaleClientId = requireCurrentShaleClientId(con);
+			if (shaleClientId.intValue() != currentShaleClientId) {
+				throw new IllegalArgumentException("shaleClientId does not match current session");
+			}
+
+			CaseSchema schema = resolveCaseSchema(con);
+			if (schema.deletedColumn() == null || schema.deletedColumn().isBlank()) {
+				throw new IllegalStateException("Cases table does not support soft delete.");
+			}
+
+			String sql = """
+					UPDATE %s
+					SET %s = 1,
+					    UpdatedAt = SYSUTCDATETIME()
+					WHERE Id = ?
+					  AND ShaleClientId = ?
+					  AND %s;
+					""".formatted(CASES_TABLE, schema.deletedColumn(), activeFilter(schema.deletedColumn(), null));
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setLong(1, caseId);
+				ps.setInt(2, shaleClientId);
+				return ps.executeUpdate() > 0;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to soft delete case (id=" + caseId + ")", e);
 		}
 	}
 
@@ -2543,68 +2548,69 @@ public final class CaseDao {
 	}
 
 	public CaseRow getCaseRow(long caseId) {
-		String sql = """
-				SELECT
-				  c.Id,
-				  c.Name,
-				  c.CallerDate,
-				  c.StatuteOfLimitations,
-				  current_status.PrimaryStatusId,
-				  ra.UserId AS ResponsibleAttorneyId,
-				  u.color AS ResponsibleAttorneyColor,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS ResponsibleAttorneyName
-				FROM %s c
-				OUTER APPLY (
-				    SELECT TOP (1) s.Id AS PrimaryStatusId
-				    FROM %s cs
-				    INNER JOIN %s s ON s.Id = cs.StatusId
-				    WHERE cs.CaseId = c.Id
-				    ORDER BY
-				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-				      cs.UpdatedAt DESC,
-				      cs.CreatedAt DESC,
-				      cs.Id DESC
-				) current_status
-				OUTER APPLY (
-				    SELECT TOP (1) cu.UserId
-				    FROM %s cu
-				    WHERE cu.CaseId = c.Id
-				      AND cu.RoleId = ?
-				      AND cu.IsPrimary = 1
-				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
-				) ra
-				LEFT JOIN %s u
-				  ON u.id = ra.UserId
-				WHERE c.Id = ?
-				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE);
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
+					SELECT
+					  c.Id,
+					  c.Name,
+					  c.CallerDate,
+					  c.StatuteOfLimitations,
+					  current_status.PrimaryStatusId,
+					  ra.UserId AS ResponsibleAttorneyId,
+					  u.color AS ResponsibleAttorneyColor,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS ResponsibleAttorneyName
+					FROM %s c
+					OUTER APPLY (
+					    SELECT TOP (1) s.Id AS PrimaryStatusId
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					OUTER APPLY (
+					    SELECT TOP (1) cu.UserId
+					    FROM %s cu
+					    WHERE cu.CaseId = c.Id
+					      AND cu.RoleId = ?
+					      AND cu.IsPrimary = 1
+					    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+					) ra
+					LEFT JOIN %s u
+					  ON u.id = ra.UserId
+					WHERE c.Id = ?
+					  AND %s;
+					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
+					activeFilter(schema.deletedColumn(), "c"));
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setLong(2, caseId);
 
-			ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
-			ps.setLong(2, caseId);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next())
+						return null;
 
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next())
-					return null;
-
-				return new CaseRow(
-						rs.getLong("Id"),
-						rs.getString("Name"),
-						toLocalDate(rs.getDate("CallerDate")),
-						toLocalDate(rs.getDate("StatuteOfLimitations")),
-						getNullableInt(rs, "PrimaryStatusId"),
-						getNullableInt(rs, "ResponsibleAttorneyId"),
-						rs.getString("ResponsibleAttorneyName"),
-						rs.getString("ResponsibleAttorneyColor")
-				);
+					return new CaseRow(
+							rs.getLong("Id"),
+							rs.getString("Name"),
+							toLocalDate(rs.getDate("CallerDate")),
+							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							getNullableInt(rs, "PrimaryStatusId"),
+							getNullableInt(rs, "ResponsibleAttorneyId"),
+							rs.getString("ResponsibleAttorneyName"),
+							rs.getString("ResponsibleAttorneyColor")
+					);
+				}
 			}
-
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load case row (caseId=" + caseId + ")", e);
 		}
@@ -2615,75 +2621,76 @@ public final class CaseDao {
 		if (userId <= 0) {
 			throw new IllegalArgumentException("userId must be > 0");
 		}
-		String sql = """
-				SELECT
-				  c.Id,
-				  c.Name,
-				  c.CallerDate,
-				  c.StatuteOfLimitations,
-				  current_status.PrimaryStatusId,
-				  ra.UserId AS ResponsibleAttorneyId,
-				  u.color AS ResponsibleAttorneyColor,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS ResponsibleAttorneyName
-				FROM %s c
-				OUTER APPLY (
-				    SELECT TOP (1) s.Id AS PrimaryStatusId
-				    FROM %s cs
-				    INNER JOIN %s s ON s.Id = cs.StatusId
-				    WHERE cs.CaseId = c.Id
-				    ORDER BY
-				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-				      cs.UpdatedAt DESC,
-				      cs.CreatedAt DESC,
-				      cs.Id DESC
-				) current_status
-				OUTER APPLY (
-				    SELECT TOP (1) cu.UserId
-				    FROM %s cu
-				    WHERE cu.CaseId = c.Id
-				      AND cu.RoleId = ?
-				      AND cu.IsPrimary = 1
-				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
-				) ra
-				LEFT JOIN %s u
-				  ON u.id = ra.UserId
-				WHERE c.Id = ?
-				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
-				  AND EXISTS (
-				    SELECT 1
-				    FROM %s cu_scope
-				    WHERE cu_scope.CaseId = c.Id
-				      AND cu_scope.UserId = ?
-				  );
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, CASE_USERS_TABLE);
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
+					SELECT
+					  c.Id,
+					  c.Name,
+					  c.CallerDate,
+					  c.StatuteOfLimitations,
+					  current_status.PrimaryStatusId,
+					  ra.UserId AS ResponsibleAttorneyId,
+					  u.color AS ResponsibleAttorneyColor,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS ResponsibleAttorneyName
+					FROM %s c
+					OUTER APPLY (
+					    SELECT TOP (1) s.Id AS PrimaryStatusId
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					OUTER APPLY (
+					    SELECT TOP (1) cu.UserId
+					    FROM %s cu
+					    WHERE cu.CaseId = c.Id
+					      AND cu.RoleId = ?
+					      AND cu.IsPrimary = 1
+					    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+					) ra
+					LEFT JOIN %s u
+					  ON u.id = ra.UserId
+					WHERE c.Id = ?
+					  AND %s
+					  AND EXISTS (
+					    SELECT 1
+					    FROM %s cu_scope
+					    WHERE cu_scope.CaseId = c.Id
+					      AND cu_scope.UserId = ?
+					  );
+					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
+					activeFilter(schema.deletedColumn(), "c"), CASE_USERS_TABLE);
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setLong(2, caseId);
+				ps.setInt(3, userId);
 
-			ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
-			ps.setLong(2, caseId);
-			ps.setInt(3, userId);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next())
+						return null;
 
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next())
-					return null;
-
-				return new CaseRow(
-						rs.getLong("Id"),
-						rs.getString("Name"),
-						toLocalDate(rs.getDate("CallerDate")),
-						toLocalDate(rs.getDate("StatuteOfLimitations")),
-						getNullableInt(rs, "PrimaryStatusId"),
-						getNullableInt(rs, "ResponsibleAttorneyId"),
-						rs.getString("ResponsibleAttorneyName"),
-						rs.getString("ResponsibleAttorneyColor")
-				);
+					return new CaseRow(
+							rs.getLong("Id"),
+							rs.getString("Name"),
+							toLocalDate(rs.getDate("CallerDate")),
+							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							getNullableInt(rs, "PrimaryStatusId"),
+							getNullableInt(rs, "ResponsibleAttorneyId"),
+							rs.getString("ResponsibleAttorneyName"),
+							rs.getString("ResponsibleAttorneyColor")
+					);
+				}
 			}
-
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load my case row (userId=" + userId + ", caseId=" + caseId + ")", e);
 		}
@@ -2930,5 +2937,29 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list attorney user ids (clientId=" + shaleClientId + ")", e);
 		}
+	}
+
+	private static String activeFilter(String deletedColumn, String alias) {
+		if (deletedColumn == null || deletedColumn.isBlank()) {
+			return "1 = 1";
+		}
+		String prefix = alias == null || alias.isBlank() ? deletedColumn : alias + "." + deletedColumn;
+		return "(" + prefix + " = 0 OR " + prefix + " IS NULL)";
+	}
+
+	private static CaseSchema resolveCaseSchema(Connection con) throws SQLException {
+		return new CaseSchema(existingColumn(con, CASES_TABLE, List.of("IsDeleted", "is_deleted")));
+	}
+
+	private static String existingColumn(Connection con, String tableName, List<String> candidates) throws SQLException {
+		if (candidates == null) {
+			return null;
+		}
+		for (String candidate : candidates) {
+			if (candidate != null && !candidate.isBlank() && tableHasColumn(con, tableName, candidate)) {
+				return candidate;
+			}
+		}
+		return null;
 	}
 }
