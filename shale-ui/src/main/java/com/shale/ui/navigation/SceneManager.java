@@ -147,14 +147,18 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createContactView(int contactId) {
+	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase) {
 		return load("/fxml/contact.fxml", controller ->
 		{
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			c.init(contactId, contactDao, appState);
+			c.init(contactId, contactDao, appState, onOpenCase);
 			return c;
 		});
+	}
+
+	public Parent createContactView(int contactId) {
+		return createContactView(contactId, null);
 	}
 
 	public Parent createOrganizationView(int organizationId, Consumer<Integer> onOpenCase, Runnable onOrganizationDeleted) {
