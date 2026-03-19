@@ -4,6 +4,9 @@ import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.NavButtonStyler;
+
+import java.util.List;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -89,6 +92,7 @@ public final class MainController {
 	@FXML
 	private void initialize() {
 		System.out.println("MainController.initialize()");// TODO remove
+		styleNavigationButtons();
 		highlightNav(navMyShaleButton);
 
 		if (globalSearchField != null) {
@@ -284,6 +288,24 @@ public final class MainController {
 		sectionContent.getChildren().setAll(myShaleRoot);
 	}
 
+	private void styleNavigationButtons() {
+		for (Button button : getNavigationButtons()) {
+			NavButtonStyler.applyBaseStyle(button);
+		}
+	}
+
+	private List<Button> getNavigationButtons() {
+		return List.of(
+				navMyShaleButton,
+				navTasksButton,
+				navCasesButton,
+				navContactsButton,
+				navOrganizationsButton,
+				navTeamButton,
+				navSettingsButton
+		);
+	}
+
 	private void setSectionContentText(String text) {
 		if (placeholderLabel == null) {
 			placeholderLabel = new Label();
@@ -305,6 +327,7 @@ public final class MainController {
 		navTeamButton.setDisable(false);
 		navSettingsButton.setDisable(false);
 
+		NavButtonStyler.setActive(active, getNavigationButtons());
 	}
 
 	public void setUpdateLauncher(UiUpdateLauncher updateLauncher) {
