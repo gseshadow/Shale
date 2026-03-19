@@ -29,10 +29,10 @@
                 <ScrollPane fx:id="contactsScroll" fitToWidth="true"
                     pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
                     <content>
-                        <FlowPane fx:id="contactsFlow" hgap="14" vgap="14"
+                        <FlowPane fx:id="contactsFlow" hgap="16" vgap="16"
                             prefWrapLength="1040" styleClass="cases-content-surface glass-panel">
                             <padding>
-                                <Insets top="14" right="14" bottom="14" left="14" />
+                                <Insets top="16" right="16" bottom="16" left="16" />
                             </padding>
                         </FlowPane>
                     </content>

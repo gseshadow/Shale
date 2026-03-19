@@ -32,6 +32,8 @@ public class CaseCard extends VBox {
 
 	private Integer caseId;
 	private Consumer<Integer> onOpen;
+	private String backgroundCss;
+	private boolean hovered;
 
 	public CaseCard() {
 		super(6);
@@ -84,7 +86,8 @@ public class CaseCard extends VBox {
 	 * "linear-gradient(...)" (if you ever want)
 	 */
 	public void setBackgroundCssColor(String backgroundColorCss) {
-		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundColorCss));
+		backgroundCss = backgroundColorCss;
+		refreshSurfaceStyle();
 	}
 
 	/**
@@ -143,6 +146,16 @@ public class CaseCard extends VBox {
 	}
 
 	private void wireEvents() {
+		setOnMouseEntered(e -> {
+			hovered = true;
+			setTranslateY(-1.5);
+			refreshSurfaceStyle();
+		});
+		setOnMouseExited(e -> {
+			hovered = false;
+			setTranslateY(0);
+			refreshSurfaceStyle();
+		});
 		setOnMouseClicked(e ->
 		{
 			if (onOpen != null && caseId != null) {
@@ -157,5 +170,9 @@ public class CaseCard extends VBox {
 	 */
 	public Node asNode() {
 		return this;
+	}
+
+	private void refreshSurfaceStyle() {
+		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
 	}
 }
