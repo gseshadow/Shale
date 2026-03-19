@@ -567,6 +567,91 @@ public final class CaseDao {
 		}
 	}
 
+	public List<CaseRow> searchDeletedCasesByName(String query) {
+		String normalizedQuery = normalizeSearchQuery(query);
+		if (normalizedQuery.isBlank()) {
+			return List.of();
+		}
+
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			if (schema.deletedColumn() == null || schema.deletedColumn().isBlank()) {
+				return List.of();
+			}
+			String deletedFilter = "(" + "c." + schema.deletedColumn() + " = 1)";
+			String sql = """
+				SELECT
+				  c.Id,
+				  c.Name,
+				  c.CallerDate,
+				  c.StatuteOfLimitations,
+				  current_status.PrimaryStatusId,
+				  ra.UserId AS ResponsibleAttorneyId,
+				  u.color AS ResponsibleAttorneyColor,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS ResponsibleAttorneyName
+				FROM %s c
+				OUTER APPLY (
+				    SELECT TOP (1) s.Id AS PrimaryStatusId
+				    FROM %s cs
+				    INNER JOIN %s s ON s.Id = cs.StatusId
+				    WHERE cs.CaseId = c.Id
+				    ORDER BY
+				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+				      cs.UpdatedAt DESC,
+				      cs.CreatedAt DESC,
+				      cs.Id DESC
+				) current_status
+				OUTER APPLY (
+				    SELECT TOP (1) cu.UserId
+				    FROM %s cu
+				    WHERE cu.CaseId = c.Id
+				      AND cu.RoleId = ?
+				      AND cu.IsPrimary = 1
+				    ORDER BY
+				      cu.UpdatedAt DESC,
+				      cu.CreatedAt DESC,
+				      cu.Id DESC
+				) ra
+				LEFT JOIN %s u
+				  ON u.id = ra.UserId
+				WHERE c.ShaleClientId = ?
+				  AND %s
+				  AND LOWER(COALESCE(c.Name, '')) LIKE ?
+				ORDER BY c.Name ASC, c.Id ASC;
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, deletedFilter);
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, requireCurrentShaleClientId(con));
+				ps.setString(idx, containsPattern(normalizedQuery));
+
+				List<CaseRow> out = new ArrayList<>();
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						out.add(new CaseRow(
+							rs.getLong("Id"),
+							rs.getString("Name"),
+							toLocalDate(rs.getDate("CallerDate")),
+							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							getNullableInt(rs, "PrimaryStatusId"),
+							getNullableInt(rs, "ResponsibleAttorneyId"),
+							rs.getString("ResponsibleAttorneyName"),
+							rs.getString("ResponsibleAttorneyColor")
+						));
+					}
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to search deleted cases by name", e);
+		}
+	}
+
 	private PagedResult<CaseRow> findPageInternal(int page,
 			int pageSize,
 			CaseSort sort,
@@ -1251,6 +1336,14 @@ public final class CaseDao {
 	}
 
 	public boolean softDeleteCase(long caseId, Integer shaleClientId) {
+		return updateDeletedState(caseId, shaleClientId, true);
+	}
+
+	public boolean restoreCase(long caseId, Integer shaleClientId) {
+		return updateDeletedState(caseId, shaleClientId, false);
+	}
+
+	private boolean updateDeletedState(long caseId, Integer shaleClientId, boolean deleted) {
 		if (caseId <= 0) {
 			throw new IllegalArgumentException("caseId must be > 0");
 		}
@@ -1269,22 +1362,27 @@ public final class CaseDao {
 				throw new IllegalStateException("Cases table does not support soft delete.");
 			}
 
+			String desiredStateFilter = deleted
+					? activeFilter(schema.deletedColumn(), null)
+					: "(" + schema.deletedColumn() + " = 1)";
+
 			String sql = """
 					UPDATE %s
-					SET %s = 1,
+					SET %s = ?,
 					    UpdatedAt = SYSUTCDATETIME()
 					WHERE Id = ?
 					  AND ShaleClientId = ?
 					  AND %s;
-					""".formatted(CASES_TABLE, schema.deletedColumn(), activeFilter(schema.deletedColumn(), null));
+					""".formatted(CASES_TABLE, schema.deletedColumn(), desiredStateFilter);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				ps.setLong(1, caseId);
-				ps.setInt(2, shaleClientId);
+				ps.setInt(1, deleted ? 1 : 0);
+				ps.setLong(2, caseId);
+				ps.setInt(3, shaleClientId);
 				return ps.executeUpdate() > 0;
 			}
 		} catch (SQLException e) {
-			throw new RuntimeException("Failed to soft delete case (id=" + caseId + ")", e);
+			throw new RuntimeException("Failed to " + (deleted ? "soft delete" : "restore") + " case (id=" + caseId + ")", e);
 		}
 	}
 

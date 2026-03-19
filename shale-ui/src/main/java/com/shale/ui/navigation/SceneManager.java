@@ -147,12 +147,14 @@ public final class SceneManager {
 		return load("/fxml/search.fxml", controller ->
 		{
 			SearchController c = (SearchController) controller;
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			SearchService searchService = new SearchService(
-					new CaseDao(dbSessionProvider),
+					caseDao,
 					new ContactDao(dbSessionProvider),
 					new OrganizationDao(dbSessionProvider),
 					new UserDao(dbSessionProvider));
-			c.init(appState, searchService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
+			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
+			c.init(appState, searchService, caseDetailService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
 			return c;
 		});
 	}

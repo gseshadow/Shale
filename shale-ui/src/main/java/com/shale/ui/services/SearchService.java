@@ -49,7 +49,7 @@ public final class SearchService {
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 	}
 
-	public SearchResults searchAll(int shaleClientId, String query) {
+	public SearchResults searchAll(int shaleClientId, String query, boolean includeDeletedCases) {
 		SearchQuery searchQuery = SearchQuery.from(query);
 		if (searchQuery.normalizedText().isBlank()) {
 			return SearchResults.empty(searchQuery.rawQuery());
@@ -60,6 +60,13 @@ public final class SearchService {
 				row -> scoreCase(row, searchQuery),
 				CaseDao.CaseRow::name,
 				row -> Long.toString(row.id()));
+		List<CaseDao.CaseRow> deletedCases = includeDeletedCases
+				? sortResults(
+						caseDao.searchDeletedCasesByName(searchQuery.rawQuery()),
+						row -> scoreCase(row, searchQuery),
+						CaseDao.CaseRow::name,
+						row -> Long.toString(row.id()))
+				: List.of();
 		List<ContactDao.DirectoryContactRow> contacts = sortResults(
 				contactDao.searchContacts(shaleClientId, searchQuery.rawQuery()),
 				row -> scoreContact(row, searchQuery),
@@ -76,7 +83,7 @@ public final class SearchService {
 				UserDao.DirectoryUserRow::displayName,
 				row -> Integer.toString(row.id()));
 
-		return new SearchResults(searchQuery.rawQuery(), cases, contacts, organizations, users);
+		return new SearchResults(searchQuery.rawQuery(), cases, deletedCases, contacts, organizations, users);
 	}
 
 	private static int scoreCase(CaseDao.CaseRow row, SearchQuery query) {
@@ -248,19 +255,21 @@ public final class SearchService {
 	public record SearchResults(
 			String query,
 			List<CaseDao.CaseRow> cases,
+			List<CaseDao.CaseRow> deletedCases,
 			List<ContactDao.DirectoryContactRow> contacts,
 			List<Organization> organizations,
 			List<UserDao.DirectoryUserRow> users) {
 		public SearchResults {
 			query = query == null ? "" : query;
 			cases = List.copyOf(cases == null ? List.of() : cases);
+			deletedCases = List.copyOf(deletedCases == null ? List.of() : deletedCases);
 			contacts = List.copyOf(contacts == null ? List.of() : contacts);
 			organizations = List.copyOf(organizations == null ? List.of() : organizations);
 			users = List.copyOf(users == null ? List.of() : users);
 		}
 
 		public static SearchResults empty(String query) {
-			return new SearchResults(query, List.of(), List.of(), List.of(), List.of());
+			return new SearchResults(query, List.of(), List.of(), List.of(), List.of(), List.of());
 		}
 	}
 }
