@@ -1,8 +1,17 @@
 package com.shale.ui.controller;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.ContactDao.ContactDetailRow;
 import com.shale.data.dao.ContactDao.ContactProfileUpdateRequest;
+import com.shale.data.dao.ContactDao.RelatedCaseRow;
+import com.shale.ui.component.factory.CaseCardFactory;
+import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
@@ -14,10 +23,8 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-
-import java.time.LocalDate;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 
 public final class ContactViewController {
 
@@ -28,6 +35,8 @@ public final class ContactViewController {
     @FXML private Button editButton;
     @FXML private Button saveButton;
     @FXML private Button cancelButton;
+    @FXML private VBox relatedCasesContainer;
+    @FXML private Label relatedCasesEmptyLabel;
 
     @FXML private Label displayNameValue;
     @FXML private Label nameValue;
@@ -56,6 +65,9 @@ public final class ContactViewController {
     private AppState appState;
     private ContactDetailRow currentContact;
     private boolean editMode;
+    private Consumer<Integer> onOpenCase;
+    private CaseCardFactory caseCardFactory;
+    private List<RelatedCaseRow> relatedCases = List.of();
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contact-view-loader");
@@ -63,10 +75,12 @@ public final class ContactViewController {
         return t;
     });
 
-    public void init(int contactId, ContactDao contactDao, AppState appState) {
+    public void init(int contactId, ContactDao contactDao, AppState appState, Consumer<Integer> onOpenCase) {
         this.contactId = contactId;
         this.contactDao = contactDao;
         this.appState = appState;
+        this.onOpenCase = onOpenCase;
+        this.caseCardFactory = new CaseCardFactory(onOpenCase);
     }
 
     @FXML
@@ -82,6 +96,7 @@ public final class ContactViewController {
         }
 
         setEditMode(false);
+        renderRelatedCases();
         Platform.runLater(this::loadContact);
     }
 
@@ -97,14 +112,19 @@ public final class ContactViewController {
         dbExec.submit(() -> {
             try {
                 ContactDetailRow row = contactDao.findById(contactId, tenantId);
+                List<RelatedCaseRow> loadedRelatedCases = contactDao.findRelatedCases(contactId, tenantId);
                 Platform.runLater(() -> {
                     setBusy(false);
                     if (row == null) {
+                        relatedCases = List.of();
+                        renderRelatedCases();
                         setError("This contact could not be found for the current tenant.");
                         return;
                     }
                     currentContact = row;
+                    relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
                     renderFromCurrent();
+                    renderRelatedCases();
                     setEditMode(false);
                     clearError();
                 });
@@ -112,6 +132,8 @@ public final class ContactViewController {
                 System.err.println("[TEMP][ContactViewController] contact load failed for contactId=" + contactId + ", shaleClientId=" + tenantId + ": " + ex.getMessage());
                 Platform.runLater(() -> {
                     setBusy(false);
+                    relatedCases = List.of();
+                    renderRelatedCases();
                     setError("Unable to load this contact.");
                 });
             }
@@ -178,6 +200,7 @@ public final class ContactViewController {
                 }
 
                 ContactDetailRow reloaded = contactDao.findById(currentContact.id(), currentContact.shaleClientId());
+                List<RelatedCaseRow> reloadedRelatedCases = contactDao.findRelatedCases(currentContact.id(), currentContact.shaleClientId());
                 Platform.runLater(() -> {
                     setBusy(false);
                     if (reloaded == null) {
@@ -185,7 +208,9 @@ public final class ContactViewController {
                         return;
                     }
                     currentContact = reloaded;
+                    relatedCases = reloadedRelatedCases == null ? List.of() : reloadedRelatedCases;
                     renderFromCurrent();
+                    renderRelatedCases();
                     setEditMode(false);
                     clearError();
                 });
@@ -286,6 +311,52 @@ public final class ContactViewController {
         }
     }
 
+    private void renderRelatedCases() {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(this::renderRelatedCases);
+            return;
+        }
+
+        if (relatedCasesContainer == null) {
+            return;
+        }
+
+        if (caseCardFactory == null) {
+            caseCardFactory = new CaseCardFactory(onOpenCase);
+        }
+
+        List<Node> cards = relatedCases.stream()
+                .map(this::createRelatedCaseCard)
+                .toList();
+
+        relatedCasesContainer.getChildren().setAll(cards);
+
+        boolean empty = cards.isEmpty();
+        if (relatedCasesEmptyLabel != null) {
+            relatedCasesEmptyLabel.setVisible(empty);
+            relatedCasesEmptyLabel.setManaged(empty);
+            if (!empty) {
+                relatedCasesEmptyLabel.toBack();
+            }
+        }
+    }
+
+    private Node createRelatedCaseCard(RelatedCaseRow row) {
+        Node card = caseCardFactory.create(new CaseCardModel(
+                row.id(),
+                row.name(),
+                row.intakeDate(),
+                row.statuteOfLimitationsDate(),
+                row.responsibleAttorneyName(),
+                row.responsibleAttorneyColor()));
+        if (card instanceof Region region) {
+            region.setMaxWidth(Double.MAX_VALUE);
+            region.setPrefWidth(300);
+        }
+        VBox.setVgrow(card, javafx.scene.layout.Priority.NEVER);
+        return card;
+    }
+
     private void setEditMode(boolean enabled) {
         this.editMode = enabled && canEditContact();
 
@@ -293,16 +364,16 @@ public final class ContactViewController {
         setVisibleManaged(saveButton, canEditContact() && editMode);
         setVisibleManaged(cancelButton, canEditContact() && editMode);
 
-        toggleEdit(nameValue, nameEditor);
-        toggleEdit(firstNameValue, firstNameEditor);
-        toggleEdit(lastNameValue, lastNameEditor);
-        toggleEdit(emailValue, emailEditor);
-        toggleEdit(phoneValue, phoneEditor);
-        toggleEdit(addressHomeValue, addressHomeEditor);
-        toggleEdit(dateOfBirthValue, dateOfBirthEditor);
-        toggleEdit(conditionValue, conditionEditor);
-        toggleEdit(clientValue, clientEditor);
-        toggleEdit(deceasedValue, deceasedEditor);
+        toggleField(nameValue, nameEditor, editMode);
+        toggleField(firstNameValue, firstNameEditor, editMode);
+        toggleField(lastNameValue, lastNameEditor, editMode);
+        toggleField(emailValue, emailEditor, editMode);
+        toggleField(phoneValue, phoneEditor, editMode);
+        toggleField(addressHomeValue, addressHomeEditor, editMode);
+        toggleField(dateOfBirthValue, dateOfBirthEditor, editMode);
+        toggleField(conditionValue, conditionEditor, editMode);
+        toggleField(clientValue, clientEditor, editMode);
+        toggleField(deceasedValue, deceasedEditor, editMode);
     }
 
     private void setBusy(boolean busy) {
@@ -315,80 +386,37 @@ public final class ContactViewController {
         if (cancelButton != null) {
             cancelButton.setDisable(busy);
         }
-        if (nameEditor != null) {
-            nameEditor.setDisable(busy);
-        }
-        if (firstNameEditor != null) {
-            firstNameEditor.setDisable(busy);
-        }
-        if (lastNameEditor != null) {
-            lastNameEditor.setDisable(busy);
-        }
-        if (emailEditor != null) {
-            emailEditor.setDisable(busy);
-        }
-        if (phoneEditor != null) {
-            phoneEditor.setDisable(busy);
-        }
-        if (addressHomeEditor != null) {
-            addressHomeEditor.setDisable(busy);
-        }
-        if (dateOfBirthEditor != null) {
-            dateOfBirthEditor.setDisable(busy);
-        }
-        if (conditionEditor != null) {
-            conditionEditor.setDisable(busy);
-        }
-        if (clientEditor != null) {
-            clientEditor.setDisable(busy);
-        }
-        if (deceasedEditor != null) {
-            deceasedEditor.setDisable(busy);
-        }
     }
 
     private boolean canEditContact() {
         return appState != null && appState.getUserId() > 0;
     }
 
-    private void toggleEdit(Node valueNode, Node editorNode) {
-        setVisibleManaged(valueNode, !editMode);
-        setVisibleManaged(editorNode, editMode);
-    }
-
-    private static void setVisibleManaged(Node node, boolean visible) {
-        if (node == null) {
-            return;
+    private void clearError() {
+        setVisibleManaged(errorLabel, false);
+        if (errorLabel != null) {
+            errorLabel.setText("");
         }
-        node.setVisible(visible);
-        node.setManaged(visible);
     }
 
     private void setError(String message) {
-        if (errorLabel != null) {
-            errorLabel.setText(message == null ? "" : message);
-            setVisibleManaged(errorLabel, message != null && !message.isBlank());
+        if (errorLabel == null) {
+            return;
         }
-    }
-
-    private void clearError() {
-        setError("");
-    }
-
-    private static String formatDate(LocalDate value) {
-        return value == null ? "—" : value.toString();
-    }
-
-    private static String booleanLabel(boolean value) {
-        return value ? "Yes" : "No";
+        errorLabel.setText(message == null ? "" : message);
+        setVisibleManaged(errorLabel, message != null && !message.isBlank());
     }
 
     private static String fallback(String value) {
         return fallback(value, "—");
     }
 
-    private static String fallback(String value, String fallback) {
-        return value == null || value.isBlank() ? fallback : value;
+    private static String fallback(String value, String defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? defaultValue : trimmed;
     }
 
     private static String safe(String value) {
@@ -401,5 +429,26 @@ public final class ContactViewController {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String booleanLabel(boolean value) {
+        return value ? "Yes" : "No";
+    }
+
+    private static String formatDate(LocalDate value) {
+        return value == null ? "—" : value.toString();
+    }
+
+    private static void setVisibleManaged(Node node, boolean visible) {
+        if (node == null) {
+            return;
+        }
+        node.setVisible(visible);
+        node.setManaged(visible);
+    }
+
+    private static void toggleField(Node readOnlyNode, Node editorNode, boolean editing) {
+        setVisibleManaged(readOnlyNode, !editing);
+        setVisibleManaged(editorNode, editing);
     }
 }
