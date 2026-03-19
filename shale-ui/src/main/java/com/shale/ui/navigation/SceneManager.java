@@ -16,8 +16,10 @@ import com.shale.ui.controller.NewIntakeController;
 import com.shale.ui.controller.NewOrganizationController;
 import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
+import com.shale.ui.controller.SearchController;
 import com.shale.ui.controller.TeamController;
 import com.shale.ui.controller.UserController;
+import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -131,6 +133,24 @@ public final class SceneManager {
 			TeamController c = (TeamController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			c.init(appState, userDao, onOpenUser);
+			return c;
+		});
+	}
+
+	public Parent createSearchView(String query,
+			Consumer<Integer> onOpenCase,
+			Consumer<Integer> onOpenContact,
+			Consumer<Integer> onOpenOrganization,
+			Consumer<Integer> onOpenUser) {
+		return load("/fxml/search.fxml", controller ->
+		{
+			SearchController c = (SearchController) controller;
+			SearchService searchService = new SearchService(
+					new CaseDao(dbSessionProvider),
+					new ContactDao(dbSessionProvider),
+					new OrganizationDao(dbSessionProvider),
+					new UserDao(dbSessionProvider));
+			c.init(appState, searchService, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
 			return c;
 		});
 	}

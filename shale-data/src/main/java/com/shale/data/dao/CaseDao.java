@@ -483,6 +483,85 @@ public final class CaseDao {
 		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId);
 	}
 
+	public List<CaseRow> searchCasesByName(String query) {
+		String normalizedQuery = normalizeSearchQuery(query);
+		if (normalizedQuery.isBlank()) {
+			return List.of();
+		}
+
+		String sql = """
+				SELECT
+				  c.Id,
+				  c.Name,
+				  c.CallerDate,
+				  c.StatuteOfLimitations,
+				  current_status.PrimaryStatusId,
+				  ra.UserId AS ResponsibleAttorneyId,
+				  u.color AS ResponsibleAttorneyColor,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS ResponsibleAttorneyName
+				FROM %s c
+				OUTER APPLY (
+				    SELECT TOP (1) s.Id AS PrimaryStatusId
+				    FROM %s cs
+				    INNER JOIN %s s ON s.Id = cs.StatusId
+				    WHERE cs.CaseId = c.Id
+				    ORDER BY
+				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+				      cs.UpdatedAt DESC,
+				      cs.CreatedAt DESC,
+				      cs.Id DESC
+				) current_status
+				OUTER APPLY (
+				    SELECT TOP (1) cu.UserId
+				    FROM %s cu
+				    WHERE cu.CaseId = c.Id
+				      AND cu.RoleId = ?
+				      AND cu.IsPrimary = 1
+				    ORDER BY
+				      cu.UpdatedAt DESC,
+				      cu.CreatedAt DESC,
+				      cu.Id DESC
+				) ra
+				LEFT JOIN %s u
+				  ON u.id = ra.UserId
+				WHERE c.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND LOWER(COALESCE(c.Name, '')) LIKE ?
+				ORDER BY c.Name ASC, c.Id ASC;
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE);
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setInt(idx++, requireCurrentShaleClientId(con));
+			ps.setString(idx, containsPattern(normalizedQuery));
+
+			List<CaseRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new CaseRow(
+						rs.getLong("Id"),
+						rs.getString("Name"),
+						toLocalDate(rs.getDate("CallerDate")),
+						toLocalDate(rs.getDate("StatuteOfLimitations")),
+						getNullableInt(rs, "PrimaryStatusId"),
+						getNullableInt(rs, "ResponsibleAttorneyId"),
+						rs.getString("ResponsibleAttorneyName"),
+						rs.getString("ResponsibleAttorneyColor")
+					));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to search cases by name", e);
+		}
+	}
+
 	private PagedResult<CaseRow> findPageInternal(int page,
 			int pageSize,
 			CaseSort sort,
@@ -604,6 +683,18 @@ public final class CaseDao {
 					e
 			);
 		}
+	}
+
+
+	private static String normalizeSearchQuery(String query) {
+		if (query == null) {
+			return "";
+		}
+		return query.trim().toLowerCase(java.util.Locale.ROOT);
+	}
+
+	private static String containsPattern(String normalizedQuery) {
+		return "%" + normalizedQuery + "%";
 	}
 
 	private static String orderByClauseFor(CaseSort sort) {
