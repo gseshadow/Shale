@@ -12,6 +12,7 @@ import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.SearchService;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
@@ -57,12 +58,15 @@ public final class SearchController {
 
 	private AppState appState;
 	private SearchService searchService;
+	private UiRuntimeBridge runtimeBridge;
 	private String query = "";
 	private CaseCardFactory caseCardFactory;
 	private ContactCardFactory contactCardFactory;
 	private OrganizationCardFactory organizationCardFactory;
 	private UserCardFactory userCardFactory;
 	private int loadGeneration = 0;
+	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private boolean liveSubscribed;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "global-search-loader");
@@ -72,6 +76,7 @@ public final class SearchController {
 
 	public void init(AppState appState,
 			SearchService searchService,
+			UiRuntimeBridge runtimeBridge,
 			String query,
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenContact,
@@ -79,6 +84,7 @@ public final class SearchController {
 			Consumer<Integer> onOpenUser) {
 		this.appState = appState;
 		this.searchService = searchService;
+		this.runtimeBridge = runtimeBridge;
 		this.query = query == null ? "" : query.trim();
 		this.caseCardFactory = new CaseCardFactory(onOpenCase == null ? id -> {
 		} : onOpenCase);
@@ -97,6 +103,39 @@ public final class SearchController {
 		configureFlow(organizationsFlow, 16, 16, 1040);
 		configureFlow(usersFlow, 16, 16, 1040);
 		Platform.runLater(this::loadResults);
+		if (casesFlow != null) {
+			casesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (newScene == null) {
+					unsubscribeLiveCaseUpdates();
+				} else {
+					subscribeLiveCaseUpdates();
+				}
+			});
+		}
+		subscribeLiveCaseUpdates();
+	}
+
+	private void subscribeLiveCaseUpdates() {
+		if (runtimeBridge == null || liveSubscribed) {
+			return;
+		}
+		liveCaseUpdatedHandler = event -> {
+			String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+			if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
+				return;
+			}
+			Platform.runLater(this::loadResults);
+		};
+		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = true;
+	}
+
+	private void unsubscribeLiveCaseUpdates() {
+		if (!liveSubscribed || runtimeBridge == null || liveCaseUpdatedHandler == null) {
+			return;
+		}
+		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = false;
 	}
 
 	private void loadResults() {

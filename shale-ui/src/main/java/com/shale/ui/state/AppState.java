@@ -5,6 +5,7 @@ public final class AppState {
 	private volatile Integer shaleClientId;
 	private volatile String userEmail;
 	private volatile boolean admin;
+	private volatile boolean attorney;
 
 	public Integer getUserId() {
 		return userId;
@@ -38,10 +39,19 @@ public final class AppState {
 		this.admin = admin;
 	}
 
+	public boolean isAttorney() {
+		return attorney;
+	}
+
+	public void setAttorney(boolean attorney) {
+		this.attorney = attorney;
+	}
+
 	public void clear() {
 		userId = null;
 		shaleClientId = null;
 		userEmail = null;
 		admin = false;
+		attorney = false;
 	}
 }

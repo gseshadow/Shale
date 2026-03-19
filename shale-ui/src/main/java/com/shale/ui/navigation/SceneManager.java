@@ -19,6 +19,8 @@ import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.controller.SearchController;
 import com.shale.ui.controller.TeamController;
 import com.shale.ui.controller.UserController;
+import com.shale.ui.services.CaseDetailService;
+import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -150,7 +152,7 @@ public final class SceneManager {
 					new ContactDao(dbSessionProvider),
 					new OrganizationDao(dbSessionProvider),
 					new UserDao(dbSessionProvider));
-			c.init(appState, searchService, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
+			c.init(appState, searchService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
 			return c;
 		});
 	}
@@ -167,18 +169,23 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase) {
+	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase, Runnable onContactDeleted) {
 		return load("/fxml/contact.fxml", controller ->
 		{
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			c.init(contactId, contactDao, appState, onOpenCase);
+			ContactDetailService contactDetailService = new ContactDetailService(contactDao);
+			c.init(contactId, contactDetailService, appState, onOpenCase, onContactDeleted);
 			return c;
 		});
 	}
 
+	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase) {
+		return createContactView(contactId, onOpenCase, null);
+	}
+
 	public Parent createContactView(int contactId) {
-		return createContactView(contactId, null);
+		return createContactView(contactId, null, null);
 	}
 
 	public Parent createOrganizationView(int organizationId, Consumer<Integer> onOpenCase, Runnable onOrganizationDeleted) {
@@ -202,7 +209,7 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {
 		return load("/fxml/case.fxml", controller ->
 		{
 			CaseController c = (CaseController) controller;
@@ -210,7 +217,8 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			c.init(caseId, caseDao, organizationDao, contactDao, appState, runtimeBridge);
+			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
+			c.init(caseId, caseDao, caseDetailService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
@@ -218,6 +226,10 @@ public final class SceneManager {
 			c.setOnOpenOrganization(onOpenOrganization);
 			return c;
 		});
+	}
+
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
+		return createCaseView(caseId, onOpenOrganization, null);
 	}
 
 	public void showNewOrganizationDialog(Consumer<Integer> onOrganizationCreated) {
@@ -311,7 +323,7 @@ public final class SceneManager {
 				System.err.println("Unable to navigate to contact profile; main controller is unavailable.");
 				return;
 			}
-			Parent contactRoot = createContactView(contactId, mainController::openCase);
+			Parent contactRoot = createContactView(contactId, mainController::openCase, mainController::showContactsListView);
 			mainController.showContactView(contactId, contactRoot);
 		} catch (RuntimeException ex) {
 			System.err.println("Failed to open contact profile for contactId " + contactId + ": " + ex.getMessage());

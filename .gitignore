@@ -44,3 +44,6 @@ dist-appimage/
 dist-updater/
 *.zip
 *.exe
+
+build/assets/javafx-jmods*/
+build/assets/javafx-jmods-21.0.10/

@@ -7,21 +7,30 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 
+import com.shale.core.platform.AppPaths;
+
 public final class DesktopUpdateLauncher {
+
+	private static final String APP_NAME = "Shale";
 
 	private DesktopUpdateLauncher() {
 	}
 
 	public static void launchUpdater(String currentVersion) {
-		Path logFile = null;
+		Path logFile = AppPaths.appLogFile(APP_NAME, "update-launcher.log");
 
 		try {
+			Files.createDirectories(logFile.getParent());
 			Path installDir = DesktopInstallLocator.detectInstallDir();
-			logFile = installDir.resolve("update-launcher.log");
 
 			log(logFile, "==== Launch attempt " + LocalDateTime.now() + " ====");
 			log(logFile, "Current version: " + currentVersion);
 			log(logFile, "Detected install dir: " + installDir);
+
+			if (!AppPaths.isWindows()) {
+				log(logFile, "Updater launch skipped on unsupported platform: " + AppPaths.platform());
+				throw new IllegalStateException("In-app updates are not available on this platform yet.");
+			}
 
 			Path updaterExe = installDir.resolve("app").resolve("updater").resolve("ShaleUpdater.exe");
 			if (!Files.exists(updaterExe)) {
@@ -38,7 +47,7 @@ public final class DesktopUpdateLauncher {
 				throw new IllegalStateException("Updater not found: " + updaterExe);
 			}
 
-			Path updaterLog = installDir.resolve("updater-output.log");
+			Path updaterLog = AppPaths.appLogFile(APP_NAME, "updater-output.log");
 
 			ProcessBuilder pb = new ProcessBuilder(
 					updaterExe.toString(),

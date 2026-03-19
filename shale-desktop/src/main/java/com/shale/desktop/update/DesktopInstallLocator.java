@@ -22,6 +22,22 @@ public final class DesktopInstallLocator {
 			System.out.println("Code source path: " + path);
 
 			Path parent = path.getParent();
+
+			if (parent != null
+					&& parent.getFileName() != null
+					&& "app".equalsIgnoreCase(parent.getFileName().toString())) {
+				Path contentsDir = parent.getParent();
+				if (contentsDir != null
+						&& contentsDir.getFileName() != null
+						&& "Contents".equalsIgnoreCase(contentsDir.getFileName().toString())) {
+					Path appBundle = contentsDir.getParent();
+					if (appBundle != null && appBundle.getFileName() != null
+							&& appBundle.getFileName().toString().endsWith(".app")) {
+						System.out.println("Detected macOS app bundle install dir: " + appBundle);
+						return appBundle;
+					}
+				}
+			}
 			if (parent != null && parent.getFileName() != null) {
 				String parentName = parent.getFileName().toString();
 
