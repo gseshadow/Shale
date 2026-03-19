@@ -193,7 +193,11 @@ public final class MainController {
 	@FXML
 	private void onUpdate() {
 		if (updateLauncher != null) {
-			updateLauncher.launchUpdater();
+			try {
+				updateLauncher.launchUpdater();
+			} catch (RuntimeException ex) {
+				sceneManager.showError(ex.getMessage());
+			}
 		} else {
 			System.out.println("Update launcher not configured.");
 		}

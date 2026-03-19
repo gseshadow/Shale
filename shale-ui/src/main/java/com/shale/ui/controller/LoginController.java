@@ -1,7 +1,11 @@
 package com.shale.ui.controller;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 
+import com.shale.core.platform.AppPaths;
 import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -40,6 +44,8 @@ public final class LoginController {
 	private AppState appState;
 	private UiAuthService authService;
 	private UiRuntimeBridge runtimeBridge;
+	private static final String APP_NAME = "Shale";
+
 	private UiUpdateLauncher updateLauncher;
 
 	public LoginController() {
@@ -59,17 +65,16 @@ public final class LoginController {
 
 	@FXML
 	private void initialize() {
-		java.nio.file.Path logPath = java.nio.file.Path.of(
-				System.getenv("LOCALAPPDATA"), "Shale", "startup.log");
+		Path logPath = AppPaths.appLogFile(APP_NAME, "startup.log");
 
 		try {
-			java.nio.file.Files.createDirectories(logPath.getParent());
+			Files.createDirectories(logPath.getParent());
 
-			java.nio.file.Files.writeString(
+			Files.writeString(
 					logPath,
 					"LoginController.initialize() called\n",
-					java.nio.file.StandardOpenOption.CREATE,
-					java.nio.file.StandardOpenOption.APPEND
+					StandardOpenOption.CREATE,
+					StandardOpenOption.APPEND
 			);
 		} catch (Exception ignored) {
 		}
@@ -84,38 +89,38 @@ public final class LoginController {
 		try {
 			var logoUrl = getClass().getResource("/images/Shale.png");
 
-			java.nio.file.Files.writeString(
+			Files.writeString(
 					logPath,
 					"Logo resource URL: " + logoUrl + "\n",
-					java.nio.file.StandardOpenOption.CREATE,
-					java.nio.file.StandardOpenOption.APPEND
+					StandardOpenOption.CREATE,
+					StandardOpenOption.APPEND
 			);
 
 			if (logoUrl != null) {
 				logoImage.setImage(new Image(logoUrl.toExternalForm()));
 
-				java.nio.file.Files.writeString(
+				Files.writeString(
 						logPath,
 						"Logo image successfully loaded\n",
-						java.nio.file.StandardOpenOption.CREATE,
-						java.nio.file.StandardOpenOption.APPEND
+						StandardOpenOption.CREATE,
+						StandardOpenOption.APPEND
 				);
 			} else {
-				java.nio.file.Files.writeString(
+				Files.writeString(
 						logPath,
 						"Logo resource NOT FOUND at /images/Shale.png\n",
-						java.nio.file.StandardOpenOption.CREATE,
-						java.nio.file.StandardOpenOption.APPEND
+						StandardOpenOption.CREATE,
+						StandardOpenOption.APPEND
 				);
 			}
 
 		} catch (Exception ex) {
 			try {
-				java.nio.file.Files.writeString(
+				Files.writeString(
 						logPath,
 						"Exception loading logo: " + ex + "\n",
-						java.nio.file.StandardOpenOption.CREATE,
-						java.nio.file.StandardOpenOption.APPEND
+						StandardOpenOption.CREATE,
+						StandardOpenOption.APPEND
 				);
 			} catch (Exception ignored) {
 			}
