@@ -873,6 +873,7 @@ public final class CaseDao {
 				    WHERE cc.CaseId = c.Id
 				      AND cc.Role = ?
 				      AND cc.IsPrimary = 1
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
 				) callerContact
 
@@ -895,6 +896,7 @@ public final class CaseDao {
 				    WHERE cc.CaseId = c.Id
 				      AND cc.Role = ?
 				      AND cc.IsPrimary = 1
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
 				) clientContact
 
@@ -917,6 +919,7 @@ public final class CaseDao {
 				    WHERE cc.CaseId = c.Id
 				      AND cc.Role = ?
 				      AND cc.IsPrimary = 1
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
 				) oppContact
 
@@ -2166,6 +2169,7 @@ public final class CaseDao {
 				    FROM dbo.Contacts ct
 				    WHERE ct.Id = ?
 				      AND ct.ShaleClientId = ?
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 				  )
 				  BEGIN
 				    THROW 50001, 'Contact not found for tenant.', 1;

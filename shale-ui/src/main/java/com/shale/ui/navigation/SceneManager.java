@@ -19,6 +19,7 @@ import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.controller.SearchController;
 import com.shale.ui.controller.TeamController;
 import com.shale.ui.controller.UserController;
+import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -167,18 +168,23 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase) {
+	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase, Runnable onContactDeleted) {
 		return load("/fxml/contact.fxml", controller ->
 		{
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			c.init(contactId, contactDao, appState, onOpenCase);
+			ContactDetailService contactDetailService = new ContactDetailService(contactDao);
+			c.init(contactId, contactDetailService, appState, onOpenCase, onContactDeleted);
 			return c;
 		});
 	}
 
+	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase) {
+		return createContactView(contactId, onOpenCase, null);
+	}
+
 	public Parent createContactView(int contactId) {
-		return createContactView(contactId, null);
+		return createContactView(contactId, null, null);
 	}
 
 	public Parent createOrganizationView(int organizationId, Consumer<Integer> onOpenCase, Runnable onOrganizationDeleted) {
@@ -311,7 +317,7 @@ public final class SceneManager {
 				System.err.println("Unable to navigate to contact profile; main controller is unavailable.");
 				return;
 			}
-			Parent contactRoot = createContactView(contactId, mainController::openCase);
+			Parent contactRoot = createContactView(contactId, mainController::openCase, mainController::showContactsListView);
 			mainController.showContactView(contactId, contactRoot);
 		} catch (RuntimeException ex) {
 			System.err.println("Failed to open contact profile for contactId " + contactId + ": " + ex.getMessage());
