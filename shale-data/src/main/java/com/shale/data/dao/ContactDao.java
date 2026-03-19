@@ -139,6 +139,57 @@ public final class ContactDao {
         }
     }
 
+    public List<DirectoryContactRow> searchContactsByName(int shaleClientId, String query) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+
+            ContactSchema schema = ContactSchema.load(con);
+            logDetectedCoreColumns(schema);
+
+            String sql = """
+                    SELECT
+                      c.Id,
+                      %s AS DisplayName,
+                      %s,
+                      %s
+                    FROM dbo.Contacts c
+                    WHERE c.%s = ?
+                      AND NULLIF(LTRIM(RTRIM(%s)), '') IS NOT NULL
+                    %s
+                    %s
+                    ORDER BY DisplayName ASC, c.Id ASC;
+                    """.formatted(
+                    displayNameExpression(schema, "c"),
+                    optionalColumnExpression(schema.emailColumn(), "c", "Email"),
+                    optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    schema.tenantColumn(),
+                    displayNameExpression(schema, "c"),
+                    activeFilter(schema.deletedColumn(), "c"),
+                    nameSearchClause(schema, "c"));
+
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                bindNameSearchQuery(ps, 1, shaleClientId, schema, query);
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<DirectoryContactRow> out = new ArrayList<>();
+                    while (rs.next()) {
+                        out.add(new DirectoryContactRow(
+                                rs.getInt("Id"),
+                                rs.getString("DisplayName"),
+                                rs.getString("Email"),
+                                rs.getString("Phone")));
+                    }
+                    return out;
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to search contacts by name for tenant (clientId=" + shaleClientId + ")", e);
+        }
+    }
+
     public PagedResult<DirectoryContactRow> findDirectoryContactsPage(int shaleClientId, int page, int pageSize, String searchQuery) {
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
@@ -666,6 +717,36 @@ public final class ContactDao {
                                           int shaleClientId,
                                           ContactSchema schema,
                                           String searchQuery) throws SQLException {
+        ps.setInt(idx++, shaleClientId);
+        String normalizedSearch = normalizeSearchQuery(searchQuery);
+        String likeValue = likeParameter(normalizedSearch);
+        ps.setString(idx++, normalizedSearch);
+        ps.setString(idx++, likeValue);
+        ps.setString(idx++, likeValue);
+        ps.setString(idx++, likeValue);
+        return idx;
+    }
+
+
+    private static String nameSearchClause(ContactSchema schema, String alias) {
+        return """
+                  AND (
+                    ? = ''
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                  )
+                """.formatted(
+                coreTextExpression(schema.firstNameColumn(), alias),
+                coreTextExpression(schema.lastNameColumn(), alias),
+                displayNameExpression(schema, alias));
+    }
+
+    private static int bindNameSearchQuery(PreparedStatement ps,
+                                           int idx,
+                                           int shaleClientId,
+                                           ContactSchema schema,
+                                           String searchQuery) throws SQLException {
         ps.setInt(idx++, shaleClientId);
         String normalizedSearch = normalizeSearchQuery(searchQuery);
         String likeValue = likeParameter(normalizedSearch);
