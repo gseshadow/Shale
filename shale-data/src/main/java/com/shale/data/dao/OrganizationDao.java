@@ -69,6 +69,72 @@ public final class OrganizationDao {
 		return findPage(page, pageSize, null);
 	}
 
+	public List<Organization> searchOrganizations(String query) {
+		String normalizedSearch = normalizeSearch(query);
+		if (normalizedSearch.isBlank()) {
+			return List.of();
+		}
+		String phoneDigits = normalizePhoneDigits(query);
+
+		String sql = """
+				SELECT
+				  o.Id,
+				  o.ShaleClientId,
+				  o.OrganizationTypeId,
+				  ot.Name AS OrganizationTypeName,
+				  o.Name,
+				  o.Phone,
+				  o.Fax,
+				  o.Email,
+				  o.Website,
+				  o.Address1,
+				  o.Address2,
+				  o.City,
+				  o.State,
+				  o.PostalCode,
+				  o.Country,
+				  o.Notes,
+				  o.IsDeleted,
+				  o.CreatedAt,
+				  o.UpdatedAt
+				FROM %s o
+				LEFT JOIN %s ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				  AND (
+				    LOWER(COALESCE(o.Name, '')) LIKE ?
+				    OR LOWER(COALESCE(o.Email, '')) LIKE ?
+				    OR (? <> '' AND %s LIKE ?)
+				    OR (? <> '' AND %s LIKE ?)
+				  )
+				ORDER BY o.Name ASC, o.Id ASC;
+				""".formatted(ORGANIZATIONS_TABLE, ORGANIZATION_TYPES_TABLE, phoneDigitsExpression("o.Phone"), phoneDigitsExpression("o.Fax"));
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			String likeValue = containsPattern(normalizedSearch.toLowerCase(java.util.Locale.ROOT));
+			String phoneLikeValue = containsPattern(phoneDigits);
+			ps.setInt(1, requireCurrentShaleClientId(con));
+			ps.setString(2, likeValue);
+			ps.setString(3, likeValue);
+			ps.setString(4, phoneDigits);
+			ps.setString(5, phoneLikeValue);
+			ps.setString(6, phoneDigits);
+			ps.setString(7, phoneLikeValue);
+			try (ResultSet rs = ps.executeQuery()) {
+				List<Organization> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(mapOrganization(rs));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to search organizations", e);
+		}
+	}
+
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize, String searchName) {
 		if (page < 0)
@@ -679,6 +745,25 @@ public final class OrganizationDao {
 			return "";
 		}
 		return searchName.trim();
+	}
+
+	private static String normalizePhoneDigits(String value) {
+		if (value == null) {
+			return "";
+		}
+		StringBuilder digits = new StringBuilder();
+		for (int i = 0; i < value.length(); i++) {
+			char c = value.charAt(i);
+			if (Character.isDigit(c)) {
+				digits.append(c);
+			}
+		}
+		return digits.toString();
+	}
+
+	private static String phoneDigitsExpression(String columnExpression) {
+		return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(" + columnExpression
+				+ ", ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', ''), '+', ''), '/', '')";
 	}
 
 	private static String containsPattern(String normalizedSearch) {

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+    xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="com.shale.ui.controller.SearchController" styleClass="app-shell">
+
+    <center>
+        <StackPane>
+            <children>
+                <ScrollPane fitToWidth="true" pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll transparent-scroll">
+                    <content>
+                        <VBox spacing="16" fillWidth="true">
+                            <padding>
+                                <Insets top="4" right="4" bottom="12" left="4" />
+                            </padding>
+
+                            <VBox spacing="6" styleClass="strong-panel">
+                                <padding>
+                                    <Insets top="14" right="16" bottom="14" left="16" />
+                                </padding>
+                                <Label fx:id="searchSummaryLabel" text="Showing search results." styleClass="search-summary-text" />
+                            </VBox>
+
+                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
+                                <padding>
+                                    <Insets top="16" right="16" bottom="16" left="16" />
+                                </padding>
+                                <Label text="Cases" styleClass="search-section-title" />
+                                <FlowPane fx:id="casesFlow" hgap="16" vgap="16" prefWrapLength="1040" />
+                                <Label fx:id="casesEmptyLabel" text="No matching cases" visible="false" managed="false" />
+                            </VBox>
+
+                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
+                                <padding>
+                                    <Insets top="16" right="16" bottom="16" left="16" />
+                                </padding>
+                                <Label text="Contacts" styleClass="search-section-title" />
+                                <FlowPane fx:id="contactsFlow" hgap="16" vgap="16" prefWrapLength="1040" />
+                                <Label fx:id="contactsEmptyLabel" text="No matching contacts" visible="false" managed="false" />
+                            </VBox>
+
+                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
+                                <padding>
+                                    <Insets top="16" right="16" bottom="16" left="16" />
+                                </padding>
+                                <Label text="Organizations" styleClass="search-section-title" />
+                                <FlowPane fx:id="organizationsFlow" hgap="16" vgap="16" prefWrapLength="1040" />
+                                <Label fx:id="organizationsEmptyLabel" text="No matching organizations" visible="false" managed="false" />
+                            </VBox>
+
+                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
+                                <padding>
+                                    <Insets top="16" right="16" bottom="16" left="16" />
+                                </padding>
+                                <Label text="Users" styleClass="search-section-title" />
+                                <FlowPane fx:id="usersFlow" hgap="16" vgap="16" prefWrapLength="1040" />
+                                <Label fx:id="usersEmptyLabel" text="No matching users" visible="false" managed="false" />
+                            </VBox>
+                        </VBox>
+                    </content>
+                </ScrollPane>
+
+                <Label fx:id="searchLoadingLabel" text="Loading search results…" visible="false" managed="false" />
+            </children>
+        </StackPane>
+    </center>
+
+</BorderPane>
