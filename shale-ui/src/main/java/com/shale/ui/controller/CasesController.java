@@ -182,7 +182,7 @@ public final class CasesController {
 			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
 			Integer patchedDeleted = extractPatchInt(rawPatch, "deleted");
 
-			if (patchedDeleted != null && patchedDeleted.intValue() == 1) {
+			if (patchedDeleted != null) {
 				refreshCaseRowFromDb(event.caseId());
 				return;
 			}
