@@ -17,6 +17,8 @@ public final class UserDao {
 
 	public record DirectoryUserRow(
 			int id,
+			String firstName,
+			String lastName,
 			String displayName,
 			String email,
 			String color,
@@ -68,7 +70,7 @@ public final class UserDao {
 		});
 	}
 
-	public List<DirectoryUserRow> searchUsersByName(int shaleClientId, String query) {
+	public List<DirectoryUserRow> searchUsers(int shaleClientId, String query) {
 		if (shaleClientId <= 0) {
 			throw new IllegalArgumentException("shaleClientId must be > 0");
 		}
@@ -80,6 +82,8 @@ public final class UserDao {
 		String baseSql = """
 				SELECT
 				  u.Id,
+				  COALESCE(u.name_first, '') AS FirstName,
+				  COALESCE(u.name_last, '') AS LastName,
 				  LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -103,6 +107,7 @@ public final class UserDao {
 				      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
 				      COALESCE(u.name_last, '')
 				    ))) LIKE ?
+				    OR LOWER(COALESCE(u.email, '')) LIKE ?
 				  )
 				""";
 
@@ -123,11 +128,14 @@ public final class UserDao {
 				ps.setString(2, likeValue);
 				ps.setString(3, likeValue);
 				ps.setString(4, likeValue);
+				ps.setString(5, likeValue);
 				try (ResultSet rs = ps.executeQuery()) {
 					List<DirectoryUserRow> out = new ArrayList<>();
 					while (rs.next()) {
 						out.add(new DirectoryUserRow(
 							rs.getInt("Id"),
+							rs.getString("FirstName"),
+							rs.getString("LastName"),
 							rs.getString("DisplayName"),
 							rs.getString("Email"),
 							rs.getString("Color"),
@@ -137,7 +145,7 @@ public final class UserDao {
 				}
 			}
 		} catch (SQLException e) {
-			throw new RuntimeException("Failed to search tenant users by name (clientId=" + shaleClientId + ")", e);
+			throw new RuntimeException("Failed to search tenant users (clientId=" + shaleClientId + ")", e);
 		}
 	}
 
@@ -156,6 +164,8 @@ public final class UserDao {
 		String baseSql = """
 				SELECT
 				  u.Id,
+				  COALESCE(u.name_first, '') AS FirstName,
+				  COALESCE(u.name_last, '') AS LastName,
 				  LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -191,6 +201,8 @@ public final class UserDao {
 					while (rs.next()) {
 						out.add(new DirectoryUserRow(
 								rs.getInt("Id"),
+								rs.getString("FirstName"),
+								rs.getString("LastName"),
 								rs.getString("DisplayName"),
 								rs.getString("Email"),
 								rs.getString("Color"),
