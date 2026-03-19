@@ -23,6 +23,8 @@ public final class ContactDao {
 
     public record DirectoryContactRow(
             int id,
+            String firstName,
+            String lastName,
             String displayName,
             String email,
             String phone
@@ -104,6 +106,8 @@ public final class ContactDao {
             String sql = """
                     SELECT
                       c.Id,
+                      %s,
+                      %s,
                       %s AS DisplayName,
                       %s,
                       %s
@@ -113,6 +117,8 @@ public final class ContactDao {
                     %s
                     ORDER BY DisplayName ASC, c.Id ASC;
                     """.formatted(
+                    optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
+                    optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
                     displayNameExpression(schema, "c"),
                     optionalColumnExpression(schema.emailColumn(), "c", "Email"),
                     optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
@@ -127,6 +133,8 @@ public final class ContactDao {
                     while (rs.next()) {
                         out.add(new DirectoryContactRow(
                                 rs.getInt("Id"),
+                                rs.getString("FirstName"),
+                                rs.getString("LastName"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
                                 rs.getString("Phone")));
@@ -139,7 +147,7 @@ public final class ContactDao {
         }
     }
 
-    public List<DirectoryContactRow> searchContactsByName(int shaleClientId, String query) {
+    public List<DirectoryContactRow> searchContacts(int shaleClientId, String query) {
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
@@ -153,6 +161,8 @@ public final class ContactDao {
             String sql = """
                     SELECT
                       c.Id,
+                      %s,
+                      %s,
                       %s AS DisplayName,
                       %s,
                       %s
@@ -163,21 +173,25 @@ public final class ContactDao {
                     %s
                     ORDER BY DisplayName ASC, c.Id ASC;
                     """.formatted(
+                    optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
+                    optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
                     displayNameExpression(schema, "c"),
                     optionalColumnExpression(schema.emailColumn(), "c", "Email"),
                     optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
                     schema.tenantColumn(),
                     displayNameExpression(schema, "c"),
                     activeFilter(schema.deletedColumn(), "c"),
-                    nameSearchClause(schema, "c"));
+                    globalSearchClause(schema, "c"));
 
             try (PreparedStatement ps = con.prepareStatement(sql)) {
-                bindNameSearchQuery(ps, 1, shaleClientId, schema, query);
+                bindGlobalSearchQuery(ps, 1, shaleClientId, schema, query);
                 try (ResultSet rs = ps.executeQuery()) {
                     List<DirectoryContactRow> out = new ArrayList<>();
                     while (rs.next()) {
                         out.add(new DirectoryContactRow(
                                 rs.getInt("Id"),
+                                rs.getString("FirstName"),
+                                rs.getString("LastName"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
                                 rs.getString("Phone")));
@@ -186,7 +200,7 @@ public final class ContactDao {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to search contacts by name for tenant (clientId=" + shaleClientId + ")", e);
+            throw new RuntimeException("Failed to search contacts for tenant (clientId=" + shaleClientId + ")", e);
         }
     }
 
@@ -216,6 +230,8 @@ public final class ContactDao {
             String sql = """
                     SELECT
                       c.Id,
+                      %s,
+                      %s,
                       %s AS DisplayName,
                       %s,
                       %s
@@ -227,6 +243,8 @@ public final class ContactDao {
                     ORDER BY DisplayName ASC, c.Id ASC
                     OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
                     """.formatted(
+                    optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
+                    optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
                     displayNameExpression(schema, "c"),
                     optionalColumnExpression(schema.emailColumn(), "c", "Email"),
                     optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
@@ -246,6 +264,8 @@ public final class ContactDao {
                     while (rs.next()) {
                         out.add(new DirectoryContactRow(
                                 rs.getInt("Id"),
+                                rs.getString("FirstName"),
+                                rs.getString("LastName"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
                                 rs.getString("Phone")));
@@ -677,6 +697,15 @@ public final class ContactDao {
         return "NULLIF(LTRIM(RTRIM(" + alias + "." + column + ")), '')";
     }
 
+    private static String phoneDigitsExpression(String column, String alias) {
+        if (column == null || column.isBlank()) {
+            return "CAST(NULL AS NVARCHAR(255))";
+        }
+        String value = "COALESCE(" + alias + "." + column + ", '')";
+        return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" + value
+                + ", ' ', ''), '-', ''), '(', ''), ')', ''), '.', ''), '+', ''), '/', '')";
+    }
+
     private static String optionalDateColumnExpression(String column, String alias, String resultAlias) {
         if (column == null || column.isBlank()) {
             return "CAST(NULL AS DATE) AS " + resultAlias;
@@ -728,32 +757,41 @@ public final class ContactDao {
     }
 
 
-    private static String nameSearchClause(ContactSchema schema, String alias) {
+    private static String globalSearchClause(ContactSchema schema, String alias) {
         return """
                   AND (
                     ? = ''
                     OR LOWER(%s) LIKE ?
                     OR LOWER(%s) LIKE ?
                     OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                    OR (? <> '' AND %s LIKE ?)
                   )
                 """.formatted(
                 coreTextExpression(schema.firstNameColumn(), alias),
                 coreTextExpression(schema.lastNameColumn(), alias),
-                displayNameExpression(schema, alias));
+                displayNameExpression(schema, alias),
+                coreTextExpression(schema.emailColumn(), alias),
+                phoneDigitsExpression(schema.phoneColumn(), alias));
     }
 
-    private static int bindNameSearchQuery(PreparedStatement ps,
-                                           int idx,
-                                           int shaleClientId,
-                                           ContactSchema schema,
-                                           String searchQuery) throws SQLException {
+    private static int bindGlobalSearchQuery(PreparedStatement ps,
+                                             int idx,
+                                             int shaleClientId,
+                                             ContactSchema schema,
+                                             String searchQuery) throws SQLException {
         ps.setInt(idx++, shaleClientId);
         String normalizedSearch = normalizeSearchQuery(searchQuery);
         String likeValue = likeParameter(normalizedSearch);
+        String phoneDigits = normalizePhoneDigits(searchQuery);
+        String phoneLikeValue = likeParameter(phoneDigits);
         ps.setString(idx++, normalizedSearch);
         ps.setString(idx++, likeValue);
         ps.setString(idx++, likeValue);
         ps.setString(idx++, likeValue);
+        ps.setString(idx++, likeValue);
+        ps.setString(idx++, phoneDigits);
+        ps.setString(idx++, phoneLikeValue);
         return idx;
     }
 
@@ -790,6 +828,20 @@ public final class ContactDao {
             return "";
         }
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizePhoneDigits(String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (Character.isDigit(c)) {
+                digits.append(c);
+            }
+        }
+        return digits.toString();
     }
 
     private static String likeParameter(String normalizedQuery) {

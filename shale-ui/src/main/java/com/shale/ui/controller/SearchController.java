@@ -126,7 +126,7 @@ public final class SearchController {
 		updateLoadingState(true);
 		dbExec.submit(() -> {
 			try {
-				SearchService.SearchResults results = searchService.searchAllByName(tenantId, trimmedQuery);
+				SearchService.SearchResults results = searchService.searchAll(tenantId, trimmedQuery);
 				Platform.runLater(() -> {
 					if (generationAtSubmit != loadGeneration) {
 						return;
