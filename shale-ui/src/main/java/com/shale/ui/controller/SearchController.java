@@ -11,7 +11,10 @@ import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
+import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.SearchService;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
@@ -19,7 +22,10 @@ import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +49,12 @@ public final class SearchController {
 	@FXML
 	private Label casesEmptyLabel;
 	@FXML
+	private VBox deletedCasesSection;
+	@FXML
+	private FlowPane deletedCasesFlow;
+	@FXML
+	private Label deletedCasesEmptyLabel;
+	@FXML
 	private FlowPane contactsFlow;
 	@FXML
 	private Label contactsEmptyLabel;
@@ -57,12 +69,16 @@ public final class SearchController {
 
 	private AppState appState;
 	private SearchService searchService;
+	private CaseDetailService caseDetailService;
+	private UiRuntimeBridge runtimeBridge;
 	private String query = "";
 	private CaseCardFactory caseCardFactory;
 	private ContactCardFactory contactCardFactory;
 	private OrganizationCardFactory organizationCardFactory;
 	private UserCardFactory userCardFactory;
 	private int loadGeneration = 0;
+	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private boolean liveSubscribed;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "global-search-loader");
@@ -72,6 +88,8 @@ public final class SearchController {
 
 	public void init(AppState appState,
 			SearchService searchService,
+			CaseDetailService caseDetailService,
+			UiRuntimeBridge runtimeBridge,
 			String query,
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenContact,
@@ -79,6 +97,8 @@ public final class SearchController {
 			Consumer<Integer> onOpenUser) {
 		this.appState = appState;
 		this.searchService = searchService;
+		this.caseDetailService = caseDetailService;
+		this.runtimeBridge = runtimeBridge;
 		this.query = query == null ? "" : query.trim();
 		this.caseCardFactory = new CaseCardFactory(onOpenCase == null ? id -> {
 		} : onOpenCase);
@@ -93,10 +113,44 @@ public final class SearchController {
 	@FXML
 	private void initialize() {
 		configureFlow(casesFlow, 16, 16, 1040);
+		configureFlow(deletedCasesFlow, 16, 16, 1040);
 		configureFlow(contactsFlow, 16, 16, 1040);
 		configureFlow(organizationsFlow, 16, 16, 1040);
 		configureFlow(usersFlow, 16, 16, 1040);
 		Platform.runLater(this::loadResults);
+		if (casesFlow != null) {
+			casesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (newScene == null) {
+					unsubscribeLiveCaseUpdates();
+				} else {
+					subscribeLiveCaseUpdates();
+				}
+			});
+		}
+		subscribeLiveCaseUpdates();
+	}
+
+	private void subscribeLiveCaseUpdates() {
+		if (runtimeBridge == null || liveSubscribed) {
+			return;
+		}
+		liveCaseUpdatedHandler = event -> {
+			String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+			if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
+				return;
+			}
+			Platform.runLater(this::loadResults);
+		};
+		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = true;
+	}
+
+	private void unsubscribeLiveCaseUpdates() {
+		if (!liveSubscribed || runtimeBridge == null || liveCaseUpdatedHandler == null) {
+			return;
+		}
+		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = false;
 	}
 
 	private void loadResults() {
@@ -126,7 +180,7 @@ public final class SearchController {
 		updateLoadingState(true);
 		dbExec.submit(() -> {
 			try {
-				SearchService.SearchResults results = searchService.searchAll(tenantId, trimmedQuery);
+				SearchService.SearchResults results = searchService.searchAll(tenantId, trimmedQuery, canRestoreDeletedCases());
 				Platform.runLater(() -> {
 					if (generationAtSubmit != loadGeneration) {
 						return;
@@ -151,9 +205,47 @@ public final class SearchController {
 
 	private void showResults(SearchService.SearchResults results) {
 		renderCases(results.cases());
+		renderDeletedCases(results.deletedCases());
 		renderContacts(results.contacts());
 		renderOrganizations(results.organizations());
 		renderUsers(results.users());
+	}
+
+	private void renderDeletedCases(List<CaseDao.CaseRow> deletedCases) {
+		boolean authorized = canRestoreDeletedCases();
+		if (deletedCasesSection != null) {
+			deletedCasesSection.setVisible(authorized);
+			deletedCasesSection.setManaged(authorized);
+		}
+		if (!authorized || deletedCasesFlow == null) {
+			return;
+		}
+		List<Node> cards = new ArrayList<>(deletedCases.size());
+		for (CaseDao.CaseRow row : deletedCases) {
+			Node card = caseCardFactory.create(new CaseCardModel(
+					row.id(),
+					row.name(),
+					row.intakeDate(),
+					row.statuteOfLimitationsDate(),
+					row.responsibleAttorneyName(),
+					row.responsibleAttorneyColor()));
+			if (card instanceof Region region) {
+				region.setPrefWidth(CASE_CARD_WIDTH);
+				region.setMaxWidth(CASE_CARD_WIDTH);
+			}
+			var restoreButton = new javafx.scene.control.Button("Restore Case");
+			restoreButton.getStyleClass().add("button-secondary");
+			restoreButton.setOnAction(e -> onRestoreCase(row));
+			Region spacer = new Region();
+			HBox.setHgrow(spacer, Priority.ALWAYS);
+			HBox actions = new HBox(8, spacer, restoreButton);
+			VBox container = new VBox(6, card, actions);
+			container.setPrefWidth(CASE_CARD_WIDTH);
+			container.setMaxWidth(CASE_CARD_WIDTH);
+			cards.add(container);
+		}
+		deletedCasesFlow.getChildren().setAll(cards);
+		updateSectionState(deletedCasesFlow, deletedCasesEmptyLabel, cards.isEmpty());
 	}
 
 	private void renderCases(List<CaseDao.CaseRow> cases) {
@@ -234,6 +326,65 @@ public final class SearchController {
 				.toList();
 		usersFlow.getChildren().setAll(cards);
 		updateSectionState(usersFlow, usersEmptyLabel, cards.isEmpty());
+	}
+
+	private void onRestoreCase(CaseDao.CaseRow row) {
+		if (row == null || caseDetailService == null) {
+			return;
+		}
+		if (!canRestoreDeletedCases()) {
+			AppDialogs.showError(dialogOwner(), "Restore Case", "Only admin and attorney users can restore cases.");
+			return;
+		}
+		Integer tenantId = appState == null ? null : appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) {
+			AppDialogs.showError(dialogOwner(), "Restore Case", "Restore is unavailable because no tenant is selected.");
+			return;
+		}
+		String caseName = row.name() == null || row.name().isBlank() ? "This case" : "\"" + row.name() + "\"";
+		boolean confirmed = AppDialogs.showConfirmation(
+				dialogOwner(),
+				"Restore Case",
+				"Restore this case?",
+				caseName + " will return to normal active views.",
+				"Restore Case",
+				AppDialogs.DialogActionKind.PRIMARY);
+		if (!confirmed) {
+			return;
+		}
+		dbExec.submit(() -> {
+			try {
+				boolean restored = caseDetailService.restoreCase(row.id(), tenantId);
+				Platform.runLater(() -> {
+					if (!restored) {
+						AppDialogs.showError(dialogOwner(), "Restore Case", "Case could not be restored.");
+						return;
+					}
+					publishDeletedStateUpdate(row.id(), 0);
+					loadResults();
+				});
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> AppDialogs.showError(dialogOwner(), "Restore Case", "Failed to restore case."));
+			}
+		});
+	}
+
+	private boolean canRestoreDeletedCases() {
+		return caseDetailService != null && caseDetailService.canRestoreCase();
+	}
+
+	private void publishDeletedStateUpdate(long caseId, int deletedValue) {
+		if (runtimeBridge == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null) {
+			return;
+		}
+		runtimeBridge.publishEntityFieldUpdated("Case", caseId, appState.getShaleClientId(), appState.getUserId(), "deleted", deletedValue);
+	}
+
+	private javafx.stage.Window dialogOwner() {
+		if (searchSummaryLabel != null && searchSummaryLabel.getScene() != null) {
+			return searchSummaryLabel.getScene().getWindow();
+		}
+		return null;
 	}
 
 	private void updateSectionState(FlowPane flowPane, Label emptyLabel, boolean empty) {

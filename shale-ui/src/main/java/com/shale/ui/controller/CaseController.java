@@ -31,6 +31,7 @@ import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.component.factory.UserCardFactory.Variant;
 import com.shale.ui.component.dialog.TeamEditorDialog;
+import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
@@ -174,6 +175,8 @@ public class CaseController {
 	@FXML
 	private TextArea ovDescriptionEditor;
 
+	@FXML
+	private Button deleteCaseButton;
 	@FXML
 	private Button editButton;
 	@FXML
@@ -362,6 +365,7 @@ public class CaseController {
 	private Consumer<Integer> onOpenOrganization;
 
 	private CaseDao caseDao;
+	private CaseDetailService caseDetailService;
 	private OrganizationDao organizationDao;
 	private ContactDao contactDao;
 	private AppState appState;
@@ -378,6 +382,7 @@ public class CaseController {
 
 	private CaseDetailDto current;
 	private CaseOverviewDto currentOverview;
+	private Runnable onCaseDeleted;
 
 	private CaseEditModel draft;
 
@@ -432,13 +437,15 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 	}
 
-	public void init(Integer caseId, CaseDao caseDao, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge) {
+	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
 		this.caseId = caseId;
 		this.caseDao = caseDao;
+		this.caseDetailService = caseDetailService;
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
+		this.onCaseDeleted = onCaseDeleted;
 		refreshHeader();
 	}
 
@@ -506,6 +513,10 @@ public class CaseController {
 			btnEditTeam.setOnAction(e -> onEditTeam());
 		if (submitCaseUpdateButton != null)
 			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
+		if (deleteCaseButton != null) {
+			deleteCaseButton.setOnAction(e -> onDeleteCase());
+			setVisibleManaged(deleteCaseButton, false);
+		}
 		if (addOrganizationButton != null)
 			addOrganizationButton.setOnAction(e -> onAddRelatedEntity());
 		if (caseUpdatesComposerArea != null) {
@@ -1460,8 +1471,12 @@ public class CaseController {
 
 			runOnFx(() ->
 			{
-				if (overview != null)
-					applyOverviewEditSafe(overview);
+				if (overview == null || detail == null) {
+					handleMissingCase();
+					return;
+				}
+
+				applyOverviewEditSafe(overview);
 
 				relatedContacts = contacts == null ? List.of() : contacts;
 				renderContactsSection();
@@ -1469,18 +1484,17 @@ public class CaseController {
 				relatedOrganizations = organizations == null ? List.of() : organizations;
 				renderOrganizationsSection();
 
-				if (detail != null) {
-					current = detail;
-					detailsLocalViewOverride = null;
-					renderDetailsFromCurrent();
-					if (!editMode)
-						applyDetail(detail);
-					else
-						applyLastUpdatedLabel(detail.getUpdatedAt());
-				}
+				current = detail;
+				detailsLocalViewOverride = null;
+				renderDetailsFromCurrent();
+				if (!editMode)
+					applyDetail(detail);
+				else
+					applyLastUpdatedLabel(detail.getUpdatedAt());
 
 				hideRemoteUpdateBanner();
 				clearError();
+				refreshDeleteAction();
 			});
 		}, "case-view-sync-" + activeCaseId).start();
 	}
@@ -1570,6 +1584,8 @@ public class CaseController {
 	private void setBusy(boolean busy) {
 		runOnFx(() ->
 		{
+			if (deleteCaseButton != null)
+				deleteCaseButton.setDisable(busy);
 			if (editButton != null)
 				editButton.setDisable(busy);
 			if (saveButton != null)
@@ -1607,6 +1623,108 @@ public class CaseController {
 			if (detailsCancelButton != null)
 				detailsCancelButton.setDisable(busy);
 		});
+	}
+
+	private void onDeleteCase() {
+		if (caseDetailService == null || current == null || caseId == null) {
+			showError("Case details are unavailable.");
+			return;
+		}
+		if (!canDeleteCurrentCase()) {
+			showError("Only admin and attorney users can delete cases.");
+			return;
+		}
+		if (!confirmDeleteCase()) {
+			return;
+		}
+
+		Integer tenantId = appState == null ? null : appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) {
+			showDeleteFailure("Failed to delete case.");
+			return;
+		}
+
+		setBusy(true);
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				boolean deleted = caseDetailService.softDeleteCase(activeCaseId, tenantId);
+				runOnFx(() -> {
+					setBusy(false);
+					if (!deleted) {
+						showDeleteFailure("Case could not be deleted.");
+						return;
+					}
+					clearError();
+					publishCaseDeleted(activeCaseId);
+					navigateAfterDelete();
+				});
+			} catch (RuntimeException ex) {
+				runOnFx(() -> {
+					setBusy(false);
+					showDeleteFailure("Failed to delete case.");
+				});
+			}
+		}, "case-delete-" + activeCaseId).start();
+	}
+
+	private boolean confirmDeleteCase() {
+		Window owner = dialogOwner(deleteCaseButton);
+		if (owner == null) {
+			owner = dialogOwner(editButton);
+		}
+		String caseName = currentOverview == null ? null : safe(currentOverview.getCaseName());
+		if (caseName == null || caseName.isBlank()) {
+			caseName = current == null ? null : safe(current.getCaseName());
+		}
+		String detail = (caseName == null || caseName.isBlank())
+				? "This will remove the case from normal views across Shale."
+				: "\"" + caseName + "\" will be removed from normal views across Shale.";
+		return AppDialogs.showConfirmation(
+				owner,
+				"Delete Case",
+				"Delete this case?",
+				detail,
+				"Delete Case",
+				AppDialogs.DialogActionKind.DANGER);
+	}
+
+	private void showDeleteFailure(String message) {
+		showError(message);
+		AppDialogs.showError(dialogOwner(deleteCaseButton), "Delete Case", message);
+	}
+
+	private Window dialogOwner(Button button) {
+		if (button != null && button.getScene() != null) {
+			return button.getScene().getWindow();
+		}
+		return null;
+	}
+
+	private void navigateAfterDelete() {
+		if (onCaseDeleted != null) {
+			onCaseDeleted.run();
+		}
+	}
+
+	private void handleMissingCase() {
+		current = null;
+		currentOverview = null;
+		relatedContacts = List.of();
+		relatedOrganizations = List.of();
+		renderContactsSection();
+		renderOrganizationsSection();
+		refreshDeleteAction();
+		navigateAfterDelete();
+	}
+
+	private void refreshDeleteAction() {
+		boolean showDelete = canDeleteCurrentCase() && !editMode && !detailsEditMode;
+		setVisibleManaged(deleteCaseButton, showDelete);
+	}
+
+	private boolean canDeleteCurrentCase() {
+		return current != null && caseDetailService != null && caseDetailService.canDeleteCase();
 	}
 
 	// ----------------------------
@@ -1681,6 +1799,12 @@ public class CaseController {
 		publishCaseFieldUpdated(caseId, "caseUpdateAdded", 1);
 	}
 
+	private void publishCaseDeleted(long caseId) {
+		if (runtimeBridge == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null)
+			return;
+		publishCaseFieldUpdated(caseId, "deleted", 1);
+	}
+
 	// ----------------------------
 	// Live updates
 	// ----------------------------
@@ -1699,8 +1823,10 @@ public class CaseController {
 		{
 			try {
 				CaseDetailDto fresh = caseDao.getDetail(id);
-				if (fresh == null)
+				if (fresh == null) {
+					runOnFx(this::handleMissingCase);
 					return;
+				}
 
 				runOnFx(() ->
 				{
@@ -1727,12 +1853,14 @@ public class CaseController {
 			{
 				if (caseId == null || caseId.longValue() != activeCaseId || !detailsEditMode)
 					return;
+				if (detail == null || overview == null) {
+					handleMissingCase();
+					return;
+				}
 				if (overview != null)
 					currentOverview = overview;
-				if (detail != null) {
-					current = detail;
-					detailsBaseline = CaseDetailsDraft.from(detail, currentOverview);
-				}
+				current = detail;
+				detailsBaseline = CaseDetailsDraft.from(detail, currentOverview);
 			});
 		}, "case-details-remote-baseline-" + activeCaseId).start();
 	}
@@ -2865,6 +2993,7 @@ public class CaseController {
 			setVisibleManaged(changePracticeAreaButton, enabled);
 			setVisibleManaged(changeOpposingCounselButton, enabled);
 			setVisibleManaged(btnEditTeam, enabled);
+			refreshDeleteAction();
 		}
 
 		void clearDraftState() {
@@ -3813,6 +3942,8 @@ public class CaseController {
 			boolean teamChanged = patchedTeamChanged != null && patchedTeamChanged.intValue() == 1;
 			Integer patchedCaseUpdateAdded = extractPatchInt(rawPatch, "caseUpdateAdded");
 			boolean caseUpdateAdded = patchedCaseUpdateAdded != null && patchedCaseUpdateAdded.intValue() == 1;
+			Integer patchedDeleted = extractPatchInt(rawPatch, "deleted");
+			boolean deleted = patchedDeleted != null && patchedDeleted.intValue() == 1;
 			boolean detailsTouched = hasDetailsFieldPatch(rawPatch);
 
 			return new LivePatchData(
@@ -3832,6 +3963,7 @@ public class CaseController {
 				patchedPrimaryOpposingCounselContactId,
 				teamChanged,
 				caseUpdateAdded,
+				deleted,
 				detailsTouched
 			);
 		}
@@ -3883,7 +4015,8 @@ public class CaseController {
 		}
 
 		private boolean shouldReloadForStructuralPatch(LivePatchData patch) {
-			return patch.patchedPrimaryStatusId() != null
+			return patch.deleted()
+					|| patch.patchedPrimaryStatusId() != null
 					|| patch.patchedPrimaryCallerContactId() != null
 					|| patch.patchedPrimaryClientContactId() != null
 					|| patch.patchedPracticeAreaId() != null
@@ -3997,6 +4130,7 @@ public class CaseController {
 			Integer patchedPrimaryOpposingCounselContactId,
 			boolean teamChanged,
 			boolean caseUpdateAdded,
+			boolean deleted,
 			boolean detailsTouched) {
 	}
 

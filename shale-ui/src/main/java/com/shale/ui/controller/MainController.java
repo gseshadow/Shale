@@ -143,13 +143,7 @@ public final class MainController {
 
 	@FXML
 	private void onNavCases() {
-		highlightNav(navCasesButton);
-		sectionTitleLabel.setText("Cases");
-		sectionSubtitleLabel.setText("Browse, search, and manage cases.");
-
-		// Pass callback so case cards can open the case workspace view
-		Node casesRoot = sceneManager.createCasesView(this::openCase);
-		sectionContent.getChildren().setAll(casesRoot);
+		showCasesList();
 	}
 
 	@FXML
@@ -214,6 +208,7 @@ public final class MainController {
 			appState.setShaleClientId(0);
 			appState.setUserEmail(null);
 			appState.setAdmin(false);
+			appState.setAttorney(false);
 		}
 
 		sceneManager.showLogin();
@@ -225,7 +220,7 @@ public final class MainController {
 		sectionTitleLabel.setText("Case");
 		sectionSubtitleLabel.setText("Case #" + caseId);
 
-		Node caseRoot = sceneManager.createCaseView(caseId, this::openOrganization);
+		Node caseRoot = sceneManager.createCaseView(caseId, this::openOrganization, this::showCasesList);
 		sectionContent.getChildren().setAll(caseRoot);
 	}
 
@@ -264,6 +259,15 @@ public final class MainController {
 		sectionTitleLabel.setText("Contact");
 		sectionSubtitleLabel.setText("Contact #" + contactId);
 		sectionContent.getChildren().setAll(contactRoot);
+	}
+
+	private void showCasesList() {
+		highlightNav(navCasesButton);
+		sectionTitleLabel.setText("Cases");
+		sectionSubtitleLabel.setText("Browse, search, and manage cases.");
+
+		Node casesRoot = sceneManager.createCasesView(this::openCase);
+		sectionContent.getChildren().setAll(casesRoot);
 	}
 
 	private void showContactsList() {

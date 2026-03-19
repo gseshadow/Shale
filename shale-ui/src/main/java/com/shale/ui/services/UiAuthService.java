@@ -5,7 +5,7 @@ package com.shale.ui.services;
  * inject into SceneManager.
  */
 public interface UiAuthService {
-	record Result(int userId, int shaleClientId, String email, boolean admin) {
+	record Result(int userId, int shaleClientId, String email, boolean admin, boolean attorney) {
 	}
 
 	Result login(String email, String password) throws Exception;
