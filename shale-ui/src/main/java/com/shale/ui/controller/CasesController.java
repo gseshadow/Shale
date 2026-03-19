@@ -60,6 +60,8 @@ public final class CasesController {
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 
 	private CaseCardFactory caseCardFactory;
+	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private boolean liveSubscribed;
 
 	private final Set<Integer> selectedStatusIds = CaseListUiSupport.defaultSelectedStatuses();
 
@@ -123,15 +125,25 @@ public final class CasesController {
 			wireInfiniteScroll();
 			loadFirstPage();
 		});
+		if (casesFlow != null) {
+			casesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (newScene == null) {
+					unsubscribeLiveCaseUpdates();
+				} else {
+					subscribeLiveCaseUpdates();
+				}
+			});
+		}
+
 		subscribeLiveCaseUpdates();
 	}
 
 	private void subscribeLiveCaseUpdates() {
-		if (runtimeBridge == null) {
+		if (runtimeBridge == null || liveSubscribed) {
 			return;
 		}
 
-		runtimeBridge.subscribeCaseUpdated(event ->
+		liveCaseUpdatedHandler = event ->
 		{
 			String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
 
@@ -162,11 +174,18 @@ public final class CasesController {
 			// 2) Patch-based updates
 			String rawPatch = event.rawPatchJson();
 			if (rawPatch == null || rawPatch.isBlank()) {
+				refreshCaseRowFromDb(event.caseId());
 				return;
 			}
 
 			String patchedName = extractPatchString(rawPatch, "name");
 			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
+			Integer patchedDeleted = extractPatchInt(rawPatch, "deleted");
+
+			if (patchedDeleted != null && patchedDeleted.intValue() == 1) {
+				refreshCaseRowFromDb(event.caseId());
+				return;
+			}
 
 			// If nothing relevant to the list changed, ignore
 			if (patchedName == null && patchedResponsibleAttorneyUserId == null) {
@@ -189,7 +208,17 @@ public final class CasesController {
 			if (patchedResponsibleAttorneyUserId != null) {
 				refreshCaseRowFromDb(event.caseId());
 			}
-		});
+		};
+		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = true;
+	}
+
+	private void unsubscribeLiveCaseUpdates() {
+		if (!liveSubscribed || runtimeBridge == null || liveCaseUpdatedHandler == null) {
+			return;
+		}
+		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = false;
 	}
 
 	/**
@@ -562,16 +591,14 @@ public final class CasesController {
 			try {
 				// simplest: fetch a 1-item "page" by filtering current page is awkward,
 				// so add a DAO method later. For now: just reload the *current page* row via DAO helper.
-				CaseDao.CaseRow row = caseDao.getCaseRow(caseId); // you’ll add this method (below)
-				if (row == null)
-					return;
+				CaseDao.CaseRow row = caseDao.getCaseRow(caseId);
 
 				Platform.runLater(() ->
 				{
 					if (generationAtSubmit != loadGeneration)
 						return;
 
-					boolean changed = applyCaseRowToList(row);
+					boolean changed = row == null ? removeLoadedCase(caseId) : applyCaseRowToList(row);
 					if (changed)
 						rerender();
 				});
@@ -579,6 +606,16 @@ public final class CasesController {
 				Platform.runLater(ex::printStackTrace);
 			}
 		});
+	}
+
+	private boolean removeLoadedCase(long caseId) {
+		for (int i = 0; i < loaded.size(); i++) {
+			if (loaded.get(i).id == caseId) {
+				loaded.remove(i);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private boolean applyCaseRowToList(CaseDao.CaseRow r) {
