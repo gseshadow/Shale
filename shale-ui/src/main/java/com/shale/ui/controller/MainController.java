@@ -113,17 +113,14 @@ public final class MainController {
 
 	@FXML
 	private void onGlobalSearch() {
-		String query = globalSearchField.getText();
-		System.out.println("Global search (shell): " + query);// TODO remove
+		String query = globalSearchField == null || globalSearchField.getText() == null
+				? ""
+				: globalSearchField.getText().trim();
+		if (query.isEmpty()) {
+			return;
+		}
 
-		highlightNav(null);
-		sectionTitleLabel.setText("Search");
-		sectionSubtitleLabel.setText(
-				(query == null || query.isBlank())
-						? "Search across cases, contacts, tasks, and more."
-						: "Results for: \"" + query + "\" (placeholder)"
-		);
-		setSectionContentText("Search results view is not implemented yet.");
+		showSearchResults(query);
 	}
 
 	// === Navigation handlers ===
@@ -281,6 +278,15 @@ public final class MainController {
 
 		Node organizationsRoot = sceneManager.createOrganizationsView(this::openOrganization);
 		sectionContent.getChildren().setAll(organizationsRoot);
+	}
+
+	private void showSearchResults(String query) {
+		highlightNav(null);
+		sectionTitleLabel.setText("Search");
+		sectionSubtitleLabel.setText("Results for: \"" + query + "\"");
+
+		Node searchRoot = sceneManager.createSearchView(query, this::openCase, this::openContact, this::openOrganization, sceneManager::openUserProfile);
+		sectionContent.getChildren().setAll(searchRoot);
 	}
 
 	private void showMyShale() {

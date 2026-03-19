@@ -118,6 +118,17 @@
     -fx-text-fill: #e8f2ff;
 }
 
+.search-section-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #112542;
+}
+
+.search-summary-text {
+    -fx-text-fill: rgba(17, 37, 66, 0.80);
+    -fx-font-weight: 600;
+}
+
 .case-main-surface,
 .form-surface {
     -fx-background-color: rgba(245, 249, 253, 0.78);
