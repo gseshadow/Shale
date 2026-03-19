@@ -68,8 +68,8 @@ public final class ContactsController {
             contactsSearchField.textProperty().addListener((obs, oldV, newV) -> loadFirstPage());
         }
         if (contactsFlow != null) {
-            contactsFlow.setHgap(14);
-            contactsFlow.setVgap(14);
+            contactsFlow.setHgap(16);
+            contactsFlow.setVgap(16);
             contactsFlow.setPrefWrapLength(1040);
         }
 

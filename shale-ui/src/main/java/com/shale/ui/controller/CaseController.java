@@ -33,6 +33,7 @@ import com.shale.ui.component.factory.UserCardFactory.Variant;
 import com.shale.ui.component.dialog.TeamEditorDialog;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.NavButtonStyler;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -581,7 +582,7 @@ public class CaseController {
 		Button button = new Button(section);
 		button.setMaxWidth(Double.MAX_VALUE);
 		button.setAlignment(Pos.CENTER_LEFT);
-		button.getStyleClass().add("section-nav-button");
+		NavButtonStyler.applyBaseStyle(button);
 		return button;
 	}
 
@@ -664,13 +665,15 @@ public class CaseController {
 	}
 
 	private void setActiveSectionButton(String activeSection) {
-		sectionButtons.forEach((section, button) ->
-		{
-			button.getStyleClass().remove("section-nav-button-active");
-			if (Objects.equals(section, activeSection)) {
-				button.getStyleClass().add("section-nav-button-active");
+		Button activeButton = null;
+		for (Map.Entry<String, Button> entry : sectionButtons.entrySet()) {
+			if (Objects.equals(entry.getKey(), activeSection)) {
+				activeButton = entry.getValue();
+				break;
 			}
-		});
+		}
+
+		NavButtonStyler.setActive(activeButton, sectionButtons.values());
 	}
 
 	private void showOverview() {
