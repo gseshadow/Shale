@@ -286,12 +286,12 @@ public final class SceneManager {
 		}
 
 		try {
-			Parent contactRoot = createContactView(contactId);
 			MainController mainController = resolveMainController();
 			if (mainController == null) {
 				System.err.println("Unable to navigate to contact profile; main controller is unavailable.");
 				return;
 			}
+			Parent contactRoot = createContactView(contactId, mainController::openCase);
 			mainController.showContactView(contactId, contactRoot);
 		} catch (RuntimeException ex) {
 			System.err.println("Failed to open contact profile for contactId " + contactId + ": " + ex.getMessage());
