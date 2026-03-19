@@ -53,7 +53,7 @@ public class OrganizationCardFactory {
 		card.setWebsite(model.website());
 		card.setAddress(model.address1(), model.address2(), model.city(), model.state(), model.postalCode(), model.country());
 		card.setNotesSnippet(model.notes());
-		card.setBackgroundCssColor(ColorUtil.toCssBackgroundColor(model.colorCss()));
+		card.setBackgroundCssColor(ColorUtil.toCssBackgroundColorOrNull(model.colorCss()));
 
 		switch (variant) {
 		case FULL -> card.applyFull();
