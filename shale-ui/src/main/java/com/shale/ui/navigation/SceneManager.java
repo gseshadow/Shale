@@ -147,14 +147,18 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createContactView(int contactId) {
+	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase) {
 		return load("/fxml/contact.fxml", controller ->
 		{
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			c.init(contactId, contactDao, appState);
+			c.init(contactId, contactDao, appState, onOpenCase);
 			return c;
 		});
+	}
+
+	public Parent createContactView(int contactId) {
+		return createContactView(contactId, null);
 	}
 
 	public Parent createOrganizationView(int organizationId, Consumer<Integer> onOpenCase, Runnable onOrganizationDeleted) {
@@ -282,12 +286,12 @@ public final class SceneManager {
 		}
 
 		try {
-			Parent contactRoot = createContactView(contactId);
 			MainController mainController = resolveMainController();
 			if (mainController == null) {
 				System.err.println("Unable to navigate to contact profile; main controller is unavailable.");
 				return;
 			}
+			Parent contactRoot = createContactView(contactId, mainController::openCase);
 			mainController.showContactView(contactId, contactRoot);
 		} catch (RuntimeException ex) {
 			System.err.println("Failed to open contact profile for contactId " + contactId + ": " + ex.getMessage());

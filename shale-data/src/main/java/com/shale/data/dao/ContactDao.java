@@ -64,6 +64,17 @@ public final class ContactDao {
     ) {
     }
 
+
+    public record RelatedCaseRow(
+            long id,
+            String name,
+            LocalDate intakeDate,
+            LocalDate statuteOfLimitationsDate,
+            String responsibleAttorneyName,
+            String responsibleAttorneyColor
+    ) {
+    }
+
     public record CreateContactRequest(
             int shaleClientId,
             String firstName,
@@ -236,6 +247,76 @@ public final class ContactDao {
             return findById(con, contactId, shaleClientId);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load contact by id (id=" + contactId + ")", e);
+        }
+    }
+
+    public List<RelatedCaseRow> findRelatedCases(int contactId, int shaleClientId) {
+        if (contactId <= 0) {
+            throw new IllegalArgumentException("contactId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        String sql = """
+                SELECT
+                  c.Id,
+                  c.Name,
+                  c.CallerDate,
+                  c.StatuteOfLimitations,
+                  u.color AS ResponsibleAttorneyColor,
+                  LTRIM(RTRIM(
+                    COALESCE(u.name_first, '') +
+                    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(u.name_last, '')
+                  )) AS ResponsibleAttorneyName
+                FROM dbo.CaseContacts cc
+                INNER JOIN dbo.Cases c
+                  ON c.Id = cc.CaseId
+                INNER JOIN dbo.Contacts ct
+                  ON ct.Id = cc.ContactId
+                OUTER APPLY (
+                    SELECT TOP (1) cu.UserId
+                    FROM dbo.CaseUsers cu
+                    WHERE cu.CaseId = c.Id
+                      AND cu.RoleId = 4
+                      AND cu.IsPrimary = 1
+                    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+                ) ra
+                LEFT JOIN dbo.Users u
+                  ON u.Id = ra.UserId
+                WHERE cc.ContactId = ?
+                  AND c.ShaleClientId = ?
+                  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+                  AND ct.Id = cc.ContactId
+                  AND ct.ShaleClientId = ?
+                  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+                ORDER BY c.Name ASC, c.Id ASC;
+                """;
+
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setInt(1, contactId);
+                ps.setInt(2, shaleClientId);
+                ps.setInt(3, shaleClientId);
+
+                List<RelatedCaseRow> out = new ArrayList<>();
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(new RelatedCaseRow(
+                                rs.getLong("Id"),
+                                rs.getString("Name"),
+                                toLocalDate(rs.getDate("CallerDate")),
+                                toLocalDate(rs.getDate("StatuteOfLimitations")),
+                                rs.getString("ResponsibleAttorneyName"),
+                                rs.getString("ResponsibleAttorneyColor")));
+                    }
+                }
+                return List.copyOf(out);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load related cases for contact (id=" + contactId + ")", e);
         }
     }
 
@@ -665,6 +746,10 @@ public final class ContactDao {
             return first;
         }
         return first + " " + last;
+    }
+
+    private static LocalDate toLocalDate(Date value) {
+        return value == null ? null : value.toLocalDate();
     }
 
     private static void setStatementValue(PreparedStatement ps, int index, Object value) throws SQLException {
