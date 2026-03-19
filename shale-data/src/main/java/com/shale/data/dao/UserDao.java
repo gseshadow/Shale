@@ -21,6 +21,7 @@ public final class UserDao {
 			String lastName,
 			String displayName,
 			String email,
+			String phone,
 			String color,
 			String initials) {
 	}
@@ -79,56 +80,67 @@ public final class UserDao {
 			return List.of();
 		}
 
-		String baseSql = """
-				SELECT
-				  u.Id,
-				  COALESCE(u.name_first, '') AS FirstName,
-				  COALESCE(u.name_last, '') AS LastName,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS DisplayName,
-				  COALESCE(u.email, '') AS Email,
-				  u.Color,
-				  u.Initials
-				FROM dbo.Users u
-				WHERE u.ShaleClientId = ?
-				  AND NULLIF(LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )), '') IS NOT NULL
-				  AND (
-				    LOWER(COALESCE(u.name_first, '')) LIKE ?
-				    OR LOWER(COALESCE(u.name_last, '')) LIKE ?
-				    OR LOWER(LTRIM(RTRIM(
-				      COALESCE(u.name_first, '') +
-				      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				      COALESCE(u.name_last, '')
-				    ))) LIKE ?
-				    OR LOWER(COALESCE(u.email, '')) LIKE ?
-				  )
-				""";
-
-		String orderSql = """
-				ORDER BY DisplayName ASC, u.Id ASC;
-				""";
-
 		try (Connection con = db.requireConnection()) {
 			verifyTenantMatchesSession(con, shaleClientId);
+			String phoneColumn = existingPhoneColumn(con);
+			String phoneSelect = phoneSelectExpression(phoneColumn, "u");
+			String phoneDigits = normalizePhoneDigits(query);
+			String phoneDigitsExpr = phoneDigitsExpression(phoneColumn, "u");
 
-			StringBuilder sql = new StringBuilder(baseSql);
+			StringBuilder sql = new StringBuilder("""
+					SELECT
+					  u.Id,
+					  COALESCE(u.name_first, '') AS FirstName,
+					  COALESCE(u.name_last, '') AS LastName,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS DisplayName,
+					  COALESCE(u.email, '') AS Email,
+					""");
+			sql.append("\n  ").append(phoneSelect).append(",\n");
+			sql.append("""
+					  u.Color,
+					  u.Initials
+					FROM dbo.Users u
+					WHERE u.ShaleClientId = ?
+					  AND NULLIF(LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )), '') IS NOT NULL
+					  AND (
+					    LOWER(COALESCE(u.name_first, '')) LIKE ?
+					    OR LOWER(COALESCE(u.name_last, '')) LIKE ?
+					    OR LOWER(LTRIM(RTRIM(
+					      COALESCE(u.name_first, '') +
+					      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					      COALESCE(u.name_last, '')
+					    ))) LIKE ?
+					    OR LOWER(COALESCE(u.email, '')) LIKE ?
+					    OR (? <> '' AND 
+					""");
+			sql.append(phoneDigitsExpr);
+			sql.append("""
+					 LIKE ?)
+					  )
+					""");
 			appendUserVisibilityFilters(sql, con, "u");
-			sql.append(orderSql);
+			sql.append("""
+					ORDER BY DisplayName ASC, u.Id ASC;
+					""");
 
 			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
 				String likeValue = containsPattern(normalizedQuery);
+				String phoneLikeValue = containsPattern(phoneDigits);
 				ps.setInt(1, shaleClientId);
 				ps.setString(2, likeValue);
 				ps.setString(3, likeValue);
 				ps.setString(4, likeValue);
 				ps.setString(5, likeValue);
+				ps.setString(6, phoneDigits);
+				ps.setString(7, phoneLikeValue);
 				try (ResultSet rs = ps.executeQuery()) {
 					List<DirectoryUserRow> out = new ArrayList<>();
 					while (rs.next()) {
@@ -138,6 +150,7 @@ public final class UserDao {
 							rs.getString("LastName"),
 							rs.getString("DisplayName"),
 							rs.getString("Email"),
+							rs.getString("Phone"),
 							rs.getString("Color"),
 							rs.getString("Initials")));
 					}
@@ -161,38 +174,39 @@ public final class UserDao {
 	}
 
 	public List<DirectoryUserRow> listUsersForTenant(int shaleClientId) {
-		String baseSql = """
-				SELECT
-				  u.Id,
-				  COALESCE(u.name_first, '') AS FirstName,
-				  COALESCE(u.name_last, '') AS LastName,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS DisplayName,
-				  COALESCE(u.email, '') AS Email,
-				  u.Color,
-				  u.Initials
-				FROM dbo.Users u
-				WHERE u.ShaleClientId = ?
-				  AND NULLIF(LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )), '') IS NOT NULL
-				""";
-
-		String orderSql = """
-				ORDER BY DisplayName ASC, u.Id ASC;
-				""";
-
 		try (Connection con = db.requireConnection()) {
 			verifyTenantMatchesSession(con, shaleClientId);
+			String phoneColumn = existingPhoneColumn(con);
+			String phoneSelect = phoneSelectExpression(phoneColumn, "u");
 
-			StringBuilder sql = new StringBuilder(baseSql);
+			StringBuilder sql = new StringBuilder("""
+					SELECT
+					  u.Id,
+					  COALESCE(u.name_first, '') AS FirstName,
+					  COALESCE(u.name_last, '') AS LastName,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS DisplayName,
+					  COALESCE(u.email, '') AS Email,
+					""");
+			sql.append("\n  ").append(phoneSelect).append(",\n");
+			sql.append("""
+					  u.Color,
+					  u.Initials
+					FROM dbo.Users u
+					WHERE u.ShaleClientId = ?
+					  AND NULLIF(LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )), '') IS NOT NULL
+					""");
 			appendUserVisibilityFilters(sql, con, "u");
-			sql.append(orderSql);
+			sql.append("""
+					ORDER BY DisplayName ASC, u.Id ASC;
+					""");
 
 			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
 				ps.setInt(1, shaleClientId);
@@ -205,6 +219,7 @@ public final class UserDao {
 								rs.getString("LastName"),
 								rs.getString("DisplayName"),
 								rs.getString("Email"),
+								rs.getString("Phone"),
 								rs.getString("Color"),
 								rs.getString("Initials")));
 					}
@@ -455,6 +470,30 @@ public final class UserDao {
 
 	private static String containsPattern(String normalizedQuery) {
 		return "%" + normalizedQuery + "%";
+	}
+
+	private static String normalizePhoneDigits(String value) {
+		if (value == null) {
+			return "";
+		}
+		StringBuilder digits = new StringBuilder();
+		for (int i = 0; i < value.length(); i++) {
+			char c = value.charAt(i);
+			if (Character.isDigit(c)) {
+				digits.append(c);
+			}
+		}
+		return digits.toString();
+	}
+
+	private static String phoneDigitsExpression(String phoneColumn, String alias) {
+		if (phoneColumn == null || phoneColumn.isBlank()) {
+			return "CAST(NULL AS NVARCHAR(255))";
+		}
+		String prefix = (alias == null || alias.isBlank()) ? "" : alias + ".";
+		String value = "COALESCE(" + prefix + phoneColumn + ", '')";
+		return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" + value
+				+ ", ' ', ''), '-', ''), '(', ''), ')', ''), '.', ''), '+', ''), '/', '')";
 	}
 
 	private static String phoneSelectExpression(String phoneColumn, String alias) {

@@ -35,6 +35,7 @@ public final class SearchService {
 	private static final int USER_FULL_NAME_WEIGHT = 500;
 	private static final int USER_NAME_PART_WEIGHT = 470;
 	private static final int USER_EMAIL_WEIGHT = 250;
+	private static final int USER_PHONE_WEIGHT = 225;
 
 	private final CaseDao caseDao;
 	private final ContactDao contactDao;
@@ -115,7 +116,8 @@ public final class SearchService {
 				weightedTextScore(query, fullName, USER_FULL_NAME_WEIGHT),
 				weightedTextScore(query, row.firstName(), USER_NAME_PART_WEIGHT),
 				weightedTextScore(query, row.lastName(), USER_NAME_PART_WEIGHT),
-				weightedTextScore(query, row.email(), USER_EMAIL_WEIGHT));
+				weightedTextScore(query, row.email(), USER_EMAIL_WEIGHT),
+				weightedPhoneScore(query, row.phone(), USER_PHONE_WEIGHT));
 	}
 
 	private static int weightedTextScore(SearchQuery query, String candidate, int fieldWeight) {
