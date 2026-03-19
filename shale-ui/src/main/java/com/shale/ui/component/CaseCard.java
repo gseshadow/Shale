@@ -84,15 +84,7 @@ public class CaseCard extends VBox {
 	 * "linear-gradient(...)" (if you ever want)
 	 */
 	public void setBackgroundCssColor(String backgroundColorCss) {
-		String bg = (backgroundColorCss == null || backgroundColorCss.isBlank()) ? "white" : backgroundColorCss;
-
-		setStyle("""
-				    -fx-background-color: %s;
-				    -fx-background-radius: 14;
-				    -fx-border-radius: 14;
-				    -fx-border-color: #e5e5e5;
-				    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0.2, 0, 2);
-				""".formatted(bg));
+		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundColorCss));
 	}
 
 	/**
@@ -132,6 +124,7 @@ public class CaseCard extends VBox {
 	private void buildUi() {
 		setPadding(new Insets(10));
 		setPrefWidth(280);
+		setBackgroundCssColor(null);
 
 		// Title / attorney styles exactly like your snippet
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");

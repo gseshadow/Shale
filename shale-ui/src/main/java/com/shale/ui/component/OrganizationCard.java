@@ -102,13 +102,7 @@ public class OrganizationCard extends HBox {
 	}
 
 	public void setBackgroundCssColor(String css) {
-		String bg = (css == null || css.isBlank()) ? "rgba(0,0,0,0.06)" : css;
-		setStyle(("""
-				-fx-background-color: %s;
-				-fx-background-radius: 14;
-				-fx-border-radius: 14;
-				-fx-border-color: rgba(0,0,0,0.08);
-				""").formatted(bg));
+		setStyle(CardSurfaceStyles.cardContainerStyle(css));
 	}
 
 	public void applyMini() {
@@ -167,6 +161,7 @@ public class OrganizationCard extends HBox {
 
 	private void buildUiMiniDefaults() {
 		setCursor(Cursor.HAND);
+		setBackgroundCssColor(null);
 		applyMini();
 	}
 

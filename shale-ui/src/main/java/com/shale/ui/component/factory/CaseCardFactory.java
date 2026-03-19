@@ -26,7 +26,7 @@ public final class CaseCardFactory {
 		card.setIntakeDate(vm.intakeDate());
 		card.setSolDate(vm.solDate());
 
-		card.setBackgroundCssColor(ColorUtil.toCssBackgroundColor(vm.responsibleAttorneyColor()));
+		card.setBackgroundCssColor(ColorUtil.toCssBackgroundColorOrNull(vm.responsibleAttorneyColor()));
 
 		card.setOnOpen(id ->
 		{

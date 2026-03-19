@@ -34,7 +34,7 @@ public class UserCardFactory {
 		card.setOnOpen(onOpenUser);
 
 		card.setName(model.displayName());
-		card.setBackgroundCssColor(ColorUtil.toCssBackgroundColor(model.colorCss()));
+		card.setBackgroundCssColor(ColorUtil.toCssBackgroundColorOrNull(model.colorCss()));
 
 		switch (variant) {
 		case FULL -> card.applyFull();
