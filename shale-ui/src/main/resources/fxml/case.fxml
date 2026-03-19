@@ -353,7 +353,7 @@
 				<Label fx:id="organizationsEmptyLabel" text="No organizations"
 					visible="false" managed="false" style="-fx-opacity: 0.75;" />
 				<ScrollPane fx:id="organizationsScrollPane" fitToWidth="true" hbarPolicy="NEVER"
-					vbarPolicy="AS_NEEDED" visible="false" managed="false" VBox.vgrow="ALWAYS">
+					vbarPolicy="AS_NEEDED" visible="false" managed="false" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
 					<FlowPane fx:id="organizationsFlow" hgap="12" vgap="12"
 						visible="false" managed="false" maxWidth="1.7976931348623157E308">
 						<padding>
