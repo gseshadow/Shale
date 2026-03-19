@@ -10,8 +10,10 @@ import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.ContactDao.ContactDetailRow;
 import com.shale.data.dao.ContactDao.ContactProfileUpdateRequest;
 import com.shale.data.dao.ContactDao.RelatedCaseRow;
+import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
@@ -25,6 +27,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Window;
 
 public final class ContactViewController {
 
@@ -35,6 +38,7 @@ public final class ContactViewController {
     @FXML private Button editButton;
     @FXML private Button saveButton;
     @FXML private Button cancelButton;
+    @FXML private Button deleteContactButton;
     @FXML private VBox relatedCasesContainer;
     @FXML private Label relatedCasesEmptyLabel;
 
@@ -61,11 +65,12 @@ public final class ContactViewController {
     @FXML private CheckBox deceasedEditor;
 
     private int contactId;
-    private ContactDao contactDao;
+    private ContactDetailService contactDetailService;
     private AppState appState;
     private ContactDetailRow currentContact;
     private boolean editMode;
     private Consumer<Integer> onOpenCase;
+    private Runnable onContactDeleted;
     private CaseCardFactory caseCardFactory;
     private List<RelatedCaseRow> relatedCases = List.of();
 
@@ -75,11 +80,17 @@ public final class ContactViewController {
         return t;
     });
 
-    public void init(int contactId, ContactDao contactDao, AppState appState, Consumer<Integer> onOpenCase) {
+    public void init(
+            int contactId,
+            ContactDetailService contactDetailService,
+            AppState appState,
+            Consumer<Integer> onOpenCase,
+            Runnable onContactDeleted) {
         this.contactId = contactId;
-        this.contactDao = contactDao;
+        this.contactDetailService = contactDetailService;
         this.appState = appState;
         this.onOpenCase = onOpenCase;
+        this.onContactDeleted = onContactDeleted;
         this.caseCardFactory = new CaseCardFactory(onOpenCase);
     }
 
@@ -94,6 +105,10 @@ public final class ContactViewController {
         if (cancelButton != null) {
             cancelButton.setOnAction(e -> onCancel());
         }
+        if (deleteContactButton != null) {
+            deleteContactButton.setOnAction(e -> onDeleteContact());
+            setVisibleManaged(deleteContactButton, false);
+        }
 
         setEditMode(false);
         renderRelatedCases();
@@ -102,8 +117,7 @@ public final class ContactViewController {
 
     private void loadContact() {
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
-        System.out.println("[TEMP][ContactViewController] loadContact contactId=" + contactId + ", shaleClientId=" + tenantId);
-        if (contactDao == null || tenantId == null || tenantId <= 0 || contactId <= 0) {
+        if (contactDetailService == null || tenantId == null || tenantId <= 0 || contactId <= 0) {
             setError("Contact details are unavailable right now.");
             return;
         }
@@ -111,13 +125,15 @@ public final class ContactViewController {
         setBusy(true);
         dbExec.submit(() -> {
             try {
-                ContactDetailRow row = contactDao.findById(contactId, tenantId);
-                List<RelatedCaseRow> loadedRelatedCases = contactDao.findRelatedCases(contactId, tenantId);
+                ContactDetailRow row = contactDetailService.loadContact(contactId, tenantId);
+                List<RelatedCaseRow> loadedRelatedCases = contactDetailService.loadRelatedCases(contactId, tenantId);
                 Platform.runLater(() -> {
                     setBusy(false);
                     if (row == null) {
+                        currentContact = null;
                         relatedCases = List.of();
                         renderRelatedCases();
+                        refreshDeleteAction();
                         setError("This contact could not be found for the current tenant.");
                         return;
                     }
@@ -129,11 +145,12 @@ public final class ContactViewController {
                     clearError();
                 });
             } catch (RuntimeException ex) {
-                System.err.println("[TEMP][ContactViewController] contact load failed for contactId=" + contactId + ", shaleClientId=" + tenantId + ": " + ex.getMessage());
                 Platform.runLater(() -> {
                     setBusy(false);
+                    currentContact = null;
                     relatedCases = List.of();
                     renderRelatedCases();
+                    refreshDeleteAction();
                     setError("Unable to load this contact.");
                 });
             }
@@ -168,7 +185,7 @@ public final class ContactViewController {
             setError("You do not have permission to save this contact.");
             return;
         }
-        if (currentContact == null || contactDao == null) {
+        if (currentContact == null || contactDetailService == null) {
             setError("Contact details are unavailable.");
             return;
         }
@@ -190,7 +207,7 @@ public final class ContactViewController {
         setBusy(true);
         dbExec.submit(() -> {
             try {
-                boolean updated = contactDao.updateBasicProfile(request);
+                boolean updated = contactDetailService.updateBasicProfile(request);
                 if (!updated) {
                     Platform.runLater(() -> {
                         setBusy(false);
@@ -199,8 +216,8 @@ public final class ContactViewController {
                     return;
                 }
 
-                ContactDetailRow reloaded = contactDao.findById(currentContact.id(), currentContact.shaleClientId());
-                List<RelatedCaseRow> reloadedRelatedCases = contactDao.findRelatedCases(currentContact.id(), currentContact.shaleClientId());
+                ContactDetailRow reloaded = contactDetailService.loadContact(currentContact.id(), currentContact.shaleClientId());
+                List<RelatedCaseRow> reloadedRelatedCases = contactDetailService.loadRelatedCases(currentContact.id(), currentContact.shaleClientId());
                 Platform.runLater(() -> {
                     setBusy(false);
                     if (reloaded == null) {
@@ -221,6 +238,77 @@ public final class ContactViewController {
                 });
             }
         });
+    }
+
+    private void onDeleteContact() {
+        if (contactDetailService == null || currentContact == null) {
+            setError("Contact details are unavailable.");
+            return;
+        }
+        if (!isAdminUser()) {
+            setError("Only admin users can delete contacts.");
+            return;
+        }
+        if (!confirmDeleteContact()) {
+            return;
+        }
+
+        setBusy(true);
+        dbExec.submit(() -> {
+            try {
+                boolean deleted = contactDetailService.softDeleteContact(currentContact.id(), currentContact.shaleClientId());
+                Platform.runLater(() -> {
+                    setBusy(false);
+                    if (!deleted) {
+                        showDeleteFailure("Contact could not be deleted.");
+                        return;
+                    }
+                    clearError();
+                    navigateAfterDelete();
+                });
+            } catch (RuntimeException ex) {
+                Platform.runLater(() -> {
+                    setBusy(false);
+                    showDeleteFailure("Failed to delete contact.");
+                });
+            }
+        });
+    }
+
+    private boolean confirmDeleteContact() {
+        Window owner = dialogOwner(deleteContactButton);
+        if (owner == null) {
+            owner = dialogOwner(editButton);
+        }
+        String contactName = preferredContactName(currentContact);
+        String message = contactName == null
+                ? "This will remove it from active views."
+                : contactName + " will be removed from active views.";
+        return AppDialogs.showConfirmation(
+                owner,
+                "Delete Contact",
+                "Delete this contact?",
+                message,
+                "Delete Contact",
+                AppDialogs.DialogActionKind.DANGER);
+    }
+
+    private void showDeleteFailure(String message) {
+        setError(message);
+        AppDialogs.showError(dialogOwner(deleteContactButton), "Delete Contact", message);
+    }
+
+    private Window dialogOwner(Button button) {
+        if (button != null && button.getScene() != null) {
+            return button.getScene().getWindow();
+        }
+        return null;
+    }
+
+    private void navigateAfterDelete() {
+        if (onContactDeleted != null) {
+            onContactDeleted.run();
+        }
     }
 
     private void renderFromCurrent() {
@@ -363,6 +451,7 @@ public final class ContactViewController {
         setVisibleManaged(editButton, canEditContact() && !editMode);
         setVisibleManaged(saveButton, canEditContact() && editMode);
         setVisibleManaged(cancelButton, canEditContact() && editMode);
+        refreshDeleteAction();
 
         toggleField(nameValue, nameEditor, editMode);
         toggleField(firstNameValue, firstNameEditor, editMode);
@@ -386,10 +475,22 @@ public final class ContactViewController {
         if (cancelButton != null) {
             cancelButton.setDisable(busy);
         }
+        if (deleteContactButton != null) {
+            deleteContactButton.setDisable(busy);
+        }
+    }
+
+    private void refreshDeleteAction() {
+        boolean showDelete = isAdminUser() && !editMode && currentContact != null;
+        setVisibleManaged(deleteContactButton, showDelete);
     }
 
     private boolean canEditContact() {
         return appState != null && appState.getUserId() > 0;
+    }
+
+    private boolean isAdminUser() {
+        return appState != null && appState.isAdmin();
     }
 
     private void clearError() {
@@ -433,6 +534,21 @@ public final class ContactViewController {
 
     private static String booleanLabel(boolean value) {
         return value ? "Yes" : "No";
+    }
+
+    private static String preferredContactName(ContactDetailRow row) {
+        if (row == null) {
+            return null;
+        }
+        String displayName = safeText(row.displayName());
+        if (displayName != null) {
+            return displayName;
+        }
+        String combinedName = safeText((safe(row.firstName()) + " " + safe(row.lastName())).trim());
+        if (combinedName != null) {
+            return combinedName;
+        }
+        return safeText(row.name());
     }
 
     private static String formatDate(LocalDate value) {

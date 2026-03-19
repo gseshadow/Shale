@@ -558,6 +558,44 @@ public final class ContactDao {
         }
     }
 
+    public boolean softDeleteContact(int contactId, int shaleClientId) {
+        if (contactId <= 0) {
+            throw new IllegalArgumentException("contactId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+            ContactSchema schema = ContactSchema.load(con);
+            logDetectedCoreColumns(schema);
+            if (schema.deletedColumn() == null || schema.deletedColumn().isBlank()) {
+                throw new IllegalStateException("Contacts table does not support soft delete.");
+            }
+
+            StringBuilder sql = new StringBuilder("""
+                    UPDATE dbo.Contacts
+                    SET
+                      """);
+            sql.append(schema.deletedColumn()).append(" = 1");
+            if (schema.updatedAtColumn() != null && !schema.updatedAtColumn().isBlank()) {
+                sql.append(",\n  ").append(schema.updatedAtColumn()).append(" = SYSUTCDATETIME()");
+            }
+            sql.append("\nWHERE Id = ?\n  AND ").append(schema.tenantColumn()).append(" = ?");
+            sql.append(activeFilter(schema.deletedColumn(), null));
+            sql.append(';');
+
+            try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+                ps.setInt(1, contactId);
+                ps.setInt(2, shaleClientId);
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to soft delete contact (id=" + contactId + ")", e);
+        }
+    }
+
     private ContactDetailRow findById(Connection con, int contactId, int shaleClientId) throws SQLException {
         ContactSchema schema = ContactSchema.load(con);
         logDetectedCoreColumns(schema);
