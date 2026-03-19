@@ -118,6 +118,8 @@ public class CaseController {
 	private TextArea placeholderTextArea;
 
 	@FXML
+	private ScrollPane organizationsScrollPane;
+	@FXML
 	private FlowPane organizationsFlow;
 	@FXML
 	private Label organizationsEmptyLabel;
@@ -475,6 +477,7 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 		setupSections();
 		setupOverviewTasksPanel();
+		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
 		setEditMode(false);
@@ -513,6 +516,24 @@ public class CaseController {
 				}
 			});
 		}
+	}
+
+	private void setupRelatedEntitiesLayout() {
+		if (organizationsScrollPane == null || organizationsFlow == null) {
+			return;
+		}
+
+		Runnable refreshWrapLength = () -> {
+			double viewportWidth = organizationsScrollPane.getViewportBounds().getWidth();
+			double contentWidth = viewportWidth > 0 ? viewportWidth : organizationsScrollPane.getWidth();
+			double wrapWidth = Math.max(0, contentWidth - 2);
+			organizationsFlow.setPrefWrapLength(wrapWidth);
+			organizationsFlow.setPrefWidth(wrapWidth);
+		};
+
+		organizationsScrollPane.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> refreshWrapLength.run());
+		organizationsScrollPane.widthProperty().addListener((obs, oldWidth, newWidth) -> refreshWrapLength.run());
+		runOnFx(refreshWrapLength);
 	}
 
 	private void wireEditButtons() {
@@ -704,6 +725,7 @@ public class CaseController {
 
 		setVisibleManaged(placeholderTextArea, true);
 		setVisibleManaged(addOrganizationButton, false);
+		setVisibleManaged(organizationsScrollPane, false);
 		setVisibleManaged(organizationsFlow, false);
 		setVisibleManaged(organizationsEmptyLabel, false);
 
@@ -732,11 +754,12 @@ public class CaseController {
 	}
 
 	private void renderContactsSection() {
-		if (organizationsFlow == null || organizationsEmptyLabel == null)
+		if (organizationsScrollPane == null || organizationsFlow == null || organizationsEmptyLabel == null)
 			return;
 
 		organizationsFlow.getChildren().clear();
 		if (relatedContacts == null || relatedContacts.isEmpty()) {
+			setVisibleManaged(organizationsScrollPane, false);
 			setVisibleManaged(organizationsFlow, false);
 			setVisibleManaged(organizationsEmptyLabel, true);
 			organizationsEmptyLabel.setText("No contacts");
@@ -751,6 +774,7 @@ public class CaseController {
 			organizationsFlow.getChildren().add(createRelatedContactCard(factory, contact));
 		}
 
+		setVisibleManaged(organizationsScrollPane, true);
 		setVisibleManaged(organizationsFlow, true);
 		setVisibleManaged(organizationsEmptyLabel, false);
 	}
@@ -815,11 +839,12 @@ public class CaseController {
 	}
 
 	private void renderOrganizationsSection() {
-		if (organizationsFlow == null || organizationsEmptyLabel == null)
+		if (organizationsScrollPane == null || organizationsFlow == null || organizationsEmptyLabel == null)
 			return;
 
 		organizationsFlow.getChildren().clear();
 		if (relatedOrganizations == null || relatedOrganizations.isEmpty()) {
+			setVisibleManaged(organizationsScrollPane, false);
 			setVisibleManaged(organizationsFlow, false);
 			setVisibleManaged(organizationsEmptyLabel, true);
 			organizationsEmptyLabel.setText("No organizations");
@@ -833,6 +858,7 @@ public class CaseController {
 			organizationsFlow.getChildren().add(createRelatedOrganizationCardContainer(factory, org));
 		}
 
+		setVisibleManaged(organizationsScrollPane, true);
 		setVisibleManaged(organizationsFlow, true);
 		setVisibleManaged(organizationsEmptyLabel, false);
 	}
