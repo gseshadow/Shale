@@ -250,7 +250,7 @@ public final class MainController {
 		sectionTitleLabel.setText("Contact");
 		sectionSubtitleLabel.setText("Contact #" + contactId);
 
-		Node contactRoot = sceneManager.createContactView(contactId);
+		Node contactRoot = sceneManager.createContactView(contactId, this::openCase);
 		sectionContent.getChildren().setAll(contactRoot);
 	}
 
