@@ -22,6 +22,11 @@ public final class InstallService {
 		copyDirectoryExcludingUpdater(stagingDir, installDir);
 	}
 
+	public void replaceInstallDir(Path sourceDir, Path installDir) throws IOException {
+		deleteRecursively(installDir);
+		copyDirectory(sourceDir, installDir);
+	}
+
 	private void copyDirectoryExcludingUpdater(Path source, Path target) throws IOException {
 		Files.createDirectories(target);
 
@@ -35,6 +40,32 @@ public final class InstallService {
 						return;
 					}
 
+					Path dest = target.resolve(relative);
+
+					if (Files.isDirectory(src)) {
+						Files.createDirectories(dest);
+					} else {
+						Path parent = dest.getParent();
+						if (parent != null) {
+							Files.createDirectories(parent);
+						}
+						Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
+					}
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			});
+		}
+	}
+
+	private void copyDirectory(Path source, Path target) throws IOException {
+		Files.createDirectories(target);
+
+		try (var stream = Files.walk(source)) {
+			stream.forEach(src ->
+			{
+				try {
+					Path relative = source.relativize(src);
 					Path dest = target.resolve(relative);
 
 					if (Files.isDirectory(src)) {

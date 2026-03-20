@@ -10,7 +10,7 @@ public final class UnsupportedPlatformSupport implements PlatformSupport {
 	}
 
 	@Override
-	public void stopRunningApp() {
+	public void stopRunningApp(Path installDir) {
 		throw new UnsupportedOperationException("Unsupported platform: " + System.getProperty("os.name"));
 	}
 

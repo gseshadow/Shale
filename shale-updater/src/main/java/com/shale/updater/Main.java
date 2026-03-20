@@ -34,6 +34,9 @@ public class Main {
 
 			UpdateService service = new UpdateService();
 			UpdateManifest manifest = service.fetchManifest(manifestUrl);
+			String zipUrl = manifest.getZipUrl(platformSupport.platform());
+			String installerUrl = manifest.getInstallerUrl(platformSupport.platform());
+			String sha256 = manifest.getSha256(platformSupport.platform());
 
 			System.out.println("Current version: " + currentVersion);
 			System.out.println("Latest version:  " + manifest.getVersion());
@@ -41,25 +44,22 @@ public class Main {
 			if (service.isUpdateAvailable(currentVersion, manifest)) {
 
 				System.out.println("Update available.");
-				System.out.println("Zip URL: " + manifest.getZipUrl());
-				System.out.println("Installer URL: " + manifest.getInstallerUrl());
-				System.out.println("Sha256: " + manifest.getSha256());
+				System.out.println("Zip URL: " + zipUrl);
+				System.out.println("Installer URL: " + installerUrl);
+				System.out.println("Sha256: " + sha256);
 				System.out.println("Published At: " + manifest.getPublishedAt());
 
 				Path stagingDir = null;
 
-				if (manifest.getZipUrl() != null && !manifest.getZipUrl().isBlank()) {
+				if (zipUrl != null && !zipUrl.isBlank()) {
 					System.out.println("Downloading update zip...");
 
 					DownloadService downloader = new DownloadService();
 					Path downloaded = downloader.downloadToTemp(
-							manifest.getZipUrl(),
-							"ShaleUpdate.zip",
-							manifest.getSha256()
+							zipUrl,
+							platformSupport.updateArchiveFileName(manifest.getVersion()),
+							sha256
 					);
-//					Path downloaded = downloader.downloadToTemp(
-//							manifest.getZipUrl(),
-//							"ShaleApp-" + manifest.getVersion() + ".zip");
 
 					System.out.println("Downloaded to: " + downloaded);
 
@@ -75,15 +75,22 @@ public class Main {
 				}
 
 				Path installDir = Path.of(installDirArg);
+				Path stagedInstallDir = platformSupport.resolveStagedInstallDir(stagingDir);
+				System.out.println("Resolved staged install dir: " + stagedInstallDir);
 
-				platformSupport.stopRunningApp();
+				platformSupport.stopRunningApp(installDir);
 
 				InstallService installService = new InstallService();
 				Path backupDir = installService.backupInstallDir(installDir);
 				System.out.println("Backup created at: " + backupDir);
 
-				installService.applyStagedUpdate(stagingDir, installDir);
-				System.out.println("Update copied into install dir.");
+				if (platformSupport.replacesInstallDir()) {
+					installService.replaceInstallDir(stagedInstallDir, installDir);
+					System.out.println("Install dir replaced from staged update.");
+				} else {
+					installService.applyStagedUpdate(stagedInstallDir, installDir);
+					System.out.println("Update copied into install dir.");
+				}
 
 				platformSupport.restartApp(installDir);
 

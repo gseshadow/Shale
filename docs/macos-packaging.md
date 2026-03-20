@@ -52,4 +52,6 @@ dist-macos/Shale.app/Contents/MacOS/Shale
 
 - Shale uses `~/Library/Application Support/Shale` for writable startup and updater logs.
 - Login and normal app startup do **not** require updater support on macOS.
-- In-app updater launch remains Windows-only for now, so macOS update prompts are bypassed until macOS updater/install replacement work is added.
+- In-app updater launch remains temporarily bypassed on macOS while the desktop launcher stays Windows-only.
+- The updater plumbing now expects a macOS **ZIP** payload that contains `Shale.app`, stages that bundle, replaces the installed app bundle, and relaunches it with `open` once the macOS launcher path is enabled.
+- DMG is still for manual install/distribution only; it is not used as the updater payload.
