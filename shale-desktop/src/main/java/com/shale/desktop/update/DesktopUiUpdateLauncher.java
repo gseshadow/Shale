@@ -17,7 +17,7 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 	@Override
 	public UiUpdateLauncher.UpdateCheckResult checkForUpdate() {
 		if (!AppPaths.isWindows()) {
-			// Keep macOS launchable until the updater/install replacement flow exists there.
+			// Keep macOS launchable until the ZIP-based updater launcher path is wired end-to-end there.
 			return new UiUpdateLauncher.UpdateCheckResult(false, false);
 		}
 
