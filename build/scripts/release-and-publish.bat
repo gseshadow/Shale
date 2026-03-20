@@ -13,6 +13,8 @@ if "%~1"=="" (
 
 set VERSION=%~1
 set BASE_URL=https://shalestorage.z13.web.core.windows.net
+set DIST=%ROOT%\dist
+set MAC_ZIP=%DIST%\ShaleApp-%VERSION%-mac.zip
 
 echo ====================================
 echo Starting Shale Release and Publish %VERSION%
@@ -35,12 +37,15 @@ echo.
 echo Published URLs:
 echo %BASE_URL%/Shale-%VERSION%.exe
 echo %BASE_URL%/ShaleApp-%VERSION%.zip
+if exist "%MAC_ZIP%" echo %BASE_URL%/ShaleApp-%VERSION%-mac.zip
 echo %BASE_URL%/shale-stable.json
 echo.
 echo Local dist files:
-echo %ROOT%\dist\Shale-%VERSION%.exe
-echo %ROOT%\dist\ShaleApp-%VERSION%.zip
-echo %ROOT%\dist\shale-stable.json
+echo %DIST%\Shale-%VERSION%.exe
+echo %DIST%\ShaleApp-%VERSION%.zip
+if exist "%MAC_ZIP%" echo %DIST%\ShaleApp-%VERSION%-mac.zip
+echo %DIST%\shale-stable.json
+echo.
 
 exit /b 0
 

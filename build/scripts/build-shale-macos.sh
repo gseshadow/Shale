@@ -26,7 +26,7 @@ print(match.group(1))
 PY
 )
 
-JAVAFX_JMODS_DIR=${JAVAFX_JMODS_DIR:-$ROOT/build/assets/javafx-jmods-macos}
+JAVAFX_JMODS_DIR=${JAVAFX_JMODS_DIR:-$ROOT/build/assets/javafx-jmods-21.0.10}
 if [[ ! -d "$JAVAFX_JMODS_DIR" ]]; then
   echo "Missing JavaFX jmods directory: $JAVAFX_JMODS_DIR" >&2
   echo "Set JAVAFX_JMODS_DIR to a macOS JavaFX jmods folder before running this script." >&2
