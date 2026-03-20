@@ -11,7 +11,7 @@ public final class WindowsPlatformSupport implements PlatformSupport {
 	}
 
 	@Override
-	public void stopRunningApp() throws Exception {
+	public void stopRunningApp(Path installDir) throws Exception {
 		Process process = new ProcessBuilder(
 				"taskkill", "/IM", "Shale.exe", "/F")
 				.inheritIO()

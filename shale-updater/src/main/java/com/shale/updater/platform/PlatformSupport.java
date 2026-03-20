@@ -6,11 +6,23 @@ public interface PlatformSupport {
 
 	Platform platform();
 
-	void stopRunningApp() throws Exception;
+	void stopRunningApp(Path installDir) throws Exception;
 
 	void restartApp(Path installDir) throws Exception;
 
 	String appExecutableName();
+
+	default Path resolveStagedInstallDir(Path stagingDir) throws Exception {
+		return stagingDir;
+	}
+
+	default String updateArchiveFileName(String version) {
+		return "ShaleUpdate-" + platform().name().toLowerCase() + "-" + version + ".zip";
+	}
+
+	default boolean replacesInstallDir() {
+		return false;
+	}
 
 	default Path appExecutablePath(Path installDir) {
 		return installDir.resolve(appExecutableName());
