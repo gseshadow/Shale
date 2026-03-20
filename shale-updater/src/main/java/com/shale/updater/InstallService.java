@@ -3,7 +3,10 @@ package com.shale.updater;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.StandardCopyOption;
+import java.util.EnumSet;
+import java.util.Set;
 
 public final class InstallService {
 
@@ -24,6 +27,11 @@ public final class InstallService {
 
 	public void replaceInstallDir(Path sourceDir, Path installDir) throws IOException {
 		deleteRecursively(installDir);
+		if (isMacAppBundle(sourceDir, installDir)) {
+			copyMacAppBundle(sourceDir, installDir);
+			ensureMacLauncherExecutable(installDir);
+			return;
+		}
 		copyDirectory(sourceDir, installDir);
 	}
 
@@ -84,6 +92,67 @@ public final class InstallService {
 		}
 	}
 
+	private void copyMacAppBundle(Path source, Path target) throws IOException {
+		Process process;
+		try {
+			process = new ProcessBuilder("/usr/bin/ditto", source.toString(), target.toString())
+					.inheritIO()
+					.start();
+		} catch (IOException ex) {
+			throw new IOException("Failed to launch ditto for macOS app bundle copy", ex);
+		}
+
+		try {
+			int exit = process.waitFor();
+			if (exit != 0) {
+				throw new IOException("ditto failed with exit code " + exit);
+			}
+		} catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+			throw new IOException("Interrupted while copying macOS app bundle", ex);
+		}
+	}
+
+	private void ensureMacLauncherExecutable(Path installDir) throws IOException {
+		Path macOsDir = installDir.resolve("Contents").resolve("MacOS");
+		if (!Files.isDirectory(macOsDir)) {
+			return;
+		}
+
+		try (var stream = Files.list(macOsDir)) {
+			stream.filter(Files::isRegularFile)
+					.forEach(path -> {
+						try {
+							setExecutable(path);
+						} catch (IOException ex) {
+							throw new RuntimeException(ex);
+						}
+					});
+		} catch (RuntimeException ex) {
+			if (ex.getCause() instanceof IOException io) {
+				throw io;
+			}
+			throw ex;
+		}
+	}
+
+	private void setExecutable(Path path) throws IOException {
+		try {
+			Set<PosixFilePermission> permissions = Files.exists(path)
+					? Files.getPosixFilePermissions(path)
+					: EnumSet.noneOf(PosixFilePermission.class);
+			permissions = EnumSet.copyOf(permissions);
+			permissions.add(PosixFilePermission.OWNER_EXECUTE);
+			permissions.add(PosixFilePermission.GROUP_EXECUTE);
+			permissions.add(PosixFilePermission.OTHERS_EXECUTE);
+			Files.setPosixFilePermissions(path, permissions);
+		} catch (UnsupportedOperationException ex) {
+			if (!path.toFile().setExecutable(true, false)) {
+				throw new IOException("Failed to set executable bit on " + path);
+			}
+		}
+	}
+
 	private void deleteRecursively(Path path) throws IOException {
 		if (!Files.exists(path)) {
 			return;
@@ -113,5 +182,14 @@ public final class InstallService {
 				|| normalized.startsWith("app/updater/")
 				|| normalized.equals("updater")
 				|| normalized.startsWith("updater/");
+	}
+
+	private boolean isMacAppBundle(Path sourceDir, Path installDir) {
+		return sourceDir != null
+				&& installDir != null
+				&& sourceDir.getFileName() != null
+				&& installDir.getFileName() != null
+				&& sourceDir.getFileName().toString().endsWith(".app")
+				&& installDir.getFileName().toString().endsWith(".app");
 	}
 }
