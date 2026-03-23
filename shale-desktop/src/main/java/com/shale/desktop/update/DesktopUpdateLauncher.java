@@ -92,7 +92,7 @@ public final class DesktopUpdateLauncher {
 		return pb;
 	}
 
-	private static ProcessBuilder buildMacLaunchCommand(Path installDir, String currentVersion, Path updaterLog) throws IOException {
+	static ProcessBuilder buildMacLaunchCommand(Path installDir, String currentVersion, Path updaterLog) throws IOException {
 		Path javaBinary = resolveMacJavaBinary(installDir);
 		Path updaterJar = resolveMacUpdaterJar(installDir);
 
