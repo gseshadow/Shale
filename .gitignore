@@ -47,3 +47,7 @@ dist-updater/
 
 build/assets/javafx-jmods*/
 build/assets/javafx-jmods-21.0.10/
+
+target-backup/
+build/mac-handoff/
+*.propertiesbuild/mac-handoff/
