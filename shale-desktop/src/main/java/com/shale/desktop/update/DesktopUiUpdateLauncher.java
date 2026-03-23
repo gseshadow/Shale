@@ -34,14 +34,9 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 		// Platform-specific restrictions belong in launchUpdater()/installer execution, not detection.
 		Platform platform = Platform.detect();
 		String currentVersion = AppVersionProvider.currentVersion();
-		log("Current installed version: " + currentVersion);
+		log("Detection entry: platform=" + platform);
+		log("Current version: " + currentVersion);
 		log("Manifest URL: " + manifestUrl);
-		log("Detected platform: " + platform);
-
-		if (platform == Platform.UNSUPPORTED) {
-			log("Final updateAvailable=false (unsupported platform)");
-			return new UiUpdateLauncher.UpdateCheckResult(false, false);
-		}
 
 		try {
 			UpdateManifest manifest = updateService.fetchManifest(manifestUrl);
@@ -50,20 +45,21 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 			String installerUrl = manifest == null ? null : manifest.getInstallerUrl(platform);
 			String sha256 = manifest == null ? null : manifest.getSha256(platform);
 			int comparison = updateService.compareVersions(currentVersion, manifest);
-			boolean versionUpdateAvailable = updateService.isUpdateAvailable(currentVersion, manifest);
+			boolean versionUpdateAvailable = comparison > 0;
 			boolean macAssetAvailable = platform != Platform.MAC || !isBlank(zipUrl);
 			boolean updateAvailable = versionUpdateAvailable && macAssetAvailable;
 			boolean mandatory = updateAvailable && manifest != null && manifest.isMandatory();
 
-			log("Parsed remote version: " + remoteVersion);
+			log("Manifest fetch result: " + (manifest == null ? "manifest=<null>" : "manifest=ok"));
+			log("Parsed remote version: " + printable(remoteVersion));
+			log("Comparison result: remoteIsNewer=" + versionUpdateAvailable + " (compare=" + comparison + ")");
 			log("Parsed " + platform + " asset: zipUrl=" + printable(zipUrl)
 					+ ", installerUrl=" + printable(installerUrl)
 					+ ", sha256=" + printable(sha256));
-			if (platform == Platform.MAC && !macAssetAvailable) {
-				log("macOS asset selection failure: no ZIP update asset was found in the manifest");
+			if (platform == Platform.MAC) {
+				log("macOS asset selection result: macZipUrl=" + printable(zipUrl) + ", available=" + macAssetAvailable);
 			}
-			log("Comparison result (remote vs current): " + comparison);
-			log("Final updateAvailable=" + updateAvailable + ", mandatory=" + mandatory);
+			log("Final updateAvailable decision: updateAvailable=" + updateAvailable + ", mandatory=" + mandatory);
 
 			return new UiUpdateLauncher.UpdateCheckResult(updateAvailable, mandatory);
 		} catch (IOException | InterruptedException | RuntimeException ex) {
