@@ -47,11 +47,10 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 echo
-echo "Step 1: Force sync repo to origin/$BRANCH"
+echo "Step 1: Git fetch / checkout / pull"
 git fetch origin
 git checkout "$BRANCH"
-git reset --hard "origin/$BRANCH"
-git clean -fd
+git pull --ff-only origin "$BRANCH"
 
 echo
 echo "Step 2: Update root pom version"
