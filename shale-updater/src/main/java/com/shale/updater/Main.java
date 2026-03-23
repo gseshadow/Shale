@@ -105,14 +105,16 @@ public class Main {
 	}
 
 	static boolean restartOrLogManualReopen(PlatformSupport platformSupport, Path installDir) {
+		String displayInstallDir = installDir.toString().replace('\\', '/');
+
 		try {
 			platformSupport.restartApp(installDir);
-			System.out.println("Relaunch succeeded for: " + installDir);
+			System.out.println("Relaunch succeeded for: " + displayInstallDir);
 			return true;
 		} catch (Exception ex) {
 			System.out.println("Install succeeded, but relaunch failed: " + ex.getMessage());
 			ex.printStackTrace(System.out);
-			System.out.println("Shale was updated successfully. Please reopen the app manually from: " + installDir);
+			System.out.println("Shale was updated successfully. Please reopen the app manually from: " + displayInstallDir);
 			return true;
 		}
 	}
