@@ -1,12 +1,13 @@
 package com.shale.updater.platform;
 
+import java.awt.Desktop;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
-public final class MacPlatformSupport implements PlatformSupport {
+public class MacPlatformSupport implements PlatformSupport {
 
 	@Override
 	public Platform platform() {
@@ -23,11 +24,21 @@ public final class MacPlatformSupport implements PlatformSupport {
 
 	@Override
 	public void restartApp(Path installDir) throws Exception {
-		new ProcessBuilder("open", installDir.toString())
-				.inheritIO()
-				.start();
+		log("Attempting macOS relaunch strategy: Desktop.open(" + installDir + ")");
 
-		System.out.println("Relaunched Shale from: " + installDir);
+		if (!isDesktopOpenSupported()) {
+			IOException error = new IOException("Desktop OPEN action is not supported for macOS relaunch");
+			log("macOS relaunch failed: " + error.getMessage());
+			throw error;
+		}
+
+		try {
+			openAppBundle(installDir);
+			log("macOS relaunch request submitted for: " + installDir);
+		} catch (Exception ex) {
+			log("macOS relaunch failed: " + ex.getMessage());
+			throw ex;
+		}
 	}
 
 	@Override
@@ -57,6 +68,14 @@ public final class MacPlatformSupport implements PlatformSupport {
 		return true;
 	}
 
+	boolean isDesktopOpenSupported() {
+		return Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN);
+	}
+
+	void openAppBundle(Path installDir) throws IOException {
+		Desktop.getDesktop().open(installDir.toFile());
+	}
+
 	private void runBestEffort(List<String> command) {
 		try {
 			Process process = new ProcessBuilder(command)
@@ -67,5 +86,9 @@ public final class MacPlatformSupport implements PlatformSupport {
 		} catch (Exception ex) {
 			System.out.println("Ignoring macOS stop command failure for " + command + ": " + ex.getMessage());
 		}
+	}
+
+	private void log(String message) {
+		System.out.println(message);
 	}
 }
