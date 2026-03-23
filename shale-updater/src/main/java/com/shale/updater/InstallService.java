@@ -93,22 +93,28 @@ public final class InstallService {
 	}
 
 	private void copyMacAppBundle(Path source, Path target) throws IOException {
+		ProcessBuilder processBuilder = new ProcessBuilder("/usr/bin/ditto", source.toString(), target.toString());
+		System.out.println("Running macOS app bundle copy command: " + processBuilder.command());
+		System.out.println("ditto source: " + source);
+		System.out.println("ditto destination: " + target);
+
 		Process process;
 		try {
-			process = new ProcessBuilder("/usr/bin/ditto", source.toString(), target.toString())
-					.inheritIO()
-					.start();
+			process = processBuilder.inheritIO().start();
 		} catch (IOException ex) {
+			System.out.println("ditto launch failed: " + ex.getMessage());
 			throw new IOException("Failed to launch ditto for macOS app bundle copy", ex);
 		}
 
 		try {
 			int exit = process.waitFor();
+			System.out.println("ditto exit code: " + exit);
 			if (exit != 0) {
 				throw new IOException("ditto failed with exit code " + exit);
 			}
 		} catch (InterruptedException ex) {
 			Thread.currentThread().interrupt();
+			System.out.println("ditto interrupted: " + ex.getMessage());
 			throw new IOException("Interrupted while copying macOS app bundle", ex);
 		}
 	}

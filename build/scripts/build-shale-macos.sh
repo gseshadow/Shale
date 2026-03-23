@@ -45,7 +45,8 @@ rm -rf "$DIST_DIR/Shale" "$DIST_DIR/Shale.app"
 rm -f "$DIST_DIR"/Shale*.dmg
 
 # Keep the Java launcher in the bundled runtime so the mac updater can run
-# `java -jar updater.jar` from inside the packaged app.
+# the self-contained shaded updater jar via
+# `java -jar shale-updater-<version>.jar` from inside the packaged app.
 JLINK_OPTIONS=(
   --strip-debug
   --no-man-pages
