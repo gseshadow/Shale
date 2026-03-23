@@ -39,18 +39,11 @@ echo "Root:    $ROOT"
 echo "===================================="
 echo
 
-echo "Step 0: Verify working tree is clean"
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Working tree is dirty. Commit, stash, or reset before release." >&2
-  git status --short
-  exit 1
-fi
-
-echo
-echo "Step 1: Git fetch / checkout / pull"
+echo "Step 0: Force sync repo to origin/$BRANCH"
 git fetch origin
 git checkout "$BRANCH"
-git pull --ff-only origin "$BRANCH"
+git reset --hard "origin/$BRANCH"
+git clean -fd
 
 echo
 echo "Step 2: Update root pom version"
