@@ -41,7 +41,8 @@ DESKTOP_TARGET="$ROOT/shale-desktop/target"
 DIST_DIR="$ROOT/dist-macos"
 mkdir -p "$DIST_DIR"
 
-rm -rf "$DIST_DIR/Shale" "$DIST_DIR/Shale.app" "$DIST_DIR/Shale.dmg"
+rm -rf "$DIST_DIR/Shale" "$DIST_DIR/Shale.app"
+rm -f "$DIST_DIR"/Shale*.dmg
 
 build_package() {
   local package_type=$1
