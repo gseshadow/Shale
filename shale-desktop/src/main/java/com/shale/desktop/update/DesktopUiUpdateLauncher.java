@@ -3,6 +3,7 @@ package com.shale.desktop.update;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.Objects;
 
 import com.shale.core.platform.AppPaths;
 import com.shale.updater.UpdateManifest;
@@ -15,14 +16,26 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 
 	private static final String MANIFEST_URL = "https://shalestorage.z13.web.core.windows.net/shale-stable.json";
 
-	private final UpdateService updateService = new UpdateService();
+	private final UpdateService updateService;
+	private final String manifestUrl;
+
+	public DesktopUiUpdateLauncher() {
+		this(new UpdateService(), MANIFEST_URL);
+	}
+
+	DesktopUiUpdateLauncher(UpdateService updateService, String manifestUrl) {
+		this.updateService = Objects.requireNonNull(updateService);
+		this.manifestUrl = Objects.requireNonNull(manifestUrl);
+	}
 
 	@Override
 	public UiUpdateLauncher.UpdateCheckResult checkForUpdate() {
+		// Detection must stay cross-platform: macOS should still fetch/parse/compare here.
+		// Platform-specific restrictions belong in launchUpdater()/installer execution, not detection.
 		Platform platform = Platform.detect();
 		String currentVersion = AppVersionProvider.currentVersion();
 		log("Current installed version: " + currentVersion);
-		log("Manifest URL: " + MANIFEST_URL);
+		log("Manifest URL: " + manifestUrl);
 		log("Detected platform: " + platform);
 
 		if (platform == Platform.UNSUPPORTED) {
@@ -31,7 +44,7 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 		}
 
 		try {
-			UpdateManifest manifest = updateService.fetchManifest(MANIFEST_URL);
+			UpdateManifest manifest = updateService.fetchManifest(manifestUrl);
 			String remoteVersion = manifest == null ? null : manifest.getVersion();
 			String zipUrl = manifest == null ? null : manifest.getZipUrl(platform);
 			String installerUrl = manifest == null ? null : manifest.getInstallerUrl(platform);
@@ -61,6 +74,7 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 
 	@Override
 	public void launchUpdater() {
+		// Execution/install remains platform-specific even though detection above is shared.
 		if (!AppPaths.isWindows()) {
 			throw new RuntimeException("In-app updates are not available on macOS yet. Continue using the installed app normally.");
 		}
