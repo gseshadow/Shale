@@ -3,11 +3,15 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)
-TYPE=${1:-app-image}
+TYPE=${1:-both}
 
-if [[ "$TYPE" != "app-image" && "$TYPE" != "dmg" ]]; then
-  echo "Usage: $0 [app-image|dmg]" >&2
+usage() {
+  echo "Usage: $0 [app-image|dmg|both]" >&2
   exit 1
+}
+
+if [[ "$TYPE" != "app-image" && "$TYPE" != "dmg" && "$TYPE" != "both" ]]; then
+  usage
 fi
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -37,22 +41,36 @@ DESKTOP_TARGET="$ROOT/shale-desktop/target"
 DIST_DIR="$ROOT/dist-macos"
 mkdir -p "$DIST_DIR"
 
-rm -rf "$DIST_DIR/Shale" "$DIST_DIR/Shale.dmg"
+rm -rf "$DIST_DIR/Shale" "$DIST_DIR/Shale.app" "$DIST_DIR/Shale.dmg"
+
+build_package() {
+  local package_type=$1
+
+  jpackage \
+    --type "$package_type" \
+    --name Shale \
+    --input "$DESKTOP_TARGET" \
+    --dest "$DIST_DIR" \
+    --icon "$ROOT/build/assets/Shale.icns" \
+    --main-jar "shale-desktop-$VERSION.jar" \
+    --main-class com.shale.desktop.MainApp \
+    --module-path "$JAVAFX_JMODS_DIR" \
+    --add-modules javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec \
+    --app-version "$VERSION" \
+    --vendor "Get Downing" \
+    --description "Shale Desktop"
+}
 
 mvn -f "$ROOT/pom.xml" -pl shale-desktop -am clean package
 
-jpackage \
-  --type "$TYPE" \
-  --name Shale \
-  --input "$DESKTOP_TARGET" \
-  --dest "$DIST_DIR" \
-  --icon "$ROOT/build/assets/Shale.icns" \
-  --main-jar "shale-desktop-$VERSION.jar" \
-  --main-class com.shale.desktop.MainApp \
-  --module-path "$JAVAFX_JMODS_DIR" \
-  --add-modules javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec \
-  --app-version "$VERSION" \
-  --vendor "Get Downing" \
-  --description "Shale Desktop"
+case "$TYPE" in
+  app-image|dmg)
+    build_package "$TYPE"
+    ;;
+  both)
+    build_package app-image
+    build_package dmg
+    ;;
+esac
 
-echo "macOS package created in $DIST_DIR"
+echo "macOS package output created in $DIST_DIR"
