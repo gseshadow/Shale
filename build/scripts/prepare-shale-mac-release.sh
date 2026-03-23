@@ -111,11 +111,11 @@ rm -rf "$ROOT/dist-macos"
 mkdir -p "$ROOT/dist-macos"
 
 echo
-echo "Step 6: Build macOS app image"
+echo "Step 6: Build macOS app image and DMG"
 
 export JAVAFX_JMODS_DIR="$ROOT/build/assets/javafx-jmods-21.0.10"
 
-"$ROOT/build/scripts/build-shale-macos.sh" app-image
+"$ROOT/build/scripts/build-shale-macos.sh" both
 
 DIST_MAC="$ROOT/dist-macos"
 MAC_ZIP_NAME="ShaleApp-$VERSION-mac.zip"
