@@ -18,7 +18,6 @@ import com.shale.core.platform.AppPlatform;
 public final class DesktopUpdateLauncher {
 
 	private static final String APP_NAME = "Shale";
-	private static final String MAC_PROCESS_LAUNCH_MECHANISM_ARG = "-Djdk.lang.Process.launchMechanism=VFORK";
 
 	private DesktopUpdateLauncher() {
 	}
@@ -106,7 +105,6 @@ public final class DesktopUpdateLauncher {
 
 		ProcessBuilder pb = new ProcessBuilder(
 				javaBinary.toString(),
-				MAC_PROCESS_LAUNCH_MECHANISM_ARG,
 				"-jar",
 				updaterJar.toString(),
 				"--currentVersion", currentVersion,

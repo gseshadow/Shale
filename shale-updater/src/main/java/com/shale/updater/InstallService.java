@@ -1,10 +1,17 @@
 package com.shale.updater;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -93,29 +100,74 @@ public final class InstallService {
 	}
 
 	private void copyMacAppBundle(Path source, Path target) throws IOException {
-		ProcessBuilder processBuilder = new ProcessBuilder("/usr/bin/ditto", source.toString(), target.toString());
-		System.out.println("Running macOS app bundle copy command: " + processBuilder.command());
-		System.out.println("ditto source: " + source);
-		System.out.println("ditto destination: " + target);
+		log("Starting macOS app bundle copy");
+		log("macOS app bundle source: " + source);
+		log("macOS app bundle destination: " + target);
 
-		Process process;
 		try {
-			process = processBuilder.inheritIO().start();
+			copyRecursively(source, target);
+			log("macOS app bundle copy succeeded");
 		} catch (IOException ex) {
-			System.out.println("ditto launch failed: " + ex.getMessage());
-			throw new IOException("Failed to launch ditto for macOS app bundle copy", ex);
+			log("macOS app bundle copy failed: " + stackTrace(ex));
+			throw ex;
 		}
+	}
 
-		try {
-			int exit = process.waitFor();
-			System.out.println("ditto exit code: " + exit);
-			if (exit != 0) {
-				throw new IOException("ditto failed with exit code " + exit);
+	private void copyRecursively(Path source, Path target) throws IOException {
+		FileVisitor<Path> visitor = new SimpleFileVisitor<>() {
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				Path destinationDir = resolveDestination(source, target, dir);
+				Files.createDirectories(destinationDir);
+				copyPosixPermissions(dir, destinationDir);
+				return FileVisitResult.CONTINUE;
 			}
-		} catch (InterruptedException ex) {
-			Thread.currentThread().interrupt();
-			System.out.println("ditto interrupted: " + ex.getMessage());
-			throw new IOException("Interrupted while copying macOS app bundle", ex);
+
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				Path destinationFile = resolveDestination(source, target, file);
+				Path parent = destinationFile.getParent();
+				if (parent != null) {
+					Files.createDirectories(parent);
+				}
+				Files.copy(
+						file,
+						destinationFile,
+						LinkOption.NOFOLLOW_LINKS,
+						StandardCopyOption.REPLACE_EXISTING,
+						StandardCopyOption.COPY_ATTRIBUTES);
+				copyPosixPermissions(file, destinationFile);
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+				if (exc != null) {
+					throw exc;
+				}
+				Path destinationDir = resolveDestination(source, target, dir);
+				Files.setLastModifiedTime(
+						destinationDir,
+						Files.getLastModifiedTime(dir, LinkOption.NOFOLLOW_LINKS));
+				copyPosixPermissions(dir, destinationDir);
+				return FileVisitResult.CONTINUE;
+			}
+		};
+
+		Files.walkFileTree(source, visitor);
+	}
+
+	private Path resolveDestination(Path sourceRoot, Path targetRoot, Path current) {
+		Path relative = sourceRoot.relativize(current);
+		return relative.getNameCount() == 0 ? targetRoot : targetRoot.resolve(relative);
+	}
+
+	private void copyPosixPermissions(Path source, Path target) throws IOException {
+		try {
+			Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(source, LinkOption.NOFOLLOW_LINKS);
+			Files.setPosixFilePermissions(target, permissions);
+		} catch (UnsupportedOperationException ignored) {
+			// Ignore when the filesystem does not expose POSIX permissions.
 		}
 	}
 
@@ -197,5 +249,15 @@ public final class InstallService {
 				&& installDir.getFileName() != null
 				&& sourceDir.getFileName().toString().endsWith(".app")
 				&& installDir.getFileName().toString().endsWith(".app");
+	}
+
+	private void log(String message) {
+		System.out.println(message);
+	}
+
+	private String stackTrace(Throwable error) {
+		StringWriter buffer = new StringWriter();
+		error.printStackTrace(new PrintWriter(buffer));
+		return buffer.toString();
 	}
 }

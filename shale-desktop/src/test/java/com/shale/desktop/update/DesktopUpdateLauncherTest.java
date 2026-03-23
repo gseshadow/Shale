@@ -52,7 +52,6 @@ final class DesktopUpdateLauncherTest {
 
 		assertEquals(List.of(
 				javaBinary.toString(),
-				"-Djdk.lang.Process.launchMechanism=VFORK",
 				"-jar",
 				updaterJar.toString(),
 				"--currentVersion", "1.0.13",
