@@ -46,6 +46,7 @@ jpackage \
   --name Shale \
   --input "$DESKTOP_TARGET" \
   --dest "$DIST_DIR" \
+  --icon "$ROOT/build/assets/Shale.icns" \
   --main-jar "shale-desktop-$VERSION.jar" \
   --main-class com.shale.desktop.MainApp \
   --module-path "$JAVAFX_JMODS_DIR" \
