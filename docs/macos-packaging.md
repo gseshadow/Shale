@@ -34,6 +34,16 @@ Artifacts are written to `dist-macos/`:
 - `dist-macos/Shale.app` when using `app-image`
 - `dist-macos/Shale.dmg` when using `dmg`
 
+## Runtime image details
+
+`jpackage` runs `jlink` automatically when `--runtime-image` is not supplied. Its default `jlink` options include `--strip-native-commands`, which removes `Contents/runtime/Contents/Home/bin/java` from the packaged app runtime.
+
+Shale now overrides the `jlink` options in `build/scripts/build-shale-macos.sh` so the runtime keeps native launchers while still stripping debug symbols, man pages, and header files. The build script also fails fast if the packaged app image is missing:
+
+```text
+Contents/runtime/Contents/Home/bin/java
+```
+
 ## Launch test on macOS
 
 After building an app image:
