@@ -104,14 +104,16 @@ public class Main {
 		}
 	}
 
-	static void restartOrLogManualReopen(PlatformSupport platformSupport, Path installDir) {
+	static boolean restartOrLogManualReopen(PlatformSupport platformSupport, Path installDir) {
 		try {
 			platformSupport.restartApp(installDir);
 			System.out.println("Relaunch succeeded for: " + installDir);
+			return true;
 		} catch (Exception ex) {
 			System.out.println("Install succeeded, but relaunch failed: " + ex.getMessage());
 			ex.printStackTrace(System.out);
 			System.out.println("Shale was updated successfully. Please reopen the app manually from: " + installDir);
+			return true;
 		}
 	}
 }
