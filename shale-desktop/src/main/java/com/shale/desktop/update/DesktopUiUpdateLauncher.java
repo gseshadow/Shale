@@ -19,24 +19,39 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 		void launch(String currentVersion);
 	}
 
+	@FunctionalInterface
+	interface AppShutdownHandler {
+		void shutdown();
+	}
+
 	private static final String MANIFEST_URL = "https://shalestorage.z13.web.core.windows.net/shale-stable.json";
 
 	private final UpdateService updateService;
 	private final String manifestUrl;
 	private final UpdaterLauncher updaterLauncher;
+	private final AppShutdownHandler appShutdownHandler;
 
 	public DesktopUiUpdateLauncher() {
-		this(new UpdateService(), MANIFEST_URL, DesktopUpdateLauncher::launchUpdater);
+		this(new UpdateService(), MANIFEST_URL, DesktopUpdateLauncher::launchUpdater, javafx.application.Platform::exit);
 	}
 
 	DesktopUiUpdateLauncher(UpdateService updateService, String manifestUrl) {
-		this(updateService, manifestUrl, DesktopUpdateLauncher::launchUpdater);
+		this(updateService, manifestUrl, DesktopUpdateLauncher::launchUpdater, javafx.application.Platform::exit);
 	}
 
 	DesktopUiUpdateLauncher(UpdateService updateService, String manifestUrl, UpdaterLauncher updaterLauncher) {
+		this(updateService, manifestUrl, updaterLauncher, javafx.application.Platform::exit);
+	}
+
+	DesktopUiUpdateLauncher(
+			UpdateService updateService,
+			String manifestUrl,
+			UpdaterLauncher updaterLauncher,
+			AppShutdownHandler appShutdownHandler) {
 		this.updateService = Objects.requireNonNull(updateService);
 		this.manifestUrl = Objects.requireNonNull(manifestUrl);
 		this.updaterLauncher = Objects.requireNonNull(updaterLauncher);
+		this.appShutdownHandler = Objects.requireNonNull(appShutdownHandler);
 	}
 
 	@Override
@@ -89,6 +104,10 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 		try {
 			updaterLauncher.launch(currentVersion);
 			log("Updater launch handoff reported success");
+			if (AppPaths.isMac()) {
+				log("macOS updater handoff succeeded; app self-shutdown initiated");
+				appShutdownHandler.shutdown();
+			}
 		} catch (RuntimeException ex) {
 			log("Updater launch failure: " + stackTrace(ex));
 			throw ex;

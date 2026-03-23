@@ -61,6 +61,7 @@ final class DesktopUiUpdateLauncherTest {
 		System.setProperty(APP_VERSION, "1.0.14");
 
 		AtomicInteger launchCalls = new AtomicInteger();
+		AtomicInteger shutdownCalls = new AtomicInteger();
 		AtomicReference<String> launchedVersion = new AtomicReference<>();
 		var launcher = new DesktopUiUpdateLauncher(
 				new com.shale.updater.UpdateService(),
@@ -68,12 +69,34 @@ final class DesktopUiUpdateLauncherTest {
 				currentVersion -> {
 					launchCalls.incrementAndGet();
 					launchedVersion.set(currentVersion);
-				});
+				},
+				shutdownCalls::incrementAndGet);
 
 		launcher.launchUpdater();
 
 		assertEquals(1, launchCalls.get(), "macOS launch should hand off into the updater execution flow");
 		assertEquals("1.0.14", launchedVersion.get(), "launcher should pass the current app version to the updater");
+		assertEquals(1, shutdownCalls.get(), "macOS launch should trigger app self-shutdown after updater handoff succeeds");
+	}
+
+	@Test
+	void launchUpdaterOnWindowsDoesNotTriggerAppShutdown() {
+		rememberOriginalProperties();
+		System.setProperty(OS_NAME, "Windows 11");
+		System.setProperty(APP_VERSION, "1.0.14");
+
+		AtomicInteger launchCalls = new AtomicInteger();
+		AtomicInteger shutdownCalls = new AtomicInteger();
+		var launcher = new DesktopUiUpdateLauncher(
+				new com.shale.updater.UpdateService(),
+				"https://example.test/manifest.json",
+				currentVersion -> launchCalls.incrementAndGet(),
+				shutdownCalls::incrementAndGet);
+
+		launcher.launchUpdater();
+
+		assertEquals(1, launchCalls.get(), "Windows launch should still hand off into the updater execution flow");
+		assertEquals(0, shutdownCalls.get(), "Windows launch should leave shutdown control to the updater");
 	}
 
 	private void rememberOriginalProperties() {

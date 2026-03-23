@@ -1,7 +1,8 @@
 package com.shale.updater.platform;
 
-import java.awt.Desktop;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -17,6 +18,7 @@ public class MacPlatformSupport implements PlatformSupport {
 	@Override
 	public void stopRunningApp(Path installDir) throws Exception {
 		Path appBinary = installDir.resolve("Contents").resolve("MacOS").resolve("Shale");
+		log("macOS fallback external stop attempted for: " + appBinary);
 		runBestEffort(List.of("pkill", "-f", appBinary.toString()));
 		runBestEffort(List.of("pkill", "-x", "Shale"));
 		Thread.sleep(1000L);
@@ -24,17 +26,18 @@ public class MacPlatformSupport implements PlatformSupport {
 
 	@Override
 	public void restartApp(Path installDir) throws Exception {
-		log("Attempting macOS relaunch strategy: Desktop.open(" + installDir + ")");
-
-		if (!isDesktopOpenSupported()) {
-			IOException error = new IOException("Desktop OPEN action is not supported for macOS relaunch");
-			log("macOS relaunch failed: " + error.getMessage());
-			throw error;
-		}
-
+		List<String> command = relaunchCommand(installDir);
+		log("Attempting macOS relaunch strategy: open-command");
+		log("macOS relaunch command: " + command);
 		try {
-			openAppBundle(installDir);
-			log("macOS relaunch request submitted for: " + installDir);
+			Process process = startRelaunchCommand(command);
+			String output = readProcessOutput(process.getInputStream());
+			int exit = process.waitFor();
+			if (exit != 0) {
+				throw new IOException("macOS relaunch command exited with code " + exit
+						+ (output.isBlank() ? "" : ": " + output));
+			}
+			log("macOS relaunch command succeeded for: " + installDir);
 		} catch (Exception ex) {
 			log("macOS relaunch failed: " + ex.getMessage());
 			throw ex;
@@ -68,12 +71,18 @@ public class MacPlatformSupport implements PlatformSupport {
 		return true;
 	}
 
-	boolean isDesktopOpenSupported() {
-		return Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN);
+	List<String> relaunchCommand(Path installDir) {
+		return List.of("/usr/bin/open", "-n", installDir.toString());
 	}
 
-	void openAppBundle(Path installDir) throws IOException {
-		Desktop.getDesktop().open(installDir.toFile());
+	Process startRelaunchCommand(List<String> command) throws IOException {
+		return new ProcessBuilder(command)
+				.redirectErrorStream(true)
+				.start();
+	}
+
+	String readProcessOutput(InputStream inputStream) throws IOException {
+		return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8).trim();
 	}
 
 	private void runBestEffort(List<String> command) {
