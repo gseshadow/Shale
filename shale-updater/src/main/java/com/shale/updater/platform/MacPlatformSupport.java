@@ -17,6 +17,7 @@ public class MacPlatformSupport implements PlatformSupport {
 	@Override
 	public void stopRunningApp(Path installDir) throws Exception {
 		Path appBinary = installDir.resolve("Contents").resolve("MacOS").resolve("Shale");
+		log("macOS fallback external stop attempted for: " + appBinary);
 		runBestEffort(List.of("pkill", "-f", appBinary.toString()));
 		runBestEffort(List.of("pkill", "-x", "Shale"));
 		Thread.sleep(1000L);
