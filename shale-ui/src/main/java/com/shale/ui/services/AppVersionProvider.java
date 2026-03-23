@@ -2,6 +2,8 @@ package com.shale.ui.services;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Properties;
 
 public final class AppVersionProvider {
@@ -35,9 +37,20 @@ public final class AppVersionProvider {
 					return resourceVersion.trim();
 				}
 			}
-		} catch (IOException ignored) {
+		} catch (IOException ex) {
+			log("Failed to read " + VERSION_RESOURCE + ": " + stackTrace(ex));
 		}
 
 		return DEFAULT_VERSION;
+	}
+
+	private static void log(String message) {
+		System.out.println("[Updater] " + message);
+	}
+
+	private static String stackTrace(Throwable error) {
+		StringWriter buffer = new StringWriter();
+		error.printStackTrace(new PrintWriter(buffer));
+		return buffer.toString();
 	}
 }
