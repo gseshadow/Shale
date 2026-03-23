@@ -8,6 +8,16 @@
 <BorderPane xmlns="http://javafx.com/javafx/21"
 	xmlns:fx="http://javafx.com/fxml/1"
 	fx:controller="com.shale.ui.controller.LoginController">
+	<bottom>
+		<HBox alignment="BOTTOM_LEFT">
+			<children>
+				<Label fx:id="versionLabel" styleClass="login-version-label" />
+			</children>
+			<padding>
+				<Insets top="0" right="16" bottom="12" left="16" />
+			</padding>
+		</HBox>
+	</bottom>
 	<center>
 		<VBox spacing="18" alignment="CENTER" maxWidth="360">
 			<children>

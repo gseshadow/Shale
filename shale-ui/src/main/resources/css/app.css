@@ -282,3 +282,8 @@
 .app-dialog-list .list-cell:filled:hover {
     -fx-background-color: rgba(17, 37, 66, 0.08);
 }
+
+.login-version-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: rgba(233, 241, 255, 0.58);
+}
