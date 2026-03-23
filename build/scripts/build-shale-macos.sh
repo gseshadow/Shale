@@ -44,6 +44,24 @@ mkdir -p "$DIST_DIR"
 rm -rf "$DIST_DIR/Shale" "$DIST_DIR/Shale.app"
 rm -f "$DIST_DIR"/Shale*.dmg
 
+# Keep the Java launcher in the bundled runtime so the mac updater can run
+# `java -jar updater.jar` from inside the packaged app.
+JLINK_OPTIONS=(
+  --strip-debug
+  --no-man-pages
+  --no-header-files
+)
+
+verify_runtime_image() {
+  local app_path=$1
+  local java_binary="$app_path/Contents/runtime/Contents/Home/bin/java"
+
+  if [[ ! -x "$java_binary" ]]; then
+    echo "Expected bundled Java launcher missing or not executable: $java_binary" >&2
+    exit 1
+  fi
+}
+
 build_package() {
   local package_type=$1
 
@@ -57,9 +75,14 @@ build_package() {
     --main-class com.shale.desktop.MainApp \
     --module-path "$JAVAFX_JMODS_DIR" \
     --add-modules javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec \
+    --jlink-options "${JLINK_OPTIONS[*]}" \
     --app-version "$VERSION" \
     --vendor "Get Downing" \
     --description "Shale Desktop"
+
+  if [[ "$package_type" == "app-image" ]]; then
+    verify_runtime_image "$DIST_DIR/Shale.app"
+  fi
 }
 
 mvn -f "$ROOT/pom.xml" -pl shale-desktop -am clean package
