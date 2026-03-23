@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import com.shale.core.platform.AppPaths;
 import com.shale.ui.navigation.SceneManager;
+import com.shale.ui.services.AppVersionProvider;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UiUpdateLauncher;
@@ -39,6 +40,8 @@ public final class LoginController {
 	private Label errorLabel;
 	@FXML
 	private ImageView logoImage;
+	@FXML
+	private Label versionLabel;
 
 	private SceneManager sceneManager;
 	private AppState appState;
@@ -80,6 +83,7 @@ public final class LoginController {
 		}
 
 		errorLabel.setText("");
+		versionLabel.setText("Version - " + AppVersionProvider.currentVersion());
 
 		signInButton.setDefaultButton(true);
 
