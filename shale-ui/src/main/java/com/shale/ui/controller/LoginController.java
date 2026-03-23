@@ -255,6 +255,7 @@ public final class LoginController {
 		progress.show();
 
 		try {
+			System.out.println("[Updater] User accepted update; launching updater.");
 			updateLauncher.launchUpdater();
 		} catch (RuntimeException ex) {
 			progress.close();

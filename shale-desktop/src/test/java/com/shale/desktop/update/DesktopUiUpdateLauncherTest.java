@@ -1,7 +1,6 @@
 package com.shale.desktop.update;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -9,6 +8,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -55,14 +55,25 @@ final class DesktopUiUpdateLauncherTest {
 	}
 
 	@Test
-	void launchUpdaterOnMacRemainsPlatformSpecific() {
+	void launchUpdaterOnMacDelegatesToUpdaterExecutionFlow() {
 		rememberOriginalProperties();
 		System.setProperty(OS_NAME, "Mac OS X");
+		System.setProperty(APP_VERSION, "1.0.14");
 
-		var launcher = new DesktopUiUpdateLauncher();
+		AtomicInteger launchCalls = new AtomicInteger();
+		AtomicReference<String> launchedVersion = new AtomicReference<>();
+		var launcher = new DesktopUiUpdateLauncher(
+				new com.shale.updater.UpdateService(),
+				"https://example.test/manifest.json",
+				currentVersion -> {
+					launchCalls.incrementAndGet();
+					launchedVersion.set(currentVersion);
+				});
 
-		RuntimeException error = assertThrows(RuntimeException.class, launcher::launchUpdater);
-		assertTrue(error.getMessage().contains("not available on macOS yet"));
+		launcher.launchUpdater();
+
+		assertEquals(1, launchCalls.get(), "macOS launch should hand off into the updater execution flow");
+		assertEquals("1.0.14", launchedVersion.get(), "launcher should pass the current app version to the updater");
 	}
 
 	private void rememberOriginalProperties() {

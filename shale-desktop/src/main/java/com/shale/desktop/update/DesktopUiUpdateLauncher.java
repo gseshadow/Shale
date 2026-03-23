@@ -14,18 +14,29 @@ import com.shale.ui.services.UiUpdateLauncher;
 
 public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 
+	@FunctionalInterface
+	interface UpdaterLauncher {
+		void launch(String currentVersion);
+	}
+
 	private static final String MANIFEST_URL = "https://shalestorage.z13.web.core.windows.net/shale-stable.json";
 
 	private final UpdateService updateService;
 	private final String manifestUrl;
+	private final UpdaterLauncher updaterLauncher;
 
 	public DesktopUiUpdateLauncher() {
-		this(new UpdateService(), MANIFEST_URL);
+		this(new UpdateService(), MANIFEST_URL, DesktopUpdateLauncher::launchUpdater);
 	}
 
 	DesktopUiUpdateLauncher(UpdateService updateService, String manifestUrl) {
+		this(updateService, manifestUrl, DesktopUpdateLauncher::launchUpdater);
+	}
+
+	DesktopUiUpdateLauncher(UpdateService updateService, String manifestUrl, UpdaterLauncher updaterLauncher) {
 		this.updateService = Objects.requireNonNull(updateService);
 		this.manifestUrl = Objects.requireNonNull(manifestUrl);
+		this.updaterLauncher = Objects.requireNonNull(updaterLauncher);
 	}
 
 	@Override
@@ -70,11 +81,18 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 
 	@Override
 	public void launchUpdater() {
-		// Execution/install remains platform-specific even though detection above is shared.
-		if (!AppPaths.isWindows()) {
-			throw new RuntimeException("In-app updates are not available on macOS yet. Continue using the installed app normally.");
+		String currentVersion = AppVersionProvider.currentVersion();
+		log("launchUpdater entry");
+		log("Selected platform: " + AppPaths.platform());
+		log("Current version for updater launch: " + currentVersion);
+
+		try {
+			updaterLauncher.launch(currentVersion);
+			log("Updater launch handoff reported success");
+		} catch (RuntimeException ex) {
+			log("Updater launch failure: " + stackTrace(ex));
+			throw ex;
 		}
-		DesktopUpdateLauncher.launchUpdater(AppVersionProvider.currentVersion());
 	}
 
 	private static String printable(String value) {
