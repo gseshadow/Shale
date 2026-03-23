@@ -135,16 +135,14 @@ META_PATH="$DIST_MAC/shale-mac-release.json"
 export JAVAFX_JMODS_DIR="$ROOT/build/assets/javafx-jmods-21.0.10"
 
 echo
+echo
 echo "Step 6: Build macOS app image"
 "$ROOT/build/scripts/build-shale-macos.sh" app-image
 
-echo
-echo "Step 7: Build macOS DMG"
-"$ROOT/build/scripts/build-shale-macos.sh" dmg
-
-echo
-echo "Step 8: Discover build outputs"
-find "$DIST_MAC" -maxdepth 1 \( -name "Shale.app" -o -name "Shale" -o -name "*.dmg" \) -print
+DIST_MAC="$ROOT/dist-macos"
+MAC_ZIP_NAME="ShaleApp-$VERSION-mac.zip"
+MAC_ZIP_PATH="$DIST_MAC/$MAC_ZIP_NAME"
+META_PATH="$DIST_MAC/shale-mac-release.json"
 
 APP_PATH=""
 if [[ -d "$DIST_MAC/Shale.app" ]]; then
@@ -153,26 +151,32 @@ elif [[ -d "$DIST_MAC/Shale" ]]; then
   APP_PATH="$DIST_MAC/Shale"
 fi
 
-DMG_PATH=$(find "$DIST_MAC" -maxdepth 1 -type f -name "*.dmg" | head -n 1 || true)
-
 if [[ -z "$APP_PATH" ]]; then
-  echo "Expected mac app image not found in $DIST_MAC" >&2
-  exit 1
-fi
-
-if [[ -z "$DMG_PATH" ]]; then
-  echo "Expected DMG not found in $DIST_MAC" >&2
-  echo "Contents of dist-macos:" >&2
-  ls -lah "$DIST_MAC" >&2
+  echo "Expected mac app image not found after app-image build" >&2
   exit 1
 fi
 
 echo
-echo "Step 9: Create Mac updater ZIP"
+echo "Step 7: Create Mac updater ZIP"
 ditto -c -k --sequesterRsrc --keepParent \
   "$APP_PATH" \
   "$MAC_ZIP_PATH"
 
+echo
+echo "Step 8: Build macOS DMG"
+"$ROOT/build/scripts/build-shale-macos.sh" dmg
+
+echo
+echo "Step 9: Locate DMG"
+DMG_PATH=$(find "$DIST_MAC" -maxdepth 1 -type f -name "*.dmg" | head -n 1 || true)
+
+if [[ -z "$DMG_PATH" ]]; then
+  echo "Expected DMG not found in $DIST_MAC" >&2
+  ls -lah "$DIST_MAC" >&2
+  exit 1
+fi
+
+echo "DMG found: $DMG_PATH"
 echo
 echo "Step 10: Compute SHA256"
 MAC_SHA256=$(shasum -a 256 "$MAC_ZIP_PATH" | awk '{print tolower($1)}')
