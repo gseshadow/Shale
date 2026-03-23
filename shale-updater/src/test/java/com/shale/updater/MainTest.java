@@ -18,15 +18,17 @@ final class MainTest {
 	void restartOrLogManualReopenPreservesInstallSuccessWhenRelaunchFails() {
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
 		PrintStream originalOut = System.out;
+		boolean success;
 
 		try (PrintStream capture = new PrintStream(output, true, StandardCharsets.UTF_8)) {
 			System.setOut(capture);
-			Main.restartOrLogManualReopen(new FailingPlatformSupport(), Path.of("/Applications/Shale.app"));
+			success = Main.restartOrLogManualReopen(new FailingPlatformSupport(), Path.of("/Applications/Shale.app"));
 		} finally {
 			System.setOut(originalOut);
 		}
 
 		String log = output.toString(StandardCharsets.UTF_8);
+		assertTrue(success, "install success should remain successful even when relaunch fails");
 		assertTrue(log.contains("Install succeeded, but relaunch failed: relaunch unavailable"));
 		assertTrue(log.contains("Shale was updated successfully. Please reopen the app manually from: /Applications/Shale.app"));
 	}
