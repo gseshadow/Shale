@@ -33,7 +33,23 @@ final class MainTest {
 		assertTrue(log.contains("Shale was updated successfully. Please reopen the app manually from: /Applications/Shale.app"));
 	}
 
-	private static final class FailingPlatformSupport implements PlatformSupport {
+	@Test
+	void armRelaunchHelperOrContinueDoesNotAbortOnHelperFailure() {
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
+		PrintStream originalOut = System.out;
+
+		try (PrintStream capture = new PrintStream(output, true, StandardCharsets.UTF_8)) {
+			System.setOut(capture);
+			Main.armRelaunchHelperOrContinue(new FailingArmPlatformSupport(), Path.of("/Applications/Shale.app"), "1.2.3");
+		} finally {
+			System.setOut(originalOut);
+		}
+
+		String log = output.toString(StandardCharsets.UTF_8);
+		assertTrue(log.contains("Failed to arm relaunch helper; continuing install"));
+	}
+
+	private static class FailingPlatformSupport implements PlatformSupport {
 		@Override
 		public Platform platform() {
 			return Platform.MAC;
@@ -51,6 +67,13 @@ final class MainTest {
 		@Override
 		public String appExecutableName() {
 			return "Shale.app";
+		}
+	}
+
+	private static final class FailingArmPlatformSupport extends FailingPlatformSupport {
+		@Override
+		public void armRelaunchHelper(Path installDir, String expectedVersion) throws Exception {
+			throw new IllegalStateException("helper unavailable");
 		}
 	}
 }
