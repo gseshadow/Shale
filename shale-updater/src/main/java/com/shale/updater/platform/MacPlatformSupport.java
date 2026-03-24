@@ -35,17 +35,20 @@ public class MacPlatformSupport implements PlatformSupport {
 		Path targetApp = relaunchTargetPath();
 		Path contentsAppDir = targetApp.resolve("Contents").resolve("app");
 		Path expectedJar = expectedDesktopJarPath(contentsAppDir, expectedVersion);
+		Path expectedUpdaterJar = expectedUpdaterJarPath(contentsAppDir, expectedVersion);
 		long updaterPid = ProcessHandle.current().pid();
 		Path helperLogPath = helperLogPath();
 
 		log("Scheduling macOS relaunch helper");
 		log("Helper target path: " + targetApp);
 		log("Helper start time: " + Instant.now());
+		log("Helper expected target version: " + expectedVersion);
 		log("Helper updater pid: " + updaterPid);
 		log("Helper expected jar: " + expectedJar);
+		log("Helper expected updater jar: " + expectedUpdaterJar);
 		log("Helper log file: " + helperLogPath);
 
-		startRelaunchHelper(targetApp, contentsAppDir, expectedJar, updaterPid, helperLogPath);
+		startRelaunchHelper(targetApp, contentsAppDir, expectedJar, expectedUpdaterJar, updaterPid, helperLogPath);
 		log("macOS relaunch helper started for: " + targetApp);
 	}
 
@@ -87,6 +90,13 @@ public class MacPlatformSupport implements PlatformSupport {
 		return contentsAppDir.resolve("shale-desktop-" + expectedVersion + ".jar");
 	}
 
+	Path expectedUpdaterJarPath(Path contentsAppDir, String expectedVersion) {
+		if (expectedVersion == null || expectedVersion.isBlank()) {
+			return null;
+		}
+		return contentsAppDir.resolve("lib").resolve("shale-updater-" + expectedVersion + ".jar");
+	}
+
 	Path helperLogPath() {
 		return Path.of(System.getProperty("user.home"))
 				.resolve("Library")
@@ -99,10 +109,11 @@ public class MacPlatformSupport implements PlatformSupport {
 			Path targetApp,
 			Path contentsAppDir,
 			Path expectedJar,
+			Path expectedUpdaterJar,
 			long updaterPid,
 			Path helperLogPath) throws Exception {
 		Files.createDirectories(helperLogPath.getParent());
-		String script = helperScript(targetApp, contentsAppDir, expectedJar, updaterPid, helperLogPath);
+		String script = helperScript(targetApp, contentsAppDir, expectedJar, expectedUpdaterJar, updaterPid, helperLogPath);
 		Path helperScriptFile = Files.createTempFile("shale-macos-relaunch-", ".sh");
 		Files.writeString(
 				helperScriptFile,
@@ -120,6 +131,7 @@ public class MacPlatformSupport implements PlatformSupport {
 			Path targetApp,
 			Path contentsAppDir,
 			Path expectedJar,
+			Path expectedUpdaterJar,
 			long updaterPid,
 			Path helperLogPath) {
 		return """
@@ -128,13 +140,20 @@ public class MacPlatformSupport implements PlatformSupport {
 				TARGET_APP=%s
 				CONTENTS_APP=%s
 				EXPECTED_JAR=%s
+				EXPECTED_UPDATER_JAR=%s
+				EXPECTED_UPDATER_JAR_REQUIRED=%s
 				UPDATER_PID=%s
+				RELAUNCH_BIN=%s
 				log_line() {
 				  printf '%%s [RelaunchHelper] %%s\\n' "$(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')" "$1" >> "$LOG_FILE"
 				}
 				log_line "helper target path: $TARGET_APP"
 				log_line "helper start time: $(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')"
+				log_line "helper expected desktop jar: $EXPECTED_JAR"
+				log_line "helper expected updater jar: $EXPECTED_UPDATER_JAR"
+				log_line "helper expected updater jar required: $EXPECTED_UPDATER_JAR_REQUIRED"
 				attempt=1
+				ready_to_launch=false
 				while [ "$attempt" -le 180 ]; do
 				  updater_alive=false
 				  if kill -0 "$UPDATER_PID" 2>/dev/null; then
@@ -152,23 +171,46 @@ public class MacPlatformSupport implements PlatformSupport {
 				  if [ -f "$EXPECTED_JAR" ]; then
 				    jar_exists=true
 				  fi
-				  log_line "poll attempt=$attempt updater_alive=$updater_alive app_exists=$app_exists contents_app_exists=$contents_exists expected_jar_exists=$jar_exists"
-				  if [ "$updater_alive" = false ] && [ "$app_exists" = true ] && [ "$contents_exists" = true ] && [ "$jar_exists" = true ]; then
+
+				  updater_jar_exists=false
+				  if [ "$EXPECTED_UPDATER_JAR_REQUIRED" = false ]; then
+				    updater_jar_exists=true
+				  elif [ -f "$EXPECTED_UPDATER_JAR" ]; then
+				    updater_jar_exists=true
+				  fi
+
+				  log_line "poll attempt=$attempt updater_alive=$updater_alive app_exists=$app_exists contents_app_exists=$contents_exists expected_jar_exists=$jar_exists expected_updater_jar_exists=$updater_jar_exists"
+				  if [ "$updater_alive" = false ] && [ "$app_exists" = true ] && [ "$contents_exists" = true ] && [ "$jar_exists" = true ] && [ "$updater_jar_exists" = true ]; then
+				    ready_to_launch=true
 				    break
 				  fi
 				  attempt=$((attempt + 1))
 				  sleep 1
 				done
-				RELAUNCH_CMD="open $TARGET_APP"
+				if [ "$ready_to_launch" != true ]; then
+				  log_line "relaunch checks did not pass before timeout; skipping relaunch"
+				  exit 1
+				fi
+				RELAUNCH_CMD="$RELAUNCH_BIN"
 				log_line "final relaunch command: $RELAUNCH_CMD"
-				open "$TARGET_APP" >> "$LOG_FILE" 2>&1
+				"$RELAUNCH_BIN" >> "$LOG_FILE" 2>&1 &
+				launch_pid=$!
+				if [ -n "$launch_pid" ] && kill -0 "$launch_pid" 2>/dev/null; then
+				  log_line "relaunch process start success pid=$launch_pid"
+				else
+				  log_line "relaunch process start failure"
+				  exit 1
+				fi
 				"""
 				.formatted(
 						shellQuote(helperLogPath.toString()),
 						shellQuote(targetApp.toString()),
 						shellQuote(contentsAppDir.toString()),
 						shellQuote(expectedJar.toString()),
-						Long.toString(updaterPid));
+						shellQuote(expectedUpdaterJar == null ? "" : expectedUpdaterJar.toString()),
+						expectedUpdaterJar == null ? "false" : "true",
+						Long.toString(updaterPid),
+						shellQuote(targetApp.resolve("Contents").resolve("MacOS").resolve("Shale").toString()));
 	}
 
 	private String shellQuote(String value) {
