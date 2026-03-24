@@ -32,6 +32,7 @@ echo "Building Shale macOS release $VERSION"
 echo "===================================="
 
 echo "Step 1: Building app image"
+echo "Runtime image preference: MAC_RUNTIME_IMAGE=${MAC_RUNTIME_IMAGE:-<unset>} JAVA_HOME=${JAVA_HOME:-<unset>}"
 ./build/scripts/build-shale-macos.sh app-image
 
 echo "Step 2: Creating Mac updater zip"
