@@ -22,6 +22,10 @@ PY
 
 cd "$ROOT"
 
+if [[ -z "${MAC_RUNTIME_IMAGE:-}" && -n "${JAVA_HOME:-}" ]]; then
+  export MAC_RUNTIME_IMAGE="$JAVA_HOME"
+fi
+
 DIST_MAC="$ROOT/dist-macos"
 MAC_ZIP_NAME="ShaleApp-$VERSION-mac.zip"
 MAC_ZIP_PATH="$DIST_MAC/$MAC_ZIP_NAME"
