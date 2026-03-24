@@ -10,8 +10,8 @@ public interface PlatformSupport {
 
 	void restartApp(Path installDir) throws Exception;
 
-	default boolean armPreReplacementRelaunch(Path installDir) {
-		return false;
+	default void restartApp(Path installDir, String expectedVersion) throws Exception {
+		restartApp(installDir);
 	}
 
 	String appExecutableName();

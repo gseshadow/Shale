@@ -79,7 +79,6 @@ public class Main {
 				System.out.println("Resolved staged install dir: " + stagedInstallDir);
 
 				platformSupport.stopRunningApp(installDir);
-				boolean preReplacementRelaunchArmed = tryArmPreReplacementRelaunch(platformSupport, installDir);
 
 				InstallService installService = new InstallService();
 				Path backupDir = installService.backupInstallDir(installDir);
@@ -94,7 +93,7 @@ public class Main {
 				}
 
 				System.out.println("Install succeeded at: " + installDir);
-				restartOrLogManualReopen(platformSupport, installDir, preReplacementRelaunchArmed);
+				restartOrLogManualReopen(platformSupport, installDir, manifest.getVersion());
 
 			} else {
 				System.out.println("Already up to date.");
@@ -105,17 +104,11 @@ public class Main {
 		}
 	}
 
-	static boolean restartOrLogManualReopen(PlatformSupport platformSupport, Path installDir, boolean preReplacementRelaunchArmed) {
+	static boolean restartOrLogManualReopen(PlatformSupport platformSupport, Path installDir, String expectedVersion) {
 		String displayInstallDir = installDir.toString().replace('\\', '/');
 
-		if (preReplacementRelaunchArmed) {
-			System.out.println("Pre-replacement relaunch helper armed; skipping post-install relaunch spawn.");
-			System.out.println("Relaunch delegated to helper for: " + displayInstallDir);
-			return true;
-		}
-
 		try {
-			platformSupport.restartApp(installDir);
+			platformSupport.restartApp(installDir, expectedVersion);
 			System.out.println("Relaunch succeeded for: " + displayInstallDir);
 			return true;
 		} catch (Exception ex) {
@@ -123,18 +116,6 @@ public class Main {
 			ex.printStackTrace(System.out);
 			System.out.println("Shale was updated successfully. Please reopen the app manually from: " + displayInstallDir);
 			return true;
-		}
-	}
-
-	static boolean tryArmPreReplacementRelaunch(PlatformSupport platformSupport, Path installDir) {
-		try {
-			boolean armed = platformSupport.armPreReplacementRelaunch(installDir);
-			System.out.println("Pre-replacement relaunch helper arm result: " + armed);
-			return armed;
-		} catch (Exception ex) {
-			System.out.println("Pre-replacement relaunch helper arm failed: " + ex.getMessage());
-			ex.printStackTrace(System.out);
-			return false;
 		}
 	}
 }

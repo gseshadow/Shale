@@ -1,13 +1,12 @@
 package com.shale.updater.platform;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.StandardOpenOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 public class MacPlatformSupport implements PlatformSupport {
@@ -28,61 +27,35 @@ public class MacPlatformSupport implements PlatformSupport {
 
 	@Override
 	public void restartApp(Path installDir) throws Exception {
-		logRelaunchDiagnostics(installDir);
-		List<String> command = relaunchCommand(installDir);
-		log("Attempting macOS relaunch strategy: open-command");
-		log("macOS relaunch command: " + command);
-		if (!command.isEmpty() && "/usr/bin/open".equals(command.get(0))) {
-			log("macOS /usr/bin/open exists: " + Files.exists(Path.of("/usr/bin/open")));
-			log("macOS /usr/bin/open arguments: " + command.subList(1, command.size()));
-		}
-		try {
-			Process process = startRelaunchCommand(command);
-			log("macOS relaunch process started successfully");
-			log("macOS relaunch process PID: " + describeProcessId(process));
-			CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> readProcessOutputBestEffort(process.getInputStream()));
-			CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> readProcessOutputBestEffort(process.getErrorStream()));
-			int exit = process.waitFor();
-			String stdout = stdoutFuture.join();
-			String stderr = stderrFuture.join();
-			log("macOS relaunch command stdout: " + (stdout.isBlank() ? "<empty>" : stdout));
-			log("macOS relaunch command stderr: " + (stderr.isBlank() ? "<empty>" : stderr));
-			log("macOS relaunch command exit code: " + exit);
-			Thread.sleep(1500L);
-			log("macOS relaunch process alive after 1500ms: " + process.isAlive());
-			if (exit != 0) {
-				throw new IOException("macOS relaunch command exited with code " + exit
-						+ (stdout.isBlank() ? "" : "; stdout: " + stdout)
-						+ (stderr.isBlank() ? "" : "; stderr: " + stderr));
-			}
-			log("macOS relaunch command succeeded for: " + installDir);
-			log("macOS relaunch diagnostic note: command succeeded but launch confirmation requires external process observation");
-		} catch (Exception ex) {
-			log("macOS relaunch failed: " + ex.getMessage());
-			throw ex;
-		}
+		restartApp(installDir, null);
 	}
 
 	@Override
-	public boolean armPreReplacementRelaunch(Path installDir) {
-		try {
-			Path helperScript = createRelaunchHelperScript();
-			Path helperLog = Files.createTempFile("shale-relaunch-helper-", ".log");
-			String normalizedInstallPath = normalizeMacPath(installDir);
-			List<String> helperCommand = List.of("/bin/sh", helperScript.toString(), normalizedInstallPath);
+	public void restartApp(Path installDir, String expectedVersion) throws Exception {
+		Path targetApp = relaunchTargetPath();
+		Path contentsAppDir = targetApp.resolve("Contents").resolve("app");
+		Path expectedMarker = expectedDesktopJarPath(contentsAppDir, expectedVersion);
+		Path expectedUpdaterJar = expectedUpdaterJarPath(contentsAppDir, expectedVersion);
+		long updaterPid = ProcessHandle.current().pid();
+		Path helperLogPath = helperLogPath();
 
-			log("macOS pre-replacement relaunch helper path: " + helperScript);
-			log("macOS pre-replacement relaunch helper log: " + helperLog);
-			log("macOS pre-replacement relaunch helper command: " + helperCommand);
+		log("Scheduling macOS relaunch helper");
+		log("Helper target path: " + targetApp);
+		log("Helper start time: " + Instant.now());
+		log("Helper expected target version: " + expectedVersion);
+		log("Helper updater pid: " + updaterPid);
+		log("Helper expected marker: " + expectedMarker);
+		log("Helper expected updater jar: " + expectedUpdaterJar);
+		log("Helper log file: " + helperLogPath);
 
-			Process process = startDetachedRelaunchHelper(helperCommand, helperLog);
-			log("macOS pre-replacement relaunch helper armed successfully");
-			log("macOS pre-replacement relaunch helper PID: " + describeProcessId(process));
-			return true;
-		} catch (Exception ex) {
-			log("macOS pre-replacement relaunch helper arm failed: " + ex.getMessage());
-			return false;
-		}
+		startRelaunchHelper(
+				targetApp,
+				expectedVersion,
+				expectedMarker,
+				expectedUpdaterJar,
+				updaterPid,
+				helperLogPath);
+		log("macOS relaunch helper started for: " + targetApp);
 	}
 
 	@Override
@@ -112,81 +85,148 @@ public class MacPlatformSupport implements PlatformSupport {
 		return true;
 	}
 
-	List<String> relaunchCommand(Path installDir) {
-		return List.of("/usr/bin/open", "-n", installDir.toString());
+	Path relaunchTargetPath() {
+		return Path.of("/Applications").resolve(appExecutableName());
 	}
 
-	Process startRelaunchCommand(List<String> command) throws IOException {
-		ProcessBuilder processBuilder = new ProcessBuilder(command);
-		log("macOS relaunch ProcessBuilder directory: " + processBuilder.directory());
-		return processBuilder.start();
+	Path expectedDesktopJarPath(Path contentsAppDir, String expectedVersion) {
+		if (expectedVersion == null || expectedVersion.isBlank()) {
+			return contentsAppDir.resolve("shale-desktop.jar");
+		}
+		return contentsAppDir.resolve("shale-desktop-" + expectedVersion + ".jar");
 	}
 
-	Process startDetachedRelaunchHelper(List<String> command, Path helperLog) throws IOException {
-		ProcessBuilder processBuilder = new ProcessBuilder(command)
-				.redirectInput(ProcessBuilder.Redirect.from(Path.of("/dev/null").toFile()))
-				.redirectOutput(ProcessBuilder.Redirect.appendTo(helperLog.toFile()))
+	Path expectedUpdaterJarPath(Path contentsAppDir, String expectedVersion) {
+		if (expectedVersion == null || expectedVersion.isBlank()) {
+			return null;
+		}
+		return contentsAppDir.resolve("lib").resolve("shale-updater-" + expectedVersion + ".jar");
+	}
+
+	Path helperLogPath() {
+		return Path.of("/tmp").resolve("shale-relaunch-helper.log");
+	}
+
+	void startRelaunchHelper(
+			Path targetApp,
+			String expectedVersion,
+			Path expectedMarker,
+			Path expectedUpdaterJar,
+			long updaterPid,
+			Path helperLogPath) throws Exception {
+		Files.createDirectories(helperLogPath.getParent());
+		String script =
+				helperScript(targetApp, expectedVersion, expectedMarker, expectedUpdaterJar, updaterPid, helperLogPath);
+		Path helperScriptFile = Files.createTempFile("shale-macos-relaunch-", ".sh");
+		Files.writeString(
+				helperScriptFile,
+				script,
+				StandardCharsets.UTF_8,
+				StandardOpenOption.TRUNCATE_EXISTING);
+		helperScriptFile.toFile().setExecutable(true, false);
+		log("Helper script path created: " + helperScriptFile);
+		log("Helper script exists after creation: " + Files.exists(helperScriptFile));
+		log("Helper script executable: " + Files.isExecutable(helperScriptFile));
+		log("Helper script content begins >>>");
+		log(script);
+		log("<<< Helper script content ends");
+
+		ProcessBuilder helperLaunchBuilder = new ProcessBuilder("/bin/sh", helperScriptFile.toString())
 				.redirectErrorStream(true);
-		return processBuilder.start();
+		log("Helper launch command: " + helperLaunchBuilder.command());
+		log("Helper launch working directory: " + Path.of("").toAbsolutePath());
+		Process helperProcess = helperLaunchBuilder.start();
+		log("Helper launch succeeded: true");
+		log("Helper launch process pid: " + helperProcess.pid());
 	}
 
-	String readProcessOutput(InputStream inputStream) throws IOException {
-		return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8).trim();
+	String helperScript(
+			Path targetApp,
+			String expectedVersion,
+			Path expectedMarker,
+			Path expectedUpdaterJar,
+			long updaterPid,
+			Path helperLogPath) {
+		return """
+				#!/bin/sh
+				LOG_FILE=%s
+				TARGET_APP=%s
+				EXPECTED_VERSION=%s
+				EXPECTED_MARKER=%s
+				EXPECTED_UPDATER_JAR=%s
+				EXPECTED_UPDATER_JAR_REQUIRED=%s
+				UPDATER_PID=%s
+				OPEN_BIN=%s
+				OPEN_TARGET=%s
+				log_line() {
+				  printf '%%s [RelaunchHelper] %%s\\n' "$(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')" "$1" >> "$LOG_FILE"
+				}
+				: > "$LOG_FILE"
+				log_line "helper started"
+				log_line "helper arguments: $*"
+				log_line "helper target path: $TARGET_APP"
+				log_line "helper start time: $(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')"
+				log_line "helper expected version: $EXPECTED_VERSION"
+				log_line "helper expected marker path: $EXPECTED_MARKER"
+				log_line "helper expected updater jar: $EXPECTED_UPDATER_JAR"
+				log_line "helper expected updater jar required: $EXPECTED_UPDATER_JAR_REQUIRED"
+				attempt=1
+				ready_to_launch=false
+				while [ "$attempt" -le 180 ]; do
+				  updater_alive=false
+				  if kill -0 "$UPDATER_PID" 2>/dev/null; then
+				    updater_alive=true
+				  fi
+				  marker_exists=false
+				  if [ -f "$EXPECTED_MARKER" ]; then
+				    marker_exists=true
+				  fi
+
+				  updater_jar_exists=false
+				  if [ "$EXPECTED_UPDATER_JAR_REQUIRED" = false ]; then
+				    updater_jar_exists=true
+				  elif [ -f "$EXPECTED_UPDATER_JAR" ]; then
+				    updater_jar_exists=true
+				  fi
+
+				  log_line "poll attempt=$attempt target_app_path=$TARGET_APP expected_version=$EXPECTED_VERSION expected_marker_path=$EXPECTED_MARKER updater_alive=$updater_alive expected_marker_exists=$marker_exists expected_updater_jar_exists=$updater_jar_exists"
+				  if [ "$updater_alive" = false ] && [ "$marker_exists" = true ] && [ "$updater_jar_exists" = true ]; then
+				    ready_to_launch=true
+				    break
+				  fi
+				  attempt=$((attempt + 1))
+				  sleep 1
+				done
+				if [ "$ready_to_launch" != true ]; then
+				  log_line "relaunch checks did not pass before timeout; skipping relaunch"
+				  exit 1
+				fi
+				OPEN_CMD="$OPEN_BIN -n $OPEN_TARGET"
+				log_line "final relaunch command: $OPEN_CMD"
+				open_output=$("$OPEN_BIN" -n "$OPEN_TARGET" 2>&1)
+				open_exit=$?
+				log_line "open stdout/stderr: $open_output"
+				log_line "open exit code: $open_exit"
+				if [ "$open_exit" -ne 0 ]; then
+				  log_line "relaunch failed via open"
+				  exit "$open_exit"
+				fi
+				log_line "helper finished"
+				"""
+				.formatted(
+						shellQuote(helperLogPath.toString()),
+						shellQuote(targetApp.toString()),
+						shellQuote(expectedVersion == null ? "" : expectedVersion),
+						shellQuote(expectedMarker.toString()),
+						shellQuote(expectedUpdaterJar == null ? "" : expectedUpdaterJar.toString()),
+						expectedUpdaterJar == null ? "false" : "true",
+						Long.toString(updaterPid),
+						shellQuote("/usr/bin/open"),
+						shellQuote(targetApp.toString()));
 	}
 
-	private String readProcessOutputBestEffort(InputStream inputStream) {
-		try {
-			return readProcessOutput(inputStream);
-		} catch (IOException ex) {
-			return "<failed to read stream: " + ex.getMessage() + ">";
-		}
-	}
-
-	private String normalizeMacPath(Path path) {
-		return path.toString().replace('\\', '/');
-	}
-
-	private Path createRelaunchHelperScript() throws IOException {
-		Path helperScript = Files.createTempFile("shale-relaunch-helper-", ".sh");
-		String script = "#!/bin/sh\n"
-				+ "APP_PATH=\"$1\"\n"
-				+ "echo \"[helper] waiting for app bundle: $APP_PATH\"\n"
-				+ "ATTEMPTS=120\n"
-				+ "while [ \"$ATTEMPTS\" -gt 0 ]; do\n"
-				+ "  if [ -d \"$APP_PATH\" ]; then\n"
-				+ "    echo \"[helper] app bundle found; launching via open -n\"\n"
-				+ "    /usr/bin/open -n \"$APP_PATH\"\n"
-				+ "    EXIT_CODE=$?\n"
-				+ "    echo \"[helper] open exit code: $EXIT_CODE\"\n"
-				+ "    exit $EXIT_CODE\n"
-				+ "  fi\n"
-				+ "  ATTEMPTS=$((ATTEMPTS - 1))\n"
-				+ "  /bin/sleep 0.5\n"
-				+ "done\n"
-				+ "echo \"[helper] timed out waiting for app bundle\"\n"
-				+ "exit 1\n";
-		Files.writeString(helperScript, script, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
-		helperScript.toFile().setExecutable(true, false);
-		return helperScript;
-	}
-
-	private void logRelaunchDiagnostics(Path installDir) {
-		Path absoluteInstallDir = installDir.toAbsolutePath().normalize();
-		Path macOsDir = installDir.resolve("Contents").resolve("MacOS");
-		Path launcher = macOsDir.resolve("Shale");
-		log("macOS relaunch installDir absolute path: " + absoluteInstallDir);
-		log("macOS relaunch installDir exists: " + Files.exists(installDir));
-		log("macOS relaunch installDir is directory: " + Files.isDirectory(installDir));
-		log("macOS relaunch Contents/MacOS exists: " + Files.exists(macOsDir));
-		log("macOS relaunch Contents/MacOS/Shale exists: " + Files.exists(launcher));
-	}
-
-	private String describeProcessId(Process process) {
-		try {
-			return Long.toString(process.pid());
-		} catch (UnsupportedOperationException ex) {
-			return "<unavailable: " + ex.getMessage() + ">";
-		}
+	private String shellQuote(String value) {
+		return "'" + value.replace("'", "'\"'\"'") + "'";
 	}
 
 	private void runBestEffort(List<String> command) {
