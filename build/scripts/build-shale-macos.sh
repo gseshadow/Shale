@@ -89,16 +89,36 @@ resolve_base_jdk_runtime() {
 }
 
 resolve_javafx_jmods_dir() {
+  local configured_jmods="${JAVAFX_JMODS_DIR:-}"
   local default_jmods="$ROOT/build/assets/javafx-jmods-macos"
-  local candidate="${JAVAFX_JMODS_DIR:-$default_jmods}"
+  local legacy_jmods="$ROOT/build/assets/javafx-jmods-21.0.10"
+  local checked=()
 
-  if [[ ! -d "$candidate" ]]; then
-    echo "JavaFX jmods directory not found: $candidate" >&2
-    echo "Set JAVAFX_JMODS_DIR or place JavaFX jmods at $default_jmods" >&2
-    exit 1
+  if [[ -n "$configured_jmods" ]]; then
+    checked+=("$configured_jmods")
+    if [[ -d "$configured_jmods" ]]; then
+      echo "$configured_jmods"
+      return
+    fi
   fi
 
-  echo "$candidate"
+  checked+=("$default_jmods")
+  if [[ -d "$default_jmods" ]]; then
+    echo "$default_jmods"
+    return
+  fi
+
+  checked+=("$legacy_jmods")
+  if [[ -d "$legacy_jmods" ]]; then
+    echo "$legacy_jmods"
+    return
+  fi
+
+  echo "JavaFX jmods directory not found." >&2
+  echo "Checked candidates (in precedence order):" >&2
+  printf '  - %s\n' "${checked[@]}" >&2
+  echo "Set JAVAFX_JMODS_DIR or ensure one of the default paths exists." >&2
+  exit 1
 }
 
 build_custom_runtime_image() {
