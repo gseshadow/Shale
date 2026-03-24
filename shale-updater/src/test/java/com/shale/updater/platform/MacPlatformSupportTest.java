@@ -2,6 +2,7 @@ package com.shale.updater.platform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,14 +29,24 @@ final class MacPlatformSupportTest {
 	}
 
 	@Test
-	void restartAppFailsWhenBinaryMissing() {
-		MacPlatformSupport platformSupport = new MacPlatformSupport() {
-			@Override
-			Path relaunchTargetPath() {
-				return Path.of("/definitely/missing/Shale.app");
-			}
-		};
-
+	void restartAppFailsWhenHelperWasNotArmed() {
+		MacPlatformSupport platformSupport = new MacPlatformSupport();
 		assertThrows(IOException.class, () -> platformSupport.restartApp(Path.of("/ignored"), "1.0.99"));
+	}
+
+	@Test
+	void helperScriptWaitsForExpectedVersionedJars() {
+		MacPlatformSupport platformSupport = new MacPlatformSupport();
+		String script = platformSupport.helperScript(
+				123L,
+				Path.of("/Applications/Shale.app/Contents/app/shale-desktop-1.0.99.jar"),
+				Path.of("/Applications/Shale.app/Contents/app/lib/shale-updater-1.0.99.jar"),
+				Path.of("/Applications/Shale.app/Contents/MacOS/Shale"),
+				Path.of("/tmp/helper.log"));
+
+		assertTrue(script.contains("while kill -0 123"));
+		assertTrue(script.contains("shale-desktop-1.0.99.jar"));
+		assertTrue(script.contains("shale-updater-1.0.99.jar"));
+		assertTrue(script.contains("relaunch command executed"));
 	}
 }
