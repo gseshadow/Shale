@@ -3,6 +3,7 @@ package com.shale.updater.platform;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -63,6 +64,27 @@ public class MacPlatformSupport implements PlatformSupport {
 	}
 
 	@Override
+	public boolean armPreReplacementRelaunch(Path installDir) {
+		try {
+			Path helperScript = createRelaunchHelperScript();
+			Path helperLog = Files.createTempFile("shale-relaunch-helper-", ".log");
+			List<String> helperCommand = List.of("/bin/sh", helperScript.toString(), installDir.toString());
+
+			log("macOS pre-replacement relaunch helper path: " + helperScript);
+			log("macOS pre-replacement relaunch helper log: " + helperLog);
+			log("macOS pre-replacement relaunch helper command: " + helperCommand);
+
+			Process process = startDetachedRelaunchHelper(helperCommand, helperLog);
+			log("macOS pre-replacement relaunch helper armed successfully");
+			log("macOS pre-replacement relaunch helper PID: " + describeProcessId(process));
+			return true;
+		} catch (Exception ex) {
+			log("macOS pre-replacement relaunch helper arm failed: " + ex.getMessage());
+			return false;
+		}
+	}
+
+	@Override
 	public String appExecutableName() {
 		return "Shale.app";
 	}
@@ -99,6 +121,14 @@ public class MacPlatformSupport implements PlatformSupport {
 		return processBuilder.start();
 	}
 
+	Process startDetachedRelaunchHelper(List<String> command, Path helperLog) throws IOException {
+		ProcessBuilder processBuilder = new ProcessBuilder(command)
+				.redirectInput(ProcessBuilder.Redirect.from(Path.of("/dev/null").toFile()))
+				.redirectOutput(ProcessBuilder.Redirect.appendTo(helperLog.toFile()))
+				.redirectErrorStream(true);
+		return processBuilder.start();
+	}
+
 	String readProcessOutput(InputStream inputStream) throws IOException {
 		return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8).trim();
 	}
@@ -109,6 +139,30 @@ public class MacPlatformSupport implements PlatformSupport {
 		} catch (IOException ex) {
 			return "<failed to read stream: " + ex.getMessage() + ">";
 		}
+	}
+
+	private Path createRelaunchHelperScript() throws IOException {
+		Path helperScript = Files.createTempFile("shale-relaunch-helper-", ".sh");
+		String script = "#!/bin/sh\n"
+				+ "APP_PATH=\"$1\"\n"
+				+ "echo \"[helper] waiting for app bundle: $APP_PATH\"\n"
+				+ "ATTEMPTS=120\n"
+				+ "while [ \"$ATTEMPTS\" -gt 0 ]; do\n"
+				+ "  if [ -d \"$APP_PATH\" ]; then\n"
+				+ "    echo \"[helper] app bundle found; launching via open -n\"\n"
+				+ "    /usr/bin/open -n \"$APP_PATH\"\n"
+				+ "    EXIT_CODE=$?\n"
+				+ "    echo \"[helper] open exit code: $EXIT_CODE\"\n"
+				+ "    exit $EXIT_CODE\n"
+				+ "  fi\n"
+				+ "  ATTEMPTS=$((ATTEMPTS - 1))\n"
+				+ "  /bin/sleep 0.5\n"
+				+ "done\n"
+				+ "echo \"[helper] timed out waiting for app bundle\"\n"
+				+ "exit 1\n";
+		Files.writeString(helperScript, script, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
+		helperScript.toFile().setExecutable(true, false);
+		return helperScript;
 	}
 
 	private void logRelaunchDiagnostics(Path installDir) {

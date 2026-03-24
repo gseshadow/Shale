@@ -22,7 +22,7 @@ final class MainTest {
 
 		try (PrintStream capture = new PrintStream(output, true, StandardCharsets.UTF_8)) {
 			System.setOut(capture);
-			success = Main.restartOrLogManualReopen(new FailingPlatformSupport(), Path.of("/Applications/Shale.app"));
+			success = Main.restartOrLogManualReopen(new FailingPlatformSupport(), Path.of("/Applications/Shale.app"), false);
 		} finally {
 			System.setOut(originalOut);
 		}
@@ -31,6 +31,24 @@ final class MainTest {
 		assertTrue(success, "install success should remain successful even when relaunch fails");
 		assertTrue(log.contains("Install succeeded, but relaunch failed: relaunch unavailable"));
 		assertTrue(log.contains("Shale was updated successfully. Please reopen the app manually from: /Applications/Shale.app"));
+	}
+
+	@Test
+	void restartOrLogManualReopenSkipsDirectRelaunchWhenHelperIsArmed() {
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
+		PrintStream originalOut = System.out;
+		boolean success;
+
+		try (PrintStream capture = new PrintStream(output, true, StandardCharsets.UTF_8)) {
+			System.setOut(capture);
+			success = Main.restartOrLogManualReopen(new FailingPlatformSupport(), Path.of("/Applications/Shale.app"), true);
+		} finally {
+			System.setOut(originalOut);
+		}
+
+		String log = output.toString(StandardCharsets.UTF_8);
+		assertTrue(success, "install success should remain successful when helper relaunch is armed");
+		assertTrue(log.contains("Pre-replacement relaunch helper armed; skipping post-install relaunch spawn."));
 	}
 
 	private static final class FailingPlatformSupport implements PlatformSupport {
