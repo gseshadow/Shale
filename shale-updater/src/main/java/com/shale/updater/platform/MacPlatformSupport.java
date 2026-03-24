@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 public class MacPlatformSupport implements PlatformSupport {
@@ -26,18 +27,35 @@ public class MacPlatformSupport implements PlatformSupport {
 
 	@Override
 	public void restartApp(Path installDir) throws Exception {
+		logRelaunchDiagnostics(installDir);
 		List<String> command = relaunchCommand(installDir);
 		log("Attempting macOS relaunch strategy: open-command");
 		log("macOS relaunch command: " + command);
+		if (!command.isEmpty() && "/usr/bin/open".equals(command.get(0))) {
+			log("macOS /usr/bin/open exists: " + Files.exists(Path.of("/usr/bin/open")));
+			log("macOS /usr/bin/open arguments: " + command.subList(1, command.size()));
+		}
 		try {
 			Process process = startRelaunchCommand(command);
-			String output = readProcessOutput(process.getInputStream());
+			log("macOS relaunch process started successfully");
+			log("macOS relaunch process PID: " + describeProcessId(process));
+			CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> readProcessOutputBestEffort(process.getInputStream()));
+			CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> readProcessOutputBestEffort(process.getErrorStream()));
 			int exit = process.waitFor();
+			String stdout = stdoutFuture.join();
+			String stderr = stderrFuture.join();
+			log("macOS relaunch command stdout: " + (stdout.isBlank() ? "<empty>" : stdout));
+			log("macOS relaunch command stderr: " + (stderr.isBlank() ? "<empty>" : stderr));
+			log("macOS relaunch command exit code: " + exit);
+			Thread.sleep(1500L);
+			log("macOS relaunch process alive after 1500ms: " + process.isAlive());
 			if (exit != 0) {
 				throw new IOException("macOS relaunch command exited with code " + exit
-						+ (output.isBlank() ? "" : ": " + output));
+						+ (stdout.isBlank() ? "" : "; stdout: " + stdout)
+						+ (stderr.isBlank() ? "" : "; stderr: " + stderr));
 			}
 			log("macOS relaunch command succeeded for: " + installDir);
+			log("macOS relaunch diagnostic note: command succeeded but launch confirmation requires external process observation");
 		} catch (Exception ex) {
 			log("macOS relaunch failed: " + ex.getMessage());
 			throw ex;
@@ -76,13 +94,40 @@ public class MacPlatformSupport implements PlatformSupport {
 	}
 
 	Process startRelaunchCommand(List<String> command) throws IOException {
-		return new ProcessBuilder(command)
-				.redirectErrorStream(true)
-				.start();
+		ProcessBuilder processBuilder = new ProcessBuilder(command);
+		log("macOS relaunch ProcessBuilder directory: " + processBuilder.directory());
+		return processBuilder.start();
 	}
 
 	String readProcessOutput(InputStream inputStream) throws IOException {
 		return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8).trim();
+	}
+
+	private String readProcessOutputBestEffort(InputStream inputStream) {
+		try {
+			return readProcessOutput(inputStream);
+		} catch (IOException ex) {
+			return "<failed to read stream: " + ex.getMessage() + ">";
+		}
+	}
+
+	private void logRelaunchDiagnostics(Path installDir) {
+		Path absoluteInstallDir = installDir.toAbsolutePath().normalize();
+		Path macOsDir = installDir.resolve("Contents").resolve("MacOS");
+		Path launcher = macOsDir.resolve("Shale");
+		log("macOS relaunch installDir absolute path: " + absoluteInstallDir);
+		log("macOS relaunch installDir exists: " + Files.exists(installDir));
+		log("macOS relaunch installDir is directory: " + Files.isDirectory(installDir));
+		log("macOS relaunch Contents/MacOS exists: " + Files.exists(macOsDir));
+		log("macOS relaunch Contents/MacOS/Shale exists: " + Files.exists(launcher));
+	}
+
+	private String describeProcessId(Process process) {
+		try {
+			return Long.toString(process.pid());
+		} catch (UnsupportedOperationException ex) {
+			return "<unavailable: " + ex.getMessage() + ">";
+		}
 	}
 
 	private void runBestEffort(List<String> command) {
