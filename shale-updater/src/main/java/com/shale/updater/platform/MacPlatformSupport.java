@@ -109,6 +109,7 @@ public class MacPlatformSupport implements PlatformSupport {
 		String updaterPath = shellQuote(updaterJar.toString());
 		String appBinaryPath = shellQuote(appBinary.toString());
 		String helperLogPath = shellQuote(helperLog.toString());
+		String relaunchWorkingDir = shellQuote("/");
 
 		return "LOG_FILE=" + helperLogPath + ";"
 				+ "log(){ printf '%s %s\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" \"$1\" >> \"$LOG_FILE\"; };"
@@ -120,6 +121,10 @@ public class MacPlatformSupport implements PlatformSupport {
 				+ "done;"
 				+ "log \"marker and updater jars ready\";"
 				+ "if [ ! -x " + appBinaryPath + " ]; then log \"app binary missing/not executable: " + appBinaryPath + "\"; exit 1; fi;"
+				+ "log \"chosen relaunch working directory: " + relaunchWorkingDir + "\";"
+				+ "if cd " + relaunchWorkingDir + "; then log \"cwd set explicitly to " + relaunchWorkingDir + "\"; "
+				+ "else log \"failed to set cwd to " + relaunchWorkingDir + "\"; exit 1; fi;"
+				+ "log \"final relaunch command: " + appBinaryPath + " >> \\\"$LOG_FILE\\\" 2>&1 &\";"
 				+ appBinaryPath + " >> \"$LOG_FILE\" 2>&1 &"
 				+ "log \"relaunch command executed\";";
 	}
