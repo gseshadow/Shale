@@ -68,7 +68,8 @@ public class MacPlatformSupport implements PlatformSupport {
 		try {
 			Path helperScript = createRelaunchHelperScript();
 			Path helperLog = Files.createTempFile("shale-relaunch-helper-", ".log");
-			List<String> helperCommand = List.of("/bin/sh", helperScript.toString(), installDir.toString());
+			String normalizedInstallPath = normalizeMacPath(installDir);
+			List<String> helperCommand = List.of("/bin/sh", helperScript.toString(), normalizedInstallPath);
 
 			log("macOS pre-replacement relaunch helper path: " + helperScript);
 			log("macOS pre-replacement relaunch helper log: " + helperLog);
@@ -139,6 +140,10 @@ public class MacPlatformSupport implements PlatformSupport {
 		} catch (IOException ex) {
 			return "<failed to read stream: " + ex.getMessage() + ">";
 		}
+	}
+
+	private String normalizeMacPath(Path path) {
+		return path.toString().replace('\\', '/');
 	}
 
 	private Path createRelaunchHelperScript() throws IOException {
