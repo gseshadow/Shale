@@ -44,7 +44,10 @@ final class MacPlatformSupportTest {
 		assertTrue(script.contains("helper arguments: $*"));
 		assertTrue(script.contains("helper expected version: $EXPECTED_VERSION"));
 		assertTrue(script.contains("helper expected marker path: $EXPECTED_MARKER"));
+		assertTrue(script.contains("helper relaunch working directory: $RELAUNCH_WORKDIR"));
 		assertTrue(script.contains("final relaunch command: $OPEN_CMD"));
+		assertTrue(script.contains("if cd \"$RELAUNCH_WORKDIR\"; then"));
+		assertTrue(script.contains("relaunch cwd set explicitly: $RELAUNCH_WORKDIR"));
 		assertTrue(script.contains("open stdout/stderr: $open_output"));
 		assertTrue(script.contains("open exit code: $open_exit"));
 		assertTrue(script.contains("helper finished"));
