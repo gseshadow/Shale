@@ -37,6 +37,48 @@ if [[ ! -d "$JAVAFX_JMODS_DIR" ]]; then
   exit 1
 fi
 
+resolve_runtime_image() {
+  local candidate
+  local resolved=""
+  local checked=()
+
+  if [[ -n "${MAC_RUNTIME_IMAGE:-}" ]]; then
+    candidate="$MAC_RUNTIME_IMAGE"
+    checked+=("$candidate")
+    if [[ -d "$candidate/Contents/Home/bin" ]]; then
+      resolved="$candidate"
+    elif [[ -d "$candidate/bin" ]]; then
+      resolved="$candidate"
+    fi
+  fi
+
+  if [[ -z "$resolved" && -n "${JAVA_HOME:-}" ]]; then
+    candidate="$JAVA_HOME"
+    checked+=("$candidate")
+    if [[ -d "$candidate/Contents/Home/bin" ]]; then
+      resolved="$candidate"
+    elif [[ -d "$candidate/bin" ]]; then
+      resolved="$candidate"
+    fi
+  fi
+
+  if [[ -z "$resolved" ]]; then
+    echo "No valid macOS runtime image found." >&2
+    echo "Provide MAC_RUNTIME_IMAGE (preferred) or JAVA_HOME." >&2
+    if [[ ${#checked[@]} -gt 0 ]]; then
+      echo "Checked candidates:" >&2
+      printf '  - %s\n' "${checked[@]}" >&2
+    fi
+    exit 1
+  fi
+
+  if [[ -d "$resolved/Contents/Home/bin" ]]; then
+    echo "$resolved/Contents/Home"
+  else
+    echo "$resolved"
+  fi
+}
+
 DESKTOP_TARGET="$ROOT/shale-desktop/target"
 DIST_DIR="$ROOT/dist-macos"
 mkdir -p "$DIST_DIR"
@@ -44,14 +86,17 @@ mkdir -p "$DIST_DIR"
 rm -rf "$DIST_DIR/Shale" "$DIST_DIR/Shale.app"
 rm -f "$DIST_DIR"/Shale*.dmg
 
-# Keep the Java launcher in the bundled runtime so the mac updater can run
-# the self-contained shaded updater jar via
-# `java -jar shale-updater-<version>.jar` from inside the packaged app.
-JLINK_OPTIONS=(
-  --strip-debug
-  --no-man-pages
-  --no-header-files
-)
+RUNTIME_IMAGE=$(resolve_runtime_image)
+RUNTIME_SOURCE=${MAC_RUNTIME_IMAGE:-${JAVA_HOME:-}}
+
+if [[ ! -x "$RUNTIME_IMAGE/bin/java" ]]; then
+  echo "Invalid runtime image: expected executable java binary at $RUNTIME_IMAGE/bin/java" >&2
+  echo "Resolved from: $RUNTIME_SOURCE" >&2
+  exit 1
+fi
+
+echo "Using macOS runtime image for packaging: $RUNTIME_IMAGE"
+echo "Runtime image source candidate: $RUNTIME_SOURCE"
 
 verify_runtime_image() {
   local app_path=$1
@@ -76,7 +121,7 @@ build_package() {
     --main-class com.shale.desktop.MainApp \
     --module-path "$JAVAFX_JMODS_DIR" \
     --add-modules javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec \
-    --jlink-options "${JLINK_OPTIONS[*]}" \
+    --runtime-image "$RUNTIME_IMAGE" \
     --app-version "$VERSION" \
     --vendor "Get Downing" \
     --description "Shale Desktop"
