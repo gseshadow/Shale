@@ -72,6 +72,48 @@ resolve_runtime_image() {
   fi
 }
 
+resolve_runtime_image() {
+  local candidate
+  local resolved=""
+  local checked=()
+
+  if [[ -n "${MAC_RUNTIME_IMAGE:-}" ]]; then
+    candidate="$MAC_RUNTIME_IMAGE"
+    checked+=("$candidate")
+    if [[ -d "$candidate/Contents/Home/bin" ]]; then
+      resolved="$candidate"
+    elif [[ -d "$candidate/bin" ]]; then
+      resolved="$candidate"
+    fi
+  fi
+
+  if [[ -z "$resolved" && -n "${JAVA_HOME:-}" ]]; then
+    candidate="$JAVA_HOME"
+    checked+=("$candidate")
+    if [[ -d "$candidate/Contents/Home/bin" ]]; then
+      resolved="$candidate"
+    elif [[ -d "$candidate/bin" ]]; then
+      resolved="$candidate"
+    fi
+  fi
+
+  if [[ -z "$resolved" ]]; then
+    echo "No valid macOS runtime image found." >&2
+    echo "Provide MAC_RUNTIME_IMAGE (preferred) or JAVA_HOME." >&2
+    if [[ ${#checked[@]} -gt 0 ]]; then
+      echo "Checked candidates:" >&2
+      printf '  - %s\n' "${checked[@]}" >&2
+    fi
+    exit 1
+  fi
+
+  if [[ -d "$resolved/Contents/Home/bin" ]]; then
+    echo "$resolved/Contents/Home"
+  else
+    echo "$resolved"
+  fi
+}
+
 DESKTOP_TARGET="$ROOT/shale-desktop/target"
 DIST_DIR="$ROOT/dist-macos"
 mkdir -p "$DIST_DIR"
