@@ -21,8 +21,8 @@ fi
 
 echo "setting runtime environment"
 DEFAULT_MAC_JAVA_HOME="/Library/Java/JavaVirtualMachines/liberica-jdk-21.jdk/Contents/Home"
-export JAVA_HOME="${JAVA_HOME:-$DEFAULT_MAC_JAVA_HOME}"
-export MAC_RUNTIME_IMAGE="${MAC_RUNTIME_IMAGE:-$JAVA_HOME}"
+export JAVA_HOME="${JAVA_HOME:-}"
+export MAC_RUNTIME_IMAGE="${MAC_RUNTIME_IMAGE:-}"
 
 
 VERSION=$(python3 - <<'PY'
@@ -36,7 +36,7 @@ print(match.group(1))
 PY
 )
 
-resolve_runtime_image() {
+resolve_base_jdk_runtime() {
   local candidate
   local resolved=""
   local checked=()
@@ -61,9 +61,19 @@ resolve_runtime_image() {
     fi
   fi
 
+  if [[ -z "$resolved" && -n "$DEFAULT_MAC_JAVA_HOME" ]]; then
+    candidate="$DEFAULT_MAC_JAVA_HOME"
+    checked+=("$candidate")
+    if [[ -d "$candidate/Contents/Home/bin" ]]; then
+      resolved="$candidate"
+    elif [[ -d "$candidate/bin" ]]; then
+      resolved="$candidate"
+    fi
+  fi
+
   if [[ -z "$resolved" ]]; then
-    echo "No valid macOS runtime image found." >&2
-    echo "Provide MAC_RUNTIME_IMAGE (preferred) or JAVA_HOME." >&2
+    echo "No valid macOS JDK runtime found." >&2
+    echo "Provide MAC_RUNTIME_IMAGE (preferred), JAVA_HOME, or install a JDK at $DEFAULT_MAC_JAVA_HOME." >&2
     if [[ ${#checked[@]} -gt 0 ]]; then
       echo "Checked candidates:" >&2
       printf '  - %s\n' "${checked[@]}" >&2
@@ -78,46 +88,56 @@ resolve_runtime_image() {
   fi
 }
 
-resolve_runtime_image() {
-  local candidate
-  local resolved=""
-  local checked=()
+resolve_javafx_jmods_dir() {
+  local default_jmods="$ROOT/build/assets/javafx-jmods-macos"
+  local candidate="${JAVAFX_JMODS_DIR:-$default_jmods}"
 
-  if [[ -n "${MAC_RUNTIME_IMAGE:-}" ]]; then
-    candidate="$MAC_RUNTIME_IMAGE"
-    checked+=("$candidate")
-    if [[ -d "$candidate/Contents/Home/bin" ]]; then
-      resolved="$candidate"
-    elif [[ -d "$candidate/bin" ]]; then
-      resolved="$candidate"
-    fi
-  fi
-
-  if [[ -z "$resolved" && -n "${JAVA_HOME:-}" ]]; then
-    candidate="$JAVA_HOME"
-    checked+=("$candidate")
-    if [[ -d "$candidate/Contents/Home/bin" ]]; then
-      resolved="$candidate"
-    elif [[ -d "$candidate/bin" ]]; then
-      resolved="$candidate"
-    fi
-  fi
-
-  if [[ -z "$resolved" ]]; then
-    echo "No valid macOS runtime image found." >&2
-    echo "Provide MAC_RUNTIME_IMAGE (preferred) or JAVA_HOME." >&2
-    if [[ ${#checked[@]} -gt 0 ]]; then
-      echo "Checked candidates:" >&2
-      printf '  - %s\n' "${checked[@]}" >&2
-    fi
+  if [[ ! -d "$candidate" ]]; then
+    echo "JavaFX jmods directory not found: $candidate" >&2
+    echo "Set JAVAFX_JMODS_DIR or place JavaFX jmods at $default_jmods" >&2
     exit 1
   fi
 
-  if [[ -d "$resolved/Contents/Home/bin" ]]; then
-    echo "$resolved/Contents/Home"
-  else
-    echo "$resolved"
+  echo "$candidate"
+}
+
+build_custom_runtime_image() {
+  local base_jdk_runtime=$1
+  local javafx_jmods_dir=$2
+  local runtime_output="$ROOT/build/tmp/macos-runtime-image"
+  local jlink_bin="$base_jdk_runtime/bin/jlink"
+  local jdk_jmods_dir="$base_jdk_runtime/jmods"
+  local module_path="$jdk_jmods_dir:$javafx_jmods_dir"
+  local modules="javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec"
+
+  if [[ ! -x "$jlink_bin" ]]; then
+    echo "Expected jlink executable at $jlink_bin" >&2
+    exit 1
   fi
+
+  if [[ ! -d "$jdk_jmods_dir" ]]; then
+    echo "Expected JDK jmods directory at $jdk_jmods_dir" >&2
+    exit 1
+  fi
+
+  rm -rf "$runtime_output"
+  mkdir -p "$(dirname "$runtime_output")"
+
+  "$jlink_bin" \
+    --module-path "$module_path" \
+    --add-modules "$modules" \
+    --output "$runtime_output" \
+    --strip-debug \
+    --no-man-pages \
+    --no-header-files \
+    --compress=2
+
+  if [[ ! -x "$runtime_output/bin/java" ]]; then
+    echo "Generated runtime image is missing java binary: $runtime_output/bin/java" >&2
+    exit 1
+  fi
+
+  echo "$runtime_output"
 }
 
 DESKTOP_TARGET="$ROOT/shale-desktop/target"
@@ -127,17 +147,13 @@ mkdir -p "$DIST_DIR"
 rm -rf "$DIST_DIR/Shale" "$DIST_DIR/Shale.app"
 rm -f "$DIST_DIR"/Shale*.dmg
 
-RUNTIME_IMAGE=$(resolve_runtime_image)
-RUNTIME_SOURCE=${MAC_RUNTIME_IMAGE:-${JAVA_HOME:-}}
+BASE_JDK_RUNTIME=$(resolve_base_jdk_runtime)
+JAVAFX_JMODS_PATH=$(resolve_javafx_jmods_dir)
+RUNTIME_IMAGE=$(build_custom_runtime_image "$BASE_JDK_RUNTIME" "$JAVAFX_JMODS_PATH")
 
-if [[ ! -x "$RUNTIME_IMAGE/bin/java" ]]; then
-  echo "Invalid runtime image: expected executable java binary at $RUNTIME_IMAGE/bin/java" >&2
-  echo "Resolved from: $RUNTIME_SOURCE" >&2
-  exit 1
-fi
-
-echo "Using macOS runtime image for packaging: $RUNTIME_IMAGE"
-echo "Runtime image source candidate: $RUNTIME_SOURCE"
+echo "Base JDK runtime used: $BASE_JDK_RUNTIME"
+echo "JavaFX jmods path used: $JAVAFX_JMODS_PATH"
+echo "Generated runtime image path: $RUNTIME_IMAGE"
 
 verify_runtime_image() {
   local app_path=$1
