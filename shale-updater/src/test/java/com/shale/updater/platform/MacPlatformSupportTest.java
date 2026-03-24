@@ -47,6 +47,10 @@ final class MacPlatformSupportTest {
 		assertTrue(script.contains("while kill -0 123"));
 		assertTrue(script.contains("shale-desktop-1.0.99.jar"));
 		assertTrue(script.contains("shale-updater-1.0.99.jar"));
+		assertTrue(script.contains("chosen relaunch working directory: '/'"));
+		assertTrue(script.contains("if cd '/'"));
+		assertTrue(script.contains("cwd set explicitly to '/'"));
+		assertTrue(script.contains("final relaunch command: '/Applications/Shale.app/Contents/MacOS/Shale' >> \\\"$LOG_FILE\\\" 2>&1 &"));
 		assertTrue(script.contains("relaunch command executed"));
 	}
 }
