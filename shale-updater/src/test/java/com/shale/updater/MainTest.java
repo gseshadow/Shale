@@ -22,7 +22,7 @@ final class MainTest {
 
 		try (PrintStream capture = new PrintStream(output, true, StandardCharsets.UTF_8)) {
 			System.setOut(capture);
-			success = Main.restartOrLogManualReopen(new FailingPlatformSupport(), Path.of("/Applications/Shale.app"));
+			success = Main.restartOrLogManualReopen(new FailingPlatformSupport(), Path.of("/Applications/Shale.app"), "1.2.3");
 		} finally {
 			System.setOut(originalOut);
 		}
