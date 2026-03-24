@@ -126,18 +126,55 @@ build_custom_runtime_image() {
   "$jlink_bin" \
     --module-path "$module_path" \
     --add-modules "$modules" \
-    --output "$runtime_output" \
-    --strip-debug \
-    --no-man-pages \
-    --no-header-files \
-    --compress=2
+    --output "$runtime_output"
 
-  if [[ ! -x "$runtime_output/bin/java" ]]; then
-    echo "Generated runtime image is missing java binary: $runtime_output/bin/java" >&2
+  echo "$runtime_output"
+}
+
+verify_generated_runtime_image() {
+  local runtime_image=$1
+  local runtime_java="$runtime_image/bin/java"
+
+  if [[ ! -x "$runtime_java" ]]; then
+    echo "Generated runtime image is missing java binary: $runtime_java" >&2
+    echo "Generated runtime has bin/java: no"
     exit 1
   fi
 
-  echo "$runtime_output"
+  echo "Generated runtime has bin/java: yes ($runtime_java)"
+}
+
+verify_generated_runtime_process_spawning() {
+  local base_jdk_runtime=$1
+  local runtime_image=$2
+  local smoke_dir="$ROOT/build/tmp/macos-runtime-smoke"
+  local smoke_src="$smoke_dir/SpawnSmokeTest.java"
+  local javac_bin="$base_jdk_runtime/bin/javac"
+  local runtime_java="$runtime_image/bin/java"
+
+  if [[ ! -x "$javac_bin" ]]; then
+    echo "Expected javac executable at $javac_bin for runtime spawn verification." >&2
+    exit 1
+  fi
+
+  rm -rf "$smoke_dir"
+  mkdir -p "$smoke_dir"
+
+  cat > "$smoke_src" <<'EOF'
+public final class SpawnSmokeTest {
+  public static void main(String[] args) throws Exception {
+    Process process = new ProcessBuilder("/usr/bin/true").start();
+    int exitCode = process.waitFor();
+    if (exitCode != 0) {
+      throw new IllegalStateException("spawn check failed with exit code " + exitCode);
+    }
+  }
+}
+EOF
+
+  "$javac_bin" -d "$smoke_dir" "$smoke_src"
+  "$runtime_java" -cp "$smoke_dir" SpawnSmokeTest
+  echo "Generated runtime process spawn check: passed"
 }
 
 DESKTOP_TARGET="$ROOT/shale-desktop/target"
@@ -154,6 +191,8 @@ RUNTIME_IMAGE=$(build_custom_runtime_image "$BASE_JDK_RUNTIME" "$JAVAFX_JMODS_PA
 echo "Base JDK runtime used: $BASE_JDK_RUNTIME"
 echo "JavaFX jmods path used: $JAVAFX_JMODS_PATH"
 echo "Generated runtime image path: $RUNTIME_IMAGE"
+verify_generated_runtime_image "$RUNTIME_IMAGE"
+verify_generated_runtime_process_spawning "$BASE_JDK_RUNTIME" "$RUNTIME_IMAGE"
 
 verify_runtime_image() {
   local app_path=$1
