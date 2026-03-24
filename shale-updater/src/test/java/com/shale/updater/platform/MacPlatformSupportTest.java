@@ -18,8 +18,8 @@ final class MacPlatformSupportTest {
 		platformSupport.restartApp(installDir, "1.0.99");
 
 		assertEquals(Path.of("/Applications/Shale.app"), platformSupport.targetApp);
-		assertEquals(Path.of("/Applications/Shale.app/Contents/app"), platformSupport.contentsAppDir);
-		assertEquals(Path.of("/Applications/Shale.app/Contents/app/shale-desktop-1.0.99.jar"), platformSupport.expectedJar);
+		assertEquals("1.0.99", platformSupport.expectedVersion);
+		assertEquals(Path.of("/Applications/Shale.app/Contents/app/shale-desktop-1.0.99.jar"), platformSupport.expectedMarker);
 		assertEquals(Path.of("/Applications/Shale.app/Contents/app/lib/shale-updater-1.0.99.jar"), platformSupport.expectedUpdaterJar);
 	}
 
@@ -28,7 +28,7 @@ final class MacPlatformSupportTest {
 		MacPlatformSupport platformSupport = new MacPlatformSupport();
 		String script = platformSupport.helperScript(
 				Path.of("/Applications/Shale.app"),
-				Path.of("/Applications/Shale.app/Contents/app"),
+				"2.0.0",
 				Path.of("/Applications/Shale.app/Contents/app/shale-desktop-2.0.0.jar"),
 				Path.of("/Applications/Shale.app/Contents/app/lib/shale-updater-2.0.0.jar"),
 				1234L,
@@ -36,12 +36,14 @@ final class MacPlatformSupportTest {
 
 		assertTrue(script.contains("helper target path: $TARGET_APP"));
 		assertTrue(script.contains("poll attempt=$attempt"));
-		assertTrue(script.contains("app_exists=$app_exists"));
-		assertTrue(script.contains("contents_app_exists=$contents_exists"));
-		assertTrue(script.contains("expected_jar_exists=$jar_exists"));
+		assertTrue(script.contains("expected_version=$EXPECTED_VERSION"));
+		assertTrue(script.contains("expected_marker_path=$EXPECTED_MARKER"));
+		assertTrue(script.contains("expected_marker_exists=$marker_exists"));
 		assertTrue(script.contains("expected_updater_jar_exists=$updater_jar_exists"));
 		assertTrue(script.contains("helper started"));
 		assertTrue(script.contains("helper arguments: $*"));
+		assertTrue(script.contains("helper expected version: $EXPECTED_VERSION"));
+		assertTrue(script.contains("helper expected marker path: $EXPECTED_MARKER"));
 		assertTrue(script.contains("final relaunch command: $OPEN_CMD"));
 		assertTrue(script.contains("open stdout/stderr: $open_output"));
 		assertTrue(script.contains("open exit code: $open_exit"));
@@ -59,21 +61,21 @@ final class MacPlatformSupportTest {
 
 	private static final class RecordingMacPlatformSupport extends MacPlatformSupport {
 		private Path targetApp;
-		private Path contentsAppDir;
-		private Path expectedJar;
+		private String expectedVersion;
+		private Path expectedMarker;
 		private Path expectedUpdaterJar;
 
 		@Override
 		void startRelaunchHelper(
 				Path targetApp,
-				Path contentsAppDir,
-				Path expectedJar,
+				String expectedVersion,
+				Path expectedMarker,
 				Path expectedUpdaterJar,
 				long updaterPid,
 				Path helperLogPath) {
 			this.targetApp = targetApp;
-			this.contentsAppDir = contentsAppDir;
-			this.expectedJar = expectedJar;
+			this.expectedVersion = expectedVersion;
+			this.expectedMarker = expectedMarker;
 			this.expectedUpdaterJar = expectedUpdaterJar;
 		}
 	}

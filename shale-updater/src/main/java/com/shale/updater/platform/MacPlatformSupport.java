@@ -34,7 +34,7 @@ public class MacPlatformSupport implements PlatformSupport {
 	public void restartApp(Path installDir, String expectedVersion) throws Exception {
 		Path targetApp = relaunchTargetPath();
 		Path contentsAppDir = targetApp.resolve("Contents").resolve("app");
-		Path expectedJar = expectedDesktopJarPath(contentsAppDir, expectedVersion);
+		Path expectedMarker = expectedDesktopJarPath(contentsAppDir, expectedVersion);
 		Path expectedUpdaterJar = expectedUpdaterJarPath(contentsAppDir, expectedVersion);
 		long updaterPid = ProcessHandle.current().pid();
 		Path helperLogPath = helperLogPath();
@@ -44,11 +44,17 @@ public class MacPlatformSupport implements PlatformSupport {
 		log("Helper start time: " + Instant.now());
 		log("Helper expected target version: " + expectedVersion);
 		log("Helper updater pid: " + updaterPid);
-		log("Helper expected jar: " + expectedJar);
+		log("Helper expected marker: " + expectedMarker);
 		log("Helper expected updater jar: " + expectedUpdaterJar);
 		log("Helper log file: " + helperLogPath);
 
-		startRelaunchHelper(targetApp, contentsAppDir, expectedJar, expectedUpdaterJar, updaterPid, helperLogPath);
+		startRelaunchHelper(
+				targetApp,
+				expectedVersion,
+				expectedMarker,
+				expectedUpdaterJar,
+				updaterPid,
+				helperLogPath);
 		log("macOS relaunch helper started for: " + targetApp);
 	}
 
@@ -103,13 +109,14 @@ public class MacPlatformSupport implements PlatformSupport {
 
 	void startRelaunchHelper(
 			Path targetApp,
-			Path contentsAppDir,
-			Path expectedJar,
+			String expectedVersion,
+			Path expectedMarker,
 			Path expectedUpdaterJar,
 			long updaterPid,
 			Path helperLogPath) throws Exception {
 		Files.createDirectories(helperLogPath.getParent());
-		String script = helperScript(targetApp, contentsAppDir, expectedJar, expectedUpdaterJar, updaterPid, helperLogPath);
+		String script =
+				helperScript(targetApp, expectedVersion, expectedMarker, expectedUpdaterJar, updaterPid, helperLogPath);
 		Path helperScriptFile = Files.createTempFile("shale-macos-relaunch-", ".sh");
 		Files.writeString(
 				helperScriptFile,
@@ -135,8 +142,8 @@ public class MacPlatformSupport implements PlatformSupport {
 
 	String helperScript(
 			Path targetApp,
-			Path contentsAppDir,
-			Path expectedJar,
+			String expectedVersion,
+			Path expectedMarker,
 			Path expectedUpdaterJar,
 			long updaterPid,
 			Path helperLogPath) {
@@ -144,8 +151,8 @@ public class MacPlatformSupport implements PlatformSupport {
 				#!/bin/sh
 				LOG_FILE=%s
 				TARGET_APP=%s
-				CONTENTS_APP=%s
-				EXPECTED_JAR=%s
+				EXPECTED_VERSION=%s
+				EXPECTED_MARKER=%s
 				EXPECTED_UPDATER_JAR=%s
 				EXPECTED_UPDATER_JAR_REQUIRED=%s
 				UPDATER_PID=%s
@@ -159,7 +166,8 @@ public class MacPlatformSupport implements PlatformSupport {
 				log_line "helper arguments: $*"
 				log_line "helper target path: $TARGET_APP"
 				log_line "helper start time: $(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')"
-				log_line "helper expected desktop jar: $EXPECTED_JAR"
+				log_line "helper expected version: $EXPECTED_VERSION"
+				log_line "helper expected marker path: $EXPECTED_MARKER"
 				log_line "helper expected updater jar: $EXPECTED_UPDATER_JAR"
 				log_line "helper expected updater jar required: $EXPECTED_UPDATER_JAR_REQUIRED"
 				attempt=1
@@ -169,17 +177,9 @@ public class MacPlatformSupport implements PlatformSupport {
 				  if kill -0 "$UPDATER_PID" 2>/dev/null; then
 				    updater_alive=true
 				  fi
-				  app_exists=false
-				  if [ -d "$TARGET_APP" ]; then
-				    app_exists=true
-				  fi
-				  contents_exists=false
-				  if [ -d "$CONTENTS_APP" ]; then
-				    contents_exists=true
-				  fi
-				  jar_exists=false
-				  if [ -f "$EXPECTED_JAR" ]; then
-				    jar_exists=true
+				  marker_exists=false
+				  if [ -f "$EXPECTED_MARKER" ]; then
+				    marker_exists=true
 				  fi
 
 				  updater_jar_exists=false
@@ -189,8 +189,8 @@ public class MacPlatformSupport implements PlatformSupport {
 				    updater_jar_exists=true
 				  fi
 
-				  log_line "poll attempt=$attempt updater_alive=$updater_alive app_exists=$app_exists contents_app_exists=$contents_exists expected_jar_exists=$jar_exists expected_updater_jar_exists=$updater_jar_exists"
-				  if [ "$updater_alive" = false ] && [ "$app_exists" = true ] && [ "$contents_exists" = true ] && [ "$jar_exists" = true ] && [ "$updater_jar_exists" = true ]; then
+				  log_line "poll attempt=$attempt target_app_path=$TARGET_APP expected_version=$EXPECTED_VERSION expected_marker_path=$EXPECTED_MARKER updater_alive=$updater_alive expected_marker_exists=$marker_exists expected_updater_jar_exists=$updater_jar_exists"
+				  if [ "$updater_alive" = false ] && [ "$marker_exists" = true ] && [ "$updater_jar_exists" = true ]; then
 				    ready_to_launch=true
 				    break
 				  fi
@@ -216,8 +216,8 @@ public class MacPlatformSupport implements PlatformSupport {
 				.formatted(
 						shellQuote(helperLogPath.toString()),
 						shellQuote(targetApp.toString()),
-						shellQuote(contentsAppDir.toString()),
-						shellQuote(expectedJar.toString()),
+						shellQuote(expectedVersion == null ? "" : expectedVersion),
+						shellQuote(expectedMarker.toString()),
 						shellQuote(expectedUpdaterJar == null ? "" : expectedUpdaterJar.toString()),
 						expectedUpdaterJar == null ? "false" : "true",
 						Long.toString(updaterPid),
