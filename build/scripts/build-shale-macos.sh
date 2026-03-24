@@ -19,6 +19,12 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
+echo "setting runtime environment"
+DEFAULT_MAC_JAVA_HOME="/Library/Java/JavaVirtualMachines/liberica-jdk-21.jdk/Contents/Home"
+export JAVA_HOME="${JAVA_HOME:-$DEFAULT_MAC_JAVA_HOME}"
+export MAC_RUNTIME_IMAGE="${MAC_RUNTIME_IMAGE:-$JAVA_HOME}"
+
+
 VERSION=$(python3 - <<'PY'
 from pathlib import Path
 import re
