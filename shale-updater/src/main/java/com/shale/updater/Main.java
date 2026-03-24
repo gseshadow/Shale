@@ -93,7 +93,7 @@ public class Main {
 				}
 
 				System.out.println("Install succeeded at: " + installDir);
-				restartOrLogManualReopen(platformSupport, installDir);
+				restartOrLogManualReopen(platformSupport, installDir, manifest.getVersion());
 
 			} else {
 				System.out.println("Already up to date.");
@@ -104,11 +104,11 @@ public class Main {
 		}
 	}
 
-	static boolean restartOrLogManualReopen(PlatformSupport platformSupport, Path installDir) {
+	static boolean restartOrLogManualReopen(PlatformSupport platformSupport, Path installDir, String expectedVersion) {
 		String displayInstallDir = installDir.toString().replace('\\', '/');
 
 		try {
-			platformSupport.restartApp(installDir);
+			platformSupport.restartApp(installDir, expectedVersion);
 			System.out.println("Relaunch succeeded for: " + displayInstallDir);
 			return true;
 		} catch (Exception ex) {

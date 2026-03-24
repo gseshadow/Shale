@@ -10,6 +10,10 @@ public interface PlatformSupport {
 
 	void restartApp(Path installDir) throws Exception;
 
+	default void restartApp(Path installDir, String expectedVersion) throws Exception {
+		restartApp(installDir);
+	}
+
 	String appExecutableName();
 
 	default Path resolveStagedInstallDir(Path stagingDir) throws Exception {
