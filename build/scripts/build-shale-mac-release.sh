@@ -22,6 +22,10 @@ PY
 
 cd "$ROOT"
 
+if [[ -z "${MAC_RUNTIME_IMAGE:-}" && -n "${JAVA_HOME:-}" ]]; then
+  export MAC_RUNTIME_IMAGE="$JAVA_HOME"
+fi
+
 DIST_MAC="$ROOT/dist-macos"
 MAC_ZIP_NAME="ShaleApp-$VERSION-mac.zip"
 MAC_ZIP_PATH="$DIST_MAC/$MAC_ZIP_NAME"
@@ -32,6 +36,7 @@ echo "Building Shale macOS release $VERSION"
 echo "===================================="
 
 echo "Step 1: Building app image"
+echo "Runtime image preference: MAC_RUNTIME_IMAGE=${MAC_RUNTIME_IMAGE:-<unset>} JAVA_HOME=${JAVA_HOME:-<unset>}"
 ./build/scripts/build-shale-macos.sh app-image
 
 echo "Step 2: Creating Mac updater zip"

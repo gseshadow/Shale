@@ -125,11 +125,14 @@ MAC_ZIP_NAME="ShaleApp-$VERSION-mac.zip"
 MAC_ZIP_PATH="$DIST_MAC/$MAC_ZIP_NAME"
 META_PATH="$DIST_MAC/shale-mac-release.json"
 
-export JAVAFX_JMODS_DIR="$ROOT/build/assets/javafx-jmods-21.0.10"
+if [[ -z "${MAC_RUNTIME_IMAGE:-}" && -n "${JAVA_HOME:-}" ]]; then
+  export MAC_RUNTIME_IMAGE="$JAVA_HOME"
+fi
 
 echo
 echo
 echo "Step 6: Build macOS app image"
+echo "Runtime image preference: MAC_RUNTIME_IMAGE=${MAC_RUNTIME_IMAGE:-<unset>} JAVA_HOME=${JAVA_HOME:-<unset>}"
 "$ROOT/build/scripts/build-shale-macos.sh" app-image
 
 DIST_MAC="$ROOT/dist-macos"
