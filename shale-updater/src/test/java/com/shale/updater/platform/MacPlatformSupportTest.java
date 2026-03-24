@@ -2,6 +2,7 @@ package com.shale.updater.platform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayInputStream;
@@ -46,10 +47,36 @@ final class MacPlatformSupportTest {
 		assertEquals("Desktop launch failed", error.getMessage());
 	}
 
+	@Test
+	void armPreReplacementRelaunchStartsDetachedHelper() {
+		RecordingMacPlatformSupport platformSupport = new RecordingMacPlatformSupport(new FakeProcess(0, ""), null);
+
+		boolean armed = platformSupport.armPreReplacementRelaunch(Path.of("/Applications/Shale.app"));
+
+		assertTrue(armed);
+		assertEquals(List.of("/bin/sh"), platformSupport.helperCommand.subList(0, 1));
+		assertTrue(platformSupport.helperCommand.get(1).endsWith(".sh"));
+		assertEquals("/Applications/Shale.app", platformSupport.helperCommand.get(2));
+		assertTrue(platformSupport.helperLog.toString().endsWith(".log"));
+	}
+
+	@Test
+	void armPreReplacementRelaunchReturnsFalseWhenHelperStartFails() {
+		RecordingMacPlatformSupport platformSupport = new RecordingMacPlatformSupport(new FakeProcess(0, ""), null);
+		platformSupport.helperFailure = new IOException("helper failed");
+
+		boolean armed = platformSupport.armPreReplacementRelaunch(Path.of("/Applications/Shale.app"));
+
+		assertFalse(armed);
+	}
+
 	private static final class RecordingMacPlatformSupport extends MacPlatformSupport {
 		private final FakeProcess process;
 		private final IOException openFailure;
 		private List<String> startedCommand;
+		private List<String> helperCommand;
+		private Path helperLog;
+		private IOException helperFailure;
 
 		private RecordingMacPlatformSupport(FakeProcess process, IOException openFailure) {
 			this.process = process;
@@ -62,6 +89,16 @@ final class MacPlatformSupportTest {
 				throw openFailure;
 			}
 			startedCommand = command;
+			return process;
+		}
+
+		@Override
+		Process startDetachedRelaunchHelper(List<String> command, Path helperLog) throws IOException {
+			if (helperFailure != null) {
+				throw helperFailure;
+			}
+			this.helperCommand = command;
+			this.helperLog = helperLog;
 			return process;
 		}
 	}

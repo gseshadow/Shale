@@ -10,6 +10,10 @@ public interface PlatformSupport {
 
 	void restartApp(Path installDir) throws Exception;
 
+	default boolean armPreReplacementRelaunch(Path installDir) {
+		return false;
+	}
+
 	String appExecutableName();
 
 	default Path resolveStagedInstallDir(Path stagingDir) throws Exception {
