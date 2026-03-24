@@ -40,9 +40,12 @@ final class MacPlatformSupportTest {
 		assertTrue(script.contains("contents_app_exists=$contents_exists"));
 		assertTrue(script.contains("expected_jar_exists=$jar_exists"));
 		assertTrue(script.contains("expected_updater_jar_exists=$updater_jar_exists"));
-		assertTrue(script.contains("final relaunch command: $RELAUNCH_CMD"));
-		assertTrue(script.contains("\"$RELAUNCH_BIN\" >> \"$LOG_FILE\" 2>&1 &"));
-		assertTrue(script.contains("relaunch process start success pid=$launch_pid"));
+		assertTrue(script.contains("helper started"));
+		assertTrue(script.contains("helper arguments: $*"));
+		assertTrue(script.contains("final relaunch command: $OPEN_CMD"));
+		assertTrue(script.contains("open stdout/stderr: $open_output"));
+		assertTrue(script.contains("open exit code: $open_exit"));
+		assertTrue(script.contains("helper finished"));
 	}
 
 	@Test

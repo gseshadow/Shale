@@ -98,11 +98,7 @@ public class MacPlatformSupport implements PlatformSupport {
 	}
 
 	Path helperLogPath() {
-		return Path.of(System.getProperty("user.home"))
-				.resolve("Library")
-				.resolve("Application Support")
-				.resolve("Shale")
-				.resolve("updater-output.log");
+		return Path.of("/tmp").resolve("shale-relaunch-helper.log");
 	}
 
 	void startRelaunchHelper(
@@ -121,10 +117,20 @@ public class MacPlatformSupport implements PlatformSupport {
 				StandardCharsets.UTF_8,
 				StandardOpenOption.TRUNCATE_EXISTING);
 		helperScriptFile.toFile().setExecutable(true, false);
+		log("Helper script path created: " + helperScriptFile);
+		log("Helper script exists after creation: " + Files.exists(helperScriptFile));
+		log("Helper script executable: " + Files.isExecutable(helperScriptFile));
+		log("Helper script content begins >>>");
+		log(script);
+		log("<<< Helper script content ends");
 
-		new ProcessBuilder("/bin/sh", helperScriptFile.toString())
-				.redirectErrorStream(true)
-				.start();
+		ProcessBuilder helperLaunchBuilder = new ProcessBuilder("/bin/sh", helperScriptFile.toString())
+				.redirectErrorStream(true);
+		log("Helper launch command: " + helperLaunchBuilder.command());
+		log("Helper launch working directory: " + Path.of("").toAbsolutePath());
+		Process helperProcess = helperLaunchBuilder.start();
+		log("Helper launch succeeded: true");
+		log("Helper launch process pid: " + helperProcess.pid());
 	}
 
 	String helperScript(
@@ -143,10 +149,14 @@ public class MacPlatformSupport implements PlatformSupport {
 				EXPECTED_UPDATER_JAR=%s
 				EXPECTED_UPDATER_JAR_REQUIRED=%s
 				UPDATER_PID=%s
-				RELAUNCH_BIN=%s
+				OPEN_BIN=%s
+				OPEN_TARGET=%s
 				log_line() {
 				  printf '%%s [RelaunchHelper] %%s\\n' "$(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')" "$1" >> "$LOG_FILE"
 				}
+				: > "$LOG_FILE"
+				log_line "helper started"
+				log_line "helper arguments: $*"
 				log_line "helper target path: $TARGET_APP"
 				log_line "helper start time: $(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')"
 				log_line "helper expected desktop jar: $EXPECTED_JAR"
@@ -191,16 +201,17 @@ public class MacPlatformSupport implements PlatformSupport {
 				  log_line "relaunch checks did not pass before timeout; skipping relaunch"
 				  exit 1
 				fi
-				RELAUNCH_CMD="$RELAUNCH_BIN"
-				log_line "final relaunch command: $RELAUNCH_CMD"
-				"$RELAUNCH_BIN" >> "$LOG_FILE" 2>&1 &
-				launch_pid=$!
-				if [ -n "$launch_pid" ] && kill -0 "$launch_pid" 2>/dev/null; then
-				  log_line "relaunch process start success pid=$launch_pid"
-				else
-				  log_line "relaunch process start failure"
-				  exit 1
+				OPEN_CMD="$OPEN_BIN -n $OPEN_TARGET"
+				log_line "final relaunch command: $OPEN_CMD"
+				open_output=$("$OPEN_BIN" -n "$OPEN_TARGET" 2>&1)
+				open_exit=$?
+				log_line "open stdout/stderr: $open_output"
+				log_line "open exit code: $open_exit"
+				if [ "$open_exit" -ne 0 ]; then
+				  log_line "relaunch failed via open"
+				  exit "$open_exit"
 				fi
+				log_line "helper finished"
 				"""
 				.formatted(
 						shellQuote(helperLogPath.toString()),
@@ -210,7 +221,8 @@ public class MacPlatformSupport implements PlatformSupport {
 						shellQuote(expectedUpdaterJar == null ? "" : expectedUpdaterJar.toString()),
 						expectedUpdaterJar == null ? "false" : "true",
 						Long.toString(updaterPid),
-						shellQuote(targetApp.resolve("Contents").resolve("MacOS").resolve("Shale").toString()));
+						shellQuote("/usr/bin/open"),
+						shellQuote(targetApp.toString()));
 	}
 
 	private String shellQuote(String value) {
