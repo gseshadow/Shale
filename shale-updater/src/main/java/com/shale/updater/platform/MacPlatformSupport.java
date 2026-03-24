@@ -107,6 +107,10 @@ public class MacPlatformSupport implements PlatformSupport {
 		return Path.of("/tmp").resolve("shale-relaunch-helper.log");
 	}
 
+	Path relaunchWorkingDirectoryPath() {
+		return Path.of("/");
+	}
+
 	void startRelaunchHelper(
 			Path targetApp,
 			String expectedVersion,
@@ -131,10 +135,13 @@ public class MacPlatformSupport implements PlatformSupport {
 		log(script);
 		log("<<< Helper script content ends");
 
+		Path relaunchWorkingDir = relaunchWorkingDirectoryPath();
 		ProcessBuilder helperLaunchBuilder = new ProcessBuilder("/bin/sh", helperScriptFile.toString())
+				.directory(relaunchWorkingDir.toFile())
 				.redirectErrorStream(true);
 		log("Helper launch command: " + helperLaunchBuilder.command());
-		log("Helper launch working directory: " + Path.of("").toAbsolutePath());
+		log("Helper launch working directory (explicit): " + relaunchWorkingDir);
+		log("Helper launch cwd explicitly set: true");
 		Process helperProcess = helperLaunchBuilder.start();
 		log("Helper launch succeeded: true");
 		log("Helper launch process pid: " + helperProcess.pid());
@@ -158,6 +165,7 @@ public class MacPlatformSupport implements PlatformSupport {
 				UPDATER_PID=%s
 				OPEN_BIN=%s
 				OPEN_TARGET=%s
+				RELAUNCH_WORKDIR=%s
 				log_line() {
 				  printf '%%s [RelaunchHelper] %%s\\n' "$(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')" "$1" >> "$LOG_FILE"
 				}
@@ -170,6 +178,7 @@ public class MacPlatformSupport implements PlatformSupport {
 				log_line "helper expected marker path: $EXPECTED_MARKER"
 				log_line "helper expected updater jar: $EXPECTED_UPDATER_JAR"
 				log_line "helper expected updater jar required: $EXPECTED_UPDATER_JAR_REQUIRED"
+				log_line "helper relaunch working directory: $RELAUNCH_WORKDIR"
 				attempt=1
 				ready_to_launch=false
 				while [ "$attempt" -le 180 ]; do
@@ -203,6 +212,12 @@ public class MacPlatformSupport implements PlatformSupport {
 				fi
 				OPEN_CMD="$OPEN_BIN -n $OPEN_TARGET"
 				log_line "final relaunch command: $OPEN_CMD"
+				if cd "$RELAUNCH_WORKDIR"; then
+				  log_line "relaunch cwd set explicitly: $RELAUNCH_WORKDIR"
+				else
+				  log_line "relaunch failed to set cwd: $RELAUNCH_WORKDIR"
+				  exit 1
+				fi
 				open_output=$("$OPEN_BIN" -n "$OPEN_TARGET" 2>&1)
 				open_exit=$?
 				log_line "open stdout/stderr: $open_output"
@@ -222,7 +237,8 @@ public class MacPlatformSupport implements PlatformSupport {
 						expectedUpdaterJar == null ? "false" : "true",
 						Long.toString(updaterPid),
 						shellQuote("/usr/bin/open"),
-						shellQuote(targetApp.toString()));
+						shellQuote(targetApp.toString()),
+						shellQuote(relaunchWorkingDirectoryPath().toString()));
 	}
 
 	private String shellQuote(String value) {
