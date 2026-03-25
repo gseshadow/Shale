@@ -611,7 +611,7 @@ public final class UserController {
 				row.responsibleAttorneyColor()));
 		if (card instanceof Region region) {
 			region.setMaxWidth(Double.MAX_VALUE);
-			region.setPrefWidth(300);
+			region.setPrefWidth(340);
 		}
 		return card;
 	}
