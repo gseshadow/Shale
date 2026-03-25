@@ -1267,7 +1267,11 @@ public class CaseController {
 	}
 
 	private TaskCardFactory buildTaskCardFactory(Consumer<Long> onOpenTaskAction) {
-		return new TaskCardFactory(onOpenTaskAction, this::onToggleTaskComplete);
+		return new TaskCardFactory(
+				onOpenTaskAction,
+				this::onToggleTaskComplete,
+				onOpenUser == null ? id -> {
+				} : onOpenUser);
 	}
 
 	private void onAddTask() {

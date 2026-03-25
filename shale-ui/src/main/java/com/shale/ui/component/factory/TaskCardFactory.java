@@ -26,12 +26,15 @@ public final class TaskCardFactory {
 
     private final Consumer<Long> onOpenTask;
     private final Consumer<Long> onToggleCompleteTask;
+    private final Consumer<Integer> onOpenUser;
 
     public TaskCardFactory(
             Consumer<Long> onOpenTask,
-            Consumer<Long> onToggleCompleteTask) {
+            Consumer<Long> onToggleCompleteTask,
+            Consumer<Integer> onOpenUser) {
         this.onOpenTask = onOpenTask;
         this.onToggleCompleteTask = onToggleCompleteTask;
+        this.onOpenUser = onOpenUser;
     }
 
     public TaskCard create(TaskCardModel model, Variant variant) {
@@ -41,6 +44,7 @@ public final class TaskCardFactory {
         card.setTaskId(model.taskId());
         card.setOnOpen(onOpenTask);
         card.setOnToggleComplete(onToggleCompleteTask);
+        card.setOnOpenAssigneeUser(onOpenUser);
         card.setTitle(model.title());
         card.setDueAt(model.dueAt());
         card.setDescriptionPreview(model.description());

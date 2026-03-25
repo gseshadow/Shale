@@ -18,6 +18,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -85,7 +86,7 @@ public final class NewTaskDialog {
         UserCardFactory userCardFactory = new UserCardFactory(id -> {
         });
         assigneeComboBox.setCellFactory(cb -> new AssigneeChoiceListCell(userCardFactory));
-        assigneeComboBox.setButtonCell(new AssigneeChoiceListCell(userCardFactory));
+        assigneeComboBox.setButtonCell(new AssigneeChoiceButtonCell());
         List<CaseTaskService.AssignableUserOption> safeAssignees = availableAssignees == null ? List.of() : availableAssignees;
         assigneeComboBox.getItems().add(AssigneeChoice.unassigned());
         for (CaseTaskService.AssignableUserOption assignee : safeAssignees) {
@@ -254,8 +255,32 @@ public final class NewTaskDialog {
                     new UserCardModel(item.userId(), text, item.colorCss(), null),
                     UserCardFactory.Variant.MINI);
             card.setMouseTransparent(true);
+            setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
             setText(null);
             setGraphic(card);
+        }
+    }
+
+    private static final class AssigneeChoiceButtonCell extends javafx.scene.control.ListCell<AssigneeChoice> {
+        @Override
+        protected void updateItem(AssigneeChoice item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setText(null);
+                setGraphic(null);
+                return;
+            }
+            if (item.userId() == null) {
+                setText("Unassigned");
+                setGraphic(null);
+                return;
+            }
+            String text = item.displayName();
+            if (text == null || text.isBlank()) {
+                text = "User #" + item.userId();
+            }
+            setText(text);
+            setGraphic(null);
         }
     }
 }

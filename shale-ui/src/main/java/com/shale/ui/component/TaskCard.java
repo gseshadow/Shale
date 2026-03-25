@@ -39,6 +39,7 @@ public final class TaskCard extends VBox {
 	private Long taskId;
 	private Consumer<Long> onOpen;
 	private Consumer<Long> onToggleComplete;
+	private Consumer<Integer> onOpenAssigneeUser;
 	private String backgroundCss;
 	private boolean hovered;
 
@@ -58,6 +59,10 @@ public final class TaskCard extends VBox {
 
 	public void setOnToggleComplete(Consumer<Long> onToggleComplete) {
 		this.onToggleComplete = onToggleComplete;
+	}
+
+	public void setOnOpenAssigneeUser(Consumer<Integer> onOpenAssigneeUser) {
+		this.onOpenAssigneeUser = onOpenAssigneeUser;
 	}
 
 	public void setTitle(String title) {
@@ -108,7 +113,12 @@ public final class TaskCard extends VBox {
 		var assigneeCard = userCardFactory.create(
 				new UserCardModel(userId, normalized, colorCss, null),
 				UserCardFactory.Variant.MINI);
-		assigneeCard.setMouseTransparent(true);
+		assigneeCard.setOnMouseClicked(e -> {
+			e.consume();
+			if (onOpenAssigneeUser != null) {
+				onOpenAssigneeUser.accept(userId);
+			}
+		});
 		assigneeHost.getChildren().setAll(assigneeCard);
 		assigneeHost.setManaged(true);
 		assigneeHost.setVisible(true);
@@ -143,6 +153,7 @@ public final class TaskCard extends VBox {
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
 		assigneeHost.setAlignment(Pos.CENTER_LEFT);
+		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
@@ -161,6 +172,7 @@ public final class TaskCard extends VBox {
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
 		assigneeHost.setAlignment(Pos.CENTER_LEFT);
+		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
 		completedLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
