@@ -102,15 +102,21 @@
 
                     </GridPane>
 
-                    <VBox spacing="8" styleClass="secondary-panel">
+                    <VBox prefWidth="360" minWidth="300" maxWidth="420" spacing="10" styleClass="secondary-panel">
+                        <padding>
+                            <Insets top="12" right="12" bottom="12" left="12" />
+                        </padding>
                         <HBox spacing="8" alignment="CENTER_LEFT">
-                            <Label text="Roles" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                            <Label text="Assigned Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                             <Region HBox.hgrow="ALWAYS" />
-                            <Button fx:id="addRoleButton" text="Add Role" visible="false" managed="false" />
+                        </HBox>
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <TextField fx:id="assignedCasesSearchField" promptText="Search assigned cases…" HBox.hgrow="ALWAYS" />
+                            <ChoiceBox fx:id="assignedCasesSortChoice" prefWidth="180" />
                         </HBox>
                         <StackPane>
-                            <FlowPane fx:id="rolesFlow" hgap="10" vgap="10" prefWrapLength="900" />
-                            <Label fx:id="rolesEmptyLabel" text="No roles assigned" visible="false" managed="false" />
+                            <VBox fx:id="assignedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
+                            <Label fx:id="assignedCasesEmptyLabel" text="No assigned cases" visible="false" managed="false" />
                         </StackPane>
                     </VBox>
                 </VBox>
