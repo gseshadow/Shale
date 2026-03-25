@@ -24,6 +24,7 @@ import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.SearchService;
+import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -168,7 +169,14 @@ public final class SceneManager {
 		{
 			UserController c = (UserController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
-			c.init(userId, userDao, appState);
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			UserDetailService userDetailService = new UserDetailService(userDao, caseDao);
+			c.init(userId, userDetailService, appState, relatedCaseId -> {
+				MainController mainController = resolveMainController();
+				if (mainController != null) {
+					mainController.openCase(relatedCaseId);
+				}
+			});
 			return c;
 		});
 	}
