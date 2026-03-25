@@ -79,6 +79,7 @@ public class Main {
 				System.out.println("Resolved staged install dir: " + stagedInstallDir);
 
 				platformSupport.stopRunningApp(installDir);
+				armRelaunchHelperOrContinue(platformSupport, installDir, manifest.getVersion());
 
 				InstallService installService = new InstallService();
 				Path backupDir = installService.backupInstallDir(installDir);
@@ -101,6 +102,15 @@ public class Main {
 		} catch (Exception ex) {
 			System.out.println("Update check failed: " + ex.getMessage());
 			ex.printStackTrace();
+		}
+	}
+
+	static void armRelaunchHelperOrContinue(PlatformSupport platformSupport, Path installDir, String expectedVersion) {
+		try {
+			platformSupport.armRelaunchHelper(installDir, expectedVersion);
+		} catch (Exception ex) {
+			System.out.println("Failed to arm relaunch helper; continuing install: " + ex.getMessage());
+			ex.printStackTrace(System.out);
 		}
 	}
 

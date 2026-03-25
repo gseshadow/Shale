@@ -14,6 +14,9 @@ public interface PlatformSupport {
 		restartApp(installDir);
 	}
 
+	default void armRelaunchHelper(Path installDir, String expectedVersion) throws Exception {
+	}
+
 	String appExecutableName();
 
 	default Path resolveStagedInstallDir(Path stagingDir) throws Exception {

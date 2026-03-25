@@ -19,6 +19,12 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
+echo "setting runtime environment"
+DEFAULT_MAC_JAVA_HOME="/Library/Java/JavaVirtualMachines/liberica-jdk-21.jdk/Contents/Home"
+export JAVA_HOME="${JAVA_HOME:-}"
+export MAC_RUNTIME_IMAGE="${MAC_RUNTIME_IMAGE:-}"
+
+
 VERSION=$(python3 - <<'PY'
 from pathlib import Path
 import re
@@ -30,12 +36,166 @@ print(match.group(1))
 PY
 )
 
-JAVAFX_JMODS_DIR=${JAVAFX_JMODS_DIR:-$ROOT/build/assets/javafx-jmods-21.0.10}
-if [[ ! -d "$JAVAFX_JMODS_DIR" ]]; then
-  echo "Missing JavaFX jmods directory: $JAVAFX_JMODS_DIR" >&2
-  echo "Set JAVAFX_JMODS_DIR to a macOS JavaFX jmods folder before running this script." >&2
+resolve_base_jdk_runtime() {
+  local candidate
+  local resolved=""
+  local checked=()
+
+  if [[ -n "${MAC_RUNTIME_IMAGE:-}" ]]; then
+    candidate="$MAC_RUNTIME_IMAGE"
+    checked+=("$candidate")
+    if [[ -d "$candidate/Contents/Home/bin" ]]; then
+      resolved="$candidate"
+    elif [[ -d "$candidate/bin" ]]; then
+      resolved="$candidate"
+    fi
+  fi
+
+  if [[ -z "$resolved" && -n "${JAVA_HOME:-}" ]]; then
+    candidate="$JAVA_HOME"
+    checked+=("$candidate")
+    if [[ -d "$candidate/Contents/Home/bin" ]]; then
+      resolved="$candidate"
+    elif [[ -d "$candidate/bin" ]]; then
+      resolved="$candidate"
+    fi
+  fi
+
+  if [[ -z "$resolved" && -n "$DEFAULT_MAC_JAVA_HOME" ]]; then
+    candidate="$DEFAULT_MAC_JAVA_HOME"
+    checked+=("$candidate")
+    if [[ -d "$candidate/Contents/Home/bin" ]]; then
+      resolved="$candidate"
+    elif [[ -d "$candidate/bin" ]]; then
+      resolved="$candidate"
+    fi
+  fi
+
+  if [[ -z "$resolved" ]]; then
+    echo "No valid macOS JDK runtime found." >&2
+    echo "Provide MAC_RUNTIME_IMAGE (preferred), JAVA_HOME, or install a JDK at $DEFAULT_MAC_JAVA_HOME." >&2
+    if [[ ${#checked[@]} -gt 0 ]]; then
+      echo "Checked candidates:" >&2
+      printf '  - %s\n' "${checked[@]}" >&2
+    fi
+    exit 1
+  fi
+
+  if [[ -d "$resolved/Contents/Home/bin" ]]; then
+    echo "$resolved/Contents/Home"
+  else
+    echo "$resolved"
+  fi
+}
+
+resolve_javafx_jmods_dir() {
+  local configured_jmods="${JAVAFX_JMODS_DIR:-}"
+  local default_jmods="$ROOT/build/assets/javafx-jmods-macos"
+  local legacy_jmods="$ROOT/build/assets/javafx-jmods-21.0.10"
+  local checked=()
+
+  if [[ -n "$configured_jmods" ]]; then
+    checked+=("$configured_jmods")
+    if [[ -d "$configured_jmods" ]]; then
+      echo "$configured_jmods"
+      return
+    fi
+  fi
+
+  checked+=("$default_jmods")
+  if [[ -d "$default_jmods" ]]; then
+    echo "$default_jmods"
+    return
+  fi
+
+  checked+=("$legacy_jmods")
+  if [[ -d "$legacy_jmods" ]]; then
+    echo "$legacy_jmods"
+    return
+  fi
+
+  echo "JavaFX jmods directory not found." >&2
+  echo "Checked candidates (in precedence order):" >&2
+  printf '  - %s\n' "${checked[@]}" >&2
+  echo "Set JAVAFX_JMODS_DIR or ensure one of the default paths exists." >&2
   exit 1
-fi
+}
+
+build_custom_runtime_image() {
+  local base_jdk_runtime=$1
+  local javafx_jmods_dir=$2
+  local runtime_output="$ROOT/build/tmp/macos-runtime-image"
+  local jlink_bin="$base_jdk_runtime/bin/jlink"
+  local jdk_jmods_dir="$base_jdk_runtime/jmods"
+  local module_path="$jdk_jmods_dir:$javafx_jmods_dir"
+  local modules="javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec"
+
+  if [[ ! -x "$jlink_bin" ]]; then
+    echo "Expected jlink executable at $jlink_bin" >&2
+    exit 1
+  fi
+
+  if [[ ! -d "$jdk_jmods_dir" ]]; then
+    echo "Expected JDK jmods directory at $jdk_jmods_dir" >&2
+    exit 1
+  fi
+
+  rm -rf "$runtime_output"
+  mkdir -p "$(dirname "$runtime_output")"
+
+  "$jlink_bin" \
+    --module-path "$module_path" \
+    --add-modules "$modules" \
+    --output "$runtime_output"
+
+  echo "$runtime_output"
+}
+
+verify_generated_runtime_image() {
+  local runtime_image=$1
+  local runtime_java="$runtime_image/bin/java"
+
+  if [[ ! -x "$runtime_java" ]]; then
+    echo "Generated runtime image is missing java binary: $runtime_java" >&2
+    echo "Generated runtime has bin/java: no"
+    exit 1
+  fi
+
+  echo "Generated runtime has bin/java: yes ($runtime_java)"
+}
+
+verify_generated_runtime_process_spawning() {
+  local base_jdk_runtime=$1
+  local runtime_image=$2
+  local smoke_dir="$ROOT/build/tmp/macos-runtime-smoke"
+  local smoke_src="$smoke_dir/SpawnSmokeTest.java"
+  local javac_bin="$base_jdk_runtime/bin/javac"
+  local runtime_java="$runtime_image/bin/java"
+
+  if [[ ! -x "$javac_bin" ]]; then
+    echo "Expected javac executable at $javac_bin for runtime spawn verification." >&2
+    exit 1
+  fi
+
+  rm -rf "$smoke_dir"
+  mkdir -p "$smoke_dir"
+
+  cat > "$smoke_src" <<'EOF'
+public final class SpawnSmokeTest {
+  public static void main(String[] args) throws Exception {
+    Process process = new ProcessBuilder("/usr/bin/true").start();
+    int exitCode = process.waitFor();
+    if (exitCode != 0) {
+      throw new IllegalStateException("spawn check failed with exit code " + exitCode);
+    }
+  }
+}
+EOF
+
+  "$javac_bin" -d "$smoke_dir" "$smoke_src"
+  "$runtime_java" -cp "$smoke_dir" SpawnSmokeTest
+  echo "Generated runtime process spawn check: passed"
+}
 
 DESKTOP_TARGET="$ROOT/shale-desktop/target"
 DIST_DIR="$ROOT/dist-macos"
@@ -44,14 +204,15 @@ mkdir -p "$DIST_DIR"
 rm -rf "$DIST_DIR/Shale" "$DIST_DIR/Shale.app"
 rm -f "$DIST_DIR"/Shale*.dmg
 
-# Keep the Java launcher in the bundled runtime so the mac updater can run
-# the self-contained shaded updater jar via
-# `java -jar shale-updater-<version>.jar` from inside the packaged app.
-JLINK_OPTIONS=(
-  --strip-debug
-  --no-man-pages
-  --no-header-files
-)
+BASE_JDK_RUNTIME=$(resolve_base_jdk_runtime)
+JAVAFX_JMODS_PATH=$(resolve_javafx_jmods_dir)
+RUNTIME_IMAGE=$(build_custom_runtime_image "$BASE_JDK_RUNTIME" "$JAVAFX_JMODS_PATH")
+
+echo "Base JDK runtime used: $BASE_JDK_RUNTIME"
+echo "JavaFX jmods path used: $JAVAFX_JMODS_PATH"
+echo "Generated runtime image path: $RUNTIME_IMAGE"
+verify_generated_runtime_image "$RUNTIME_IMAGE"
+verify_generated_runtime_process_spawning "$BASE_JDK_RUNTIME" "$RUNTIME_IMAGE"
 
 verify_runtime_image() {
   local app_path=$1
@@ -74,9 +235,7 @@ build_package() {
     --icon "$ROOT/build/assets/Shale.icns" \
     --main-jar "shale-desktop-$VERSION.jar" \
     --main-class com.shale.desktop.MainApp \
-    --module-path "$JAVAFX_JMODS_DIR" \
-    --add-modules javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec \
-    --jlink-options "${JLINK_OPTIONS[*]}" \
+    --runtime-image "$RUNTIME_IMAGE" \
     --app-version "$VERSION" \
     --vendor "Get Downing" \
     --description "Shale Desktop"

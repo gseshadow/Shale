@@ -1,85 +1,61 @@
 package com.shale.updater.platform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 final class MacPlatformSupportTest {
 
 	@Test
-	void restartAppUsesApplicationsTargetAndVersionedJar() throws Exception {
-		Path installDir = Path.of("/Applications/Shale.app");
-		RecordingMacPlatformSupport platformSupport = new RecordingMacPlatformSupport();
-
-		platformSupport.restartApp(installDir, "1.0.99");
-
-		assertEquals(Path.of("/Applications/Shale.app"), platformSupport.targetApp);
-		assertEquals("1.0.99", platformSupport.expectedVersion);
-		assertEquals(Path.of("/Applications/Shale.app/Contents/app/shale-desktop-1.0.99.jar"), platformSupport.expectedMarker);
-		assertEquals(Path.of("/Applications/Shale.app/Contents/app/lib/shale-updater-1.0.99.jar"), platformSupport.expectedUpdaterJar);
+	void relaunchTargetPathUsesApplicationsFolder() {
+		MacPlatformSupport platformSupport = new MacPlatformSupport();
+		assertEquals(Path.of("/Applications/Shale.app"), platformSupport.relaunchTargetPath());
 	}
 
 	@Test
-	void helperScriptLogsPollingStateAndFinalOpenCommand() {
+	void resolveStagedInstallDirFindsDirectAppBundle(@TempDir Path tempDir) throws Exception {
+		MacPlatformSupport platformSupport = new MacPlatformSupport();
+		Path appBundle = tempDir.resolve("Shale.app");
+		Files.createDirectories(appBundle);
+
+		assertEquals(appBundle, platformSupport.resolveStagedInstallDir(tempDir));
+	}
+
+	@Test
+	void restartAppFailsWhenHelperWasNotArmed() {
+		MacPlatformSupport platformSupport = new MacPlatformSupport();
+		assertThrows(IOException.class, () -> platformSupport.restartApp(Path.of("/ignored"), "1.0.99"));
+	}
+
+	@Test
+	void helperScriptWaitsForExpectedVersionedJars() {
 		MacPlatformSupport platformSupport = new MacPlatformSupport();
 		String script = platformSupport.helperScript(
-				Path.of("/Applications/Shale.app"),
-				"2.0.0",
-				Path.of("/Applications/Shale.app/Contents/app/shale-desktop-2.0.0.jar"),
-				Path.of("/Applications/Shale.app/Contents/app/lib/shale-updater-2.0.0.jar"),
-				1234L,
-				Path.of("/tmp/updater-output.log"));
+				123L,
+				Path.of("/Applications/Shale.app/Contents/app/shale-desktop-1.0.99.jar"),
+				Path.of("/Applications/Shale.app/Contents/app/lib/shale-updater-1.0.99.jar"),
+				Path.of("/Applications/Shale.app/Contents/MacOS/Shale"),
+				Path.of("/tmp/helper.log"));
 
-		assertTrue(script.contains("helper target path: $TARGET_APP"));
-		assertTrue(script.contains("poll attempt=$attempt"));
-		assertTrue(script.contains("expected_version=$EXPECTED_VERSION"));
-		assertTrue(script.contains("expected_marker_path=$EXPECTED_MARKER"));
-		assertTrue(script.contains("expected_marker_exists=$marker_exists"));
-		assertTrue(script.contains("expected_updater_jar_exists=$updater_jar_exists"));
-		assertTrue(script.contains("helper started"));
-		assertTrue(script.contains("helper arguments: $*"));
-		assertTrue(script.contains("helper expected version: $EXPECTED_VERSION"));
-		assertTrue(script.contains("helper expected marker path: $EXPECTED_MARKER"));
-		assertTrue(script.contains("helper relaunch working directory: $RELAUNCH_WORKDIR"));
-		assertTrue(script.contains("final relaunch command: $OPEN_CMD"));
-		assertTrue(script.contains("if cd \"$RELAUNCH_WORKDIR\"; then"));
-		assertTrue(script.contains("relaunch cwd set explicitly: $RELAUNCH_WORKDIR"));
-		assertTrue(script.contains("open stdout/stderr: $open_output"));
-		assertTrue(script.contains("open exit code: $open_exit"));
-		assertTrue(script.contains("helper finished"));
-	}
+		assertTrue(script.contains("while kill -0 123"));
+		assertTrue(script.contains("until [ -f"));
+		assertTrue(script.contains("waiting for marker/updater jars"));
+		assertTrue(script.contains("marker and updater jars ready"));
 
-	@Test
-	void expectedUpdaterJarPathIsOptionalWhenVersionUnknown() {
-		MacPlatformSupport platformSupport = new MacPlatformSupport();
-		Path contentsAppDir = Path.of("/Applications/Shale.app/Contents/app");
+		assertTrue(script.contains("shale-desktop-1.0.99.jar"));
+		assertTrue(script.contains("shale-updater-1.0.99.jar"));
 
-		assertNull(platformSupport.expectedUpdaterJarPath(contentsAppDir, null));
-		assertNull(platformSupport.expectedUpdaterJarPath(contentsAppDir, ""));
-	}
-
-	private static final class RecordingMacPlatformSupport extends MacPlatformSupport {
-		private Path targetApp;
-		private String expectedVersion;
-		private Path expectedMarker;
-		private Path expectedUpdaterJar;
-
-		@Override
-		void startRelaunchHelper(
-				Path targetApp,
-				String expectedVersion,
-				Path expectedMarker,
-				Path expectedUpdaterJar,
-				long updaterPid,
-				Path helperLogPath) {
-			this.targetApp = targetApp;
-			this.expectedVersion = expectedVersion;
-			this.expectedMarker = expectedMarker;
-			this.expectedUpdaterJar = expectedUpdaterJar;
-		}
+		assertTrue(script.contains("chosen relaunch working directory"));
+		assertTrue(script.contains("cwd set explicitly"));
+		assertTrue(script.contains("cd /") || script.contains("cd '/'"));
+		assertTrue(script.contains("final relaunch command"));
+		assertTrue(script.contains("relaunch command executed"));
 	}
 }

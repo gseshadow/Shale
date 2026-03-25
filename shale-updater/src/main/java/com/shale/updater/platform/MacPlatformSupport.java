@@ -1,15 +1,15 @@
 package com.shale.updater.platform;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 public class MacPlatformSupport implements PlatformSupport {
+
+	private final AtomicBoolean relaunchHelperArmed = new AtomicBoolean(false);
 
 	@Override
 	public Platform platform() {
@@ -32,30 +32,40 @@ public class MacPlatformSupport implements PlatformSupport {
 
 	@Override
 	public void restartApp(Path installDir, String expectedVersion) throws Exception {
+		if (!relaunchHelperArmed.get()) {
+			throw new IOException("macOS relaunch helper was not armed before replacement");
+		}
+		log("macOS relaunch delegated to pre-armed detached helper");
+	}
+
+	@Override
+	public void armRelaunchHelper(Path installDir, String expectedVersion) throws Exception {
+		if (expectedVersion == null || expectedVersion.isBlank()) {
+			log("Skipping macOS relaunch helper arming because expected version is blank");
+			return;
+		}
+
 		Path targetApp = relaunchTargetPath();
-		Path contentsAppDir = targetApp.resolve("Contents").resolve("app");
-		Path expectedMarker = expectedDesktopJarPath(contentsAppDir, expectedVersion);
-		Path expectedUpdaterJar = expectedUpdaterJarPath(contentsAppDir, expectedVersion);
+		Path markerJar = targetApp.resolve("Contents/app/shale-desktop-" + expectedVersion + ".jar");
+		Path updaterJar = targetApp.resolve("Contents/app/lib/shale-updater-" + expectedVersion + ".jar");
+		Path appBinary = targetApp.resolve("Contents/MacOS/Shale");
 		long updaterPid = ProcessHandle.current().pid();
-		Path helperLogPath = helperLogPath();
+		Path helperLog = helperLogPath();
 
-		log("Scheduling macOS relaunch helper");
-		log("Helper target path: " + targetApp);
-		log("Helper start time: " + Instant.now());
-		log("Helper expected target version: " + expectedVersion);
-		log("Helper updater pid: " + updaterPid);
-		log("Helper expected marker: " + expectedMarker);
-		log("Helper expected updater jar: " + expectedUpdaterJar);
-		log("Helper log file: " + helperLogPath);
+		String helperScript = helperScript(updaterPid, markerJar, updaterJar, appBinary, helperLog);
+		ProcessBuilder builder = new ProcessBuilder("nohup", "/bin/sh", "-c", helperScript).redirectErrorStream(true);
 
-		startRelaunchHelper(
-				targetApp,
-				expectedVersion,
-				expectedMarker,
-				expectedUpdaterJar,
-				updaterPid,
-				helperLogPath);
-		log("macOS relaunch helper started for: " + targetApp);
+		log("Arming detached macOS relaunch helper before backup/replace");
+		log("macOS relaunch helper updater pid: " + updaterPid);
+		log("macOS relaunch helper marker jar: " + markerJar);
+		log("macOS relaunch helper updater jar: " + updaterJar);
+		log("macOS relaunch helper app binary: " + appBinary);
+		log("macOS relaunch helper log path: " + helperLog);
+		log("macOS relaunch helper command: " + builder.command());
+
+		Process process = builder.start();
+		log("macOS relaunch helper launcher process started with pid: " + process.pid());
+		relaunchHelperArmed.set(true);
 	}
 
 	@Override
@@ -89,156 +99,34 @@ public class MacPlatformSupport implements PlatformSupport {
 		return Path.of("/Applications").resolve(appExecutableName());
 	}
 
-	Path expectedDesktopJarPath(Path contentsAppDir, String expectedVersion) {
-		if (expectedVersion == null || expectedVersion.isBlank()) {
-			return contentsAppDir.resolve("shale-desktop.jar");
-		}
-		return contentsAppDir.resolve("shale-desktop-" + expectedVersion + ".jar");
-	}
-
-	Path expectedUpdaterJarPath(Path contentsAppDir, String expectedVersion) {
-		if (expectedVersion == null || expectedVersion.isBlank()) {
-			return null;
-		}
-		return contentsAppDir.resolve("lib").resolve("shale-updater-" + expectedVersion + ".jar");
-	}
-
 	Path helperLogPath() {
-		return Path.of("/tmp").resolve("shale-relaunch-helper.log");
+		return Path.of("/tmp/shale-updater-relaunch-helper.log");
 	}
 
-	Path relaunchWorkingDirectoryPath() {
-		return Path.of("/");
-	}
+	String helperScript(long updaterPid, Path markerJar, Path updaterJar, Path appBinary, Path helperLog) {
+		String updaterPidValue = Long.toString(updaterPid);
+		String markerPath = shellQuote(markerJar.toString());
+		String updaterPath = shellQuote(updaterJar.toString());
+		String appBinaryPath = shellQuote(appBinary.toString());
+		String helperLogPath = shellQuote(helperLog.toString());
+		String relaunchWorkingDir = shellQuote("/");
 
-	void startRelaunchHelper(
-			Path targetApp,
-			String expectedVersion,
-			Path expectedMarker,
-			Path expectedUpdaterJar,
-			long updaterPid,
-			Path helperLogPath) throws Exception {
-		Files.createDirectories(helperLogPath.getParent());
-		String script =
-				helperScript(targetApp, expectedVersion, expectedMarker, expectedUpdaterJar, updaterPid, helperLogPath);
-		Path helperScriptFile = Files.createTempFile("shale-macos-relaunch-", ".sh");
-		Files.writeString(
-				helperScriptFile,
-				script,
-				StandardCharsets.UTF_8,
-				StandardOpenOption.TRUNCATE_EXISTING);
-		helperScriptFile.toFile().setExecutable(true, false);
-		log("Helper script path created: " + helperScriptFile);
-		log("Helper script exists after creation: " + Files.exists(helperScriptFile));
-		log("Helper script executable: " + Files.isExecutable(helperScriptFile));
-		log("Helper script content begins >>>");
-		log(script);
-		log("<<< Helper script content ends");
-
-		Path relaunchWorkingDir = relaunchWorkingDirectoryPath();
-		ProcessBuilder helperLaunchBuilder = new ProcessBuilder("/bin/sh", helperScriptFile.toString())
-				.directory(relaunchWorkingDir.toFile())
-				.redirectErrorStream(true);
-		log("Helper launch command: " + helperLaunchBuilder.command());
-		log("Helper launch working directory (explicit): " + relaunchWorkingDir);
-		log("Helper launch cwd explicitly set: true");
-		Process helperProcess = helperLaunchBuilder.start();
-		log("Helper launch succeeded: true");
-		log("Helper launch process pid: " + helperProcess.pid());
-	}
-
-	String helperScript(
-			Path targetApp,
-			String expectedVersion,
-			Path expectedMarker,
-			Path expectedUpdaterJar,
-			long updaterPid,
-			Path helperLogPath) {
-		return """
-				#!/bin/sh
-				LOG_FILE=%s
-				TARGET_APP=%s
-				EXPECTED_VERSION=%s
-				EXPECTED_MARKER=%s
-				EXPECTED_UPDATER_JAR=%s
-				EXPECTED_UPDATER_JAR_REQUIRED=%s
-				UPDATER_PID=%s
-				OPEN_BIN=%s
-				OPEN_TARGET=%s
-				RELAUNCH_WORKDIR=%s
-				log_line() {
-				  printf '%%s [RelaunchHelper] %%s\\n' "$(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')" "$1" >> "$LOG_FILE"
-				}
-				: > "$LOG_FILE"
-				log_line "helper started"
-				log_line "helper arguments: $*"
-				log_line "helper target path: $TARGET_APP"
-				log_line "helper start time: $(date -u '+%%Y-%%m-%%dT%%H:%%M:%%SZ')"
-				log_line "helper expected version: $EXPECTED_VERSION"
-				log_line "helper expected marker path: $EXPECTED_MARKER"
-				log_line "helper expected updater jar: $EXPECTED_UPDATER_JAR"
-				log_line "helper expected updater jar required: $EXPECTED_UPDATER_JAR_REQUIRED"
-				log_line "helper relaunch working directory: $RELAUNCH_WORKDIR"
-				attempt=1
-				ready_to_launch=false
-				while [ "$attempt" -le 180 ]; do
-				  updater_alive=false
-				  if kill -0 "$UPDATER_PID" 2>/dev/null; then
-				    updater_alive=true
-				  fi
-				  marker_exists=false
-				  if [ -f "$EXPECTED_MARKER" ]; then
-				    marker_exists=true
-				  fi
-
-				  updater_jar_exists=false
-				  if [ "$EXPECTED_UPDATER_JAR_REQUIRED" = false ]; then
-				    updater_jar_exists=true
-				  elif [ -f "$EXPECTED_UPDATER_JAR" ]; then
-				    updater_jar_exists=true
-				  fi
-
-				  log_line "poll attempt=$attempt target_app_path=$TARGET_APP expected_version=$EXPECTED_VERSION expected_marker_path=$EXPECTED_MARKER updater_alive=$updater_alive expected_marker_exists=$marker_exists expected_updater_jar_exists=$updater_jar_exists"
-				  if [ "$updater_alive" = false ] && [ "$marker_exists" = true ] && [ "$updater_jar_exists" = true ]; then
-				    ready_to_launch=true
-				    break
-				  fi
-				  attempt=$((attempt + 1))
-				  sleep 1
-				done
-				if [ "$ready_to_launch" != true ]; then
-				  log_line "relaunch checks did not pass before timeout; skipping relaunch"
-				  exit 1
-				fi
-				OPEN_CMD="$OPEN_BIN -n $OPEN_TARGET"
-				log_line "final relaunch command: $OPEN_CMD"
-				if cd "$RELAUNCH_WORKDIR"; then
-				  log_line "relaunch cwd set explicitly: $RELAUNCH_WORKDIR"
-				else
-				  log_line "relaunch failed to set cwd: $RELAUNCH_WORKDIR"
-				  exit 1
-				fi
-				open_output=$("$OPEN_BIN" -n "$OPEN_TARGET" 2>&1)
-				open_exit=$?
-				log_line "open stdout/stderr: $open_output"
-				log_line "open exit code: $open_exit"
-				if [ "$open_exit" -ne 0 ]; then
-				  log_line "relaunch failed via open"
-				  exit "$open_exit"
-				fi
-				log_line "helper finished"
-				"""
-				.formatted(
-						shellQuote(helperLogPath.toString()),
-						shellQuote(targetApp.toString()),
-						shellQuote(expectedVersion == null ? "" : expectedVersion),
-						shellQuote(expectedMarker.toString()),
-						shellQuote(expectedUpdaterJar == null ? "" : expectedUpdaterJar.toString()),
-						expectedUpdaterJar == null ? "false" : "true",
-						Long.toString(updaterPid),
-						shellQuote("/usr/bin/open"),
-						shellQuote(targetApp.toString()),
-						shellQuote(relaunchWorkingDirectoryPath().toString()));
+		return "LOG_FILE=" + helperLogPath + ";"
+				+ "log(){ printf '%s %s\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" \"$1\" >> \"$LOG_FILE\"; };"
+				+ "log \"helper booting (updater pid " + updaterPidValue + ")\";"
+				+ "while kill -0 " + updaterPidValue + " 2>/dev/null; do sleep 1; done;"
+				+ "log \"updater process exited\";"
+				+ "until [ -f " + markerPath + " ] && [ -f " + updaterPath + " ]; do "
+				+ "log \"waiting for marker/updater jars\"; sleep 1; "
+				+ "done;"
+				+ "log \"marker and updater jars ready\";"
+				+ "if [ ! -x " + appBinaryPath + " ]; then log \"app binary missing/not executable: " + appBinaryPath + "\"; exit 1; fi;"
+				+ "log \"chosen relaunch working directory: " + relaunchWorkingDir + "\";"
+				+ "if cd " + relaunchWorkingDir + "; then log \"cwd set explicitly to " + relaunchWorkingDir + "\"; "
+				+ "else log \"failed to set cwd to " + relaunchWorkingDir + "\"; exit 1; fi;"
+				+ "log \"final relaunch command: " + appBinaryPath + " >> \\\"$LOG_FILE\\\" 2>&1 &\";"
+				+ appBinaryPath + " >> \"$LOG_FILE\" 2>&1 &"
+				+ "log \"relaunch command executed\";";
 	}
 
 	private String shellQuote(String value) {
