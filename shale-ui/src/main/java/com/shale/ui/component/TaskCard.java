@@ -25,18 +25,24 @@ public final class TaskCard extends VBox {
     private final Label dueLabel = new Label();
     private final Label descriptionLabel = new Label();
     private final Label completedLabel = new Label();
+    private final Label assigneeLabel = new Label();
     private final Button toggleCompleteButton = new Button();
+    private final Button assignButton = new Button("Assign");
+    private final Button clearAssigneeButton = new Button("Clear");
     private final Button deleteButton = new Button("Delete");
     private final Region actionsSpacer = new Region();
-    private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton, deleteButton);
+    private final HBox actionsRow = new HBox(8, actionsSpacer, assignButton, clearAssigneeButton, toggleCompleteButton, deleteButton);
 
     private Long taskId;
     private Consumer<Long> onOpen;
     private Consumer<Long> onToggleComplete;
     private Consumer<Long> onDeleteTask;
+    private Consumer<Long> onAssignUser;
+    private Consumer<Long> onClearAssignee;
     private String backgroundCss;
     private boolean hovered;
     private boolean completed;
+    private Integer assignedUserId;
 
     public TaskCard() {
         setCursor(Cursor.HAND);
@@ -58,6 +64,14 @@ public final class TaskCard extends VBox {
 
     public void setOnDeleteTask(Consumer<Long> onDeleteTask) {
         this.onDeleteTask = onDeleteTask;
+    }
+
+    public void setOnAssignUser(Consumer<Long> onAssignUser) {
+        this.onAssignUser = onAssignUser;
+    }
+
+    public void setOnClearAssignee(Consumer<Long> onClearAssignee) {
+        this.onClearAssignee = onClearAssignee;
     }
 
     public void setTitle(String title) {
@@ -97,6 +111,27 @@ public final class TaskCard extends VBox {
         setOpacity(completed ? 0.78 : 1.0);
     }
 
+    public void setAssignee(Integer userId, String displayName) {
+        this.assignedUserId = userId;
+        String normalized = displayName == null ? "" : displayName.trim();
+        if (userId == null || userId <= 0 || normalized.isBlank()) {
+            assigneeLabel.setText("");
+            assigneeLabel.setManaged(false);
+            assigneeLabel.setVisible(false);
+            assignButton.setText("Assign");
+            clearAssigneeButton.setManaged(false);
+            clearAssigneeButton.setVisible(false);
+            return;
+        }
+
+        assigneeLabel.setText("Assigned: " + normalized);
+        assigneeLabel.setManaged(true);
+        assigneeLabel.setVisible(true);
+        assignButton.setText("Change");
+        clearAssigneeButton.setManaged(true);
+        clearAssigneeButton.setVisible(true);
+    }
+
     public void setBackgroundCssColor(String css) {
         this.backgroundCss = css;
         refreshSurfaceStyle();
@@ -114,7 +149,7 @@ public final class TaskCard extends VBox {
     }
 
     public void applyCompact() {
-        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, completedLabel, actionsRow);
+        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeLabel, completedLabel, actionsRow);
         setSpacing(6);
         setPadding(new Insets(10, 12, 10, 12));
         setAlignment(Pos.TOP_LEFT);
@@ -125,13 +160,14 @@ public final class TaskCard extends VBox {
         dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
         descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
         descriptionLabel.setWrapText(true);
+        assigneeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.84);");
         completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
         actionsRow.setAlignment(Pos.CENTER_RIGHT);
         refreshSurfaceStyle();
     }
 
     public void applyFull() {
-        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, completedLabel, actionsRow);
+        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeLabel, completedLabel, actionsRow);
         setSpacing(8);
         setPadding(new Insets(14, 16, 14, 16));
         setAlignment(Pos.TOP_LEFT);
@@ -142,6 +178,7 @@ public final class TaskCard extends VBox {
         dueLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
         descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
         descriptionLabel.setWrapText(true);
+        assigneeLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.84);");
         completedLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
         actionsRow.setAlignment(Pos.CENTER_RIGHT);
         refreshSurfaceStyle();
@@ -149,8 +186,22 @@ public final class TaskCard extends VBox {
 
     private void wireEvents() {
         HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
+        assignButton.getStyleClass().add("button-secondary");
+        clearAssigneeButton.getStyleClass().add("button-secondary");
         toggleCompleteButton.getStyleClass().add("button-secondary");
         deleteButton.getStyleClass().add("button-secondary");
+        assignButton.setOnAction(e -> {
+            e.consume();
+            if (onAssignUser != null && taskId != null) {
+                onAssignUser.accept(taskId);
+            }
+        });
+        clearAssigneeButton.setOnAction(e -> {
+            e.consume();
+            if (onClearAssignee != null && taskId != null && assignedUserId != null && assignedUserId > 0) {
+                onClearAssignee.accept(taskId);
+            }
+        });
         toggleCompleteButton.setOnAction(e -> {
             e.consume();
             if (onToggleComplete != null && taskId != null) {
@@ -178,6 +229,7 @@ public final class TaskCard extends VBox {
                 onOpen.accept(taskId);
             }
         });
+        setAssignee(null, null);
     }
 
     private void refreshSurfaceStyle() {
