@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.ui.services.CaseTaskService;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -33,7 +34,10 @@ public final class NewTaskDialog {
     private NewTaskDialog() {
     }
 
-    public static Optional<CreateTaskInput> showAndWait(Window owner, List<TaskPriorityOptionDto> availablePriorities) {
+    public static Optional<CreateTaskInput> showAndWait(
+            Window owner,
+            List<TaskPriorityOptionDto> availablePriorities,
+            List<CaseTaskService.AssignableUserOption> availableAssignees) {
         Stage stage = AppDialogs.createModalStage(owner, "New Task");
 
         ResultHolder result = new ResultHolder();
@@ -72,6 +76,22 @@ public final class NewTaskDialog {
         priorityComboBox.setButtonCell(new PriorityListCell());
         selectDefaultPriority(priorityComboBox, safePriorities);
 
+        Label assigneeLabel = new Label("Assignee");
+        ComboBox<AssigneeChoice> assigneeComboBox = new ComboBox<>();
+        assigneeComboBox.setMaxWidth(Double.MAX_VALUE);
+        assigneeComboBox.setPromptText("Unassigned");
+        assigneeComboBox.setCellFactory(cb -> new AssigneeChoiceListCell());
+        assigneeComboBox.setButtonCell(new AssigneeChoiceListCell());
+        List<CaseTaskService.AssignableUserOption> safeAssignees = availableAssignees == null ? List.of() : availableAssignees;
+        assigneeComboBox.getItems().add(AssigneeChoice.unassigned());
+        for (CaseTaskService.AssignableUserOption assignee : safeAssignees) {
+            if (assignee == null || assignee.id() <= 0) {
+                continue;
+            }
+            assigneeComboBox.getItems().add(new AssigneeChoice(assignee.id(), assignee.displayName()));
+        }
+        assigneeComboBox.setValue(AssigneeChoice.unassigned());
+
         Label errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: #b42318;");
         errorLabel.setVisible(false);
@@ -84,6 +104,8 @@ public final class NewTaskDialog {
                 descriptionArea,
                 priorityLabel,
                 priorityComboBox,
+                assigneeLabel,
+                assigneeComboBox,
                 dueLabel,
                 dueRow,
                 errorLabel);
@@ -115,7 +137,15 @@ public final class NewTaskDialog {
             Integer selectedPriorityId = Optional.ofNullable(priorityComboBox.getValue())
                     .map(TaskPriorityOptionDto::id)
                     .orElse(null);
-            result.value = new CreateTaskInput(title, descriptionArea.getText(), dueAt, selectedPriorityId);
+            Integer selectedAssigneeId = Optional.ofNullable(assigneeComboBox.getValue())
+                    .map(AssigneeChoice::userId)
+                    .orElse(null);
+            result.value = new CreateTaskInput(
+                    title,
+                    descriptionArea.getText(),
+                    dueAt,
+                    selectedPriorityId,
+                    selectedAssigneeId);
             stage.close();
         });
 
@@ -166,7 +196,12 @@ public final class NewTaskDialog {
         priorityComboBox.setValue(preferred);
     }
 
-    public record CreateTaskInput(String title, String description, LocalDateTime dueAt, Integer priorityId) {
+    public record CreateTaskInput(
+            String title,
+            String description,
+            LocalDateTime dueAt,
+            Integer priorityId,
+            Integer assigneeUserId) {
     }
 
     private static final class ResultHolder {
@@ -178,6 +213,28 @@ public final class NewTaskDialog {
         protected void updateItem(TaskPriorityOptionDto item, boolean empty) {
             super.updateItem(item, empty);
             setText(empty || item == null ? null : item.name());
+        }
+    }
+
+    private record AssigneeChoice(Integer userId, String displayName) {
+        static AssigneeChoice unassigned() {
+            return new AssigneeChoice(null, "Unassigned");
+        }
+    }
+
+    private static final class AssigneeChoiceListCell extends javafx.scene.control.ListCell<AssigneeChoice> {
+        @Override
+        protected void updateItem(AssigneeChoice item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setText(null);
+                return;
+            }
+            String text = item.displayName();
+            if (text == null || text.isBlank()) {
+                text = item.userId() == null ? "Unassigned" : "User #" + item.userId();
+            }
+            setText(text);
         }
     }
 }
