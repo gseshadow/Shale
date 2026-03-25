@@ -109,6 +109,7 @@ public final class TaskDao {
         String sql = """
                 INSERT INTO dbo.Tasks (
                   ShaleClientId,
+                  StatusId,
                   Title,
                   Description,
                   CaseId,
@@ -120,13 +121,15 @@ public final class TaskDao {
                   IsDeleted
                 )
                 OUTPUT INSERTED.Id
-                VALUES (?, ?, ?, ?, ?, NULL, ?, SYSDATETIME(), SYSDATETIME(), 0);
+                VALUES (?, ?, ?, ?, ?, ?, NULL, ?, SYSDATETIME(), SYSDATETIME(), 0);
                 """;
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
+            int defaultStatusId = resolveDefaultTaskStatusId(con, shaleClientId);
             int i = 1;
             ps.setInt(i++, shaleClientId);
+            ps.setInt(i++, defaultStatusId);
             ps.setString(i++, normalizedTitle);
             setNullableString(ps, i++, description);
             ps.setLong(i++, caseId);
@@ -223,6 +226,28 @@ public final class TaskDao {
             return;
         }
         ps.setObject(index, value);
+    }
+
+    private static int resolveDefaultTaskStatusId(Connection con, int shaleClientId) throws SQLException {
+        String sql = """
+                SELECT TOP (1) s.Id
+                FROM dbo.Statuses s
+                WHERE s.ShaleClientId = ?
+                  AND ISNULL(s.IsClosed, 0) = 0
+                ORDER BY
+                  CASE WHEN LOWER(LTRIM(RTRIM(ISNULL(s.Name, '')))) IN ('open', 'todo', 'to do', 'active') THEN 0 ELSE 1 END,
+                  ISNULL(s.SortOrder, 2147483647),
+                  s.Id;
+                """;
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        }
+        throw new IllegalStateException("No default open task status found for shaleClientId=" + shaleClientId);
     }
 
     private static LocalDateTime toLocalDateTime(Timestamp timestamp) {

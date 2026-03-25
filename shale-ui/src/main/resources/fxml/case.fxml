@@ -329,6 +329,9 @@
 			<!-- TASKS TAB PANE (center) -->
 			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980" styleClass="case-main-surface"
 				visible="false" managed="false">
+				<padding>
+					<Insets top="12" right="12" bottom="12" left="12" />
+				</padding>
 				<HBox spacing="8" alignment="CENTER_LEFT">
 					<Label text="Tasks"
 						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
@@ -341,7 +344,7 @@
 					<content>
 						<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12" prefWrapLength="880" maxWidth="1.7976931348623157E308">
 							<padding>
-								<Insets top="4" right="4" bottom="4" left="4" />
+								<Insets top="2" right="2" bottom="2" left="2" />
 							</padding>
 						</FlowPane>
 					</content>
