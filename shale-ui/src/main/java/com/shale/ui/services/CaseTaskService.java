@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.TaskDao;
 
 /**
@@ -29,7 +30,12 @@ public final class CaseTaskService {
                 request.title(),
                 request.description(),
                 request.dueAt(),
+                request.priorityId(),
                 request.createdByUserId());
+    }
+
+    public List<TaskPriorityOptionDto> loadActivePriorities(int shaleClientId) {
+        return taskDao.listActivePriorities(shaleClientId);
     }
 
     public void completeTask(long taskId, int shaleClientId) {
@@ -50,6 +56,7 @@ public final class CaseTaskService {
             String title,
             String description,
             java.time.LocalDateTime dueAt,
+            Integer priorityId,
             int createdByUserId) {
     }
 }

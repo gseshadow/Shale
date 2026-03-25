@@ -4,13 +4,17 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+
+import com.shale.core.dto.TaskPriorityOptionDto;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -24,10 +28,12 @@ import javafx.stage.Window;
 
 public final class NewTaskDialog {
 
+    private static final int MEDIUM_PRIORITY_ID = 2;
+
     private NewTaskDialog() {
     }
 
-    public static Optional<CreateTaskInput> showAndWait(Window owner) {
+    public static Optional<CreateTaskInput> showAndWait(Window owner, List<TaskPriorityOptionDto> availablePriorities) {
         Stage stage = AppDialogs.createModalStage(owner, "New Task");
 
         ResultHolder result = new ResultHolder();
@@ -56,6 +62,16 @@ public final class NewTaskDialog {
         dueTimeField.setPrefColumnCount(8);
         HBox dueRow = new HBox(8, dueDatePicker, dueTimeField);
 
+        Label priorityLabel = new Label("Priority");
+        ComboBox<TaskPriorityOptionDto> priorityComboBox = new ComboBox<>();
+        priorityComboBox.setMaxWidth(Double.MAX_VALUE);
+        priorityComboBox.setPromptText("Select priority");
+        List<TaskPriorityOptionDto> safePriorities = availablePriorities == null ? List.of() : availablePriorities;
+        priorityComboBox.getItems().setAll(safePriorities);
+        priorityComboBox.setCellFactory(cb -> new PriorityListCell());
+        priorityComboBox.setButtonCell(new PriorityListCell());
+        selectDefaultPriority(priorityComboBox, safePriorities);
+
         Label errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: #b42318;");
         errorLabel.setVisible(false);
@@ -66,6 +82,8 @@ public final class NewTaskDialog {
                 titleField,
                 descriptionLabel,
                 descriptionArea,
+                priorityLabel,
+                priorityComboBox,
                 dueLabel,
                 dueRow,
                 errorLabel);
@@ -94,7 +112,10 @@ public final class NewTaskDialog {
                 return;
             }
 
-            result.value = new CreateTaskInput(title, descriptionArea.getText(), dueAt);
+            Integer selectedPriorityId = Optional.ofNullable(priorityComboBox.getValue())
+                    .map(TaskPriorityOptionDto::id)
+                    .orElse(null);
+            result.value = new CreateTaskInput(title, descriptionArea.getText(), dueAt, selectedPriorityId);
             stage.close();
         });
 
@@ -133,10 +154,30 @@ public final class NewTaskDialog {
         errorLabel.setVisible(true);
     }
 
-    public record CreateTaskInput(String title, String description, LocalDateTime dueAt) {
+    private static void selectDefaultPriority(ComboBox<TaskPriorityOptionDto> priorityComboBox,
+            List<TaskPriorityOptionDto> priorities) {
+        if (priorities == null || priorities.isEmpty()) {
+            return;
+        }
+        TaskPriorityOptionDto preferred = priorities.stream()
+                .filter(p -> p.id() == MEDIUM_PRIORITY_ID)
+                .findFirst()
+                .orElse(priorities.get(0));
+        priorityComboBox.setValue(preferred);
+    }
+
+    public record CreateTaskInput(String title, String description, LocalDateTime dueAt, Integer priorityId) {
     }
 
     private static final class ResultHolder {
         private CreateTaskInput value;
+    }
+
+    private static final class PriorityListCell extends javafx.scene.control.ListCell<TaskPriorityOptionDto> {
+        @Override
+        protected void updateItem(TaskPriorityOptionDto item, boolean empty) {
+            super.updateItem(item, empty);
+            setText(empty || item == null ? null : item.name());
+        }
     }
 }

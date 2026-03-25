@@ -16,6 +16,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
@@ -1279,7 +1280,16 @@ public class CaseController {
 			return;
 		}
 
-		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(taskDialogOwner());
+		List<TaskPriorityOptionDto> priorities;
+		try {
+			priorities = caseTaskService.loadActivePriorities(shaleClientId);
+		} catch (Exception ex) {
+			logTaskActionException("load-priorities", ex);
+			showTaskActionError("Unable to load priorities right now.");
+			return;
+		}
+
+		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(taskDialogOwner(), priorities);
 		if (input.isEmpty()) {
 			return;
 		}
@@ -1290,6 +1300,7 @@ public class CaseController {
 				input.get().title(),
 				input.get().description(),
 				input.get().dueAt(),
+				input.get().priorityId(),
 				currentUserId);
 
 		new Thread(() -> {

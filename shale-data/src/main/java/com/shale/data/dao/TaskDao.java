@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.runtime.DbSessionProvider;
 
 /**
@@ -91,6 +92,7 @@ public final class TaskDao {
             String title,
             String description,
             LocalDateTime dueAt,
+            Integer priorityId,
             int createdByUserId) {
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
@@ -128,11 +130,11 @@ public final class TaskDao {
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             int defaultStatusId = resolveDefaultTaskStatusId(con, shaleClientId);
-            int defaultPriorityId = resolveDefaultTaskPriorityId(con, shaleClientId);
+            int resolvedPriorityId = resolvePriorityIdForCreate(con, shaleClientId, priorityId);
             int i = 1;
             ps.setInt(i++, shaleClientId);
             ps.setInt(i++, defaultStatusId);
-            ps.setInt(i++, defaultPriorityId);
+            ps.setInt(i++, resolvedPriorityId);
             ps.setString(i++, normalizedTitle);
             setNullableString(ps, i++, description);
             ps.setLong(i++, caseId);
@@ -148,8 +150,60 @@ public final class TaskDao {
         } catch (SQLException e) {
             throw new RuntimeException(
                     "Failed to create task for caseId=" + caseId
+                            + ", requestedPriorityId=" + priorityId
                             + " (sqlState=" + e.getSQLState() + ", errorCode=" + e.getErrorCode() + ")",
                     e);
+        }
+    }
+
+    public List<TaskPriorityOptionDto> listActivePriorities(int shaleClientId) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        try (Connection con = db.requireConnection()) {
+            String tableName = "dbo.Priorities";
+            if (!tableExists(con, tableName)) {
+                return List.of();
+            }
+
+            boolean hasName = hasColumn(con, tableName, "Name");
+            boolean hasSortOrder = hasColumn(con, tableName, "SortOrder");
+            boolean hasIsActive = hasColumn(con, tableName, "IsActive");
+
+            StringBuilder sql = new StringBuilder("SELECT p.Id");
+            if (hasName) {
+                sql.append(", p.Name");
+            }
+            if (hasSortOrder) {
+                sql.append(", p.SortOrder");
+            }
+            sql.append("\nFROM dbo.Priorities p\nWHERE p.ShaleClientId = ?");
+            if (hasIsActive) {
+                sql.append("\n  AND ISNULL(p.IsActive, 1) = 1");
+            }
+            sql.append("\nORDER BY ");
+            if (hasSortOrder) {
+                sql.append("ISNULL(p.SortOrder, 2147483647), ");
+            }
+            sql.append("p.Id;");
+
+            try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+                ps.setInt(1, shaleClientId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<TaskPriorityOptionDto> out = new ArrayList<>();
+                    while (rs.next()) {
+                        int id = rs.getInt("Id");
+                        String name = hasName ? rs.getString("Name") : null;
+                        Integer sortOrder = hasSortOrder ? (Integer) rs.getObject("SortOrder") : null;
+                        String displayName = name == null || name.isBlank() ? "Priority " + id : name.trim();
+                        out.add(new TaskPriorityOptionDto(id, displayName, sortOrder));
+                    }
+                    return out;
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to list task priorities for shaleClientId=" + shaleClientId, e);
         }
     }
 
@@ -290,6 +344,41 @@ public final class TaskDao {
             }
         }
         throw new IllegalStateException("No default task priority found for shaleClientId=" + shaleClientId);
+    }
+
+    private static int resolvePriorityIdForCreate(Connection con, int shaleClientId, Integer requestedPriorityId) throws SQLException {
+        if (requestedPriorityId != null && requestedPriorityId > 0
+                && isPrioritySelectable(con, shaleClientId, requestedPriorityId)) {
+            return requestedPriorityId;
+        }
+        return resolveDefaultTaskPriorityId(con, shaleClientId);
+    }
+
+    private static boolean isPrioritySelectable(Connection con, int shaleClientId, int priorityId) throws SQLException {
+        String tableName = "dbo.Priorities";
+        if (!tableExists(con, tableName)) {
+            return false;
+        }
+        boolean hasIsActive = hasColumn(con, tableName, "IsActive");
+        StringBuilder sql = new StringBuilder("""
+                SELECT CASE WHEN EXISTS (
+                    SELECT 1
+                    FROM dbo.Priorities p
+                    WHERE p.Id = ?
+                      AND p.ShaleClientId = ?
+                """);
+        if (hasIsActive) {
+            sql.append("\n  AND ISNULL(p.IsActive, 1) = 1");
+        }
+        sql.append("\n) THEN 1 ELSE 0 END;");
+
+        try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+            ps.setInt(1, priorityId);
+            ps.setInt(2, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) == 1;
+            }
+        }
     }
 
     private static boolean tableExists(Connection con, String fullyQualifiedTableName) throws SQLException {
