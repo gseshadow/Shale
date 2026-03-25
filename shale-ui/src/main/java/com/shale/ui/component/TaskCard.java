@@ -158,6 +158,8 @@ public final class TaskCard extends VBox {
 
     private void wireEvents() {
         HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
+        assignButton.getStyleClass().add("button-secondary");
+        clearAssigneeButton.getStyleClass().add("button-secondary");
         toggleCompleteButton.getStyleClass().add("button-secondary");
         toggleCompleteButton.setOnAction(e -> {
             e.consume();
