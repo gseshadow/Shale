@@ -904,7 +904,8 @@ public class CaseController {
 					task.dueAt(),
 					task.completedAt(),
 					task.assignedUserId(),
-					task.assignedUserDisplayName());
+					task.assignedUserDisplayName(),
+					task.assignedUserColor());
 			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT));
 		}
 
@@ -1266,7 +1267,11 @@ public class CaseController {
 	}
 
 	private TaskCardFactory buildTaskCardFactory(Consumer<Long> onOpenTaskAction) {
-		return new TaskCardFactory(onOpenTaskAction, this::onToggleTaskComplete);
+		return new TaskCardFactory(
+				onOpenTaskAction,
+				this::onToggleTaskComplete,
+				onOpenUser == null ? id -> {
+				} : onOpenUser);
 	}
 
 	private void onAddTask() {
