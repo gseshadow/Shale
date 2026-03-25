@@ -19,7 +19,8 @@ public final class TaskCardFactory {
             LocalDateTime dueAt,
             LocalDateTime completedAt,
             Integer assignedUserId,
-            String assignedUserDisplayName
+            String assignedUserDisplayName,
+            String assignedUserColor
     ) {
     }
 
@@ -44,7 +45,7 @@ public final class TaskCardFactory {
         card.setDueAt(model.dueAt());
         card.setDescriptionPreview(model.description());
         card.setCompleted(model.completedAt() != null);
-        card.setAssignee(model.assignedUserId(), model.assignedUserDisplayName());
+        card.setAssignee(model.assignedUserId(), model.assignedUserDisplayName(), model.assignedUserColor());
         card.setBackgroundCssColor(null);
 
         switch (variant) {

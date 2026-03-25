@@ -904,7 +904,8 @@ public class CaseController {
 					task.dueAt(),
 					task.completedAt(),
 					task.assignedUserId(),
-					task.assignedUserDisplayName());
+					task.assignedUserDisplayName(),
+					task.assignedUserColor());
 			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT));
 		}
 
