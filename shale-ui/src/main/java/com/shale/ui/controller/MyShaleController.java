@@ -71,6 +71,7 @@ public final class MyShaleController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private Consumer<Integer> onOpenCase;
+	private Consumer<Integer> onOpenUser;
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
@@ -97,15 +98,21 @@ public final class MyShaleController {
 			UiRuntimeBridge runtimeBridge,
 			CaseDao caseDao,
 			CaseTaskService caseTaskService,
-			Consumer<Integer> onOpenCase) {
+			Consumer<Integer> onOpenCase,
+			Consumer<Integer> onOpenUser) {
 		this.caseDao = caseDao;
 		this.caseTaskService = caseTaskService;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.onOpenCase = onOpenCase;
+		this.onOpenUser = onOpenUser;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
-		this.taskCardFactory = new TaskCardFactory(this::openTask, this::onToggleMyTaskComplete, onOpenCase, id -> {
-		});
+		this.taskCardFactory = new TaskCardFactory(
+				this::openTask,
+				this::onToggleMyTaskComplete,
+				onOpenCase,
+				onOpenUser == null ? id -> {
+				} : onOpenUser);
 	}
 
 	@FXML
