@@ -1297,7 +1297,8 @@ public class CaseController {
 				caseTaskService.createTask(request);
 				runOnFx(this::refreshCaseTasksSectionAsync);
 			} catch (Exception ex) {
-				runOnFx(() -> showTaskActionError("Failed to create task for this case."));
+				logTaskActionException("create", ex);
+				runOnFx(() -> showTaskActionError("Failed to create task for this case. " + rootCauseMessage(ex)));
 			}
 		}, "case-create-task-" + caseId).start();
 	}
@@ -1321,7 +1322,8 @@ public class CaseController {
 				}
 				runOnFx(this::refreshCaseTasksSectionAsync);
 			} catch (Exception ex) {
-				runOnFx(() -> showTaskActionError("Failed to update task completion."));
+				logTaskActionException("toggle-complete", ex);
+				runOnFx(() -> showTaskActionError("Failed to update task completion. " + rootCauseMessage(ex)));
 			}
 		}, "case-toggle-task-" + taskId).start();
 	}
@@ -1345,7 +1347,8 @@ public class CaseController {
 				caseTaskService.deleteTask(taskId, shaleClientId);
 				runOnFx(this::refreshCaseTasksSectionAsync);
 			} catch (Exception ex) {
-				runOnFx(() -> showTaskActionError("Failed to delete task."));
+				logTaskActionException("delete", ex);
+				runOnFx(() -> showTaskActionError("Failed to delete task. " + rootCauseMessage(ex)));
 			}
 		}, "case-delete-task-" + taskId).start();
 	}
@@ -1393,6 +1396,23 @@ public class CaseController {
 
 	private void showTaskActionError(String message) {
 		AppDialogs.showError(taskDialogOwner(), "Tasks", message);
+	}
+
+	private void logTaskActionException(String action, Exception ex) {
+		System.err.println("Task action failed (" + action + ") for caseId=" + caseId + ": " + ex.getMessage());
+		ex.printStackTrace();
+	}
+
+	private String rootCauseMessage(Throwable throwable) {
+		if (throwable == null) {
+			return "";
+		}
+		Throwable current = throwable;
+		while (current.getCause() != null && current.getCause() != current) {
+			current = current.getCause();
+		}
+		String message = current.getMessage();
+		return (message == null || message.isBlank()) ? "" : "Details: " + message;
 	}
 
 	private Window taskDialogOwner() {

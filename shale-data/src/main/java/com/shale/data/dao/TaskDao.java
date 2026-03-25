@@ -120,10 +120,9 @@ public final class TaskDao {
                   IsDeleted
                 )
                 OUTPUT INSERTED.Id
-                VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, 0);
+                VALUES (?, ?, ?, ?, ?, NULL, ?, SYSDATETIME(), SYSDATETIME(), 0);
                 """;
 
-        Timestamp now = Timestamp.valueOf(LocalDateTime.now());
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             int i = 1;
@@ -133,8 +132,6 @@ public final class TaskDao {
             ps.setLong(i++, caseId);
             setNullableTimestamp(ps, i++, dueAt);
             ps.setInt(i++, createdByUserId);
-            ps.setTimestamp(i++, now);
-            ps.setTimestamp(i++, now);
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
@@ -143,7 +140,10 @@ public final class TaskDao {
                 return rs.getLong(1);
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to create task for caseId=" + caseId, e);
+            throw new RuntimeException(
+                    "Failed to create task for caseId=" + caseId
+                            + " (sqlState=" + e.getSQLState() + ", errorCode=" + e.getErrorCode() + ")",
+                    e);
         }
     }
 
@@ -222,7 +222,7 @@ public final class TaskDao {
             ps.setNull(index, java.sql.Types.TIMESTAMP);
             return;
         }
-        ps.setTimestamp(index, Timestamp.valueOf(value));
+        ps.setObject(index, value);
     }
 
     private static LocalDateTime toLocalDateTime(Timestamp timestamp) {

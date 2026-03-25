@@ -69,6 +69,7 @@ public final class NewTaskDialog {
                 dueLabel,
                 dueRow,
                 errorLabel);
+        content.setPadding(new Insets(6, 2, 2, 2));
 
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -104,7 +105,7 @@ public final class NewTaskDialog {
 
         VBox root = new VBox(16, heading, message, content, actions);
         root.getStyleClass().add("app-dialog-root");
-        root.setPadding(new Insets(18));
+        root.setPadding(new Insets(22, 24, 22, 24));
         root.setMinWidth(460);
 
         Scene scene = new Scene(root);
