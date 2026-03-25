@@ -45,9 +45,6 @@
 				<Button fx:id="navMyShaleButton" text="My Shale"
 					maxWidth="Infinity" onAction="#onNavMyShale" />
 
-				<Button fx:id="navTasksButton" text="Tasks"
-					maxWidth="Infinity" onAction="#onNavTasks" />
-
 				<Button fx:id="navCasesButton" text="Cases"
 					maxWidth="Infinity" onAction="#onNavCases" />
 
