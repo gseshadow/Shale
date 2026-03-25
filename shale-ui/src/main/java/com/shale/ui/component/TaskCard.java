@@ -4,6 +4,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.function.Consumer;
 
+import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -11,6 +14,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 public final class TaskCard extends VBox {
@@ -25,10 +29,12 @@ public final class TaskCard extends VBox {
 	private final Label dueLabel = new Label();
 	private final Label descriptionLabel = new Label();
 	private final Label completedLabel = new Label();
-	private final Label assigneeLabel = new Label();
+	private final StackPane assigneeHost = new StackPane();
 	private final Button toggleCompleteButton = new Button();
 	private final Region actionsSpacer = new Region();
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
+	private final UserCardFactory userCardFactory = new UserCardFactory(id -> {
+	});
 
 	private Long taskId;
 	private Consumer<Long> onOpen;
@@ -90,18 +96,22 @@ public final class TaskCard extends VBox {
 		setOpacity(completed ? 0.78 : 1.0);
 	}
 
-	public void setAssignee(Integer userId, String displayName) {
+	public void setAssignee(Integer userId, String displayName, String colorCss) {
 		String normalized = displayName == null ? "" : displayName.trim();
 		if (userId == null || userId <= 0 || normalized.isBlank()) {
-			assigneeLabel.setText("");
-			assigneeLabel.setManaged(false);
-			assigneeLabel.setVisible(false);
+			assigneeHost.getChildren().clear();
+			assigneeHost.setManaged(false);
+			assigneeHost.setVisible(false);
 			return;
 		}
 
-		assigneeLabel.setText("Assigned: " + normalized);
-		assigneeLabel.setManaged(true);
-		assigneeLabel.setVisible(true);
+		var assigneeCard = userCardFactory.create(
+				new UserCardModel(userId, normalized, colorCss, null),
+				UserCardFactory.Variant.MINI);
+		assigneeCard.setMouseTransparent(true);
+		assigneeHost.getChildren().setAll(assigneeCard);
+		assigneeHost.setManaged(true);
+		assigneeHost.setVisible(true);
 	}
 
 	public void setBackgroundCssColor(String css) {
@@ -121,7 +131,7 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyCompact() {
-		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeLabel, completedLabel, actionsRow);
+		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeHost, completedLabel, actionsRow);
 		setSpacing(6);
 		setPadding(new Insets(10, 12, 10, 12));
 		setAlignment(Pos.TOP_LEFT);
@@ -132,14 +142,14 @@ public final class TaskCard extends VBox {
 		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
-		assigneeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.84);");
+		assigneeHost.setAlignment(Pos.CENTER_LEFT);
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
 	}
 
 	public void applyFull() {
-		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeLabel, completedLabel, actionsRow);
+		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeHost, completedLabel, actionsRow);
 		setSpacing(8);
 		setPadding(new Insets(14, 16, 14, 16));
 		setAlignment(Pos.TOP_LEFT);
@@ -150,7 +160,7 @@ public final class TaskCard extends VBox {
 		dueLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
-		assigneeLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.84);");
+		assigneeHost.setAlignment(Pos.CENTER_LEFT);
 		completedLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
@@ -187,7 +197,7 @@ public final class TaskCard extends VBox {
 				onOpen.accept(taskId);
 			}
 		});
-		setAssignee(null, null);
+		setAssignee(null, null, null);
 	}
 
 	private void refreshSurfaceStyle() {

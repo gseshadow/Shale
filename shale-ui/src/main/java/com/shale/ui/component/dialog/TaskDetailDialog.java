@@ -9,6 +9,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
 
 import javafx.geometry.Insets;
@@ -68,15 +70,17 @@ public final class TaskDetailDialog {
 
         ComboBox<AssigneeChoice> assigneeCombo = new ComboBox<>();
         assigneeCombo.setMaxWidth(Double.MAX_VALUE);
-        assigneeCombo.setCellFactory(cb -> new AssigneeChoiceListCell());
-        assigneeCombo.setButtonCell(new AssigneeChoiceListCell());
+        UserCardFactory userCardFactory = new UserCardFactory(id -> {
+        });
+        assigneeCombo.setCellFactory(cb -> new AssigneeChoiceListCell(userCardFactory));
+        assigneeCombo.setButtonCell(new AssigneeChoiceListCell(userCardFactory));
         assigneeCombo.getItems().add(AssigneeChoice.unassigned());
         List<CaseTaskService.AssignableUserOption> safeAssignees = assignees == null ? List.of() : assignees;
         for (CaseTaskService.AssignableUserOption assignee : safeAssignees) {
             if (assignee == null || assignee.id() <= 0) {
                 continue;
             }
-            assigneeCombo.getItems().add(new AssigneeChoice(assignee.id(), assignee.displayName()));
+            assigneeCombo.getItems().add(new AssigneeChoice(assignee.id(), assignee.displayName(), assignee.color()));
         }
         selectAssignee(assigneeCombo, model.assignedUserId());
 
@@ -264,9 +268,9 @@ public final class TaskDetailDialog {
         private TaskDetailResult value;
     }
 
-    private record AssigneeChoice(Integer userId, String displayName) {
+    private record AssigneeChoice(Integer userId, String displayName, String colorCss) {
         static AssigneeChoice unassigned() {
-            return new AssigneeChoice(null, "Unassigned");
+            return new AssigneeChoice(null, "Unassigned", null);
         }
     }
 
@@ -279,18 +283,35 @@ public final class TaskDetailDialog {
     }
 
     private static final class AssigneeChoiceListCell extends javafx.scene.control.ListCell<AssigneeChoice> {
+        private final UserCardFactory userCardFactory;
+
+        private AssigneeChoiceListCell(UserCardFactory userCardFactory) {
+            this.userCardFactory = userCardFactory;
+        }
+
         @Override
         protected void updateItem(AssigneeChoice item, boolean empty) {
             super.updateItem(item, empty);
             if (empty || item == null) {
                 setText(null);
+                setGraphic(null);
+                return;
+            }
+            if (item.userId() == null) {
+                setText("Unassigned");
+                setGraphic(null);
                 return;
             }
             String text = item.displayName();
             if (text == null || text.isBlank()) {
-                text = item.userId() == null ? "Unassigned" : "User #" + item.userId();
+                text = "User #" + item.userId();
             }
-            setText(text);
+            var card = userCardFactory.create(
+                    new UserCardModel(item.userId(), text, item.colorCss(), null),
+                    UserCardFactory.Variant.MINI);
+            card.setMouseTransparent(true);
+            setText(null);
+            setGraphic(card);
         }
     }
 }
