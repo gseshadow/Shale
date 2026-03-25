@@ -1364,24 +1364,6 @@ public class CaseController {
 			showTaskActionError("You must be signed in to edit tasks.");
 			return;
 		}
-
-		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
-				detail.id(),
-				detail.title(),
-				detail.description(),
-				detail.dueAt(),
-				detail.priorityId(),
-				detail.assignedUserId(),
-				detail.completedAt() != null);
-
-		Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
-				taskDialogOwner(),
-				model,
-				priorities,
-				users);
-		if (result.isEmpty()) {
-			return;
-		}
 		TaskDetailDialog.TaskDetailResult action = result.get();
 		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
 			deleteTaskFromDetail(taskId, shaleClientId);
@@ -1412,69 +1394,49 @@ public class CaseController {
 
 		new Thread(() -> {
 			try {
-				caseTaskService.updateTask(request);
-				runOnFx(this::refreshCaseTasksSectionAsync);
-			} catch (Exception ex) {
-				logTaskActionException("save-detail", ex);
-				runOnFx(() -> showTaskActionError("Failed to save task. " + rootCauseMessage(ex)));
-			}
-		}, "case-task-save-detail-" + taskId).start();
-	}
-
-	private void deleteTaskFromDetail(long taskId, int shaleClientId) {
-		new Thread(() -> {
-			try {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
 				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
-				runOnFx(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, detail, priorities, users));
+				runOnFx(() -> {
+					if (detail == null) {
+						showTaskActionError("Task was not found or may have been deleted.");
+						refreshCaseTasks();
+						return;
+					}
+
+					TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+							detail.id(),
+							detail.title(),
+							detail.description(),
+							detail.dueAt(),
+							detail.priorityId(),
+							detail.assignedUserId(),
+							detail.completedAt() != null);
+
+					Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+							taskDialogOwner(),
+							model,
+							priorities,
+							users);
+					if (result.isEmpty()) {
+						return;
+					}
+					TaskDetailDialog.TaskDetailResult action = result.get();
+					if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+						deleteTaskFromDetail(taskId, shaleClientId);
+						return;
+					}
+					TaskDetailDialog.SaveTaskPayload payload = action.payload();
+					if (payload == null) {
+						return;
+					}
+					saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+				});
 			} catch (Exception ex) {
 				logTaskActionException("load-detail", ex);
 				runOnFx(() -> showTaskActionError("Failed to load task details. " + rootCauseMessage(ex)));
 			}
 		}, "case-task-detail-" + taskId).start();
-	}
-
-	private void showTaskDetailDialog(
-			long taskId,
-			int shaleClientId,
-			int currentUserId,
-			TaskDetailDto detail,
-			List<TaskPriorityOptionDto> priorities,
-			List<CaseTaskService.AssignableUserOption> users) {
-		if (detail == null) {
-			showTaskActionError("Task was not found or may have been deleted.");
-			refreshCaseTasks();
-			return;
-		}
-
-		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
-				detail.id(),
-				detail.title(),
-				detail.description(),
-				detail.dueAt(),
-				detail.priorityId(),
-				detail.assignedUserId(),
-				detail.completedAt() != null);
-
-		Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
-				taskDialogOwner(),
-				model,
-				priorities,
-				users);
-		if (result.isEmpty()) {
-			return;
-		}
-		TaskDetailDialog.TaskDetailResult action = result.get();
-		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
-			deleteTaskFromDetail(taskId, shaleClientId);
-			return;
-		}
-		TaskDetailDialog.SaveTaskPayload payload = action.payload();
-		if (payload == null) {
-			return;
-		}
-		saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
 	}
 
 	private void saveTaskFromDetail(
