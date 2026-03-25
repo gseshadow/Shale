@@ -3,22 +3,19 @@ package com.shale.core.dto;
 import java.time.LocalDateTime;
 
 /**
- * Lightweight task read model for case-level task list rendering.
+ * Editable task detail model used by task detail dialogs.
  */
-public record CaseTaskListItemDto(
+public record TaskDetailDto(
         long id,
         int shaleClientId,
         long caseId,
         String title,
         String description,
         LocalDateTime dueAt,
+        Integer priorityId,
         LocalDateTime completedAt,
         Integer assignedUserId,
         String assignedUserDisplayName,
-        String assignedUserColor,
-        Integer createdByUserId,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt,
-        boolean deleted
+        String assignedUserColor
 ) {
 }

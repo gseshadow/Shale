@@ -25,18 +25,16 @@ public final class TaskCard extends VBox {
     private final Label dueLabel = new Label();
     private final Label descriptionLabel = new Label();
     private final Label completedLabel = new Label();
+    private final Label assigneeLabel = new Label();
     private final Button toggleCompleteButton = new Button();
-    private final Button deleteButton = new Button("Delete");
     private final Region actionsSpacer = new Region();
-    private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton, deleteButton);
+    private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
 
     private Long taskId;
     private Consumer<Long> onOpen;
     private Consumer<Long> onToggleComplete;
-    private Consumer<Long> onDeleteTask;
     private String backgroundCss;
     private boolean hovered;
-    private boolean completed;
 
     public TaskCard() {
         setCursor(Cursor.HAND);
@@ -54,10 +52,6 @@ public final class TaskCard extends VBox {
 
     public void setOnToggleComplete(Consumer<Long> onToggleComplete) {
         this.onToggleComplete = onToggleComplete;
-    }
-
-    public void setOnDeleteTask(Consumer<Long> onDeleteTask) {
-        this.onDeleteTask = onDeleteTask;
     }
 
     public void setTitle(String title) {
@@ -89,12 +83,25 @@ public final class TaskCard extends VBox {
     }
 
     public void setCompleted(boolean completed) {
-        this.completed = completed;
         completedLabel.setManaged(completed);
         completedLabel.setVisible(completed);
         completedLabel.setText(completed ? "Completed" : "");
         toggleCompleteButton.setText(completed ? "Mark Incomplete" : "Complete");
         setOpacity(completed ? 0.78 : 1.0);
+    }
+
+    public void setAssignee(Integer userId, String displayName) {
+        String normalized = displayName == null ? "" : displayName.trim();
+        if (userId == null || userId <= 0 || normalized.isBlank()) {
+            assigneeLabel.setText("");
+            assigneeLabel.setManaged(false);
+            assigneeLabel.setVisible(false);
+            return;
+        }
+
+        assigneeLabel.setText("Assigned: " + normalized);
+        assigneeLabel.setManaged(true);
+        assigneeLabel.setVisible(true);
     }
 
     public void setBackgroundCssColor(String css) {
@@ -114,7 +121,7 @@ public final class TaskCard extends VBox {
     }
 
     public void applyCompact() {
-        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, completedLabel, actionsRow);
+        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeLabel, completedLabel, actionsRow);
         setSpacing(6);
         setPadding(new Insets(10, 12, 10, 12));
         setAlignment(Pos.TOP_LEFT);
@@ -125,13 +132,14 @@ public final class TaskCard extends VBox {
         dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
         descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
         descriptionLabel.setWrapText(true);
+        assigneeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.84);");
         completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
         actionsRow.setAlignment(Pos.CENTER_RIGHT);
         refreshSurfaceStyle();
     }
 
     public void applyFull() {
-        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, completedLabel, actionsRow);
+        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeLabel, completedLabel, actionsRow);
         setSpacing(8);
         setPadding(new Insets(14, 16, 14, 16));
         setAlignment(Pos.TOP_LEFT);
@@ -142,6 +150,7 @@ public final class TaskCard extends VBox {
         dueLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
         descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
         descriptionLabel.setWrapText(true);
+        assigneeLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.84);");
         completedLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
         actionsRow.setAlignment(Pos.CENTER_RIGHT);
         refreshSurfaceStyle();
@@ -150,17 +159,10 @@ public final class TaskCard extends VBox {
     private void wireEvents() {
         HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
         toggleCompleteButton.getStyleClass().add("button-secondary");
-        deleteButton.getStyleClass().add("button-secondary");
         toggleCompleteButton.setOnAction(e -> {
             e.consume();
             if (onToggleComplete != null && taskId != null) {
                 onToggleComplete.accept(taskId);
-            }
-        });
-        deleteButton.setOnAction(e -> {
-            e.consume();
-            if (onDeleteTask != null && taskId != null) {
-                onDeleteTask.accept(taskId);
             }
         });
         setOnMouseEntered(e -> {
@@ -174,10 +176,14 @@ public final class TaskCard extends VBox {
             refreshSurfaceStyle();
         });
         setOnMouseClicked(e -> {
+            if (e.isConsumed()) {
+                return;
+            }
             if (onOpen != null && taskId != null) {
                 onOpen.accept(taskId);
             }
         });
+        setAssignee(null, null);
     }
 
     private void refreshSurfaceStyle() {
