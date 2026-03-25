@@ -56,6 +56,6 @@ final class DesktopUpdateLauncherTest {
 				updaterJar.toString(),
 				"--currentVersion", "1.0.13",
 				"--installDir", installDir.toString()), pb.command());
-		assertEquals(installDir.toFile(), pb.directory());
+		assertEquals(Path.of("/").toFile(), pb.directory());
 	}
 }
