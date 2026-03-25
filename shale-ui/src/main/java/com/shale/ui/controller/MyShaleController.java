@@ -70,6 +70,7 @@ public final class MyShaleController {
 	private CaseTaskService caseTaskService;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
+	private Consumer<Integer> onOpenCase;
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
@@ -101,8 +102,9 @@ public final class MyShaleController {
 		this.caseTaskService = caseTaskService;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
+		this.onOpenCase = onOpenCase;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
-		this.taskCardFactory = new TaskCardFactory(this::openTask, this::onToggleMyTaskComplete, id -> {
+		this.taskCardFactory = new TaskCardFactory(this::openTask, this::onToggleMyTaskComplete, onOpenCase, id -> {
 		});
 	}
 
@@ -467,6 +469,8 @@ public final class MyShaleController {
 		for (CaseTaskListItemDto task : myTasks) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
 					task.id(),
+					task.caseId(),
+					task.caseName(),
 					task.title(),
 					task.description(),
 					task.dueAt(),
@@ -556,6 +560,8 @@ public final class MyShaleController {
 					}
 					TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 							detail.id(),
+							detail.caseId(),
+							detail.caseName(),
 							detail.title(),
 							detail.description(),
 							detail.dueAt(),
@@ -563,7 +569,7 @@ public final class MyShaleController {
 							detail.assignedUserId(),
 							detail.completedAt() != null);
 					Optional<TaskDetailDialog.TaskDetailResult> result =
-							TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users);
+							TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users, onOpenCase);
 					if (result.isEmpty()) {
 						return;
 					}
