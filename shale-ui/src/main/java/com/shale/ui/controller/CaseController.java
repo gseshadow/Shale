@@ -15,6 +15,7 @@ import java.util.function.Consumer;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
@@ -28,10 +29,12 @@ import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.CreateContactDialog;
 import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.component.factory.UserCardFactory.Variant;
 import com.shale.ui.component.dialog.TeamEditorDialog;
 import com.shale.ui.services.CaseDetailService;
+import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
@@ -50,7 +53,6 @@ import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ScrollPane;
@@ -202,17 +204,11 @@ public class CaseController {
 
 	@FXML
 	private VBox tasksPanel;
-	@FXML
-	private TextField taskSearchField;
-	@FXML
-	private ListView<String> taskListView;
-	@FXML
-	private Button newTaskInlineButton;
 
 	@FXML
-	private TextField tasksTabSearchField;
+	private FlowPane tasksTabFlow;
 	@FXML
-	private ListView<String> tasksTabListView;
+	private Label tasksTabEmptyLabel;
 
 	@FXML
 	private StackPane ovCaseStatusHost;
@@ -361,11 +357,15 @@ public class CaseController {
 	private PracticeAreaCardFactory practiceAreaCardFactory;
 	private Consumer<Integer> onOpenPracticeArea;
 
+	private TaskCardFactory taskCardFactory;
+	private Consumer<Long> onOpenTask;
+
 	private OrganizationCardFactory organizationCardFactory;
 	private Consumer<Integer> onOpenOrganization;
 
 	private CaseDao caseDao;
 	private CaseDetailService caseDetailService;
+	private CaseTaskService caseTaskService;
 	private OrganizationDao organizationDao;
 	private ContactDao contactDao;
 	private AppState appState;
@@ -415,6 +415,7 @@ public class CaseController {
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
 	private List<CaseDao.RelatedContactRow> relatedContacts = List.of();
 	private List<CaseDao.RelatedOrganizationRow> relatedOrganizations = List.of();
+	private List<CaseTaskListItemDto> caseTasks = List.of();
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 
@@ -437,10 +438,11 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 	}
 
-	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
+	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
 		this.caseId = caseId;
 		this.caseDao = caseDao;
 		this.caseDetailService = caseDetailService;
+		this.caseTaskService = caseTaskService;
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
@@ -470,6 +472,12 @@ public class CaseController {
 		this.practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea);
 	}
 
+
+	public void setOnOpenTask(Consumer<Long> onOpenTask) {
+		this.onOpenTask = onOpenTask;
+		this.taskCardFactory = new TaskCardFactory(onOpenTask);
+	}
+
 	public void setOnOpenOrganization(Consumer<Integer> onOpenOrganization) {
 		this.onOpenOrganization = onOpenOrganization;
 		this.organizationCardFactory = new OrganizationCardFactory(onOpenOrganization);
@@ -484,7 +492,6 @@ public class CaseController {
 		refreshHeader();
 		refreshOverviewPlaceholders();
 		setupSections();
-		setupOverviewTasksPanel();
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
@@ -597,17 +604,6 @@ public class CaseController {
 		return button;
 	}
 
-	private void setupOverviewTasksPanel() {
-		if (taskListView != null) {
-			taskListView.getItems().setAll(
-					"Past due: Call client (placeholder)",
-					"Upcoming: Request records (placeholder)",
-					"Upcoming: Review radiology (placeholder)",
-					"Upcoming: Send HIPAA auth (placeholder)",
-					"Upcoming: Draft demand outline (placeholder)"
-			);
-		}
-	}
 
 	private void refreshHeader() {
 		if (caseTitleLabel == null || caseId == null)
@@ -704,16 +700,8 @@ public class CaseController {
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
-
-		if (tasksTabListView != null && tasksTabListView.getItems().isEmpty()) {
-			tasksTabListView.getItems().setAll(
-					"Call client (placeholder)",
-					"Request records (placeholder)",
-					"Review radiology (placeholder)",
-					"Draft demand (placeholder)",
-					"Schedule depo (placeholder)"
-			);
-		}
+		loadCaseTasksAsync();
+		renderTasksSection();
 	}
 
 	private void showDetails() {
@@ -852,6 +840,67 @@ public class CaseController {
 		}
 		setVisibleManaged(placeholderTextArea, false);
 		renderOrganizationsSection();
+	}
+
+
+	private void loadCaseTasksAsync() {
+		if (caseTaskService == null || appState == null || caseId == null) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		final int shaleClientId = appState.getShaleClientId();
+		if (shaleClientId <= 0) {
+			return;
+		}
+
+		new Thread(() -> {
+			try {
+				List<CaseTaskListItemDto> tasks = caseTaskService.loadTasksForCase(activeCaseId, shaleClientId);
+				runOnFx(() -> {
+					if (caseId == null || caseId.longValue() != activeCaseId) {
+						return;
+					}
+					caseTasks = tasks == null ? List.of() : tasks;
+					renderTasksSection();
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> {
+					caseTasks = List.of();
+					renderTasksSection();
+				});
+				System.err.println("Case tasks load failed for caseId=" + activeCaseId + ": " + ex.getMessage());
+			}
+		}, "case-load-tasks-" + activeCaseId).start();
+	}
+
+	private void renderTasksSection() {
+		if (tasksTabFlow == null || tasksTabEmptyLabel == null) {
+			return;
+		}
+
+		tasksTabFlow.getChildren().clear();
+		if (caseTasks == null || caseTasks.isEmpty()) {
+			setVisibleManaged(tasksTabEmptyLabel, true);
+			tasksTabEmptyLabel.setText("No tasks for this case yet.");
+			return;
+		}
+
+		TaskCardFactory factory = taskCardFactory != null
+				? taskCardFactory
+				: new TaskCardFactory(this::openTask);
+
+		for (CaseTaskListItemDto task : caseTasks) {
+			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+					task.id(),
+					task.title(),
+					task.description(),
+					task.dueAt(),
+					task.completedAt());
+			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT));
+		}
+
+		setVisibleManaged(tasksTabEmptyLabel, false);
 	}
 
 	private void renderOrganizationsSection() {
@@ -1204,6 +1253,14 @@ public class CaseController {
 		return name + " — " + detail + " (#" + row.id() + ")";
 	}
 
+	private void openTask(Long taskId) {
+		if (onOpenTask != null) {
+			onOpenTask.accept(taskId);
+			return;
+		}
+		System.out.println("navigate to task " + taskId);
+	}
+
 	private void openOrganization(Integer organizationId) {
 		if (organizationId == null)
 			return;
@@ -1449,6 +1506,7 @@ public class CaseController {
 			return;
 		final long activeCaseId = caseId.longValue();
 		loadCaseUpdatesAsync();
+		loadCaseTasksAsync();
 
 		new Thread(() ->
 		{
@@ -2136,6 +2194,7 @@ public class CaseController {
 
 	private void loadCaseUpdatesAsync() {
 		updatesPanelController.loadCaseUpdatesAsync();
+		loadCaseTasksAsync();
 	}
 
 	private void loadCaseUpdatesAsyncInternal() {
@@ -3993,6 +4052,7 @@ public class CaseController {
 			runOnFx(() ->
 			{
 				loadCaseUpdatesAsync();
+		loadCaseTasksAsync();
 				refreshLastUpdatedLabelAsync();
 			});
 			return true;

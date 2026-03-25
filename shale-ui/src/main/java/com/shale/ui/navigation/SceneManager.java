@@ -5,6 +5,7 @@ import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
+import com.shale.data.dao.TaskDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.ContactViewController;
@@ -21,6 +22,7 @@ import com.shale.ui.controller.TeamController;
 import com.shale.ui.controller.UserController;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.ContactDetailService;
+import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -220,11 +222,14 @@ public final class SceneManager {
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
-			c.init(caseId, caseDao, caseDetailService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
+			TaskDao taskDao = new TaskDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao);
+			c.init(caseId, caseDao, caseDetailService, caseTaskService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
 
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
 			c.setOnOpenContact(this::openContactProfile);
+			c.setOnOpenTask(this::openTaskProfile);
 			c.setOnOpenOrganization(onOpenOrganization);
 			return c;
 		});
@@ -330,6 +335,16 @@ public final class SceneManager {
 		} catch (RuntimeException ex) {
 			System.err.println("Failed to open contact profile for contactId " + contactId + ": " + ex.getMessage());
 		}
+	}
+
+
+	public void openTaskProfile(Long taskId) {
+		if (taskId == null || taskId <= 0) {
+			System.err.println("Ignoring task navigation for invalid taskId: " + taskId);
+			return;
+		}
+		System.out.println("navigate to task " + taskId);
+		// TODO: wire real task detail scene in Phase 2+
 	}
 
 
