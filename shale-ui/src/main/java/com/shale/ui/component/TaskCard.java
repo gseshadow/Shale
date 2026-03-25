@@ -7,7 +7,9 @@ import java.util.function.Consumer;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
@@ -23,9 +25,15 @@ public final class TaskCard extends VBox {
     private final Label dueLabel = new Label();
     private final Label descriptionLabel = new Label();
     private final Label completedLabel = new Label();
+    private final Button toggleCompleteButton = new Button();
+    private final Button deleteButton = new Button("Delete");
+    private final Region actionsSpacer = new Region();
+    private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton, deleteButton);
 
     private Long taskId;
     private Consumer<Long> onOpen;
+    private Consumer<Long> onToggleComplete;
+    private Consumer<Long> onDeleteTask;
     private String backgroundCss;
     private boolean hovered;
     private boolean completed;
@@ -42,6 +50,14 @@ public final class TaskCard extends VBox {
 
     public void setOnOpen(Consumer<Long> onOpen) {
         this.onOpen = onOpen;
+    }
+
+    public void setOnToggleComplete(Consumer<Long> onToggleComplete) {
+        this.onToggleComplete = onToggleComplete;
+    }
+
+    public void setOnDeleteTask(Consumer<Long> onDeleteTask) {
+        this.onDeleteTask = onDeleteTask;
     }
 
     public void setTitle(String title) {
@@ -77,6 +93,7 @@ public final class TaskCard extends VBox {
         completedLabel.setManaged(completed);
         completedLabel.setVisible(completed);
         completedLabel.setText(completed ? "Completed" : "");
+        toggleCompleteButton.setText(completed ? "Mark Incomplete" : "Complete");
         setOpacity(completed ? 0.78 : 1.0);
     }
 
@@ -97,7 +114,7 @@ public final class TaskCard extends VBox {
     }
 
     public void applyCompact() {
-        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, completedLabel);
+        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, completedLabel, actionsRow);
         setSpacing(6);
         setPadding(new Insets(10, 12, 10, 12));
         setAlignment(Pos.TOP_LEFT);
@@ -109,11 +126,12 @@ public final class TaskCard extends VBox {
         descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
         descriptionLabel.setWrapText(true);
         completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+        actionsRow.setAlignment(Pos.CENTER_RIGHT);
         refreshSurfaceStyle();
     }
 
     public void applyFull() {
-        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, completedLabel);
+        getChildren().setAll(titleLabel, dueLabel, descriptionLabel, completedLabel, actionsRow);
         setSpacing(8);
         setPadding(new Insets(14, 16, 14, 16));
         setAlignment(Pos.TOP_LEFT);
@@ -125,10 +143,26 @@ public final class TaskCard extends VBox {
         descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
         descriptionLabel.setWrapText(true);
         completedLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+        actionsRow.setAlignment(Pos.CENTER_RIGHT);
         refreshSurfaceStyle();
     }
 
     private void wireEvents() {
+        HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
+        toggleCompleteButton.getStyleClass().add("button-secondary");
+        deleteButton.getStyleClass().add("button-secondary");
+        toggleCompleteButton.setOnAction(e -> {
+            e.consume();
+            if (onToggleComplete != null && taskId != null) {
+                onToggleComplete.accept(taskId);
+            }
+        });
+        deleteButton.setOnAction(e -> {
+            e.consume();
+            if (onDeleteTask != null && taskId != null) {
+                onDeleteTask.accept(taskId);
+            }
+        });
         setOnMouseEntered(e -> {
             hovered = true;
             setTranslateY(-1.5);
