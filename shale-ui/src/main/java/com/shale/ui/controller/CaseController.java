@@ -28,6 +28,7 @@ import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.CreateContactDialog;
+import com.shale.ui.component.dialog.NewTaskDialog;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
@@ -475,7 +476,7 @@ public class CaseController {
 
 	public void setOnOpenTask(Consumer<Long> onOpenTask) {
 		this.onOpenTask = onOpenTask;
-		this.taskCardFactory = new TaskCardFactory(onOpenTask);
+		this.taskCardFactory = buildTaskCardFactory(onOpenTask);
 	}
 
 	public void setOnOpenOrganization(Consumer<Integer> onOpenOrganization) {
@@ -524,6 +525,8 @@ public class CaseController {
 			deleteCaseButton.setOnAction(e -> onDeleteCase());
 			setVisibleManaged(deleteCaseButton, false);
 		}
+		if (addTaskButton != null)
+			addTaskButton.setOnAction(e -> onAddTask());
 		if (addOrganizationButton != null)
 			addOrganizationButton.setOnAction(e -> onAddRelatedEntity());
 		if (caseUpdatesComposerArea != null) {
@@ -888,7 +891,7 @@ public class CaseController {
 
 		TaskCardFactory factory = taskCardFactory != null
 				? taskCardFactory
-				: new TaskCardFactory(this::openTask);
+				: buildTaskCardFactory(this::openTask);
 
 		for (CaseTaskListItemDto task : caseTasks) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
@@ -1259,6 +1262,147 @@ public class CaseController {
 			return;
 		}
 		System.out.println("navigate to task " + taskId);
+	}
+
+	private TaskCardFactory buildTaskCardFactory(Consumer<Long> onOpenTaskAction) {
+		return new TaskCardFactory(onOpenTaskAction, this::onToggleTaskComplete, this::onDeleteTask);
+	}
+
+	private void onAddTask() {
+		if (caseTaskService == null || caseId == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showTaskActionError("You must be signed in to create tasks.");
+			return;
+		}
+
+		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(taskDialogOwner());
+		if (input.isEmpty()) {
+			return;
+		}
+
+		CaseTaskService.CreateTaskRequest request = new CaseTaskService.CreateTaskRequest(
+				shaleClientId,
+				caseId.longValue(),
+				input.get().title(),
+				input.get().description(),
+				input.get().dueAt(),
+				currentUserId);
+
+		new Thread(() -> {
+			try {
+				caseTaskService.createTask(request);
+				runOnFx(this::refreshCaseTasksSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showTaskActionError("Failed to create task for this case."));
+			}
+		}, "case-create-task-" + caseId).start();
+	}
+
+	private void onToggleTaskComplete(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			showTaskActionError("Unable to update task right now.");
+			return;
+		}
+		boolean currentlyCompleted = isTaskCompleted(taskId);
+		new Thread(() -> {
+			try {
+				if (currentlyCompleted) {
+					caseTaskService.uncompleteTask(taskId, shaleClientId);
+				} else {
+					caseTaskService.completeTask(taskId, shaleClientId);
+				}
+				runOnFx(this::refreshCaseTasksSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showTaskActionError("Failed to update task completion."));
+			}
+		}, "case-toggle-task-" + taskId).start();
+	}
+
+	private void onDeleteTask(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+		if (!confirmTaskDelete(taskId)) {
+			return;
+		}
+
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			showTaskActionError("Unable to delete task right now.");
+			return;
+		}
+
+		new Thread(() -> {
+			try {
+				caseTaskService.deleteTask(taskId, shaleClientId);
+				runOnFx(this::refreshCaseTasksSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showTaskActionError("Failed to delete task."));
+			}
+		}, "case-delete-task-" + taskId).start();
+	}
+
+	private void refreshCaseTasksSectionAsync() {
+		loadCaseTasksAsync();
+	}
+
+	private boolean isTaskCompleted(Long taskId) {
+		if (taskId == null || caseTasks == null) {
+			return false;
+		}
+		for (CaseTaskListItemDto task : caseTasks) {
+			if (task.id() == taskId.longValue()) {
+				return task.completedAt() != null;
+			}
+		}
+		return false;
+	}
+
+	private boolean confirmTaskDelete(Long taskId) {
+		return AppDialogs.showConfirmation(
+				taskDialogOwner(),
+				"Delete Task",
+				"Delete this task?",
+				taskDeleteMessage(taskId),
+				"Delete Task",
+				AppDialogs.DialogActionKind.DANGER);
+	}
+
+	private String taskDeleteMessage(Long taskId) {
+		if (taskId == null || caseTasks == null) {
+			return "This task will be removed from the case task list.";
+		}
+		for (CaseTaskListItemDto task : caseTasks) {
+			if (task.id() == taskId.longValue()) {
+				String title = safe(task.title());
+				return title.isBlank()
+						? "This task will be removed from the case task list."
+						: title + "\n\nThis task will be removed from the case task list.";
+			}
+		}
+		return "This task will be removed from the case task list.";
+	}
+
+	private void showTaskActionError(String message) {
+		AppDialogs.showError(taskDialogOwner(), "Tasks", message);
+	}
+
+	private Window taskDialogOwner() {
+		if (tasksTabPane != null && tasksTabPane.getScene() != null) {
+			return tasksTabPane.getScene().getWindow();
+		}
+		if (addTaskButton != null && addTaskButton.getScene() != null) {
+			return addTaskButton.getScene().getWindow();
+		}
+		return null;
 	}
 
 	private void openOrganization(Integer organizationId) {
