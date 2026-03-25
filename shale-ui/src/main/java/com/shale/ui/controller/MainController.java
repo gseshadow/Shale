@@ -37,9 +37,6 @@ public final class MainController {
 	private Button navMyShaleButton;
 
 	@FXML
-	private Button navTasksButton;
-
-	@FXML
 	private Button navCasesButton;
 
 	@FXML
@@ -131,14 +128,6 @@ public final class MainController {
 		sectionTitleLabel.setText("My Shale");
 		sectionSubtitleLabel.setText("Overview of your tasks, assigned cases, and recent activity.");
 		showMyShale();
-	}
-
-	@FXML
-	private void onNavTasks() {
-		highlightNav(navTasksButton);
-		sectionTitleLabel.setText("Tasks");
-		sectionSubtitleLabel.setText("View and manage your tasks.");
-		setSectionContentText("Tasks tab is not implemented yet.");
 	}
 
 	@FXML
@@ -315,7 +304,6 @@ public final class MainController {
 	private List<Button> getNavigationButtons() {
 		return List.of(
 				navMyShaleButton,
-				navTasksButton,
 				navCasesButton,
 				navContactsButton,
 				navOrganizationsButton,
@@ -338,7 +326,6 @@ public final class MainController {
 			return;
 
 		navMyShaleButton.setDisable(false);
-		navTasksButton.setDisable(false);
 		navCasesButton.setDisable(false);
 		navContactsButton.setDisable(false);
 		navOrganizationsButton.setDisable(false);
