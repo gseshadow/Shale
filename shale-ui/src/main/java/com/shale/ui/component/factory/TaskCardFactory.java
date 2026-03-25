@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import com.shale.ui.component.TaskCard;
+import com.shale.ui.util.ColorUtil;
 
 public final class TaskCardFactory {
 
@@ -65,7 +66,7 @@ public final class TaskCardFactory {
         card.setCompleted(model.completedAt() != null);
         card.setBorderByDueState(model.dueAt(), model.completedAt());
         card.setAssignee(model.assignedUserId(), model.assignedUserDisplayName(), model.assignedUserColor());
-        card.setBackgroundCssColor(model.priorityColorHex());
+        card.setBackgroundCssColor(ColorUtil.toCssBackgroundColorOrNull(model.priorityColorHex()));
 
         switch (variant) {
             case FULL -> card.applyFull();
