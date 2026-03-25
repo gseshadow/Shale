@@ -27,18 +27,12 @@ public final class TaskCard extends VBox {
     private final Label completedLabel = new Label();
     private final Label assigneeLabel = new Label();
     private final Button toggleCompleteButton = new Button();
-    private final Button assignButton = new Button("Assign");
-    private final Button clearAssigneeButton = new Button("Clear");
-    private final Button deleteButton = new Button("Delete");
     private final Region actionsSpacer = new Region();
-    private final HBox actionsRow = new HBox(8, actionsSpacer, assignButton, clearAssigneeButton, toggleCompleteButton, deleteButton);
+    private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
 
     private Long taskId;
     private Consumer<Long> onOpen;
     private Consumer<Long> onToggleComplete;
-    private Consumer<Long> onDeleteTask;
-    private Consumer<Long> onAssignUser;
-    private Consumer<Long> onClearAssignee;
     private String backgroundCss;
     private boolean hovered;
     private boolean completed;
@@ -60,18 +54,6 @@ public final class TaskCard extends VBox {
 
     public void setOnToggleComplete(Consumer<Long> onToggleComplete) {
         this.onToggleComplete = onToggleComplete;
-    }
-
-    public void setOnDeleteTask(Consumer<Long> onDeleteTask) {
-        this.onDeleteTask = onDeleteTask;
-    }
-
-    public void setOnAssignUser(Consumer<Long> onAssignUser) {
-        this.onAssignUser = onAssignUser;
-    }
-
-    public void setOnClearAssignee(Consumer<Long> onClearAssignee) {
-        this.onClearAssignee = onClearAssignee;
     }
 
     public void setTitle(String title) {
@@ -118,18 +100,12 @@ public final class TaskCard extends VBox {
             assigneeLabel.setText("");
             assigneeLabel.setManaged(false);
             assigneeLabel.setVisible(false);
-            assignButton.setText("Assign");
-            clearAssigneeButton.setManaged(false);
-            clearAssigneeButton.setVisible(false);
             return;
         }
 
         assigneeLabel.setText("Assigned: " + normalized);
         assigneeLabel.setManaged(true);
         assigneeLabel.setVisible(true);
-        assignButton.setText("Change");
-        clearAssigneeButton.setManaged(true);
-        clearAssigneeButton.setVisible(true);
     }
 
     public void setBackgroundCssColor(String css) {
@@ -189,29 +165,10 @@ public final class TaskCard extends VBox {
         assignButton.getStyleClass().add("button-secondary");
         clearAssigneeButton.getStyleClass().add("button-secondary");
         toggleCompleteButton.getStyleClass().add("button-secondary");
-        deleteButton.getStyleClass().add("button-secondary");
-        assignButton.setOnAction(e -> {
-            e.consume();
-            if (onAssignUser != null && taskId != null) {
-                onAssignUser.accept(taskId);
-            }
-        });
-        clearAssigneeButton.setOnAction(e -> {
-            e.consume();
-            if (onClearAssignee != null && taskId != null && assignedUserId != null && assignedUserId > 0) {
-                onClearAssignee.accept(taskId);
-            }
-        });
         toggleCompleteButton.setOnAction(e -> {
             e.consume();
             if (onToggleComplete != null && taskId != null) {
                 onToggleComplete.accept(taskId);
-            }
-        });
-        deleteButton.setOnAction(e -> {
-            e.consume();
-            if (onDeleteTask != null && taskId != null) {
-                onDeleteTask.accept(taskId);
             }
         });
         setOnMouseEntered(e -> {

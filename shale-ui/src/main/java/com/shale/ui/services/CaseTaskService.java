@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.UserDao;
@@ -23,6 +24,10 @@ public final class CaseTaskService {
 
     public List<CaseTaskListItemDto> loadTasksForCase(long caseId, int shaleClientId) {
         return taskDao.listActiveTasksForCase(caseId, shaleClientId);
+    }
+
+    public TaskDetailDto loadTaskDetail(long taskId, int shaleClientId) {
+        return taskDao.findTaskDetail(taskId, shaleClientId);
     }
 
     public long createTask(CreateTaskRequest request) {
@@ -62,6 +67,27 @@ public final class CaseTaskService {
         taskDao.softDeleteTask(taskId, shaleClientId);
     }
 
+    public void updateTask(UpdateTaskRequest request) {
+        Objects.requireNonNull(request, "request");
+        taskDao.updateTask(
+                request.taskId(),
+                request.shaleClientId(),
+                request.title(),
+                request.description(),
+                request.dueAt(),
+                request.priorityId(),
+                request.completed());
+        if (request.assigneeUserId() != null && request.assigneeUserId() > 0) {
+            taskDao.assignPrimaryUserToTask(
+                    request.taskId(),
+                    request.shaleClientId(),
+                    request.assigneeUserId(),
+                    request.changedByUserId());
+        } else {
+            taskDao.clearPrimaryUserAssignment(request.taskId(), request.shaleClientId());
+        }
+    }
+
     public void assignUserToTask(long taskId, int shaleClientId, int userId, int assignedByUserId) {
         taskDao.assignPrimaryUserToTask(taskId, shaleClientId, userId, assignedByUserId);
     }
@@ -91,5 +117,17 @@ public final class CaseTaskService {
             int id,
             String displayName,
             String color) {
+    }
+
+    public record UpdateTaskRequest(
+            long taskId,
+            int shaleClientId,
+            String title,
+            String description,
+            java.time.LocalDateTime dueAt,
+            Integer priorityId,
+            Integer assigneeUserId,
+            boolean completed,
+            int changedByUserId) {
     }
 }

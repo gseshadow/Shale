@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.runtime.DbSessionProvider;
 
@@ -116,6 +117,77 @@ public final class TaskDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load tasks for caseId=" + caseId, e);
+        }
+    }
+
+    public TaskDetailDto findTaskDetail(long taskId, int shaleClientId) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        String sql = """
+                SELECT
+                  t.Id,
+                  t.ShaleClientId,
+                  t.CaseId,
+                  t.Title,
+                  t.Description,
+                  t.DueAt,
+                  t.PriorityId,
+                  t.CompletedAt,
+                  assignment.UserId AS AssignedUserId,
+                  assignment.DisplayName AS AssignedUserDisplayName,
+                  assignment.Color AS AssignedUserColor
+                FROM dbo.Tasks t
+                OUTER APPLY (
+                  SELECT TOP (1)
+                    ta.UserId,
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName,
+                    u.Color
+                  FROM dbo.TaskAssignments ta
+                  INNER JOIN dbo.Users u
+                    ON u.Id = ta.UserId
+                   AND u.ShaleClientId = ta.ShaleClientId
+                  WHERE ta.TaskId = t.Id
+                    AND ta.ShaleClientId = t.ShaleClientId
+                    AND ta.IsPrimary = 1
+                  ORDER BY ta.AssignedAt DESC, ta.UserId DESC
+                ) assignment
+                WHERE t.Id = ?
+                  AND t.ShaleClientId = ?
+                  AND ISNULL(t.IsDeleted, 0) = 0;
+                """;
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setLong(1, taskId);
+            ps.setInt(2, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                return new TaskDetailDto(
+                        rs.getLong("Id"),
+                        rs.getInt("ShaleClientId"),
+                        rs.getLong("CaseId"),
+                        rs.getString("Title"),
+                        rs.getString("Description"),
+                        toLocalDateTime(rs.getTimestamp("DueAt")),
+                        (Integer) rs.getObject("PriorityId"),
+                        toLocalDateTime(rs.getTimestamp("CompletedAt")),
+                        (Integer) rs.getObject("AssignedUserId"),
+                        rs.getString("AssignedUserDisplayName"),
+                        rs.getString("AssignedUserColor"));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load task detail for taskId=" + taskId, e);
         }
     }
 
@@ -237,6 +309,54 @@ public final class TaskDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to list task priorities for shaleClientId=" + shaleClientId, e);
+        }
+    }
+
+    public void updateTask(
+            long taskId,
+            int shaleClientId,
+            String title,
+            String description,
+            LocalDateTime dueAt,
+            Integer priorityId,
+            boolean completed) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        String normalizedTitle = title == null ? "" : title.trim();
+        if (normalizedTitle.isBlank()) {
+            throw new IllegalArgumentException("title is required");
+        }
+
+        String sql = """
+                UPDATE dbo.Tasks
+                SET Title = ?,
+                    Description = ?,
+                    DueAt = ?,
+                    PriorityId = ?,
+                    CompletedAt = %s,
+                    UpdatedAt = SYSDATETIME()
+                WHERE Id = ?
+                  AND ShaleClientId = ?
+                  AND ISNULL(IsDeleted, 0) = 0;
+                """.formatted(completed ? "SYSDATETIME()" : "NULL");
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            int resolvedPriorityId = resolvePriorityIdForCreate(con, shaleClientId, priorityId);
+            int i = 1;
+            ps.setString(i++, normalizedTitle);
+            setNullableString(ps, i++, description);
+            setNullableTimestamp(ps, i++, dueAt);
+            ps.setInt(i++, resolvedPriorityId);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update taskId=" + taskId, e);
         }
     }
 
