@@ -1319,7 +1319,7 @@ public class CaseController {
 		new Thread(() -> {
 			try {
 				caseTaskService.createTask(request);
-				runOnFx(this::refreshCaseTasksSectionAsync);
+				runOnFx(this::refreshCaseTasks);
 			} catch (Exception ex) {
 				logTaskActionException("create", ex);
 				runOnFx(() -> showTaskActionError("Failed to create task for this case. " + rootCauseMessage(ex)));
@@ -1336,7 +1336,9 @@ public class CaseController {
 			showTaskActionError("Unable to update task right now.");
 			return;
 		}
-		boolean currentlyCompleted = isTaskCompleted(taskId);
+		boolean currentlyCompleted = findCaseTaskById(taskId)
+				.map(task -> task.completedAt() != null)
+				.orElse(false);
 		new Thread(() -> {
 			try {
 				if (currentlyCompleted) {
@@ -1344,7 +1346,7 @@ public class CaseController {
 				} else {
 					caseTaskService.completeTask(taskId, shaleClientId);
 				}
-				runOnFx(this::refreshCaseTasksSectionAsync);
+				runOnFx(this::refreshCaseTasks);
 			} catch (Exception ex) {
 				logTaskActionException("toggle-complete", ex);
 				runOnFx(() -> showTaskActionError("Failed to update task completion. " + rootCauseMessage(ex)));
@@ -1360,32 +1362,6 @@ public class CaseController {
 		Integer currentUserId = appState.getUserId();
 		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
 			showTaskActionError("You must be signed in to edit tasks.");
-			return;
-		}
-
-		new Thread(() -> {
-			try {
-				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
-				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
-				runOnFx(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, detail, priorities, users));
-			} catch (Exception ex) {
-				logTaskActionException("load-detail", ex);
-				runOnFx(() -> showTaskActionError("Failed to load task details. " + rootCauseMessage(ex)));
-			}
-		}, "case-task-detail-" + taskId).start();
-	}
-
-	private void showTaskDetailDialog(
-			long taskId,
-			int shaleClientId,
-			int currentUserId,
-			TaskDetailDto detail,
-			List<TaskPriorityOptionDto> priorities,
-			List<CaseTaskService.AssignableUserOption> users) {
-		if (detail == null) {
-			showTaskActionError("Task was not found or may have been deleted.");
-			refreshCaseTasksSectionAsync();
 			return;
 		}
 
@@ -1448,8 +1424,91 @@ public class CaseController {
 	private void deleteTaskFromDetail(long taskId, int shaleClientId) {
 		new Thread(() -> {
 			try {
+				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
+				runOnFx(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, detail, priorities, users));
+			} catch (Exception ex) {
+				logTaskActionException("load-detail", ex);
+				runOnFx(() -> showTaskActionError("Failed to load task details. " + rootCauseMessage(ex)));
+			}
+		}, "case-task-detail-" + taskId).start();
+	}
+
+	private void showTaskDetailDialog(
+			long taskId,
+			int shaleClientId,
+			int currentUserId,
+			TaskDetailDto detail,
+			List<TaskPriorityOptionDto> priorities,
+			List<CaseTaskService.AssignableUserOption> users) {
+		if (detail == null) {
+			showTaskActionError("Task was not found or may have been deleted.");
+			refreshCaseTasks();
+			return;
+		}
+
+		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+				detail.id(),
+				detail.title(),
+				detail.description(),
+				detail.dueAt(),
+				detail.priorityId(),
+				detail.assignedUserId(),
+				detail.completedAt() != null);
+
+		Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+				taskDialogOwner(),
+				model,
+				priorities,
+				users);
+		if (result.isEmpty()) {
+			return;
+		}
+		TaskDetailDialog.TaskDetailResult action = result.get();
+		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+			deleteTaskFromDetail(taskId, shaleClientId);
+			return;
+		}
+		TaskDetailDialog.SaveTaskPayload payload = action.payload();
+		if (payload == null) {
+			return;
+		}
+		saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+	}
+
+	private void saveTaskFromDetail(
+			long taskId,
+			int shaleClientId,
+			int currentUserId,
+			TaskDetailDialog.SaveTaskPayload payload) {
+		CaseTaskService.UpdateTaskRequest request = new CaseTaskService.UpdateTaskRequest(
+				taskId,
+				shaleClientId,
+				payload.title(),
+				payload.description(),
+				payload.dueAt(),
+				payload.priorityId(),
+				payload.assigneeUserId(),
+				payload.completed(),
+				currentUserId);
+
+		new Thread(() -> {
+			try {
+				caseTaskService.updateTask(request);
+				runOnFx(this::refreshCaseTasks);
+			} catch (Exception ex) {
+				logTaskActionException("save-detail", ex);
+				runOnFx(() -> showTaskActionError("Failed to save task. " + rootCauseMessage(ex)));
+			}
+		}, "case-task-save-detail-" + taskId).start();
+	}
+
+	private void deleteTaskFromDetail(long taskId, int shaleClientId) {
+		new Thread(() -> {
+			try {
 				caseTaskService.deleteTask(taskId, shaleClientId);
-				runOnFx(this::refreshCaseTasksSectionAsync);
+				runOnFx(this::refreshCaseTasks);
 			} catch (Exception ex) {
 				logTaskActionException("delete-detail", ex);
 				runOnFx(() -> showTaskActionError("Failed to delete task. " + rootCauseMessage(ex)));
@@ -1457,80 +1516,20 @@ public class CaseController {
 		}, "case-task-delete-detail-" + taskId).start();
 	}
 
-	private void onAssignTaskUser(Long taskId) {
-		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
-			return;
-		}
-		Integer shaleClientId = appState.getShaleClientId();
-		Integer assignedByUserId = appState.getUserId();
-		if (shaleClientId == null || shaleClientId <= 0 || assignedByUserId == null || assignedByUserId <= 0) {
-			showTaskActionError("You must be signed in to assign tasks.");
-			return;
-		}
-
-		new Thread(() -> {
-			try {
-				List<CaseTaskService.AssignableUserOption> options = caseTaskService.loadAssignableUsers(shaleClientId);
-				runOnFx(() -> showTaskAssigneePicker(taskId, shaleClientId, assignedByUserId, options));
-			} catch (Exception ex) {
-				logTaskActionException("load-assignees", ex);
-				runOnFx(() -> showTaskActionError("Unable to load users for assignment. " + rootCauseMessage(ex)));
-			}
-		}, "case-task-assignees-" + taskId).start();
+	private void refreshCaseTasks() {
+		loadCaseTasksAsync();
 	}
 
-	private void showTaskAssigneePicker(
-			Long taskId,
-			int shaleClientId,
-			int assignedByUserId,
-			List<CaseTaskService.AssignableUserOption> users) {
-		List<CaseTaskService.AssignableUserOption> options = users == null ? List.of() : users;
-		if (options.isEmpty()) {
-			showTaskActionError("No active users are available for assignment.");
-			return;
+	private Optional<CaseTaskListItemDto> findCaseTaskById(Long taskId) {
+		if (taskId == null || caseTasks == null) {
+			return Optional.empty();
 		}
-
-		Integer currentAssigneeId = null;
-		for (CaseTaskListItemDto task : caseTasks == null ? List.<CaseTaskListItemDto>of() : caseTasks) {
+		for (CaseTaskListItemDto task : caseTasks) {
 			if (task.id() == taskId.longValue()) {
-				currentAssigneeId = task.assignedUserId();
-				break;
+				return Optional.of(task);
 			}
 		}
-
-		CaseTaskService.AssignableUserOption preselect = null;
-		if (currentAssigneeId != null) {
-			for (CaseTaskService.AssignableUserOption option : options) {
-				if (option != null && option.id() == currentAssigneeId) {
-					preselect = option;
-					break;
-				}
-			}
-		}
-
-		ContactPickerDialog<CaseTaskService.AssignableUserOption> picker = new ContactPickerDialog<>(
-				taskDialogOwner(),
-				currentAssigneeId == null ? "Assign Task" : "Change Task Assignee",
-				options,
-				this::formatAssignableUserOption,
-				preselect);
-
-		Optional<CaseTaskService.AssignableUserOption> selected = picker.showAndWait();
-		if (selected.isEmpty()) {
-			return;
-		}
-		assignTaskToUser(taskId, shaleClientId, selected.get().id(), assignedByUserId);
-	}
-
-	private String formatAssignableUserOption(CaseTaskService.AssignableUserOption option) {
-		if (option == null) {
-			return "";
-		}
-		String name = safe(option.displayName());
-		if (!name.isBlank()) {
-			return name;
-		}
-		return "User #" + option.id();
+		return Optional.empty();
 	}
 
 	private void showTaskActionError(String message) {
