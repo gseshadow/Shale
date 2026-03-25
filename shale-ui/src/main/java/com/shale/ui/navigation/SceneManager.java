@@ -211,7 +211,7 @@ public final class SceneManager {
 	}
 
 
-	public Parent createMyShaleView(Consumer<Integer> onOpenCase) {
+	public Parent createMyShaleView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser) {
 		return load("/fxml/my-shale.fxml", controller ->
 		{
 			MyShaleController c = (MyShaleController) controller;
@@ -219,7 +219,7 @@ public final class SceneManager {
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase);
+			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser);
 			return c;
 		});
 	}

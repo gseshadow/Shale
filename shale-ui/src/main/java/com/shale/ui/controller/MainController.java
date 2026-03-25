@@ -291,7 +291,7 @@ public final class MainController {
 	}
 
 	private void showMyShale() {
-		Node myShaleRoot = sceneManager.createMyShaleView(this::openCase);
+		Node myShaleRoot = sceneManager.createMyShaleView(this::openCase, sceneManager::openUserProfile);
 		sectionContent.getChildren().setAll(myShaleRoot);
 	}
 
