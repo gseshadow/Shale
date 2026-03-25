@@ -26,6 +26,14 @@ public final class TaskDao {
         DUE_DATE_ASC,
         DUE_DATE_DESC
     }
+
+    public enum CaseTaskSort {
+        DEFAULT,
+        DUE_DATE_ASC,
+        DUE_DATE_DESC,
+        PRIORITY_ASC,
+        PRIORITY_DESC
+    }
     /**
      * Temporary default tinyint role used for primary task assignee rows.
      * <p>
@@ -40,13 +48,49 @@ public final class TaskDao {
         this.db = Objects.requireNonNull(db, "db");
     }
 
-    public List<CaseTaskListItemDto> listActiveTasksForCase(long caseId, int shaleClientId) {
+    public List<CaseTaskListItemDto> listActiveTasksForCase(long caseId, int shaleClientId, CaseTaskSort sort) {
         if (caseId <= 0) {
             throw new IllegalArgumentException("caseId must be > 0");
         }
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
+        CaseTaskSort resolvedSort = sort == null ? CaseTaskSort.DEFAULT : sort;
+
+        String sortOrderClause = switch (resolvedSort) {
+            case DUE_DATE_ASC, DEFAULT -> """
+                    CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                    t.DueAt ASC,
+                    t.UpdatedAt DESC,
+                    t.CreatedAt DESC,
+                    t.Id DESC
+                    """;
+            case DUE_DATE_DESC -> """
+                    CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                    t.DueAt DESC,
+                    t.UpdatedAt DESC,
+                    t.CreatedAt DESC,
+                    t.Id DESC
+                    """;
+            case PRIORITY_ASC -> """
+                    CASE WHEN p.SortOrder IS NULL THEN 1 ELSE 0 END ASC,
+                    p.SortOrder ASC,
+                    CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                    t.DueAt ASC,
+                    t.UpdatedAt DESC,
+                    t.CreatedAt DESC,
+                    t.Id DESC
+                    """;
+            case PRIORITY_DESC -> """
+                    CASE WHEN p.SortOrder IS NULL THEN 1 ELSE 0 END ASC,
+                    p.SortOrder DESC,
+                    CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                    t.DueAt ASC,
+                    t.UpdatedAt DESC,
+                    t.CreatedAt DESC,
+                    t.Id DESC
+                    """;
+        };
 
         String sql = """
                 SELECT
@@ -120,11 +164,8 @@ public final class TaskDao {
                   AND ISNULL(t.IsDeleted, 0) = 0
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
-                  CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
-                  t.DueAt ASC,
-                  t.CreatedAt DESC,
-                  t.Id DESC;
-                """;
+                  %s;
+                """.formatted(sortOrderClause);
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
