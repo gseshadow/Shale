@@ -41,7 +41,9 @@ public final class DesktopUpdateLauncher {
 			ProcessBuilder pb = buildLaunchCommand(platform, installDir, currentVersion, updaterLog);
 
 			log(logFile, "Updater executable/script/path chosen: " + pb.command().get(0));
+			log(logFile, "Updater launch working directory: " + pb.directory());
 			log(logFile, "Command: " + pb.command());
+			log(logFile, "Updater launch cwd explicitly set: " + (pb.directory() != null));
 			Process process = pb.start();
 			log(logFile, platform == AppPlatform.MAC
 					? "macOS execution handoff success. PID available: " + process.pid()
@@ -109,7 +111,7 @@ public final class DesktopUpdateLauncher {
 				updaterJar.toString(),
 				"--currentVersion", currentVersion,
 				"--installDir", installDir.toString());
-		pb.directory(installDir.toFile());
+		pb.directory(Path.of("/").toFile());
 		pb.redirectErrorStream(true);
 		pb.redirectOutput(updaterLog.toFile());
 		return pb;
