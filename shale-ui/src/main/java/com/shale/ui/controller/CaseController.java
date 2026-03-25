@@ -1364,6 +1364,33 @@ public class CaseController {
 			showTaskActionError("You must be signed in to edit tasks.");
 			return;
 		}
+		TaskDetailDialog.TaskDetailResult action = result.get();
+		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+			deleteTaskFromDetail(taskId, shaleClientId);
+			return;
+		}
+		TaskDetailDialog.SaveTaskPayload payload = action.payload();
+		if (payload == null) {
+			return;
+		}
+		saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+	}
+
+	private void saveTaskFromDetail(
+			long taskId,
+			int shaleClientId,
+			int currentUserId,
+			TaskDetailDialog.SaveTaskPayload payload) {
+		CaseTaskService.UpdateTaskRequest request = new CaseTaskService.UpdateTaskRequest(
+				taskId,
+				shaleClientId,
+				payload.title(),
+				payload.description(),
+				payload.dueAt(),
+				payload.priorityId(),
+				payload.assigneeUserId(),
+				payload.completed(),
+				currentUserId);
 
 		new Thread(() -> {
 			try {
