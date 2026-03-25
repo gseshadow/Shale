@@ -85,6 +85,241 @@ public final class TaskDao {
         }
     }
 
+    public long createTask(
+            int shaleClientId,
+            long caseId,
+            String title,
+            String description,
+            LocalDateTime dueAt,
+            int createdByUserId) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (caseId <= 0) {
+            throw new IllegalArgumentException("caseId must be > 0");
+        }
+        if (createdByUserId <= 0) {
+            throw new IllegalArgumentException("createdByUserId must be > 0");
+        }
+        String normalizedTitle = title == null ? "" : title.trim();
+        if (normalizedTitle.isBlank()) {
+            throw new IllegalArgumentException("title is required");
+        }
+
+        String sql = """
+                INSERT INTO dbo.Tasks (
+                  ShaleClientId,
+                  StatusId,
+                  PriorityId,
+                  Title,
+                  Description,
+                  CaseId,
+                  DueAt,
+                  CompletedAt,
+                  CreatedByUserId,
+                  CreatedAt,
+                  UpdatedAt,
+                  IsDeleted
+                )
+                OUTPUT INSERTED.Id
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, SYSDATETIME(), SYSDATETIME(), 0);
+                """;
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            int defaultStatusId = resolveDefaultTaskStatusId(con, shaleClientId);
+            int defaultPriorityId = resolveDefaultTaskPriorityId(con, shaleClientId);
+            int i = 1;
+            ps.setInt(i++, shaleClientId);
+            ps.setInt(i++, defaultStatusId);
+            ps.setInt(i++, defaultPriorityId);
+            ps.setString(i++, normalizedTitle);
+            setNullableString(ps, i++, description);
+            ps.setLong(i++, caseId);
+            setNullableTimestamp(ps, i++, dueAt);
+            ps.setInt(i++, createdByUserId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new RuntimeException("Failed to create task for caseId=" + caseId);
+                }
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Failed to create task for caseId=" + caseId
+                            + " (sqlState=" + e.getSQLState() + ", errorCode=" + e.getErrorCode() + ")",
+                    e);
+        }
+    }
+
+    public void markTaskCompleted(long taskId, int shaleClientId) {
+        updateTaskCompletion(taskId, shaleClientId, true);
+    }
+
+    public void clearTaskCompleted(long taskId, int shaleClientId) {
+        updateTaskCompletion(taskId, shaleClientId, false);
+    }
+
+    public void softDeleteTask(long taskId, int shaleClientId) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        String sql = """
+                UPDATE dbo.Tasks
+                SET IsDeleted = 1,
+                    UpdatedAt = SYSDATETIME()
+                WHERE Id = ?
+                  AND ShaleClientId = ?
+                  AND ISNULL(IsDeleted, 0) = 0;
+                """;
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setLong(1, taskId);
+            ps.setInt(2, shaleClientId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete taskId=" + taskId, e);
+        }
+    }
+
+    private void updateTaskCompletion(long taskId, int shaleClientId, boolean completed) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        String sql = """
+                UPDATE dbo.Tasks
+                SET CompletedAt = %s,
+                    UpdatedAt = SYSDATETIME()
+                WHERE Id = ?
+                  AND ShaleClientId = ?
+                  AND ISNULL(IsDeleted, 0) = 0;
+                """.formatted(completed ? "SYSDATETIME()" : "NULL");
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setLong(1, taskId);
+            ps.setInt(2, shaleClientId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update completion for taskId=" + taskId, e);
+        }
+    }
+
+    private static void setNullableString(PreparedStatement ps, int index, String value) throws SQLException {
+        if (value == null || value.isBlank()) {
+            ps.setNull(index, java.sql.Types.NVARCHAR);
+            return;
+        }
+        ps.setString(index, value.trim());
+    }
+
+    private static void setNullableTimestamp(PreparedStatement ps, int index, LocalDateTime value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, java.sql.Types.TIMESTAMP);
+            return;
+        }
+        ps.setObject(index, value);
+    }
+
+    private static int resolveDefaultTaskStatusId(Connection con, int shaleClientId) throws SQLException {
+        String sql = """
+                SELECT TOP (1) s.Id
+                FROM dbo.Statuses s
+                WHERE s.ShaleClientId = ?
+                  AND ISNULL(s.IsClosed, 0) = 0
+                ORDER BY
+                  CASE WHEN LOWER(LTRIM(RTRIM(ISNULL(s.Name, '')))) IN ('open', 'todo', 'to do', 'active') THEN 0 ELSE 1 END,
+                  ISNULL(s.SortOrder, 2147483647),
+                  s.Id;
+                """;
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        }
+        throw new IllegalStateException("No default open task status found for shaleClientId=" + shaleClientId);
+    }
+
+    private static int resolveDefaultTaskPriorityId(Connection con, int shaleClientId) throws SQLException {
+        String tableName = "dbo.Priorities";
+        if (!tableExists(con, tableName)) {
+            throw new IllegalStateException("Priority resolution failed: table " + tableName + " does not exist.");
+        }
+
+        boolean hasName = hasColumn(con, tableName, "Name");
+        boolean hasSortOrder = hasColumn(con, tableName, "SortOrder");
+        boolean hasIsActive = hasColumn(con, tableName, "IsActive");
+
+        StringBuilder sql = new StringBuilder("""
+                SELECT TOP (1) p.Id
+                FROM dbo.Priorities p
+                WHERE p.ShaleClientId = ?
+                """);
+        if (hasIsActive) {
+            sql.append("\n  AND ISNULL(p.IsActive, 1) = 1");
+        }
+
+        sql.append("\nORDER BY ");
+        if (hasName) {
+            sql.append("\n  CASE WHEN LOWER(LTRIM(RTRIM(ISNULL(p.Name, '')))) IN ('normal', 'medium', 'default', 'standard') THEN 0 ELSE 1 END,");
+        }
+        if (hasSortOrder) {
+            sql.append("\n  ISNULL(p.SortOrder, 2147483647),");
+        }
+        sql.append("\n  p.Id;");
+
+        try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+            ps.setInt(1, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        }
+        throw new IllegalStateException("No default task priority found for shaleClientId=" + shaleClientId);
+    }
+
+    private static boolean tableExists(Connection con, String fullyQualifiedTableName) throws SQLException {
+        String sql = "SELECT CASE WHEN OBJECT_ID(?, 'U') IS NULL THEN 0 ELSE 1 END;";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, fullyQualifiedTableName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) == 1;
+            }
+        }
+    }
+
+    private static boolean hasColumn(Connection con, String fullyQualifiedTableName, String columnName) throws SQLException {
+        String sql = """
+                SELECT CASE WHEN EXISTS (
+                    SELECT 1
+                    FROM sys.columns c
+                    WHERE c.object_id = OBJECT_ID(?)
+                      AND c.name = ?
+                ) THEN 1 ELSE 0 END;
+                """;
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, fullyQualifiedTableName);
+            ps.setString(2, columnName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) == 1;
+            }
+        }
+    }
+
     private static LocalDateTime toLocalDateTime(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
     }
