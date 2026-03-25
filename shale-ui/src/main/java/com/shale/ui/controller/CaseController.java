@@ -900,7 +900,9 @@ public class CaseController {
 					task.title(),
 					task.description(),
 					task.dueAt(),
-					task.completedAt());
+					task.completedAt(),
+					task.assignedUserId(),
+					task.assignedUserDisplayName());
 			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT));
 		}
 
@@ -1266,7 +1268,12 @@ public class CaseController {
 	}
 
 	private TaskCardFactory buildTaskCardFactory(Consumer<Long> onOpenTaskAction) {
-		return new TaskCardFactory(onOpenTaskAction, this::onToggleTaskComplete, this::onDeleteTask);
+		return new TaskCardFactory(
+				onOpenTaskAction,
+				this::onToggleTaskComplete,
+				this::onDeleteTask,
+				this::onAssignTaskUser,
+				this::onClearTaskAssignee);
 	}
 
 	private void onAddTask() {
@@ -1289,7 +1296,19 @@ public class CaseController {
 			return;
 		}
 
-		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(taskDialogOwner(), priorities);
+		List<CaseTaskService.AssignableUserOption> assignableUsers;
+		try {
+			assignableUsers = caseTaskService.loadAssignableUsers(shaleClientId);
+		} catch (Exception ex) {
+			logTaskActionException("load-assignees", ex);
+			showTaskActionError("Unable to load users right now.");
+			return;
+		}
+
+		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
+				taskDialogOwner(),
+				priorities,
+				assignableUsers);
 		if (input.isEmpty()) {
 			return;
 		}
@@ -1301,6 +1320,7 @@ public class CaseController {
 				input.get().description(),
 				input.get().dueAt(),
 				input.get().priorityId(),
+				input.get().assigneeUserId(),
 				currentUserId);
 
 		new Thread(() -> {
@@ -1362,6 +1382,144 @@ public class CaseController {
 				runOnFx(() -> showTaskActionError("Failed to delete task. " + rootCauseMessage(ex)));
 			}
 		}, "case-delete-task-" + taskId).start();
+	}
+
+	private void onAssignTaskUser(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer assignedByUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || assignedByUserId == null || assignedByUserId <= 0) {
+			showTaskActionError("You must be signed in to assign tasks.");
+			return;
+		}
+
+		new Thread(() -> {
+			try {
+				List<CaseTaskService.AssignableUserOption> options = caseTaskService.loadAssignableUsers(shaleClientId);
+				runOnFx(() -> showTaskAssigneePicker(taskId, shaleClientId, assignedByUserId, options));
+			} catch (Exception ex) {
+				logTaskActionException("load-assignees", ex);
+				runOnFx(() -> showTaskActionError("Unable to load users for assignment. " + rootCauseMessage(ex)));
+			}
+		}, "case-task-assignees-" + taskId).start();
+	}
+
+	private void showTaskAssigneePicker(
+			Long taskId,
+			int shaleClientId,
+			int assignedByUserId,
+			List<CaseTaskService.AssignableUserOption> users) {
+		List<CaseTaskService.AssignableUserOption> options = users == null ? List.of() : users;
+		if (options.isEmpty()) {
+			showTaskActionError("No active users are available for assignment.");
+			return;
+		}
+
+		Integer currentAssigneeId = null;
+		for (CaseTaskListItemDto task : caseTasks == null ? List.<CaseTaskListItemDto>of() : caseTasks) {
+			if (task.id() == taskId.longValue()) {
+				currentAssigneeId = task.assignedUserId();
+				break;
+			}
+		}
+
+		CaseTaskService.AssignableUserOption preselect = null;
+		if (currentAssigneeId != null) {
+			for (CaseTaskService.AssignableUserOption option : options) {
+				if (option != null && option.id() == currentAssigneeId) {
+					preselect = option;
+					break;
+				}
+			}
+		}
+
+		ContactPickerDialog<CaseTaskService.AssignableUserOption> picker = new ContactPickerDialog<>(
+				taskDialogOwner(),
+				currentAssigneeId == null ? "Assign Task" : "Change Task Assignee",
+				options,
+				this::formatAssignableUserOption,
+				preselect);
+
+		Optional<CaseTaskService.AssignableUserOption> selected = picker.showAndWait();
+		if (selected.isEmpty()) {
+			return;
+		}
+		assignTaskToUser(taskId, shaleClientId, selected.get().id(), assignedByUserId);
+	}
+
+	private String formatAssignableUserOption(CaseTaskService.AssignableUserOption option) {
+		if (option == null) {
+			return "";
+		}
+		String name = safe(option.displayName());
+		if (!name.isBlank()) {
+			return name;
+		}
+		return "User #" + option.id();
+	}
+
+	private void assignTaskToUser(Long taskId, int shaleClientId, int userId, int assignedByUserId) {
+		new Thread(() -> {
+			try {
+				caseTaskService.assignUserToTask(taskId, shaleClientId, userId, assignedByUserId);
+				runOnFx(this::refreshCaseTasksSectionAsync);
+			} catch (Exception ex) {
+				logTaskActionException("assign-user", ex);
+				runOnFx(() -> showTaskActionError("Failed to assign task user. " + rootCauseMessage(ex)));
+			}
+		}, "case-task-assign-" + taskId + "-" + userId).start();
+	}
+
+	private void onClearTaskAssignee(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			showTaskActionError("Unable to update assignment right now.");
+			return;
+		}
+		if (!confirmTaskAssigneeClear(taskId)) {
+			return;
+		}
+
+		new Thread(() -> {
+			try {
+				caseTaskService.clearTaskAssignee(taskId, shaleClientId);
+				runOnFx(this::refreshCaseTasksSectionAsync);
+			} catch (Exception ex) {
+				logTaskActionException("clear-assignee", ex);
+				runOnFx(() -> showTaskActionError("Failed to clear task assignee. " + rootCauseMessage(ex)));
+			}
+		}, "case-task-clear-assignee-" + taskId).start();
+	}
+
+	private boolean confirmTaskAssigneeClear(Long taskId) {
+		return AppDialogs.showConfirmation(
+				taskDialogOwner(),
+				"Clear Assignee",
+				"Clear the assignee for this task?",
+				taskClearAssigneeMessage(taskId),
+				"Clear Assignee",
+				AppDialogs.DialogActionKind.DANGER);
+	}
+
+	private String taskClearAssigneeMessage(Long taskId) {
+		if (taskId == null || caseTasks == null) {
+			return "This task will become unassigned.";
+		}
+		for (CaseTaskListItemDto task : caseTasks) {
+			if (task.id() == taskId.longValue()) {
+				String title = safe(task.title());
+				if (title.isBlank()) {
+					return "This task will become unassigned.";
+				}
+				return title + "\n\nThis task will become unassigned.";
+			}
+		}
+		return "This task will become unassigned.";
 	}
 
 	private void refreshCaseTasksSectionAsync() {
