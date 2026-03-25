@@ -19,6 +19,11 @@ import com.shale.core.runtime.DbSessionProvider;
  * DAO for task reads used by case task sections.
  */
 public final class TaskDao {
+    public enum MyTaskSort {
+        DEFAULT,
+        DUE_DATE_ASC,
+        DUE_DATE_DESC
+    }
     /**
      * Temporary default tinyint role used for primary task assignee rows.
      * <p>
@@ -117,6 +122,103 @@ public final class TaskDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load tasks for caseId=" + caseId, e);
+        }
+    }
+
+    public List<CaseTaskListItemDto> listActiveTasksAssignedToUser(int shaleClientId, int assignedUserId, MyTaskSort sort) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (assignedUserId <= 0) {
+            throw new IllegalArgumentException("assignedUserId must be > 0");
+        }
+
+        MyTaskSort resolvedSort = sort == null ? MyTaskSort.DEFAULT : sort;
+        String dueOrderSql = resolvedSort == MyTaskSort.DUE_DATE_DESC ? "DESC" : "ASC";
+
+        String sql = """
+                SELECT
+                  t.Id,
+                  t.ShaleClientId,
+                  t.CaseId,
+                  t.Title,
+                  t.Description,
+                  t.DueAt,
+                  t.CompletedAt,
+                  assignment.UserId AS AssignedUserId,
+                  assignment.DisplayName AS AssignedUserDisplayName,
+                  assignment.Color AS AssignedUserColor,
+                  t.CreatedByUserId,
+                  t.CreatedAt,
+                  t.UpdatedAt,
+                  t.IsDeleted
+                FROM dbo.Tasks t
+                INNER JOIN dbo.TaskAssignments myAssignment
+                  ON myAssignment.TaskId = t.Id
+                 AND myAssignment.ShaleClientId = t.ShaleClientId
+                 AND myAssignment.IsPrimary = 1
+                 AND myAssignment.UserId = ?
+                OUTER APPLY (
+                  SELECT TOP (1)
+                    ta.UserId,
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName,
+                    u.Color
+                  FROM dbo.TaskAssignments ta
+                  INNER JOIN dbo.Users u
+                    ON u.Id = ta.UserId
+                   AND u.ShaleClientId = ta.ShaleClientId
+                  WHERE ta.TaskId = t.Id
+                    AND ta.ShaleClientId = t.ShaleClientId
+                    AND ta.IsPrimary = 1
+                  ORDER BY
+                    ta.AssignedAt DESC,
+                    ta.UserId DESC
+                ) assignment
+                WHERE t.ShaleClientId = ?
+                  AND ISNULL(t.IsDeleted, 0) = 0
+                ORDER BY
+                  CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
+                  CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                  t.DueAt %s,
+                  t.UpdatedAt DESC,
+                  t.CreatedAt DESC,
+                  t.Id DESC;
+                """.formatted(dueOrderSql);
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, assignedUserId);
+            ps.setInt(2, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<CaseTaskListItemDto> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(new CaseTaskListItemDto(
+                            rs.getLong("Id"),
+                            rs.getInt("ShaleClientId"),
+                            rs.getLong("CaseId"),
+                            rs.getString("Title"),
+                            rs.getString("Description"),
+                            toLocalDateTime(rs.getTimestamp("DueAt")),
+                            toLocalDateTime(rs.getTimestamp("CompletedAt")),
+                            (Integer) rs.getObject("AssignedUserId"),
+                            rs.getString("AssignedUserDisplayName"),
+                            rs.getString("AssignedUserColor"),
+                            (Integer) rs.getObject("CreatedByUserId"),
+                            toLocalDateTime(rs.getTimestamp("CreatedAt")),
+                            toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+                            rs.getBoolean("IsDeleted")
+                    ));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Failed to load tasks for assignedUserId=" + assignedUserId + " shaleClientId=" + shaleClientId,
+                    e);
         }
     }
 
