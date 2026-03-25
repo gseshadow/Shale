@@ -208,7 +208,10 @@ public final class SceneManager {
 		{
 			MyShaleController c = (MyShaleController) controller;
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			c.init(appState, runtimeBridge, caseDao, onOpenCase);
+			TaskDao taskDao = new TaskDao(dbSessionProvider);
+			UserDao userDao = new UserDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
+			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase);
 			return c;
 		});
 	}
