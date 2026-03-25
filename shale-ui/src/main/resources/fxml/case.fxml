@@ -336,6 +336,8 @@
 					<Label text="Tasks"
 						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 					<Region HBox.hgrow="ALWAYS" />
+					<Label text="Sort By" style="-fx-opacity: 0.8;" />
+					<ChoiceBox fx:id="caseTasksSortChoice" prefWidth="190" />
 					<Button fx:id="addTaskButton" text="New Task" />
 				</HBox>
 				<Label fx:id="tasksTabEmptyLabel" text="No tasks for this case yet."
