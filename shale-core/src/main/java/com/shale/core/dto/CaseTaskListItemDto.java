@@ -10,6 +10,8 @@ public record CaseTaskListItemDto(
         int shaleClientId,
         long caseId,
         String caseName,
+        String caseResponsibleAttorney,
+        String caseResponsibleAttorneyColor,
         String title,
         String description,
         LocalDateTime dueAt,
