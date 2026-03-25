@@ -329,13 +329,26 @@
 			<!-- TASKS TAB PANE (center) -->
 			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980" styleClass="case-main-surface"
 				visible="false" managed="false">
-				<Label text="Tasks"
-					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
-				<TextField fx:id="tasksTabSearchField"
-					promptText="Search tasks…" />
-				<ListView fx:id="tasksTabListView" prefHeight="520.0" />
-				<Label text="(placeholder) Task details / actions go here"
-					wrapText="true" style="-fx-opacity: 0.7;" />
+				<padding>
+					<Insets top="12" right="12" bottom="12" left="12" />
+				</padding>
+				<HBox spacing="8" alignment="CENTER_LEFT">
+					<Label text="Tasks"
+						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+					<Region HBox.hgrow="ALWAYS" />
+					<Button fx:id="addTaskButton" text="New Task" />
+				</HBox>
+				<Label fx:id="tasksTabEmptyLabel" text="No tasks for this case yet."
+					visible="false" managed="false" style="-fx-opacity: 0.7;" />
+				<ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
+					<content>
+						<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12" prefWrapLength="880" maxWidth="1.7976931348623157E308">
+							<padding>
+								<Insets top="2" right="2" bottom="2" left="2" />
+							</padding>
+						</FlowPane>
+					</content>
+				</ScrollPane>
 			</VBox>
 
 			<!-- GENERIC PLACEHOLDER PANE -->

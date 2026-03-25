@@ -15,6 +15,9 @@ import java.util.function.Consumer;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.TaskDetailDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
@@ -27,11 +30,15 @@ import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.CreateContactDialog;
+import com.shale.ui.component.dialog.NewTaskDialog;
 import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.component.factory.UserCardFactory.Variant;
 import com.shale.ui.component.dialog.TeamEditorDialog;
+import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CaseDetailService;
+import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
@@ -50,7 +57,6 @@ import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ScrollPane;
@@ -202,17 +208,11 @@ public class CaseController {
 
 	@FXML
 	private VBox tasksPanel;
-	@FXML
-	private TextField taskSearchField;
-	@FXML
-	private ListView<String> taskListView;
-	@FXML
-	private Button newTaskInlineButton;
 
 	@FXML
-	private TextField tasksTabSearchField;
+	private FlowPane tasksTabFlow;
 	@FXML
-	private ListView<String> tasksTabListView;
+	private Label tasksTabEmptyLabel;
 
 	@FXML
 	private StackPane ovCaseStatusHost;
@@ -361,11 +361,15 @@ public class CaseController {
 	private PracticeAreaCardFactory practiceAreaCardFactory;
 	private Consumer<Integer> onOpenPracticeArea;
 
+	private TaskCardFactory taskCardFactory;
+	private Consumer<Long> onOpenTask;
+
 	private OrganizationCardFactory organizationCardFactory;
 	private Consumer<Integer> onOpenOrganization;
 
 	private CaseDao caseDao;
 	private CaseDetailService caseDetailService;
+	private CaseTaskService caseTaskService;
 	private OrganizationDao organizationDao;
 	private ContactDao contactDao;
 	private AppState appState;
@@ -415,6 +419,7 @@ public class CaseController {
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
 	private List<CaseDao.RelatedContactRow> relatedContacts = List.of();
 	private List<CaseDao.RelatedOrganizationRow> relatedOrganizations = List.of();
+	private List<CaseTaskListItemDto> caseTasks = List.of();
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 
@@ -437,10 +442,11 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 	}
 
-	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
+	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
 		this.caseId = caseId;
 		this.caseDao = caseDao;
 		this.caseDetailService = caseDetailService;
+		this.caseTaskService = caseTaskService;
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
@@ -470,6 +476,12 @@ public class CaseController {
 		this.practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea);
 	}
 
+
+	public void setOnOpenTask(Consumer<Long> onOpenTask) {
+		this.onOpenTask = onOpenTask;
+		this.taskCardFactory = buildTaskCardFactory(this::openTask);
+	}
+
 	public void setOnOpenOrganization(Consumer<Integer> onOpenOrganization) {
 		this.onOpenOrganization = onOpenOrganization;
 		this.organizationCardFactory = new OrganizationCardFactory(onOpenOrganization);
@@ -484,7 +496,6 @@ public class CaseController {
 		refreshHeader();
 		refreshOverviewPlaceholders();
 		setupSections();
-		setupOverviewTasksPanel();
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
@@ -517,6 +528,8 @@ public class CaseController {
 			deleteCaseButton.setOnAction(e -> onDeleteCase());
 			setVisibleManaged(deleteCaseButton, false);
 		}
+		if (addTaskButton != null)
+			addTaskButton.setOnAction(e -> onAddTask());
 		if (addOrganizationButton != null)
 			addOrganizationButton.setOnAction(e -> onAddRelatedEntity());
 		if (caseUpdatesComposerArea != null) {
@@ -597,17 +610,6 @@ public class CaseController {
 		return button;
 	}
 
-	private void setupOverviewTasksPanel() {
-		if (taskListView != null) {
-			taskListView.getItems().setAll(
-					"Past due: Call client (placeholder)",
-					"Upcoming: Request records (placeholder)",
-					"Upcoming: Review radiology (placeholder)",
-					"Upcoming: Send HIPAA auth (placeholder)",
-					"Upcoming: Draft demand outline (placeholder)"
-			);
-		}
-	}
 
 	private void refreshHeader() {
 		if (caseTitleLabel == null || caseId == null)
@@ -704,16 +706,8 @@ public class CaseController {
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
-
-		if (tasksTabListView != null && tasksTabListView.getItems().isEmpty()) {
-			tasksTabListView.getItems().setAll(
-					"Call client (placeholder)",
-					"Request records (placeholder)",
-					"Review radiology (placeholder)",
-					"Draft demand (placeholder)",
-					"Schedule depo (placeholder)"
-			);
-		}
+		loadCaseTasksAsync();
+		renderTasksSection();
 	}
 
 	private void showDetails() {
@@ -852,6 +846,70 @@ public class CaseController {
 		}
 		setVisibleManaged(placeholderTextArea, false);
 		renderOrganizationsSection();
+	}
+
+
+	private void loadCaseTasksAsync() {
+		if (caseTaskService == null || appState == null || caseId == null) {
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		final int shaleClientId = appState.getShaleClientId();
+		if (shaleClientId <= 0) {
+			return;
+		}
+
+		new Thread(() -> {
+			try {
+				List<CaseTaskListItemDto> tasks = caseTaskService.loadTasksForCase(activeCaseId, shaleClientId);
+				runOnFx(() -> {
+					if (caseId == null || caseId.longValue() != activeCaseId) {
+						return;
+					}
+					caseTasks = tasks == null ? List.of() : tasks;
+					renderTasksSection();
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> {
+					caseTasks = List.of();
+					renderTasksSection();
+				});
+				System.err.println("Case tasks load failed for caseId=" + activeCaseId + ": " + ex.getMessage());
+			}
+		}, "case-load-tasks-" + activeCaseId).start();
+	}
+
+	private void renderTasksSection() {
+		if (tasksTabFlow == null || tasksTabEmptyLabel == null) {
+			return;
+		}
+
+		tasksTabFlow.getChildren().clear();
+		if (caseTasks == null || caseTasks.isEmpty()) {
+			setVisibleManaged(tasksTabEmptyLabel, true);
+			tasksTabEmptyLabel.setText("No tasks for this case yet.");
+			return;
+		}
+
+		TaskCardFactory factory = taskCardFactory != null
+				? taskCardFactory
+				: buildTaskCardFactory(this::openTask);
+
+		for (CaseTaskListItemDto task : caseTasks) {
+			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+					task.id(),
+					task.title(),
+					task.description(),
+					task.dueAt(),
+					task.completedAt(),
+					task.assignedUserId(),
+					task.assignedUserDisplayName(),
+					task.assignedUserColor());
+			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT));
+		}
+
+		setVisibleManaged(tasksTabEmptyLabel, false);
 	}
 
 	private void renderOrganizationsSection() {
@@ -1204,6 +1262,251 @@ public class CaseController {
 		return name + " — " + detail + " (#" + row.id() + ")";
 	}
 
+	private void openTask(Long taskId) {
+		showTaskDetailPopup(taskId);
+	}
+
+	private TaskCardFactory buildTaskCardFactory(Consumer<Long> onOpenTaskAction) {
+		return new TaskCardFactory(
+				onOpenTaskAction,
+				this::onToggleTaskComplete,
+				onOpenUser == null ? id -> {
+				} : onOpenUser);
+	}
+
+	private void onAddTask() {
+		if (caseTaskService == null || caseId == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showTaskActionError("You must be signed in to create tasks.");
+			return;
+		}
+
+		List<TaskPriorityOptionDto> priorities;
+		try {
+			priorities = caseTaskService.loadActivePriorities(shaleClientId);
+		} catch (Exception ex) {
+			logTaskActionException("load-priorities", ex);
+			showTaskActionError("Unable to load priorities right now.");
+			return;
+		}
+
+		List<CaseTaskService.AssignableUserOption> assignableUsers;
+		try {
+			assignableUsers = caseTaskService.loadAssignableUsers(shaleClientId);
+		} catch (Exception ex) {
+			logTaskActionException("load-assignees", ex);
+			showTaskActionError("Unable to load users right now.");
+			return;
+		}
+
+		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
+				taskDialogOwner(),
+				priorities,
+				assignableUsers);
+		if (input.isEmpty()) {
+			return;
+		}
+
+		CaseTaskService.CreateTaskRequest request = new CaseTaskService.CreateTaskRequest(
+				shaleClientId,
+				caseId.longValue(),
+				input.get().title(),
+				input.get().description(),
+				input.get().dueAt(),
+				input.get().priorityId(),
+				input.get().assigneeUserId(),
+				currentUserId);
+
+		new Thread(() -> {
+			try {
+				caseTaskService.createTask(request);
+				runOnFx(this::refreshCaseTasks);
+			} catch (Exception ex) {
+				logTaskActionException("create", ex);
+				runOnFx(() -> showTaskActionError("Failed to create task for this case. " + rootCauseMessage(ex)));
+			}
+		}, "case-create-task-" + caseId).start();
+	}
+
+	private void onToggleTaskComplete(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			showTaskActionError("Unable to update task right now.");
+			return;
+		}
+		boolean currentlyCompleted = findCaseTaskById(taskId)
+				.map(task -> task.completedAt() != null)
+				.orElse(false);
+		new Thread(() -> {
+			try {
+				if (currentlyCompleted) {
+					caseTaskService.uncompleteTask(taskId, shaleClientId);
+				} else {
+					caseTaskService.completeTask(taskId, shaleClientId);
+				}
+				runOnFx(this::refreshCaseTasks);
+			} catch (Exception ex) {
+				logTaskActionException("toggle-complete", ex);
+				runOnFx(() -> showTaskActionError("Failed to update task completion. " + rootCauseMessage(ex)));
+			}
+		}, "case-toggle-task-" + taskId).start();
+	}
+
+	private void showTaskDetailPopup(Long taskId) {
+	    if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+	        return;
+	    }
+
+	    Integer shaleClientId = appState.getShaleClientId();
+	    Integer currentUserId = appState.getUserId();
+	    if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+	        showTaskActionError("You must be signed in to edit tasks.");
+	        return;
+	    }
+
+	    new Thread(() -> {
+	        try {
+	            TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+	            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+	            List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
+
+	            runOnFx(() -> {
+	                if (detail == null) {
+	                    showTaskActionError("Task was not found or may have been deleted.");
+	                    refreshCaseTasks();
+	                    return;
+	                }
+
+	                TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+	                        detail.id(),
+	                        detail.title(),
+	                        detail.description(),
+	                        detail.dueAt(),
+	                        detail.priorityId(),
+	                        detail.assignedUserId(),
+	                        detail.completedAt() != null
+	                );
+
+	                Optional<TaskDetailDialog.TaskDetailResult> result =
+	                        TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users);
+
+	                if (result.isEmpty()) {
+	                    return;
+	                }
+
+	                TaskDetailDialog.TaskDetailResult action = result.get();
+	                if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+	                    deleteTaskFromDetail(taskId, shaleClientId);
+	                    return;
+	                }
+
+	                TaskDetailDialog.SaveTaskPayload payload = action.payload();
+	                if (payload == null) {
+	                    return;
+	                }
+
+	                saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+	            });
+	        } catch (Exception ex) {
+	            logTaskActionException("load-detail", ex);
+	            runOnFx(() -> showTaskActionError("Failed to load task details. " + rootCauseMessage(ex)));
+	        }
+	    }, "case-task-detail-" + taskId).start();
+	}
+
+	private void saveTaskFromDetail(
+			long taskId,
+			int shaleClientId,
+			int currentUserId,
+			TaskDetailDialog.SaveTaskPayload payload) {
+		CaseTaskService.UpdateTaskRequest request = new CaseTaskService.UpdateTaskRequest(
+				taskId,
+				shaleClientId,
+				payload.title(),
+				payload.description(),
+				payload.dueAt(),
+				payload.priorityId(),
+				payload.assigneeUserId(),
+				payload.completed(),
+				currentUserId);
+
+		new Thread(() -> {
+			try {
+				caseTaskService.updateTask(request);
+				runOnFx(this::refreshCaseTasks);
+			} catch (Exception ex) {
+				logTaskActionException("save-detail", ex);
+				runOnFx(() -> showTaskActionError("Failed to save task. " + rootCauseMessage(ex)));
+			}
+		}, "case-task-save-detail-" + taskId).start();
+	}
+
+	private void deleteTaskFromDetail(long taskId, int shaleClientId) {
+		new Thread(() -> {
+			try {
+				caseTaskService.deleteTask(taskId, shaleClientId);
+				runOnFx(this::refreshCaseTasks);
+			} catch (Exception ex) {
+				logTaskActionException("delete-detail", ex);
+				runOnFx(() -> showTaskActionError("Failed to delete task. " + rootCauseMessage(ex)));
+			}
+		}, "case-task-delete-detail-" + taskId).start();
+	}
+
+	private void refreshCaseTasks() {
+		loadCaseTasksAsync();
+	}
+
+	private Optional<CaseTaskListItemDto> findCaseTaskById(Long taskId) {
+		if (taskId == null || caseTasks == null) {
+			return Optional.empty();
+		}
+		for (CaseTaskListItemDto task : caseTasks) {
+			if (task.id() == taskId.longValue()) {
+				return Optional.of(task);
+			}
+		}
+		return Optional.empty();
+	}
+
+	private void showTaskActionError(String message) {
+		AppDialogs.showError(taskDialogOwner(), "Tasks", message);
+	}
+
+	private void logTaskActionException(String action, Exception ex) {
+		System.err.println("Task action failed (" + action + ") for caseId=" + caseId + ": " + ex.getMessage());
+		ex.printStackTrace();
+	}
+
+	private String rootCauseMessage(Throwable throwable) {
+		if (throwable == null) {
+			return "";
+		}
+		Throwable current = throwable;
+		while (current.getCause() != null && current.getCause() != current) {
+			current = current.getCause();
+		}
+		String message = current.getMessage();
+		return (message == null || message.isBlank()) ? "" : "Details: " + message;
+	}
+
+	private Window taskDialogOwner() {
+		if (tasksTabPane != null && tasksTabPane.getScene() != null) {
+			return tasksTabPane.getScene().getWindow();
+		}
+		if (addTaskButton != null && addTaskButton.getScene() != null) {
+			return addTaskButton.getScene().getWindow();
+		}
+		return null;
+	}
+
 	private void openOrganization(Integer organizationId) {
 		if (organizationId == null)
 			return;
@@ -1449,6 +1752,7 @@ public class CaseController {
 			return;
 		final long activeCaseId = caseId.longValue();
 		loadCaseUpdatesAsync();
+		loadCaseTasksAsync();
 
 		new Thread(() ->
 		{
@@ -2136,6 +2440,7 @@ public class CaseController {
 
 	private void loadCaseUpdatesAsync() {
 		updatesPanelController.loadCaseUpdatesAsync();
+		loadCaseTasksAsync();
 	}
 
 	private void loadCaseUpdatesAsyncInternal() {
@@ -3993,6 +4298,7 @@ public class CaseController {
 			runOnFx(() ->
 			{
 				loadCaseUpdatesAsync();
+		loadCaseTasksAsync();
 				refreshLastUpdatedLabelAsync();
 			});
 			return true;
