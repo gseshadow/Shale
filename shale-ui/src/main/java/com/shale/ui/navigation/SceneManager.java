@@ -171,7 +171,7 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			UserDetailService userDetailService = new UserDetailService(userDao, caseDao);
-			c.init(userId, userDetailService, appState, relatedCaseId -> {
+			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId -> {
 				MainController mainController = resolveMainController();
 				if (mainController != null) {
 					mainController.openCase(relatedCaseId);

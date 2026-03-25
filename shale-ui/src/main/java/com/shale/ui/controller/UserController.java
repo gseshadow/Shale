@@ -9,6 +9,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.state.AppState;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.util.ColorUtil;
 
@@ -16,6 +17,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -27,7 +29,10 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Window;
 
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -35,6 +40,9 @@ import java.util.function.Consumer;
 public final class UserController {
 
 	private static final Color DEFAULT_USER_COLOR = Color.WHITE;
+	private static final String SORT_NAME = "Name";
+	private static final String SORT_INTAKE = "Date of Intake";
+	private static final String SORT_SOL = "Statute of Limitations Date";
 	private static final String COLOR_SWATCH_BASE_STYLE = "-fx-min-width: 22px; -fx-pref-width: 22px; -fx-max-width: 22px; "
 			+ "-fx-min-height: 22px; -fx-pref-height: 22px; -fx-max-height: 22px; "
 			+ "-fx-background-radius: 11px; -fx-border-radius: 11px; "
@@ -52,6 +60,8 @@ public final class UserController {
 	@FXML private Label rolesEmptyLabel;
 	@FXML private VBox assignedCasesContainer;
 	@FXML private Label assignedCasesEmptyLabel;
+	@FXML private TextField assignedCasesSearchField;
+	@FXML private ChoiceBox<String> assignedCasesSortChoice;
 
 	@FXML private Label displayNameValue;
 	@FXML private Label firstNameValue;
@@ -74,8 +84,11 @@ public final class UserController {
 	private Integer userId;
 	private UserDetailService userDetailService;
 	private AppState appState;
+	private UiRuntimeBridge runtimeBridge;
 	private Consumer<Integer> onOpenCase;
 	private CaseCardFactory caseCardFactory;
+	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private boolean liveSubscribed;
 	private UserDetailRow currentUser;
 	private List<UserRoleRow> assignedRoles = List.of();
 	private List<UserRoleRow> assignableRoles = List.of();
@@ -89,10 +102,15 @@ public final class UserController {
 		return t;
 	});
 
-	public void init(int userId, UserDetailService userDetailService, AppState appState, Consumer<Integer> onOpenCase) {
+	public void init(int userId,
+			UserDetailService userDetailService,
+			AppState appState,
+			UiRuntimeBridge runtimeBridge,
+			Consumer<Integer> onOpenCase) {
 		this.userId = userId;
 		this.userDetailService = userDetailService;
 		this.appState = appState;
+		this.runtimeBridge = runtimeBridge;
 		this.onOpenCase = onOpenCase;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 	}
@@ -111,10 +129,65 @@ public final class UserController {
 		if (addRoleButton != null) {
 			addRoleButton.setOnAction(e -> onAddRole());
 		}
+		if (assignedCasesSortChoice != null) {
+			assignedCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
+			assignedCasesSortChoice.getSelectionModel().select(SORT_NAME);
+			assignedCasesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderAssignedCases());
+		}
+		if (assignedCasesSearchField != null) {
+			assignedCasesSearchField.textProperty().addListener((obs, oldV, newV) -> renderAssignedCases());
+		}
 		configureColorEditor();
 
 		setEditMode(false);
+		wireLiveRefreshLifecycle();
 		Platform.runLater(this::loadUser);
+	}
+
+	private void wireLiveRefreshLifecycle() {
+		if (assignedCasesContainer == null) {
+			return;
+		}
+		assignedCasesContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null) {
+				unsubscribeLiveCaseUpdates();
+			} else {
+				subscribeLiveCaseUpdates();
+			}
+		});
+		subscribeLiveCaseUpdates();
+	}
+
+	private void subscribeLiveCaseUpdates() {
+		if (runtimeBridge == null || liveSubscribed) {
+			return;
+		}
+		liveCaseUpdatedHandler = this::handleLiveCaseUpdatedEvent;
+		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = true;
+	}
+
+	private void unsubscribeLiveCaseUpdates() {
+		if (!liveSubscribed || runtimeBridge == null || liveCaseUpdatedHandler == null) {
+			return;
+		}
+		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = false;
+	}
+
+	private void handleLiveCaseUpdatedEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+		if (event == null || currentUser == null) {
+			return;
+		}
+		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
+			return;
+		}
+		Integer currentShaleClientId = appState == null ? null : appState.getShaleClientId();
+		if (currentShaleClientId == null || currentShaleClientId <= 0 || event.shaleClientId() != currentShaleClientId) {
+			return;
+		}
+		refreshAssignedCasesAsync();
 	}
 
 	private void loadUser() {
@@ -138,8 +211,9 @@ public final class UserController {
 						setError("User not found.");
 						return;
 					}
-					currentUser = loaded;
-					renderFromCurrent();
+						currentUser = loaded;
+						resetAssignedCaseControls();
+						renderFromCurrent();
 					setEditMode(false);
 					clearError();
 					refreshRolesAsync();
@@ -456,7 +530,11 @@ public final class UserController {
 		if (caseCardFactory == null) {
 			caseCardFactory = new CaseCardFactory(onOpenCase);
 		}
+		String query = normalizedAssignedCaseQuery();
+		Comparator<CaseRow> comparator = assignedCasesComparator();
 		List<Node> cards = assignedCases.stream()
+				.filter(row -> matchesAssignedCaseQuery(row, query))
+				.sorted(comparator)
 				.map(this::createAssignedCaseCard)
 				.toList();
 		assignedCasesContainer.getChildren().setAll(cards);
@@ -464,6 +542,62 @@ public final class UserController {
 		if (assignedCasesEmptyLabel != null) {
 			assignedCasesEmptyLabel.setVisible(empty);
 			assignedCasesEmptyLabel.setManaged(empty);
+			if (!empty) {
+				assignedCasesEmptyLabel.toBack();
+			} else if (!query.isEmpty()) {
+				assignedCasesEmptyLabel.setText("No assigned cases match your search");
+			} else {
+				assignedCasesEmptyLabel.setText("No assigned cases");
+			}
+		}
+	}
+
+	private String normalizedAssignedCaseQuery() {
+		if (assignedCasesSearchField == null) {
+			return "";
+		}
+		String query = assignedCasesSearchField.getText();
+		return query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+	}
+
+	private Comparator<CaseRow> assignedCasesComparator() {
+		String sortOption = assignedCasesSortChoice == null ? SORT_NAME : assignedCasesSortChoice.getValue();
+		if (SORT_SOL.equals(sortOption)) {
+			return Comparator.comparing(CaseRow::statuteOfLimitationsDate, this::nullsLastDate);
+		}
+		if (SORT_INTAKE.equals(sortOption)) {
+			return Comparator.comparing(CaseRow::intakeDate, this::nullsLastDate).reversed();
+		}
+		return Comparator.comparing(row -> safeText(row.name()), String.CASE_INSENSITIVE_ORDER);
+	}
+
+	private static boolean matchesAssignedCaseQuery(CaseRow row, String query) {
+		if (query == null || query.isEmpty()) {
+			return true;
+		}
+		return safeText(row.name()).toLowerCase(Locale.ROOT).contains(query)
+				|| safeText(row.responsibleAttorneyName()).toLowerCase(Locale.ROOT).contains(query);
+	}
+
+	private int nullsLastDate(LocalDate a, LocalDate b) {
+		if (a == null && b == null) {
+			return 0;
+		}
+		if (a == null) {
+			return 1;
+		}
+		if (b == null) {
+			return -1;
+		}
+		return a.compareTo(b);
+	}
+
+	private void resetAssignedCaseControls() {
+		if (assignedCasesSearchField != null) {
+			assignedCasesSearchField.clear();
+		}
+		if (assignedCasesSortChoice != null) {
+			assignedCasesSortChoice.getSelectionModel().select(SORT_NAME);
 		}
 	}
 
