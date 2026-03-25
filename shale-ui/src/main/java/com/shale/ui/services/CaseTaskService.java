@@ -27,7 +27,7 @@ public final class CaseTaskService {
 
     public long createTask(CreateTaskRequest request) {
         Objects.requireNonNull(request, "request");
-        return taskDao.createTask(
+        long taskId = taskDao.createTask(
                 request.shaleClientId(),
                 request.caseId(),
                 request.title(),
@@ -35,6 +35,15 @@ public final class CaseTaskService {
                 request.dueAt(),
                 request.priorityId(),
                 request.createdByUserId());
+        Integer assigneeUserId = request.assigneeUserId();
+        if (assigneeUserId != null && assigneeUserId > 0) {
+            taskDao.assignPrimaryUserToTask(
+                    taskId,
+                    request.shaleClientId(),
+                    assigneeUserId,
+                    request.createdByUserId());
+        }
+        return taskId;
     }
 
     public List<TaskPriorityOptionDto> loadActivePriorities(int shaleClientId) {
@@ -74,6 +83,7 @@ public final class CaseTaskService {
             String description,
             java.time.LocalDateTime dueAt,
             Integer priorityId,
+            Integer assigneeUserId,
             int createdByUserId) {
     }
 

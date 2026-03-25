@@ -1296,7 +1296,19 @@ public class CaseController {
 			return;
 		}
 
-		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(taskDialogOwner(), priorities);
+		List<CaseTaskService.AssignableUserOption> assignableUsers;
+		try {
+			assignableUsers = caseTaskService.loadAssignableUsers(shaleClientId);
+		} catch (Exception ex) {
+			logTaskActionException("load-assignees", ex);
+			showTaskActionError("Unable to load users right now.");
+			return;
+		}
+
+		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
+				taskDialogOwner(),
+				priorities,
+				assignableUsers);
 		if (input.isEmpty()) {
 			return;
 		}
@@ -1308,6 +1320,7 @@ public class CaseController {
 				input.get().description(),
 				input.get().dueAt(),
 				input.get().priorityId(),
+				input.get().assigneeUserId(),
 				currentUserId);
 
 		new Thread(() -> {

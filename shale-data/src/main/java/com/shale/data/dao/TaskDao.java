@@ -19,12 +19,12 @@ import com.shale.core.runtime.DbSessionProvider;
  */
 public final class TaskDao {
     /**
-     * Temporary default role used for primary task assignee inserts.
+     * Temporary default tinyint role used for primary task assignee rows.
      * <p>
-     * This phase does not expose assignment-role semantics in UI/workflows, so a stable
-     * placeholder value is used until role management is introduced.
+     * The schema stores TaskAssignments.Role as tinyint and this phase does not expose
+     * assignment-role semantics yet, so we use a single internal default code.
      */
-    public static final String DEFAULT_PRIMARY_ASSIGNMENT_ROLE = "ASSIGNEE";
+    public static final byte DEFAULT_PRIMARY_ASSIGNMENT_ROLE = 1;
 
     private final DbSessionProvider db;
 
@@ -367,7 +367,7 @@ public final class TaskDao {
             ps.setInt(i++, shaleClientId);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
-            ps.setString(i++, DEFAULT_PRIMARY_ASSIGNMENT_ROLE);
+            ps.setByte(i++, DEFAULT_PRIMARY_ASSIGNMENT_ROLE);
             ps.setInt(i++, assignedByUserId);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
@@ -375,7 +375,7 @@ public final class TaskDao {
             ps.setLong(i++, taskId);
             ps.setInt(i++, userId);
             ps.setInt(i++, shaleClientId);
-            ps.setString(i++, DEFAULT_PRIMARY_ASSIGNMENT_ROLE);
+            ps.setByte(i++, DEFAULT_PRIMARY_ASSIGNMENT_ROLE);
             ps.setInt(i++, assignedByUserId);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
