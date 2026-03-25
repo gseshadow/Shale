@@ -223,7 +223,8 @@ public final class SceneManager {
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
-			CaseTaskService caseTaskService = new CaseTaskService(taskDao);
+			UserDao userDao = new UserDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
 			c.init(caseId, caseDao, caseDetailService, caseTaskService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
 
 			c.setOnOpenUser(this::openUserProfile);

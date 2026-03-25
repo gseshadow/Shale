@@ -17,21 +17,20 @@ public final class TaskCardFactory {
             String title,
             String description,
             LocalDateTime dueAt,
-            LocalDateTime completedAt
+            LocalDateTime completedAt,
+            Integer assignedUserId,
+            String assignedUserDisplayName
     ) {
     }
 
     private final Consumer<Long> onOpenTask;
     private final Consumer<Long> onToggleCompleteTask;
-    private final Consumer<Long> onDeleteTask;
 
     public TaskCardFactory(
             Consumer<Long> onOpenTask,
-            Consumer<Long> onToggleCompleteTask,
-            Consumer<Long> onDeleteTask) {
+            Consumer<Long> onToggleCompleteTask) {
         this.onOpenTask = onOpenTask;
         this.onToggleCompleteTask = onToggleCompleteTask;
-        this.onDeleteTask = onDeleteTask;
     }
 
     public TaskCard create(TaskCardModel model, Variant variant) {
@@ -41,11 +40,11 @@ public final class TaskCardFactory {
         card.setTaskId(model.taskId());
         card.setOnOpen(onOpenTask);
         card.setOnToggleComplete(onToggleCompleteTask);
-        card.setOnDeleteTask(onDeleteTask);
         card.setTitle(model.title());
         card.setDueAt(model.dueAt());
         card.setDescriptionPreview(model.description());
         card.setCompleted(model.completedAt() != null);
+        card.setAssignee(model.assignedUserId(), model.assignedUserDisplayName());
         card.setBackgroundCssColor(null);
 
         switch (variant) {
