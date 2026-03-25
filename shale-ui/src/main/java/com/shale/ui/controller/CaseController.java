@@ -1457,20 +1457,80 @@ public class CaseController {
 		}, "case-task-delete-detail-" + taskId).start();
 	}
 
-	private void refreshCaseTasksSectionAsync() {
-		loadCaseTasksAsync();
+	private void onAssignTaskUser(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer assignedByUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || assignedByUserId == null || assignedByUserId <= 0) {
+			showTaskActionError("You must be signed in to assign tasks.");
+			return;
+		}
+
+		new Thread(() -> {
+			try {
+				List<CaseTaskService.AssignableUserOption> options = caseTaskService.loadAssignableUsers(shaleClientId);
+				runOnFx(() -> showTaskAssigneePicker(taskId, shaleClientId, assignedByUserId, options));
+			} catch (Exception ex) {
+				logTaskActionException("load-assignees", ex);
+				runOnFx(() -> showTaskActionError("Unable to load users for assignment. " + rootCauseMessage(ex)));
+			}
+		}, "case-task-assignees-" + taskId).start();
 	}
 
-	private boolean isTaskCompleted(Long taskId) {
-		if (taskId == null || caseTasks == null) {
-			return false;
+	private void showTaskAssigneePicker(
+			Long taskId,
+			int shaleClientId,
+			int assignedByUserId,
+			List<CaseTaskService.AssignableUserOption> users) {
+		List<CaseTaskService.AssignableUserOption> options = users == null ? List.of() : users;
+		if (options.isEmpty()) {
+			showTaskActionError("No active users are available for assignment.");
+			return;
 		}
-		for (CaseTaskListItemDto task : caseTasks) {
+
+		Integer currentAssigneeId = null;
+		for (CaseTaskListItemDto task : caseTasks == null ? List.<CaseTaskListItemDto>of() : caseTasks) {
 			if (task.id() == taskId.longValue()) {
-				return task.completedAt() != null;
+				currentAssigneeId = task.assignedUserId();
+				break;
 			}
 		}
-		return false;
+
+		CaseTaskService.AssignableUserOption preselect = null;
+		if (currentAssigneeId != null) {
+			for (CaseTaskService.AssignableUserOption option : options) {
+				if (option != null && option.id() == currentAssigneeId) {
+					preselect = option;
+					break;
+				}
+			}
+		}
+
+		ContactPickerDialog<CaseTaskService.AssignableUserOption> picker = new ContactPickerDialog<>(
+				taskDialogOwner(),
+				currentAssigneeId == null ? "Assign Task" : "Change Task Assignee",
+				options,
+				this::formatAssignableUserOption,
+				preselect);
+
+		Optional<CaseTaskService.AssignableUserOption> selected = picker.showAndWait();
+		if (selected.isEmpty()) {
+			return;
+		}
+		assignTaskToUser(taskId, shaleClientId, selected.get().id(), assignedByUserId);
+	}
+
+	private String formatAssignableUserOption(CaseTaskService.AssignableUserOption option) {
+		if (option == null) {
+			return "";
+		}
+		String name = safe(option.displayName());
+		if (!name.isBlank()) {
+			return name;
+		}
+		return "User #" + option.id();
 	}
 
 	private void showTaskActionError(String message) {
