@@ -329,8 +329,12 @@
 			<!-- TASKS TAB PANE (center) -->
 			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980" styleClass="case-main-surface"
 				visible="false" managed="false">
-				<Label text="Tasks"
-					style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+				<HBox spacing="8" alignment="CENTER_LEFT">
+					<Label text="Tasks"
+						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+					<Region HBox.hgrow="ALWAYS" />
+					<Button fx:id="addTaskButton" text="New Task" />
+				</HBox>
 				<Label fx:id="tasksTabEmptyLabel" text="No tasks for this case yet."
 					visible="false" managed="false" style="-fx-opacity: 0.7;" />
 				<ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
