@@ -35,8 +35,6 @@ public final class TaskCard extends VBox {
     private Consumer<Long> onToggleComplete;
     private String backgroundCss;
     private boolean hovered;
-    private boolean completed;
-    private Integer assignedUserId;
 
     public TaskCard() {
         setCursor(Cursor.HAND);
@@ -85,7 +83,6 @@ public final class TaskCard extends VBox {
     }
 
     public void setCompleted(boolean completed) {
-        this.completed = completed;
         completedLabel.setManaged(completed);
         completedLabel.setVisible(completed);
         completedLabel.setText(completed ? "Completed" : "");
@@ -94,7 +91,6 @@ public final class TaskCard extends VBox {
     }
 
     public void setAssignee(Integer userId, String displayName) {
-        this.assignedUserId = userId;
         String normalized = displayName == null ? "" : displayName.trim();
         if (userId == null || userId <= 0 || normalized.isBlank()) {
             assigneeLabel.setText("");
@@ -182,6 +178,9 @@ public final class TaskCard extends VBox {
             refreshSurfaceStyle();
         });
         setOnMouseClicked(e -> {
+            if (e.isConsumed()) {
+                return;
+            }
             if (onOpen != null && taskId != null) {
                 onOpen.accept(taskId);
             }
