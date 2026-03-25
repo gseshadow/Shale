@@ -486,6 +486,16 @@ public final class CaseDao {
 		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId);
 	}
 
+	public List<CaseRow> listActiveCasesForUserTeamMember(int userId, int limit) {
+		if (userId <= 0) {
+			return List.of();
+		}
+		if (limit <= 0) {
+			return List.of();
+		}
+		return findMyCasesPage(userId, 0, limit, CaseSort.INTAKE_NEWEST, false).items();
+	}
+
 	public List<CaseRow> searchCasesByName(String query) {
 		String normalizedQuery = normalizeSearchQuery(query);
 		if (normalizedQuery.isBlank()) {

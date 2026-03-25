@@ -108,6 +108,17 @@
                             <Label fx:id="rolesEmptyLabel" text="No roles assigned" visible="false" managed="false" />
                         </StackPane>
                     </VBox>
+
+                    <VBox spacing="8" styleClass="secondary-panel">
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="Assigned Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                            <Region HBox.hgrow="ALWAYS" />
+                        </HBox>
+                        <StackPane>
+                            <VBox fx:id="assignedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
+                            <Label fx:id="assignedCasesEmptyLabel" text="No assigned cases" visible="false" managed="false" />
+                        </StackPane>
+                    </VBox>
                 </VBox>
             </ScrollPane>
         </StackPane>
