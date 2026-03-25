@@ -46,6 +46,34 @@ public class CaseCard extends VBox {
 		setCaseId(caseId);
 	}
 
+	public void applyMini() {
+		setSpacing(3);
+		setPadding(new Insets(5, 9, 5, 9));
+		setMinWidth(Region.USE_COMPUTED_SIZE);
+		setPrefWidth(Region.USE_COMPUTED_SIZE);
+		setMaxWidth(Region.USE_COMPUTED_SIZE);
+		attorneyLabel.setManaged(false);
+		attorneyLabel.setVisible(false);
+		datesRow.setManaged(false);
+		datesRow.setVisible(false);
+		titleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+	}
+
+	public void applyCompact() {
+		setSpacing(6);
+		setPadding(new Insets(10));
+		setPrefWidth(280);
+		attorneyLabel.setManaged(true);
+		attorneyLabel.setVisible(true);
+		datesRow.setManaged(true);
+		datesRow.setVisible(true);
+		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+	}
+
+	public void applyFull() {
+		applyCompact();
+	}
+
 	/*
 	 * ----------------------------- Data setters -----------------------------
 	 */
@@ -125,12 +153,8 @@ public class CaseCard extends VBox {
 	 */
 
 	private void buildUi() {
-		setPadding(new Insets(10));
-		setPrefWidth(280);
 		setBackgroundCssColor(null);
-
 		// Title / attorney styles exactly like your snippet
-		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
 		attorneyLabel.setStyle("-fx-font-size: 12px; -fx-opacity: 0.75;");
 
 		intakeLabel.setStyle("-fx-font-size: 12px;");
@@ -143,6 +167,7 @@ public class CaseCard extends VBox {
 
 		// Nice UX: looks clickable
 		setCursor(Cursor.HAND);
+		applyCompact();
 	}
 
 	private void wireEvents() {

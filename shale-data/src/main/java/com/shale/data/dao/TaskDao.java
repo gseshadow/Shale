@@ -19,6 +19,21 @@ import com.shale.core.runtime.DbSessionProvider;
  * DAO for task reads used by case task sections.
  */
 public final class TaskDao {
+    private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+
+    public enum MyTaskSort {
+        DEFAULT,
+        DUE_DATE_ASC,
+        DUE_DATE_DESC
+    }
+
+    public enum CaseTaskSort {
+        DEFAULT,
+        DUE_DATE_ASC,
+        DUE_DATE_DESC,
+        PRIORITY_ASC,
+        PRIORITY_DESC
+    }
     /**
      * Temporary default tinyint role used for primary task assignee rows.
      * <p>
@@ -33,21 +48,61 @@ public final class TaskDao {
         this.db = Objects.requireNonNull(db, "db");
     }
 
-    public List<CaseTaskListItemDto> listActiveTasksForCase(long caseId, int shaleClientId) {
+    public List<CaseTaskListItemDto> listActiveTasksForCase(long caseId, int shaleClientId, CaseTaskSort sort) {
         if (caseId <= 0) {
             throw new IllegalArgumentException("caseId must be > 0");
         }
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
+        CaseTaskSort resolvedSort = sort == null ? CaseTaskSort.DEFAULT : sort;
+
+        String sortOrderClause = switch (resolvedSort) {
+            case DUE_DATE_ASC, DEFAULT -> """
+                    CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                    t.DueAt ASC,
+                    t.UpdatedAt DESC,
+                    t.CreatedAt DESC,
+                    t.Id DESC
+                    """;
+            case DUE_DATE_DESC -> """
+                    CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                    t.DueAt DESC,
+                    t.UpdatedAt DESC,
+                    t.CreatedAt DESC,
+                    t.Id DESC
+                    """;
+            case PRIORITY_ASC -> """
+                    CASE WHEN p.SortOrder IS NULL THEN 1 ELSE 0 END ASC,
+                    p.SortOrder ASC,
+                    CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                    t.DueAt ASC,
+                    t.UpdatedAt DESC,
+                    t.CreatedAt DESC,
+                    t.Id DESC
+                    """;
+            case PRIORITY_DESC -> """
+                    CASE WHEN p.SortOrder IS NULL THEN 1 ELSE 0 END ASC,
+                    p.SortOrder DESC,
+                    CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                    t.DueAt ASC,
+                    t.UpdatedAt DESC,
+                    t.CreatedAt DESC,
+                    t.Id DESC
+                    """;
+        };
 
         String sql = """
                 SELECT
                   t.Id,
                   t.ShaleClientId,
                   t.CaseId,
+                  c.Name AS CaseName,
+                  caseAttorney.DisplayName AS CaseResponsibleAttorney,
+                  caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   t.Title,
                   t.Description,
+                  p.ColorHex AS PriorityColorHex,
                   t.DueAt,
                   t.CompletedAt,
                   assignment.UserId AS AssignedUserId,
@@ -58,6 +113,32 @@ public final class TaskDao {
                   t.UpdatedAt,
                   t.IsDeleted
                 FROM dbo.Tasks t
+                INNER JOIN dbo.Cases c
+                  ON c.Id = t.CaseId
+                 AND c.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.Priorities p
+                  ON p.Id = t.PriorityId
+                 AND p.ShaleClientId = t.ShaleClientId
+                OUTER APPLY (
+                  SELECT TOP (1)
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName,
+                    u.Color
+                  FROM dbo.CaseUsers cu
+                  INNER JOIN dbo.Users u
+                    ON u.Id = cu.UserId
+                   AND u.ShaleClientId = c.ShaleClientId
+                  WHERE cu.CaseId = c.Id
+                    AND cu.RoleId = ?
+                    AND cu.IsPrimary = 1
+                  ORDER BY
+                    cu.UpdatedAt DESC,
+                    cu.CreatedAt DESC,
+                    cu.Id DESC
+                ) caseAttorney
                 OUTER APPLY (
                   SELECT TOP (1)
                     ta.UserId,
@@ -83,16 +164,14 @@ public final class TaskDao {
                   AND ISNULL(t.IsDeleted, 0) = 0
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
-                  CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
-                  t.DueAt ASC,
-                  t.CreatedAt DESC,
-                  t.Id DESC;
-                """;
+                  %s;
+                """.formatted(sortOrderClause);
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setLong(1, caseId);
-            ps.setInt(2, shaleClientId);
+            ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+            ps.setLong(2, caseId);
+            ps.setInt(3, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<CaseTaskListItemDto> out = new ArrayList<>();
                 while (rs.next()) {
@@ -100,8 +179,12 @@ public final class TaskDao {
                             rs.getLong("Id"),
                             rs.getInt("ShaleClientId"),
                             rs.getLong("CaseId"),
+                            rs.getString("CaseName"),
+                            rs.getString("CaseResponsibleAttorney"),
+                            rs.getString("CaseResponsibleAttorneyColor"),
                             rs.getString("Title"),
                             rs.getString("Description"),
+                            rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
                             toLocalDateTime(rs.getTimestamp("CompletedAt")),
                             (Integer) rs.getObject("AssignedUserId"),
@@ -120,6 +203,138 @@ public final class TaskDao {
         }
     }
 
+    public List<CaseTaskListItemDto> listActiveTasksAssignedToUser(int shaleClientId, int assignedUserId, MyTaskSort sort) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (assignedUserId <= 0) {
+            throw new IllegalArgumentException("assignedUserId must be > 0");
+        }
+
+        MyTaskSort resolvedSort = sort == null ? MyTaskSort.DEFAULT : sort;
+        String dueOrderSql = resolvedSort == MyTaskSort.DUE_DATE_DESC ? "DESC" : "ASC";
+
+        String sql = """
+                SELECT
+                  t.Id,
+                  t.ShaleClientId,
+                  t.CaseId,
+                  c.Name AS CaseName,
+                  caseAttorney.DisplayName AS CaseResponsibleAttorney,
+                  caseAttorney.Color AS CaseResponsibleAttorneyColor,
+                  t.Title,
+                  t.Description,
+                  p.ColorHex AS PriorityColorHex,
+                  t.DueAt,
+                  t.CompletedAt,
+                  assignment.UserId AS AssignedUserId,
+                  assignment.DisplayName AS AssignedUserDisplayName,
+                  assignment.Color AS AssignedUserColor,
+                  t.CreatedByUserId,
+                  t.CreatedAt,
+                  t.UpdatedAt,
+                  t.IsDeleted
+                FROM dbo.Tasks t
+                INNER JOIN dbo.Cases c
+                  ON c.Id = t.CaseId
+                 AND c.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.Priorities p
+                  ON p.Id = t.PriorityId
+                 AND p.ShaleClientId = t.ShaleClientId
+                OUTER APPLY (
+                  SELECT TOP (1)
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName,
+                    u.Color
+                  FROM dbo.CaseUsers cu
+                  INNER JOIN dbo.Users u
+                    ON u.Id = cu.UserId
+                   AND u.ShaleClientId = c.ShaleClientId
+                  WHERE cu.CaseId = c.Id
+                    AND cu.RoleId = ?
+                    AND cu.IsPrimary = 1
+                  ORDER BY
+                    cu.UpdatedAt DESC,
+                    cu.CreatedAt DESC,
+                    cu.Id DESC
+                ) caseAttorney
+                INNER JOIN dbo.TaskAssignments myAssignment
+                  ON myAssignment.TaskId = t.Id
+                 AND myAssignment.ShaleClientId = t.ShaleClientId
+                 AND myAssignment.IsPrimary = 1
+                 AND myAssignment.UserId = ?
+                OUTER APPLY (
+                  SELECT TOP (1)
+                    ta.UserId,
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName,
+                    u.Color
+                  FROM dbo.TaskAssignments ta
+                  INNER JOIN dbo.Users u
+                    ON u.Id = ta.UserId
+                   AND u.ShaleClientId = ta.ShaleClientId
+                  WHERE ta.TaskId = t.Id
+                    AND ta.ShaleClientId = t.ShaleClientId
+                    AND ta.IsPrimary = 1
+                  ORDER BY
+                    ta.AssignedAt DESC,
+                    ta.UserId DESC
+                ) assignment
+                WHERE t.ShaleClientId = ?
+                  AND ISNULL(t.IsDeleted, 0) = 0
+                ORDER BY
+                  CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
+                  CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
+                  t.DueAt %s,
+                  t.UpdatedAt DESC,
+                  t.CreatedAt DESC,
+                  t.Id DESC;
+                """.formatted(dueOrderSql);
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+            ps.setInt(2, assignedUserId);
+            ps.setInt(3, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<CaseTaskListItemDto> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(new CaseTaskListItemDto(
+                            rs.getLong("Id"),
+                            rs.getInt("ShaleClientId"),
+                            rs.getLong("CaseId"),
+                            rs.getString("CaseName"),
+                            rs.getString("CaseResponsibleAttorney"),
+                            rs.getString("CaseResponsibleAttorneyColor"),
+                            rs.getString("Title"),
+                            rs.getString("Description"),
+                            rs.getString("PriorityColorHex"),
+                            toLocalDateTime(rs.getTimestamp("DueAt")),
+                            toLocalDateTime(rs.getTimestamp("CompletedAt")),
+                            (Integer) rs.getObject("AssignedUserId"),
+                            rs.getString("AssignedUserDisplayName"),
+                            rs.getString("AssignedUserColor"),
+                            (Integer) rs.getObject("CreatedByUserId"),
+                            toLocalDateTime(rs.getTimestamp("CreatedAt")),
+                            toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+                            rs.getBoolean("IsDeleted")
+                    ));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Failed to load tasks for assignedUserId=" + assignedUserId + " shaleClientId=" + shaleClientId,
+                    e);
+        }
+    }
+
     public TaskDetailDto findTaskDetail(long taskId, int shaleClientId) {
         if (taskId <= 0) {
             throw new IllegalArgumentException("taskId must be > 0");
@@ -133,6 +348,9 @@ public final class TaskDao {
                   t.Id,
                   t.ShaleClientId,
                   t.CaseId,
+                  c.Name AS CaseName,
+                  caseAttorney.DisplayName AS CaseResponsibleAttorney,
+                  caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   t.Title,
                   t.Description,
                   t.DueAt,
@@ -142,6 +360,26 @@ public final class TaskDao {
                   assignment.DisplayName AS AssignedUserDisplayName,
                   assignment.Color AS AssignedUserColor
                 FROM dbo.Tasks t
+                INNER JOIN dbo.Cases c
+                  ON c.Id = t.CaseId
+                 AND c.ShaleClientId = t.ShaleClientId
+                OUTER APPLY (
+                  SELECT TOP (1)
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName,
+                    u.Color
+                  FROM dbo.CaseUsers cu
+                  INNER JOIN dbo.Users u
+                    ON u.Id = cu.UserId
+                   AND u.ShaleClientId = c.ShaleClientId
+                  WHERE cu.CaseId = c.Id
+                    AND cu.RoleId = ?
+                    AND cu.IsPrimary = 1
+                  ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+                ) caseAttorney
                 OUTER APPLY (
                   SELECT TOP (1)
                     ta.UserId,
@@ -167,8 +405,9 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setLong(1, taskId);
-            ps.setInt(2, shaleClientId);
+            ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+            ps.setLong(2, taskId);
+            ps.setInt(3, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
                     return null;
@@ -177,6 +416,9 @@ public final class TaskDao {
                         rs.getLong("Id"),
                         rs.getInt("ShaleClientId"),
                         rs.getLong("CaseId"),
+                        rs.getString("CaseName"),
+                        rs.getString("CaseResponsibleAttorney"),
+                        rs.getString("CaseResponsibleAttorneyColor"),
                         rs.getString("Title"),
                         rs.getString("Description"),
                         toLocalDateTime(rs.getTimestamp("DueAt")),

@@ -6,16 +6,24 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
+import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.TaskDetailDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
+import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.controller.support.CaseListUiSupport;
+import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 
@@ -23,16 +31,21 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
 
 public final class MyShaleController {
 
 	private static final String SORT_NAME = "Name";
 	private static final String SORT_INTAKE = "Date of Intake";
 	private static final String SORT_SOL = "Statute of Limitations Date";
+	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
+	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -44,11 +57,22 @@ public final class MyShaleController {
 	private ScrollPane myCasesScroll;
 	@FXML
 	private FlowPane myCasesFlow;
+	@FXML
+	private ChoiceBox<String> myTasksSortChoice;
+	@FXML
+	private ScrollPane myTasksScroll;
+	@FXML
+	private VBox myTasksList;
+	@FXML
+	private Label myTasksEmptyLabel;
 
 	private CaseDao caseDao;
+	private CaseTaskService caseTaskService;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
+	private Consumer<Integer> onOpenCase;
 	private CaseCardFactory caseCardFactory;
+	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
 
@@ -59,6 +83,7 @@ public final class MyShaleController {
 	private int loadGeneration = 0;
 
 	private final List<CaseCardVm> loaded = new ArrayList<>();
+	private List<CaseTaskListItemDto> myTasks = List.of();
 	private final Set<Integer> selectedStatusIds = CaseListUiSupport.defaultSelectedStatuses();
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
@@ -67,11 +92,20 @@ public final class MyShaleController {
 		return t;
 	});
 
-	public void init(AppState appState, UiRuntimeBridge runtimeBridge, CaseDao caseDao, Consumer<Integer> onOpenCase) {
+	public void init(
+			AppState appState,
+			UiRuntimeBridge runtimeBridge,
+			CaseDao caseDao,
+			CaseTaskService caseTaskService,
+			Consumer<Integer> onOpenCase) {
 		this.caseDao = caseDao;
+		this.caseTaskService = caseTaskService;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
+		this.onOpenCase = onOpenCase;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
+		this.taskCardFactory = new TaskCardFactory(this::openTask, this::onToggleMyTaskComplete, onOpenCase, id -> {
+		});
 	}
 
 	@FXML
@@ -85,12 +119,19 @@ public final class MyShaleController {
 		if (myCasesSearchField != null) {
 			myCasesSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
 		}
+		if (myTasksSortChoice != null) {
+			myTasksSortChoice.getItems().setAll(MY_TASKS_SORT_DUE_ASC, MY_TASKS_SORT_DUE_DESC);
+			myTasksSortChoice.getSelectionModel().select(MY_TASKS_SORT_DUE_ASC);
+			myTasksSortChoice.getSelectionModel().selectedItemProperty()
+					.addListener((obs, oldV, newV) -> refreshMyTasks());
+		}
 
 		CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, this::rerender);
 
 		Platform.runLater(() -> {
 			wireInfiniteScroll();
 			loadFirstPage();
+			refreshMyTasks();
 		});
 
 		if (myCasesFlow != null) {
@@ -386,6 +427,240 @@ public final class MyShaleController {
 				vm.responsibleAttorneyColor));
 	}
 
+	private void refreshMyTasks() {
+		if (caseTaskService == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			myTasks = List.of();
+			renderMyTasks();
+			return;
+		}
+
+		CaseTaskService.MyTasksSortOption sortOption = selectedMyTaskSort();
+		dbExec.submit(() -> {
+			try {
+				List<CaseTaskListItemDto> tasks = caseTaskService.loadMyTasks(shaleClientId, userId, sortOption);
+				runOnFx(() -> {
+					myTasks = tasks == null ? List.of() : tasks;
+					renderMyTasks();
+				});
+			} catch (Exception ex) {
+				System.err.println("My tasks load failed: " + ex.getMessage());
+				ex.printStackTrace();
+				runOnFx(() -> showTaskActionError("Failed to load your tasks."));
+			}
+		});
+	}
+
+	private void renderMyTasks() {
+		if (myTasksList == null || myTasksEmptyLabel == null || myTasksScroll == null) {
+			return;
+		}
+		myTasksList.getChildren().clear();
+		if (myTasks == null || myTasks.isEmpty()) {
+			setVisibleManaged(myTasksEmptyLabel, true);
+			setVisibleManaged(myTasksScroll, false);
+			myTasksEmptyLabel.setText("No tasks assigned to you.");
+			return;
+		}
+		for (CaseTaskListItemDto task : myTasks) {
+			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+					task.id(),
+					task.caseId(),
+					task.caseName(),
+					task.caseResponsibleAttorney(),
+					task.caseResponsibleAttorneyColor(),
+					task.title(),
+					task.description(),
+					task.priorityColorHex(),
+					task.dueAt(),
+					task.completedAt(),
+					task.assignedUserId(),
+					task.assignedUserDisplayName(),
+					task.assignedUserColor());
+			myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+		}
+		setVisibleManaged(myTasksEmptyLabel, false);
+		setVisibleManaged(myTasksScroll, true);
+	}
+
+	private CaseTaskService.MyTasksSortOption selectedMyTaskSort() {
+		if (MY_TASKS_SORT_DUE_DESC.equals(myTasksSortChoice == null ? null : myTasksSortChoice.getValue())) {
+			return CaseTaskService.MyTasksSortOption.DUE_DATE_DESC;
+		}
+		return CaseTaskService.MyTasksSortOption.DUE_DATE_ASC;
+	}
+
+	private void openTask(Long taskId) {
+		showTaskDetailPopup(taskId);
+	}
+
+	private void onToggleMyTaskComplete(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			showTaskActionError("Unable to update task right now.");
+			return;
+		}
+		boolean currentlyCompleted = findMyTaskById(taskId)
+				.map(task -> task.completedAt() != null)
+				.orElse(false);
+
+		new Thread(() -> {
+			try {
+				if (currentlyCompleted) {
+					caseTaskService.uncompleteTask(taskId, shaleClientId);
+				} else {
+					caseTaskService.completeTask(taskId, shaleClientId);
+				}
+				runOnFx(this::refreshMyTasks);
+			} catch (Exception ex) {
+				runOnFx(() -> showTaskActionError("Failed to update task completion. " + rootCauseMessage(ex)));
+			}
+		}, "my-shale-toggle-task-" + taskId).start();
+	}
+
+	private Optional<CaseTaskListItemDto> findMyTaskById(Long taskId) {
+		if (taskId == null || myTasks == null) {
+			return Optional.empty();
+		}
+		for (CaseTaskListItemDto task : myTasks) {
+			if (task.id() == taskId.longValue()) {
+				return Optional.of(task);
+			}
+		}
+		return Optional.empty();
+	}
+
+	private void showTaskDetailPopup(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showTaskActionError("You must be signed in to edit tasks.");
+			return;
+		}
+
+		new Thread(() -> {
+			try {
+				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
+
+				runOnFx(() -> {
+					if (detail == null) {
+						showTaskActionError("Task was not found or may have been deleted.");
+						refreshMyTasks();
+						return;
+					}
+					TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+							detail.id(),
+							detail.caseId(),
+							detail.caseName(),
+							detail.caseResponsibleAttorney(),
+							detail.caseResponsibleAttorneyColor(),
+							detail.title(),
+							detail.description(),
+							detail.dueAt(),
+							detail.priorityId(),
+							detail.assignedUserId(),
+							detail.completedAt() != null);
+					Optional<TaskDetailDialog.TaskDetailResult> result =
+							TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users, onOpenCase);
+					if (result.isEmpty()) {
+						return;
+					}
+					TaskDetailDialog.TaskDetailResult action = result.get();
+					if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+						deleteTaskFromDetail(taskId, shaleClientId);
+						return;
+					}
+					TaskDetailDialog.SaveTaskPayload payload = action.payload();
+					if (payload == null) {
+						return;
+					}
+					saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showTaskActionError("Failed to load task details. " + rootCauseMessage(ex)));
+			}
+		}, "my-shale-task-detail-" + taskId).start();
+	}
+
+	private void saveTaskFromDetail(
+			long taskId,
+			int shaleClientId,
+			int currentUserId,
+			TaskDetailDialog.SaveTaskPayload payload) {
+		CaseTaskService.UpdateTaskRequest request = new CaseTaskService.UpdateTaskRequest(
+				taskId,
+				shaleClientId,
+				payload.title(),
+				payload.description(),
+				payload.dueAt(),
+				payload.priorityId(),
+				payload.assigneeUserId(),
+				payload.completed(),
+				currentUserId);
+		new Thread(() -> {
+			try {
+				caseTaskService.updateTask(request);
+				runOnFx(this::refreshMyTasks);
+			} catch (Exception ex) {
+				runOnFx(() -> showTaskActionError("Failed to save task. " + rootCauseMessage(ex)));
+			}
+		}, "my-shale-task-save-" + taskId).start();
+	}
+
+	private void deleteTaskFromDetail(long taskId, int shaleClientId) {
+		new Thread(() -> {
+			try {
+				caseTaskService.deleteTask(taskId, shaleClientId);
+				runOnFx(this::refreshMyTasks);
+			} catch (Exception ex) {
+				runOnFx(() -> showTaskActionError("Failed to delete task. " + rootCauseMessage(ex)));
+			}
+		}, "my-shale-task-delete-" + taskId).start();
+	}
+
+	private void showTaskActionError(String message) {
+		AppDialogs.showError(taskDialogOwner(), "Tasks", message);
+	}
+
+	private String rootCauseMessage(Throwable throwable) {
+		if (throwable == null) {
+			return "";
+		}
+		Throwable current = throwable;
+		while (current.getCause() != null && current.getCause() != current) {
+			current = current.getCause();
+		}
+		String message = current.getMessage();
+		return (message == null || message.isBlank()) ? "" : "Details: " + message;
+	}
+
+	private Window taskDialogOwner() {
+		if (myTasksList != null && myTasksList.getScene() != null) {
+			return myTasksList.getScene().getWindow();
+		}
+		return null;
+	}
+
+	private static void setVisibleManaged(Node node, boolean visible) {
+		if (node == null) {
+			return;
+		}
+		node.setVisible(visible);
+		node.setManaged(visible);
+	}
 
 	private static void runOnFx(Runnable runnable) {
 		if (Platform.isFxApplicationThread()) {

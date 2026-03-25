@@ -7,8 +7,11 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.ui.component.factory.CaseCardFactory;
+import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
@@ -40,7 +43,8 @@ public final class TaskDetailDialog {
             Window owner,
             TaskDetailModel model,
             List<TaskPriorityOptionDto> priorities,
-            List<CaseTaskService.AssignableUserOption> assignees) {
+            List<CaseTaskService.AssignableUserOption> assignees,
+            Consumer<Integer> onOpenCase) {
         Stage stage = AppDialogs.createModalStage(owner, "Task Details");
 
         ResultHolder result = new ResultHolder();
@@ -93,9 +97,31 @@ public final class TaskDetailDialog {
         errorLabel.setVisible(false);
         errorLabel.setManaged(false);
 
+        VBox relatedCaseSection = new VBox(4);
+        String relatedCaseName = safe(model.caseName()).trim();
+        if (model.caseId() > 0 && !relatedCaseName.isBlank()) {
+            Label relatedCaseLabel = new Label("Case:");
+            relatedCaseLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+            CaseCardFactory caseCardFactory = new CaseCardFactory(onOpenCase);
+            var caseCard = caseCardFactory.create(
+                    new CaseCardModel(
+                            model.caseId(),
+                            relatedCaseName,
+                            null,
+                            null,
+                            model.caseResponsibleAttorney(),
+                            model.caseResponsibleAttorneyColor()),
+                    CaseCardFactory.Variant.MINI);
+            relatedCaseSection.getChildren().setAll(relatedCaseLabel, caseCard);
+        } else {
+            relatedCaseSection.setManaged(false);
+            relatedCaseSection.setVisible(false);
+        }
+
         VBox content = new VBox(8,
                 new Label("Title"), titleField,
                 new Label("Description"), descriptionArea,
+                relatedCaseSection,
                 new Label("Priority"), priorityCombo,
                 new Label("Assignee"), assigneeCombo,
                 new Label("Due date/time"), dueRow,
@@ -234,6 +260,10 @@ public final class TaskDetailDialog {
 
     public record TaskDetailModel(
             long taskId,
+            long caseId,
+            String caseName,
+            String caseResponsibleAttorney,
+            String caseResponsibleAttorneyColor,
             String title,
             String description,
             LocalDateTime dueAt,

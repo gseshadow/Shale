@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.function.Consumer;
 
+import com.shale.ui.component.factory.CaseCardFactory;
+import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 
@@ -29,18 +31,27 @@ public final class TaskCard extends VBox {
 	private final Label dueLabel = new Label();
 	private final Label descriptionLabel = new Label();
 	private final Label completedLabel = new Label();
+	private final StackPane relatedCaseHost = new StackPane();
 	private final StackPane assigneeHost = new StackPane();
+	private final Label caseSectionLabel = new Label("Case:");
+	private final VBox caseSection = new VBox(3, caseSectionLabel, relatedCaseHost);
+	private final Label teamSectionLabel = new Label("Team:");
+	private final VBox teamSection = new VBox(3, teamSectionLabel, assigneeHost);
 	private final Button toggleCompleteButton = new Button();
 	private final Region actionsSpacer = new Region();
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
 	private final UserCardFactory userCardFactory = new UserCardFactory(id -> {
+	});
+	private final CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {
 	});
 
 	private Long taskId;
 	private Consumer<Long> onOpen;
 	private Consumer<Long> onToggleComplete;
 	private Consumer<Integer> onOpenAssigneeUser;
+	private Consumer<Integer> onOpenRelatedCase;
 	private String backgroundCss;
+	private String borderCss;
 	private boolean hovered;
 
 	public TaskCard() {
@@ -63,6 +74,10 @@ public final class TaskCard extends VBox {
 
 	public void setOnOpenAssigneeUser(Consumer<Integer> onOpenAssigneeUser) {
 		this.onOpenAssigneeUser = onOpenAssigneeUser;
+	}
+
+	public void setOnOpenRelatedCase(Consumer<Integer> onOpenRelatedCase) {
+		this.onOpenRelatedCase = onOpenRelatedCase;
 	}
 
 	public void setTitle(String title) {
@@ -105,8 +120,8 @@ public final class TaskCard extends VBox {
 		String normalized = displayName == null ? "" : displayName.trim();
 		if (userId == null || userId <= 0 || normalized.isBlank()) {
 			assigneeHost.getChildren().clear();
-			assigneeHost.setManaged(false);
-			assigneeHost.setVisible(false);
+			teamSection.setManaged(false);
+			teamSection.setVisible(false);
 			return;
 		}
 
@@ -120,12 +135,61 @@ public final class TaskCard extends VBox {
 			}
 		});
 		assigneeHost.getChildren().setAll(assigneeCard);
-		assigneeHost.setManaged(true);
-		assigneeHost.setVisible(true);
+		teamSection.setManaged(true);
+		teamSection.setVisible(true);
+	}
+
+	public void setRelatedCase(Long caseId, String caseName, String responsibleAttorney, String responsibleAttorneyColor) {
+		String normalizedName = caseName == null ? "" : caseName.trim();
+		if (caseId == null || caseId <= 0 || normalizedName.isBlank()) {
+			relatedCaseHost.getChildren().clear();
+			caseSection.setManaged(false);
+			caseSection.setVisible(false);
+			return;
+		}
+		var caseCard = caseCardFactory.create(
+				new CaseCardModel(caseId, normalizedName, null, null, responsibleAttorney, responsibleAttorneyColor),
+				CaseCardFactory.Variant.MINI);
+		caseCard.setOnMouseClicked(e -> {
+			e.consume();
+			if (onOpenRelatedCase != null) {
+				onOpenRelatedCase.accept(caseId.intValue());
+			}
+		});
+		relatedCaseHost.getChildren().setAll(caseCard);
+		caseSection.setManaged(true);
+		caseSection.setVisible(true);
 	}
 
 	public void setBackgroundCssColor(String css) {
 		this.backgroundCss = css;
+		refreshSurfaceStyle();
+	}
+
+	public void setBorderByDueState(LocalDateTime dueAt, LocalDateTime completedAt) {
+		if (completedAt != null) {
+			borderCss = "#16a34a";
+			refreshSurfaceStyle();
+			return;
+		}
+		if (dueAt == null) {
+			borderCss = null;
+			refreshSurfaceStyle();
+			return;
+		}
+
+		LocalDateTime now = LocalDateTime.now();
+		if (dueAt.isBefore(now)) {
+			borderCss = "#7f1d1d";
+		} else if (!dueAt.isAfter(now.plusDays(1))) {
+			borderCss = "#dc2626";
+		} else if (!dueAt.isAfter(now.plusWeeks(1))) {
+			borderCss = "#f97316";
+		} else if (!dueAt.isAfter(now.plusWeeks(2))) {
+			borderCss = "#eab308";
+		} else {
+			borderCss = null;
+		}
 		refreshSurfaceStyle();
 	}
 
@@ -141,7 +205,7 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyCompact() {
-		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeHost, completedLabel, actionsRow);
+		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, caseSection, teamSection, completedLabel, actionsRow);
 		setSpacing(6);
 		setPadding(new Insets(10, 12, 10, 12));
 		setAlignment(Pos.TOP_LEFT);
@@ -152,15 +216,14 @@ public final class TaskCard extends VBox {
 		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
-		assigneeHost.setAlignment(Pos.CENTER_LEFT);
-		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
+		configureRelatedSections();
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
 	}
 
 	public void applyFull() {
-		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, assigneeHost, completedLabel, actionsRow);
+		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, caseSection, teamSection, completedLabel, actionsRow);
 		setSpacing(8);
 		setPadding(new Insets(14, 16, 14, 16));
 		setAlignment(Pos.TOP_LEFT);
@@ -171,8 +234,7 @@ public final class TaskCard extends VBox {
 		dueLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
-		assigneeHost.setAlignment(Pos.CENTER_LEFT);
-		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
+		configureRelatedSections();
 		completedLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
@@ -210,9 +272,19 @@ public final class TaskCard extends VBox {
 			}
 		});
 		setAssignee(null, null, null);
+		setRelatedCase(null, null, null, null);
+	}
+
+	private void configureRelatedSections() {
+		caseSectionLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+		teamSectionLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
+		relatedCaseHost.setMaxWidth(Region.USE_PREF_SIZE);
+		assigneeHost.setAlignment(Pos.CENTER_LEFT);
+		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
+		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, borderCss, hovered));
 	}
 }

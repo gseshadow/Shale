@@ -17,32 +17,59 @@
 		<Insets top="0" right="0" bottom="0" left="0" />
 	</padding>
 
-	<VBox spacing="8" styleClass="strong-panel">
-		<padding>
-			<Insets top="10" right="10" bottom="10" left="10" />
-		</padding>
-		<Label text="My Cases" styleClass="page-heading" />
-		<BorderPane>
-			<top>
-				<HBox spacing="10" styleClass="cases-filter-bar">
-					<TextField fx:id="myCasesSearchField" promptText="Search my cases…" HBox.hgrow="ALWAYS" />
-					<MenuButton fx:id="myCasesStatusFilterMenuButton" text="Status (8/8)" />
-					<ChoiceBox fx:id="myCasesSortChoice" prefWidth="220" />
-				</HBox>
-			</top>
-			<center>
-				<ScrollPane fx:id="myCasesScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
-					vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
-					<content>
-						<FlowPane fx:id="myCasesFlow" hgap="10" vgap="10" prefWrapLength="900"
-							styleClass="cases-content-surface glass-panel">
-							<padding>
-								<Insets top="10" right="10" bottom="10" left="10" />
-							</padding>
-						</FlowPane>
-					</content>
-				</ScrollPane>
-			</center>
-		</BorderPane>
-	</VBox>
+	<HBox spacing="10" fillHeight="true">
+		<VBox spacing="8" styleClass="strong-panel" HBox.hgrow="ALWAYS">
+			<padding>
+				<Insets top="10" right="10" bottom="10" left="10" />
+			</padding>
+			<Label text="My Cases" styleClass="page-heading" />
+			<BorderPane VBox.vgrow="ALWAYS">
+				<top>
+					<HBox spacing="10" styleClass="cases-filter-bar">
+						<TextField fx:id="myCasesSearchField" promptText="Search my cases…" HBox.hgrow="ALWAYS" />
+						<MenuButton fx:id="myCasesStatusFilterMenuButton" text="Status (8/8)" />
+						<ChoiceBox fx:id="myCasesSortChoice" prefWidth="220" />
+					</HBox>
+				</top>
+				<center>
+					<ScrollPane fx:id="myCasesScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
+						vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
+						<content>
+							<FlowPane fx:id="myCasesFlow" hgap="10" vgap="10" prefWrapLength="900"
+								styleClass="cases-content-surface glass-panel">
+								<padding>
+									<Insets top="10" right="10" bottom="10" left="10" />
+								</padding>
+							</FlowPane>
+						</content>
+					</ScrollPane>
+				</center>
+			</BorderPane>
+		</VBox>
+
+		<VBox spacing="8" styleClass="strong-panel" prefWidth="380" minWidth="340">
+			<padding>
+				<Insets top="10" right="10" bottom="10" left="10" />
+			</padding>
+			<BorderPane>
+				<left>
+					<Label text="My Tasks" styleClass="page-heading" />
+				</left>
+				<right>
+					<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170" />
+				</right>
+			</BorderPane>
+			<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" />
+			<ScrollPane fx:id="myTasksScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
+				vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
+				<content>
+					<VBox fx:id="myTasksList" spacing="10" styleClass="cases-content-surface glass-panel">
+						<padding>
+							<Insets top="10" right="10" bottom="10" left="10" />
+						</padding>
+					</VBox>
+				</content>
+			</ScrollPane>
+		</VBox>
+	</HBox>
 </VBox>

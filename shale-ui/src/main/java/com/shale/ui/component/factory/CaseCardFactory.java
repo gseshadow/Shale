@@ -11,6 +11,10 @@ import javafx.scene.Node;
 
 public final class CaseCardFactory {
 
+	public enum Variant {
+		FULL, COMPACT, MINI
+	}
+
 	private final Consumer<Integer> onOpenCase;
 
 	public CaseCardFactory(Consumer<Integer> onOpenCase) {
@@ -18,6 +22,10 @@ public final class CaseCardFactory {
 	}
 
 	public Node create(CaseCardModel vm) {
+		return create(vm, Variant.COMPACT);
+	}
+
+	public Node create(CaseCardModel vm, Variant variant) {
 		CaseCard card = new CaseCard();
 
 		card.setCaseId((int) vm.id()); // keep your current int wiring
@@ -33,6 +41,12 @@ public final class CaseCardFactory {
 			if (onOpenCase != null)
 				onOpenCase.accept(id);
 		});
+
+		switch (variant) {
+		case FULL -> card.applyFull();
+		case COMPACT -> card.applyCompact();
+		case MINI -> card.applyMini();
+		}
 
 		return card;
 	}

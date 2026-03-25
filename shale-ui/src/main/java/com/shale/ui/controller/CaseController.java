@@ -53,6 +53,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
@@ -86,6 +87,10 @@ import javafx.stage.Window;
  * </ul>
  */
 public class CaseController {
+	private static final String CASE_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
+	private static final String CASE_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
+	private static final String CASE_TASKS_SORT_PRIORITY_ASC = "Priority (Low to High)";
+	private static final String CASE_TASKS_SORT_PRIORITY_DESC = "Priority (High to Low)";
 
 	// ----------------------------
 	// FXML fields
@@ -213,6 +218,8 @@ public class CaseController {
 	private FlowPane tasksTabFlow;
 	@FXML
 	private Label tasksTabEmptyLabel;
+	@FXML
+	private ChoiceBox<String> caseTasksSortChoice;
 
 	@FXML
 	private StackPane ovCaseStatusHost;
@@ -357,6 +364,7 @@ public class CaseController {
 
 	private ContactCardFactory contactCardFactory;
 	private Consumer<Integer> onOpenContact;
+	private Consumer<Integer> onOpenCase;
 
 	private PracticeAreaCardFactory practiceAreaCardFactory;
 	private Consumer<Integer> onOpenPracticeArea;
@@ -470,6 +478,11 @@ public class CaseController {
 		this.contactCardFactory = new ContactCardFactory(onOpenContact);
 	}
 
+	public void setOnOpenCase(Consumer<Integer> onOpenCase) {
+		this.onOpenCase = onOpenCase;
+		this.taskCardFactory = buildTaskCardFactory(this::openTask);
+	}
+
 	/** Optional - if you don’t set this, card click will Sys.out for now */
 	public void setOnOpenPracticeArea(Consumer<Integer> onOpenPracticeArea) {
 		this.onOpenPracticeArea = onOpenPracticeArea;
@@ -530,6 +543,16 @@ public class CaseController {
 		}
 		if (addTaskButton != null)
 			addTaskButton.setOnAction(e -> onAddTask());
+		if (caseTasksSortChoice != null) {
+			caseTasksSortChoice.getItems().setAll(
+					CASE_TASKS_SORT_DUE_ASC,
+					CASE_TASKS_SORT_DUE_DESC,
+					CASE_TASKS_SORT_PRIORITY_ASC,
+					CASE_TASKS_SORT_PRIORITY_DESC);
+			caseTasksSortChoice.getSelectionModel().select(CASE_TASKS_SORT_DUE_ASC);
+			caseTasksSortChoice.getSelectionModel().selectedItemProperty()
+					.addListener((obs, oldV, newV) -> refreshCaseTasks());
+		}
 		if (addOrganizationButton != null)
 			addOrganizationButton.setOnAction(e -> onAddRelatedEntity());
 		if (caseUpdatesComposerArea != null) {
@@ -862,7 +885,10 @@ public class CaseController {
 
 		new Thread(() -> {
 			try {
-				List<CaseTaskListItemDto> tasks = caseTaskService.loadTasksForCase(activeCaseId, shaleClientId);
+				List<CaseTaskListItemDto> tasks = caseTaskService.loadTasksForCase(
+						activeCaseId,
+						shaleClientId,
+						selectedCaseTaskSort());
 				runOnFx(() -> {
 					if (caseId == null || caseId.longValue() != activeCaseId) {
 						return;
@@ -899,8 +925,13 @@ public class CaseController {
 		for (CaseTaskListItemDto task : caseTasks) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
 					task.id(),
+					task.caseId(),
+					task.caseName(),
+					task.caseResponsibleAttorney(),
+					task.caseResponsibleAttorneyColor(),
 					task.title(),
 					task.description(),
+					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
 					task.assignedUserId(),
@@ -1270,6 +1301,8 @@ public class CaseController {
 		return new TaskCardFactory(
 				onOpenTaskAction,
 				this::onToggleTaskComplete,
+				onOpenCase == null ? id -> {
+				} : onOpenCase,
 				onOpenUser == null ? id -> {
 				} : onOpenUser);
 	}
@@ -1386,6 +1419,10 @@ public class CaseController {
 
 	                TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 	                        detail.id(),
+	                        detail.caseId(),
+	                        detail.caseName(),
+	                        detail.caseResponsibleAttorney(),
+	                        detail.caseResponsibleAttorneyColor(),
 	                        detail.title(),
 	                        detail.description(),
 	                        detail.dueAt(),
@@ -1395,7 +1432,7 @@ public class CaseController {
 	                );
 
 	                Optional<TaskDetailDialog.TaskDetailResult> result =
-	                        TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users);
+	                        TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users, onOpenCase);
 
 	                if (result.isEmpty()) {
 	                    return;
@@ -1462,6 +1499,20 @@ public class CaseController {
 
 	private void refreshCaseTasks() {
 		loadCaseTasksAsync();
+	}
+
+	private CaseTaskService.CaseTasksSortOption selectedCaseTaskSort() {
+		String selectedSort = caseTasksSortChoice == null ? null : caseTasksSortChoice.getValue();
+		if (CASE_TASKS_SORT_DUE_DESC.equals(selectedSort)) {
+			return CaseTaskService.CaseTasksSortOption.DUE_DATE_DESC;
+		}
+		if (CASE_TASKS_SORT_PRIORITY_ASC.equals(selectedSort)) {
+			return CaseTaskService.CaseTasksSortOption.PRIORITY_ASC;
+		}
+		if (CASE_TASKS_SORT_PRIORITY_DESC.equals(selectedSort)) {
+			return CaseTaskService.CaseTasksSortOption.PRIORITY_DESC;
+		}
+		return CaseTaskService.CaseTasksSortOption.DUE_DATE_ASC;
 	}
 
 	private Optional<CaseTaskListItemDto> findCaseTaskById(Long taskId) {

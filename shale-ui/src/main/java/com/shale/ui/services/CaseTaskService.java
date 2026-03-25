@@ -13,6 +13,19 @@ import com.shale.data.dao.UserDao;
  * Thin case-task service facade for UI.
  */
 public final class CaseTaskService {
+    public enum MyTasksSortOption {
+        DEFAULT,
+        DUE_DATE_ASC,
+        DUE_DATE_DESC
+    }
+
+    public enum CaseTasksSortOption {
+        DEFAULT,
+        DUE_DATE_ASC,
+        DUE_DATE_DESC,
+        PRIORITY_ASC,
+        PRIORITY_DESC
+    }
 
     private final TaskDao taskDao;
     private final UserDao userDao;
@@ -23,7 +36,27 @@ public final class CaseTaskService {
     }
 
     public List<CaseTaskListItemDto> loadTasksForCase(long caseId, int shaleClientId) {
-        return taskDao.listActiveTasksForCase(caseId, shaleClientId);
+        return loadTasksForCase(caseId, shaleClientId, CaseTasksSortOption.DEFAULT);
+    }
+
+    public List<CaseTaskListItemDto> loadTasksForCase(long caseId, int shaleClientId, CaseTasksSortOption sortOption) {
+        TaskDao.CaseTaskSort daoSort = switch (sortOption == null ? CaseTasksSortOption.DEFAULT : sortOption) {
+            case DUE_DATE_ASC -> TaskDao.CaseTaskSort.DUE_DATE_ASC;
+            case DUE_DATE_DESC -> TaskDao.CaseTaskSort.DUE_DATE_DESC;
+            case PRIORITY_ASC -> TaskDao.CaseTaskSort.PRIORITY_ASC;
+            case PRIORITY_DESC -> TaskDao.CaseTaskSort.PRIORITY_DESC;
+            case DEFAULT -> TaskDao.CaseTaskSort.DEFAULT;
+        };
+        return taskDao.listActiveTasksForCase(caseId, shaleClientId, daoSort);
+    }
+
+    public List<CaseTaskListItemDto> loadMyTasks(int shaleClientId, int currentUserId, MyTasksSortOption sortOption) {
+        TaskDao.MyTaskSort daoSort = switch (sortOption == null ? MyTasksSortOption.DEFAULT : sortOption) {
+            case DUE_DATE_ASC -> TaskDao.MyTaskSort.DUE_DATE_ASC;
+            case DUE_DATE_DESC -> TaskDao.MyTaskSort.DUE_DATE_DESC;
+            case DEFAULT -> TaskDao.MyTaskSort.DEFAULT;
+        };
+        return taskDao.listActiveTasksAssignedToUser(shaleClientId, currentUserId, daoSort);
     }
 
     public TaskDetailDto loadTaskDetail(long taskId, int shaleClientId) {
