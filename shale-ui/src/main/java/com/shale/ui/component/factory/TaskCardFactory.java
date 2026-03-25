@@ -20,6 +20,7 @@ public final class TaskCardFactory {
             String caseResponsibleAttorneyColor,
             String title,
             String description,
+            String priorityColorHex,
             LocalDateTime dueAt,
             LocalDateTime completedAt,
             Integer assignedUserId,
@@ -62,8 +63,9 @@ public final class TaskCardFactory {
         card.setDueAt(model.dueAt());
         card.setDescriptionPreview(model.description());
         card.setCompleted(model.completedAt() != null);
+        card.setBorderByDueState(model.dueAt(), model.completedAt());
         card.setAssignee(model.assignedUserId(), model.assignedUserDisplayName(), model.assignedUserColor());
-        card.setBackgroundCssColor(null);
+        card.setBackgroundCssColor(model.priorityColorHex());
 
         switch (variant) {
             case FULL -> card.applyFull();

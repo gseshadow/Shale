@@ -911,6 +911,7 @@ public class CaseController {
 					task.caseResponsibleAttorneyColor(),
 					task.title(),
 					task.description(),
+					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
 					task.assignedUserId(),

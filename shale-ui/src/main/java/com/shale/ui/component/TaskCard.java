@@ -51,6 +51,7 @@ public final class TaskCard extends VBox {
 	private Consumer<Integer> onOpenAssigneeUser;
 	private Consumer<Integer> onOpenRelatedCase;
 	private String backgroundCss;
+	private String borderCss;
 	private boolean hovered;
 
 	public TaskCard() {
@@ -165,6 +166,33 @@ public final class TaskCard extends VBox {
 		refreshSurfaceStyle();
 	}
 
+	public void setBorderByDueState(LocalDateTime dueAt, LocalDateTime completedAt) {
+		if (completedAt != null) {
+			borderCss = "#16a34a";
+			refreshSurfaceStyle();
+			return;
+		}
+		if (dueAt == null) {
+			borderCss = null;
+			refreshSurfaceStyle();
+			return;
+		}
+
+		LocalDateTime now = LocalDateTime.now();
+		if (dueAt.isBefore(now)) {
+			borderCss = "#7f1d1d";
+		} else if (!dueAt.isAfter(now.plusDays(1))) {
+			borderCss = "#dc2626";
+		} else if (!dueAt.isAfter(now.plusWeeks(1))) {
+			borderCss = "#f97316";
+		} else if (!dueAt.isAfter(now.plusWeeks(2))) {
+			borderCss = "#eab308";
+		} else {
+			borderCss = null;
+		}
+		refreshSurfaceStyle();
+	}
+
 	public void applyMini() {
 		getChildren().setAll(titleLabel, completedLabel);
 		setSpacing(2);
@@ -257,6 +285,6 @@ public final class TaskCard extends VBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
+		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, borderCss, hovered));
 	}
 }

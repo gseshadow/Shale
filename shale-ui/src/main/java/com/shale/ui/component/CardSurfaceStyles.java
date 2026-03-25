@@ -13,14 +13,20 @@ final class CardSurfaceStyles {
     }
 
     static String cardContainerStyle(String backgroundCss) {
-        return cardContainerStyle(backgroundCss, false);
+        return cardContainerStyle(backgroundCss, null, false);
     }
 
     static String cardContainerStyle(String backgroundCss, boolean hovered) {
+        return cardContainerStyle(backgroundCss, null, hovered);
+    }
+
+    static String cardContainerStyle(String backgroundCss, String borderCss, boolean hovered) {
         String surface = (backgroundCss == null || backgroundCss.isBlank())
                 ? (hovered ? HOVER_CARD_SURFACE : DEFAULT_CARD_SURFACE)
                 : backgroundCss;
-        String border = hovered ? HOVER_CARD_BORDER : CARD_BORDER;
+        String border = (borderCss == null || borderCss.isBlank())
+                ? (hovered ? HOVER_CARD_BORDER : CARD_BORDER)
+                : borderCss;
         String effect = hovered ? HOVER_CARD_EFFECT : CARD_EFFECT;
         return """
                 -fx-background-color: %s;
