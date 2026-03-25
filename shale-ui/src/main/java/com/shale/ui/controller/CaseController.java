@@ -62,6 +62,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.Node;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -113,6 +114,8 @@ public class CaseController {
 
 	@FXML
 	private VBox sectionButtonsBox;
+	@FXML
+	private BorderPane caseRootPane;
 	@FXML
 	private VBox overviewPane;
 	@FXML
@@ -247,6 +250,8 @@ public class CaseController {
 	private TextArea caseUpdatesComposerArea;
 	@FXML
 	private Button submitCaseUpdateButton;
+	@FXML
+	private VBox caseUpdatesPane;
 	@FXML
 	private ScrollPane caseUpdatesScrollPane;
 	@FXML
@@ -713,6 +718,7 @@ public class CaseController {
 	}
 
 	private void showOverview() {
+		setUpdatesPaneVisible(true);
 		setPaneVisible(overviewPane, true);
 		setVisibleManaged(detailsScrollPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -724,6 +730,7 @@ public class CaseController {
 	}
 
 	private void showTasksTab() {
+		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
 		setVisibleManaged(detailsScrollPane, false);
 		setPaneVisible(tasksTabPane, true);
@@ -734,6 +741,7 @@ public class CaseController {
 	}
 
 	private void showDetails() {
+		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
 		setVisibleManaged(detailsScrollPane, true);
 		setPaneVisible(tasksTabPane, false);
@@ -745,6 +753,7 @@ public class CaseController {
 	}
 
 	private void showGeneric(String sectionName) {
+		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
 		setVisibleManaged(detailsScrollPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -767,6 +776,7 @@ public class CaseController {
 
 
 	private void showContacts() {
+		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
 		setVisibleManaged(detailsScrollPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -854,6 +864,7 @@ public class CaseController {
 	}
 
 	private void showOrganizations() {
+		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
 		setVisibleManaged(detailsScrollPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -904,6 +915,19 @@ public class CaseController {
 				System.err.println("Case tasks load failed for caseId=" + activeCaseId + ": " + ex.getMessage());
 			}
 		}, "case-load-tasks-" + activeCaseId).start();
+	}
+
+	private void setUpdatesPaneVisible(boolean showOnRight) {
+		if (caseRootPane == null || caseUpdatesPane == null) {
+			return;
+		}
+		if (showOnRight) {
+			if (caseRootPane.getRight() != caseUpdatesPane) {
+				caseRootPane.setRight(caseUpdatesPane);
+			}
+		} else if (caseRootPane.getRight() != null) {
+			caseRootPane.setRight(null);
+		}
 	}
 
 	private void renderTasksSection() {
