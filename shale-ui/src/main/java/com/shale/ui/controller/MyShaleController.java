@@ -475,6 +475,7 @@ public final class MyShaleController {
 					task.caseResponsibleAttorneyColor(),
 					task.title(),
 					task.description(),
+					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
 					task.assignedUserId(),

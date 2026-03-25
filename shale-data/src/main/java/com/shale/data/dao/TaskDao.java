@@ -58,6 +58,7 @@ public final class TaskDao {
                   caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   t.Title,
                   t.Description,
+                  p.ColorHex AS PriorityColorHex,
                   t.DueAt,
                   t.CompletedAt,
                   assignment.UserId AS AssignedUserId,
@@ -71,6 +72,9 @@ public final class TaskDao {
                 INNER JOIN dbo.Cases c
                   ON c.Id = t.CaseId
                  AND c.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.Priorities p
+                  ON p.Id = t.PriorityId
+                 AND p.ShaleClientId = t.ShaleClientId
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -139,6 +143,7 @@ public final class TaskDao {
                             rs.getString("CaseResponsibleAttorneyColor"),
                             rs.getString("Title"),
                             rs.getString("Description"),
+                            rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
                             toLocalDateTime(rs.getTimestamp("CompletedAt")),
                             (Integer) rs.getObject("AssignedUserId"),
@@ -178,6 +183,7 @@ public final class TaskDao {
                   caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   t.Title,
                   t.Description,
+                  p.ColorHex AS PriorityColorHex,
                   t.DueAt,
                   t.CompletedAt,
                   assignment.UserId AS AssignedUserId,
@@ -191,6 +197,9 @@ public final class TaskDao {
                 INNER JOIN dbo.Cases c
                   ON c.Id = t.CaseId
                  AND c.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.Priorities p
+                  ON p.Id = t.PriorityId
+                 AND p.ShaleClientId = t.ShaleClientId
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -264,6 +273,7 @@ public final class TaskDao {
                             rs.getString("CaseResponsibleAttorneyColor"),
                             rs.getString("Title"),
                             rs.getString("Description"),
+                            rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
                             toLocalDateTime(rs.getTimestamp("CompletedAt")),
                             (Integer) rs.getObject("AssignedUserId"),

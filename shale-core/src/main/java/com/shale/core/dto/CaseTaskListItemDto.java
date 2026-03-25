@@ -14,6 +14,7 @@ public record CaseTaskListItemDto(
         String caseResponsibleAttorneyColor,
         String title,
         String description,
+        String priorityColorHex,
         LocalDateTime dueAt,
         LocalDateTime completedAt,
         Integer assignedUserId,
