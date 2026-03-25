@@ -110,6 +110,7 @@ public final class TaskDao {
                 INSERT INTO dbo.Tasks (
                   ShaleClientId,
                   StatusId,
+                  PriorityId,
                   Title,
                   Description,
                   CaseId,
@@ -121,15 +122,17 @@ public final class TaskDao {
                   IsDeleted
                 )
                 OUTPUT INSERTED.Id
-                VALUES (?, ?, ?, ?, ?, ?, NULL, ?, SYSDATETIME(), SYSDATETIME(), 0);
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, SYSDATETIME(), SYSDATETIME(), 0);
                 """;
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             int defaultStatusId = resolveDefaultTaskStatusId(con, shaleClientId);
+            int defaultPriorityId = resolveDefaultTaskPriorityId(con, shaleClientId);
             int i = 1;
             ps.setInt(i++, shaleClientId);
             ps.setInt(i++, defaultStatusId);
+            ps.setInt(i++, defaultPriorityId);
             ps.setString(i++, normalizedTitle);
             setNullableString(ps, i++, description);
             ps.setLong(i++, caseId);
@@ -248,6 +251,73 @@ public final class TaskDao {
             }
         }
         throw new IllegalStateException("No default open task status found for shaleClientId=" + shaleClientId);
+    }
+
+    private static int resolveDefaultTaskPriorityId(Connection con, int shaleClientId) throws SQLException {
+        String tableName = "dbo.Priorities";
+        if (!tableExists(con, tableName)) {
+            throw new IllegalStateException("Priority resolution failed: table " + tableName + " does not exist.");
+        }
+
+        boolean hasName = hasColumn(con, tableName, "Name");
+        boolean hasSortOrder = hasColumn(con, tableName, "SortOrder");
+        boolean hasIsActive = hasColumn(con, tableName, "IsActive");
+
+        StringBuilder sql = new StringBuilder("""
+                SELECT TOP (1) p.Id
+                FROM dbo.Priorities p
+                WHERE p.ShaleClientId = ?
+                """);
+        if (hasIsActive) {
+            sql.append("\n  AND ISNULL(p.IsActive, 1) = 1");
+        }
+
+        sql.append("\nORDER BY ");
+        if (hasName) {
+            sql.append("\n  CASE WHEN LOWER(LTRIM(RTRIM(ISNULL(p.Name, '')))) IN ('normal', 'medium', 'default', 'standard') THEN 0 ELSE 1 END,");
+        }
+        if (hasSortOrder) {
+            sql.append("\n  ISNULL(p.SortOrder, 2147483647),");
+        }
+        sql.append("\n  p.Id;");
+
+        try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+            ps.setInt(1, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        }
+        throw new IllegalStateException("No default task priority found for shaleClientId=" + shaleClientId);
+    }
+
+    private static boolean tableExists(Connection con, String fullyQualifiedTableName) throws SQLException {
+        String sql = "SELECT CASE WHEN OBJECT_ID(?, 'U') IS NULL THEN 0 ELSE 1 END;";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, fullyQualifiedTableName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) == 1;
+            }
+        }
+    }
+
+    private static boolean hasColumn(Connection con, String fullyQualifiedTableName, String columnName) throws SQLException {
+        String sql = """
+                SELECT CASE WHEN EXISTS (
+                    SELECT 1
+                    FROM sys.columns c
+                    WHERE c.object_id = OBJECT_ID(?)
+                      AND c.name = ?
+                ) THEN 1 ELSE 0 END;
+                """;
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, fullyQualifiedTableName);
+            ps.setString(2, columnName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) == 1;
+            }
+        }
     }
 
     private static LocalDateTime toLocalDateTime(Timestamp timestamp) {
