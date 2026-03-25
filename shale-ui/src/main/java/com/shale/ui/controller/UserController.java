@@ -1,18 +1,23 @@
 package com.shale.ui.controller;
 
-import com.shale.data.dao.UserDao;
+import com.shale.data.dao.CaseDao.CaseRow;
 import com.shale.data.dao.UserDao.UserDetailRow;
 import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
 import com.shale.data.dao.UserDao.UserRoleRow;
+import com.shale.ui.component.factory.CaseCardFactory;
+import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.state.AppState;
+import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UserDetailService;
 import com.shale.ui.util.ColorUtil;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -24,13 +29,20 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Window;
 
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 public final class UserController {
 
 	private static final Color DEFAULT_USER_COLOR = Color.WHITE;
+	private static final String SORT_NAME = "Name";
+	private static final String SORT_INTAKE = "Date of Intake";
+	private static final String SORT_SOL = "Statute of Limitations Date";
 	private static final String COLOR_SWATCH_BASE_STYLE = "-fx-min-width: 22px; -fx-pref-width: 22px; -fx-max-width: 22px; "
 			+ "-fx-min-height: 22px; -fx-pref-height: 22px; -fx-max-height: 22px; "
 			+ "-fx-background-radius: 11px; -fx-border-radius: 11px; "
@@ -46,6 +58,10 @@ public final class UserController {
 	@FXML private Button addRoleButton;
 	@FXML private FlowPane rolesFlow;
 	@FXML private Label rolesEmptyLabel;
+	@FXML private VBox assignedCasesContainer;
+	@FXML private Label assignedCasesEmptyLabel;
+	@FXML private TextField assignedCasesSearchField;
+	@FXML private ChoiceBox<String> assignedCasesSortChoice;
 
 	@FXML private Label displayNameValue;
 	@FXML private Label firstNameValue;
@@ -66,11 +82,17 @@ public final class UserController {
 	@FXML private Label colorEditorValue;
 
 	private Integer userId;
-	private UserDao userDao;
+	private UserDetailService userDetailService;
 	private AppState appState;
+	private UiRuntimeBridge runtimeBridge;
+	private Consumer<Integer> onOpenCase;
+	private CaseCardFactory caseCardFactory;
+	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private boolean liveSubscribed;
 	private UserDetailRow currentUser;
 	private List<UserRoleRow> assignedRoles = List.of();
 	private List<UserRoleRow> assignableRoles = List.of();
+	private List<CaseRow> assignedCases = List.of();
 	private boolean editMode;
 	private boolean colorEditedInSession;
 
@@ -80,10 +102,17 @@ public final class UserController {
 		return t;
 	});
 
-	public void init(int userId, UserDao userDao, AppState appState) {
+	public void init(int userId,
+			UserDetailService userDetailService,
+			AppState appState,
+			UiRuntimeBridge runtimeBridge,
+			Consumer<Integer> onOpenCase) {
 		this.userId = userId;
-		this.userDao = userDao;
+		this.userDetailService = userDetailService;
 		this.appState = appState;
+		this.runtimeBridge = runtimeBridge;
+		this.onOpenCase = onOpenCase;
+		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 	}
 
 	@FXML
@@ -100,14 +129,69 @@ public final class UserController {
 		if (addRoleButton != null) {
 			addRoleButton.setOnAction(e -> onAddRole());
 		}
+		if (assignedCasesSortChoice != null) {
+			assignedCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
+			assignedCasesSortChoice.getSelectionModel().select(SORT_NAME);
+			assignedCasesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderAssignedCases());
+		}
+		if (assignedCasesSearchField != null) {
+			assignedCasesSearchField.textProperty().addListener((obs, oldV, newV) -> renderAssignedCases());
+		}
 		configureColorEditor();
 
 		setEditMode(false);
+		wireLiveRefreshLifecycle();
 		Platform.runLater(this::loadUser);
 	}
 
+	private void wireLiveRefreshLifecycle() {
+		if (assignedCasesContainer == null) {
+			return;
+		}
+		assignedCasesContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null) {
+				unsubscribeLiveCaseUpdates();
+			} else {
+				subscribeLiveCaseUpdates();
+			}
+		});
+		subscribeLiveCaseUpdates();
+	}
+
+	private void subscribeLiveCaseUpdates() {
+		if (runtimeBridge == null || liveSubscribed) {
+			return;
+		}
+		liveCaseUpdatedHandler = this::handleLiveCaseUpdatedEvent;
+		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = true;
+	}
+
+	private void unsubscribeLiveCaseUpdates() {
+		if (!liveSubscribed || runtimeBridge == null || liveCaseUpdatedHandler == null) {
+			return;
+		}
+		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveSubscribed = false;
+	}
+
+	private void handleLiveCaseUpdatedEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
+		if (event == null || currentUser == null) {
+			return;
+		}
+		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
+			return;
+		}
+		Integer currentShaleClientId = appState == null ? null : appState.getShaleClientId();
+		if (currentShaleClientId == null || currentShaleClientId <= 0 || event.shaleClientId() != currentShaleClientId) {
+			return;
+		}
+		refreshAssignedCasesAsync();
+	}
+
 	private void loadUser() {
-		if (userDao == null || userId == null || userId <= 0) {
+		if (userDetailService == null || userId == null || userId <= 0) {
 			setError("User view is not configured.");
 			return;
 		}
@@ -120,18 +204,20 @@ public final class UserController {
 		setBusy(true);
 		dbExec.submit(() -> {
 			try {
-				UserDetailRow loaded = userDao.findById(userId, shaleClientId);
+				UserDetailRow loaded = userDetailService.loadUser(userId, shaleClientId);
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (loaded == null) {
 						setError("User not found.");
 						return;
 					}
-					currentUser = loaded;
-					renderFromCurrent();
+						currentUser = loaded;
+						resetAssignedCaseControls();
+						renderFromCurrent();
 					setEditMode(false);
 					clearError();
 					refreshRolesAsync();
+					refreshAssignedCasesAsync();
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
@@ -143,7 +229,7 @@ public final class UserController {
 	}
 
 	private void refreshRolesAsync() {
-		if (userDao == null || currentUser == null) {
+		if (userDetailService == null || currentUser == null) {
 			assignedRoles = List.of();
 			assignableRoles = List.of();
 			renderRoles();
@@ -154,9 +240,9 @@ public final class UserController {
 		final int shaleClientId = currentUser.shaleClientId();
 		dbExec.submit(() -> {
 			try {
-				List<UserRoleRow> loadedAssigned = userDao.listAssignedRoles(targetUserId, shaleClientId);
+				List<UserRoleRow> loadedAssigned = userDetailService.loadAssignedRoles(targetUserId, shaleClientId);
 				List<UserRoleRow> loadedAssignable = canManageRoles()
-						? userDao.listAssignableRoles(targetUserId, shaleClientId)
+						? userDetailService.loadAssignableRoles(targetUserId, shaleClientId)
 						: List.of();
 				Platform.runLater(() -> {
 					assignedRoles = loadedAssigned == null ? List.of() : List.copyOf(loadedAssigned);
@@ -169,6 +255,30 @@ public final class UserController {
 					assignableRoles = List.of();
 					renderRoles();
 					setError("Failed to load roles for this user.");
+				});
+			}
+		});
+	}
+
+	private void refreshAssignedCasesAsync() {
+		if (userDetailService == null || currentUser == null) {
+			assignedCases = List.of();
+			renderAssignedCases();
+			return;
+		}
+		final int targetUserId = currentUser.id();
+		dbExec.submit(() -> {
+			try {
+				List<CaseRow> loaded = userDetailService.loadAssignedCases(targetUserId);
+				Platform.runLater(() -> {
+					assignedCases = loaded == null ? List.of() : List.copyOf(loaded);
+					renderAssignedCases();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> {
+					assignedCases = List.of();
+					renderAssignedCases();
+					setError("Failed to load assigned cases for this user.");
 				});
 			}
 		});
@@ -202,7 +312,7 @@ public final class UserController {
 			setError("You do not have permission to save changes for this user.");
 			return;
 		}
-		if (currentUser == null || userDao == null) {
+		if (currentUser == null || userDetailService == null) {
 			setError("User details are unavailable.");
 			return;
 		}
@@ -220,7 +330,7 @@ public final class UserController {
 		setBusy(true);
 		dbExec.submit(() -> {
 			try {
-				boolean updated = userDao.updateBasicProfile(request);
+				boolean updated = userDetailService.updateBasicProfile(request);
 				if (!updated) {
 					Platform.runLater(() -> {
 						setBusy(false);
@@ -229,7 +339,7 @@ public final class UserController {
 					return;
 				}
 
-				UserDetailRow reloaded = userDao.findById(currentUser.id(), currentUser.shaleClientId());
+				UserDetailRow reloaded = userDetailService.loadUser(currentUser.id(), currentUser.shaleClientId());
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (reloaded == null) {
@@ -258,7 +368,7 @@ public final class UserController {
 			setError("Only admin users can manage roles.");
 			return;
 		}
-		if (currentUser == null || userDao == null) {
+		if (currentUser == null || userDetailService == null) {
 			setError("User details are unavailable.");
 			return;
 		}
@@ -283,7 +393,7 @@ public final class UserController {
 		setBusy(true);
 		dbExec.submit(() -> {
 			try {
-				boolean added = userDao.addRoleToUser(currentUser.id(), chosen.roleId(), currentUser.shaleClientId());
+				boolean added = userDetailService.addRoleToUser(currentUser.id(), chosen.roleId(), currentUser.shaleClientId());
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (!added) {
@@ -308,7 +418,7 @@ public final class UserController {
 			setError("Only admin users can manage roles.");
 			return;
 		}
-		if (currentUser == null || role == null || userDao == null) {
+		if (currentUser == null || role == null || userDetailService == null) {
 			setError("Role details are unavailable.");
 			return;
 		}
@@ -326,7 +436,7 @@ public final class UserController {
 		setBusy(true);
 		dbExec.submit(() -> {
 			try {
-				boolean removed = userDao.removeRoleFromUser(currentUser.id(), role.roleId(), currentUser.shaleClientId());
+				boolean removed = userDetailService.removeRoleFromUser(currentUser.id(), role.roleId(), currentUser.shaleClientId());
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (!removed) {
@@ -372,6 +482,7 @@ public final class UserController {
 		writeEditorsFromCurrent();
 		refreshActionVisibility();
 		renderRoles();
+		renderAssignedCases();
 	}
 
 	private void renderRoles() {
@@ -410,6 +521,99 @@ public final class UserController {
 		container.getStyleClass().add("secondary-panel");
 		container.setPrefWidth(280);
 		return container;
+	}
+
+	private void renderAssignedCases() {
+		if (assignedCasesContainer == null) {
+			return;
+		}
+		if (caseCardFactory == null) {
+			caseCardFactory = new CaseCardFactory(onOpenCase);
+		}
+		String query = normalizedAssignedCaseQuery();
+		Comparator<CaseRow> comparator = assignedCasesComparator();
+		List<Node> cards = assignedCases.stream()
+				.filter(row -> matchesAssignedCaseQuery(row, query))
+				.sorted(comparator)
+				.map(this::createAssignedCaseCard)
+				.toList();
+		assignedCasesContainer.getChildren().setAll(cards);
+		boolean empty = cards.isEmpty();
+		if (assignedCasesEmptyLabel != null) {
+			assignedCasesEmptyLabel.setVisible(empty);
+			assignedCasesEmptyLabel.setManaged(empty);
+			if (!empty) {
+				assignedCasesEmptyLabel.toBack();
+			} else if (!query.isEmpty()) {
+				assignedCasesEmptyLabel.setText("No assigned cases match your search");
+			} else {
+				assignedCasesEmptyLabel.setText("No assigned cases");
+			}
+		}
+	}
+
+	private String normalizedAssignedCaseQuery() {
+		if (assignedCasesSearchField == null) {
+			return "";
+		}
+		String query = assignedCasesSearchField.getText();
+		return query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+	}
+
+	private Comparator<CaseRow> assignedCasesComparator() {
+		String sortOption = assignedCasesSortChoice == null ? SORT_NAME : assignedCasesSortChoice.getValue();
+		if (SORT_SOL.equals(sortOption)) {
+			return Comparator.comparing(CaseRow::statuteOfLimitationsDate, this::nullsLastDate);
+		}
+		if (SORT_INTAKE.equals(sortOption)) {
+			return Comparator.comparing(CaseRow::intakeDate, this::nullsLastDate).reversed();
+		}
+		return Comparator.comparing(row -> safeText(row.name()), String.CASE_INSENSITIVE_ORDER);
+	}
+
+	private static boolean matchesAssignedCaseQuery(CaseRow row, String query) {
+		if (query == null || query.isEmpty()) {
+			return true;
+		}
+		return safeText(row.name()).toLowerCase(Locale.ROOT).contains(query)
+				|| safeText(row.responsibleAttorneyName()).toLowerCase(Locale.ROOT).contains(query);
+	}
+
+	private int nullsLastDate(LocalDate a, LocalDate b) {
+		if (a == null && b == null) {
+			return 0;
+		}
+		if (a == null) {
+			return 1;
+		}
+		if (b == null) {
+			return -1;
+		}
+		return a.compareTo(b);
+	}
+
+	private void resetAssignedCaseControls() {
+		if (assignedCasesSearchField != null) {
+			assignedCasesSearchField.clear();
+		}
+		if (assignedCasesSortChoice != null) {
+			assignedCasesSortChoice.getSelectionModel().select(SORT_NAME);
+		}
+	}
+
+	private Node createAssignedCaseCard(CaseRow row) {
+		Node card = caseCardFactory.create(new CaseCardModel(
+				Math.toIntExact(row.id()),
+				row.name(),
+				row.intakeDate(),
+				row.statuteOfLimitationsDate(),
+				row.responsibleAttorneyName(),
+				row.responsibleAttorneyColor()));
+		if (card instanceof Region region) {
+			region.setMaxWidth(Double.MAX_VALUE);
+			region.setPrefWidth(300);
+		}
+		return card;
 	}
 
 	private void writeEditorsFromCurrent() {
