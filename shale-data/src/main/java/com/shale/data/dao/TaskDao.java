@@ -51,6 +51,7 @@ public final class TaskDao {
                   t.Id,
                   t.ShaleClientId,
                   t.CaseId,
+                  c.Name AS CaseName,
                   t.Title,
                   t.Description,
                   t.DueAt,
@@ -63,6 +64,9 @@ public final class TaskDao {
                   t.UpdatedAt,
                   t.IsDeleted
                 FROM dbo.Tasks t
+                INNER JOIN dbo.Cases c
+                  ON c.Id = t.CaseId
+                 AND c.ShaleClientId = t.ShaleClientId
                 OUTER APPLY (
                   SELECT TOP (1)
                     ta.UserId,
@@ -105,6 +109,7 @@ public final class TaskDao {
                             rs.getLong("Id"),
                             rs.getInt("ShaleClientId"),
                             rs.getLong("CaseId"),
+                            rs.getString("CaseName"),
                             rs.getString("Title"),
                             rs.getString("Description"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
@@ -141,6 +146,7 @@ public final class TaskDao {
                   t.Id,
                   t.ShaleClientId,
                   t.CaseId,
+                  c.Name AS CaseName,
                   t.Title,
                   t.Description,
                   t.DueAt,
@@ -153,6 +159,9 @@ public final class TaskDao {
                   t.UpdatedAt,
                   t.IsDeleted
                 FROM dbo.Tasks t
+                INNER JOIN dbo.Cases c
+                  ON c.Id = t.CaseId
+                 AND c.ShaleClientId = t.ShaleClientId
                 INNER JOIN dbo.TaskAssignments myAssignment
                   ON myAssignment.TaskId = t.Id
                  AND myAssignment.ShaleClientId = t.ShaleClientId
@@ -200,6 +209,7 @@ public final class TaskDao {
                             rs.getLong("Id"),
                             rs.getInt("ShaleClientId"),
                             rs.getLong("CaseId"),
+                            rs.getString("CaseName"),
                             rs.getString("Title"),
                             rs.getString("Description"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
@@ -235,6 +245,7 @@ public final class TaskDao {
                   t.Id,
                   t.ShaleClientId,
                   t.CaseId,
+                  c.Name AS CaseName,
                   t.Title,
                   t.Description,
                   t.DueAt,
@@ -244,6 +255,9 @@ public final class TaskDao {
                   assignment.DisplayName AS AssignedUserDisplayName,
                   assignment.Color AS AssignedUserColor
                 FROM dbo.Tasks t
+                INNER JOIN dbo.Cases c
+                  ON c.Id = t.CaseId
+                 AND c.ShaleClientId = t.ShaleClientId
                 OUTER APPLY (
                   SELECT TOP (1)
                     ta.UserId,
@@ -279,6 +293,7 @@ public final class TaskDao {
                         rs.getLong("Id"),
                         rs.getInt("ShaleClientId"),
                         rs.getLong("CaseId"),
+                        rs.getString("CaseName"),
                         rs.getString("Title"),
                         rs.getString("Description"),
                         toLocalDateTime(rs.getTimestamp("DueAt")),

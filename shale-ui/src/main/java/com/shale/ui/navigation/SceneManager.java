@@ -233,6 +233,12 @@ public final class SceneManager {
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
 			c.setOnOpenContact(this::openContactProfile);
+			c.setOnOpenCase(relatedCaseId -> {
+				MainController mainController = resolveMainController();
+				if (mainController != null) {
+					mainController.openCase(relatedCaseId);
+				}
+			});
 			c.setOnOpenTask(this::openTaskProfile);
 			c.setOnOpenOrganization(onOpenOrganization);
 			return c;

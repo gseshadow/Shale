@@ -357,6 +357,7 @@ public class CaseController {
 
 	private ContactCardFactory contactCardFactory;
 	private Consumer<Integer> onOpenContact;
+	private Consumer<Integer> onOpenCase;
 
 	private PracticeAreaCardFactory practiceAreaCardFactory;
 	private Consumer<Integer> onOpenPracticeArea;
@@ -468,6 +469,11 @@ public class CaseController {
 	public void setOnOpenContact(Consumer<Integer> onOpenContact) {
 		this.onOpenContact = onOpenContact;
 		this.contactCardFactory = new ContactCardFactory(onOpenContact);
+	}
+
+	public void setOnOpenCase(Consumer<Integer> onOpenCase) {
+		this.onOpenCase = onOpenCase;
+		this.taskCardFactory = buildTaskCardFactory(this::openTask);
 	}
 
 	/** Optional - if you don’t set this, card click will Sys.out for now */
@@ -899,6 +905,8 @@ public class CaseController {
 		for (CaseTaskListItemDto task : caseTasks) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
 					task.id(),
+					task.caseId(),
+					task.caseName(),
 					task.title(),
 					task.description(),
 					task.dueAt(),
@@ -1270,6 +1278,8 @@ public class CaseController {
 		return new TaskCardFactory(
 				onOpenTaskAction,
 				this::onToggleTaskComplete,
+				onOpenCase == null ? id -> {
+				} : onOpenCase,
 				onOpenUser == null ? id -> {
 				} : onOpenUser);
 	}
@@ -1386,6 +1396,8 @@ public class CaseController {
 
 	                TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 	                        detail.id(),
+	                        detail.caseId(),
+	                        detail.caseName(),
 	                        detail.title(),
 	                        detail.description(),
 	                        detail.dueAt(),
@@ -1395,7 +1407,7 @@ public class CaseController {
 	                );
 
 	                Optional<TaskDetailDialog.TaskDetailResult> result =
-	                        TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users);
+	                        TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users, onOpenCase);
 
 	                if (result.isEmpty()) {
 	                    return;

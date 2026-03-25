@@ -14,6 +14,8 @@ public final class TaskCardFactory {
 
     public record TaskCardModel(
             long taskId,
+            Long caseId,
+            String caseName,
             String title,
             String description,
             LocalDateTime dueAt,
@@ -26,14 +28,17 @@ public final class TaskCardFactory {
 
     private final Consumer<Long> onOpenTask;
     private final Consumer<Long> onToggleCompleteTask;
+    private final Consumer<Integer> onOpenCase;
     private final Consumer<Integer> onOpenUser;
 
     public TaskCardFactory(
             Consumer<Long> onOpenTask,
             Consumer<Long> onToggleCompleteTask,
+            Consumer<Integer> onOpenCase,
             Consumer<Integer> onOpenUser) {
         this.onOpenTask = onOpenTask;
         this.onToggleCompleteTask = onToggleCompleteTask;
+        this.onOpenCase = onOpenCase;
         this.onOpenUser = onOpenUser;
     }
 
@@ -44,7 +49,9 @@ public final class TaskCardFactory {
         card.setTaskId(model.taskId());
         card.setOnOpen(onOpenTask);
         card.setOnToggleComplete(onToggleCompleteTask);
+        card.setOnOpenRelatedCase(onOpenCase);
         card.setOnOpenAssigneeUser(onOpenUser);
+        card.setRelatedCase(model.caseId(), model.caseName());
         card.setTitle(model.title());
         card.setDueAt(model.dueAt());
         card.setDescriptionPreview(model.description());
