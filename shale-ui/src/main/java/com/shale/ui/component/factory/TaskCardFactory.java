@@ -16,6 +16,8 @@ public final class TaskCardFactory {
             long taskId,
             Long caseId,
             String caseName,
+            String caseResponsibleAttorney,
+            String caseResponsibleAttorneyColor,
             String title,
             String description,
             LocalDateTime dueAt,
@@ -51,7 +53,11 @@ public final class TaskCardFactory {
         card.setOnToggleComplete(onToggleCompleteTask);
         card.setOnOpenRelatedCase(onOpenCase);
         card.setOnOpenAssigneeUser(onOpenUser);
-        card.setRelatedCase(model.caseId(), model.caseName());
+        card.setRelatedCase(
+                model.caseId(),
+                model.caseName(),
+                model.caseResponsibleAttorney(),
+                model.caseResponsibleAttorneyColor());
         card.setTitle(model.title());
         card.setDueAt(model.dueAt());
         card.setDescriptionPreview(model.description());

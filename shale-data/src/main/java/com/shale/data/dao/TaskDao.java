@@ -19,6 +19,8 @@ import com.shale.core.runtime.DbSessionProvider;
  * DAO for task reads used by case task sections.
  */
 public final class TaskDao {
+    private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+
     public enum MyTaskSort {
         DEFAULT,
         DUE_DATE_ASC,
@@ -52,6 +54,8 @@ public final class TaskDao {
                   t.ShaleClientId,
                   t.CaseId,
                   c.Name AS CaseName,
+                  caseAttorney.DisplayName AS CaseResponsibleAttorney,
+                  caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   t.Title,
                   t.Description,
                   t.DueAt,
@@ -67,6 +71,26 @@ public final class TaskDao {
                 INNER JOIN dbo.Cases c
                   ON c.Id = t.CaseId
                  AND c.ShaleClientId = t.ShaleClientId
+                OUTER APPLY (
+                  SELECT TOP (1)
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName,
+                    u.Color
+                  FROM dbo.CaseUsers cu
+                  INNER JOIN dbo.Users u
+                    ON u.Id = cu.UserId
+                   AND u.ShaleClientId = c.ShaleClientId
+                  WHERE cu.CaseId = c.Id
+                    AND cu.RoleId = ?
+                    AND cu.IsPrimary = 1
+                  ORDER BY
+                    cu.UpdatedAt DESC,
+                    cu.CreatedAt DESC,
+                    cu.Id DESC
+                ) caseAttorney
                 OUTER APPLY (
                   SELECT TOP (1)
                     ta.UserId,
@@ -100,8 +124,9 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setLong(1, caseId);
-            ps.setInt(2, shaleClientId);
+            ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+            ps.setLong(2, caseId);
+            ps.setInt(3, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<CaseTaskListItemDto> out = new ArrayList<>();
                 while (rs.next()) {
@@ -110,6 +135,8 @@ public final class TaskDao {
                             rs.getInt("ShaleClientId"),
                             rs.getLong("CaseId"),
                             rs.getString("CaseName"),
+                            rs.getString("CaseResponsibleAttorney"),
+                            rs.getString("CaseResponsibleAttorneyColor"),
                             rs.getString("Title"),
                             rs.getString("Description"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
@@ -147,6 +174,8 @@ public final class TaskDao {
                   t.ShaleClientId,
                   t.CaseId,
                   c.Name AS CaseName,
+                  caseAttorney.DisplayName AS CaseResponsibleAttorney,
+                  caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   t.Title,
                   t.Description,
                   t.DueAt,
@@ -162,6 +191,26 @@ public final class TaskDao {
                 INNER JOIN dbo.Cases c
                   ON c.Id = t.CaseId
                  AND c.ShaleClientId = t.ShaleClientId
+                OUTER APPLY (
+                  SELECT TOP (1)
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName,
+                    u.Color
+                  FROM dbo.CaseUsers cu
+                  INNER JOIN dbo.Users u
+                    ON u.Id = cu.UserId
+                   AND u.ShaleClientId = c.ShaleClientId
+                  WHERE cu.CaseId = c.Id
+                    AND cu.RoleId = ?
+                    AND cu.IsPrimary = 1
+                  ORDER BY
+                    cu.UpdatedAt DESC,
+                    cu.CreatedAt DESC,
+                    cu.Id DESC
+                ) caseAttorney
                 INNER JOIN dbo.TaskAssignments myAssignment
                   ON myAssignment.TaskId = t.Id
                  AND myAssignment.ShaleClientId = t.ShaleClientId
@@ -200,8 +249,9 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, assignedUserId);
-            ps.setInt(2, shaleClientId);
+            ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+            ps.setInt(2, assignedUserId);
+            ps.setInt(3, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<CaseTaskListItemDto> out = new ArrayList<>();
                 while (rs.next()) {
@@ -210,6 +260,8 @@ public final class TaskDao {
                             rs.getInt("ShaleClientId"),
                             rs.getLong("CaseId"),
                             rs.getString("CaseName"),
+                            rs.getString("CaseResponsibleAttorney"),
+                            rs.getString("CaseResponsibleAttorneyColor"),
                             rs.getString("Title"),
                             rs.getString("Description"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
@@ -246,6 +298,8 @@ public final class TaskDao {
                   t.ShaleClientId,
                   t.CaseId,
                   c.Name AS CaseName,
+                  caseAttorney.DisplayName AS CaseResponsibleAttorney,
+                  caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   t.Title,
                   t.Description,
                   t.DueAt,
@@ -258,6 +312,23 @@ public final class TaskDao {
                 INNER JOIN dbo.Cases c
                   ON c.Id = t.CaseId
                  AND c.ShaleClientId = t.ShaleClientId
+                OUTER APPLY (
+                  SELECT TOP (1)
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName,
+                    u.Color
+                  FROM dbo.CaseUsers cu
+                  INNER JOIN dbo.Users u
+                    ON u.Id = cu.UserId
+                   AND u.ShaleClientId = c.ShaleClientId
+                  WHERE cu.CaseId = c.Id
+                    AND cu.RoleId = ?
+                    AND cu.IsPrimary = 1
+                  ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+                ) caseAttorney
                 OUTER APPLY (
                   SELECT TOP (1)
                     ta.UserId,
@@ -283,8 +354,9 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setLong(1, taskId);
-            ps.setInt(2, shaleClientId);
+            ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+            ps.setLong(2, taskId);
+            ps.setInt(3, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
                     return null;
@@ -294,6 +366,8 @@ public final class TaskDao {
                         rs.getInt("ShaleClientId"),
                         rs.getLong("CaseId"),
                         rs.getString("CaseName"),
+                        rs.getString("CaseResponsibleAttorney"),
+                        rs.getString("CaseResponsibleAttorneyColor"),
                         rs.getString("Title"),
                         rs.getString("Description"),
                         toLocalDateTime(rs.getTimestamp("DueAt")),

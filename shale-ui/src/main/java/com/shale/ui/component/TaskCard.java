@@ -33,6 +33,10 @@ public final class TaskCard extends VBox {
 	private final Label completedLabel = new Label();
 	private final StackPane relatedCaseHost = new StackPane();
 	private final StackPane assigneeHost = new StackPane();
+	private final Label caseSectionLabel = new Label("Case:");
+	private final VBox caseSection = new VBox(3, caseSectionLabel, relatedCaseHost);
+	private final Label teamSectionLabel = new Label("Team:");
+	private final VBox teamSection = new VBox(3, teamSectionLabel, assigneeHost);
 	private final Button toggleCompleteButton = new Button();
 	private final Region actionsSpacer = new Region();
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
@@ -115,8 +119,8 @@ public final class TaskCard extends VBox {
 		String normalized = displayName == null ? "" : displayName.trim();
 		if (userId == null || userId <= 0 || normalized.isBlank()) {
 			assigneeHost.getChildren().clear();
-			assigneeHost.setManaged(false);
-			assigneeHost.setVisible(false);
+			teamSection.setManaged(false);
+			teamSection.setVisible(false);
 			return;
 		}
 
@@ -130,20 +134,20 @@ public final class TaskCard extends VBox {
 			}
 		});
 		assigneeHost.getChildren().setAll(assigneeCard);
-		assigneeHost.setManaged(true);
-		assigneeHost.setVisible(true);
+		teamSection.setManaged(true);
+		teamSection.setVisible(true);
 	}
 
-	public void setRelatedCase(Long caseId, String caseName) {
+	public void setRelatedCase(Long caseId, String caseName, String responsibleAttorney, String responsibleAttorneyColor) {
 		String normalizedName = caseName == null ? "" : caseName.trim();
 		if (caseId == null || caseId <= 0 || normalizedName.isBlank()) {
 			relatedCaseHost.getChildren().clear();
-			relatedCaseHost.setManaged(false);
-			relatedCaseHost.setVisible(false);
+			caseSection.setManaged(false);
+			caseSection.setVisible(false);
 			return;
 		}
 		var caseCard = caseCardFactory.create(
-				new CaseCardModel(caseId, normalizedName, null, null, null, null),
+				new CaseCardModel(caseId, normalizedName, null, null, responsibleAttorney, responsibleAttorneyColor),
 				CaseCardFactory.Variant.MINI);
 		caseCard.setOnMouseClicked(e -> {
 			e.consume();
@@ -152,8 +156,8 @@ public final class TaskCard extends VBox {
 			}
 		});
 		relatedCaseHost.getChildren().setAll(caseCard);
-		relatedCaseHost.setManaged(true);
-		relatedCaseHost.setVisible(true);
+		caseSection.setManaged(true);
+		caseSection.setVisible(true);
 	}
 
 	public void setBackgroundCssColor(String css) {
@@ -173,7 +177,7 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyCompact() {
-		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, relatedCaseHost, assigneeHost, completedLabel, actionsRow);
+		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, caseSection, teamSection, completedLabel, actionsRow);
 		setSpacing(6);
 		setPadding(new Insets(10, 12, 10, 12));
 		setAlignment(Pos.TOP_LEFT);
@@ -184,17 +188,14 @@ public final class TaskCard extends VBox {
 		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
-		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
-		relatedCaseHost.setMaxWidth(Region.USE_PREF_SIZE);
-		assigneeHost.setAlignment(Pos.CENTER_LEFT);
-		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
+		configureRelatedSections();
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
 	}
 
 	public void applyFull() {
-		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, relatedCaseHost, assigneeHost, completedLabel, actionsRow);
+		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, caseSection, teamSection, completedLabel, actionsRow);
 		setSpacing(8);
 		setPadding(new Insets(14, 16, 14, 16));
 		setAlignment(Pos.TOP_LEFT);
@@ -205,10 +206,7 @@ public final class TaskCard extends VBox {
 		dueLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
-		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
-		relatedCaseHost.setMaxWidth(Region.USE_PREF_SIZE);
-		assigneeHost.setAlignment(Pos.CENTER_LEFT);
-		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
+		configureRelatedSections();
 		completedLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
@@ -246,7 +244,16 @@ public final class TaskCard extends VBox {
 			}
 		});
 		setAssignee(null, null, null);
-		setRelatedCase(null, null);
+		setRelatedCase(null, null, null, null);
+	}
+
+	private void configureRelatedSections() {
+		caseSectionLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+		teamSectionLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
+		relatedCaseHost.setMaxWidth(Region.USE_PREF_SIZE);
+		assigneeHost.setAlignment(Pos.CENTER_LEFT);
+		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
 	}
 
 	private void refreshSurfaceStyle() {

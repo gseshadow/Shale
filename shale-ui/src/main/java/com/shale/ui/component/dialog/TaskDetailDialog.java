@@ -100,10 +100,17 @@ public final class TaskDetailDialog {
         VBox relatedCaseSection = new VBox(4);
         String relatedCaseName = safe(model.caseName()).trim();
         if (model.caseId() > 0 && !relatedCaseName.isBlank()) {
-            Label relatedCaseLabel = new Label("Related case");
+            Label relatedCaseLabel = new Label("Case:");
+            relatedCaseLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
             CaseCardFactory caseCardFactory = new CaseCardFactory(onOpenCase);
             var caseCard = caseCardFactory.create(
-                    new CaseCardModel(model.caseId(), relatedCaseName, null, null, null, null),
+                    new CaseCardModel(
+                            model.caseId(),
+                            relatedCaseName,
+                            null,
+                            null,
+                            model.caseResponsibleAttorney(),
+                            model.caseResponsibleAttorneyColor()),
                     CaseCardFactory.Variant.MINI);
             relatedCaseSection.getChildren().setAll(relatedCaseLabel, caseCard);
         } else {
@@ -255,6 +262,8 @@ public final class TaskDetailDialog {
             long taskId,
             long caseId,
             String caseName,
+            String caseResponsibleAttorney,
+            String caseResponsibleAttorneyColor,
             String title,
             String description,
             LocalDateTime dueAt,
