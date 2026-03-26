@@ -22,14 +22,11 @@ import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -46,7 +43,7 @@ public final class OrganizationController {
 	@FXML private Button deleteOrganizationButton;
 	@FXML private HBox remoteUpdateBanner;
 	@FXML private Button reloadRemoteButton;
-	@FXML private FlowPane relatedCasesFlow;
+	@FXML private VBox relatedCasesContainer;
 	@FXML private Label relatedCasesEmptyLabel;
 	@FXML private Button addCaseButton;
 
@@ -277,38 +274,6 @@ public final class OrganizationController {
 				Platform.runLater(() -> setError("Failed to link case to organization."));
 			}
 		});
-	}
-
-	private void onRemoveCase(OrganizationDao.RelatedCaseRow row) {
-		if (row == null || organizationDao == null || organizationId == null) {
-			return;
-		}
-
-		if (!confirmUnlink(row)) {
-			return;
-		}
-
-		dbExec.submit(() -> {
-			try {
-				organizationDao.unlinkCaseFromOrganization(organizationId, row.id());
-				Platform.runLater(() -> {
-					clearError();
-					loadRelatedCasesSafe();
-				});
-			} catch (Exception ex) {
-				Platform.runLater(() -> setError("Failed to remove case from organization."));
-			}
-		});
-	}
-
-	private boolean confirmUnlink(OrganizationDao.RelatedCaseRow row) {
-		return AppDialogs.showConfirmation(
-				dialogOwner(addCaseButton),
-				"Remove Case",
-				"Remove this case from the organization?",
-				fallback(row.name()) + " (#" + row.id() + ")",
-				"Remove Case",
-				AppDialogs.DialogActionKind.DANGER);
 	}
 
 	private void onEdit() {
@@ -623,7 +588,7 @@ public final class OrganizationController {
 			return;
 		}
 
-		if (relatedCasesFlow == null) {
+		if (relatedCasesContainer == null) {
 			return;
 		}
 
@@ -635,7 +600,7 @@ public final class OrganizationController {
 				.map(this::createRelatedCaseCardContainer)
 				.toList();
 
-		relatedCasesFlow.getChildren().setAll(cards);
+		relatedCasesContainer.getChildren().setAll(cards);
 
 		boolean empty = cards.isEmpty();
 		if (relatedCasesEmptyLabel != null) {
@@ -644,7 +609,7 @@ public final class OrganizationController {
 			if (empty) {
 				relatedCasesEmptyLabel.toFront();
 			} else {
-				relatedCasesFlow.toFront();
+				relatedCasesContainer.toFront();
 			}
 		}
 	}
@@ -658,18 +623,11 @@ public final class OrganizationController {
 				row.responsibleAttorneyName(),
 				row.responsibleAttorneyColor()
 		));
-
-		Button removeButton = new Button("Remove");
-		removeButton.getStyleClass().add("button-secondary");
-		removeButton.setOnAction(e -> onRemoveCase(row));
-
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox actions = new HBox(8, spacer, removeButton);
-
-		VBox container = new VBox(6, card, actions);
-		container.setPrefWidth(280);
-		return container;
+		if (card instanceof Region region) {
+			region.setMaxWidth(Double.MAX_VALUE);
+			region.setPrefWidth(330);
+		}
+		return card;
 	}
 
 	private void setEditMode(boolean enabled) {
