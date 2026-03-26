@@ -3887,7 +3887,12 @@ public class CaseController {
 			{
 				try {
 					List<CaseDao.UserRow> users = caseDao.listAttorneysForTenant(tenantId);
-					runOnFx(() -> handleResponsibleAttorneyLoaded(users));
+					java.util.Set<Integer> attorneyIds = caseDao.listAttorneyUserIdsForTenant(tenantId);
+					List<CaseDao.UserRow> attorneyUsers = (users == null ? List.<CaseDao.UserRow>of() : users).stream()
+							.filter(java.util.Objects::nonNull)
+							.filter(u -> attorneyIds.contains(u.id()))
+							.toList();
+					runOnFx(() -> handleResponsibleAttorneyLoaded(attorneyUsers));
 				} catch (Exception ex) {
 					runOnFx(() ->
 					{
