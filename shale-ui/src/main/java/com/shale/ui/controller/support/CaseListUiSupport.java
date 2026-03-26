@@ -40,7 +40,10 @@ public final class CaseListUiSupport {
 	}
 
 	public static Set<Integer> defaultSelectedStatuses() {
-		return new LinkedHashSet<>(STATUS_FILTER_OPTIONS.keySet());
+		Set<Integer> defaults = new LinkedHashSet<>(STATUS_FILTER_OPTIONS.keySet());
+		defaults.remove(STATUS_CLOSED);
+		defaults.remove(STATUS_DENIED);
+		return defaults;
 	}
 
 	public static void initializeStatusFilterMenu(MenuButton statusFilterMenuButton,
