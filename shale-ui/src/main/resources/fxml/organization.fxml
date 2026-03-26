@@ -128,7 +128,11 @@
                     </HBox>
                     <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
                         <StackPane>
-                            <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
+                            <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308">
+                                <padding>
+                                    <Insets right="8" />
+                                </padding>
+                            </VBox>
                             <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
                         </StackPane>
                     </ScrollPane>
