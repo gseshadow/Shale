@@ -27,7 +27,6 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -46,7 +45,7 @@ public final class OrganizationController {
 	@FXML private Button deleteOrganizationButton;
 	@FXML private HBox remoteUpdateBanner;
 	@FXML private Button reloadRemoteButton;
-	@FXML private FlowPane relatedCasesFlow;
+	@FXML private VBox relatedCasesContainer;
 	@FXML private Label relatedCasesEmptyLabel;
 	@FXML private Button addCaseButton;
 
@@ -623,7 +622,7 @@ public final class OrganizationController {
 			return;
 		}
 
-		if (relatedCasesFlow == null) {
+		if (relatedCasesContainer == null) {
 			return;
 		}
 
@@ -635,7 +634,7 @@ public final class OrganizationController {
 				.map(this::createRelatedCaseCardContainer)
 				.toList();
 
-		relatedCasesFlow.getChildren().setAll(cards);
+		relatedCasesContainer.getChildren().setAll(cards);
 
 		boolean empty = cards.isEmpty();
 		if (relatedCasesEmptyLabel != null) {
@@ -644,7 +643,7 @@ public final class OrganizationController {
 			if (empty) {
 				relatedCasesEmptyLabel.toFront();
 			} else {
-				relatedCasesFlow.toFront();
+				relatedCasesContainer.toFront();
 			}
 		}
 	}
@@ -668,7 +667,11 @@ public final class OrganizationController {
 		HBox actions = new HBox(8, spacer, removeButton);
 
 		VBox container = new VBox(6, card, actions);
-		container.setPrefWidth(280);
+		container.setMaxWidth(Double.MAX_VALUE);
+		if (card instanceof Region region) {
+			region.setMaxWidth(Double.MAX_VALUE);
+			region.setPrefWidth(340);
+		}
 		return container;
 	}
 
