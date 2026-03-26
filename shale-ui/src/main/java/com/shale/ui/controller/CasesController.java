@@ -333,7 +333,7 @@ public final class CasesController {
 		dbExec.submit(() ->
 		{
 			try {
-				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort());
+				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort(), true);
 
 				// map DAO rows into UI VM
 				List<CaseCardVm> newItems = page.items().stream()

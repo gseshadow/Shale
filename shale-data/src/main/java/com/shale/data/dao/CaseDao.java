@@ -844,11 +844,6 @@ public final class CaseDao {
 				  ON u.id = ra.UserId
 				WHERE %s
 				  AND c.ShaleClientId = ?
-				  AND (
-				    ? = 1
-				    OR current_status.CurrentStatusName IS NULL
-				    OR LOWER(current_status.CurrentStatusName) NOT IN ('closed', 'denied')
-				  )
 				  %s
 				ORDER BY
 				  %s
@@ -860,7 +855,6 @@ public final class CaseDao {
 				int idx = 1;
 				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(idx++, shaleClientId);
-				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
 				StringBuilder traceParams = new StringBuilder()
 						.append("raRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY)
 						.append(" shaleClientId=").append(shaleClientId)
@@ -979,11 +973,6 @@ public final class CaseDao {
 				) current_status
 				WHERE %s
 				  AND c.ShaleClientId = ?
-				  AND (
-				    ? = 1
-				    OR current_status.CurrentStatusName IS NULL
-				    OR LOWER(current_status.CurrentStatusName) NOT IN ('closed', 'denied')
-				  )
 				  %s;
 				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter);
 
@@ -991,7 +980,6 @@ public final class CaseDao {
 				int shaleClientId = requireCurrentShaleClientId(con);
 				int idx = 1;
 				ps.setInt(idx++, shaleClientId);
-				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
 				StringBuilder traceParams = new StringBuilder()
 						.append("shaleClientId=").append(shaleClientId)
 						.append("includeClosedDeniedFlag=").append(includeClosedDenied ? 1 : 0);
