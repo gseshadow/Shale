@@ -312,6 +312,7 @@ public final class SceneManager {
 	}
 
 	public void openUserProfile(Integer userId) {
+		System.out.println("[TRACE ASSIGNED_CASES][SceneManager.openUserProfile] selectedUserId=" + userId);
 		if (userId == null || userId <= 0) {
 			System.err.println("Ignoring user navigation for invalid userId: " + userId);
 			return;

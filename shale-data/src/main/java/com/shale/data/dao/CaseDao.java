@@ -500,7 +500,9 @@ public final class CaseDao {
 			return List.of();
 		}
 		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
-				+ "selectedUserId=" + userId
+				+ "daoQueryMethodName=listActiveCasesForUserTeamMember "
+				+ " daoInputUserId=" + userId
+				+ " selectedUserId=" + userId
 				+ " limit=" + limit);
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
@@ -591,7 +593,7 @@ public final class CaseDao {
 						+ " shaleClientId=" + shaleClientId
 						+ " roleId=" + ROLE_RESPONSIBLE_ATTORNEY
 						+ " isPrimary=1"
-						+ " daoResultCount=" + out.size());
+						+ " daoTotalRowsReturned=" + out.size());
 				return out;
 			}
 		} catch (SQLException e) {

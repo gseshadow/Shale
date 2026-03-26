@@ -12,7 +12,7 @@ import com.shale.data.dao.UserDao.UserRoleRow;
 
 public final class UserDetailService {
 
-	private static final int ASSIGNED_CASES_LIMIT = 25;
+	private static final int ASSIGNED_CASES_LIMIT = Integer.MAX_VALUE;
 
 	private final UserDao userDao;
 	private final CaseDao caseDao;
@@ -48,12 +48,13 @@ public final class UserDetailService {
 
 	public List<CaseRow> loadAssignedCases(int userId) {
 		System.out.println("[TRACE ASSIGNED_CASES][UserDetailService.loadAssignedCases] "
+				+ "daoMethod=listActiveCasesForUserTeamMember "
 				+ "selectedUserId=" + userId
 				+ " limit=" + ASSIGNED_CASES_LIMIT);
 		List<CaseRow> rows = caseDao.listActiveCasesForUserTeamMember(userId, ASSIGNED_CASES_LIMIT);
 		System.out.println("[TRACE ASSIGNED_CASES][UserDetailService.loadAssignedCases] "
 				+ "selectedUserId=" + userId
-				+ " daoResultCount=" + (rows == null ? 0 : rows.size()));
+				+ " serviceRowsReceived=" + (rows == null ? 0 : rows.size()));
 		return rows;
 	}
 }
