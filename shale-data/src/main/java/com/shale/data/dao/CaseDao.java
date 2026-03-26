@@ -795,8 +795,6 @@ public final class CaseDao {
 				    FROM %s cu_scope
 				    WHERE cu_scope.CaseId = c.Id
 				      AND cu_scope.UserId = ?
-				      AND cu_scope.RoleId = ?
-				      AND cu_scope.IsPrimary = 1
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
@@ -862,9 +860,8 @@ public final class CaseDao {
 						.append(" includeClosedDeniedFlag=").append(includeClosedDenied ? 1 : 0);
 				if (restrictToUserId != null) {
 					ps.setInt(idx++, restrictToUserId);
-					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 					traceParams.append(" restrictToUserId=").append(restrictToUserId)
-							.append(" restrictRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY);
+							.append(" restrictByAnyCaseUserMembership=true");
 				}
 				ps.setInt(idx++, offset);
 				ps.setInt(idx++, pageSize);
@@ -951,8 +948,6 @@ public final class CaseDao {
 				    FROM %s cu_scope
 				    WHERE cu_scope.CaseId = c.Id
 				      AND cu_scope.UserId = ?
-				      AND cu_scope.RoleId = ?
-				      AND cu_scope.IsPrimary = 1
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
@@ -986,9 +981,8 @@ public final class CaseDao {
 						.append("includeClosedDeniedFlag=").append(includeClosedDenied ? 1 : 0);
 				if (restrictToUserId != null) {
 					ps.setInt(idx++, restrictToUserId);
-					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 					traceParams.append(" restrictToUserId=").append(restrictToUserId)
-							.append(" restrictRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY);
+							.append(" restrictByAnyCaseUserMembership=true");
 				}
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.countAll] "
 						+ "restrictToUserId=" + restrictToUserId
