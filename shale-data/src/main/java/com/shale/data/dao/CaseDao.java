@@ -689,6 +689,8 @@ public final class CaseDao {
 				    FROM %s cu_scope
 				    WHERE cu_scope.CaseId = c.Id
 				      AND cu_scope.UserId = ?
+				      AND cu_scope.RoleId = ?
+				      AND cu_scope.IsPrimary = 1
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
@@ -753,6 +755,7 @@ public final class CaseDao {
 				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
 				if (restrictToUserId != null) {
 					ps.setInt(idx++, restrictToUserId);
+					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				}
 				ps.setInt(idx++, offset);
 				ps.setInt(idx++, pageSize);
@@ -830,6 +833,8 @@ public final class CaseDao {
 				    FROM %s cu_scope
 				    WHERE cu_scope.CaseId = c.Id
 				      AND cu_scope.UserId = ?
+				      AND cu_scope.RoleId = ?
+				      AND cu_scope.IsPrimary = 1
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
@@ -863,6 +868,7 @@ public final class CaseDao {
 				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
 				if (restrictToUserId != null) {
 					ps.setInt(idx++, restrictToUserId);
+					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				}
 
 				try (ResultSet rs = ps.executeQuery()) {
