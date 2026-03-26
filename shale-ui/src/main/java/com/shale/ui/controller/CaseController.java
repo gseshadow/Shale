@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -3540,13 +3541,19 @@ public class CaseController {
 				}
 
 				persistRelationshipChanges(request, computation);
+				updated = populateLifecycleDateForSavedStatusIfMissing(
+						request.saveCaseId(),
+						resolveSavedPrimaryStatusId(request),
+						request.tenantId(),
+						updated);
 				boolean teamChanged = persistTeamChanges(request);
 
 				CaseOverviewDto updatedOverview = caseDao.getOverview(request.saveCaseId());
 				String importantChangesNote = buildImportantOverviewChangesNote(request, updatedOverview, teamChanged);
 				persistImportantChangesNote(request, importantChangesNote);
+				CaseDetailDto updatedForUi = updated;
 
-				runOnFx(() -> finalizeSuccessfulSave(request, updated, computation, teamChanged, importantChangesNote));
+				runOnFx(() -> finalizeSuccessfulSave(request, updatedForUi, computation, teamChanged, importantChangesNote));
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
@@ -3554,6 +3561,13 @@ public class CaseController {
 					setBusy(false);
 				});
 			}
+		}
+
+		private Integer resolveSavedPrimaryStatusId(SaveRequest request) {
+			if (request.desired().desiredStatusId() != null)
+				return request.desired().desiredStatusId();
+			CaseOverviewDto baseOverview = request.baseline().baseOverview();
+			return baseOverview == null ? null : baseOverview.getPrimaryStatusId();
 		}
 
 		private SaveComputation computeChangeSet(SaveRequest request) {
@@ -4938,6 +4952,12 @@ public class CaseController {
 			String deniedDetail = normalizeNullableText(source.deniedDetail);
 			String summary = normalizeNullableText(source.summary);
 			String receivedUpdates = toNullableBooleanStorage(source.receivedUpdates);
+			LifecycleDates lifecycleDates = withLifecycleAutopopulatedDates(
+					source.primaryStatusId,
+					(appState == null ? null : appState.getShaleClientId()),
+					source.acceptedDate,
+					source.closedDate,
+					source.deniedDate);
 
 			boolean statusChanged = !Objects.equals(source.primaryStatusId, currentOverview == null ? null : currentOverview.getPrimaryStatusId());
 			boolean changed =
@@ -4948,9 +4968,9 @@ public class CaseController {
 				!Objects.equals(description, normalizeNullableText(baseline.getDescription())) ||
 				!Objects.equals(source.callerDate, baseline.getCallerDate()) ||
 				!Objects.equals(callerTime, normalizeCallerTimeInput(normalizeCallerTimeDisplay(baseline.getCallerTime()))) ||
-				!Objects.equals(source.acceptedDate, baseline.getAcceptedDate()) ||
-				!Objects.equals(source.closedDate, baseline.getClosedDate()) ||
-				!Objects.equals(source.deniedDate, baseline.getDeniedDate()) ||
+				!Objects.equals(lifecycleDates.acceptedDate(), baseline.getAcceptedDate()) ||
+				!Objects.equals(lifecycleDates.closedDate(), baseline.getClosedDate()) ||
+				!Objects.equals(lifecycleDates.deniedDate(), baseline.getDeniedDate()) ||
 				!Objects.equals(source.dateOfMedicalNegligence, baseline.getDateOfMedicalNegligence()) ||
 				!Objects.equals(source.dateMedicalNegligenceWasDiscovered, baseline.getDateMedicalNegligenceWasDiscovered()) ||
 				!Objects.equals(source.dateOfInjury, baseline.getDateOfInjury()) ||
@@ -4982,9 +5002,9 @@ public class CaseController {
 				description,
 				source.callerDate,
 				callerTime,
-				source.acceptedDate,
-				source.closedDate,
-				source.deniedDate,
+				lifecycleDates.acceptedDate(),
+				lifecycleDates.closedDate(),
+				lifecycleDates.deniedDate(),
 				source.dateOfMedicalNegligence,
 				source.dateMedicalNegligenceWasDiscovered,
 				source.dateOfInjury,
@@ -5020,6 +5040,71 @@ public class CaseController {
 		private String normalizeRequired(String value) {
 			return safeText(value).trim();
 		}
+	}
+
+	private CaseDetailDto populateLifecycleDateForSavedStatusIfMissing(
+			long caseId,
+			Integer savedStatusId,
+			Integer tenantId,
+			CaseDetailDto snapshot) {
+		if (caseDao == null || savedStatusId == null || tenantId == null || tenantId <= 0)
+			return snapshot;
+
+		LifecycleDates before = new LifecycleDates(
+				snapshot == null ? null : snapshot.getAcceptedDate(),
+				snapshot == null ? null : snapshot.getClosedDate(),
+				snapshot == null ? null : snapshot.getDeniedDate());
+		LifecycleDates after = withLifecycleAutopopulatedDates(
+				savedStatusId,
+				tenantId,
+				before.acceptedDate(),
+				before.closedDate(),
+				before.deniedDate());
+		if (Objects.equals(before, after))
+			return snapshot;
+
+		caseDao.populateLifecycleDateIfNull(caseId, resolvePrimaryStatusLifecycleKey(savedStatusId, tenantId));
+		return caseDao.getDetail(caseId);
+	}
+
+	private LifecycleDates withLifecycleAutopopulatedDates(
+			Integer savedStatusId,
+			Integer tenantId,
+			LocalDate acceptedDate,
+			LocalDate closedDate,
+			LocalDate deniedDate) {
+		String lifecycleKey = resolvePrimaryStatusLifecycleKey(savedStatusId, tenantId);
+		LocalDate today = LocalDate.now();
+		LocalDate effectiveAcceptedDate = acceptedDate;
+		LocalDate effectiveClosedDate = closedDate;
+		LocalDate effectiveDeniedDate = deniedDate;
+		if ("accepted".equals(lifecycleKey) && effectiveAcceptedDate == null)
+			effectiveAcceptedDate = today;
+		if ("closed".equals(lifecycleKey) && effectiveClosedDate == null)
+			effectiveClosedDate = today;
+		if ("denied".equals(lifecycleKey) && effectiveDeniedDate == null)
+			effectiveDeniedDate = today;
+		return new LifecycleDates(effectiveAcceptedDate, effectiveClosedDate, effectiveDeniedDate);
+	}
+
+	private String resolvePrimaryStatusLifecycleKey(Integer savedStatusId, Integer tenantId) {
+		if (caseDao == null || savedStatusId == null || tenantId == null || tenantId <= 0)
+			return null;
+		List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+		if (statuses == null || statuses.isEmpty())
+			return null;
+		for (CaseDao.StatusRow status : statuses) {
+			if (status == null || status.id() != savedStatusId)
+				continue;
+			String normalized = safeText(status.name()).trim().toLowerCase(Locale.ROOT);
+			if ("accepted".equals(normalized) || "closed".equals(normalized) || "denied".equals(normalized))
+				return normalized;
+			return null;
+		}
+		return null;
+	}
+
+	private record LifecycleDates(LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate) {
 	}
 
 	private record DetailsSaveRequest(

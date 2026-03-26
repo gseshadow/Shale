@@ -12,6 +12,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -2497,7 +2498,6 @@ public final class CaseDao {
 				  BEGIN TRAN;
 
 				  DECLARE @now datetime2 = SYSDATETIME();
-				  DECLARE @today date = CAST(@now AS date);
 				  DECLARE @oldPrimaryStatusId int = (
 				    SELECT TOP 1 cs.StatusId
 				    FROM dbo.CaseStatuses cs
@@ -2523,34 +2523,6 @@ public final class CaseDao {
 				    VALUES
 				        (?, ?, @now, NULL, ?, @now, @now, 1);
 
-				    DECLARE @newPrimaryStatusName varchar(200) = (
-				      SELECT TOP 1 s.Name
-				      FROM dbo.Statuses s
-				      WHERE s.Id = ?
-				    );
-				    DECLARE @normalizedStatusName varchar(200) = LOWER(LTRIM(RTRIM(COALESCE(@newPrimaryStatusName, ''))));
-
-				    UPDATE dbo.Cases
-				    SET AcceptedDate = CASE
-				                          WHEN @normalizedStatusName = 'accepted' AND AcceptedDate IS NULL THEN @today
-				                          ELSE AcceptedDate
-				                       END,
-				        DeniedDate = CASE
-				                        WHEN @normalizedStatusName = 'denied' AND DeniedDate IS NULL THEN @today
-				                        ELSE DeniedDate
-				                     END,
-				        ClosedDate = CASE
-				                        WHEN @normalizedStatusName = 'closed' AND ClosedDate IS NULL THEN @today
-				                        ELSE ClosedDate
-				                     END,
-				        UpdatedAt = CASE
-				                      WHEN (@normalizedStatusName = 'accepted' AND AcceptedDate IS NULL)
-				                        OR (@normalizedStatusName = 'denied' AND DeniedDate IS NULL)
-				                        OR (@normalizedStatusName = 'closed' AND ClosedDate IS NULL)
-				                      THEN @now
-				                      ELSE UpdatedAt
-				                    END
-				    WHERE Id = ?;
 				  END
 
 				  COMMIT;
@@ -2571,12 +2543,46 @@ public final class CaseDao {
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, statusId);
 			ps.setString(i++, (notes == null || notes.isBlank()) ? null : notes.trim());
-			ps.setInt(i++, statusId);
-			ps.setLong(i++, caseId);
 
 			ps.executeUpdate();
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to set primary status (caseId=" + caseId + ", statusId=" + statusId + ")", e);
+		}
+	}
+
+	public void populateLifecycleDateIfNull(long caseId, String normalizedStatusName) {
+		String normalized = (normalizedStatusName == null) ? "" : normalizedStatusName.trim().toLowerCase(Locale.ROOT);
+		if (!"accepted".equals(normalized) && !"denied".equals(normalized) && !"closed".equals(normalized))
+			return;
+
+		String sql = """
+				UPDATE dbo.Cases
+				SET AcceptedDate = CASE WHEN ? = 'accepted' AND AcceptedDate IS NULL THEN CAST(SYSDATETIME() AS date) ELSE AcceptedDate END,
+				    DeniedDate = CASE WHEN ? = 'denied' AND DeniedDate IS NULL THEN CAST(SYSDATETIME() AS date) ELSE DeniedDate END,
+				    ClosedDate = CASE WHEN ? = 'closed' AND ClosedDate IS NULL THEN CAST(SYSDATETIME() AS date) ELSE ClosedDate END,
+				    UpdatedAt = CASE
+				                  WHEN (? = 'accepted' AND AcceptedDate IS NULL)
+				                    OR (? = 'denied' AND DeniedDate IS NULL)
+				                    OR (? = 'closed' AND ClosedDate IS NULL)
+				                  THEN SYSDATETIME()
+				                  ELSE UpdatedAt
+				                END
+				WHERE Id = ?;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			ps.setString(i++, normalized);
+			ps.setString(i++, normalized);
+			ps.setString(i++, normalized);
+			ps.setString(i++, normalized);
+			ps.setString(i++, normalized);
+			ps.setString(i++, normalized);
+			ps.setLong(i++, caseId);
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to populate lifecycle date (caseId=" + caseId + ", status=" + normalized + ")", e);
 		}
 	}
 
