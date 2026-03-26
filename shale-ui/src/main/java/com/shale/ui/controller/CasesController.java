@@ -395,7 +395,8 @@ public final class CasesController {
 				.sorted(comp)
 				.toList();
 
-		if (!q.isEmpty() && filtered.size() < pageSize && hasMore && !loading) {
+		boolean statusFilterActive = selectedStatusIds.size() < CaseListUiSupport.STATUS_FILTER_OPTIONS.size();
+		if (( !q.isEmpty() || statusFilterActive ) && filtered.size() < pageSize && hasMore && !loading) {
 			loadNextPage();
 		}
 
