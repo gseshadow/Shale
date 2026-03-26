@@ -2768,6 +2768,7 @@ public final class CaseDao {
 				  u.Color
 				FROM dbo.Users u
 				WHERE u.ShaleClientId = ?
+				  AND COALESCE(u.is_attorney, 0) = 1
 				  AND NULLIF(LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
