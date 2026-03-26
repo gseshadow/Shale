@@ -89,6 +89,7 @@ public final class UserController {
 	private List<UserRoleRow> assignedRoles = List.of();
 	private List<UserRoleRow> assignableRoles = List.of();
 	private List<CaseRow> assignedCases = List.of();
+	private long assignedCasesRefreshSequence;
 	private boolean editMode;
 	private boolean colorEditedInSession;
 
@@ -109,6 +110,7 @@ public final class UserController {
 		this.runtimeBridge = runtimeBridge;
 		this.onOpenCase = onOpenCase;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
+		System.out.println("[TRACE ASSIGNED_CASES][UserController.init] selectedUserId=" + userId);
 	}
 
 	@FXML
@@ -258,20 +260,32 @@ public final class UserController {
 			return;
 		}
 		final int targetUserId = currentUser.id();
+		final long requestId = ++assignedCasesRefreshSequence;
 		final String targetUserName = safeText(currentUser.displayName());
 		final String targetUserEmail = safeText(currentUser.email());
 		System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
-				+ "selectedUserId=" + targetUserId
+				+ "requestId=" + requestId
+				+ " selectedUserId=" + targetUserId
 				+ " selectedUserName=\"" + targetUserName + "\""
 				+ " selectedUserEmail=\"" + targetUserEmail + "\"");
 		dbExec.submit(() -> {
 			try {
 				List<CaseRow> loaded = userDetailService.loadAssignedCases(targetUserId);
 				Platform.runLater(() -> {
+					if (requestId != assignedCasesRefreshSequence) {
+						System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
+								+ "requestId=" + requestId
+								+ " selectedUserId=" + targetUserId
+								+ " staleResultDiscard=true");
+						return;
+					}
 					assignedCases = loaded == null ? List.of() : List.copyOf(loaded);
 					System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
-							+ "selectedUserId=" + targetUserId
-							+ " daoResultCount=" + assignedCases.size());
+							+ "requestId=" + requestId
+							+ " selectedUserId=" + targetUserId
+							+ " controllerRowsReceived=" + assignedCases.size()
+							+ " asyncRefreshReplacement=true"
+							+ " staleResultDiscard=false");
 					renderAssignedCases();
 				});
 			} catch (Exception ex) {
@@ -532,6 +546,19 @@ public final class UserController {
 		}
 		String query = normalizedAssignedCaseQuery();
 		Comparator<CaseRow> comparator = assignedCasesComparator();
+		boolean hasTextSearchFilter = !query.isEmpty();
+		boolean hasStatusFilterAfterDao = false;
+		boolean sortCurrentPageOnly = true;
+		boolean paginationTruncationAfterDao = false;
+		boolean clientSideAttorneyOrNameFilter = hasTextSearchFilter;
+		System.out.println("[TRACE ASSIGNED_CASES][UserController.renderAssignedCases] "
+				+ "selectedUserId=" + (currentUser == null ? null : currentUser.id())
+				+ " renderInputRowCount=" + assignedCases.size()
+				+ " textSearchFilterApplied=" + hasTextSearchFilter
+				+ " statusFilterApplied=" + hasStatusFilterAfterDao
+				+ " sortOnlyCurrentPageLogicApplied=" + sortCurrentPageOnly
+				+ " paginationTruncationApplied=" + paginationTruncationAfterDao
+				+ " clientSideFilterByResponsibleAttorneyNameOrIdApplied=" + clientSideAttorneyOrNameFilter);
 		List<Node> cards = assignedCases.stream()
 				.filter(row -> CaseListFilterSortSupport.matchesQuery(query, row.name(), row.responsibleAttorneyName()))
 				.sorted(comparator)
@@ -543,6 +570,9 @@ public final class UserController {
 				+ " query=\"" + query + "\""
 				+ " renderedCardCount=" + cards.size());
 		assignedCasesContainer.getChildren().setAll(cards);
+		System.out.println("[TRACE ASSIGNED_CASES][UserController.renderAssignedCases] "
+				+ "selectedUserId=" + (currentUser == null ? null : currentUser.id())
+				+ " finalCardCountDisplayed=" + assignedCasesContainer.getChildren().size());
 		boolean empty = cards.isEmpty();
 		if (assignedCasesEmptyLabel != null) {
 			assignedCasesEmptyLabel.setVisible(empty);
