@@ -2493,25 +2493,72 @@ public final class CaseDao {
 
 	public void setPrimaryStatus(long caseId, int statusId, String notes) {
 		String sql = """
-				BEGIN TRAN;
+				BEGIN TRY
+				  BEGIN TRAN;
 
-				DECLARE @now datetime2 = SYSDATETIME();
+				  DECLARE @now datetime2 = SYSDATETIME();
+				  DECLARE @today date = CAST(@now AS date);
+				  DECLARE @oldPrimaryStatusId int = (
+				    SELECT TOP 1 cs.StatusId
+				    FROM dbo.CaseStatuses cs
+				    WHERE cs.CaseId = ?
+				      AND cs.EndDate IS NULL
+				      AND cs.IsPrimary = 1
+				    ORDER BY cs.EffectiveDate DESC, cs.Id DESC
+				  );
 
-				-- End any active statuses and clear primary
-				UPDATE dbo.CaseStatuses
-				SET EndDate   = @now,
-				    IsPrimary = 0,
-				    UpdatedAt = @now
-				WHERE CaseId = ?
-				  AND EndDate IS NULL;
+				  IF (@oldPrimaryStatusId IS NULL OR @oldPrimaryStatusId <> ?)
+				  BEGIN
+				    -- End any active statuses and clear primary
+				    UPDATE dbo.CaseStatuses
+				    SET EndDate   = @now,
+				        IsPrimary = 0,
+				        UpdatedAt = @now
+				    WHERE CaseId = ?
+				      AND EndDate IS NULL;
 
-				-- Insert new active primary status row
-				INSERT INTO dbo.CaseStatuses
-				    (CaseId, StatusId, EffectiveDate, EndDate, Notes, CreatedAt, UpdatedAt, IsPrimary)
-				VALUES
-				    (?, ?, @now, NULL, ?, @now, @now, 1);
+				    -- Insert new active primary status row
+				    INSERT INTO dbo.CaseStatuses
+				        (CaseId, StatusId, EffectiveDate, EndDate, Notes, CreatedAt, UpdatedAt, IsPrimary)
+				    VALUES
+				        (?, ?, @now, NULL, ?, @now, @now, 1);
 
-				COMMIT;
+				    DECLARE @newPrimaryStatusName varchar(200) = (
+				      SELECT TOP 1 s.Name
+				      FROM dbo.Statuses s
+				      WHERE s.Id = ?
+				    );
+				    DECLARE @normalizedStatusName varchar(200) = LOWER(LTRIM(RTRIM(COALESCE(@newPrimaryStatusName, ''))));
+
+				    UPDATE dbo.Cases
+				    SET AcceptedDate = CASE
+				                          WHEN @normalizedStatusName = 'accepted' AND AcceptedDate IS NULL THEN @today
+				                          ELSE AcceptedDate
+				                       END,
+				        DeniedDate = CASE
+				                        WHEN @normalizedStatusName = 'denied' AND DeniedDate IS NULL THEN @today
+				                        ELSE DeniedDate
+				                     END,
+				        ClosedDate = CASE
+				                        WHEN @normalizedStatusName = 'closed' AND ClosedDate IS NULL THEN @today
+				                        ELSE ClosedDate
+				                     END,
+				        UpdatedAt = CASE
+				                      WHEN (@normalizedStatusName = 'accepted' AND AcceptedDate IS NULL)
+				                        OR (@normalizedStatusName = 'denied' AND DeniedDate IS NULL)
+				                        OR (@normalizedStatusName = 'closed' AND ClosedDate IS NULL)
+				                      THEN @now
+				                      ELSE UpdatedAt
+				                    END
+				    WHERE Id = ?;
+				  END
+
+				  COMMIT;
+				END TRY
+				BEGIN CATCH
+				  IF @@TRANCOUNT > 0 ROLLBACK;
+				  THROW;
+				END CATCH;
 				""";
 
 		try (Connection con = db.requireConnection();
@@ -2519,14 +2566,15 @@ public final class CaseDao {
 
 			int i = 1;
 			ps.setLong(i++, caseId);
+			ps.setInt(i++, statusId);
+			ps.setLong(i++, caseId);
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, statusId);
 			ps.setString(i++, (notes == null || notes.isBlank()) ? null : notes.trim());
+			ps.setInt(i++, statusId);
+			ps.setLong(i++, caseId);
 
-			int rows = ps.executeUpdate();
-			if (rows != 1) {
-				throw new RuntimeException("Unexpected insert row count for case update (caseId=" + caseId + "): " + rows);
-			}
+			ps.executeUpdate();
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to set primary status (caseId=" + caseId + ", statusId=" + statusId + ")", e);
 		}
