@@ -8,6 +8,7 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
+import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.state.AppState;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserDetailService;
@@ -29,10 +30,8 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Window;
 
-import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -40,9 +39,6 @@ import java.util.function.Consumer;
 public final class UserController {
 
 	private static final Color DEFAULT_USER_COLOR = Color.WHITE;
-	private static final String SORT_NAME = "Name";
-	private static final String SORT_INTAKE = "Date of Intake";
-	private static final String SORT_SOL = "Statute of Limitations Date";
 	private static final String COLOR_SWATCH_BASE_STYLE = "-fx-min-width: 22px; -fx-pref-width: 22px; -fx-max-width: 22px; "
 			+ "-fx-min-height: 22px; -fx-pref-height: 22px; -fx-max-height: 22px; "
 			+ "-fx-background-radius: 11px; -fx-border-radius: 11px; "
@@ -129,14 +125,7 @@ public final class UserController {
 		if (addRoleButton != null) {
 			addRoleButton.setOnAction(e -> onAddRole());
 		}
-		if (assignedCasesSortChoice != null) {
-			assignedCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
-			assignedCasesSortChoice.getSelectionModel().select(SORT_NAME);
-			assignedCasesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderAssignedCases());
-		}
-		if (assignedCasesSearchField != null) {
-			assignedCasesSearchField.textProperty().addListener((obs, oldV, newV) -> renderAssignedCases());
-		}
+		CaseListFilterSortSupport.initializeControls(assignedCasesSearchField, assignedCasesSortChoice, this::renderAssignedCases);
 		configureColorEditor();
 
 		setEditMode(false);
@@ -533,7 +522,7 @@ public final class UserController {
 		String query = normalizedAssignedCaseQuery();
 		Comparator<CaseRow> comparator = assignedCasesComparator();
 		List<Node> cards = assignedCases.stream()
-				.filter(row -> matchesAssignedCaseQuery(row, query))
+				.filter(row -> CaseListFilterSortSupport.matchesQuery(query, row.name(), row.responsibleAttorneyName()))
 				.sorted(comparator)
 				.map(this::createAssignedCaseCard)
 				.toList();
@@ -553,52 +542,19 @@ public final class UserController {
 	}
 
 	private String normalizedAssignedCaseQuery() {
-		if (assignedCasesSearchField == null) {
-			return "";
-		}
-		String query = assignedCasesSearchField.getText();
-		return query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+		return CaseListFilterSortSupport.normalizedQuery(assignedCasesSearchField);
 	}
 
 	private Comparator<CaseRow> assignedCasesComparator() {
-		String sortOption = assignedCasesSortChoice == null ? SORT_NAME : assignedCasesSortChoice.getValue();
-		if (SORT_SOL.equals(sortOption)) {
-			return Comparator.comparing(CaseRow::statuteOfLimitationsDate, this::nullsLastDate);
-		}
-		if (SORT_INTAKE.equals(sortOption)) {
-			return Comparator.comparing(CaseRow::intakeDate, this::nullsLastDate).reversed();
-		}
-		return Comparator.comparing(row -> safeText(row.name()), String.CASE_INSENSITIVE_ORDER);
-	}
-
-	private static boolean matchesAssignedCaseQuery(CaseRow row, String query) {
-		if (query == null || query.isEmpty()) {
-			return true;
-		}
-		return safeText(row.name()).toLowerCase(Locale.ROOT).contains(query)
-				|| safeText(row.responsibleAttorneyName()).toLowerCase(Locale.ROOT).contains(query);
-	}
-
-	private int nullsLastDate(LocalDate a, LocalDate b) {
-		if (a == null && b == null) {
-			return 0;
-		}
-		if (a == null) {
-			return 1;
-		}
-		if (b == null) {
-			return -1;
-		}
-		return a.compareTo(b);
+		return CaseListFilterSortSupport.comparator(
+				assignedCasesSortChoice,
+				CaseRow::name,
+				CaseRow::intakeDate,
+				CaseRow::statuteOfLimitationsDate);
 	}
 
 	private void resetAssignedCaseControls() {
-		if (assignedCasesSearchField != null) {
-			assignedCasesSearchField.clear();
-		}
-		if (assignedCasesSortChoice != null) {
-			assignedCasesSortChoice.getSelectionModel().select(SORT_NAME);
-		}
+		CaseListFilterSortSupport.resetControls(assignedCasesSearchField, assignedCasesSortChoice);
 	}
 
 	private Node createAssignedCaseCard(CaseRow row) {
