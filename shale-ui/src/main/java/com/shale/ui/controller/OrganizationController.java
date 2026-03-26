@@ -2,8 +2,8 @@ package com.shale.ui.controller;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -11,9 +11,9 @@ import java.util.function.Consumer;
 import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.dialog.AppDialogs;
-import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 
@@ -22,14 +22,12 @@ import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -46,9 +44,10 @@ public final class OrganizationController {
 	@FXML private Button deleteOrganizationButton;
 	@FXML private HBox remoteUpdateBanner;
 	@FXML private Button reloadRemoteButton;
-	@FXML private FlowPane relatedCasesFlow;
+	@FXML private VBox relatedCasesContainer;
 	@FXML private Label relatedCasesEmptyLabel;
-	@FXML private Button addCaseButton;
+	@FXML private TextField relatedCasesSearchField;
+	@FXML private ChoiceBox<String> relatedCasesSortChoice;
 
 	@FXML private Label nameValue;
 	@FXML private TextField nameEditor;
@@ -132,9 +131,7 @@ public final class OrganizationController {
 		if (reloadRemoteButton != null) {
 			reloadRemoteButton.setOnAction(e -> onReloadRemote());
 		}
-		if (addCaseButton != null) {
-			addCaseButton.setOnAction(e -> onAddCase());
-		}
+		CaseListFilterSortSupport.initializeControls(relatedCasesSearchField, relatedCasesSortChoice, this::renderRelatedCases);
 
 		if (typeEditor != null) {
 			typeEditor.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
@@ -193,6 +190,7 @@ public final class OrganizationController {
 
 					currentOrganization = loaded;
 					organizationTypeOptions = loadedTypeOptions == null ? List.of() : loadedTypeOptions;
+					resetRelatedCaseControls();
 					renderFromCurrent();
 					clearError();
 					loadRelatedCasesSafe();
@@ -228,87 +226,6 @@ public final class OrganizationController {
 				});
 			}
 		});
-	}
-
-	private void onAddCase() {
-		if (organizationDao == null || organizationId == null || addCaseButton == null) {
-			return;
-		}
-
-		Window owner = addCaseButton.getScene() == null ? null : addCaseButton.getScene().getWindow();
-		dbExec.submit(() -> {
-			try {
-				List<OrganizationDao.SelectableCaseRow> selectable = organizationDao.findLinkableCases(organizationId);
-				Platform.runLater(() -> showAddCasePicker(owner, selectable));
-			} catch (Exception ex) {
-				Platform.runLater(() -> setError("Failed to load cases for linking."));
-			}
-		});
-	}
-
-	private void showAddCasePicker(Window owner, List<OrganizationDao.SelectableCaseRow> selectable) {
-		List<OrganizationDao.SelectableCaseRow> options = selectable == null ? List.of() : selectable;
-		if (options.isEmpty()) {
-			setError("No available cases to link.");
-			return;
-		}
-
-		ContactPickerDialog<OrganizationDao.SelectableCaseRow> picker = new ContactPickerDialog<>(
-				owner,
-				"Add Case",
-				options,
-				row -> row == null ? "" : fallback(row.name()) + " (#" + row.id() + ")",
-				null);
-
-		Optional<OrganizationDao.SelectableCaseRow> selected = picker.showAndWait();
-		if (selected.isEmpty()) {
-			return;
-		}
-
-		OrganizationDao.SelectableCaseRow chosen = selected.get();
-		dbExec.submit(() -> {
-			try {
-				organizationDao.linkCaseToOrganization(organizationId, chosen.id());
-				Platform.runLater(() -> {
-					clearError();
-					loadRelatedCasesSafe();
-				});
-			} catch (Exception ex) {
-				Platform.runLater(() -> setError("Failed to link case to organization."));
-			}
-		});
-	}
-
-	private void onRemoveCase(OrganizationDao.RelatedCaseRow row) {
-		if (row == null || organizationDao == null || organizationId == null) {
-			return;
-		}
-
-		if (!confirmUnlink(row)) {
-			return;
-		}
-
-		dbExec.submit(() -> {
-			try {
-				organizationDao.unlinkCaseFromOrganization(organizationId, row.id());
-				Platform.runLater(() -> {
-					clearError();
-					loadRelatedCasesSafe();
-				});
-			} catch (Exception ex) {
-				Platform.runLater(() -> setError("Failed to remove case from organization."));
-			}
-		});
-	}
-
-	private boolean confirmUnlink(OrganizationDao.RelatedCaseRow row) {
-		return AppDialogs.showConfirmation(
-				dialogOwner(addCaseButton),
-				"Remove Case",
-				"Remove this case from the organization?",
-				fallback(row.name()) + " (#" + row.id() + ")",
-				"Remove Case",
-				AppDialogs.DialogActionKind.DANGER);
 	}
 
 	private void onEdit() {
@@ -623,19 +540,27 @@ public final class OrganizationController {
 			return;
 		}
 
-		if (relatedCasesFlow == null) {
+		if (relatedCasesContainer == null) {
 			return;
 		}
 
 		if (caseCardFactory == null) {
 			caseCardFactory = new CaseCardFactory(onOpenCase);
 		}
+		String query = CaseListFilterSortSupport.normalizedQuery(relatedCasesSearchField);
+		Comparator<OrganizationDao.RelatedCaseRow> comparator = CaseListFilterSortSupport.comparator(
+				relatedCasesSortChoice,
+				OrganizationDao.RelatedCaseRow::name,
+				OrganizationDao.RelatedCaseRow::intakeDate,
+				OrganizationDao.RelatedCaseRow::statuteOfLimitationsDate);
 
 		List<Node> cards = relatedCases.stream()
+				.filter(row -> CaseListFilterSortSupport.matchesQuery(query, row.name(), row.responsibleAttorneyName()))
+				.sorted(comparator)
 				.map(this::createRelatedCaseCardContainer)
 				.toList();
 
-		relatedCasesFlow.getChildren().setAll(cards);
+		relatedCasesContainer.getChildren().setAll(cards);
 
 		boolean empty = cards.isEmpty();
 		if (relatedCasesEmptyLabel != null) {
@@ -643,8 +568,13 @@ public final class OrganizationController {
 			relatedCasesEmptyLabel.setManaged(empty);
 			if (empty) {
 				relatedCasesEmptyLabel.toFront();
+				if (!query.isEmpty()) {
+					relatedCasesEmptyLabel.setText("No related cases match your search");
+				} else {
+					relatedCasesEmptyLabel.setText("No related cases");
+				}
 			} else {
-				relatedCasesFlow.toFront();
+				relatedCasesContainer.toFront();
 			}
 		}
 	}
@@ -658,18 +588,15 @@ public final class OrganizationController {
 				row.responsibleAttorneyName(),
 				row.responsibleAttorneyColor()
 		));
+		if (card instanceof Region region) {
+			region.setMaxWidth(Double.MAX_VALUE);
+			region.setPrefWidth(330);
+		}
+		return card;
+	}
 
-		Button removeButton = new Button("Remove");
-		removeButton.getStyleClass().add("button-secondary");
-		removeButton.setOnAction(e -> onRemoveCase(row));
-
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox actions = new HBox(8, spacer, removeButton);
-
-		VBox container = new VBox(6, card, actions);
-		container.setPrefWidth(280);
-		return container;
+	private void resetRelatedCaseControls() {
+		CaseListFilterSortSupport.resetControls(relatedCasesSearchField, relatedCasesSortChoice);
 	}
 
 	private void setEditMode(boolean enabled) {
