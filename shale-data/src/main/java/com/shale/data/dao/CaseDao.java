@@ -483,6 +483,12 @@ public final class CaseDao {
 		if (userId <= 0) {
 			throw new IllegalArgumentException("userId must be > 0");
 		}
+		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findMyCasesPage] "
+				+ "restrictToUserId=" + userId
+				+ " page=" + page
+				+ " pageSize=" + pageSize
+				+ " sort=" + sort
+				+ " includeClosedDenied=" + includeClosedDenied);
 		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId);
 	}
 
@@ -493,7 +499,104 @@ public final class CaseDao {
 		if (limit <= 0) {
 			return List.of();
 		}
-		return findMyCasesPage(userId, 0, limit, CaseSort.INTAKE_NEWEST, false).items();
+		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
+				+ "selectedUserId=" + userId
+				+ " limit=" + limit);
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			int shaleClientId = requireCurrentShaleClientId(con);
+			String sql = """
+					SELECT TOP (?)
+					  c.Id,
+					  c.Name,
+					  c.CallerDate,
+					  c.StatuteOfLimitations,
+					  current_status.PrimaryStatusId,
+					  ra.UserId AS ResponsibleAttorneyId,
+					  u.color AS ResponsibleAttorneyColor,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS ResponsibleAttorneyName
+					FROM %s c
+					OUTER APPLY (
+					    SELECT TOP (1) s.Id AS PrimaryStatusId
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					OUTER APPLY (
+					    SELECT TOP (1) cu.UserId
+					    FROM %s cu
+					    WHERE cu.CaseId = c.Id
+					      AND cu.RoleId = ?
+					      AND cu.IsPrimary = 1
+					    ORDER BY
+					      cu.UpdatedAt DESC,
+					      cu.CreatedAt DESC,
+					      cu.Id DESC
+					) ra
+					LEFT JOIN %s u
+					  ON u.id = ra.UserId
+					WHERE %s
+					  AND c.ShaleClientId = ?
+					  AND EXISTS (
+					    SELECT 1
+					    FROM %s cu_scope
+					    WHERE cu_scope.CaseId = c.Id
+					      AND cu_scope.UserId = ?
+					      AND cu_scope.RoleId = ?
+					      AND cu_scope.IsPrimary = 1
+					  )
+					ORDER BY c.CallerDate DESC, c.Id DESC;
+					""".formatted(
+							CASES_TABLE,
+							CASE_STATUSES_TABLE,
+							STATUSES_TABLE,
+							CASE_USERS_TABLE,
+							USERS_TABLE,
+							activeFilter(schema.deletedColumn(), "c"),
+							CASE_USERS_TABLE);
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setInt(idx++, limit);
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, shaleClientId);
+				ps.setInt(idx++, userId);
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+
+				List<CaseRow> out = new ArrayList<>();
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						out.add(new CaseRow(
+								rs.getLong("Id"),
+								rs.getString("Name"),
+								toLocalDate(rs.getDate("CallerDate")),
+								toLocalDate(rs.getDate("StatuteOfLimitations")),
+								getNullableInt(rs, "PrimaryStatusId"),
+								getNullableInt(rs, "ResponsibleAttorneyId"),
+								rs.getString("ResponsibleAttorneyName"),
+								rs.getString("ResponsibleAttorneyColor")));
+					}
+				}
+				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
+						+ "selectedUserId=" + userId
+						+ " shaleClientId=" + shaleClientId
+						+ " roleId=" + ROLE_RESPONSIBLE_ATTORNEY
+						+ " isPrimary=1"
+						+ " daoResultCount=" + out.size());
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list assigned cases for responsible attorney user (userId=" + userId + ")", e);
+		}
 	}
 
 	public List<CaseRow> searchCasesByName(String query) {
@@ -689,6 +792,8 @@ public final class CaseDao {
 				    FROM %s cu_scope
 				    WHERE cu_scope.CaseId = c.Id
 				      AND cu_scope.UserId = ?
+				      AND cu_scope.RoleId = ?
+				      AND cu_scope.IsPrimary = 1
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
@@ -736,6 +841,7 @@ public final class CaseDao {
 				LEFT JOIN %s u
 				  ON u.id = ra.UserId
 				WHERE %s
+				  AND c.ShaleClientId = ?
 				  AND (
 				    ? = 1
 				    OR current_status.CurrentStatusName IS NULL
@@ -748,14 +854,28 @@ public final class CaseDao {
 				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter, orderByClause);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int shaleClientId = requireCurrentShaleClientId(con);
 				int idx = 1;
 				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
+				StringBuilder traceParams = new StringBuilder()
+						.append("raRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY)
+						.append(" shaleClientId=").append(shaleClientId)
+						.append(" includeClosedDeniedFlag=").append(includeClosedDenied ? 1 : 0);
 				if (restrictToUserId != null) {
 					ps.setInt(idx++, restrictToUserId);
+					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+					traceParams.append(" restrictToUserId=").append(restrictToUserId)
+							.append(" restrictRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY);
 				}
 				ps.setInt(idx++, offset);
 				ps.setInt(idx++, pageSize);
+				traceParams.append(" offset=").append(offset)
+						.append(" pageSize=").append(pageSize);
+				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findPageInternal] "
+						+ "restrictToUserId=" + restrictToUserId
+						+ " sqlParams={" + traceParams + "}");
 
 				try (ResultSet rs = ps.executeQuery()) {
 					while (rs.next()) {
@@ -772,6 +892,10 @@ public final class CaseDao {
 					}
 				}
 			}
+			System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findPageInternal] "
+					+ "restrictToUserId=" + restrictToUserId
+					+ " resultCount=" + out.size()
+					+ " total=" + total);
 
 			return new PagedResult<>(out, page, pageSize, total);
 		} catch (SQLException e) {
@@ -830,6 +954,8 @@ public final class CaseDao {
 				    FROM %s cu_scope
 				    WHERE cu_scope.CaseId = c.Id
 				      AND cu_scope.UserId = ?
+				      AND cu_scope.RoleId = ?
+				      AND cu_scope.IsPrimary = 1
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
@@ -850,6 +976,7 @@ public final class CaseDao {
 				      cs.Id DESC
 				) current_status
 				WHERE %s
+				  AND c.ShaleClientId = ?
 				  AND (
 				    ? = 1
 				    OR current_status.CurrentStatusName IS NULL
@@ -859,15 +986,30 @@ public final class CaseDao {
 				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int shaleClientId = requireCurrentShaleClientId(con);
 				int idx = 1;
+				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
+				StringBuilder traceParams = new StringBuilder()
+						.append("shaleClientId=").append(shaleClientId)
+						.append("includeClosedDeniedFlag=").append(includeClosedDenied ? 1 : 0);
 				if (restrictToUserId != null) {
 					ps.setInt(idx++, restrictToUserId);
+					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+					traceParams.append(" restrictToUserId=").append(restrictToUserId)
+							.append(" restrictRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY);
 				}
+				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.countAll] "
+						+ "restrictToUserId=" + restrictToUserId
+						+ " sqlParams={" + traceParams + "}");
 
 				try (ResultSet rs = ps.executeQuery()) {
 					rs.next();
-					return rs.getLong(1);
+					long count = rs.getLong(1);
+					System.out.println("[TRACE ASSIGNED_CASES][CaseDao.countAll] "
+							+ "restrictToUserId=" + restrictToUserId
+							+ " count=" + count);
+					return count;
 				}
 			}
 		} catch (SQLException e) {

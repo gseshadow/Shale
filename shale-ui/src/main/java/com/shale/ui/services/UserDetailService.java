@@ -47,6 +47,13 @@ public final class UserDetailService {
 	}
 
 	public List<CaseRow> loadAssignedCases(int userId) {
-		return caseDao.listActiveCasesForUserTeamMember(userId, ASSIGNED_CASES_LIMIT);
+		System.out.println("[TRACE ASSIGNED_CASES][UserDetailService.loadAssignedCases] "
+				+ "selectedUserId=" + userId
+				+ " limit=" + ASSIGNED_CASES_LIMIT);
+		List<CaseRow> rows = caseDao.listActiveCasesForUserTeamMember(userId, ASSIGNED_CASES_LIMIT);
+		System.out.println("[TRACE ASSIGNED_CASES][UserDetailService.loadAssignedCases] "
+				+ "selectedUserId=" + userId
+				+ " daoResultCount=" + (rows == null ? 0 : rows.size()));
+		return rows;
 	}
 }

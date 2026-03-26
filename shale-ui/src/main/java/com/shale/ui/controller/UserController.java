@@ -252,15 +252,26 @@ public final class UserController {
 	private void refreshAssignedCasesAsync() {
 		if (userDetailService == null || currentUser == null) {
 			assignedCases = List.of();
+			System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
+					+ "userDetailServiceOrCurrentUserMissing=true");
 			renderAssignedCases();
 			return;
 		}
 		final int targetUserId = currentUser.id();
+		final String targetUserName = safeText(currentUser.displayName());
+		final String targetUserEmail = safeText(currentUser.email());
+		System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
+				+ "selectedUserId=" + targetUserId
+				+ " selectedUserName=\"" + targetUserName + "\""
+				+ " selectedUserEmail=\"" + targetUserEmail + "\"");
 		dbExec.submit(() -> {
 			try {
 				List<CaseRow> loaded = userDetailService.loadAssignedCases(targetUserId);
 				Platform.runLater(() -> {
 					assignedCases = loaded == null ? List.of() : List.copyOf(loaded);
+					System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
+							+ "selectedUserId=" + targetUserId
+							+ " daoResultCount=" + assignedCases.size());
 					renderAssignedCases();
 				});
 			} catch (Exception ex) {
@@ -526,6 +537,11 @@ public final class UserController {
 				.sorted(comparator)
 				.map(this::createAssignedCaseCard)
 				.toList();
+		System.out.println("[TRACE ASSIGNED_CASES][UserController.renderAssignedCases] "
+				+ "selectedUserId=" + (currentUser == null ? null : currentUser.id())
+				+ " rawAssignedCases=" + assignedCases.size()
+				+ " query=\"" + query + "\""
+				+ " renderedCardCount=" + cards.size());
 		assignedCasesContainer.getChildren().setAll(cards);
 		boolean empty = cards.isEmpty();
 		if (assignedCasesEmptyLabel != null) {
