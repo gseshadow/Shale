@@ -483,6 +483,12 @@ public final class CaseDao {
 		if (userId <= 0) {
 			throw new IllegalArgumentException("userId must be > 0");
 		}
+		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findMyCasesPage] "
+				+ "restrictToUserId=" + userId
+				+ " page=" + page
+				+ " pageSize=" + pageSize
+				+ " sort=" + sort
+				+ " includeClosedDenied=" + includeClosedDenied);
 		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId);
 	}
 
@@ -493,7 +499,14 @@ public final class CaseDao {
 		if (limit <= 0) {
 			return List.of();
 		}
-		return findMyCasesPage(userId, 0, limit, CaseSort.INTAKE_NEWEST, false).items();
+		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
+				+ "selectedUserId=" + userId
+				+ " limit=" + limit);
+		List<CaseRow> rows = findMyCasesPage(userId, 0, limit, CaseSort.INTAKE_NEWEST, false).items();
+		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
+				+ "selectedUserId=" + userId
+				+ " daoResultCount=" + rows.size());
+		return rows;
 	}
 
 	public List<CaseRow> searchCasesByName(String query) {
@@ -689,6 +702,8 @@ public final class CaseDao {
 				    FROM %s cu_scope
 				    WHERE cu_scope.CaseId = c.Id
 				      AND cu_scope.UserId = ?
+				      AND cu_scope.RoleId = ?
+				      AND cu_scope.IsPrimary = 1
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
@@ -736,6 +751,7 @@ public final class CaseDao {
 				LEFT JOIN %s u
 				  ON u.id = ra.UserId
 				WHERE %s
+				  AND c.ShaleClientId = ?
 				  AND (
 				    ? = 1
 				    OR current_status.CurrentStatusName IS NULL
@@ -748,14 +764,28 @@ public final class CaseDao {
 				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter, orderByClause);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int shaleClientId = requireCurrentShaleClientId(con);
 				int idx = 1;
 				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
+				StringBuilder traceParams = new StringBuilder()
+						.append("raRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY)
+						.append(" shaleClientId=").append(shaleClientId)
+						.append(" includeClosedDeniedFlag=").append(includeClosedDenied ? 1 : 0);
 				if (restrictToUserId != null) {
 					ps.setInt(idx++, restrictToUserId);
+					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+					traceParams.append(" restrictToUserId=").append(restrictToUserId)
+							.append(" restrictRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY);
 				}
 				ps.setInt(idx++, offset);
 				ps.setInt(idx++, pageSize);
+				traceParams.append(" offset=").append(offset)
+						.append(" pageSize=").append(pageSize);
+				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findPageInternal] "
+						+ "restrictToUserId=" + restrictToUserId
+						+ " sqlParams={" + traceParams + "}");
 
 				try (ResultSet rs = ps.executeQuery()) {
 					while (rs.next()) {
@@ -772,6 +802,10 @@ public final class CaseDao {
 					}
 				}
 			}
+			System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findPageInternal] "
+					+ "restrictToUserId=" + restrictToUserId
+					+ " resultCount=" + out.size()
+					+ " total=" + total);
 
 			return new PagedResult<>(out, page, pageSize, total);
 		} catch (SQLException e) {
@@ -830,6 +864,8 @@ public final class CaseDao {
 				    FROM %s cu_scope
 				    WHERE cu_scope.CaseId = c.Id
 				      AND cu_scope.UserId = ?
+				      AND cu_scope.RoleId = ?
+				      AND cu_scope.IsPrimary = 1
 				  )
 				""".formatted(CASE_USERS_TABLE);
 
@@ -850,6 +886,7 @@ public final class CaseDao {
 				      cs.Id DESC
 				) current_status
 				WHERE %s
+				  AND c.ShaleClientId = ?
 				  AND (
 				    ? = 1
 				    OR current_status.CurrentStatusName IS NULL
@@ -859,15 +896,30 @@ public final class CaseDao {
 				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int shaleClientId = requireCurrentShaleClientId(con);
 				int idx = 1;
+				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, includeClosedDenied ? 1 : 0);
+				StringBuilder traceParams = new StringBuilder()
+						.append("shaleClientId=").append(shaleClientId)
+						.append("includeClosedDeniedFlag=").append(includeClosedDenied ? 1 : 0);
 				if (restrictToUserId != null) {
 					ps.setInt(idx++, restrictToUserId);
+					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+					traceParams.append(" restrictToUserId=").append(restrictToUserId)
+							.append(" restrictRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY);
 				}
+				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.countAll] "
+						+ "restrictToUserId=" + restrictToUserId
+						+ " sqlParams={" + traceParams + "}");
 
 				try (ResultSet rs = ps.executeQuery()) {
 					rs.next();
-					return rs.getLong(1);
+					long count = rs.getLong(1);
+					System.out.println("[TRACE ASSIGNED_CASES][CaseDao.countAll] "
+							+ "restrictToUserId=" + restrictToUserId
+							+ " count=" + count);
+					return count;
 				}
 			}
 		} catch (SQLException e) {
