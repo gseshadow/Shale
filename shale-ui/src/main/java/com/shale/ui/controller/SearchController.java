@@ -180,7 +180,7 @@ public final class SearchController {
 		updateLoadingState(true);
 		dbExec.submit(() -> {
 			try {
-				SearchService.SearchResults results = searchService.searchAll(tenantId, trimmedQuery, canRestoreDeletedCases());
+				SearchService.SearchResults results = searchService.searchAll(tenantId, trimmedQuery, canViewDeletedCasesInSearch());
 				Platform.runLater(() -> {
 					if (generationAtSubmit != loadGeneration) {
 						return;
@@ -212,7 +212,7 @@ public final class SearchController {
 	}
 
 	private void renderDeletedCases(List<CaseDao.CaseRow> deletedCases) {
-		boolean authorized = canRestoreDeletedCases();
+		boolean authorized = canViewDeletedCasesInSearch();
 		if (deletedCasesSection != null) {
 			deletedCasesSection.setVisible(authorized);
 			deletedCasesSection.setManaged(authorized);
@@ -371,6 +371,10 @@ public final class SearchController {
 
 	private boolean canRestoreDeletedCases() {
 		return caseDetailService != null && caseDetailService.canRestoreCase();
+	}
+
+	private boolean canViewDeletedCasesInSearch() {
+		return caseDetailService != null && caseDetailService.canViewDeletedCasesInSearch();
 	}
 
 	private void publishDeletedStateUpdate(long caseId, int deletedValue) {

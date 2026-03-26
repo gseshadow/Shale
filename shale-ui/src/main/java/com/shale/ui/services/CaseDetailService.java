@@ -27,6 +27,10 @@ public final class CaseDetailService {
         return canManageDeletedCases();
     }
 
+    public boolean canViewDeletedCasesInSearch() {
+        return appState.isAdmin();
+    }
+
     public boolean softDeleteCase(long caseId, Integer shaleClientId) {
         if (!canDeleteCase()) {
             throw new IllegalStateException("Only admin and attorney users can delete cases.");
