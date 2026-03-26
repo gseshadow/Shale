@@ -115,9 +115,9 @@
                     </GridPane>
                 </VBox>
 
-                <VBox prefWidth="460" minWidth="400" maxWidth="560" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
+                <VBox prefWidth="460" minWidth="400" maxWidth="560" maxHeight="1.7976931348623157E308" spacing="8" styleClass="secondary-panel">
                     <padding>
-                        <Insets top="12" right="12" bottom="12" left="12" />
+                        <Insets top="10" right="10" bottom="10" left="10" />
                     </padding>
                     <HBox spacing="8" alignment="CENTER_LEFT">
                         <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
@@ -126,7 +126,7 @@
                     </HBox>
                     <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
                         <StackPane>
-                            <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
+                            <VBox fx:id="relatedCasesContainer" spacing="8" fillWidth="true" maxWidth="1.7976931348623157E308" />
                             <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
                         </StackPane>
                     </ScrollPane>
