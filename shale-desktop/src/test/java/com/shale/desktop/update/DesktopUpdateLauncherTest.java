@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -36,7 +37,7 @@ final class DesktopUpdateLauncherTest {
 	}
 
 	@Test
-	void buildMacLaunchCommandUsesSelfContainedUpdaterJar(@TempDir Path tempDir) throws IOException {
+	void buildMacLaunchCommandUsesDetachedShellHelper(@TempDir Path tempDir) throws IOException {
 		Path installDir = tempDir.resolve("Shale.app");
 		Path javaBinary = installDir.resolve("Contents").resolve("runtime").resolve("Contents").resolve("Home").resolve("bin").resolve("java");
 		Path libDir = installDir.resolve("Contents").resolve("app").resolve("lib");
@@ -48,14 +49,17 @@ final class DesktopUpdateLauncherTest {
 		Files.writeString(javaBinary, "java");
 		Files.writeString(updaterJar, "jar");
 
-		ProcessBuilder pb = DesktopUpdateLauncher.buildMacLaunchCommand(installDir, "1.0.13", updaterLog);
-
-		assertEquals(List.of(
-				javaBinary.toString(),
-				"-jar",
-				updaterJar.toString(),
-				"--currentVersion", "1.0.13",
-				"--installDir", installDir.toString()), pb.command());
+		DesktopUpdateLauncher.LaunchPlan launchPlan = DesktopUpdateLauncher.buildMacLaunchCommand(installDir, "1.0.13", updaterLog);
+		ProcessBuilder pb = launchPlan.processBuilder();
+		assertEquals(List.of("/bin/sh", launchPlan.macHelperScript().toString()), pb.command());
 		assertEquals(Path.of("/").toFile(), pb.directory());
+		assertEquals(Path.of("/"), launchPlan.helperWorkingDirectory());
+
+		String helperScript = Files.readString(launchPlan.macHelperScript(), StandardCharsets.UTF_8);
+		assertTrue(helperScript.contains("cd '/'"));
+		assertTrue(helperScript.contains("nohup "));
+		assertTrue(helperScript.contains("'--currentVersion' '1.0.13'"));
+		assertTrue(helperScript.contains("'--installDir' '" + installDir + "'"));
+		assertTrue(helperScript.contains("'" + updaterLog + "' 2>&1 < /dev/null &"));
 	}
 }
