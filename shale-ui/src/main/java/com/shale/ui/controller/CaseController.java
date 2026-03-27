@@ -15,6 +15,7 @@ import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
@@ -142,6 +143,12 @@ public class CaseController {
 	private Label organizationsEmptyLabel;
 	@FXML
 	private Button addOrganizationButton;
+	@FXML
+	private ScrollPane timelineScrollPane;
+	@FXML
+	private VBox timelineListBox;
+	@FXML
+	private Label timelineEmptyLabel;
 
 	@FXML
 	private Label ovCaseStatusValue;
@@ -699,6 +706,7 @@ public class CaseController {
 		switch (sectionName) {
 		case "Overview" -> showOverview();
 		case "Tasks" -> showTasksTab();
+		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
 		case "Contacts" -> showContacts();
 		case "Organizations" -> showOrganizations();
@@ -769,10 +777,109 @@ public class CaseController {
 		setVisibleManaged(organizationsScrollPane, false);
 		setVisibleManaged(organizationsFlow, false);
 		setVisibleManaged(organizationsEmptyLabel, false);
+		setVisibleManaged(timelineScrollPane, false);
+		setVisibleManaged(timelineListBox, false);
+		setVisibleManaged(timelineEmptyLabel, false);
 
 		if (placeholderTextArea != null) {
 			placeholderTextArea.setText(sectionName + " view is not implemented yet.");
 		}
+	}
+
+	private void showTimeline() {
+		setUpdatesPaneVisible(false);
+		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, true);
+		setPaneVisible(tasksPanel, false);
+
+		if (genericTitleLabel != null)
+			genericTitleLabel.setText("Timeline");
+
+		setVisibleManaged(addOrganizationButton, false);
+		setVisibleManaged(placeholderTextArea, false);
+		setVisibleManaged(organizationsScrollPane, false);
+		setVisibleManaged(organizationsFlow, false);
+		setVisibleManaged(organizationsEmptyLabel, false);
+		setVisibleManaged(timelineScrollPane, true);
+		setVisibleManaged(timelineListBox, true);
+		setVisibleManaged(timelineEmptyLabel, false);
+		loadCaseTimelineEventsAsync();
+	}
+
+	private void loadCaseTimelineEventsAsync() {
+		if (caseDao == null || caseId == null) {
+			renderTimelineEvents(List.of());
+			return;
+		}
+
+		final int activeCaseId = caseId;
+		new Thread(() -> {
+			try {
+				List<CaseTimelineEventDto> events = caseDao.listCaseTimelineEvents(activeCaseId);
+				runOnFx(() -> {
+					if (caseId == null || caseId != activeCaseId)
+						return;
+					renderTimelineEvents(events);
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to load timeline events. " + ex.getMessage()));
+			}
+		}, "case-timeline-load-" + activeCaseId).start();
+	}
+
+	private void renderTimelineEvents(List<CaseTimelineEventDto> events) {
+		if (timelineListBox == null)
+			return;
+
+		timelineListBox.getChildren().clear();
+		List<CaseTimelineEventDto> safeEvents = events == null ? List.of() : events;
+		if (safeEvents.isEmpty()) {
+			setVisibleManaged(timelineEmptyLabel, true);
+			if (timelineScrollPane != null)
+				timelineScrollPane.setVvalue(0.0);
+			return;
+		}
+
+		setVisibleManaged(timelineEmptyLabel, false);
+		for (CaseTimelineEventDto event : safeEvents) {
+			if (event == null)
+				continue;
+			timelineListBox.getChildren().add(createTimelineEventCard(event));
+		}
+		if (timelineScrollPane != null)
+			timelineScrollPane.setVvalue(0.0);
+	}
+
+	private Node createTimelineEventCard(CaseTimelineEventDto event) {
+		Label titleLabel = new Label(safeText(event.getTitle()));
+		titleLabel.setStyle("-fx-font-weight: bold;");
+		titleLabel.setWrapText(true);
+
+		Label actorLabel = new Label(safeText(event.getActorDisplayName()));
+		actorLabel.setStyle("-fx-opacity: 0.85;");
+
+		Label timestampLabel = new Label(formatDateTime(event.getOccurredAt()));
+		timestampLabel.setStyle("-fx-opacity: 0.75;");
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox metaRow = new HBox(8, actorLabel, spacer, timestampLabel);
+		metaRow.setAlignment(Pos.CENTER_LEFT);
+
+		VBox content = new VBox(6, titleLabel, metaRow);
+		String body = safeText(event.getBody()).trim();
+		if (!body.isBlank()) {
+			Label bodyLabel = new Label(body);
+			bodyLabel.setWrapText(true);
+			content.getChildren().add(bodyLabel);
+		}
+
+		VBox card = new VBox(content);
+		card.setPadding(new Insets(10, 12, 10, 12));
+		card.getStyleClass().add("secondary-panel");
+		return card;
 	}
 
 
@@ -792,6 +899,9 @@ public class CaseController {
 			addOrganizationButton.setText("Add Contact");
 		}
 		setVisibleManaged(placeholderTextArea, false);
+		setVisibleManaged(timelineScrollPane, false);
+		setVisibleManaged(timelineListBox, false);
+		setVisibleManaged(timelineEmptyLabel, false);
 		renderContactsSection();
 	}
 
@@ -880,6 +990,9 @@ public class CaseController {
 			addOrganizationButton.setText("Add Organization");
 		}
 		setVisibleManaged(placeholderTextArea, false);
+		setVisibleManaged(timelineScrollPane, false);
+		setVisibleManaged(timelineListBox, false);
+		setVisibleManaged(timelineEmptyLabel, false);
 		renderOrganizationsSection();
 	}
 
@@ -3547,6 +3660,30 @@ public class CaseController {
 						request.tenantId(),
 						updated);
 				boolean teamChanged = persistTeamChanges(request);
+				if (computation.statusChanged()) {
+					CaseOverviewDto baseOverview = request.baseline().baseOverview();
+					addStatusChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							baseOverview == null ? null : baseOverview.getPrimaryStatusId(),
+							baseOverview == null ? null : baseOverview.getCaseStatus(),
+							request.desired().desiredStatusId(),
+							null
+					);
+				}
+				if (computation.attyChanged()) {
+					CaseOverviewDto baseOverview = request.baseline().baseOverview();
+					addResponsibleAttorneyChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							baseOverview == null ? null : baseOverview.getResponsibleAttorneyUserId(),
+							baseOverview == null ? null : baseOverview.getResponsibleAttorney(),
+							request.desired().desiredResponsibleAttorneyUserId(),
+							null
+					);
+				}
 
 				CaseDetailDto updatedForUi = updated;
 
@@ -4704,6 +4841,17 @@ public class CaseController {
 
 				if (updated != null && request.statusChanged() && request.primaryStatusId() != null)
 					caseDao.setPrimaryStatus(request.caseId(), request.primaryStatusId(), null);
+				if (updated != null && request.statusChanged() && request.primaryStatusId() != null) {
+					addStatusChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							request.baselinePrimaryStatusId(),
+							request.baselinePrimaryStatusName(),
+							request.primaryStatusId(),
+							request.primaryStatusName()
+					);
+				}
 				if (updated != null)
 					currentOverview = caseDao.getOverview(request.caseId());
 
@@ -4836,7 +4984,9 @@ public class CaseController {
 			return new DetailsSaveRequest(
 				caseId.longValue(),
 				currentOverview == null ? null : currentOverview.getPrimaryStatusId(),
+				currentOverview == null ? null : currentOverview.getCaseStatus(),
 				source.primaryStatusId,
+				source.primaryStatusName,
 				name,
 				caseNumber,
 				practiceAreaId,
@@ -4945,13 +5095,111 @@ public class CaseController {
 		return null;
 	}
 
+	private void addStatusChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			Integer oldStatusId,
+			String oldStatusName,
+			Integer newStatusId,
+			String newStatusName) {
+		if (caseDao == null || tenantId == null || tenantId <= 0 || newStatusId == null)
+			return;
+		if (Objects.equals(oldStatusId, newStatusId))
+			return;
+
+		String oldLabel = resolveStatusLabel(oldStatusName, oldStatusId, tenantId);
+		String newLabel = resolveStatusLabel(newStatusName, newStatusId, tenantId);
+		String body = "from " + oldLabel + " to " + newLabel;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				CaseDao.CaseTimelineEventTypes.STATUS_CHANGED,
+				actorUserId,
+				"Status changed",
+				body
+		);
+	}
+
+	private String resolveStatusLabel(String preferredName, Integer statusId, Integer tenantId) {
+		String trimmed = safeText(preferredName).trim();
+		if (!trimmed.isBlank())
+			return trimmed;
+		if (statusId == null)
+			return "none";
+		if (caseDao != null && tenantId != null && tenantId > 0) {
+			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+			if (statuses != null) {
+				for (CaseDao.StatusRow status : statuses) {
+					if (status == null || status.id() != statusId)
+						continue;
+					String name = safeText(status.name()).trim();
+					if (!name.isBlank())
+						return name;
+				}
+			}
+		}
+		return "Status #" + statusId;
+	}
+
+	private void addResponsibleAttorneyChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			Integer oldAttorneyUserId,
+			String oldAttorneyDisplayName,
+			Integer newAttorneyUserId,
+			String newAttorneyDisplayName) {
+		if (caseDao == null || tenantId == null || tenantId <= 0 || newAttorneyUserId == null)
+			return;
+		if (Objects.equals(oldAttorneyUserId, newAttorneyUserId))
+			return;
+
+		String oldLabel = resolveUserDisplayName(oldAttorneyDisplayName, oldAttorneyUserId, tenantId);
+		String newLabel = resolveUserDisplayName(newAttorneyDisplayName, newAttorneyUserId, tenantId);
+		String body = "from " + oldLabel + " to " + newLabel;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				CaseDao.CaseTimelineEventTypes.RESPONSIBLE_ATTORNEY_CHANGED,
+				actorUserId,
+				"Responsible attorney changed",
+				body
+		);
+	}
+
+	private String resolveUserDisplayName(String preferredName, Integer userId, Integer tenantId) {
+		String trimmed = safeText(preferredName).trim();
+		if (!trimmed.isBlank())
+			return trimmed;
+		if (userId == null)
+			return "none";
+		if (caseDao != null && tenantId != null && tenantId > 0) {
+			List<CaseDao.UserRow> users = caseDao.listUsersForTenant(tenantId);
+			if (users != null) {
+				for (CaseDao.UserRow user : users) {
+					if (user == null || user.id() != userId)
+						continue;
+					String displayName = safeText(user.displayName()).trim();
+					if (!displayName.isBlank())
+						return displayName;
+				}
+			}
+		}
+		return "User #" + userId;
+	}
+
 	private record LifecycleDates(LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate) {
 	}
 
 	private record DetailsSaveRequest(
 			long caseId,
 			Integer baselinePrimaryStatusId,
+			String baselinePrimaryStatusName,
 			Integer primaryStatusId,
+			String primaryStatusName,
 			String name,
 			String caseNumber,
 			Integer practiceAreaId,
