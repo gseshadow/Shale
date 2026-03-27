@@ -3727,6 +3727,28 @@ public class CaseController {
 							request.desired().desiredOpposingCounselContactName()
 					);
 				}
+				if (computation.incidentChanged()) {
+					addDateChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							CaseDao.CaseTimelineEventTypes.INCIDENT_DATE_CHANGED,
+							"Incident date changed",
+							baseOverview == null ? null : baseOverview.getIncidentDate(),
+							request.desired().desiredIncidentDate()
+					);
+				}
+				if (computation.solChanged()) {
+					addDateChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							CaseDao.CaseTimelineEventTypes.SOL_DATE_CHANGED,
+							"SOL date changed",
+							baseOverview == null ? null : baseOverview.getSolDate(),
+							request.desired().desiredSolDate()
+					);
+				}
 
 				CaseDetailDto updatedForUi = updated;
 
@@ -5285,6 +5307,37 @@ public class CaseController {
 			}
 		}
 		return "Contact #" + contactId;
+	}
+
+	private void addDateChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			String eventType,
+			String title,
+			LocalDate oldDate,
+			LocalDate newDate) {
+		if (caseDao == null || tenantId == null || tenantId <= 0)
+			return;
+		if (Objects.equals(oldDate, newDate))
+			return;
+
+		String oldLabel = resolveTimelineDateLabel(oldDate);
+		String newLabel = resolveTimelineDateLabel(newDate);
+		String body = "from " + oldLabel + " to " + newLabel;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				eventType,
+				actorUserId,
+				title,
+				body
+		);
+	}
+
+	private String resolveTimelineDateLabel(LocalDate value) {
+		return value == null ? "none" : value.toString();
 	}
 
 	private record LifecycleDates(LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate) {
