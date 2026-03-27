@@ -38,33 +38,32 @@
                 <Insets top="10" right="12" bottom="12" left="12" />
             </padding>
 
-            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll">
-                <HBox spacing="16" maxWidth="1240" alignment="TOP_LEFT">
+            <HBox spacing="16" maxWidth="1360" alignment="TOP_LEFT">
+                <padding>
+                    <Insets top="12" right="12" bottom="12" left="12" />
+                </padding>
+
+                <VBox spacing="10" styleClass="case-main-surface" minWidth="640" prefWidth="820" maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS">
                     <padding>
                         <Insets top="12" right="12" bottom="12" left="12" />
                     </padding>
 
-                    <VBox spacing="10" styleClass="case-main-surface" maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS">
-                        <padding>
-                            <Insets top="12" right="12" bottom="12" left="12" />
-                        </padding>
+                    <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
 
-                        <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
+                    <HBox fx:id="remoteUpdateBanner" spacing="8" alignment="CENTER_LEFT" visible="false" managed="false">
+                        <Label text="This organization was updated elsewhere." style="-fx-text-fill: #b42318;" />
+                        <Button fx:id="reloadRemoteButton" text="Reload" />
+                    </HBox>
 
-                        <HBox fx:id="remoteUpdateBanner" spacing="8" alignment="CENTER_LEFT" visible="false" managed="false">
-                            <Label text="This organization was updated elsewhere." style="-fx-text-fill: #b42318;" />
-                            <Button fx:id="reloadRemoteButton" text="Reload" />
-                        </HBox>
+                    <GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
+                        <columnConstraints>
+                            <ColumnConstraints minWidth="160" prefWidth="180" />
+                            <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
+                        </columnConstraints>
 
-                        <GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
-                            <columnConstraints>
-                                <ColumnConstraints minWidth="160" prefWidth="180" />
-                                <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
-                            </columnConstraints>
-
-                            <Label text="Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
-                            <Label fx:id="nameValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-                            <TextField fx:id="nameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+                        <Label text="Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
+                        <Label fx:id="nameValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+                        <TextField fx:id="nameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
                             <Label text="Organization Type:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
                             <Label fx:id="typeValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" />
@@ -110,25 +109,35 @@
                             <Label fx:id="countryValue" text="—" wrapText="true" GridPane.rowIndex="11" GridPane.columnIndex="1" />
                             <TextField fx:id="countryEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="11" GridPane.columnIndex="1" />
 
-                            <Label text="Notes:" style="-fx-opacity: 0.8;" GridPane.rowIndex="12" />
-                            <Label fx:id="notesValue" text="—" wrapText="true" GridPane.rowIndex="12" GridPane.columnIndex="1" />
-                            <TextArea fx:id="notesEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" GridPane.rowIndex="12" GridPane.columnIndex="1" />
-                        </GridPane>
-                    </VBox>
+                        <Label text="Notes:" style="-fx-opacity: 0.8;" GridPane.rowIndex="12" />
+                        <Label fx:id="notesValue" text="—" wrapText="true" GridPane.rowIndex="12" GridPane.columnIndex="1" />
+                        <TextArea fx:id="notesEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" GridPane.rowIndex="12" GridPane.columnIndex="1" />
+                    </GridPane>
+                </VBox>
 
-                    <VBox prefWidth="320" minWidth="280" maxWidth="360" spacing="8" styleClass="secondary-panel">
-                        <HBox spacing="8" alignment="CENTER_LEFT">
-                            <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                            <Region HBox.hgrow="ALWAYS" />
-                            <Button fx:id="addCaseButton" text="Add Case" />
-                        </HBox>
+                <VBox prefWidth="460" minWidth="400" maxWidth="560" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
+                    <padding>
+                        <Insets top="12" right="12" bottom="12" left="12" />
+                    </padding>
+                    <HBox spacing="8" alignment="CENTER_LEFT">
+                        <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                    </HBox>
+                    <HBox spacing="8" alignment="CENTER_LEFT">
+                        <TextField fx:id="relatedCasesSearchField" promptText="Search related cases…" HBox.hgrow="ALWAYS" />
+                        <ChoiceBox fx:id="relatedCasesSortChoice" prefWidth="180" />
+                    </HBox>
+                    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
                         <StackPane>
-                            <FlowPane fx:id="relatedCasesFlow" hgap="10" vgap="10" prefWrapLength="320" maxWidth="1.7976931348623157E308" />
+                            <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308">
+                                <padding>
+                                    <Insets right="8" />
+                                </padding>
+                            </VBox>
                             <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
                         </StackPane>
-                    </VBox>
-                </HBox>
-            </ScrollPane>
+                    </ScrollPane>
+                </VBox>
+            </HBox>
         </StackPane>
     </center>
 

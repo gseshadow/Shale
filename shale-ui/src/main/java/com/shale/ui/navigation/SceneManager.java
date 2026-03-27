@@ -24,6 +24,7 @@ import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.SearchService;
+import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -168,7 +169,14 @@ public final class SceneManager {
 		{
 			UserController c = (UserController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
-			c.init(userId, userDao, appState);
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			UserDetailService userDetailService = new UserDetailService(userDao, caseDao);
+			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId -> {
+				MainController mainController = resolveMainController();
+				if (mainController != null) {
+					mainController.openCase(relatedCaseId);
+				}
+			});
 			return c;
 		});
 	}
@@ -203,7 +211,7 @@ public final class SceneManager {
 	}
 
 
-	public Parent createMyShaleView(Consumer<Integer> onOpenCase) {
+	public Parent createMyShaleView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser) {
 		return load("/fxml/my-shale.fxml", controller ->
 		{
 			MyShaleController c = (MyShaleController) controller;
@@ -211,7 +219,7 @@ public final class SceneManager {
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase);
+			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser);
 			return c;
 		});
 	}
@@ -304,6 +312,7 @@ public final class SceneManager {
 	}
 
 	public void openUserProfile(Integer userId) {
+		System.out.println("[TRACE ASSIGNED_CASES][SceneManager.openUserProfile] selectedUserId=" + userId);
 		if (userId == null || userId <= 0) {
 			System.err.println("Ignoring user navigation for invalid userId: " + userId);
 			return;

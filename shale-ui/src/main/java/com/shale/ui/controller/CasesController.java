@@ -333,7 +333,7 @@ public final class CasesController {
 		dbExec.submit(() ->
 		{
 			try {
-				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort());
+				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort(), includeClosedDeniedInQuery());
 
 				// map DAO rows into UI VM
 				List<CaseCardVm> newItems = page.items().stream()
@@ -395,7 +395,8 @@ public final class CasesController {
 				.sorted(comp)
 				.toList();
 
-		if (!q.isEmpty() && filtered.size() < pageSize && hasMore && !loading) {
+		boolean statusFilterActive = selectedStatusIds.size() < CaseListUiSupport.STATUS_FILTER_OPTIONS.size();
+		if (( !q.isEmpty() || statusFilterActive ) && filtered.size() < pageSize && hasMore && !loading) {
 			loadNextPage();
 		}
 
@@ -404,8 +405,13 @@ public final class CasesController {
 		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
 	}
 
+	private boolean includeClosedDeniedInQuery() {
+		return selectedStatusIds.contains(CaseListUiSupport.STATUS_CLOSED)
+				|| selectedStatusIds.contains(CaseListUiSupport.STATUS_DENIED);
+	}
+
 	private void initializeStatusFilter() {
-		CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, this::rerender);
+		CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, this::loadFirstPage);
 	}
 
 	private boolean matchesSelectedStatus(CaseCardVm vm) {

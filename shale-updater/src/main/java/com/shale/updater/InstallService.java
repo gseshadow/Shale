@@ -36,7 +36,8 @@ public final class InstallService {
 		deleteRecursively(installDir);
 		if (isMacAppBundle(sourceDir, installDir)) {
 			copyMacAppBundle(sourceDir, installDir);
-			ensureMacLauncherExecutable(installDir);
+			ensureMacBundleExecutables(installDir);
+			logMacRuntimeJavaStatus(installDir);
 			return;
 		}
 		copyDirectory(sourceDir, installDir);
@@ -171,6 +172,12 @@ public final class InstallService {
 		}
 	}
 
+	private void ensureMacBundleExecutables(Path installDir) throws IOException {
+		ensureMacLauncherExecutable(installDir);
+		ensureMacRuntimeBinExecutables(installDir);
+		ensureMacRuntimeLibExecutables(installDir);
+	}
+
 	private void ensureMacLauncherExecutable(Path installDir) throws IOException {
 		Path macOsDir = installDir.resolve("Contents").resolve("MacOS");
 		if (!Files.isDirectory(macOsDir)) {
@@ -191,6 +198,81 @@ public final class InstallService {
 				throw io;
 			}
 			throw ex;
+		}
+	}
+
+	private void ensureMacRuntimeBinExecutables(Path installDir) throws IOException {
+		Path runtimeBinDir = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("bin");
+		if (!Files.isDirectory(runtimeBinDir)) {
+			return;
+		}
+
+		try (var stream = Files.list(runtimeBinDir)) {
+			stream.filter(Files::isRegularFile)
+					.forEach(path -> {
+						try {
+							setExecutable(path);
+						} catch (IOException ex) {
+							throw new RuntimeException(ex);
+						}
+					});
+		} catch (RuntimeException ex) {
+			if (ex.getCause() instanceof IOException io) {
+				throw io;
+			}
+			throw ex;
+		}
+	}
+
+	private void ensureMacRuntimeLibExecutables(Path installDir) throws IOException {
+		Path runtimeLibDir = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("lib");
+		if (!Files.isDirectory(runtimeLibDir)) {
+			return;
+		}
+
+		Path jspawnhelperPath = runtimeLibDir.resolve("jspawnhelper");
+		setExecutableIfRegularFile(jspawnhelperPath);
+
+		// Some runtime-native helpers under Home/lib are binary entrypoints without file extensions.
+		// Restore execute bits to avoid regressing subprocess support after replacement.
+		setExecutableIfRegularFile(runtimeLibDir.resolve("jexec"));
+	}
+
+	private void logMacRuntimeJavaStatus(Path installDir) {
+		Path runtimeJavaPath = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("bin")
+				.resolve("java");
+		boolean exists = Files.exists(runtimeJavaPath);
+		boolean executable = exists && Files.isExecutable(runtimeJavaPath);
+		log("macOS runtime java path: " + runtimeJavaPath + ", exists=" + exists + ", executable=" + executable);
+
+		Path jspawnhelperPath = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("lib")
+				.resolve("jspawnhelper");
+		boolean jspawnhelperExists = Files.exists(jspawnhelperPath);
+		boolean jspawnhelperExecutable = jspawnhelperExists && Files.isExecutable(jspawnhelperPath);
+		log("macOS runtime jspawnhelper path: " + jspawnhelperPath
+				+ ", exists=" + jspawnhelperExists
+				+ ", executable=" + jspawnhelperExecutable);
+	}
+
+	private void setExecutableIfRegularFile(Path path) throws IOException {
+		if (Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+			setExecutable(path);
 		}
 	}
 

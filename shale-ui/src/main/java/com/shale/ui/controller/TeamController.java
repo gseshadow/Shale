@@ -55,7 +55,10 @@ public final class TeamController {
 		this.appState = appState;
 		this.userDao = userDao;
 		this.userCardFactory = new UserCardFactory(onOpenUser == null ? id -> {
-		} : onOpenUser);
+		} : userId -> {
+			System.out.println("[TRACE ASSIGNED_CASES][TeamController.onOpenUser] selectedUserId=" + userId);
+			onOpenUser.accept(userId);
+		});
 	}
 
 	@FXML
