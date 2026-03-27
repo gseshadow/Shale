@@ -3672,6 +3672,18 @@ public class CaseController {
 							null
 					);
 				}
+				if (computation.attyChanged()) {
+					CaseOverviewDto baseOverview = request.baseline().baseOverview();
+					addResponsibleAttorneyChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							baseOverview == null ? null : baseOverview.getResponsibleAttorneyUserId(),
+							baseOverview == null ? null : baseOverview.getResponsibleAttorney(),
+							request.desired().desiredResponsibleAttorneyUserId(),
+							null
+					);
+				}
 
 				CaseDetailDto updatedForUi = updated;
 
@@ -5129,6 +5141,54 @@ public class CaseController {
 			}
 		}
 		return "Status #" + statusId;
+	}
+
+	private void addResponsibleAttorneyChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			Integer oldAttorneyUserId,
+			String oldAttorneyDisplayName,
+			Integer newAttorneyUserId,
+			String newAttorneyDisplayName) {
+		if (caseDao == null || tenantId == null || tenantId <= 0 || newAttorneyUserId == null)
+			return;
+		if (Objects.equals(oldAttorneyUserId, newAttorneyUserId))
+			return;
+
+		String oldLabel = resolveUserDisplayName(oldAttorneyDisplayName, oldAttorneyUserId, tenantId);
+		String newLabel = resolveUserDisplayName(newAttorneyDisplayName, newAttorneyUserId, tenantId);
+		String body = "from " + oldLabel + " to " + newLabel;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				CaseDao.CaseTimelineEventTypes.RESPONSIBLE_ATTORNEY_CHANGED,
+				actorUserId,
+				"Responsible attorney changed",
+				body
+		);
+	}
+
+	private String resolveUserDisplayName(String preferredName, Integer userId, Integer tenantId) {
+		String trimmed = safeText(preferredName).trim();
+		if (!trimmed.isBlank())
+			return trimmed;
+		if (userId == null)
+			return "none";
+		if (caseDao != null && tenantId != null && tenantId > 0) {
+			List<CaseDao.UserRow> users = caseDao.listUsersForTenant(tenantId);
+			if (users != null) {
+				for (CaseDao.UserRow user : users) {
+					if (user == null || user.id() != userId)
+						continue;
+					String displayName = safeText(user.displayName()).trim();
+					if (!displayName.isBlank())
+						return displayName;
+				}
+			}
+		}
+		return "User #" + userId;
 	}
 
 	private record LifecycleDates(LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate) {
