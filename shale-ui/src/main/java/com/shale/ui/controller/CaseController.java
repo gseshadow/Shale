@@ -3660,6 +3660,18 @@ public class CaseController {
 						request.tenantId(),
 						updated);
 				boolean teamChanged = persistTeamChanges(request);
+				if (computation.statusChanged()) {
+					CaseOverviewDto baseOverview = request.baseline().baseOverview();
+					addStatusChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							baseOverview == null ? null : baseOverview.getPrimaryStatusId(),
+							baseOverview == null ? null : baseOverview.getCaseStatus(),
+							request.desired().desiredStatusId(),
+							null
+					);
+				}
 
 				CaseDetailDto updatedForUi = updated;
 
@@ -4817,6 +4829,17 @@ public class CaseController {
 
 				if (updated != null && request.statusChanged() && request.primaryStatusId() != null)
 					caseDao.setPrimaryStatus(request.caseId(), request.primaryStatusId(), null);
+				if (updated != null && request.statusChanged() && request.primaryStatusId() != null) {
+					addStatusChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							request.baselinePrimaryStatusId(),
+							request.baselinePrimaryStatusName(),
+							request.primaryStatusId(),
+							request.primaryStatusName()
+					);
+				}
 				if (updated != null)
 					currentOverview = caseDao.getOverview(request.caseId());
 
@@ -4949,7 +4972,9 @@ public class CaseController {
 			return new DetailsSaveRequest(
 				caseId.longValue(),
 				currentOverview == null ? null : currentOverview.getPrimaryStatusId(),
+				currentOverview == null ? null : currentOverview.getCaseStatus(),
 				source.primaryStatusId,
+				source.primaryStatusName,
 				name,
 				caseNumber,
 				practiceAreaId,
@@ -5058,13 +5083,63 @@ public class CaseController {
 		return null;
 	}
 
+	private void addStatusChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			Integer oldStatusId,
+			String oldStatusName,
+			Integer newStatusId,
+			String newStatusName) {
+		if (caseDao == null || tenantId == null || tenantId <= 0 || newStatusId == null)
+			return;
+		if (Objects.equals(oldStatusId, newStatusId))
+			return;
+
+		String oldLabel = resolveStatusLabel(oldStatusName, oldStatusId, tenantId);
+		String newLabel = resolveStatusLabel(newStatusName, newStatusId, tenantId);
+		String body = "from " + oldLabel + " to " + newLabel;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				CaseDao.CaseTimelineEventTypes.STATUS_CHANGED,
+				actorUserId,
+				"Status changed",
+				body
+		);
+	}
+
+	private String resolveStatusLabel(String preferredName, Integer statusId, Integer tenantId) {
+		String trimmed = safeText(preferredName).trim();
+		if (!trimmed.isBlank())
+			return trimmed;
+		if (statusId == null)
+			return "none";
+		if (caseDao != null && tenantId != null && tenantId > 0) {
+			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+			if (statuses != null) {
+				for (CaseDao.StatusRow status : statuses) {
+					if (status == null || status.id() != statusId)
+						continue;
+					String name = safeText(status.name()).trim();
+					if (!name.isBlank())
+						return name;
+				}
+			}
+		}
+		return "Status #" + statusId;
+	}
+
 	private record LifecycleDates(LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate) {
 	}
 
 	private record DetailsSaveRequest(
 			long caseId,
 			Integer baselinePrimaryStatusId,
+			String baselinePrimaryStatusName,
 			Integer primaryStatusId,
+			String primaryStatusName,
 			String name,
 			String caseNumber,
 			Integer practiceAreaId,
