@@ -28,7 +28,12 @@ final class DesktopUpdateLauncherTest {
 	@Test
 	void resolveMacJavaBinaryPrefersBundledRuntime(@TempDir Path tempDir) throws IOException {
 		Path installDir = tempDir.resolve("Shale.app");
-		Path javaBinary = installDir.resolve("Contents").resolve("runtime").resolve("Contents").resolve("Home").resolve("bin").resolve("java");
+		Path javaBinary = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("bin")
+				.resolve("java");
 		Files.createDirectories(javaBinary.getParent());
 		Files.writeString(javaBinary, "java");
 
@@ -39,7 +44,12 @@ final class DesktopUpdateLauncherTest {
 	@Test
 	void buildMacLaunchCommandUsesDetachedShellHelper(@TempDir Path tempDir) throws IOException {
 		Path installDir = tempDir.resolve("Shale.app");
-		Path javaBinary = installDir.resolve("Contents").resolve("runtime").resolve("Contents").resolve("Home").resolve("bin").resolve("java");
+		Path javaBinary = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("bin")
+				.resolve("java");
 		Path libDir = installDir.resolve("Contents").resolve("app").resolve("lib");
 		Path updaterJar = libDir.resolve("shale-updater-1.0.14.jar");
 		Path updaterLog = tempDir.resolve("updater-output.log");
@@ -50,16 +60,23 @@ final class DesktopUpdateLauncherTest {
 		Files.writeString(updaterJar, "jar");
 
 		DesktopUpdateLauncher.LaunchPlan launchPlan = DesktopUpdateLauncher.buildMacLaunchCommand(installDir, "1.0.13", updaterLog);
+
 		ProcessBuilder pb = launchPlan.processBuilder();
 		assertEquals(List.of("/bin/sh", launchPlan.macHelperScript().toString()), pb.command());
 		assertEquals(Path.of("/").toFile(), pb.directory());
 		assertEquals(Path.of("/"), launchPlan.helperWorkingDirectory());
 
 		String helperScript = Files.readString(launchPlan.macHelperScript(), StandardCharsets.UTF_8);
+
 		assertTrue(helperScript.contains("cd '/'"));
 		assertTrue(helperScript.contains("nohup "));
 		assertTrue(helperScript.contains("'--currentVersion' '1.0.13'"));
-		assertTrue(helperScript.contains("'--installDir' '" + installDir + "'"));
-		assertTrue(helperScript.contains("'" + updaterLog + "' 2>&1 < /dev/null &"));
+		assertTrue(helperScript.contains("'--installDir' '" + shellPath(installDir) + "'"));
+		assertTrue(helperScript.contains(shellPath(updaterLog)));
+		assertTrue(helperScript.contains("2>&1 < /dev/null &"));
+	}
+
+	private static String shellPath(Path path) {
+		return path.toString().replace('\\', '/');
 	}
 }
