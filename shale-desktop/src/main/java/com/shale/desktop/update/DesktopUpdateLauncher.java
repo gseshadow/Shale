@@ -137,14 +137,20 @@ public final class DesktopUpdateLauncher {
 				+ "nohup " + updaterCommand + " >> " + shellQuote(updaterLog.toString())
 				+ " 2>&1 < /dev/null &\n";
 		Files.writeString(helperScript, script, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
-		Files.setPosixFilePermissions(helperScript, EnumSet.of(
-				PosixFilePermission.OWNER_READ,
-				PosixFilePermission.OWNER_WRITE,
-				PosixFilePermission.OWNER_EXECUTE,
-				PosixFilePermission.GROUP_READ,
-				PosixFilePermission.GROUP_EXECUTE,
-				PosixFilePermission.OTHERS_READ,
-				PosixFilePermission.OTHERS_EXECUTE));
+		try {
+			Files.setPosixFilePermissions(helperScript, EnumSet.of(
+					PosixFilePermission.OWNER_READ,
+					PosixFilePermission.OWNER_WRITE,
+					PosixFilePermission.OWNER_EXECUTE,
+					PosixFilePermission.GROUP_READ,
+					PosixFilePermission.GROUP_EXECUTE,
+					PosixFilePermission.OTHERS_READ,
+					PosixFilePermission.OTHERS_EXECUTE));
+		} catch (UnsupportedOperationException ex) {
+			if (!helperScript.toFile().setExecutable(true, false)) {
+				throw new IOException("Failed to mark helper script executable: " + helperScript, ex);
+			}
+		}
 		return helperScript;
 	}
 
