@@ -31,6 +31,7 @@ final class InstallServiceTest {
 		Files.createDirectories(sourceLauncher.getParent());
 		Files.createDirectories(sourceConfig.getParent());
 		Files.createDirectories(sourceRuntimeJava.getParent());
+		Files.createDirectories(sourceRuntimeJar.getParent());
 		Files.writeString(sourceLauncher, "launcher");
 		Files.writeString(sourceConfig, "config");
 		Files.writeString(sourceRuntimeJava, "java");
@@ -82,7 +83,8 @@ final class InstallServiceTest {
 			permissions.remove(PosixFilePermission.OTHERS_EXECUTE);
 			Files.setPosixFilePermissions(path, permissions);
 		} catch (UnsupportedOperationException ex) {
-			assertTrue(path.toFile().setExecutable(false, false));
+			// Best-effort only on non-POSIX filesystems like Windows.
+			path.toFile().setExecutable(false, false);
 		}
 	}
 }
