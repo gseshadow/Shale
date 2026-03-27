@@ -41,6 +41,7 @@ public final class CaseDao {
 		public static final String TEAM_CHANGED = "TEAM_CHANGED";
 		public static final String CLIENT_CHANGED = "CLIENT_CHANGED";
 		public static final String CALLER_CHANGED = "CALLER_CHANGED";
+		public static final String OPPOSING_COUNSEL_CHANGED = "OPPOSING_COUNSEL_CHANGED";
 		public static final String INCIDENT_DATE_CHANGED = "INCIDENT_DATE_CHANGED";
 		public static final String SOL_DATE_CHANGED = "SOL_DATE_CHANGED";
 		public static final String PRACTICE_AREA_CHANGED = "PRACTICE_AREA_CHANGED";
@@ -53,6 +54,7 @@ public final class CaseDao {
 				TEAM_CHANGED,
 				CLIENT_CHANGED,
 				CALLER_CHANGED,
+				OPPOSING_COUNSEL_CHANGED,
 				INCIDENT_DATE_CHANGED,
 				SOL_DATE_CHANGED,
 				PRACTICE_AREA_CHANGED,

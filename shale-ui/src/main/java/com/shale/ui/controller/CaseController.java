@@ -3634,10 +3634,13 @@ public class CaseController {
 			return new SaveDesiredValues(
 					draftPrimaryStatusId,
 					draftPrimaryCallerContactId,
+					draftPrimaryCallerName,
 					draftPrimaryClientContactId,
+					draftPrimaryClientName,
 					draftPracticeAreaId,
 					draftResponsibleAttorneyUserId,
 					draftPrimaryOpposingCounselContactId,
+					draftPrimaryOpposingCounselName,
 					(ovIncidentDateEditor == null ? null : ovIncidentDateEditor.getValue()),
 					(ovSolDateEditor == null ? null : ovSolDateEditor.getValue()),
 					(draftTeamAssignments == null) ? null : List.copyOf(draftTeamAssignments)
@@ -3682,6 +3685,46 @@ public class CaseController {
 							baseOverview == null ? null : baseOverview.getResponsibleAttorney(),
 							request.desired().desiredResponsibleAttorneyUserId(),
 							null
+					);
+				}
+				CaseOverviewDto baseOverview = request.baseline().baseOverview();
+				if (computation.callerChanged()) {
+					addPrimaryContactChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							CaseDao.CaseTimelineEventTypes.CALLER_CHANGED,
+							"Caller changed",
+							baseOverview == null ? null : baseOverview.getPrimaryCallerContactId(),
+							baseOverview == null ? null : baseOverview.getCaller(),
+							request.desired().desiredCallerContactId(),
+							request.desired().desiredCallerContactName()
+					);
+				}
+				if (computation.clientChanged()) {
+					addPrimaryContactChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							CaseDao.CaseTimelineEventTypes.CLIENT_CHANGED,
+							"Client changed",
+							baseOverview == null ? null : baseOverview.getPrimaryClientContactId(),
+							baseOverview == null ? null : baseOverview.getClient(),
+							request.desired().desiredClientContactId(),
+							request.desired().desiredClientContactName()
+					);
+				}
+				if (computation.opposingCounselChanged()) {
+					addPrimaryContactChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							CaseDao.CaseTimelineEventTypes.OPPOSING_COUNSEL_CHANGED,
+							"Opposing counsel changed",
+							baseOverview == null ? null : baseOverview.getPrimaryOpposingCounselContactId(),
+							baseOverview == null ? null : baseOverview.getOpposingCounsel(),
+							request.desired().desiredOpposingCounselContactId(),
+							request.desired().desiredOpposingCounselContactName()
 					);
 				}
 
@@ -3919,10 +3962,13 @@ public class CaseController {
 	private record SaveDesiredValues(
 			Integer desiredStatusId,
 			Integer desiredCallerContactId,
+			String desiredCallerContactName,
 			Integer desiredClientContactId,
+			String desiredClientContactName,
 			Integer desiredPracticeAreaId,
 			Integer desiredResponsibleAttorneyUserId,
 			Integer desiredOpposingCounselContactId,
+			String desiredOpposingCounselContactName,
 			LocalDate desiredIncidentDate,
 			LocalDate desiredSolDate,
 			List<CaseDao.TeamAssignmentRow> desiredTeamAssignments) {
@@ -5189,6 +5235,56 @@ public class CaseController {
 			}
 		}
 		return "User #" + userId;
+	}
+
+	private void addPrimaryContactChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			String eventType,
+			String title,
+			Integer oldContactId,
+			String oldContactName,
+			Integer newContactId,
+			String newContactName) {
+		if (caseDao == null || tenantId == null || tenantId <= 0 || newContactId == null)
+			return;
+		if (Objects.equals(oldContactId, newContactId))
+			return;
+
+		String oldLabel = resolveContactDisplayName(oldContactName, oldContactId, caseId);
+		String newLabel = resolveContactDisplayName(newContactName, newContactId, caseId);
+		String body = "from " + oldLabel + " to " + newLabel;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				eventType,
+				actorUserId,
+				title,
+				body
+		);
+	}
+
+	private String resolveContactDisplayName(String preferredName, Integer contactId, long caseId) {
+		String trimmed = safeText(preferredName).trim();
+		if (!trimmed.isBlank())
+			return trimmed;
+		if (contactId == null)
+			return "none";
+		if (caseDao != null) {
+			List<CaseDao.RelatedContactRow> contacts = caseDao.findRelatedContacts(caseId);
+			if (contacts != null) {
+				for (CaseDao.RelatedContactRow contact : contacts) {
+					if (contact == null || contact.id() != contactId)
+						continue;
+					String displayName = safeText(contact.displayName()).trim();
+					if (!displayName.isBlank())
+						return displayName;
+				}
+			}
+		}
+		return "Contact #" + contactId;
 	}
 
 	private record LifecycleDates(LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate) {
