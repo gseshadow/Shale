@@ -368,6 +368,8 @@
 				</HBox>
 				<Label fx:id="organizationsEmptyLabel" text="No organizations"
 					visible="false" managed="false" style="-fx-opacity: 0.75;" />
+				<Label fx:id="timelineEmptyLabel" text="No timeline events yet."
+					visible="false" managed="false" style="-fx-opacity: 0.75;" />
 				<ScrollPane fx:id="organizationsScrollPane" fitToWidth="true" hbarPolicy="NEVER"
 					vbarPolicy="AS_NEEDED" visible="false" managed="false" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
 					<FlowPane fx:id="organizationsFlow" hgap="14" vgap="14" alignment="TOP_LEFT"
@@ -376,6 +378,14 @@
 							<Insets top="4" right="4" bottom="4" left="4" />
 						</padding>
 					</FlowPane>
+				</ScrollPane>
+				<ScrollPane fx:id="timelineScrollPane" fitToWidth="true" hbarPolicy="NEVER"
+					vbarPolicy="AS_NEEDED" visible="false" managed="false" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
+					<VBox fx:id="timelineListBox" spacing="10.0" visible="false" managed="false">
+						<padding>
+							<Insets top="4" right="4" bottom="4" left="4" />
+						</padding>
+					</VBox>
 				</ScrollPane>
 				<TextArea fx:id="placeholderTextArea"
 					promptText="Placeholder notes / testing area" prefRowCount="12" />
