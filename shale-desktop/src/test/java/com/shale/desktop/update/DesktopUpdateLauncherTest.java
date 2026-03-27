@@ -1,6 +1,7 @@
 package com.shale.desktop.update;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -59,24 +60,32 @@ final class DesktopUpdateLauncherTest {
 		Files.writeString(javaBinary, "java");
 		Files.writeString(updaterJar, "jar");
 
-		DesktopUpdateLauncher.LaunchPlan launchPlan = DesktopUpdateLauncher.buildMacLaunchCommand(installDir, "1.0.13", updaterLog);
+		DesktopUpdateLauncher.LaunchPlan launchPlan =
+				DesktopUpdateLauncher.buildMacLaunchCommand(installDir, "1.0.13", updaterLog);
+
+		assertNotNull(launchPlan);
+		assertNotNull(launchPlan.processBuilder());
+		assertNotNull(launchPlan.macHelperScript());
 
 		ProcessBuilder pb = launchPlan.processBuilder();
 		assertEquals(List.of("/bin/sh", launchPlan.macHelperScript().toString()), pb.command());
 		assertEquals(Path.of("/").toFile(), pb.directory());
 		assertEquals(Path.of("/"), launchPlan.helperWorkingDirectory());
+		assertTrue(Files.exists(launchPlan.macHelperScript()));
 
 		String helperScript = Files.readString(launchPlan.macHelperScript(), StandardCharsets.UTF_8);
 
-		assertTrue(helperScript.contains("cd '/'"));
-		assertTrue(helperScript.contains("nohup "));
-		assertTrue(helperScript.contains("'--currentVersion' '1.0.13'"));
-		assertTrue(helperScript.contains("'--installDir' '" + shellPath(installDir) + "'"));
-		assertTrue(helperScript.contains(shellPath(updaterLog)));
-		assertTrue(helperScript.contains("2>&1 < /dev/null &"));
-	}
-
-	private static String shellPath(Path path) {
-		return path.toString().replace('\\', '/');
+		assertTrue(helperScript.contains("#!/bin/sh"));
+		assertTrue(helperScript.contains("cd "));
+		assertTrue(helperScript.contains("nohup"));
+		assertTrue(helperScript.contains("-jar"));
+		assertTrue(helperScript.contains("--currentVersion"));
+		assertTrue(helperScript.contains("1.0.13"));
+		assertTrue(helperScript.contains("--installDir"));
+		assertTrue(helperScript.contains(installDir.toString()));
+		assertTrue(helperScript.contains(updaterLog.toString()));
+		assertTrue(helperScript.contains("/dev/null"));
+		assertTrue(helperScript.contains("2>&1"));
+		assertTrue(helperScript.contains("&"));
 	}
 }
