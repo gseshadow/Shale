@@ -206,7 +206,6 @@ public final class CaseDao {
 			insertCaseContact(con, caseId, clientContactId, ROLE_CASECONTACT_CLIENT, now);
 			insertCaseContact(con, caseId, callerContactId, ROLE_CASECONTACT_CALLER, now);
 			insertCaseStatus(con, caseId, request.statusId(), now);
-			insertInitialCaseUpdate(con, caseId, request, now);
 
 			con.commit();
 			return new NewIntakeCreateResult(caseId, clientContactId, callerContactId);
@@ -405,51 +404,6 @@ public final class CaseDao {
 			if (rows != 1)
 				throw new RuntimeException("Failed to create case status.");
 		}
-	}
-
-	private void insertInitialCaseUpdate(Connection con, long caseId, NewIntakeCreateRequest request, Timestamp now) throws SQLException {
-		String sql = """
-				INSERT INTO dbo.CaseUpdates (
-				  CaseId,
-				  ShaleClientId,
-				  NoteText,
-				  CreatedAt,
-				  CreatedByUserId,
-				  UpdatedAt,
-				  EditedByUserId
-				)
-				VALUES (?, ?, ?, ?, ?, ?, NULL);
-				""";
-
-		String noteText = buildInitialIntakeNote(request.clientFirstName(), request.clientLastName());
-
-		try (PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setLong(1, caseId);
-			ps.setInt(2, request.shaleClientId());
-			ps.setString(3, noteText);
-			ps.setTimestamp(4, now);
-			if (request.createdByUserId() == null)
-				ps.setNull(5, java.sql.Types.INTEGER);
-			else
-				ps.setInt(5, request.createdByUserId());
-			ps.setTimestamp(6, now);
-
-			int rows = ps.executeUpdate();
-			if (rows != 1)
-				throw new RuntimeException("Failed to create initial case update.");
-		}
-	}
-
-	private static String buildInitialIntakeNote(String firstName, String lastName) {
-		String first = firstName == null ? "" : firstName.trim();
-		String last = lastName == null ? "" : lastName.trim();
-		if (first.isBlank() && last.isBlank())
-			return "Intake created";
-		if (first.isBlank())
-			return "Intake created for " + last;
-		if (last.isBlank())
-			return "Intake created for " + first;
-		return "Intake created for " + last + ", " + first;
 	}
 
 	private static String buildFullName(String firstName, String lastName) {
@@ -1541,6 +1495,7 @@ public final class CaseDao {
 				FROM dbo.CaseUpdates cu
 				LEFT JOIN dbo.Users u ON u.Id = cu.CreatedByUserId
 				WHERE cu.CaseId = ?
+				  AND ISNULL(cu.IsDeleted, 0) = 0
 				ORDER BY cu.CreatedAt DESC, cu.Id DESC;
 				""";
 
@@ -1574,6 +1529,10 @@ public final class CaseDao {
 	}
 
 	public void addCaseUpdate(long caseId, int shaleClientId, String noteText, Integer createdByUserId) {
+		addCaseNote(caseId, shaleClientId, noteText, createdByUserId);
+	}
+
+	public void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId) {
 		String trimmedText = noteText == null ? "" : noteText.trim();
 		if (trimmedText.isBlank()) {
 			throw new IllegalArgumentException("Case update text is required.");
@@ -1648,6 +1607,39 @@ public final class CaseDao {
 				} catch (SQLException ignored) {
 				}
 			}
+		}
+	}
+
+	public void softDeleteCaseUpdate(long caseUpdateId, long caseId, int shaleClientId, Integer deletedByUserId) {
+		String sql = """
+				UPDATE dbo.CaseUpdates
+				SET IsDeleted = 1,
+				    DeletedAt = SYSDATETIME(),
+				    DeletedByUserId = ?,
+				    UpdatedAt = SYSDATETIME(),
+				    EditedByUserId = COALESCE(?, EditedByUserId)
+				WHERE Id = ?
+				  AND CaseId = ?
+				  AND ShaleClientId = ?
+				  AND ISNULL(IsDeleted, 0) = 0;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			if (deletedByUserId == null)
+				ps.setNull(1, java.sql.Types.INTEGER);
+			else
+				ps.setInt(1, deletedByUserId);
+			if (deletedByUserId == null)
+				ps.setNull(2, java.sql.Types.INTEGER);
+			else
+				ps.setInt(2, deletedByUserId);
+			ps.setLong(3, caseUpdateId);
+			ps.setLong(4, caseId);
+			ps.setInt(5, shaleClientId);
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to soft delete case update (id=" + caseUpdateId + ")", e);
 		}
 	}
 
