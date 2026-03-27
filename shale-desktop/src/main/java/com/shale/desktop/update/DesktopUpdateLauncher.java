@@ -7,8 +7,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermission;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -38,15 +40,21 @@ public final class DesktopUpdateLauncher {
 
 			Path updaterLog = AppPaths.appLogFile(APP_NAME, "updater-output.log");
 			Files.createDirectories(updaterLog.getParent());
-			ProcessBuilder pb = buildLaunchCommand(platform, installDir, currentVersion, updaterLog);
+			LaunchPlan launchPlan = buildLaunchCommand(platform, installDir, currentVersion, updaterLog);
+			ProcessBuilder pb = launchPlan.processBuilder();
 
+			if (launchPlan.macHelperScript() != null) {
+				log(logFile, "macOS helper script path: " + launchPlan.macHelperScript());
+				log(logFile, "macOS helper updater command: " + launchPlan.macUpdaterCommand());
+				log(logFile, "macOS helper working directory: " + launchPlan.helperWorkingDirectory());
+			}
 			log(logFile, "Updater executable/script/path chosen: " + pb.command().get(0));
 			log(logFile, "Updater launch working directory: " + pb.directory());
 			log(logFile, "Command: " + pb.command());
 			log(logFile, "Updater launch cwd explicitly set: " + (pb.directory() != null));
 			Process process = pb.start();
 			log(logFile, platform == AppPlatform.MAC
-					? "macOS execution handoff success. PID available: " + process.pid()
+					? "macOS detached helper launch success. PID available: " + process.pid()
 					: "Updater launched. PID available: " + process.pid());
 
 		} catch (Exception ex) {
@@ -54,7 +62,7 @@ public final class DesktopUpdateLauncher {
 				try {
 					log(logFile, "Launch failed: " + stackTrace(ex));
 					if (AppPaths.isMac()) {
-						log(logFile, "macOS execution handoff failure");
+						log(logFile, "macOS detached helper launch failure");
 					}
 				} catch (Exception ignored) {
 				}
@@ -63,10 +71,10 @@ public final class DesktopUpdateLauncher {
 		}
 	}
 
-	private static ProcessBuilder buildLaunchCommand(AppPlatform platform, Path installDir, String currentVersion, Path updaterLog)
+	private static LaunchPlan buildLaunchCommand(AppPlatform platform, Path installDir, String currentVersion, Path updaterLog)
 			throws IOException {
 		return switch (platform) {
-			case WINDOWS -> buildWindowsLaunchCommand(installDir, currentVersion, updaterLog);
+			case WINDOWS -> new LaunchPlan(buildWindowsLaunchCommand(installDir, currentVersion, updaterLog), null, null, null);
 			case MAC -> buildMacLaunchCommand(installDir, currentVersion, updaterLog);
 			default -> throw new IllegalStateException("In-app updates are not available on this platform yet.");
 		};
@@ -94,9 +102,10 @@ public final class DesktopUpdateLauncher {
 		return pb;
 	}
 
-	static ProcessBuilder buildMacLaunchCommand(Path installDir, String currentVersion, Path updaterLog) throws IOException {
+	static LaunchPlan buildMacLaunchCommand(Path installDir, String currentVersion, Path updaterLog) throws IOException {
 		Path javaBinary = resolveMacJavaBinary(installDir);
 		Path updaterJar = resolveMacUpdaterJar(installDir);
+		Path helperWorkingDirectory = Path.of("/");
 
 		if (!Files.exists(javaBinary)) {
 			throw new IllegalStateException("Bundled Java runtime not found: " + javaBinary);
@@ -105,16 +114,44 @@ public final class DesktopUpdateLauncher {
 			throw new IllegalStateException("Updater jar not found: " + updaterJar);
 		}
 
-		ProcessBuilder pb = new ProcessBuilder(
+		List<String> updaterArgs = List.of(
 				javaBinary.toString(),
 				"-jar",
 				updaterJar.toString(),
 				"--currentVersion", currentVersion,
 				"--installDir", installDir.toString());
-		pb.directory(Path.of("/").toFile());
+		String updaterCommand = shellJoin(updaterArgs);
+		Path helperScript = createMacDetachedHelperScript(updaterCommand, updaterLog, helperWorkingDirectory);
+
+		ProcessBuilder pb = new ProcessBuilder("/bin/sh", helperScript.toString());
+		pb.directory(helperWorkingDirectory.toFile());
 		pb.redirectErrorStream(true);
-		pb.redirectOutput(updaterLog.toFile());
-		return pb;
+		pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+		return new LaunchPlan(pb, helperScript, updaterCommand, helperWorkingDirectory);
+	}
+
+	static Path createMacDetachedHelperScript(String updaterCommand, Path updaterLog, Path helperWorkingDirectory) throws IOException {
+		Path helperScript = Files.createTempFile("shale-updater-handoff-", ".sh");
+		String script = "#!/bin/sh\n"
+				+ "cd " + shellQuote(helperWorkingDirectory.toString()) + "\n"
+				+ "nohup " + updaterCommand + " >> " + shellQuote(updaterLog.toString())
+				+ " 2>&1 < /dev/null &\n";
+		Files.writeString(helperScript, script, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
+		try {
+			Files.setPosixFilePermissions(helperScript, EnumSet.of(
+					PosixFilePermission.OWNER_READ,
+					PosixFilePermission.OWNER_WRITE,
+					PosixFilePermission.OWNER_EXECUTE,
+					PosixFilePermission.GROUP_READ,
+					PosixFilePermission.GROUP_EXECUTE,
+					PosixFilePermission.OTHERS_READ,
+					PosixFilePermission.OTHERS_EXECUTE));
+		} catch (UnsupportedOperationException ex) {
+			if (!helperScript.toFile().setExecutable(true, false)) {
+				throw new IOException("Failed to mark helper script executable: " + helperScript, ex);
+			}
+		}
+		return helperScript;
 	}
 
 	static Path resolveMacUpdaterJar(Path installDir) throws IOException {
@@ -169,9 +206,27 @@ public final class DesktopUpdateLauncher {
 				StandardOpenOption.APPEND);
 	}
 
+	private static String shellJoin(List<String> args) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < args.size(); i++) {
+			if (i > 0) {
+				sb.append(' ');
+			}
+			sb.append(shellQuote(args.get(i)));
+		}
+		return sb.toString();
+	}
+
+	private static String shellQuote(String value) {
+		return "'" + value.replace("'", "'\\''") + "'";
+	}
+
 	private static String stackTrace(Throwable error) {
 		StringWriter buffer = new StringWriter();
 		error.printStackTrace(new PrintWriter(buffer));
 		return buffer.toString();
+	}
+
+	record LaunchPlan(ProcessBuilder processBuilder, Path macHelperScript, String macUpdaterCommand, Path helperWorkingDirectory) {
 	}
 }
