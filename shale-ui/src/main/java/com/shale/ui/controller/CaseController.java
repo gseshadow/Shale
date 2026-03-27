@@ -15,6 +15,7 @@ import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
@@ -142,6 +143,12 @@ public class CaseController {
 	private Label organizationsEmptyLabel;
 	@FXML
 	private Button addOrganizationButton;
+	@FXML
+	private ScrollPane timelineScrollPane;
+	@FXML
+	private VBox timelineListBox;
+	@FXML
+	private Label timelineEmptyLabel;
 
 	@FXML
 	private Label ovCaseStatusValue;
@@ -699,6 +706,7 @@ public class CaseController {
 		switch (sectionName) {
 		case "Overview" -> showOverview();
 		case "Tasks" -> showTasksTab();
+		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
 		case "Contacts" -> showContacts();
 		case "Organizations" -> showOrganizations();
@@ -769,10 +777,109 @@ public class CaseController {
 		setVisibleManaged(organizationsScrollPane, false);
 		setVisibleManaged(organizationsFlow, false);
 		setVisibleManaged(organizationsEmptyLabel, false);
+		setVisibleManaged(timelineScrollPane, false);
+		setVisibleManaged(timelineListBox, false);
+		setVisibleManaged(timelineEmptyLabel, false);
 
 		if (placeholderTextArea != null) {
 			placeholderTextArea.setText(sectionName + " view is not implemented yet.");
 		}
+	}
+
+	private void showTimeline() {
+		setUpdatesPaneVisible(false);
+		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, true);
+		setPaneVisible(tasksPanel, false);
+
+		if (genericTitleLabel != null)
+			genericTitleLabel.setText("Timeline");
+
+		setVisibleManaged(addOrganizationButton, false);
+		setVisibleManaged(placeholderTextArea, false);
+		setVisibleManaged(organizationsScrollPane, false);
+		setVisibleManaged(organizationsFlow, false);
+		setVisibleManaged(organizationsEmptyLabel, false);
+		setVisibleManaged(timelineScrollPane, true);
+		setVisibleManaged(timelineListBox, true);
+		setVisibleManaged(timelineEmptyLabel, false);
+		loadCaseTimelineEventsAsync();
+	}
+
+	private void loadCaseTimelineEventsAsync() {
+		if (caseDao == null || caseId == null) {
+			renderTimelineEvents(List.of());
+			return;
+		}
+
+		final int activeCaseId = caseId;
+		new Thread(() -> {
+			try {
+				List<CaseTimelineEventDto> events = caseDao.listCaseTimelineEvents(activeCaseId);
+				runOnFx(() -> {
+					if (caseId == null || caseId != activeCaseId)
+						return;
+					renderTimelineEvents(events);
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to load timeline events. " + ex.getMessage()));
+			}
+		}, "case-timeline-load-" + activeCaseId).start();
+	}
+
+	private void renderTimelineEvents(List<CaseTimelineEventDto> events) {
+		if (timelineListBox == null)
+			return;
+
+		timelineListBox.getChildren().clear();
+		List<CaseTimelineEventDto> safeEvents = events == null ? List.of() : events;
+		if (safeEvents.isEmpty()) {
+			setVisibleManaged(timelineEmptyLabel, true);
+			if (timelineScrollPane != null)
+				timelineScrollPane.setVvalue(0.0);
+			return;
+		}
+
+		setVisibleManaged(timelineEmptyLabel, false);
+		for (CaseTimelineEventDto event : safeEvents) {
+			if (event == null)
+				continue;
+			timelineListBox.getChildren().add(createTimelineEventCard(event));
+		}
+		if (timelineScrollPane != null)
+			timelineScrollPane.setVvalue(0.0);
+	}
+
+	private Node createTimelineEventCard(CaseTimelineEventDto event) {
+		Label titleLabel = new Label(safeText(event.getTitle()));
+		titleLabel.setStyle("-fx-font-weight: bold;");
+		titleLabel.setWrapText(true);
+
+		Label actorLabel = new Label(safeText(event.getActorDisplayName()));
+		actorLabel.setStyle("-fx-opacity: 0.85;");
+
+		Label timestampLabel = new Label(formatDateTime(event.getOccurredAt()));
+		timestampLabel.setStyle("-fx-opacity: 0.75;");
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox metaRow = new HBox(8, actorLabel, spacer, timestampLabel);
+		metaRow.setAlignment(Pos.CENTER_LEFT);
+
+		VBox content = new VBox(6, titleLabel, metaRow);
+		String body = safeText(event.getBody()).trim();
+		if (!body.isBlank()) {
+			Label bodyLabel = new Label(body);
+			bodyLabel.setWrapText(true);
+			content.getChildren().add(bodyLabel);
+		}
+
+		VBox card = new VBox(content);
+		card.setPadding(new Insets(10, 12, 10, 12));
+		card.getStyleClass().add("secondary-panel");
+		return card;
 	}
 
 
@@ -792,6 +899,9 @@ public class CaseController {
 			addOrganizationButton.setText("Add Contact");
 		}
 		setVisibleManaged(placeholderTextArea, false);
+		setVisibleManaged(timelineScrollPane, false);
+		setVisibleManaged(timelineListBox, false);
+		setVisibleManaged(timelineEmptyLabel, false);
 		renderContactsSection();
 	}
 
@@ -880,6 +990,9 @@ public class CaseController {
 			addOrganizationButton.setText("Add Organization");
 		}
 		setVisibleManaged(placeholderTextArea, false);
+		setVisibleManaged(timelineScrollPane, false);
+		setVisibleManaged(timelineListBox, false);
+		setVisibleManaged(timelineEmptyLabel, false);
 		renderOrganizationsSection();
 	}
 
