@@ -36,7 +36,8 @@ public final class InstallService {
 		deleteRecursively(installDir);
 		if (isMacAppBundle(sourceDir, installDir)) {
 			copyMacAppBundle(sourceDir, installDir);
-			ensureMacLauncherExecutable(installDir);
+			ensureMacBundleExecutables(installDir);
+			logMacRuntimeJavaStatus(installDir);
 			return;
 		}
 		copyDirectory(sourceDir, installDir);
@@ -171,6 +172,11 @@ public final class InstallService {
 		}
 	}
 
+	private void ensureMacBundleExecutables(Path installDir) throws IOException {
+		ensureMacLauncherExecutable(installDir);
+		ensureMacRuntimeBinExecutables(installDir);
+	}
+
 	private void ensureMacLauncherExecutable(Path installDir) throws IOException {
 		Path macOsDir = installDir.resolve("Contents").resolve("MacOS");
 		if (!Files.isDirectory(macOsDir)) {
@@ -192,6 +198,45 @@ public final class InstallService {
 			}
 			throw ex;
 		}
+	}
+
+	private void ensureMacRuntimeBinExecutables(Path installDir) throws IOException {
+		Path runtimeBinDir = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("bin");
+		if (!Files.isDirectory(runtimeBinDir)) {
+			return;
+		}
+
+		try (var stream = Files.list(runtimeBinDir)) {
+			stream.filter(Files::isRegularFile)
+					.forEach(path -> {
+						try {
+							setExecutable(path);
+						} catch (IOException ex) {
+							throw new RuntimeException(ex);
+						}
+					});
+		} catch (RuntimeException ex) {
+			if (ex.getCause() instanceof IOException io) {
+				throw io;
+			}
+			throw ex;
+		}
+	}
+
+	private void logMacRuntimeJavaStatus(Path installDir) {
+		Path runtimeJavaPath = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("bin")
+				.resolve("java");
+		boolean exists = Files.exists(runtimeJavaPath);
+		boolean executable = exists && Files.isExecutable(runtimeJavaPath);
+		log("macOS runtime java path: " + runtimeJavaPath + ", exists=" + exists + ", executable=" + executable);
 	}
 
 	private void setExecutable(Path path) throws IOException {
