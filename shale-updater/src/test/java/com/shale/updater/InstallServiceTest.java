@@ -25,6 +25,8 @@ final class InstallServiceTest {
 				.resolve("bin").resolve("java");
 		Path sourceRuntimeJar = sourceApp.resolve("Contents").resolve("runtime").resolve("Contents").resolve("Home")
 				.resolve("bin").resolve("jar");
+		Path sourceJspawnhelper = sourceApp.resolve("Contents").resolve("runtime").resolve("Contents").resolve("Home")
+				.resolve("lib").resolve("jspawnhelper");
 		Path installApp = tempDir.resolve("Applications").resolve("Shale.app");
 		Path oldFile = installApp.resolve("Contents").resolve("obsolete.txt");
 
@@ -32,15 +34,18 @@ final class InstallServiceTest {
 		Files.createDirectories(sourceConfig.getParent());
 		Files.createDirectories(sourceRuntimeJava.getParent());
 		Files.createDirectories(sourceRuntimeJar.getParent());
+		Files.createDirectories(sourceJspawnhelper.getParent());
 		Files.writeString(sourceLauncher, "launcher");
 		Files.writeString(sourceConfig, "config");
 		Files.writeString(sourceRuntimeJava, "java");
 		Files.writeString(sourceRuntimeJar, "jar");
+		Files.writeString(sourceJspawnhelper, "jspawnhelper");
 		Files.createDirectories(oldFile.getParent());
 		Files.writeString(oldFile, "old");
 		removeExecutable(sourceLauncher);
 		removeExecutable(sourceRuntimeJava);
 		removeExecutable(sourceRuntimeJar);
+		removeExecutable(sourceJspawnhelper);
 
 		installService.replaceInstallDir(sourceApp, installApp);
 
@@ -55,6 +60,8 @@ final class InstallServiceTest {
 				.resolve("Home").resolve("bin").resolve("java")));
 		assertTrue(Files.isExecutable(installApp.resolve("Contents").resolve("runtime").resolve("Contents")
 				.resolve("Home").resolve("bin").resolve("jar")));
+		assertTrue(Files.isExecutable(installApp.resolve("Contents").resolve("runtime").resolve("Contents")
+				.resolve("Home").resolve("lib").resolve("jspawnhelper")));
 	}
 
 	@Test

@@ -175,6 +175,7 @@ public final class InstallService {
 	private void ensureMacBundleExecutables(Path installDir) throws IOException {
 		ensureMacLauncherExecutable(installDir);
 		ensureMacRuntimeBinExecutables(installDir);
+		ensureMacRuntimeLibExecutables(installDir);
 	}
 
 	private void ensureMacLauncherExecutable(Path installDir) throws IOException {
@@ -227,6 +228,24 @@ public final class InstallService {
 		}
 	}
 
+	private void ensureMacRuntimeLibExecutables(Path installDir) throws IOException {
+		Path runtimeLibDir = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("lib");
+		if (!Files.isDirectory(runtimeLibDir)) {
+			return;
+		}
+
+		Path jspawnhelperPath = runtimeLibDir.resolve("jspawnhelper");
+		setExecutableIfRegularFile(jspawnhelperPath);
+
+		// Some runtime-native helpers under Home/lib are binary entrypoints without file extensions.
+		// Restore execute bits to avoid regressing subprocess support after replacement.
+		setExecutableIfRegularFile(runtimeLibDir.resolve("jexec"));
+	}
+
 	private void logMacRuntimeJavaStatus(Path installDir) {
 		Path runtimeJavaPath = installDir.resolve("Contents")
 				.resolve("runtime")
@@ -237,6 +256,24 @@ public final class InstallService {
 		boolean exists = Files.exists(runtimeJavaPath);
 		boolean executable = exists && Files.isExecutable(runtimeJavaPath);
 		log("macOS runtime java path: " + runtimeJavaPath + ", exists=" + exists + ", executable=" + executable);
+
+		Path jspawnhelperPath = installDir.resolve("Contents")
+				.resolve("runtime")
+				.resolve("Contents")
+				.resolve("Home")
+				.resolve("lib")
+				.resolve("jspawnhelper");
+		boolean jspawnhelperExists = Files.exists(jspawnhelperPath);
+		boolean jspawnhelperExecutable = jspawnhelperExists && Files.isExecutable(jspawnhelperPath);
+		log("macOS runtime jspawnhelper path: " + jspawnhelperPath
+				+ ", exists=" + jspawnhelperExists
+				+ ", executable=" + jspawnhelperExecutable);
+	}
+
+	private void setExecutableIfRegularFile(Path path) throws IOException {
+		if (Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+			setExecutable(path);
+		}
 	}
 
 	private void setExecutable(Path path) throws IOException {
