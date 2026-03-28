@@ -3778,6 +3778,13 @@ public class CaseController {
 						request.baseline().oldNumber(),
 						request.saveDraft().caseNumber()
 				);
+				addDescriptionChangedTimelineEvent(
+						request.saveCaseId(),
+						request.tenantId(),
+						request.userId(),
+						request.baseline().oldDescription(),
+						request.saveDraft().description()
+				);
 				if (teamChanged) {
 					addTeamChangedTimelineEvent(
 							request.saveCaseId(),
@@ -5472,6 +5479,29 @@ public class CaseController {
 				actorUserId,
 				"Team changed",
 				"updated assigned team"
+		);
+	}
+
+	private void addDescriptionChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			String oldDescription,
+			String newDescription) {
+		if (caseDao == null || tenantId == null || tenantId <= 0)
+			return;
+		String normalizedOld = normalizeTimelineTextValue(oldDescription);
+		String normalizedNew = normalizeTimelineTextValue(newDescription);
+		if (Objects.equals(normalizedOld, normalizedNew))
+			return;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				CaseDao.CaseTimelineEventTypes.DESCRIPTION_CHANGED,
+				actorUserId,
+				"Description updated",
+				null
 		);
 	}
 

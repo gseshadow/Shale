@@ -46,6 +46,7 @@ public final class CaseDao {
 		public static final String SOL_DATE_CHANGED = "SOL_DATE_CHANGED";
 		public static final String CASE_NAME_CHANGED = "CASE_NAME_CHANGED";
 		public static final String CASE_NUMBER_CHANGED = "CASE_NUMBER_CHANGED";
+		public static final String DESCRIPTION_CHANGED = "DESCRIPTION_CHANGED";
 		public static final String PRACTICE_AREA_CHANGED = "PRACTICE_AREA_CHANGED";
 		public static final String USER_NOTE_ADDED = "USER_NOTE_ADDED";
 
@@ -61,6 +62,7 @@ public final class CaseDao {
 				SOL_DATE_CHANGED,
 				CASE_NAME_CHANGED,
 				CASE_NUMBER_CHANGED,
+				DESCRIPTION_CHANGED,
 				PRACTICE_AREA_CHANGED,
 				USER_NOTE_ADDED
 		);
