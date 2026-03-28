@@ -857,7 +857,9 @@ public class CaseController {
 		titleLabel.setStyle("-fx-font-weight: bold;");
 		titleLabel.setWrapText(true);
 
-		Label actorLabel = new Label(safeText(event.getActorDisplayName()));
+		String actorDisplayName = safeText(event.getActorDisplayName()).trim();
+		String actorMeta = actorDisplayName.isBlank() ? "By system" : "By " + actorDisplayName;
+		Label actorLabel = new Label(actorMeta);
 		actorLabel.setStyle("-fx-opacity: 0.85;");
 
 		Label timestampLabel = new Label(formatDateTime(event.getOccurredAt()));
