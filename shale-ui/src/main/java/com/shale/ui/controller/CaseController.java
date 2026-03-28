@@ -3749,6 +3749,17 @@ public class CaseController {
 							request.desired().desiredSolDate()
 					);
 				}
+				if (computation.practiceAreaChanged()) {
+					addPracticeAreaChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							baseOverview == null ? null : baseOverview.getPracticeAreaId(),
+							baseOverview == null ? null : baseOverview.getPracticeArea(),
+							request.desired().desiredPracticeAreaId(),
+							draftPracticeAreaName
+					);
+				}
 				addTextIdentityChangedTimelineEvent(
 						request.saveCaseId(),
 						request.tenantId(),
@@ -5356,6 +5367,54 @@ public class CaseController {
 
 	private String resolveTimelineDateLabel(LocalDate value) {
 		return value == null ? "none" : value.toString();
+	}
+
+	private void addPracticeAreaChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			Integer oldPracticeAreaId,
+			String oldPracticeAreaName,
+			Integer newPracticeAreaId,
+			String newPracticeAreaName) {
+		if (caseDao == null || tenantId == null || tenantId <= 0)
+			return;
+		if (Objects.equals(oldPracticeAreaId, newPracticeAreaId))
+			return;
+
+		String oldLabel = resolvePracticeAreaLabel(oldPracticeAreaName, oldPracticeAreaId, tenantId);
+		String newLabel = resolvePracticeAreaLabel(newPracticeAreaName, newPracticeAreaId, tenantId);
+		String body = "from " + oldLabel + " to " + newLabel;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				CaseDao.CaseTimelineEventTypes.PRACTICE_AREA_CHANGED,
+				actorUserId,
+				"Practice area changed",
+				body
+		);
+	}
+
+	private String resolvePracticeAreaLabel(String preferredName, Integer practiceAreaId, Integer tenantId) {
+		String trimmed = safeText(preferredName).trim();
+		if (!trimmed.isBlank())
+			return trimmed;
+		if (practiceAreaId == null)
+			return "none";
+		if (caseDao != null && tenantId != null && tenantId > 0) {
+			List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(tenantId);
+			if (areas != null) {
+				for (CaseDao.PracticeAreaRow area : areas) {
+					if (area == null || area.id() != practiceAreaId)
+						continue;
+					String name = safeText(area.name()).trim();
+					if (!name.isBlank())
+						return name;
+				}
+			}
+		}
+		return "Practice area #" + practiceAreaId;
 	}
 
 	private void addTextIdentityChangedTimelineEvent(
