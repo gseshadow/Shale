@@ -499,6 +499,7 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
 			int shaleClientId = requireCurrentShaleClientId(con);
+			String caseUserActiveFilter = activeFilter("IsDeleted", "cu_scope");
 			String sql = """
 					SELECT TOP (?)
 					  c.Id,
@@ -545,8 +546,7 @@ public final class CaseDao {
 					    FROM %s cu_scope
 					    WHERE cu_scope.CaseId = c.Id
 					      AND cu_scope.UserId = ?
-					      AND cu_scope.RoleId = ?
-					      AND cu_scope.IsPrimary = 1
+					      AND %s
 					  )
 					ORDER BY c.CallerDate DESC, c.Id DESC;
 					""".formatted(
@@ -556,7 +556,8 @@ public final class CaseDao {
 							CASE_USERS_TABLE,
 							USERS_TABLE,
 							activeFilter(schema.deletedColumn(), "c"),
-							CASE_USERS_TABLE);
+							CASE_USERS_TABLE,
+							caseUserActiveFilter);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
@@ -564,7 +565,6 @@ public final class CaseDao {
 				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, userId);
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 
 				List<CaseRow> out = new ArrayList<>();
 				try (ResultSet rs = ps.executeQuery()) {
@@ -583,13 +583,13 @@ public final class CaseDao {
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
 						+ "selectedUserId=" + userId
 						+ " shaleClientId=" + shaleClientId
-						+ " roleId=" + ROLE_RESPONSIBLE_ATTORNEY
-						+ " isPrimary=1"
+						+ " membershipRule=anyCaseUsersRow"
+						+ " caseUsersIsDeletedFilter=" + caseUserActiveFilter
 						+ " daoTotalRowsReturned=" + out.size());
 				return out;
 			}
 		} catch (SQLException e) {
-			throw new RuntimeException("Failed to list assigned cases for responsible attorney user (userId=" + userId + ")", e);
+			throw new RuntimeException("Failed to list assigned cases for team-member user (userId=" + userId + ")", e);
 		}
 	}
 
