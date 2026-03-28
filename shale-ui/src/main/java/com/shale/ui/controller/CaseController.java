@@ -3778,6 +3778,13 @@ public class CaseController {
 						request.baseline().oldNumber(),
 						request.saveDraft().caseNumber()
 				);
+				if (teamChanged) {
+					addTeamChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId()
+					);
+				}
 
 				CaseDetailDto updatedForUi = updated;
 
@@ -5450,6 +5457,22 @@ public class CaseController {
 	private String normalizeTimelineTextValue(String value) {
 		String trimmed = safeText(value).trim();
 		return trimmed.isBlank() ? null : trimmed;
+	}
+
+	private void addTeamChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId) {
+		if (caseDao == null || tenantId == null || tenantId <= 0)
+			return;
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				CaseDao.CaseTimelineEventTypes.TEAM_CHANGED,
+				actorUserId,
+				"Team changed",
+				"updated assigned team"
+		);
 	}
 
 	private record LifecycleDates(LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate) {
