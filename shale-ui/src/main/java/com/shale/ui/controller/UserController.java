@@ -290,6 +290,11 @@ public final class UserController {
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
+					System.err.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
+							+ "requestId=" + requestId
+							+ " selectedUserId=" + targetUserId
+							+ " controllerException=" + ex.getMessage());
+					ex.printStackTrace(System.err);
 					assignedCases = List.of();
 					renderAssignedCases();
 					setError("Failed to load assigned cases for this user.");

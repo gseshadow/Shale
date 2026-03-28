@@ -499,7 +499,7 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
 			int shaleClientId = requireCurrentShaleClientId(con);
-			String caseUserActiveFilter = activeFilter("IsDeleted", "cu_scope");
+			String caseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "cu_scope");
 			String sql = """
 					SELECT TOP (?)
 					  c.Id,
@@ -583,12 +583,20 @@ public final class CaseDao {
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
 						+ "selectedUserId=" + userId
 						+ " shaleClientId=" + shaleClientId
+						+ " sqlSummary=list-active-cases-for-user-team-member"
+						+ " sql=" + sql.replace('\n', ' ')
 						+ " membershipRule=anyCaseUsersRow"
+						+ " sqlParamOrder=[limit, responsibleAttorneyRoleId, shaleClientId, selectedUserId]"
+						+ " sqlParams=[" + limit + "," + ROLE_RESPONSIBLE_ATTORNEY + "," + shaleClientId + "," + userId + "]"
 						+ " caseUsersIsDeletedFilter=" + caseUserActiveFilter
 						+ " daoTotalRowsReturned=" + out.size());
 				return out;
 			}
 		} catch (SQLException e) {
+			System.err.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
+					+ "selectedUserId=" + userId
+					+ " daoException=" + e.getMessage());
+			e.printStackTrace(System.err);
 			throw new RuntimeException("Failed to list assigned cases for team-member user (userId=" + userId + ")", e);
 		}
 	}
@@ -778,21 +786,11 @@ public final class CaseDao {
 		CaseSort effectiveSort = sort == null ? CaseSort.INTAKE_NEWEST : sort;
 		String orderByClause = orderByClauseFor(effectiveSort);
 
-		String userMembershipFilter = restrictToUserId == null
-				? ""
-				: """
-				  AND EXISTS (
-				    SELECT 1
-				    FROM %s cu_scope
-				    WHERE cu_scope.CaseId = c.Id
-				      AND cu_scope.UserId = ?
-				  )
-				""".formatted(CASE_USERS_TABLE);
-
 		List<CaseRow> out = new ArrayList<>(pageSize);
 
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
+			String userMembershipFilter = membershipExistsFilter(restrictToUserId, resolveCaseUsersDeletedColumn(con));
 			String sql = """
 				SELECT
 				  c.Id,
@@ -931,19 +929,9 @@ public final class CaseDao {
 	}
 
 	private long countAll(boolean includeClosedDenied, Integer restrictToUserId) {
-		String userMembershipFilter = restrictToUserId == null
-				? ""
-				: """
-				  AND EXISTS (
-				    SELECT 1
-				    FROM %s cu_scope
-				    WHERE cu_scope.CaseId = c.Id
-				      AND cu_scope.UserId = ?
-				  )
-				""".formatted(CASE_USERS_TABLE);
-
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
+			String userMembershipFilter = membershipExistsFilter(restrictToUserId, resolveCaseUsersDeletedColumn(con));
 			String sql = """
 				SELECT COUNT(1)
 				FROM %s c
@@ -3385,6 +3373,25 @@ public final class CaseDao {
 
 	private static CaseSchema resolveCaseSchema(Connection con) throws SQLException {
 		return new CaseSchema(existingColumn(con, CASES_TABLE, List.of("IsDeleted", "is_deleted")));
+	}
+
+	private static String resolveCaseUsersDeletedColumn(Connection con) throws SQLException {
+		return existingColumn(con, CASE_USERS_TABLE, List.of("IsDeleted", "is_deleted"));
+	}
+
+	private static String membershipExistsFilter(Integer restrictToUserId, String caseUsersDeletedColumn) {
+		if (restrictToUserId == null) {
+			return "";
+		}
+		return """
+			  AND EXISTS (
+			    SELECT 1
+			    FROM %s cu_scope
+			    WHERE cu_scope.CaseId = c.Id
+			      AND cu_scope.UserId = ?
+			      AND %s
+			  )
+			""".formatted(CASE_USERS_TABLE, activeFilter(caseUsersDeletedColumn, "cu_scope"));
 	}
 
 	private static String existingColumn(Connection con, String tableName, List<String> candidates) throws SQLException {
