@@ -5074,6 +5074,87 @@ public class CaseController {
 							request.baseline().getDateFeeAgreementSigned(),
 							request.dateFeeAgreementSigned()
 					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.ESTATE_CASE_CHANGED,
+							"Estate case updated",
+							parseNullableBooleanStorage(request.baseline().getClientEstate()),
+							parseNullableBooleanStorage(request.clientEstate())
+					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.MEDICAL_RECORDS_RECEIVED_CHANGED,
+							"Medical records received updated",
+							request.baseline().getMedicalRecordsReceived(),
+							request.medicalRecordsReceived()
+					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.FEE_AGREEMENT_SIGNED_CHANGED,
+							"Fee agreement signed updated",
+							request.baseline().getFeeAgreementSigned(),
+							request.feeAgreementSigned()
+					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.ACCEPTED_CHRONOLOGY_CHANGED,
+							"Accepted chronology updated",
+							request.baseline().getAcceptedChronology(),
+							request.acceptedChronology()
+					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.CONSULTANT_EXPERT_SEARCH_CHANGED,
+							"Consultant expert search updated",
+							request.baseline().getAcceptedConsultantExpertSearch(),
+							request.acceptedConsultantExpertSearch()
+					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.TESTIFYING_EXPERT_SEARCH_CHANGED,
+							"Testifying expert search updated",
+							request.baseline().getAcceptedTestifyingExpertSearch(),
+							request.acceptedTestifyingExpertSearch()
+					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.MEDICAL_LITERATURE_CHANGED,
+							"Medical literature updated",
+							request.baseline().getAcceptedMedicalLiterature(),
+							request.acceptedMedicalLiterature()
+					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.DENIED_CHRONOLOGY_CHANGED,
+							"Denied chronology updated",
+							request.baseline().getDeniedChronology(),
+							request.deniedChronology()
+					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.RECEIVED_UPDATES_CHANGED,
+							"Received updates updated",
+							parseNullableBooleanStorage(request.baseline().getReceivedUpdates()),
+							parseNullableBooleanStorage(request.receivedUpdates())
+					);
 					addTextIdentityChangedTimelineEvent(
 							request.caseId(),
 							(appState == null ? null : appState.getShaleClientId()),
@@ -5587,6 +5668,29 @@ public class CaseController {
 				actorUserId,
 				title,
 				body
+		);
+	}
+
+	private void addBooleanChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			String eventType,
+			String title,
+			Boolean oldValue,
+			Boolean newValue) {
+		if (caseDao == null || tenantId == null || tenantId <= 0)
+			return;
+		if (Objects.equals(oldValue, newValue) || newValue == null)
+			return;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				eventType,
+				actorUserId,
+				title,
+				newValue ? "enabled" : "disabled"
 		);
 	}
 
