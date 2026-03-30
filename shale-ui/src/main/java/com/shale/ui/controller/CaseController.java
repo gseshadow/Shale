@@ -4965,6 +4965,35 @@ public class CaseController {
 							request.primaryStatusName()
 					);
 				}
+				if (updated != null) {
+					addTextIdentityChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.CASE_NAME_CHANGED,
+							"Case name changed",
+							request.baseline().getCaseName(),
+							request.name()
+					);
+					addTextIdentityChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.CASE_NUMBER_CHANGED,
+							"Case number changed",
+							request.baseline().getCaseNumber(),
+							request.caseNumber()
+					);
+					addTextIdentityChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.OFFICE_CASE_CODE_CHANGED,
+							"Office case code changed",
+							request.baseline().getOfficePrinterCode(),
+							request.officePrinterCode()
+					);
+				}
 				if (updated != null)
 					currentOverview = caseDao.getOverview(request.caseId());
 
