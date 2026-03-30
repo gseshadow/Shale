@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
+import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.data.dao.CaseDao;
 
@@ -29,7 +30,8 @@ public final class CaseDocumentService {
         if (type != CaseDocumentType.CASE_SUMMARY) throw new IllegalArgumentException("Unsupported type: " + type);
 
         CaseOverviewDto overview = caseDao.getOverview(caseId);
-        if (overview == null) throw new IllegalStateException("Case not found for id=" + caseId);
+        CaseDetailDto detail = caseDao.getDetail(caseId);
+        if (overview == null || detail == null) throw new IllegalStateException("Case not found for id=" + caseId);
 
         List<CaseDocumentModel.TeamEntry> team = caseDao.listCaseTeamRows(caseId).stream()
                 .filter(Objects::nonNull)
@@ -41,10 +43,43 @@ public final class CaseDocumentService {
                 .map(row -> new CaseDocumentModel.OrganizationEntry(row.name()))
                 .toList();
 
-        return new CaseDocumentModel(caseId, overview.getCaseName(), overview.getCaseNumber(), overview.getCaseStatus(),
-                overview.getResponsibleAttorney(), overview.getPracticeArea(), overview.getCaller(),
-                overview.getClient(), overview.getOpposingCounsel(), overview.getIncidentDate(),
-                overview.getSolDate(), overview.getDescription(), team, orgs);
+        return new CaseDocumentModel(
+                overview.getCaseName(),
+                overview.getCaseStatus(),
+                overview.getResponsibleAttorney(),
+                overview.getPracticeArea(),
+                overview.getCaller(),
+                overview.getClient(),
+                overview.getOpposingCounsel(),
+                team,
+                orgs,
+                overview.getIncidentDate(),
+                overview.getSolDate(),
+                overview.getDescription(),
+                detail.getSummary(),
+                detail.getCallerDate(),
+                detail.getCallerTime(),
+                detail.getAcceptedDate(),
+                detail.getDeniedDate(),
+                detail.getClosedDate(),
+                detail.getDateOfMedicalNegligence(),
+                detail.getDateMedicalNegligenceWasDiscovered(),
+                detail.getTortNoticeDeadline(),
+                detail.getDiscoveryDeadline(),
+                detail.getDateFeeAgreementSigned(),
+                detail.getOfficePrinterCode(),
+                detail.getClientEstate(),
+                detail.getMedicalRecordsReceived(),
+                detail.getFeeAgreementSigned(),
+                detail.getAcceptedChronology(),
+                detail.getAcceptedConsultantExpertSearch(),
+                detail.getAcceptedTestifyingExpertSearch(),
+                detail.getAcceptedMedicalLiterature(),
+                detail.getAcceptedDetail(),
+                detail.getDeniedChronology(),
+                detail.getDeniedDetail(),
+                detail.getReceivedUpdates(),
+                detail.getSummary());
     }
 
     private String roleLabel(int roleId) {

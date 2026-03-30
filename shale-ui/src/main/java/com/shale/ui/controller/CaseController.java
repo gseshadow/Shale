@@ -597,15 +597,15 @@ public class CaseController {
 
 	private void onGenerateDocument() {
 		if (caseId == null || caseId <= 0) {
-			showError("Load a case before generating a document.");
+			showError("Load a case before generating a summary.");
 			return;
 		}
 		if (appState == null || appState.getShaleClientId() == null || appState.getShaleClientId() <= 0) {
-			showError("Unable to resolve tenant context for document generation.");
+			showError("Unable to resolve tenant context for summary generation.");
 			return;
 		}
 		if (caseDocumentService == null) {
-			showError("Document generation service is unavailable.");
+			showError("Summary generation service is unavailable.");
 			return;
 		}
 
@@ -621,7 +621,7 @@ public class CaseController {
 			System.out.println("[Document] Generated case summary HTML at " + path);
 		} catch (Exception ex) {
 			System.err.println("[Document] Failed to generate case summary: " + ex.getMessage());
-			showError("Could not generate case summary document. Please try again.");
+			showError("Could not generate case summary. Please try again.");
 		}
 	}
 
