@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +45,7 @@ import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
+import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -2740,7 +2742,7 @@ public class CaseController {
 		{
 			try {
 				caseDao.addCaseNote(activeCaseId, activeClientId, trimmedText, createdByUserId);
-				runOnFx(() -> applyLastUpdatedLabel(LocalDateTime.now()));
+				runOnFx(() -> applyLastUpdatedLabel(LocalDateTime.now(ZoneOffset.UTC)));
 				publishCaseUpdateAdded(activeCaseId);
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
 				runOnFx(() ->
@@ -3100,8 +3102,10 @@ public class CaseController {
 		return s == null ? "" : s;
 	}
 
+	private static final DateTimeFormatter CASE_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
 	private String formatDateTime(LocalDateTime value) {
-		return value == null ? "—" : value.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+		return UtcDateTimeDisplayFormatter.formatUtcToLocal(value, CASE_TIMESTAMP_FORMAT);
 	}
 
 	private static boolean hasPatchKey(String rawPatchJson, String key) {
