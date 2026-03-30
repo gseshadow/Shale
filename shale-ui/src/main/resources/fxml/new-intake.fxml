@@ -127,26 +127,26 @@
                                     <Button fx:id="selectStatusButton" text="Change" minWidth="90" />
                                 </HBox>
 
-                                <Label text="Description" GridPane.rowIndex="2" />
-                                <TextArea fx:id="descriptionArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <Label text="Description" GridPane.rowIndex="2" GridPane.columnSpan="2" />
+                                <TextArea fx:id="descriptionArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="3" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Summary" GridPane.rowIndex="3" />
-                                <TextArea fx:id="summaryArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <Label text="Summary" GridPane.rowIndex="4" GridPane.columnSpan="2" />
+                                <TextArea fx:id="summaryArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="5" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Date of Medical Negligence" wrapText="true" GridPane.rowIndex="4" />
-                                <DatePicker fx:id="dateMedicalNegligencePicker" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <Label text="Date of Medical Negligence" wrapText="true" GridPane.rowIndex="6" />
+                                <DatePicker fx:id="dateMedicalNegligencePicker" GridPane.rowIndex="6" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Date Medical Negligence Was Discovered" wrapText="true" GridPane.rowIndex="5" />
-                                <DatePicker fx:id="dateMedicalNegligenceDiscoveredPicker" GridPane.rowIndex="5" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <Label text="Date Medical Negligence Was Discovered" wrapText="true" GridPane.rowIndex="7" />
+                                <DatePicker fx:id="dateMedicalNegligenceDiscoveredPicker" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Date of Injury" GridPane.rowIndex="6" />
-                                <DatePicker fx:id="dateOfInjuryPicker" GridPane.rowIndex="6" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <Label text="Date of Injury" GridPane.rowIndex="8" />
+                                <DatePicker fx:id="dateOfInjuryPicker" GridPane.rowIndex="8" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Statute of Limitations" wrapText="true" GridPane.rowIndex="7" />
-                                <DatePicker fx:id="statuteOfLimitationsPicker" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <Label text="Statute of Limitations" wrapText="true" GridPane.rowIndex="9" />
+                                <DatePicker fx:id="statuteOfLimitationsPicker" GridPane.rowIndex="9" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Tort Claims Notice" GridPane.rowIndex="8" />
-                                <DatePicker fx:id="tortClaimsNoticePicker" GridPane.rowIndex="8" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <Label text="Tort Claims Notice" GridPane.rowIndex="10" />
+                                <DatePicker fx:id="tortClaimsNoticePicker" GridPane.rowIndex="10" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
                             </GridPane>
                         </VBox>
                     </VBox>
