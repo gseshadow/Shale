@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseDetailDto;
@@ -402,6 +403,7 @@ public class CaseController {
 	private Consumer<Integer> onOpenPracticeArea;
 
 	private TaskCardFactory taskCardFactory;
+	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 	private Consumer<Long> onOpenTask;
 
 	private OrganizationCardFactory organizationCardFactory;
@@ -1626,6 +1628,9 @@ public class CaseController {
 	        showTaskActionError("You must be signed in to edit tasks.");
 	        return;
 	    }
+	    if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
+	        return;
+	    }
 
 	    new Thread(() -> {
 	        try {
@@ -1634,49 +1639,56 @@ public class CaseController {
 	            List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
 
 	            runOnFx(() -> {
-	                if (detail == null) {
-	                    showTaskActionError("Task was not found or may have been deleted.");
-	                    refreshCaseTasks();
-	                    return;
+	                try {
+	                    if (detail == null) {
+	                        showTaskActionError("Task was not found or may have been deleted.");
+	                        refreshCaseTasks();
+	                        return;
+	                    }
+
+	                    TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+	                            detail.id(),
+	                            detail.caseId(),
+	                            detail.caseName(),
+	                            detail.caseResponsibleAttorney(),
+	                            detail.caseResponsibleAttorneyColor(),
+	                            detail.title(),
+	                            detail.description(),
+	                            detail.dueAt(),
+	                            detail.priorityId(),
+	                            detail.assignedUserId(),
+	                            detail.completedAt() != null
+	                    );
+
+	                    Optional<TaskDetailDialog.TaskDetailResult> result =
+	                            TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users, onOpenCase);
+
+	                    if (result.isEmpty()) {
+	                        return;
+	                    }
+
+	                    TaskDetailDialog.TaskDetailResult action = result.get();
+	                    if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+	                        deleteTaskFromDetail(taskId, shaleClientId);
+	                        return;
+	                    }
+
+	                    TaskDetailDialog.SaveTaskPayload payload = action.payload();
+	                    if (payload == null) {
+	                        return;
+	                    }
+
+	                    saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+	                } finally {
+	                    taskDetailDialogInFlight.set(false);
 	                }
-
-	                TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
-	                        detail.id(),
-	                        detail.caseId(),
-	                        detail.caseName(),
-	                        detail.caseResponsibleAttorney(),
-	                        detail.caseResponsibleAttorneyColor(),
-	                        detail.title(),
-	                        detail.description(),
-	                        detail.dueAt(),
-	                        detail.priorityId(),
-	                        detail.assignedUserId(),
-	                        detail.completedAt() != null
-	                );
-
-	                Optional<TaskDetailDialog.TaskDetailResult> result =
-	                        TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users, onOpenCase);
-
-	                if (result.isEmpty()) {
-	                    return;
-	                }
-
-	                TaskDetailDialog.TaskDetailResult action = result.get();
-	                if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
-	                    deleteTaskFromDetail(taskId, shaleClientId);
-	                    return;
-	                }
-
-	                TaskDetailDialog.SaveTaskPayload payload = action.payload();
-	                if (payload == null) {
-	                    return;
-	                }
-
-	                saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
 	            });
 	        } catch (Exception ex) {
 	            logTaskActionException("load-detail", ex);
-	            runOnFx(() -> showTaskActionError("Failed to load task details. " + rootCauseMessage(ex)));
+	            runOnFx(() -> {
+	                taskDetailDialogInFlight.set(false);
+	                showTaskActionError("Failed to load task details. " + rootCauseMessage(ex));
+	            });
 	        }
 	    }, "case-task-detail-" + taskId).start();
 	}
