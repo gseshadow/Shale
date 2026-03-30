@@ -28,8 +28,11 @@ import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.factory.ContactCardFactory;
+import com.shale.ui.document.CaseDocumentExportService;
+import com.shale.ui.document.CaseDocumentFormat;
 import com.shale.ui.document.CaseDocumentService;
 import com.shale.ui.document.CaseDocumentType;
+import com.shale.ui.document.GeneratedDocument;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
@@ -67,6 +70,8 @@ import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ScrollPane;
@@ -214,7 +219,11 @@ public class CaseController {
 	private Button cancelButton;
 
 	@FXML
-	private Button generateDocumentButton;
+	private MenuButton generateSummaryMenuButton;
+	@FXML
+	private MenuItem generateSummaryHtmlMenuItem;
+	@FXML
+	private MenuItem generateSummaryPdfMenuItem;
 
 	@FXML
 	private Button detailsEditButton;
@@ -406,6 +415,7 @@ public class CaseController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private CaseDocumentService caseDocumentService;
+	private CaseDocumentExportService caseDocumentExportService;
 
 	// ----------------------------
 	// Controller state
@@ -485,6 +495,7 @@ public class CaseController {
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.caseDocumentService = caseDao == null ? null : new CaseDocumentService(caseDao);
+		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
 		this.onCaseDeleted = onCaseDeleted;
 		refreshHeader();
 	}
@@ -569,8 +580,12 @@ public class CaseController {
 		}
 		if (addTaskButton != null)
 			addTaskButton.setOnAction(e -> onAddTask());
-		if (generateDocumentButton != null)
-			generateDocumentButton.setOnAction(e -> onGenerateDocument());
+		if (generateSummaryHtmlMenuItem != null)
+			generateSummaryHtmlMenuItem.setOnAction(e -> onGenerateSummaryHtml());
+		if (generateSummaryPdfMenuItem != null)
+			generateSummaryPdfMenuItem.setOnAction(e -> onGenerateSummaryPdf());
+		if (generateSummaryMenuButton != null && generateSummaryHtmlMenuItem == null && generateSummaryPdfMenuItem == null)
+			generateSummaryMenuButton.setOnAction(e -> onGenerateSummaryHtml());
 		if (caseTasksSortChoice != null) {
 			caseTasksSortChoice.getItems().setAll(
 					CASE_TASKS_SORT_DUE_ASC,
@@ -595,7 +610,15 @@ public class CaseController {
 	}
 
 
-	private void onGenerateDocument() {
+	private void onGenerateSummaryPdf() {
+		generateAndOpenSummary(CaseDocumentFormat.PDF);
+	}
+
+	private void onGenerateSummaryHtml() {
+		generateAndOpenSummary(CaseDocumentFormat.HTML);
+	}
+
+	private void generateAndOpenSummary(CaseDocumentFormat format) {
 		if (caseId == null || caseId <= 0) {
 			showError("Load a case before generating a summary.");
 			return;
@@ -604,32 +627,24 @@ public class CaseController {
 			showError("Unable to resolve tenant context for summary generation.");
 			return;
 		}
-		if (caseDocumentService == null) {
+		if (caseDocumentExportService == null) {
 			showError("Summary generation service is unavailable.");
 			return;
 		}
 
 		int tenantId = appState.getShaleClientId();
 		try {
-			System.out.println("[Document] Generating CASE_SUMMARY for caseId=" + caseId + " shaleClientId=" + tenantId);
-			String html = caseDocumentService.generateCaseDocumentHtml(caseId, tenantId, CaseDocumentType.CASE_SUMMARY);
-			Path path = writeCaseSummaryHtml(html);
-			boolean opened = runtimeBridge != null && runtimeBridge.openPath(path);
+			System.out.println("[Document] Generating " + format + " CASE_SUMMARY for caseId=" + caseId + " shaleClientId=" + tenantId);
+			GeneratedDocument generated = caseDocumentExportService.exportCaseSummary(caseId, tenantId, CaseDocumentType.CASE_SUMMARY, format);
+			boolean opened = runtimeBridge != null && runtimeBridge.openPath(generated.path());
 			if (!opened) {
-				throw new IllegalStateException("Unable to open generated document preview.");
+				throw new IllegalStateException("Unable to open generated summary preview.");
 			}
-			System.out.println("[Document] Generated case summary HTML at " + path);
+			System.out.println("[Document] Generated case summary " + format + " at " + generated.path());
 		} catch (Exception ex) {
-			System.err.println("[Document] Failed to generate case summary: " + ex.getMessage());
-			showError("Could not generate case summary. Please try again.");
+			System.err.println("[Document] Failed to generate case summary " + format + ": " + ex.getMessage());
+			showError("Could not generate case summary " + format.name().toLowerCase() + ". Please try again.");
 		}
-	}
-
-	private Path writeCaseSummaryHtml(String html) throws IOException {
-		Path file = Files.createTempFile("shale-case-summary-" + caseId + "-", ".html");
-		Files.writeString(file, html == null ? "" : html, StandardCharsets.UTF_8);
-		file.toFile().deleteOnExit();
-		return file;
 	}
 
 	private void setupRelatedEntitiesLayout() {
