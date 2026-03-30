@@ -5027,6 +5027,15 @@ public class CaseController {
 							request.baseline().getDeniedDetail(),
 							request.deniedDetail()
 					);
+					addPracticeAreaChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							request.baseline().getPracticeAreaId(),
+							null,
+							request.practiceAreaId(),
+							null
+					);
 				}
 				if (updated != null)
 					currentOverview = caseDao.getOverview(request.caseId());
