@@ -1,6 +1,7 @@
 package com.shale.ui.services;
 
 import java.util.Map;
+import java.nio.file.Path;
 import java.util.function.Consumer;
 
 public interface UiRuntimeBridge {
@@ -54,6 +55,10 @@ public interface UiRuntimeBridge {
 
 	default String getClientInstanceId() {
 		return "";
+	}
+
+	default boolean openPath(Path path) {
+		return false;
 	}
 	
 
