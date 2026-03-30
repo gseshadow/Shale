@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +45,7 @@ import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
+import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -443,6 +445,7 @@ public class CaseController {
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
+	private String activeSectionName = "Overview";
 
 	private final CaseOverviewRenderer overviewRenderer = new CaseOverviewRenderer();
 	private final CaseOverviewEditor overviewEditor = new CaseOverviewEditor();
@@ -702,6 +705,7 @@ public class CaseController {
 		if (sectionName == null)
 			return;
 
+		activeSectionName = sectionName;
 		setActiveSectionButton(sectionName);
 		switch (sectionName) {
 		case "Overview" -> showOverview();
@@ -910,13 +914,16 @@ public class CaseController {
 	private void renderContactsSection() {
 		if (organizationsScrollPane == null || organizationsFlow == null || organizationsEmptyLabel == null)
 			return;
+		boolean contactsSectionActive = isSectionActive("Contacts");
 
 		organizationsFlow.getChildren().clear();
 		if (relatedContacts == null || relatedContacts.isEmpty()) {
-			setVisibleManaged(organizationsScrollPane, false);
-			setVisibleManaged(organizationsFlow, false);
-			setVisibleManaged(organizationsEmptyLabel, true);
-			organizationsEmptyLabel.setText("No contacts");
+			if (contactsSectionActive) {
+				setVisibleManaged(organizationsScrollPane, false);
+				setVisibleManaged(organizationsFlow, false);
+				setVisibleManaged(organizationsEmptyLabel, true);
+				organizationsEmptyLabel.setText("No contacts");
+			}
 			return;
 		}
 
@@ -928,9 +935,11 @@ public class CaseController {
 			organizationsFlow.getChildren().add(createRelatedContactCard(factory, contact));
 		}
 
-		setVisibleManaged(organizationsScrollPane, true);
-		setVisibleManaged(organizationsFlow, true);
-		setVisibleManaged(organizationsEmptyLabel, false);
+		if (contactsSectionActive) {
+			setVisibleManaged(organizationsScrollPane, true);
+			setVisibleManaged(organizationsFlow, true);
+			setVisibleManaged(organizationsEmptyLabel, false);
+		}
 	}
 
 	private Node createRelatedContactCard(ContactCardFactory factory, CaseDao.RelatedContactRow contact) {
@@ -1086,13 +1095,16 @@ public class CaseController {
 	private void renderOrganizationsSection() {
 		if (organizationsScrollPane == null || organizationsFlow == null || organizationsEmptyLabel == null)
 			return;
+		boolean organizationsSectionActive = isSectionActive("Organizations");
 
 		organizationsFlow.getChildren().clear();
 		if (relatedOrganizations == null || relatedOrganizations.isEmpty()) {
-			setVisibleManaged(organizationsScrollPane, false);
-			setVisibleManaged(organizationsFlow, false);
-			setVisibleManaged(organizationsEmptyLabel, true);
-			organizationsEmptyLabel.setText("No organizations");
+			if (organizationsSectionActive) {
+				setVisibleManaged(organizationsScrollPane, false);
+				setVisibleManaged(organizationsFlow, false);
+				setVisibleManaged(organizationsEmptyLabel, true);
+				organizationsEmptyLabel.setText("No organizations");
+			}
 			return;
 		}
 
@@ -1103,9 +1115,15 @@ public class CaseController {
 			organizationsFlow.getChildren().add(createRelatedOrganizationCardContainer(factory, org));
 		}
 
-		setVisibleManaged(organizationsScrollPane, true);
-		setVisibleManaged(organizationsFlow, true);
-		setVisibleManaged(organizationsEmptyLabel, false);
+		if (organizationsSectionActive) {
+			setVisibleManaged(organizationsScrollPane, true);
+			setVisibleManaged(organizationsFlow, true);
+			setVisibleManaged(organizationsEmptyLabel, false);
+		}
+	}
+
+	private boolean isSectionActive(String sectionName) {
+		return Objects.equals(activeSectionName, sectionName);
 	}
 
 	private Node createRelatedOrganizationCardContainer(OrganizationCardFactory factory, CaseDao.RelatedOrganizationRow org) {
@@ -2724,7 +2742,7 @@ public class CaseController {
 		{
 			try {
 				caseDao.addCaseNote(activeCaseId, activeClientId, trimmedText, createdByUserId);
-				runOnFx(() -> applyLastUpdatedLabel(LocalDateTime.now()));
+				runOnFx(() -> applyLastUpdatedLabel(LocalDateTime.now(ZoneOffset.UTC)));
 				publishCaseUpdateAdded(activeCaseId);
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
 				runOnFx(() ->
@@ -2911,6 +2929,14 @@ public class CaseController {
 		return value ? "1" : "0";
 	}
 
+	private static Boolean normalizeDetailsCheckboxBoolean(Boolean value) {
+		return Boolean.TRUE.equals(value);
+	}
+
+	private static String normalizeDetailsCheckboxStorage(String raw) {
+		return toNullableBooleanStorage(normalizeDetailsCheckboxBoolean(parseNullableBooleanStorage(raw)));
+	}
+
 	private static String normalizeCallerTimeInput(String value) {
 		String trimmed = safeText(value).trim();
 		if (trimmed.isBlank())
@@ -3076,8 +3102,10 @@ public class CaseController {
 		return s == null ? "" : s;
 	}
 
+	private static final DateTimeFormatter CASE_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
 	private String formatDateTime(LocalDateTime value) {
-		return value == null ? "—" : value.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+		return UtcDateTimeDisplayFormatter.formatUtcToLocal(value, CASE_TIMESTAMP_FORMAT);
 	}
 
 	private static boolean hasPatchKey(String rawPatchJson, String key) {
@@ -4823,23 +4851,23 @@ public class CaseController {
 			d.tortNoticeDeadline = detail == null ? null : detail.getTortNoticeDeadline();
 			d.discoveryDeadline = detail == null ? null : detail.getDiscoveryDeadline();
 
-			d.clientEstate = detail == null ? "" : safeText(detail.getClientEstate());
+			d.clientEstate = detail == null ? "0" : normalizeDetailsCheckboxStorage(detail.getClientEstate());
 			d.officePrinterCode = detail == null ? "" : safeText(detail.getOfficePrinterCode());
-			d.medicalRecordsReceived = detail == null ? null : detail.getMedicalRecordsReceived();
-			d.feeAgreementSigned = detail == null ? null : detail.getFeeAgreementSigned();
+			d.medicalRecordsReceived = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getMedicalRecordsReceived());
+			d.feeAgreementSigned = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getFeeAgreementSigned());
 			d.dateFeeAgreementSigned = detail == null ? null : detail.getDateFeeAgreementSigned();
 
-			d.acceptedChronology = detail == null ? null : detail.getAcceptedChronology();
-			d.acceptedConsultantExpertSearch = detail == null ? null : detail.getAcceptedConsultantExpertSearch();
-			d.acceptedTestifyingExpertSearch = detail == null ? null : detail.getAcceptedTestifyingExpertSearch();
-			d.acceptedMedicalLiterature = detail == null ? null : detail.getAcceptedMedicalLiterature();
+			d.acceptedChronology = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedChronology());
+			d.acceptedConsultantExpertSearch = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedConsultantExpertSearch());
+			d.acceptedTestifyingExpertSearch = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedTestifyingExpertSearch());
+			d.acceptedMedicalLiterature = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedMedicalLiterature());
 			d.acceptedDetail = detail == null ? "" : safeText(detail.getAcceptedDetail());
 
-			d.deniedChronology = detail == null ? null : detail.getDeniedChronology();
+			d.deniedChronology = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getDeniedChronology());
 			d.deniedDetail = detail == null ? "" : safeText(detail.getDeniedDetail());
 
 			d.summary = detail == null ? "" : safeText(detail.getSummary());
-			d.receivedUpdates = detail == null ? null : parseNullableBooleanStorage(detail.getReceivedUpdates());
+			d.receivedUpdates = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(parseNullableBooleanStorage(detail.getReceivedUpdates()));
 			return d;
 		}
 
@@ -5309,12 +5337,26 @@ public class CaseController {
 			Integer practiceAreaId = source.practiceAreaId;
 			String description = normalizeNullableText(source.description);
 			String callerTime = normalizeCallerTimeInput(source.callerTime);
-			String clientEstate = toNullableBooleanStorage(parseNullableBooleanStorage(source.clientEstate));
+			String clientEstate = normalizeDetailsCheckboxStorage(source.clientEstate);
 			String officePrinterCode = normalizeNullableText(source.officePrinterCode);
+			Boolean medicalRecordsReceived = normalizeDetailsCheckboxBoolean(source.medicalRecordsReceived);
+			Boolean feeAgreementSigned = normalizeDetailsCheckboxBoolean(source.feeAgreementSigned);
+			Boolean acceptedChronology = normalizeDetailsCheckboxBoolean(source.acceptedChronology);
+			Boolean acceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedConsultantExpertSearch);
+			Boolean acceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedTestifyingExpertSearch);
+			Boolean acceptedMedicalLiterature = normalizeDetailsCheckboxBoolean(source.acceptedMedicalLiterature);
+			Boolean deniedChronology = normalizeDetailsCheckboxBoolean(source.deniedChronology);
 			String acceptedDetail = normalizeNullableText(source.acceptedDetail);
 			String deniedDetail = normalizeNullableText(source.deniedDetail);
 			String summary = normalizeNullableText(source.summary);
-			String receivedUpdates = toNullableBooleanStorage(source.receivedUpdates);
+			String receivedUpdates = toNullableBooleanStorage(normalizeDetailsCheckboxBoolean(source.receivedUpdates));
+			Boolean baselineMedicalRecordsReceived = normalizeDetailsCheckboxBoolean(baseline.getMedicalRecordsReceived());
+			Boolean baselineFeeAgreementSigned = normalizeDetailsCheckboxBoolean(baseline.getFeeAgreementSigned());
+			Boolean baselineAcceptedChronology = normalizeDetailsCheckboxBoolean(baseline.getAcceptedChronology());
+			Boolean baselineAcceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedConsultantExpertSearch());
+			Boolean baselineAcceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedTestifyingExpertSearch());
+			Boolean baselineAcceptedMedicalLiterature = normalizeDetailsCheckboxBoolean(baseline.getAcceptedMedicalLiterature());
+			Boolean baselineDeniedChronology = normalizeDetailsCheckboxBoolean(baseline.getDeniedChronology());
 			LifecycleDates lifecycleDates = withLifecycleAutopopulatedDates(
 					source.primaryStatusId,
 					(appState == null ? null : appState.getShaleClientId()),
@@ -5340,20 +5382,20 @@ public class CaseController {
 				!Objects.equals(source.statuteOfLimitations, baseline.getStatuteOfLimitations()) ||
 				!Objects.equals(source.tortNoticeDeadline, baseline.getTortNoticeDeadline()) ||
 				!Objects.equals(source.discoveryDeadline, baseline.getDiscoveryDeadline()) ||
-				!Objects.equals(clientEstate, normalizeNullableText(baseline.getClientEstate())) ||
+				!Objects.equals(clientEstate, normalizeDetailsCheckboxStorage(baseline.getClientEstate())) ||
 				!Objects.equals(officePrinterCode, normalizeNullableText(baseline.getOfficePrinterCode())) ||
-				!Objects.equals(source.medicalRecordsReceived, baseline.getMedicalRecordsReceived()) ||
-				!Objects.equals(source.feeAgreementSigned, baseline.getFeeAgreementSigned()) ||
+				!Objects.equals(medicalRecordsReceived, baselineMedicalRecordsReceived) ||
+				!Objects.equals(feeAgreementSigned, baselineFeeAgreementSigned) ||
 				!Objects.equals(source.dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
-				!Objects.equals(source.acceptedChronology, baseline.getAcceptedChronology()) ||
-				!Objects.equals(source.acceptedConsultantExpertSearch, baseline.getAcceptedConsultantExpertSearch()) ||
-				!Objects.equals(source.acceptedTestifyingExpertSearch, baseline.getAcceptedTestifyingExpertSearch()) ||
-				!Objects.equals(source.acceptedMedicalLiterature, baseline.getAcceptedMedicalLiterature()) ||
+				!Objects.equals(acceptedChronology, baselineAcceptedChronology) ||
+				!Objects.equals(acceptedConsultantExpertSearch, baselineAcceptedConsultantExpertSearch) ||
+				!Objects.equals(acceptedTestifyingExpertSearch, baselineAcceptedTestifyingExpertSearch) ||
+				!Objects.equals(acceptedMedicalLiterature, baselineAcceptedMedicalLiterature) ||
 				!Objects.equals(acceptedDetail, normalizeNullableText(baseline.getAcceptedDetail())) ||
-				!Objects.equals(source.deniedChronology, baseline.getDeniedChronology()) ||
+				!Objects.equals(deniedChronology, baselineDeniedChronology) ||
 				!Objects.equals(deniedDetail, normalizeNullableText(baseline.getDeniedDetail())) ||
 				!Objects.equals(summary, normalizeNullableText(baseline.getSummary())) ||
-				!Objects.equals(receivedUpdates, normalizeNullableText(baseline.getReceivedUpdates()));
+				!Objects.equals(receivedUpdates, normalizeDetailsCheckboxStorage(baseline.getReceivedUpdates()));
 
 			return new DetailsSaveRequest(
 				caseId.longValue(),
@@ -5378,15 +5420,15 @@ public class CaseController {
 				source.discoveryDeadline,
 				clientEstate,
 				officePrinterCode,
-				source.medicalRecordsReceived,
-				source.feeAgreementSigned,
+				medicalRecordsReceived,
+				feeAgreementSigned,
 				source.dateFeeAgreementSigned,
-				source.acceptedChronology,
-				source.acceptedConsultantExpertSearch,
-				source.acceptedTestifyingExpertSearch,
-				source.acceptedMedicalLiterature,
+				acceptedChronology,
+				acceptedConsultantExpertSearch,
+				acceptedTestifyingExpertSearch,
+				acceptedMedicalLiterature,
 				acceptedDetail,
-				source.deniedChronology,
+				deniedChronology,
 				deniedDetail,
 				summary,
 				receivedUpdates,
@@ -5949,22 +5991,13 @@ public class CaseController {
 		private void renderNullableBoolean(CheckBox editor, Boolean value) {
 			if (editor == null)
 				return;
-			editor.setAllowIndeterminate(true);
-			if (value == null) {
-				editor.setIndeterminate(true);
-				editor.setSelected(false);
-				return;
-			}
+			editor.setAllowIndeterminate(false);
 			editor.setIndeterminate(false);
-			editor.setSelected(value);
+			editor.setSelected(Boolean.TRUE.equals(value));
 		}
 
 		private Boolean captureNullableBoolean(CheckBox editor) {
-			if (editor == null)
-				return null;
-			if (editor.isIndeterminate())
-				return null;
-			return editor.isSelected();
+			return editor != null && editor.isSelected();
 		}
 
 		void renderView(CaseDetailsDraft d) {
@@ -6039,7 +6072,7 @@ public class CaseController {
 		private void refreshFeeAgreementDateState() {
 			if (detFeeAgreementSignedEditor == null || detDateFeeAgreementSignedEditor == null)
 				return;
-			boolean disable = !detFeeAgreementSignedEditor.isIndeterminate() && !detFeeAgreementSignedEditor.isSelected();
+			boolean disable = !detFeeAgreementSignedEditor.isSelected();
 			detDateFeeAgreementSignedEditor.setDisable(disable);
 			if (disable)
 				detDateFeeAgreementSignedEditor.setValue(null);
