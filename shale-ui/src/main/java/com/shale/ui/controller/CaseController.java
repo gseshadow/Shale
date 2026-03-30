@@ -4966,6 +4966,114 @@ public class CaseController {
 					);
 				}
 				if (updated != null) {
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.INTAKE_DATE_CHANGED,
+							"Intake date changed",
+							request.baseline().getCallerDate(),
+							request.callerDate()
+					);
+					addTimeChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.INTAKE_TIME_CHANGED,
+							"Intake time changed",
+							normalizeCallerTimeDisplay(request.baseline().getCallerTime()),
+							request.callerTime()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.ACCEPTED_DATE_CHANGED,
+							"Accepted date changed",
+							request.baseline().getAcceptedDate(),
+							request.acceptedDate()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.CLOSED_DATE_CHANGED,
+							"Closed date changed",
+							request.baseline().getClosedDate(),
+							request.closedDate()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.DENIED_DATE_CHANGED,
+							"Denied date changed",
+							request.baseline().getDeniedDate(),
+							request.deniedDate()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.MEDICAL_MALPRACTICE_DATE_CHANGED,
+							"Date of medical negligence changed",
+							request.baseline().getDateOfMedicalNegligence(),
+							request.dateOfMedicalNegligence()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.MEDICAL_MALPRACTICE_DISCOVERY_DATE_CHANGED,
+							"Medical negligence discovery date changed",
+							request.baseline().getDateMedicalNegligenceWasDiscovered(),
+							request.dateMedicalNegligenceWasDiscovered()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.INJURY_DATE_CHANGED,
+							"Date of injury changed",
+							request.baseline().getDateOfInjury(),
+							request.dateOfInjury()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.STATUTE_OF_LIMITATIONS_CHANGED,
+							"Statute of limitations changed",
+							request.baseline().getStatuteOfLimitations(),
+							request.statuteOfLimitations()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.TORT_NOTICE_DEADLINE_CHANGED,
+							"Tort notice deadline changed",
+							request.baseline().getTortNoticeDeadline(),
+							request.tortNoticeDeadline()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.DISCOVERY_DEADLINE_CHANGED,
+							"Discovery deadline changed",
+							request.baseline().getDiscoveryDeadline(),
+							request.discoveryDeadline()
+					);
+					addDateChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.FEE_AGREEMENT_DATE_CHANGED,
+							"Fee agreement date changed",
+							request.baseline().getDateFeeAgreementSigned(),
+							request.dateFeeAgreementSigned()
+					);
 					addTextIdentityChangedTimelineEvent(
 							request.caseId(),
 							(appState == null ? null : appState.getShaleClientId()),
@@ -5441,6 +5549,35 @@ public class CaseController {
 
 		String oldLabel = resolveTimelineDateLabel(oldDate);
 		String newLabel = resolveTimelineDateLabel(newDate);
+		String body = "from " + oldLabel + " to " + newLabel;
+
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				eventType,
+				actorUserId,
+				title,
+				body
+		);
+	}
+
+	private void addTimeChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			String eventType,
+			String title,
+			String oldTime,
+			String newTime) {
+		if (caseDao == null || tenantId == null || tenantId <= 0)
+			return;
+		String normalizedOld = normalizeTimelineTextValue(oldTime);
+		String normalizedNew = normalizeTimelineTextValue(newTime);
+		if (Objects.equals(normalizedOld, normalizedNew))
+			return;
+
+		String oldLabel = normalizedOld == null ? "none" : normalizedOld;
+		String newLabel = normalizedNew == null ? "none" : normalizedNew;
 		String body = "from " + oldLabel + " to " + newLabel;
 
 		caseDao.addCaseTimelineEvent(
