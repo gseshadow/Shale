@@ -1,5 +1,7 @@
 package com.shale.desktop.ui;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.function.Consumer;
 
 import com.shale.data.runtime.RuntimeSessionService;
@@ -144,6 +146,25 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	public void setRuntimeSessionService(RuntimeSessionService runtime) {
 		this.runtimeSessionService = runtime;
+	}
+
+
+	@Override
+	public boolean openPath(Path path) {
+		if (path == null) {
+			return false;
+		}
+		try {
+			java.awt.Desktop desktop = java.awt.Desktop.getDesktop();
+			if (!java.awt.Desktop.isDesktopSupported() || !desktop.isSupported(java.awt.Desktop.Action.BROWSE)) {
+				return false;
+			}
+			desktop.browse(path.toUri());
+			return true;
+		} catch (IOException | UnsupportedOperationException | SecurityException ex) {
+			System.err.println("Failed to open path: " + path + " error=" + ex.getMessage());
+			return false;
+		}
 	}
 
 	@Override
