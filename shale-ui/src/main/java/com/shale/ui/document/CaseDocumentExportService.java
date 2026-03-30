@@ -34,6 +34,8 @@ public final class CaseDocumentExportService {
             CaseDocumentFormat format) throws IOException {
         CaseDocumentModel model = caseDocumentService.buildCaseDocumentModel(caseId, shaleClientId, type);
         String html = htmlRenderer.render(model, type, LocalDateTime.now());
+        System.out.println("[Document][Export] renderedHtmlLength=" + (html == null ? 0 : html.length())
+                + " format=" + format + " caseId=" + caseId + " shaleClientId=" + shaleClientId);
         String safeName = sanitizeFileName(model.caseName());
         String prefix = "Case Summary - " + safeName + "-";
 

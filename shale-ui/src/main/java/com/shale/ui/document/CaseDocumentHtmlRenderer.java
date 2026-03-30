@@ -90,43 +90,43 @@ public final class CaseDocumentHtmlRenderer {
         }
 
         return """
-                <!doctype html>
-                <html lang=\"en\">
-                <head>
-                  <meta charset=\"utf-8\" />
-                  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-                  <title>Case Summary</title>
-                  <style>
-                    body { margin: 0; font-family: \"Segoe UI\", Arial, sans-serif; color: #1f2937; }
-                    .page { max-width: 8.5in; margin: 0 auto; padding: 0.5in; }
-                    .doc-header { border-bottom: 2px solid #d1d5db; margin-bottom: 18px; padding-bottom: 10px; }
-                    .firm { font-size: 12px; color: #4b5563; text-transform: uppercase; }
-                    h1 { font-size: 26px; margin: 6px 0; color: #111827; }
-                    .generated { font-size: 12px; color: #6b7280; }
-                    .section { margin-top: 18px; page-break-inside: avoid; }
-                    .section-title { font-size: 16px; margin: 0 0 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
-                    .kv-grid { display: grid; grid-template-columns: minmax(210px, 34%%) 1fr; column-gap: 14px; row-gap: 8px; }
-                    .key { color: #4b5563; font-weight: 600; }
-                    .value { white-space: pre-wrap; word-break: break-word; }
-                    .text-block { margin-top: 12px; }
-                    .text-title { font-weight: 600; color: #374151; margin-bottom: 4px; }
-                    ul { margin: 0; padding-left: 20px; }
-                    li { margin: 5px 0; word-break: break-word; }
-                    .description { white-space: pre-wrap; word-break: break-word; }
-                    @media print {
-                      .section-title { break-after: avoid-page; }
-                      .kv-grid, .section { break-inside: avoid-page; }
-                    }
-                  </style>
-                </head>
-                <body>
-                  <main class=\"page\">
-                    <header class=\"doc-header\"><div class=\"firm\">Shale</div><h1>Case Summary</h1><div class=\"generated\">Generated: %s</div></header>
-                    %s
-                  </main>
-                </body>
-                </html>
-                """.formatted(escape(TS_FORMAT.format(at)), body);
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Case Summary</title>
+  <style>
+    body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #1f2937; }
+    .page { max-width: 8.5in; margin: 0 auto; padding: 0.5in; }
+    .doc-header { border-bottom: 2px solid #d1d5db; margin-bottom: 18px; padding-bottom: 10px; }
+    .firm { font-size: 12px; color: #4b5563; text-transform: uppercase; }
+    h1 { font-size: 26px; margin: 6px 0; color: #111827; }
+    .generated { font-size: 12px; color: #6b7280; }
+    .section { margin-top: 18px; page-break-inside: avoid; }
+    .section-title { font-size: 16px; margin: 0 0 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+    .kv-grid { display: grid; grid-template-columns: minmax(210px, 34%%) 1fr; column-gap: 14px; row-gap: 8px; }
+    .key { color: #4b5563; font-weight: 600; }
+    .value { white-space: normal; word-break: break-word; }
+    .text-block { margin-top: 12px; }
+    .text-title { font-weight: 600; color: #374151; margin-bottom: 4px; }
+    ul { margin: 0; padding-left: 20px; }
+    li { margin: 5px 0; word-break: break-word; }
+    .description { white-space: normal; word-break: break-word; }
+    @media print {
+      .section-title { break-after: avoid-page; }
+      .kv-grid, .section { break-inside: avoid-page; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="doc-header"><div class="firm">Shale</div><h1>Case Summary</h1><div class="generated">Generated: %s</div></header>
+    %s
+  </main>
+</body>
+</html>
+""".formatted(escape(TS_FORMAT.format(at)), body);
     }
 
     private String section(String title, String content) {
@@ -176,7 +176,13 @@ public final class CaseDocumentHtmlRenderer {
         return sb.toString();
     }
 
-    private String safe(String v) { String t = blank(v); return t.isBlank() ? "&mdash;" : escape(t); }
+    private String safe(String v) {
+        String t = blank(v);
+        if (t.isBlank()) {
+            return "&mdash;";
+        }
+        return escape(t).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br />");
+    }
     private String blank(String v) { return v == null ? "" : v.trim(); }
     private boolean isBlank(String v) { return blank(v).isBlank(); }
 
