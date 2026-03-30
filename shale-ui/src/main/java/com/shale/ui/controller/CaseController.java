@@ -4993,6 +4993,40 @@ public class CaseController {
 							request.baseline().getOfficePrinterCode(),
 							request.officePrinterCode()
 					);
+					addDescriptionChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							request.baseline().getDescription(),
+							request.description()
+					);
+					addLongTextChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.SUMMARY_UPDATED,
+							"Summary updated",
+							request.baseline().getSummary(),
+							request.summary()
+					);
+					addLongTextChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.ACCEPTED_DETAIL_UPDATED,
+							"Accepted detail updated",
+							request.baseline().getAcceptedDetail(),
+							request.acceptedDetail()
+					);
+					addLongTextChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.DENIED_DETAIL_UPDATED,
+							"Denied detail updated",
+							request.baseline().getDeniedDetail(),
+							request.deniedDetail()
+					);
 				}
 				if (updated != null)
 					currentOverview = caseDao.getOverview(request.caseId());
@@ -5519,19 +5553,38 @@ public class CaseController {
 			Integer actorUserId,
 			String oldDescription,
 			String newDescription) {
+		addLongTextChangedTimelineEvent(
+				caseId,
+				tenantId,
+				actorUserId,
+				CaseDao.CaseTimelineEventTypes.DESCRIPTION_CHANGED,
+				"Description updated",
+				oldDescription,
+				newDescription
+		);
+	}
+
+	private void addLongTextChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			String eventType,
+			String title,
+			String oldValue,
+			String newValue) {
 		if (caseDao == null || tenantId == null || tenantId <= 0)
 			return;
-		String normalizedOld = normalizeTimelineTextValue(oldDescription);
-		String normalizedNew = normalizeTimelineTextValue(newDescription);
+		String normalizedOld = normalizeTimelineTextValue(oldValue);
+		String normalizedNew = normalizeTimelineTextValue(newValue);
 		if (Objects.equals(normalizedOld, normalizedNew))
 			return;
 
 		caseDao.addCaseTimelineEvent(
 				(int) caseId,
 				tenantId,
-				CaseDao.CaseTimelineEventTypes.DESCRIPTION_CHANGED,
+				eventType,
 				actorUserId,
-				"Description updated",
+				title,
 				null
 		);
 	}
