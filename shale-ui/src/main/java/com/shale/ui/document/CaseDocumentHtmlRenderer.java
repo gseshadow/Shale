@@ -19,15 +19,15 @@ public final class CaseDocumentHtmlRenderer {
 
         LocalDateTime at = generatedAt == null ? LocalDateTime.now() : generatedAt;
         StringBuilder body = new StringBuilder();
-        body.append(section("Case Information", kvGrid(List.of(
-                kv("Case Name", model.caseName()),
-                kv("Status", model.statusName()),
-                kv("Responsible Attorney", model.responsibleAttorneyName()),
-                kv("Practice Area", model.practiceAreaName())))));
-        body.append(section("Contacts", kvGrid(List.of(
-                kv("Caller", model.callerName()),
-                kv("Client", model.clientName()),
-                kv("Opposing Counsel", model.opposingCounselName())))));
+        body.append(section("Case Information", kvTable(List.of(
+                kvRow("Case Name", model.caseName()),
+                kvRow("Status", model.statusName()),
+                kvRow("Responsible Attorney", model.responsibleAttorneyName()),
+                kvRow("Practice Area", model.practiceAreaName())))));
+        body.append(section("Contacts", kvTable(List.of(
+                kvRow("Caller", model.callerName()),
+                kvRow("Client", model.clientName()),
+                kvRow("Opposing Counsel", model.opposingCounselName())))));
 
         List<String> team = teamLines(model.teamMembers());
         if (!team.isEmpty()) {
@@ -39,38 +39,38 @@ public final class CaseDocumentHtmlRenderer {
         }
 
         List<String> dateRows = new ArrayList<>();
-        addIfPresent(dateRows, kv("Incident Date", fmt(model.incidentDate())));
-        addIfPresent(dateRows, kv("SOL Date", fmt(model.solDate())));
-        addIfPresent(dateRows, kv("Accepted Date", fmt(model.acceptedDate())));
-        addIfPresent(dateRows, kv("Denied Date", fmt(model.deniedDate())));
-        addIfPresent(dateRows, kv("Closed Date", fmt(model.closedDate())));
-        addIfPresent(dateRows, kv("Intake Date", fmt(model.callerDate())));
-        addIfPresent(dateRows, kv("Intake Time", model.callerTime()));
-        addIfPresent(dateRows, kv("Medical Negligence Date", fmt(model.dateOfMedicalNegligence())));
-        addIfPresent(dateRows, kv("Negligence Discovery Date", fmt(model.dateMedicalNegligenceWasDiscovered())));
-        addIfPresent(dateRows, kv("Tort Notice Deadline", fmt(model.tortNoticeDeadline())));
-        addIfPresent(dateRows, kv("Discovery Deadline", fmt(model.discoveryDeadline())));
-        addIfPresent(dateRows, kv("Fee Agreement Date", fmt(model.dateFeeAgreementSigned())));
+        addIfPresent(dateRows, kvRow("Incident Date", fmt(model.incidentDate())));
+        addIfPresent(dateRows, kvRow("SOL Date", fmt(model.solDate())));
+        addIfPresent(dateRows, kvRow("Accepted Date", fmt(model.acceptedDate())));
+        addIfPresent(dateRows, kvRow("Denied Date", fmt(model.deniedDate())));
+        addIfPresent(dateRows, kvRow("Closed Date", fmt(model.closedDate())));
+        addIfPresent(dateRows, kvRow("Intake Date", fmt(model.callerDate())));
+        addIfPresent(dateRows, kvRow("Intake Time", model.callerTime()));
+        addIfPresent(dateRows, kvRow("Medical Negligence Date", fmt(model.dateOfMedicalNegligence())));
+        addIfPresent(dateRows, kvRow("Negligence Discovery Date", fmt(model.dateMedicalNegligenceWasDiscovered())));
+        addIfPresent(dateRows, kvRow("Tort Notice Deadline", fmt(model.tortNoticeDeadline())));
+        addIfPresent(dateRows, kvRow("Discovery Deadline", fmt(model.discoveryDeadline())));
+        addIfPresent(dateRows, kvRow("Fee Agreement Date", fmt(model.dateFeeAgreementSigned())));
         if (!dateRows.isEmpty()) {
-            body.append(section("Dates / Status Details", kvGrid(dateRows)));
+            body.append(section("Dates / Status Details", kvTable(dateRows)));
         }
 
         List<String> additionalRows = new ArrayList<>();
-        addIfPresent(additionalRows, kv("Office Case Code", model.officeCaseCode()));
-        addIfPresent(additionalRows, kv("Estate Case", model.clientEstate()));
-        addIfPresent(additionalRows, kv("Medical Records Received", yesNo(model.medicalRecordsReceived())));
-        addIfPresent(additionalRows, kv("Fee Agreement Signed", yesNo(model.feeAgreementSigned())));
-        addIfPresent(additionalRows, kv("Accepted Chronology", yesNo(model.acceptedChronology())));
-        addIfPresent(additionalRows, kv("Consultant Expert Search", yesNo(model.acceptedConsultantExpertSearch())));
-        addIfPresent(additionalRows, kv("Testifying Expert Search", yesNo(model.acceptedTestifyingExpertSearch())));
-        addIfPresent(additionalRows, kv("Accepted Medical Literature", yesNo(model.acceptedMedicalLiterature())));
-        addIfPresent(additionalRows, kv("Denied Chronology", yesNo(model.deniedChronology())));
-        addIfPresent(additionalRows, kv("Received Updates", model.receivedUpdates()));
-        addIfPresent(additionalRows, kv("Summary (Detail Field)", model.summary()));
+        addIfPresent(additionalRows, kvRow("Office Case Code", model.officeCaseCode()));
+        addIfPresent(additionalRows, kvRow("Estate Case", model.clientEstate()));
+        addIfPresent(additionalRows, kvRow("Medical Records Received", yesNo(model.medicalRecordsReceived())));
+        addIfPresent(additionalRows, kvRow("Fee Agreement Signed", yesNo(model.feeAgreementSigned())));
+        addIfPresent(additionalRows, kvRow("Accepted Chronology", yesNo(model.acceptedChronology())));
+        addIfPresent(additionalRows, kvRow("Consultant Expert Search", yesNo(model.acceptedConsultantExpertSearch())));
+        addIfPresent(additionalRows, kvRow("Testifying Expert Search", yesNo(model.acceptedTestifyingExpertSearch())));
+        addIfPresent(additionalRows, kvRow("Accepted Medical Literature", yesNo(model.acceptedMedicalLiterature())));
+        addIfPresent(additionalRows, kvRow("Denied Chronology", yesNo(model.deniedChronology())));
+        addIfPresent(additionalRows, kvRow("Received Updates", model.receivedUpdates()));
+        addIfPresent(additionalRows, kvRow("Summary (Detail Field)", model.summary()));
 
         StringBuilder additionalBlock = new StringBuilder();
         if (!additionalRows.isEmpty()) {
-            additionalBlock.append(kvGrid(additionalRows));
+            additionalBlock.append(kvTable(additionalRows));
         }
         if (!isBlank(model.acceptedDetail())) {
             additionalBlock.append(block("Accepted Detail", model.acceptedDetail()));
@@ -105,17 +105,20 @@ public final class CaseDocumentHtmlRenderer {
     .generated { font-size: 12px; color: #6b7280; }
     .section { margin-top: 18px; page-break-inside: avoid; }
     .section-title { font-size: 16px; margin: 0 0 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
-    .kv-grid { display: grid; grid-template-columns: minmax(210px, 34%%) 1fr; column-gap: 14px; row-gap: 8px; }
-    .key { color: #4b5563; font-weight: 600; }
-    .value { white-space: normal; word-break: break-word; }
+    .kv-table { width: 100%%; border-collapse: collapse; table-layout: fixed; }
+    .kv-table tr { vertical-align: top; }
+    .kv-table th { width: 34%%; text-align: left; font-weight: 600; color: #4b5563; padding: 4px 10px 4px 0; }
+    .kv-table td { color: #111827; padding: 4px 0; }
     .text-block { margin-top: 12px; }
     .text-title { font-weight: 600; color: #374151; margin-bottom: 4px; }
     ul { margin: 0; padding-left: 20px; }
-    li { margin: 5px 0; word-break: break-word; }
-    .description { white-space: normal; word-break: break-word; }
+    li { margin: 5px 0; }
+    .description { white-space: normal; }
     @media print {
-      .section-title { break-after: avoid-page; }
-      .kv-grid, .section { break-inside: avoid-page; }
+      .section-title { page-break-after: avoid; }
+      .section { page-break-inside: avoid; }
+      .kv-table { page-break-inside: avoid; }
+      .text-block { page-break-inside: avoid; }
     }
   </style>
 </head>
@@ -134,13 +137,13 @@ public final class CaseDocumentHtmlRenderer {
         return "<section class=\"section\"><h2 class=\"section-title\">" + escape(title) + "</h2>" + content + "</section>";
     }
 
-    private String kvGrid(List<String> rows) {
+    private String kvTable(List<String> rows) {
         if (rows == null || rows.isEmpty()) return "";
-        return "<div class=\"kv-grid\">" + String.join("", rows) + "</div>";
+        return "<table class=\"kv-table\"><tbody>" + String.join("", rows) + "</tbody></table>";
     }
 
-    private String kv(String key, String value) {
-        return "<div class=\"key\">" + escape(key) + "</div><div class=\"value\">" + safe(value) + "</div>";
+    private String kvRow(String key, String value) {
+        return "<tr><th scope=\"row\">" + escape(key) + "</th><td>" + safe(value) + "</td></tr>";
     }
 
     private String block(String title, String text) {
