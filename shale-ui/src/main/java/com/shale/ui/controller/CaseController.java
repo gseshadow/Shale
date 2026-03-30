@@ -443,6 +443,7 @@ public class CaseController {
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
+	private String activeSectionName = "Overview";
 
 	private final CaseOverviewRenderer overviewRenderer = new CaseOverviewRenderer();
 	private final CaseOverviewEditor overviewEditor = new CaseOverviewEditor();
@@ -702,6 +703,7 @@ public class CaseController {
 		if (sectionName == null)
 			return;
 
+		activeSectionName = sectionName;
 		setActiveSectionButton(sectionName);
 		switch (sectionName) {
 		case "Overview" -> showOverview();
@@ -910,13 +912,16 @@ public class CaseController {
 	private void renderContactsSection() {
 		if (organizationsScrollPane == null || organizationsFlow == null || organizationsEmptyLabel == null)
 			return;
+		boolean contactsSectionActive = isSectionActive("Contacts");
 
 		organizationsFlow.getChildren().clear();
 		if (relatedContacts == null || relatedContacts.isEmpty()) {
-			setVisibleManaged(organizationsScrollPane, false);
-			setVisibleManaged(organizationsFlow, false);
-			setVisibleManaged(organizationsEmptyLabel, true);
-			organizationsEmptyLabel.setText("No contacts");
+			if (contactsSectionActive) {
+				setVisibleManaged(organizationsScrollPane, false);
+				setVisibleManaged(organizationsFlow, false);
+				setVisibleManaged(organizationsEmptyLabel, true);
+				organizationsEmptyLabel.setText("No contacts");
+			}
 			return;
 		}
 
@@ -928,9 +933,11 @@ public class CaseController {
 			organizationsFlow.getChildren().add(createRelatedContactCard(factory, contact));
 		}
 
-		setVisibleManaged(organizationsScrollPane, true);
-		setVisibleManaged(organizationsFlow, true);
-		setVisibleManaged(organizationsEmptyLabel, false);
+		if (contactsSectionActive) {
+			setVisibleManaged(organizationsScrollPane, true);
+			setVisibleManaged(organizationsFlow, true);
+			setVisibleManaged(organizationsEmptyLabel, false);
+		}
 	}
 
 	private Node createRelatedContactCard(ContactCardFactory factory, CaseDao.RelatedContactRow contact) {
@@ -1086,13 +1093,16 @@ public class CaseController {
 	private void renderOrganizationsSection() {
 		if (organizationsScrollPane == null || organizationsFlow == null || organizationsEmptyLabel == null)
 			return;
+		boolean organizationsSectionActive = isSectionActive("Organizations");
 
 		organizationsFlow.getChildren().clear();
 		if (relatedOrganizations == null || relatedOrganizations.isEmpty()) {
-			setVisibleManaged(organizationsScrollPane, false);
-			setVisibleManaged(organizationsFlow, false);
-			setVisibleManaged(organizationsEmptyLabel, true);
-			organizationsEmptyLabel.setText("No organizations");
+			if (organizationsSectionActive) {
+				setVisibleManaged(organizationsScrollPane, false);
+				setVisibleManaged(organizationsFlow, false);
+				setVisibleManaged(organizationsEmptyLabel, true);
+				organizationsEmptyLabel.setText("No organizations");
+			}
 			return;
 		}
 
@@ -1103,9 +1113,15 @@ public class CaseController {
 			organizationsFlow.getChildren().add(createRelatedOrganizationCardContainer(factory, org));
 		}
 
-		setVisibleManaged(organizationsScrollPane, true);
-		setVisibleManaged(organizationsFlow, true);
-		setVisibleManaged(organizationsEmptyLabel, false);
+		if (organizationsSectionActive) {
+			setVisibleManaged(organizationsScrollPane, true);
+			setVisibleManaged(organizationsFlow, true);
+			setVisibleManaged(organizationsEmptyLabel, false);
+		}
+	}
+
+	private boolean isSectionActive(String sectionName) {
+		return Objects.equals(activeSectionName, sectionName);
 	}
 
 	private Node createRelatedOrganizationCardContainer(OrganizationCardFactory factory, CaseDao.RelatedOrganizationRow org) {
