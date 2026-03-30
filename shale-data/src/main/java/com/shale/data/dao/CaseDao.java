@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
+import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.runtime.DbSessionProvider;
 
@@ -33,6 +34,92 @@ public final class CaseDao {
 
 	// CaseUsers.RoleId (int) for Responsible Attorney
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+	public static final class CaseTimelineEventTypes {
+		public static final String CASE_CREATED = "CASE_CREATED";
+		public static final String STATUS_CHANGED = "STATUS_CHANGED";
+		public static final String RESPONSIBLE_ATTORNEY_CHANGED = "RESPONSIBLE_ATTORNEY_CHANGED";
+		public static final String TEAM_CHANGED = "TEAM_CHANGED";
+		public static final String CLIENT_CHANGED = "CLIENT_CHANGED";
+		public static final String CALLER_CHANGED = "CALLER_CHANGED";
+		public static final String OPPOSING_COUNSEL_CHANGED = "OPPOSING_COUNSEL_CHANGED";
+		public static final String INCIDENT_DATE_CHANGED = "INCIDENT_DATE_CHANGED";
+		public static final String SOL_DATE_CHANGED = "SOL_DATE_CHANGED";
+		public static final String CASE_NAME_CHANGED = "CASE_NAME_CHANGED";
+		public static final String CASE_NUMBER_CHANGED = "CASE_NUMBER_CHANGED";
+		public static final String OFFICE_CASE_CODE_CHANGED = "OFFICE_CASE_CODE_CHANGED";
+		public static final String DESCRIPTION_CHANGED = "DESCRIPTION_CHANGED";
+		public static final String SUMMARY_UPDATED = "SUMMARY_UPDATED";
+		public static final String ACCEPTED_DETAIL_UPDATED = "ACCEPTED_DETAIL_UPDATED";
+		public static final String DENIED_DETAIL_UPDATED = "DENIED_DETAIL_UPDATED";
+		public static final String PRACTICE_AREA_CHANGED = "PRACTICE_AREA_CHANGED";
+		public static final String USER_NOTE_ADDED = "USER_NOTE_ADDED";
+		public static final String INTAKE_DATE_CHANGED = "INTAKE_DATE_CHANGED";
+		public static final String INTAKE_TIME_CHANGED = "INTAKE_TIME_CHANGED";
+		public static final String ACCEPTED_DATE_CHANGED = "ACCEPTED_DATE_CHANGED";
+		public static final String CLOSED_DATE_CHANGED = "CLOSED_DATE_CHANGED";
+		public static final String DENIED_DATE_CHANGED = "DENIED_DATE_CHANGED";
+		public static final String MEDICAL_MALPRACTICE_DATE_CHANGED = "MEDICAL_MALPRACTICE_DATE_CHANGED";
+		public static final String MEDICAL_MALPRACTICE_DISCOVERY_DATE_CHANGED = "MEDICAL_MALPRACTICE_DISCOVERY_DATE_CHANGED";
+		public static final String INJURY_DATE_CHANGED = "INJURY_DATE_CHANGED";
+		public static final String STATUTE_OF_LIMITATIONS_CHANGED = "STATUTE_OF_LIMITATIONS_CHANGED";
+		public static final String TORT_NOTICE_DEADLINE_CHANGED = "TORT_NOTICE_DEADLINE_CHANGED";
+		public static final String DISCOVERY_DEADLINE_CHANGED = "DISCOVERY_DEADLINE_CHANGED";
+		public static final String FEE_AGREEMENT_DATE_CHANGED = "FEE_AGREEMENT_DATE_CHANGED";
+		public static final String ESTATE_CASE_CHANGED = "ESTATE_CASE_CHANGED";
+		public static final String MEDICAL_RECORDS_RECEIVED_CHANGED = "MEDICAL_RECORDS_RECEIVED_CHANGED";
+		public static final String FEE_AGREEMENT_SIGNED_CHANGED = "FEE_AGREEMENT_SIGNED_CHANGED";
+		public static final String ACCEPTED_CHRONOLOGY_CHANGED = "ACCEPTED_CHRONOLOGY_CHANGED";
+		public static final String CONSULTANT_EXPERT_SEARCH_CHANGED = "CONSULTANT_EXPERT_SEARCH_CHANGED";
+		public static final String TESTIFYING_EXPERT_SEARCH_CHANGED = "TESTIFYING_EXPERT_SEARCH_CHANGED";
+		public static final String MEDICAL_LITERATURE_CHANGED = "MEDICAL_LITERATURE_CHANGED";
+		public static final String DENIED_CHRONOLOGY_CHANGED = "DENIED_CHRONOLOGY_CHANGED";
+		public static final String RECEIVED_UPDATES_CHANGED = "RECEIVED_UPDATES_CHANGED";
+
+		private static final Set<String> ALLOWED = Set.of(
+				CASE_CREATED,
+				STATUS_CHANGED,
+				RESPONSIBLE_ATTORNEY_CHANGED,
+				TEAM_CHANGED,
+				CLIENT_CHANGED,
+				CALLER_CHANGED,
+				OPPOSING_COUNSEL_CHANGED,
+				INCIDENT_DATE_CHANGED,
+				SOL_DATE_CHANGED,
+				CASE_NAME_CHANGED,
+				CASE_NUMBER_CHANGED,
+				OFFICE_CASE_CODE_CHANGED,
+				DESCRIPTION_CHANGED,
+				SUMMARY_UPDATED,
+				ACCEPTED_DETAIL_UPDATED,
+				DENIED_DETAIL_UPDATED,
+				PRACTICE_AREA_CHANGED,
+				USER_NOTE_ADDED,
+				INTAKE_DATE_CHANGED,
+				INTAKE_TIME_CHANGED,
+				ACCEPTED_DATE_CHANGED,
+				CLOSED_DATE_CHANGED,
+				DENIED_DATE_CHANGED,
+				MEDICAL_MALPRACTICE_DATE_CHANGED,
+				MEDICAL_MALPRACTICE_DISCOVERY_DATE_CHANGED,
+				INJURY_DATE_CHANGED,
+				STATUTE_OF_LIMITATIONS_CHANGED,
+				TORT_NOTICE_DEADLINE_CHANGED,
+				DISCOVERY_DEADLINE_CHANGED,
+				FEE_AGREEMENT_DATE_CHANGED,
+				ESTATE_CASE_CHANGED,
+				MEDICAL_RECORDS_RECEIVED_CHANGED,
+				FEE_AGREEMENT_SIGNED_CHANGED,
+				ACCEPTED_CHRONOLOGY_CHANGED,
+				CONSULTANT_EXPERT_SEARCH_CHANGED,
+				TESTIFYING_EXPERT_SEARCH_CHANGED,
+				MEDICAL_LITERATURE_CHANGED,
+				DENIED_CHRONOLOGY_CHANGED,
+				RECEIVED_UPDATES_CHANGED
+		);
+
+		private CaseTimelineEventTypes() {
+		}
+	}
 
 	public enum CaseSort {
 		INTAKE_NEWEST,
@@ -462,6 +549,7 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
 			int shaleClientId = requireCurrentShaleClientId(con);
+			String caseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "cu_scope");
 			String sql = """
 					SELECT TOP (?)
 					  c.Id,
@@ -508,8 +596,7 @@ public final class CaseDao {
 					    FROM %s cu_scope
 					    WHERE cu_scope.CaseId = c.Id
 					      AND cu_scope.UserId = ?
-					      AND cu_scope.RoleId = ?
-					      AND cu_scope.IsPrimary = 1
+					      AND %s
 					  )
 					ORDER BY c.CallerDate DESC, c.Id DESC;
 					""".formatted(
@@ -519,7 +606,8 @@ public final class CaseDao {
 							CASE_USERS_TABLE,
 							USERS_TABLE,
 							activeFilter(schema.deletedColumn(), "c"),
-							CASE_USERS_TABLE);
+							CASE_USERS_TABLE,
+							caseUserActiveFilter);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
@@ -527,7 +615,6 @@ public final class CaseDao {
 				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, userId);
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 
 				List<CaseRow> out = new ArrayList<>();
 				try (ResultSet rs = ps.executeQuery()) {
@@ -546,13 +633,21 @@ public final class CaseDao {
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
 						+ "selectedUserId=" + userId
 						+ " shaleClientId=" + shaleClientId
-						+ " roleId=" + ROLE_RESPONSIBLE_ATTORNEY
-						+ " isPrimary=1"
+						+ " sqlSummary=list-active-cases-for-user-team-member"
+						+ " sql=" + sql.replace('\n', ' ')
+						+ " membershipRule=anyCaseUsersRow"
+						+ " sqlParamOrder=[limit, responsibleAttorneyRoleId, shaleClientId, selectedUserId]"
+						+ " sqlParams=[" + limit + "," + ROLE_RESPONSIBLE_ATTORNEY + "," + shaleClientId + "," + userId + "]"
+						+ " caseUsersIsDeletedFilter=" + caseUserActiveFilter
 						+ " daoTotalRowsReturned=" + out.size());
 				return out;
 			}
 		} catch (SQLException e) {
-			throw new RuntimeException("Failed to list assigned cases for responsible attorney user (userId=" + userId + ")", e);
+			System.err.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
+					+ "selectedUserId=" + userId
+					+ " daoException=" + e.getMessage());
+			e.printStackTrace(System.err);
+			throw new RuntimeException("Failed to list assigned cases for team-member user (userId=" + userId + ")", e);
 		}
 	}
 
@@ -741,21 +836,11 @@ public final class CaseDao {
 		CaseSort effectiveSort = sort == null ? CaseSort.INTAKE_NEWEST : sort;
 		String orderByClause = orderByClauseFor(effectiveSort);
 
-		String userMembershipFilter = restrictToUserId == null
-				? ""
-				: """
-				  AND EXISTS (
-				    SELECT 1
-				    FROM %s cu_scope
-				    WHERE cu_scope.CaseId = c.Id
-				      AND cu_scope.UserId = ?
-				  )
-				""".formatted(CASE_USERS_TABLE);
-
 		List<CaseRow> out = new ArrayList<>(pageSize);
 
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
+			String userMembershipFilter = membershipExistsFilter(restrictToUserId, resolveCaseUsersDeletedColumn(con));
 			String sql = """
 				SELECT
 				  c.Id,
@@ -894,19 +979,9 @@ public final class CaseDao {
 	}
 
 	private long countAll(boolean includeClosedDenied, Integer restrictToUserId) {
-		String userMembershipFilter = restrictToUserId == null
-				? ""
-				: """
-				  AND EXISTS (
-				    SELECT 1
-				    FROM %s cu_scope
-				    WHERE cu_scope.CaseId = c.Id
-				      AND cu_scope.UserId = ?
-				  )
-				""".formatted(CASE_USERS_TABLE);
-
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
+			String userMembershipFilter = membershipExistsFilter(restrictToUserId, resolveCaseUsersDeletedColumn(con));
 			String sql = """
 				SELECT COUNT(1)
 				FROM %s c
@@ -1525,6 +1600,112 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list case updates (caseId=" + caseId + ")", e);
+		}
+	}
+
+	public void addCaseTimelineEvent(int caseId,
+			int shaleClientId,
+			String eventType,
+			Integer actorUserId,
+			String title,
+			String body) {
+		if (caseId <= 0)
+			throw new IllegalArgumentException("caseId is required.");
+		if (shaleClientId <= 0)
+			throw new IllegalArgumentException("shaleClientId is required.");
+
+		String normalizedEventType = eventType == null ? "" : eventType.trim().toUpperCase(Locale.ROOT);
+		if (!CaseTimelineEventTypes.ALLOWED.contains(normalizedEventType))
+			throw new IllegalArgumentException("Unsupported timeline eventType: " + eventType);
+
+		String normalizedTitle = title == null ? "" : title.trim();
+		if (normalizedTitle.isBlank())
+			throw new IllegalArgumentException("Timeline event title is required.");
+		String normalizedBody = body == null ? null : body.trim();
+
+		String sql = """
+				INSERT INTO dbo.CaseTimelineEvents (
+				  CaseId,
+				  ShaleClientId,
+				  EventType,
+				  ActorUserId,
+				  Title,
+				  Body
+				)
+				VALUES (?, ?, ?, ?, ?, ?);
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, caseId);
+			ps.setInt(2, shaleClientId);
+			ps.setString(3, normalizedEventType);
+			if (actorUserId == null)
+				ps.setNull(4, java.sql.Types.INTEGER);
+			else
+				ps.setInt(4, actorUserId);
+			ps.setString(5, normalizedTitle);
+			setNullableString(ps, 6, normalizedBody);
+			int rows = ps.executeUpdate();
+			if (rows != 1) {
+				throw new RuntimeException("Unexpected insert row count for case timeline event (caseId=" + caseId + "): " + rows);
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to add case timeline event (caseId=" + caseId + ")", e);
+		}
+	}
+
+	public List<CaseTimelineEventDto> listCaseTimelineEvents(int caseId) {
+		if (caseId <= 0)
+			throw new IllegalArgumentException("caseId is required.");
+
+		String sql = """
+				SELECT
+				  cte.Id,
+				  cte.CaseId,
+				  cte.ShaleClientId,
+				  cte.EventType,
+				  cte.OccurredAt,
+				  cte.ActorUserId,
+				  cte.Title,
+				  cte.Body,
+				  LTRIM(RTRIM(
+				    COALESCE(u.name_first, '') +
+				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(u.name_last, '')
+				  )) AS ActorDisplayName
+				FROM dbo.CaseTimelineEvents cte
+				INNER JOIN dbo.Cases c ON c.Id = cte.CaseId
+				                   AND c.ShaleClientId = cte.ShaleClientId
+				LEFT JOIN dbo.Users u ON u.Id = cte.ActorUserId
+				WHERE cte.CaseId = ?
+				ORDER BY cte.OccurredAt DESC, cte.Id DESC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, caseId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				List<CaseTimelineEventDto> out = new ArrayList<>();
+				while (rs.next()) {
+					Integer actorUserId = getNullableInt(rs, "ActorUserId");
+					out.add(new CaseTimelineEventDto(
+							rs.getLong("Id"),
+							rs.getInt("CaseId"),
+							rs.getInt("ShaleClientId"),
+							rs.getString("EventType"),
+							toLocalDateTime(rs.getTimestamp("OccurredAt")),
+							actorUserId,
+							rs.getString("Title"),
+							rs.getString("Body"),
+							safeUserDisplayName(rs.getString("ActorDisplayName"), actorUserId)
+					));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list case timeline events (caseId=" + caseId + ")", e);
 		}
 	}
 
@@ -3242,6 +3423,25 @@ public final class CaseDao {
 
 	private static CaseSchema resolveCaseSchema(Connection con) throws SQLException {
 		return new CaseSchema(existingColumn(con, CASES_TABLE, List.of("IsDeleted", "is_deleted")));
+	}
+
+	private static String resolveCaseUsersDeletedColumn(Connection con) throws SQLException {
+		return existingColumn(con, CASE_USERS_TABLE, List.of("IsDeleted", "is_deleted"));
+	}
+
+	private static String membershipExistsFilter(Integer restrictToUserId, String caseUsersDeletedColumn) {
+		if (restrictToUserId == null) {
+			return "";
+		}
+		return """
+			  AND EXISTS (
+			    SELECT 1
+			    FROM %s cu_scope
+			    WHERE cu_scope.CaseId = c.Id
+			      AND cu_scope.UserId = ?
+			      AND %s
+			  )
+			""".formatted(CASE_USERS_TABLE, activeFilter(caseUsersDeletedColumn, "cu_scope"));
 	}
 
 	private static String existingColumn(Connection con, String tableName, List<String> candidates) throws SQLException {
