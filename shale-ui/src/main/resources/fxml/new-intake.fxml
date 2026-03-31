@@ -37,13 +37,22 @@
                                     <ColumnConstraints minWidth="230" hgrow="ALWAYS" fillWidth="true" />
                                 </columnConstraints>
 
-                                <Label text="First Name" GridPane.rowIndex="0" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="0">
+                                    <Label text="First Name" />
+                                    <Label fx:id="callerFirstNameRequiredIndicator" text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <TextField fx:id="callerFirstNameField" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Last Name" GridPane.rowIndex="1" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
+                                    <Label text="Last Name" />
+                                    <Label fx:id="callerLastNameRequiredIndicator" text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <TextField fx:id="callerLastNameField" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Phone Number" GridPane.rowIndex="2" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="2">
+                                    <Label text="Phone Number" />
+                                    <Label fx:id="callerPhoneRequiredIndicator" text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <TextField fx:id="callerPhoneField" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
                                 <Label text="Address" GridPane.rowIndex="3" />
@@ -63,16 +72,25 @@
                                     <ColumnConstraints minWidth="230" hgrow="ALWAYS" fillWidth="true" />
                                 </columnConstraints>
 
-                                <Label text="First Name" GridPane.rowIndex="0" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="0">
+                                    <Label text="First Name" />
+                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <TextField fx:id="clientFirstNameField" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Last Name" GridPane.rowIndex="1" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
+                                    <Label text="Last Name" />
+                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <TextField fx:id="clientLastNameField" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
                                 <Label text="Address" GridPane.rowIndex="2" />
                                 <TextField fx:id="clientAddressField" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Phone Number" GridPane.rowIndex="3" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="3">
+                                    <Label text="Phone Number" />
+                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <TextField fx:id="clientPhoneField" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
                                 <Label text="Email" GridPane.rowIndex="4" />
@@ -99,13 +117,22 @@
                                     <ColumnConstraints minWidth="230" hgrow="ALWAYS" fillWidth="true" />
                                 </columnConstraints>
 
-                                <Label text="Case Name" GridPane.rowIndex="0" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="0">
+                                    <Label text="Case Name" />
+                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <TextField fx:id="caseNameField" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Date of Intake" GridPane.rowIndex="1" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
+                                    <Label text="Date of Intake" />
+                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <DatePicker fx:id="dateOfIntakePicker" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Time of Intake" GridPane.rowIndex="2" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="2">
+                                    <Label text="Time of Intake" />
+                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <TextField fx:id="timeOfIntakeField" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
                                 <Label text="Estate Case" GridPane.rowIndex="3" />
@@ -121,13 +148,19 @@
                                     <ColumnConstraints minWidth="250" hgrow="ALWAYS" fillWidth="true" />
                                 </columnConstraints>
 
-                                <Label text="Practice Area" GridPane.rowIndex="0" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="0">
+                                    <Label text="Practice Area" />
+                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <HBox spacing="12" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308">
                                     <StackPane fx:id="practiceAreaHost" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
                                     <Button fx:id="selectPracticeAreaButton" text="Change" minWidth="90" />
                                 </HBox>
 
-                                <Label text="Status" GridPane.rowIndex="1" />
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
+                                    <Label text="Status" />
+                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
+                                </HBox>
                                 <HBox spacing="12" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308">
                                     <StackPane fx:id="statusHost" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
                                     <Button fx:id="selectStatusButton" text="Change" minWidth="90" />
