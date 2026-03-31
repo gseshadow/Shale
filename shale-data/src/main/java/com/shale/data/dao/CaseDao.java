@@ -240,6 +240,8 @@ public final class CaseDao {
 			String callerFirstName,
 			String callerLastName,
 			String callerPhone,
+			String callerAddress,
+			String callerEmail,
 			Integer createdByUserId
 	) {
 	}
@@ -278,9 +280,9 @@ public final class CaseDao {
 						buildFullName(request.callerFirstName(), request.callerLastName()),
 						request.callerFirstName(),
 						request.callerLastName(),
-						null,
+						request.callerAddress(),
 						request.callerPhone(),
-						null,
+						request.callerEmail(),
 						null,
 						null,
 						false,
