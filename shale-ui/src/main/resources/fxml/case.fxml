@@ -147,11 +147,11 @@
 							visible="false" managed="false" GridPane.rowIndex="4"
 							GridPane.columnIndex="2" />
 
-						<Label text="Client:" style="-fx-opacity: 0.8;"
+						<Label text="Clients:" style="-fx-opacity: 0.8;"
 							GridPane.rowIndex="5" GridPane.columnIndex="0" />
 						<StackPane fx:id="ovClientHost" GridPane.rowIndex="5"
 							GridPane.columnIndex="1" />
-						<Button fx:id="changeClientButton" text="Change"
+						<Button fx:id="changeClientButton" text="Manage"
 							visible="false" managed="false" GridPane.rowIndex="5"
 							GridPane.columnIndex="2" />
 
