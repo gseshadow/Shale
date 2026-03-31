@@ -45,6 +45,12 @@
 
                                 <Label text="Phone Number" GridPane.rowIndex="2" />
                                 <TextField fx:id="callerPhoneField" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+
+                                <Label text="Address" GridPane.rowIndex="3" />
+                                <TextField fx:id="callerAddressField" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+
+                                <Label text="Email" GridPane.rowIndex="4" />
+                                <TextField fx:id="callerEmailField" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
                             </GridPane>
                         </VBox>
 
