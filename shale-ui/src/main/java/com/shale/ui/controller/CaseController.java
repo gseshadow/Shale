@@ -74,6 +74,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ScrollPane;
@@ -467,6 +468,10 @@ public class CaseController {
 	private List<CaseDao.RelatedContactRow> relatedContacts = List.of();
 	private List<CaseDao.RelatedOrganizationRow> relatedOrganizations = List.of();
 	private List<CaseTaskListItemDto> caseTasks = List.of();
+	private List<CaseUpdateDto> caseUpdates = List.of();
+	private Long editingCaseUpdateId;
+	private String editingCaseUpdateDraftText = "";
+	private boolean savingCaseUpdateEdit = false;
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSectionName = "Overview";
@@ -2805,7 +2810,14 @@ public class CaseController {
 			return;
 
 		caseUpdatesFeedBox.getChildren().clear();
-		List<CaseUpdateDto> safeUpdates = updates == null ? List.of() : updates;
+		List<CaseUpdateDto> safeUpdates = updates == null ? List.of() : List.copyOf(updates);
+		caseUpdates = safeUpdates;
+		if (editingCaseUpdateId != null
+				&& safeUpdates.stream().noneMatch(u -> u != null && u.getId() == editingCaseUpdateId.longValue())) {
+			editingCaseUpdateId = null;
+			editingCaseUpdateDraftText = "";
+			savingCaseUpdateEdit = false;
+		}
 
 		if (safeUpdates.isEmpty()) {
 			Label empty = new Label("No updates yet.");
@@ -2901,23 +2913,163 @@ public class CaseController {
 	private Node createCaseUpdateCardInternal(CaseUpdateDto dto) {
 		Label authorLabel = new Label(safeAuthorName(dto));
 		authorLabel.setStyle("-fx-font-weight: bold;");
+		authorLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		authorLabel.setMaxWidth(Double.MAX_VALUE);
+		HBox.setHgrow(authorLabel, javafx.scene.layout.Priority.ALWAYS);
 
-		Label timestampLabel = new Label(formatDateTime(dto.getCreatedAt()));
-		timestampLabel.setStyle("-fx-opacity: 0.75;");
+		VBox bodyBox;
+		HBox rightActions = new HBox();
+		rightActions.setAlignment(Pos.CENTER_RIGHT);
+		if (!isEditingCaseUpdate(dto) && canEditCaseUpdate(dto)) {
+			Button editButton = new Button("Edit");
+			editButton.setDisable(savingCaseUpdateEdit);
+			editButton.setOnAction(e -> startEditingCaseUpdate(dto));
+			rightActions.getChildren().add(editButton);
+		}
 
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
-
-		HBox topRow = new HBox(8, authorLabel, spacer, timestampLabel);
+		HBox topRow = new HBox(8, authorLabel, rightActions);
 		topRow.setAlignment(Pos.CENTER_LEFT);
 
-		Label noteLabel = new Label(safeText(dto.getNoteText()));
-		noteLabel.setWrapText(true);
+		Label metadataLabel = new Label(buildCaseUpdateMetadata(dto));
+		metadataLabel.setWrapText(true);
+		metadataLabel.setStyle("-fx-opacity: 0.75; -fx-font-size: 11px;");
 
-		VBox card = new VBox(6, topRow, noteLabel);
+		if (isEditingCaseUpdate(dto)) {
+			TextArea editArea = new TextArea(editingCaseUpdateDraftText);
+			editArea.setWrapText(true);
+			editArea.setPrefRowCount(4);
+			editArea.setDisable(savingCaseUpdateEdit);
+			editArea.textProperty().addListener((obs, oldText, newText) -> editingCaseUpdateDraftText = safeText(newText));
+
+			Button saveButton = new Button("Save");
+			saveButton.setDisable(savingCaseUpdateEdit);
+			saveButton.setOnAction(e -> saveEditedCaseUpdate(dto));
+
+			Button cancelButton = new Button("Cancel");
+			cancelButton.setDisable(savingCaseUpdateEdit);
+			cancelButton.setOnAction(e -> cancelEditingCaseUpdate());
+
+			HBox editActions = new HBox(8, saveButton, cancelButton);
+			editActions.setAlignment(Pos.CENTER_LEFT);
+			bodyBox = new VBox(8, editArea, editActions);
+		} else {
+			Label noteLabel = new Label(safeText(dto.getNoteText()));
+			noteLabel.setWrapText(true);
+			bodyBox = new VBox(noteLabel);
+		}
+
+		VBox card = new VBox(4, topRow, metadataLabel, bodyBox);
 		card.setPadding(new Insets(8, 10, 8, 10));
 		card.setStyle("-fx-background-color: rgba(0,0,0,0.04); -fx-background-radius: 8;");
 		return card;
+	}
+
+	private String buildCaseUpdateMetadata(CaseUpdateDto dto) {
+		if (dto == null)
+			return "";
+		String createdText = "Created " + formatDateTime(dto.getCreatedAt());
+		if (!isMeaningfullyEdited(dto)) {
+			return createdText;
+		}
+		return createdText + " • Edited " + formatDateTime(dto.getUpdatedAt());
+	}
+
+	private boolean isMeaningfullyEdited(CaseUpdateDto dto) {
+		if (dto == null || dto.getUpdatedAt() == null)
+			return false;
+		if (dto.getCreatedAt() == null)
+			return true;
+		return dto.getUpdatedAt().isAfter(dto.getCreatedAt().plusSeconds(1));
+	}
+
+	private boolean canEditCaseUpdate(CaseUpdateDto dto) {
+		if (dto == null || appState == null)
+			return false;
+		Integer actorUserId = appState.getUserId();
+		Integer createdByUserId = dto.getCreatedByUserId();
+		return actorUserId != null && createdByUserId != null && actorUserId.intValue() == createdByUserId.intValue();
+	}
+
+	private boolean isEditingCaseUpdate(CaseUpdateDto dto) {
+		return dto != null && editingCaseUpdateId != null && dto.getId() == editingCaseUpdateId.longValue();
+	}
+
+	private void startEditingCaseUpdate(CaseUpdateDto dto) {
+		if (dto == null || !canEditCaseUpdate(dto))
+			return;
+		editingCaseUpdateId = dto.getId();
+		editingCaseUpdateDraftText = safeText(dto.getNoteText());
+		savingCaseUpdateEdit = false;
+		renderCaseUpdates(caseUpdates);
+	}
+
+	private void cancelEditingCaseUpdate() {
+		editingCaseUpdateId = null;
+		editingCaseUpdateDraftText = "";
+		savingCaseUpdateEdit = false;
+		renderCaseUpdates(caseUpdates);
+	}
+
+	private void saveEditedCaseUpdate(CaseUpdateDto dto) {
+		if (dto == null || caseDao == null || appState == null || caseId == null)
+			return;
+
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer actorUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || actorUserId == null || actorUserId <= 0) {
+			showError("Unable to save note edit.");
+			return;
+		}
+
+		String trimmedText = safeText(editingCaseUpdateDraftText).trim();
+		if (trimmedText.isBlank()) {
+			showError("Update text is required.");
+			return;
+		}
+
+		final long activeCaseId = caseId.longValue();
+		final long caseUpdateId = dto.getId();
+		final int activeClientId = shaleClientId;
+		final int activeActorUserId = actorUserId;
+		savingCaseUpdateEdit = true;
+		clearError();
+		renderCaseUpdates(caseUpdates);
+
+		new Thread(() ->
+		{
+			try {
+				boolean updated = caseDao.updateCaseNote(caseUpdateId, activeCaseId, activeClientId, activeActorUserId, trimmedText);
+				if (!updated) {
+					runOnFx(() ->
+					{
+						savingCaseUpdateEdit = false;
+						showError("Only the note creator can edit this update.");
+						renderCaseUpdates(caseUpdates);
+					});
+					return;
+				}
+				runOnFx(() -> applyLastUpdatedLabel(LocalDateTime.now(ZoneOffset.UTC)));
+				publishCaseUpdateAdded(activeCaseId);
+				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
+				runOnFx(() ->
+				{
+					if (caseId == null || caseId.longValue() != activeCaseId)
+						return;
+					editingCaseUpdateId = null;
+					editingCaseUpdateDraftText = "";
+					savingCaseUpdateEdit = false;
+					renderCaseUpdates(updates);
+					refreshLastUpdatedLabelAsync();
+				});
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					savingCaseUpdateEdit = false;
+					showError("Failed to save case update. " + ex.getMessage());
+					renderCaseUpdates(caseUpdates);
+				});
+			}
+		}, "case-updates-edit-" + activeCaseId + "-" + caseUpdateId).start();
 	}
 
 	private static String safeAuthorName(CaseUpdateDto dto) {
