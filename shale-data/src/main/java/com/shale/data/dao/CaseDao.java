@@ -1563,6 +1563,7 @@ public final class CaseDao {
 				  cu.CaseId,
 				  cu.NoteText,
 				  cu.CreatedAt,
+				  cu.UpdatedAt,
 				  cu.CreatedByUserId,
 				  LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
@@ -1594,6 +1595,7 @@ public final class CaseDao {
 							rs.getLong("CaseId"),
 							rs.getString("NoteText"),
 							toLocalDateTime(rs.getTimestamp("CreatedAt")),
+							toLocalDateTime(rs.getTimestamp("UpdatedAt")),
 							createdByUserId,
 							displayName
 					));

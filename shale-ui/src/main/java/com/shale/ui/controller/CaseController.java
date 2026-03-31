@@ -74,6 +74,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ScrollPane;
@@ -2912,15 +2913,12 @@ public class CaseController {
 	private Node createCaseUpdateCardInternal(CaseUpdateDto dto) {
 		Label authorLabel = new Label(safeAuthorName(dto));
 		authorLabel.setStyle("-fx-font-weight: bold;");
-
-		Label timestampLabel = new Label(formatDateTime(dto.getCreatedAt()));
-		timestampLabel.setStyle("-fx-opacity: 0.75;");
-
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+		authorLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		authorLabel.setMaxWidth(Double.MAX_VALUE);
+		HBox.setHgrow(authorLabel, javafx.scene.layout.Priority.ALWAYS);
 
 		VBox bodyBox;
-		HBox rightActions = new HBox(8, timestampLabel);
+		HBox rightActions = new HBox();
 		rightActions.setAlignment(Pos.CENTER_RIGHT);
 		if (!isEditingCaseUpdate(dto) && canEditCaseUpdate(dto)) {
 			Button editButton = new Button("Edit");
@@ -2929,8 +2927,12 @@ public class CaseController {
 			rightActions.getChildren().add(editButton);
 		}
 
-		HBox topRow = new HBox(8, authorLabel, spacer, rightActions);
+		HBox topRow = new HBox(8, authorLabel, rightActions);
 		topRow.setAlignment(Pos.CENTER_LEFT);
+
+		Label metadataLabel = new Label(buildCaseUpdateMetadata(dto));
+		metadataLabel.setWrapText(true);
+		metadataLabel.setStyle("-fx-opacity: 0.75; -fx-font-size: 11px;");
 
 		if (isEditingCaseUpdate(dto)) {
 			TextArea editArea = new TextArea(editingCaseUpdateDraftText);
@@ -2956,10 +2958,28 @@ public class CaseController {
 			bodyBox = new VBox(noteLabel);
 		}
 
-		VBox card = new VBox(6, topRow, bodyBox);
+		VBox card = new VBox(4, topRow, metadataLabel, bodyBox);
 		card.setPadding(new Insets(8, 10, 8, 10));
 		card.setStyle("-fx-background-color: rgba(0,0,0,0.04); -fx-background-radius: 8;");
 		return card;
+	}
+
+	private String buildCaseUpdateMetadata(CaseUpdateDto dto) {
+		if (dto == null)
+			return "";
+		String createdText = "Created " + formatDateTime(dto.getCreatedAt());
+		if (!isMeaningfullyEdited(dto)) {
+			return createdText;
+		}
+		return createdText + " • Edited " + formatDateTime(dto.getUpdatedAt());
+	}
+
+	private boolean isMeaningfullyEdited(CaseUpdateDto dto) {
+		if (dto == null || dto.getUpdatedAt() == null)
+			return false;
+		if (dto.getCreatedAt() == null)
+			return true;
+		return dto.getUpdatedAt().isAfter(dto.getCreatedAt().plusSeconds(1));
 	}
 
 	private boolean canEditCaseUpdate(CaseUpdateDto dto) {
