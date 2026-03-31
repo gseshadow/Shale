@@ -364,7 +364,7 @@ public class CaseController {
 	private static final int ROLE_CASECONTACT_CLIENT = 1;
 	private static final int ROLE_CASECONTACT_OPPOSING_COUNSEL = 6;
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
-	private static final int ROLE_INTAKE_STAFF = 5;
+	private static final int ROLE_PRELITIGATION_STAFF = 5;
 	private static final int ROLE_ATTORNEY = 7;
 	private static final int ROLE_LEGAL_ASSISTANT = 11;
 	private static final int ROLE_PARALEGAL = 12;
@@ -373,7 +373,7 @@ public class CaseController {
 
 	private static final java.util.Set<Integer> TEAM_ROLE_IDS = java.util.Set.of(
 			ROLE_RESPONSIBLE_ATTORNEY,
-			ROLE_INTAKE_STAFF,
+			ROLE_PRELITIGATION_STAFF,
 			ROLE_ATTORNEY,
 			ROLE_LEGAL_ASSISTANT,
 			ROLE_PARALEGAL,
@@ -2635,7 +2635,7 @@ public class CaseController {
 	private String roleLabel(int roleId) {
 		return switch (roleId) {
 		case ROLE_RESPONSIBLE_ATTORNEY -> "Responsible Attorney";
-		case ROLE_INTAKE_STAFF -> "Intake Staff";
+		case ROLE_PRELITIGATION_STAFF -> "Prelitigation Staff";
 		case ROLE_ATTORNEY -> "Attorney";
 		case ROLE_LEGAL_ASSISTANT -> "Legal Assistant";
 		case ROLE_PARALEGAL -> "Paralegal";

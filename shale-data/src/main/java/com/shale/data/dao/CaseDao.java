@@ -34,6 +34,7 @@ public final class CaseDao {
 
 	// CaseUsers.RoleId (int) for Responsible Attorney
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+
 	public static final class CaseTimelineEventTypes {
 		public static final String CASE_CREATED = "CASE_CREATED";
 		public static final String STATUS_CHANGED = "STATUS_CHANGED";
@@ -211,7 +212,6 @@ public final class CaseDao {
 
 	private record CaseSchema(String deletedColumn) {
 	}
-
 
 	public record NewIntakeCreateRequest(
 			int shaleClientId,
@@ -602,14 +602,14 @@ public final class CaseDao {
 					  )
 					ORDER BY c.CallerDate DESC, c.Id DESC;
 					""".formatted(
-							CASES_TABLE,
-							CASE_STATUSES_TABLE,
-							STATUSES_TABLE,
-							CASE_USERS_TABLE,
-							USERS_TABLE,
-							activeFilter(schema.deletedColumn(), "c"),
-							CASE_USERS_TABLE,
-							caseUserActiveFilter);
+					CASES_TABLE,
+					CASE_STATUSES_TABLE,
+					STATUSES_TABLE,
+					CASE_USERS_TABLE,
+					USERS_TABLE,
+					activeFilter(schema.deletedColumn(), "c"),
+					CASE_USERS_TABLE,
+					caseUserActiveFilter);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
@@ -662,49 +662,49 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
 			String sql = """
-				SELECT
-				  c.Id,
-				  c.Name,
-				  c.CallerDate,
-				  c.StatuteOfLimitations,
-				  current_status.PrimaryStatusId,
-				  ra.UserId AS ResponsibleAttorneyId,
-				  u.color AS ResponsibleAttorneyColor,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS ResponsibleAttorneyName
-				FROM %s c
-				OUTER APPLY (
-				    SELECT TOP (1) s.Id AS PrimaryStatusId
-				    FROM %s cs
-				    INNER JOIN %s s ON s.Id = cs.StatusId
-				    WHERE cs.CaseId = c.Id
-				    ORDER BY
-				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-				      cs.UpdatedAt DESC,
-				      cs.CreatedAt DESC,
-				      cs.Id DESC
-				) current_status
-				OUTER APPLY (
-				    SELECT TOP (1) cu.UserId
-				    FROM %s cu
-				    WHERE cu.CaseId = c.Id
-				      AND cu.RoleId = ?
-				      AND cu.IsPrimary = 1
-				    ORDER BY
-				      cu.UpdatedAt DESC,
-				      cu.CreatedAt DESC,
-				      cu.Id DESC
-				) ra
-				LEFT JOIN %s u
-				  ON u.id = ra.UserId
-				WHERE c.ShaleClientId = ?
-				  AND %s
-				  AND LOWER(COALESCE(c.Name, '')) LIKE ?
-				ORDER BY c.Name ASC, c.Id ASC;
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"));
+					SELECT
+					  c.Id,
+					  c.Name,
+					  c.CallerDate,
+					  c.StatuteOfLimitations,
+					  current_status.PrimaryStatusId,
+					  ra.UserId AS ResponsibleAttorneyId,
+					  u.color AS ResponsibleAttorneyColor,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS ResponsibleAttorneyName
+					FROM %s c
+					OUTER APPLY (
+					    SELECT TOP (1) s.Id AS PrimaryStatusId
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					OUTER APPLY (
+					    SELECT TOP (1) cu.UserId
+					    FROM %s cu
+					    WHERE cu.CaseId = c.Id
+					      AND cu.RoleId = ?
+					      AND cu.IsPrimary = 1
+					    ORDER BY
+					      cu.UpdatedAt DESC,
+					      cu.CreatedAt DESC,
+					      cu.Id DESC
+					) ra
+					LEFT JOIN %s u
+					  ON u.id = ra.UserId
+					WHERE c.ShaleClientId = ?
+					  AND %s
+					  AND LOWER(COALESCE(c.Name, '')) LIKE ?
+					ORDER BY c.Name ASC, c.Id ASC;
+					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"));
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
@@ -716,14 +716,14 @@ public final class CaseDao {
 				try (ResultSet rs = ps.executeQuery()) {
 					while (rs.next()) {
 						out.add(new CaseRow(
-							rs.getLong("Id"),
-							rs.getString("Name"),
-							toLocalDate(rs.getDate("CallerDate")),
-							toLocalDate(rs.getDate("StatuteOfLimitations")),
-							getNullableInt(rs, "PrimaryStatusId"),
-							getNullableInt(rs, "ResponsibleAttorneyId"),
-							rs.getString("ResponsibleAttorneyName"),
-							rs.getString("ResponsibleAttorneyColor")
+								rs.getLong("Id"),
+								rs.getString("Name"),
+								toLocalDate(rs.getDate("CallerDate")),
+								toLocalDate(rs.getDate("StatuteOfLimitations")),
+								getNullableInt(rs, "PrimaryStatusId"),
+								getNullableInt(rs, "ResponsibleAttorneyId"),
+								rs.getString("ResponsibleAttorneyName"),
+								rs.getString("ResponsibleAttorneyColor")
 						));
 					}
 				}
@@ -747,49 +747,49 @@ public final class CaseDao {
 			}
 			String deletedFilter = "(" + "c." + schema.deletedColumn() + " = 1)";
 			String sql = """
-				SELECT
-				  c.Id,
-				  c.Name,
-				  c.CallerDate,
-				  c.StatuteOfLimitations,
-				  current_status.PrimaryStatusId,
-				  ra.UserId AS ResponsibleAttorneyId,
-				  u.color AS ResponsibleAttorneyColor,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS ResponsibleAttorneyName
-				FROM %s c
-				OUTER APPLY (
-				    SELECT TOP (1) s.Id AS PrimaryStatusId
-				    FROM %s cs
-				    INNER JOIN %s s ON s.Id = cs.StatusId
-				    WHERE cs.CaseId = c.Id
-				    ORDER BY
-				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-				      cs.UpdatedAt DESC,
-				      cs.CreatedAt DESC,
-				      cs.Id DESC
-				) current_status
-				OUTER APPLY (
-				    SELECT TOP (1) cu.UserId
-				    FROM %s cu
-				    WHERE cu.CaseId = c.Id
-				      AND cu.RoleId = ?
-				      AND cu.IsPrimary = 1
-				    ORDER BY
-				      cu.UpdatedAt DESC,
-				      cu.CreatedAt DESC,
-				      cu.Id DESC
-				) ra
-				LEFT JOIN %s u
-				  ON u.id = ra.UserId
-				WHERE c.ShaleClientId = ?
-				  AND %s
-				  AND LOWER(COALESCE(c.Name, '')) LIKE ?
-				ORDER BY c.Name ASC, c.Id ASC;
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, deletedFilter);
+					SELECT
+					  c.Id,
+					  c.Name,
+					  c.CallerDate,
+					  c.StatuteOfLimitations,
+					  current_status.PrimaryStatusId,
+					  ra.UserId AS ResponsibleAttorneyId,
+					  u.color AS ResponsibleAttorneyColor,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS ResponsibleAttorneyName
+					FROM %s c
+					OUTER APPLY (
+					    SELECT TOP (1) s.Id AS PrimaryStatusId
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					OUTER APPLY (
+					    SELECT TOP (1) cu.UserId
+					    FROM %s cu
+					    WHERE cu.CaseId = c.Id
+					      AND cu.RoleId = ?
+					      AND cu.IsPrimary = 1
+					    ORDER BY
+					      cu.UpdatedAt DESC,
+					      cu.CreatedAt DESC,
+					      cu.Id DESC
+					) ra
+					LEFT JOIN %s u
+					  ON u.id = ra.UserId
+					WHERE c.ShaleClientId = ?
+					  AND %s
+					  AND LOWER(COALESCE(c.Name, '')) LIKE ?
+					ORDER BY c.Name ASC, c.Id ASC;
+					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, deletedFilter);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
@@ -801,14 +801,14 @@ public final class CaseDao {
 				try (ResultSet rs = ps.executeQuery()) {
 					while (rs.next()) {
 						out.add(new CaseRow(
-							rs.getLong("Id"),
-							rs.getString("Name"),
-							toLocalDate(rs.getDate("CallerDate")),
-							toLocalDate(rs.getDate("StatuteOfLimitations")),
-							getNullableInt(rs, "PrimaryStatusId"),
-							getNullableInt(rs, "ResponsibleAttorneyId"),
-							rs.getString("ResponsibleAttorneyName"),
-							rs.getString("ResponsibleAttorneyColor")
+								rs.getLong("Id"),
+								rs.getString("Name"),
+								toLocalDate(rs.getDate("CallerDate")),
+								toLocalDate(rs.getDate("StatuteOfLimitations")),
+								getNullableInt(rs, "PrimaryStatusId"),
+								getNullableInt(rs, "ResponsibleAttorneyId"),
+								rs.getString("ResponsibleAttorneyName"),
+								rs.getString("ResponsibleAttorneyColor")
 						));
 					}
 				}
@@ -844,51 +844,52 @@ public final class CaseDao {
 			CaseSchema schema = resolveCaseSchema(con);
 			String userMembershipFilter = membershipExistsFilter(restrictToUserId, resolveCaseUsersDeletedColumn(con));
 			String sql = """
-				SELECT
-				  c.Id,
-				  c.Name,
-				  c.CallerDate,
-				  c.StatuteOfLimitations,
-				  current_status.PrimaryStatusId,
-				  ra.UserId AS ResponsibleAttorneyId,
-				  u.color AS ResponsibleAttorneyColor,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS ResponsibleAttorneyName
-				FROM %s c
-				OUTER APPLY (
-				    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
-				    FROM %s cs
-				    INNER JOIN %s s ON s.Id = cs.StatusId
-				    WHERE cs.CaseId = c.Id
-				    ORDER BY
-				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-				      cs.UpdatedAt DESC,
-				      cs.CreatedAt DESC,
-				      cs.Id DESC
-				) current_status
-				OUTER APPLY (
-				    SELECT TOP (1) cu.UserId
-				    FROM %s cu
-				    WHERE cu.CaseId = c.Id
-				      AND cu.RoleId = ?
-				      AND cu.IsPrimary = 1
-				    ORDER BY
-				      cu.UpdatedAt DESC,
-				      cu.CreatedAt DESC,
-				      cu.Id DESC
-				) ra
-				LEFT JOIN %s u
-				  ON u.id = ra.UserId
-				WHERE %s
-				  AND c.ShaleClientId = ?
-				  %s
-				ORDER BY
-				  %s
-				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter, orderByClause);
+					SELECT
+					  c.Id,
+					  c.Name,
+					  c.CallerDate,
+					  c.StatuteOfLimitations,
+					  current_status.PrimaryStatusId,
+					  ra.UserId AS ResponsibleAttorneyId,
+					  u.color AS ResponsibleAttorneyColor,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS ResponsibleAttorneyName
+					FROM %s c
+					OUTER APPLY (
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					OUTER APPLY (
+					    SELECT TOP (1) cu.UserId
+					    FROM %s cu
+					    WHERE cu.CaseId = c.Id
+					      AND cu.RoleId = ?
+					      AND cu.IsPrimary = 1
+					    ORDER BY
+					      cu.UpdatedAt DESC,
+					      cu.CreatedAt DESC,
+					      cu.Id DESC
+					) ra
+					LEFT JOIN %s u
+					  ON u.id = ra.UserId
+					WHERE %s
+					  AND c.ShaleClientId = ?
+					  %s
+					ORDER BY
+					  %s
+					OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
+					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter,
+					orderByClause);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int shaleClientId = requireCurrentShaleClientId(con);
@@ -915,14 +916,14 @@ public final class CaseDao {
 				try (ResultSet rs = ps.executeQuery()) {
 					while (rs.next()) {
 						out.add(new CaseRow(
-							rs.getLong("Id"),
-							rs.getString("Name"),
-							toLocalDate(rs.getDate("CallerDate")),
-							toLocalDate(rs.getDate("StatuteOfLimitations")),
-							getNullableInt(rs, "PrimaryStatusId"),
-							getNullableInt(rs, "ResponsibleAttorneyId"),
-							rs.getString("ResponsibleAttorneyName"),
-							rs.getString("ResponsibleAttorneyColor")
+								rs.getLong("Id"),
+								rs.getString("Name"),
+								toLocalDate(rs.getDate("CallerDate")),
+								toLocalDate(rs.getDate("StatuteOfLimitations")),
+								getNullableInt(rs, "PrimaryStatusId"),
+								getNullableInt(rs, "ResponsibleAttorneyId"),
+								rs.getString("ResponsibleAttorneyName"),
+								rs.getString("ResponsibleAttorneyColor")
 						));
 					}
 				}
@@ -985,23 +986,23 @@ public final class CaseDao {
 			CaseSchema schema = resolveCaseSchema(con);
 			String userMembershipFilter = membershipExistsFilter(restrictToUserId, resolveCaseUsersDeletedColumn(con));
 			String sql = """
-				SELECT COUNT(1)
-				FROM %s c
-				OUTER APPLY (
-				    SELECT TOP (1) s.Name AS CurrentStatusName
-				    FROM %s cs
-				    INNER JOIN %s s ON s.Id = cs.StatusId
-				    WHERE cs.CaseId = c.Id
-				    ORDER BY
-				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-				      cs.UpdatedAt DESC,
-				      cs.CreatedAt DESC,
-				      cs.Id DESC
-				) current_status
-				WHERE %s
-				  AND c.ShaleClientId = ?
-				  %s;
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter);
+					SELECT COUNT(1)
+					FROM %s c
+					OUTER APPLY (
+					    SELECT TOP (1) s.Name AS CurrentStatusName
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					WHERE %s
+					  AND c.ShaleClientId = ?
+					  %s;
+					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int shaleClientId = requireCurrentShaleClientId(con);
@@ -1038,131 +1039,131 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
 			String sql = """
-				SELECT
-				  c.Id,
-				  c.Name,
-				  c.CaseNumber,
-				  c.Description,
-				  c.CallerDate,
-				  c.DateOfInjury,
-				  c.StatuteOfLimitations,
+					SELECT
+					  c.Id,
+					  c.Name,
+					  c.CaseNumber,
+					  c.Description,
+					  c.CallerDate,
+					  c.DateOfInjury,
+					  c.StatuteOfLimitations,
 
-				  pa.Id    AS PracticeAreaId,
-				  pa.Name  AS PracticeAreaName,
-				  pa.Color AS PracticeAreaColor,
+					  pa.Id    AS PracticeAreaId,
+					  pa.Name  AS PracticeAreaName,
+					  pa.Color AS PracticeAreaColor,
 
-				  ra.UserId AS ResponsibleAttorneyUserId,
-				  u.color AS ResponsibleAttorneyColor,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS ResponsibleAttorneyName,
+					  ra.UserId AS ResponsibleAttorneyUserId,
+					  u.color AS ResponsibleAttorneyColor,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS ResponsibleAttorneyName,
 
-				  current_status.CurrentStatusName,
-				  current_status.PrimaryStatusId,
-				  current_status.PrimaryStatusColor,
+					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusId,
+					  current_status.PrimaryStatusColor,
 
-				  callerContact.PrimaryCallerContactId,
-				  callerContact.CallerName,
+					  callerContact.PrimaryCallerContactId,
+					  callerContact.CallerName,
 
-				  clientContact.PrimaryClientContactId,
-				  clientContact.ClientName AS ClientName,
+					  clientContact.PrimaryClientContactId,
+					  clientContact.ClientName AS ClientName,
 
-				  oppContact.PrimaryOpposingCounselContactId,
-				  oppContact.FullName AS OpposingCounselName
+					  oppContact.PrimaryOpposingCounselContactId,
+					  oppContact.FullName AS OpposingCounselName
 
-				FROM %s c
-				LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
-				OUTER APPLY (
-				    SELECT TOP (1) cu.UserId
-				    FROM %s cu
-				    WHERE cu.CaseId = c.Id
-				      AND cu.RoleId = ?
-				      AND cu.IsPrimary = 1
-				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
-				) ra
-				LEFT JOIN %s u ON u.id = ra.UserId
-				OUTER APPLY (
-				    SELECT TOP (1)
-				      s.Id    AS PrimaryStatusId,
-				      s.Color AS PrimaryStatusColor,
-				      s.Name  AS CurrentStatusName
-				    FROM %s cs
-				    INNER JOIN %s s ON s.Id = cs.StatusId
-				    WHERE cs.CaseId = c.Id
-				    ORDER BY
-				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-				      cs.UpdatedAt DESC,
-				      cs.CreatedAt DESC,
-				      cs.Id DESC
-				) current_status
-				OUTER APPLY (
-				    SELECT TOP (1)
-				      cc.ContactId AS PrimaryCallerContactId,
-				      CASE
-				        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-				          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-				        THEN LTRIM(RTRIM(
-				              COALESCE(ct.FirstName, '') +
-				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-				              COALESCE(ct.LastName, '')
-				            ))
-				        ELSE COALESCE(ct.Name, '')
-				      END AS CallerName
-				    FROM CaseContacts cc
-				    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
-				    WHERE cc.CaseId = c.Id
-				      AND cc.Role = ?
-				      AND cc.IsPrimary = 1
-				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
-				) callerContact
-				OUTER APPLY (
-				    SELECT TOP (1)
-				      cc.ContactId AS PrimaryClientContactId,
-				      CASE
-				        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-				          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-				        THEN LTRIM(RTRIM(
-				              COALESCE(ct.FirstName, '') +
-				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-				              COALESCE(ct.LastName, '')
-				            ))
-				        ELSE COALESCE(ct.Name, '')
-				      END AS ClientName
-				    FROM CaseContacts cc
-				    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
-				    WHERE cc.CaseId = c.Id
-				      AND cc.Role = ?
-				      AND cc.IsPrimary = 1
-				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
-				) clientContact
-				OUTER APPLY (
-				    SELECT TOP (1)
-				      cc.ContactId AS PrimaryOpposingCounselContactId,
-				      CASE
-				        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-				          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-				        THEN LTRIM(RTRIM(
-				              COALESCE(ct.FirstName, '') +
-				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-				              COALESCE(ct.LastName, '')
-				            ))
-				        ELSE COALESCE(ct.Name, '')
-				      END AS FullName
-				    FROM CaseContacts cc
-				    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
-				    WHERE cc.CaseId = c.Id
-				      AND cc.Role = ?
-				      AND cc.IsPrimary = 1
-				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-				    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
-				) oppContact
-				WHERE c.Id = ?
-				  AND %s;
-				""".formatted(CASES_TABLE, CASE_USERS_TABLE, USERS_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"));
+					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
+					OUTER APPLY (
+					    SELECT TOP (1) cu.UserId
+					    FROM %s cu
+					    WHERE cu.CaseId = c.Id
+					      AND cu.RoleId = ?
+					      AND cu.IsPrimary = 1
+					    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+					) ra
+					LEFT JOIN %s u ON u.id = ra.UserId
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      s.Id    AS PrimaryStatusId,
+					      s.Color AS PrimaryStatusColor,
+					      s.Name  AS CurrentStatusName
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      cc.ContactId AS PrimaryCallerContactId,
+					      CASE
+					        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+					          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+					        THEN LTRIM(RTRIM(
+					              COALESCE(ct.FirstName, '') +
+					              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+					              COALESCE(ct.LastName, '')
+					            ))
+					        ELSE COALESCE(ct.Name, '')
+					      END AS CallerName
+					    FROM CaseContacts cc
+					    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
+					    WHERE cc.CaseId = c.Id
+					      AND cc.Role = ?
+					      AND cc.IsPrimary = 1
+					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
+					) callerContact
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      cc.ContactId AS PrimaryClientContactId,
+					      CASE
+					        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+					          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+					        THEN LTRIM(RTRIM(
+					              COALESCE(ct.FirstName, '') +
+					              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+					              COALESCE(ct.LastName, '')
+					            ))
+					        ELSE COALESCE(ct.Name, '')
+					      END AS ClientName
+					    FROM CaseContacts cc
+					    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
+					    WHERE cc.CaseId = c.Id
+					      AND cc.Role = ?
+					      AND cc.IsPrimary = 1
+					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
+					) clientContact
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      cc.ContactId AS PrimaryOpposingCounselContactId,
+					      CASE
+					        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+					          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+					        THEN LTRIM(RTRIM(
+					              COALESCE(ct.FirstName, '') +
+					              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+					              COALESCE(ct.LastName, '')
+					            ))
+					        ELSE COALESCE(ct.Name, '')
+					      END AS FullName
+					    FROM CaseContacts cc
+					    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
+					    WHERE cc.CaseId = c.Id
+					      AND cc.Role = ?
+					      AND cc.IsPrimary = 1
+					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
+					) oppContact
+					WHERE c.Id = ?
+					  AND %s;
+					""".formatted(CASES_TABLE, CASE_USERS_TABLE, USERS_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"));
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
@@ -1180,30 +1181,30 @@ public final class CaseDao {
 					Integer primaryClientContactId = clients.isEmpty() ? null : clients.get(0).contactId();
 					String primaryClientName = clients.isEmpty() ? null : clients.get(0).displayName();
 					return new com.shale.core.dto.CaseOverviewDto(
-						rs.getLong("Id"),
-						rs.getString("CaseNumber"),
-						rs.getString("Name"),
-						rs.getString("CurrentStatusName"),
-						getNullableInt(rs, "PrimaryStatusId"),
-						rs.getString("PrimaryStatusColor"),
-						getNullableInt(rs, "ResponsibleAttorneyUserId"),
-						rs.getString("ResponsibleAttorneyName"),
-						rs.getString("ResponsibleAttorneyColor"),
-						getNullableInt(rs, "PracticeAreaId"),
-						rs.getString("PracticeAreaName"),
-						rs.getString("PracticeAreaColor"),
-						toLocalDate(rs.getDate("CallerDate")),
-						toLocalDate(rs.getDate("DateOfInjury")),
-						toLocalDate(rs.getDate("StatuteOfLimitations")),
-						getNullableInt(rs, "PrimaryCallerContactId"),
-						primaryClientContactId,
-						getNullableInt(rs, "PrimaryOpposingCounselContactId"),
-						rs.getString("CallerName"),
-						primaryClientName,
-						clients,
-						rs.getString("OpposingCounselName"),
-						team,
-						rs.getString("Description")
+							rs.getLong("Id"),
+							rs.getString("CaseNumber"),
+							rs.getString("Name"),
+							rs.getString("CurrentStatusName"),
+							getNullableInt(rs, "PrimaryStatusId"),
+							rs.getString("PrimaryStatusColor"),
+							getNullableInt(rs, "ResponsibleAttorneyUserId"),
+							rs.getString("ResponsibleAttorneyName"),
+							rs.getString("ResponsibleAttorneyColor"),
+							getNullableInt(rs, "PracticeAreaId"),
+							rs.getString("PracticeAreaName"),
+							rs.getString("PracticeAreaColor"),
+							toLocalDate(rs.getDate("CallerDate")),
+							toLocalDate(rs.getDate("DateOfInjury")),
+							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							getNullableInt(rs, "PrimaryCallerContactId"),
+							primaryClientContactId,
+							getNullableInt(rs, "PrimaryOpposingCounselContactId"),
+							rs.getString("CallerName"),
+							primaryClientName,
+							clients,
+							rs.getString("OpposingCounselName"),
+							team,
+							rs.getString("Description")
 					);
 				}
 			}
@@ -1233,7 +1234,11 @@ public final class CaseDao {
 				WHERE cc.CaseId = ?
 				  AND cc.Role = ?
 				  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-				ORDER BY CASE WHEN cc.IsPrimary = 1 THEN 0 ELSE 1 END, cc.UpdatedAt DESC, cc.CreatedAt DESC, cc.Id DESC;
+				ORDER BY
+				  CASE WHEN cc.IsPrimary = 1 THEN 0 ELSE 1 END,
+				  cc.UpdatedAt DESC,
+				  cc.CreatedAt DESC,
+				  cc.ContactId DESC;
 				""";
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId);
@@ -1498,48 +1503,48 @@ public final class CaseDao {
 					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
-			int idx = 1;
-			ps.setString(idx++, name);
-			ps.setString(idx++, caseNumber);
-			if (practiceAreaId == null)
-				ps.setNull(idx++, java.sql.Types.INTEGER);
-			else
-				ps.setInt(idx++, practiceAreaId);
-			ps.setString(idx++, description);
-			setNullableDate(ps, idx++, callerDate);
-			setNullableString(ps, idx++, callerTime);
-			setNullableDate(ps, idx++, acceptedDate);
-			setNullableDate(ps, idx++, closedDate);
-			setNullableDate(ps, idx++, deniedDate);
-			setNullableDate(ps, idx++, dateOfMedicalNegligence);
-			setNullableDate(ps, idx++, dateMedicalNegligenceWasDiscovered);
-			setNullableDate(ps, idx++, dateOfInjury);
-			setNullableDate(ps, idx++, statuteOfLimitations);
-			setNullableDate(ps, idx++, tortNoticeDeadline);
-			setNullableDate(ps, idx++, discoveryDeadline);
-			setNullableString(ps, idx++, clientEstate);
-			setNullableString(ps, idx++, officePrinterCode);
-			setNullableBoolean(ps, idx++, medicalRecordsReceived);
-			setNullableBoolean(ps, idx++, feeAgreementSigned);
-			setNullableDate(ps, idx++, dateFeeAgreementSigned);
-			setNullableBoolean(ps, idx++, acceptedChronology);
-			setNullableBoolean(ps, idx++, acceptedConsultantExpertSearch);
-			setNullableBoolean(ps, idx++, acceptedTestifyingExpertSearch);
-			setNullableBoolean(ps, idx++, acceptedMedicalLiterature);
-			setNullableString(ps, idx++, acceptedDetail);
-			setNullableBoolean(ps, idx++, deniedChronology);
-			setNullableString(ps, idx++, deniedDetail);
-			setNullableString(ps, idx++, summary);
-			setNullableString(ps, idx++, receivedUpdates);
-			ps.setLong(idx++, caseId);
-			ps.setBytes(idx, expectedRowVer);
+				int idx = 1;
+				ps.setString(idx++, name);
+				ps.setString(idx++, caseNumber);
+				if (practiceAreaId == null)
+					ps.setNull(idx++, java.sql.Types.INTEGER);
+				else
+					ps.setInt(idx++, practiceAreaId);
+				ps.setString(idx++, description);
+				setNullableDate(ps, idx++, callerDate);
+				setNullableString(ps, idx++, callerTime);
+				setNullableDate(ps, idx++, acceptedDate);
+				setNullableDate(ps, idx++, closedDate);
+				setNullableDate(ps, idx++, deniedDate);
+				setNullableDate(ps, idx++, dateOfMedicalNegligence);
+				setNullableDate(ps, idx++, dateMedicalNegligenceWasDiscovered);
+				setNullableDate(ps, idx++, dateOfInjury);
+				setNullableDate(ps, idx++, statuteOfLimitations);
+				setNullableDate(ps, idx++, tortNoticeDeadline);
+				setNullableDate(ps, idx++, discoveryDeadline);
+				setNullableString(ps, idx++, clientEstate);
+				setNullableString(ps, idx++, officePrinterCode);
+				setNullableBoolean(ps, idx++, medicalRecordsReceived);
+				setNullableBoolean(ps, idx++, feeAgreementSigned);
+				setNullableDate(ps, idx++, dateFeeAgreementSigned);
+				setNullableBoolean(ps, idx++, acceptedChronology);
+				setNullableBoolean(ps, idx++, acceptedConsultantExpertSearch);
+				setNullableBoolean(ps, idx++, acceptedTestifyingExpertSearch);
+				setNullableBoolean(ps, idx++, acceptedMedicalLiterature);
+				setNullableString(ps, idx++, acceptedDetail);
+				setNullableBoolean(ps, idx++, deniedChronology);
+				setNullableString(ps, idx++, deniedDetail);
+				setNullableString(ps, idx++, summary);
+				setNullableString(ps, idx++, receivedUpdates);
+				ps.setLong(idx++, caseId);
+				ps.setBytes(idx, expectedRowVer);
 
-			int rows = ps.executeUpdate();
-			if (rows == 0)
-				return null;
-			if (rows == 1)
-				return selectCaseDetail(con, caseId);
-			throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
+				int rows = ps.executeUpdate();
+				if (rows == 0)
+					return null;
+				if (rows == 1)
+					return selectCaseDetail(con, caseId);
+				throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update case details (caseId=" + caseId + ")", e);
@@ -1596,8 +1601,6 @@ public final class CaseDao {
 			throw new RuntimeException("Failed to " + (deleted ? "soft delete" : "restore") + " case (id=" + caseId + ")", e);
 		}
 	}
-
-
 
 	public List<CaseUpdateDto> listCaseUpdates(long caseId) {
 		String sql = """
@@ -1957,7 +1960,6 @@ public final class CaseDao {
 			ps.setString(idx, trimmed);
 	}
 
-
 	private static String safeUserDisplayName(String displayName, Integer userId) {
 		String trimmed = displayName == null ? "" : displayName.trim();
 		if (!trimmed.isBlank())
@@ -1984,7 +1986,6 @@ public final class CaseDao {
 			return n.intValue();
 		return Integer.valueOf(o.toString());
 	}
-
 
 	private static int requireCurrentShaleClientId(Connection con) throws SQLException {
 		String sql = "SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT);";
@@ -2177,13 +2178,13 @@ public final class CaseDao {
 				try (ResultSet rs = ps.executeQuery()) {
 					while (rs.next()) {
 						out.add(new RelatedContactRow(
-							rs.getInt("Id"),
-							rs.getString("DisplayName"),
-							(Integer) rs.getObject("RoleId"),
-							rs.getString("RoleName"),
-							rs.getBoolean("IsPrimary"),
-							rs.getString("Email"),
-							rs.getString("Phone")));
+								rs.getInt("Id"),
+								rs.getString("DisplayName"),
+								(Integer) rs.getObject("RoleId"),
+								rs.getString("RoleName"),
+								rs.getBoolean("IsPrimary"),
+								rs.getString("Email"),
+								rs.getString("Phone")));
 					}
 				}
 				return out;
@@ -2213,9 +2214,9 @@ public final class CaseDao {
 			try (ResultSet rs = ps.executeQuery()) {
 				while (rs.next()) {
 					out.add(new CaseContactRoleOption(
-						rs.getInt("Id"),
-						rs.getString("Name"),
-						rs.getString("Description")));
+							rs.getInt("Id"),
+							rs.getString("Name"),
+							rs.getString("Description")));
 				}
 			}
 			return out;
@@ -2290,10 +2291,10 @@ public final class CaseDao {
 			try (ResultSet rs = ps.executeQuery()) {
 				while (rs.next()) {
 					out.add(new SelectableContactRow(
-						rs.getInt("Id"),
-						rs.getString("DisplayName"),
-						rs.getString("Email"),
-						rs.getString("Phone")));
+							rs.getInt("Id"),
+							rs.getString("DisplayName"),
+							rs.getString("Email"),
+							rs.getString("Phone")));
 				}
 			}
 			return out;
@@ -2427,21 +2428,21 @@ public final class CaseDao {
 			try (ResultSet rs = ps.executeQuery()) {
 				while (rs.next()) {
 					out.add(new RelatedOrganizationRow(
-						rs.getInt("Id"),
-						rs.getString("Name"),
-						(Integer) rs.getObject("OrganizationTypeId"),
-						rs.getString("OrganizationTypeName"),
-						rs.getString("Phone"),
-						rs.getString("Email"),
-						rs.getString("Website"),
-						rs.getString("Address1"),
-						rs.getString("Address2"),
-						rs.getString("City"),
-						rs.getString("State"),
-						rs.getString("PostalCode"),
-						rs.getString("Country"),
-						rs.getString("Notes"),
-						null
+							rs.getInt("Id"),
+							rs.getString("Name"),
+							(Integer) rs.getObject("OrganizationTypeId"),
+							rs.getString("OrganizationTypeName"),
+							rs.getString("Phone"),
+							rs.getString("Email"),
+							rs.getString("Website"),
+							rs.getString("Address1"),
+							rs.getString("Address2"),
+							rs.getString("City"),
+							rs.getString("State"),
+							rs.getString("PostalCode"),
+							rs.getString("Country"),
+							rs.getString("Notes"),
+							null
 					));
 				}
 			}
@@ -2479,9 +2480,9 @@ public final class CaseDao {
 			try (ResultSet rs = ps.executeQuery()) {
 				while (rs.next()) {
 					out.add(new SelectableOrganizationRow(
-						rs.getInt("Id"),
-						rs.getString("Name"),
-						rs.getString("OrganizationTypeName")
+							rs.getInt("Id"),
+							rs.getString("Name"),
+							rs.getString("OrganizationTypeName")
 					));
 				}
 			}
@@ -3251,7 +3252,6 @@ public final class CaseDao {
 		}
 	}
 
-
 	public CaseRow getMyCaseRow(int userId, long caseId) {
 		if (userId <= 0) {
 			throw new IllegalArgumentException("userId must be > 0");
@@ -3595,14 +3595,14 @@ public final class CaseDao {
 			return "";
 		}
 		return """
-			  AND EXISTS (
-			    SELECT 1
-			    FROM %s cu_scope
-			    WHERE cu_scope.CaseId = c.Id
-			      AND cu_scope.UserId = ?
-			      AND %s
-			  )
-			""".formatted(CASE_USERS_TABLE, activeFilter(caseUsersDeletedColumn, "cu_scope"));
+				  AND EXISTS (
+				    SELECT 1
+				    FROM %s cu_scope
+				    WHERE cu_scope.CaseId = c.Id
+				      AND cu_scope.UserId = ?
+				      AND %s
+				  )
+				""".formatted(CASE_USERS_TABLE, activeFilter(caseUsersDeletedColumn, "cu_scope"));
 	}
 
 	private static String existingColumn(Connection con, String tableName, List<String> candidates) throws SQLException {
