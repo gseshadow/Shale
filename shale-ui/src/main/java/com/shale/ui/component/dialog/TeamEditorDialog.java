@@ -245,6 +245,15 @@ public final class TeamEditorDialog {
 //		HBox primaryRow = new HBox(10, new Label("Primary (Responsible Attorney):"), cbPrimary);
 		HBox.setHgrow(cbPrimary, Priority.ALWAYS);
 		cbPrimary.setMaxWidth(Double.MAX_VALUE);
+		cbPrimary.setPromptText("None");
+
+		Button btnClearPrimary = new Button("Clear");
+		btnClearPrimary.setOnAction(e -> cbPrimary.getSelectionModel().clearSelection());
+
+		HBox primaryRow = new HBox(10,
+				new Label("Responsible Attorney (optional):"),
+				cbPrimary,
+				btnClearPrimary);
 
 		VBox left = new VBox(6, new Label("Available"), lvAvailable);
 		VBox right = new VBox(6,
@@ -271,11 +280,6 @@ public final class TeamEditorDialog {
 
 		btnSave.setOnAction(e ->
 		{
-			if (!assignedItems.isEmpty() && cbPrimary.getSelectionModel().getSelectedItem() == null) {
-				warn("Select a primary (Responsible Attorney) before saving.");
-				return;
-			}
-
 			Integer primaryId = (cbPrimary.getSelectionModel().getSelectedItem() == null)
 					? null
 					: cbPrimary.getSelectionModel().getSelectedItem().id();
@@ -284,7 +288,7 @@ public final class TeamEditorDialog {
 			for (var a : assignedItems) {
 				int rid = (primaryId != null && a.user.id() == primaryId.intValue())
 						? ROLE_RESPONSIBLE_ATTORNEY
-						: a.roleId;
+						: normalizeRoleForSave(a.roleId);
 				out.add(new TeamAssignment(a.user.id(), rid));
 			}
 
@@ -297,8 +301,7 @@ public final class TeamEditorDialog {
 
 		HBox bottom = new HBox(10, spacer, btnCancel, btnSave);
 
-//		VBox root = new VBox(12, lists, primaryRow, bottom);
-		VBox root = new VBox(12, lists, bottom);
+		VBox root = new VBox(12, lists, primaryRow, bottom);
 		root.setPadding(new Insets(12));
 
 		Scene scene = new Scene(root, 780, 540);
@@ -353,10 +356,11 @@ public final class TeamEditorDialog {
 			}
 		}
 
-		if (toSelect == null)
-			toSelect = eligible.get(0);
-
-		cbPrimary.getSelectionModel().select(toSelect);
+		if (toSelect == null) {
+			cbPrimary.getSelectionModel().clearSelection();
+		} else {
+			cbPrimary.getSelectionModel().select(toSelect);
+		}
 	}
 
 	private Integer findResponsibleAttorneyUserId() {
@@ -365,6 +369,10 @@ public final class TeamEditorDialog {
 				return a.user.id();
 		}
 		return null;
+	}
+
+	private static int normalizeRoleForSave(int roleId) {
+		return roleId == ROLE_RESPONSIBLE_ATTORNEY ? ROLE_ATTORNEY : roleId;
 	}
 
 	private void sortLists() {
@@ -383,14 +391,6 @@ public final class TeamEditorDialog {
 		case ROLE_CO_COUNSEL -> "Co-counsel";
 		default -> "Role " + roleId;
 		};
-	}
-
-	private static void warn(String msg) {
-		Alert a = new Alert(Alert.AlertType.WARNING);
-		a.setTitle("Team");
-		a.setHeaderText(null);
-		a.setContentText(msg);
-		a.showAndWait();
 	}
 
 	private static String safeText(String s) {
