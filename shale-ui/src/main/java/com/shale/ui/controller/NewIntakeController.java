@@ -97,6 +97,7 @@ public final class NewIntakeController {
 		this.caseDao = caseDao;
 		this.stage = stage;
 		this.onCaseCreated = onCaseCreated;
+		Platform.runLater(this::preselectDefaultStatusIfAvailable);
 	}
 
 	@FXML
@@ -230,6 +231,28 @@ public final class NewIntakeController {
 		} catch (RuntimeException ex) {
 			showValidation("Unable to load statuses.");
 		}
+	}
+
+	private void preselectDefaultStatusIfAvailable() {
+		if (selectedStatus != null || caseDao == null || appState == null) {
+			return;
+		}
+		try {
+			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(requireClientId());
+			Optional<CaseDao.StatusRow> potentialStatus = statuses.stream()
+					.filter(status -> "potential".equals(normalizeStatusName(status.name())))
+					.findFirst();
+			if (potentialStatus.isPresent()) {
+				selectedStatus = potentialStatus.get();
+				renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
+			}
+		} catch (RuntimeException ignored) {
+			// If statuses cannot be loaded at initialization time, keep existing fallback (unselected).
+		}
+	}
+
+	private String normalizeStatusName(String value) {
+		return value == null ? "" : value.trim().toLowerCase();
 	}
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorCss) {
