@@ -496,7 +496,7 @@ public class CaseController {
 		this.contactDao = contactDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
-		this.caseDocumentService = caseDao == null ? null : new CaseDocumentService(caseDao);
+		this.caseDocumentService = (caseDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, contactDao);
 		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
 		this.onCaseDeleted = onCaseDeleted;
 		refreshHeader();
