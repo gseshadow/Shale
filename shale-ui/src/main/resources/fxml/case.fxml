@@ -75,8 +75,16 @@
 						<Region HBox.hgrow="ALWAYS" />
 						<Button fx:id="deleteCaseButton" text="Delete Case" visible="false" managed="false" />
 						<Button fx:id="editButton" text="Edit" />
-						<Button fx:id="saveButton" text="Save" visible="false"
-							managed="false" />
+							<MenuButton fx:id="generateSummaryMenuButton" text="Generate Summary">
+									<items>
+										<MenuItem fx:id="generateSummaryHtmlMenuItem" text="Preview HTML" />
+										<MenuItem fx:id="generateSummaryPdfMenuItem" text="Export PDF" />
+									</items>
+								</MenuButton>
+							<Label fx:id="summaryGenerationStatusLabel" text="" visible="false" managed="false"
+								style="-fx-opacity: 0.75;" />
+							<Button fx:id="saveButton" text="Save" visible="false"
+								managed="false" />
 						<Button fx:id="cancelButton" text="Cancel" visible="false"
 							managed="false" />
 					</HBox>

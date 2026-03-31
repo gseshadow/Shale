@@ -25,6 +25,11 @@ import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.factory.ContactCardFactory;
+import com.shale.ui.document.CaseDocumentExportService;
+import com.shale.ui.document.CaseDocumentFormat;
+import com.shale.ui.document.CaseDocumentService;
+import com.shale.ui.document.CaseDocumentType;
+import com.shale.ui.document.GeneratedDocument;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
@@ -48,6 +53,7 @@ import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
@@ -62,6 +68,8 @@ import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ScrollPane;
@@ -207,6 +215,15 @@ public class CaseController {
 	private Button saveButton;
 	@FXML
 	private Button cancelButton;
+
+	@FXML
+	private MenuButton generateSummaryMenuButton;
+	@FXML
+	private MenuItem generateSummaryHtmlMenuItem;
+	@FXML
+	private MenuItem generateSummaryPdfMenuItem;
+	@FXML
+	private Label summaryGenerationStatusLabel;
 
 	@FXML
 	private Button detailsEditButton;
@@ -397,6 +414,8 @@ public class CaseController {
 	private ContactDao contactDao;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
+	private CaseDocumentService caseDocumentService;
+	private CaseDocumentExportService caseDocumentExportService;
 
 	// ----------------------------
 	// Controller state
@@ -475,6 +494,8 @@ public class CaseController {
 		this.contactDao = contactDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
+		this.caseDocumentService = (caseDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, contactDao);
+		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
 		this.onCaseDeleted = onCaseDeleted;
 		refreshHeader();
 	}
@@ -559,6 +580,12 @@ public class CaseController {
 		}
 		if (addTaskButton != null)
 			addTaskButton.setOnAction(e -> onAddTask());
+		if (generateSummaryHtmlMenuItem != null)
+			generateSummaryHtmlMenuItem.setOnAction(e -> onGenerateSummaryHtml());
+		if (generateSummaryPdfMenuItem != null)
+			generateSummaryPdfMenuItem.setOnAction(e -> onGenerateSummaryPdf());
+		if (generateSummaryMenuButton != null && generateSummaryHtmlMenuItem == null && generateSummaryPdfMenuItem == null)
+			generateSummaryMenuButton.setOnAction(e -> onGenerateSummaryHtml());
 		if (caseTasksSortChoice != null) {
 			caseTasksSortChoice.getItems().setAll(
 					CASE_TASKS_SORT_DUE_ASC,
@@ -580,6 +607,87 @@ public class CaseController {
 				}
 			});
 		}
+	}
+
+
+	private void onGenerateSummaryPdf() {
+		generateAndOpenSummary(CaseDocumentFormat.PDF);
+	}
+
+	private void onGenerateSummaryHtml() {
+		generateAndOpenSummary(CaseDocumentFormat.HTML);
+	}
+
+	private void generateAndOpenSummary(CaseDocumentFormat format) {
+		if (caseId == null || caseId <= 0) {
+			showError("Load a case before generating a summary.");
+			return;
+		}
+		if (appState == null || appState.getShaleClientId() == null || appState.getShaleClientId() <= 0) {
+			showError("Unable to resolve tenant context for summary generation.");
+			return;
+		}
+		if (caseDocumentExportService == null) {
+			showError("Summary generation service is unavailable.");
+			return;
+		}
+
+		final int tenantId = appState.getShaleClientId();
+		final int activeCaseId = caseId;
+		final String loadingText = format == CaseDocumentFormat.PDF ? "Generating PDF summary..." : "Generating HTML summary...";
+		setSummaryGenerationBusy(true, loadingText);
+
+		Task<GeneratedDocument> task = new Task<>() {
+			@Override
+			protected GeneratedDocument call() throws Exception {
+				System.out.println("[Document] Generating " + format + " CASE_SUMMARY for caseId=" + activeCaseId + " shaleClientId=" + tenantId);
+				return caseDocumentExportService.exportCaseSummary(activeCaseId, tenantId, CaseDocumentType.CASE_SUMMARY, format);
+			}
+		};
+
+		task.setOnSucceeded(event -> {
+			setSummaryGenerationBusy(false, null);
+			GeneratedDocument generated = task.getValue();
+			try {
+				boolean opened = runtimeBridge != null && runtimeBridge.openPath(generated.path());
+				if (!opened) {
+					throw new IllegalStateException("Unable to open generated summary preview.");
+				}
+				System.out.println("[Document] Generated case summary " + format + " at " + generated.path());
+			} catch (Exception ex) {
+				System.err.println("[Document] Failed to open generated case summary " + format + ": " + ex.getMessage());
+				showSummaryGenerationError("Could not open generated case summary.");
+			}
+		});
+
+		task.setOnFailed(event -> {
+			setSummaryGenerationBusy(false, null);
+			Throwable ex = task.getException();
+			System.err.println("[Document] Failed to generate case summary " + format + ": " + (ex == null ? "<unknown>" : ex.getMessage()));
+			showSummaryGenerationError("Could not generate case summary " + format.name().toLowerCase() + ". Please try again.");
+		});
+
+		Thread worker = new Thread(task, "case-summary-export-" + format.name().toLowerCase() + "-" + activeCaseId);
+		worker.setDaemon(true);
+		worker.start();
+	}
+
+	private void setSummaryGenerationBusy(boolean busy, String message) {
+		if (generateSummaryMenuButton != null) {
+			generateSummaryMenuButton.setDisable(busy);
+		}
+		if (summaryGenerationStatusLabel != null) {
+			boolean show = busy && message != null && !message.isBlank();
+			summaryGenerationStatusLabel.setText(show ? message : "");
+			summaryGenerationStatusLabel.setVisible(show);
+			summaryGenerationStatusLabel.setManaged(show);
+		}
+	}
+
+	private void showSummaryGenerationError(String message) {
+		showError(message);
+		Window owner = caseRootPane == null || caseRootPane.getScene() == null ? null : caseRootPane.getScene().getWindow();
+		AppDialogs.showError(owner, "Case Summary", message);
 	}
 
 	private void setupRelatedEntitiesLayout() {
