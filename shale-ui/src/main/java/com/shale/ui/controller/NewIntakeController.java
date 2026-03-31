@@ -57,6 +57,8 @@ public final class NewIntakeController {
 	@FXML private TextField callerFirstNameField;
 	@FXML private TextField callerLastNameField;
 	@FXML private TextField callerPhoneField;
+	@FXML private TextField callerAddressField;
+	@FXML private TextField callerEmailField;
 
 	@FXML private StackPane practiceAreaHost;
 	@FXML private Button selectPracticeAreaButton;
@@ -303,6 +305,8 @@ public final class NewIntakeController {
 				safeTrim(callerFirstNameField.getText()),
 				safeTrim(callerLastNameField.getText()),
 				safeTrim(callerPhoneField.getText()),
+				safeTrim(callerAddressField.getText()),
+				safeTrim(callerEmailField.getText()),
 				appState == null ? null : appState.getUserId()
 			);
 
