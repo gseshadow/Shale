@@ -144,6 +144,22 @@
     -fx-padding: 12;
 }
 
+.secondary-panel.caller-section-panel {
+    -fx-background-color: rgba(228, 239, 253, 0.70); /* very light blue */
+}
+
+.secondary-panel.client-section-panel {
+    -fx-background-color: rgba(230, 246, 236, 0.72); /* very light green */
+}
+
+.secondary-panel.case-section-panel {
+    -fx-background-color: rgba(248, 242, 228, 0.74); /* very light amber */
+}
+
+.secondary-panel.incident-section-panel {
+    -fx-background-color: rgba(244, 234, 246, 0.72); /* very light lavender/rose */
+}
+
 .section-nav-button {
     -fx-padding: 10 14 10 14;
     -fx-min-height: 40;

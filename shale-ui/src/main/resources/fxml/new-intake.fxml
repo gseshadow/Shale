@@ -27,7 +27,7 @@
                     </padding>
 
                     <VBox spacing="14" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308">
-                        <VBox spacing="10" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
+                        <VBox spacing="10" styleClass="secondary-panel caller-section-panel" maxWidth="1.7976931348623157E308">
                             <Label text="Caller" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                             <Label fx:id="callerReuseLabel" text="Client information will be reused for caller details." style="-fx-opacity: 0.75;" visible="false" managed="false" wrapText="true" />
 
@@ -63,7 +63,7 @@
                             </GridPane>
                         </VBox>
 
-                        <VBox spacing="10" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
+                        <VBox spacing="10" styleClass="secondary-panel client-section-panel" maxWidth="1.7976931348623157E308">
                             <Label text="Client" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                             <CheckBox fx:id="callerIsClientCheckBox" text="Caller is Client" />
                             <GridPane hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
@@ -109,7 +109,7 @@
                     </VBox>
 
                     <VBox spacing="14" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308">
-                        <VBox spacing="10" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
+                        <VBox spacing="10" styleClass="secondary-panel case-section-panel" maxWidth="1.7976931348623157E308">
                             <Label text="Case" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                             <GridPane hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
                                 <columnConstraints>
@@ -140,7 +140,7 @@
                             </GridPane>
                         </VBox>
 
-                        <VBox spacing="10" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
+                        <VBox spacing="10" styleClass="secondary-panel incident-section-panel" maxWidth="1.7976931348623157E308">
                             <Label text="Incident" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                             <GridPane hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
                                 <columnConstraints>
