@@ -571,7 +571,7 @@ public class CaseController {
 		if (changeCallerButton != null)
 			changeCallerButton.setOnAction(e -> onChangeCaller());
 		if (changeClientButton != null)
-			changeClientButton.setOnAction(e -> onChangeClient());
+			changeClientButton.setOnAction(e -> onManageClients());
 		if (changePracticeAreaButton != null)
 			changePracticeAreaButton.setOnAction(e -> onChangePracticeArea());
 		if (detChangeStatusButton != null)
@@ -2388,8 +2388,8 @@ public class CaseController {
 		overviewPickerCoordinator.changeCaller();
 	}
 
-	private void onChangeClient() {
-		overviewPickerCoordinator.changeClient();
+	private void onManageClients() {
+		overviewPickerCoordinator.manageClients();
 	}
 
 	private void onChangePracticeArea() {
@@ -4016,18 +4016,12 @@ public class CaseController {
 					);
 				}
 				if (computation.clientChanged()) {
-					addTextIdentityChangedTimelineEvent(
+					addClientsChangedTimelineEvent(
 							request.saveCaseId(),
 							request.tenantId(),
 							request.userId(),
-							CaseDao.CaseTimelineEventTypes.CLIENT_CHANGED,
-							"Clients changed",
-							(baseOverview == null || baseOverview.getClients() == null)
-									? ""
-									: baseOverview.getClients().stream().map(CaseOverviewDto.ContactSummary::displayName).filter(Objects::nonNull).collect(Collectors.joining(", ")),
-							(request.desired().desiredClientContacts() == null)
-									? ""
-									: request.desired().desiredClientContacts().stream().map(CaseOverviewDto.ContactSummary::displayName).filter(Objects::nonNull).collect(Collectors.joining(", "))
+							baseOverview == null ? List.of() : baseOverview.getClients(),
+							request.desired().desiredClientContacts()
 					);
 				}
 				if (computation.opposingCounselChanged()) {
@@ -4144,10 +4138,8 @@ public class CaseController {
 			Integer baseCallerContactId = baseOverview == null ? null : baseOverview.getPrimaryCallerContactId();
 			boolean callerChanged = desired.desiredCallerContactId() != null && !desired.desiredCallerContactId().equals(baseCallerContactId);
 
-			List<Integer> baseClientIds = (baseOverview == null || baseOverview.getClients() == null) ? List.of()
-					: baseOverview.getClients().stream().map(CaseOverviewDto.ContactSummary::contactId).filter(Objects::nonNull).distinct().toList();
-			List<Integer> desiredClientIds = (desired.desiredClientContacts() == null) ? List.of()
-					: desired.desiredClientContacts().stream().map(CaseOverviewDto.ContactSummary::contactId).filter(Objects::nonNull).distinct().toList();
+			java.util.Set<Integer> baseClientIds = toClientIdSet(baseOverview == null ? null : baseOverview.getClients());
+			java.util.Set<Integer> desiredClientIds = toClientIdSet(desired.desiredClientContacts());
 			boolean clientChanged = !baseClientIds.equals(desiredClientIds);
 
 			Integer basePracticeAreaId = baseOverview == null ? null : baseOverview.getPracticeAreaId();
@@ -4456,7 +4448,7 @@ public class CaseController {
 					});
 		}
 
-		void changeClient() {
+		void manageClients() {
 			if (!requirePickerContext("Client change is unavailable."))
 				return;
 			Integer tenantId = appState.getShaleClientId();
@@ -4936,7 +4928,8 @@ public class CaseController {
 			String patchedSol = extractPatchString(rawPatch, "solDate");
 			Integer patchedPrimaryStatusId = extractPatchInt(rawPatch, "primaryStatusId");
 			Integer patchedPrimaryCallerContactId = extractPatchInt(rawPatch, "primaryCallerContactId");
-			Integer patchedClientContactsChanged = extractPatchInt(rawPatch, "clientContactsChanged");
+			boolean clientAssignmentsPatched = hasPatchKey(rawPatch, "clientContactsChanged")
+					|| hasPatchKey(rawPatch, "primaryClientContactId");
 			Integer patchedPracticeAreaId = extractPatchInt(rawPatch, "practiceAreaId");
 			Integer patchedResponsibleAttorneyUserId = extractPatchInt(rawPatch, "responsibleAttorneyUserId");
 			Integer patchedPrimaryOpposingCounselContactId = extractPatchInt(rawPatch, "primaryOpposingCounselContactId");
@@ -4959,7 +4952,7 @@ public class CaseController {
 				patchedSol,
 				patchedPrimaryStatusId,
 				patchedPrimaryCallerContactId,
-				patchedClientContactsChanged,
+				clientAssignmentsPatched,
 				patchedPracticeAreaId,
 				patchedResponsibleAttorneyUserId,
 				patchedPrimaryOpposingCounselContactId,
@@ -5021,7 +5014,7 @@ public class CaseController {
 			return patch.deleted()
 					|| patch.patchedPrimaryStatusId() != null
 					|| patch.patchedPrimaryCallerContactId() != null
-					|| patch.patchedClientContactsChanged() != null
+					|| patch.clientAssignmentsPatched()
 					|| patch.patchedPracticeAreaId() != null
 					|| patch.patchedResponsibleAttorneyUserId() != null
 					|| patch.patchedPrimaryOpposingCounselContactId() != null
@@ -5127,7 +5120,7 @@ public class CaseController {
 			String patchedSol,
 			Integer patchedPrimaryStatusId,
 			Integer patchedPrimaryCallerContactId,
-			Integer patchedClientContactsChanged,
+			boolean clientAssignmentsPatched,
 			Integer patchedPracticeAreaId,
 			Integer patchedResponsibleAttorneyUserId,
 			Integer patchedPrimaryOpposingCounselContactId,
@@ -6027,6 +6020,62 @@ public class CaseController {
 				title,
 				body
 		);
+	}
+
+	private void addClientsChangedTimelineEvent(
+			long caseId,
+			Integer tenantId,
+			Integer actorUserId,
+			List<CaseOverviewDto.ContactSummary> oldClients,
+			List<CaseOverviewDto.ContactSummary> newClients) {
+		if (caseDao == null || tenantId == null || tenantId <= 0)
+			return;
+		Map<Integer, String> oldById = toClientNameMap(oldClients);
+		Map<Integer, String> newById = toClientNameMap(newClients);
+
+		List<String> added = newById.entrySet().stream()
+				.filter(e -> !oldById.containsKey(e.getKey()))
+				.map(e -> resolveContactDisplayName(e.getValue(), e.getKey(), caseId))
+				.toList();
+		List<String> removed = oldById.entrySet().stream()
+				.filter(e -> !newById.containsKey(e.getKey()))
+				.map(e -> resolveContactDisplayName(e.getValue(), e.getKey(), caseId))
+				.toList();
+		if (added.isEmpty() && removed.isEmpty())
+			return;
+
+		StringBuilder body = new StringBuilder();
+		if (!added.isEmpty())
+			body.append("added: ").append(String.join(", ", added));
+		if (!removed.isEmpty()) {
+			if (body.length() > 0)
+				body.append("; ");
+			body.append("removed: ").append(String.join(", ", removed));
+		}
+		caseDao.addCaseTimelineEvent(
+				(int) caseId,
+				tenantId,
+				CaseDao.CaseTimelineEventTypes.CLIENT_CHANGED,
+				actorUserId,
+				"Clients updated",
+				body.toString()
+		);
+	}
+
+	private Map<Integer, String> toClientNameMap(List<CaseOverviewDto.ContactSummary> clients) {
+		Map<Integer, String> out = new LinkedHashMap<>();
+		if (clients == null)
+			return out;
+		for (CaseOverviewDto.ContactSummary client : clients) {
+			if (client == null || client.contactId() == null || client.contactId() <= 0 || out.containsKey(client.contactId()))
+				continue;
+			out.put(client.contactId(), safeText(client.displayName()));
+		}
+		return out;
+	}
+
+	private java.util.Set<Integer> toClientIdSet(List<CaseOverviewDto.ContactSummary> clients) {
+		return new java.util.LinkedHashSet<>(toClientNameMap(clients).keySet());
 	}
 
 	private String resolveContactDisplayName(String preferredName, Integer contactId, long caseId) {
