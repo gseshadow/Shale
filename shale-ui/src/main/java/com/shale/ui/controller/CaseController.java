@@ -41,6 +41,7 @@ import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardMo
 import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.dialog.ClientAssignmentDialog;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.CreateContactDialog;
 import com.shale.ui.component.dialog.NewTaskDialog;
@@ -4770,78 +4771,30 @@ public class CaseController {
 			List<CaseOverviewDto.ContactSummary> initial = draftClientContacts != null
 					? draftClientContacts
 					: (currentOverview == null ? List.of() : currentOverview.getClients());
-			Map<Integer, String> selected = new LinkedHashMap<>();
-			for (CaseOverviewDto.ContactSummary c : initial) {
-				if (c == null || c.contactId() == null || c.contactId() <= 0 || selected.containsKey(c.contactId()))
-					continue;
-				selected.put(c.contactId(), safeText(c.displayName()));
-			}
-
-			boolean done = false;
-			while (!done) {
-				List<String> selectedNames = selected.values().stream().filter(v -> v != null && !v.isBlank()).toList();
-				String header = selectedNames.isEmpty()
-						? "No clients selected."
-						: "Selected: " + String.join(", ", selectedNames);
-				Optional<String> action = showChoiceDialog(
-						"Manage Clients",
-						header,
-						"Action:",
-						"Add Client",
-						List.of("Add Client", "Remove Client", "Done"));
-				if (action.isEmpty())
-					return;
-				switch (action.get()) {
-					case "Add Client" -> {
-						List<CaseDao.ContactRow> addable = cleaned.stream()
-								.filter(c -> !selected.containsKey(c.id()))
-								.toList();
-						if (addable.isEmpty()) {
-							showError("All contacts are already assigned as clients.");
-							continue;
-						}
-						Optional<CaseDao.ContactRow> chosen = showSearchPickerDialog(
-								"Add Client",
-								"Select a client to add",
-								"Search...",
-								addable,
-								null);
-						if (chosen.isPresent())
-							selected.put(chosen.get().id(), chosen.get().displayName());
-					}
-					case "Remove Client" -> {
-						if (selected.isEmpty()) {
-							showError("No clients to remove.");
-							continue;
-						}
-						List<String> options = selected.entrySet().stream()
-								.map(e -> e.getValue() + "  (#" + e.getKey() + ")")
-								.toList();
-						Optional<String> toRemove = showChoiceDialog(
-								"Remove Client",
-								"Select a client to remove",
-								"Client:",
-								options.get(0),
-								options);
-						if (toRemove.isPresent()) {
-							Integer id = selected.entrySet().stream()
-									.filter(e -> (e.getValue() + "  (#" + e.getKey() + ")").equals(toRemove.get()))
-									.map(Map.Entry::getKey)
-									.findFirst()
-									.orElse(null);
-							if (id != null)
-								selected.remove(id);
-						}
-					}
-					case "Done" -> done = true;
-					default -> {
-					}
-				}
-			}
-
-			draftClientContacts = selected.entrySet().stream()
-					.map(e -> new CaseOverviewDto.ContactSummary(e.getKey(), e.getValue()))
-					.toList();
+			Window owner = dialogOwner(changeClientButton);
+			ClientAssignmentDialog dialog = new ClientAssignmentDialog(
+					owner,
+					cleaned,
+					initial,
+					(firstName, lastName) -> {
+						if (contactDao == null || appState == null || appState.getShaleClientId() == null || appState.getShaleClientId() <= 0)
+							throw new IllegalStateException("Cannot create contact without an active tenant.");
+						int createdId = contactDao.createContact(new ContactDao.CreateContactRequest(
+								appState.getShaleClientId(),
+								firstName,
+								lastName,
+								null,
+								null,
+								true));
+						String displayName = ((firstName == null ? "" : firstName) + " " + (lastName == null ? "" : lastName)).trim();
+						if (displayName.isBlank())
+							displayName = "Contact #" + createdId;
+						return new CaseDao.ContactRow(createdId, displayName);
+					});
+			Optional<ClientAssignmentDialog.Result> result = dialog.showAndWait();
+			if (result.isEmpty())
+				return;
+			draftClientContacts = result.get().assignedClients();
 			renderClientsMini(draftClientContacts);
 		}
 
