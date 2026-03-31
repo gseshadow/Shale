@@ -53,10 +53,15 @@ public final class NewIntakeController {
 
 	@FXML private CheckBox callerIsClientCheckBox;
 	@FXML private Label callerReuseLabel;
+	@FXML private Label callerFirstNameRequiredIndicator;
+	@FXML private Label callerLastNameRequiredIndicator;
+	@FXML private Label callerPhoneRequiredIndicator;
 	@FXML private GridPane callerFieldsGrid;
 	@FXML private TextField callerFirstNameField;
 	@FXML private TextField callerLastNameField;
 	@FXML private TextField callerPhoneField;
+	@FXML private TextField callerAddressField;
+	@FXML private TextField callerEmailField;
 
 	@FXML private StackPane practiceAreaHost;
 	@FXML private Button selectPracticeAreaButton;
@@ -151,6 +156,10 @@ public final class NewIntakeController {
 		callerFieldsGrid.setDisable(callerIsClient);
 		callerReuseLabel.setVisible(callerIsClient);
 		callerReuseLabel.setManaged(callerIsClient);
+		boolean callerFieldsRequired = !callerIsClient;
+		setRequiredIndicator(callerFirstNameRequiredIndicator, callerFieldsRequired);
+		setRequiredIndicator(callerLastNameRequiredIndicator, callerFieldsRequired);
+		setRequiredIndicator(callerPhoneRequiredIndicator, callerFieldsRequired);
 	}
 
 	private void onSelectPracticeArea() {
@@ -303,6 +312,8 @@ public final class NewIntakeController {
 				safeTrim(callerFirstNameField.getText()),
 				safeTrim(callerLastNameField.getText()),
 				safeTrim(callerPhoneField.getText()),
+				safeTrim(callerAddressField.getText()),
+				safeTrim(callerEmailField.getText()),
 				appState == null ? null : appState.getUserId()
 			);
 
@@ -351,14 +362,17 @@ public final class NewIntakeController {
 
 	private List<String> validate() {
 		return java.util.stream.Stream.of(
+				required(caseNameField.getText(), "Case Name is required."),
+				requiredDate(dateOfIntakePicker.getValue(), "Date of Intake is required."),
+				validateIntakeTime(),
 				required(clientFirstNameField.getText(), "Client First Name is required."),
 				required(clientLastNameField.getText(), "Client Last Name is required."),
+				required(clientPhoneField.getText(), "Client Phone Number is required."),
 				selectedPracticeArea == null ? "Practice Area is required." : null,
 				selectedStatus == null ? "Status is required." : null,
-				validateIntakeTime(),
-				requireDescriptionOrSummary(),
 				callerRequiredWhenNotClient(callerFirstNameField.getText(), "Caller First Name is required when Caller is Client is unchecked."),
-				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked.")
+				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked."),
+				callerRequiredWhenNotClient(callerPhoneField.getText(), "Caller Phone Number is required when Caller is Client is unchecked.")
 		).filter(s -> s != null && !s.isBlank()).toList();
 	}
 
@@ -379,11 +393,8 @@ public final class NewIntakeController {
 		}
 	}
 
-	private String requireDescriptionOrSummary() {
-		if (!safeTrim(descriptionArea.getText()).isEmpty() || !safeTrim(summaryArea.getText()).isEmpty()) {
-			return null;
-		}
-		return "Either Description or Summary is required.";
+	private String requiredDate(LocalDate value, String message) {
+		return value == null ? message : null;
 	}
 
 	private String callerRequiredWhenNotClient(String value, String message) {
@@ -410,6 +421,14 @@ public final class NewIntakeController {
 	private void hideValidation() {
 		validationLabel.setVisible(false);
 		validationLabel.setManaged(false);
+	}
+
+	private void setRequiredIndicator(Label indicator, boolean visible) {
+		if (indicator == null) {
+			return;
+		}
+		indicator.setVisible(visible);
+		indicator.setManaged(visible);
 	}
 
 	private static String safeTrim(String value) {
