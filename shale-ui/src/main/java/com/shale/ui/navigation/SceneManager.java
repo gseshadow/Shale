@@ -303,7 +303,8 @@ public final class SceneManager {
 			dialogScene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			dialog.setScene(dialogScene);
-			dialog.setMinWidth(860);
+			dialog.setWidth(1180);
+			dialog.setMinWidth(1080);
 			dialog.setMinHeight(760);
 			dialog.showAndWait();
 		} catch (IOException e) {
