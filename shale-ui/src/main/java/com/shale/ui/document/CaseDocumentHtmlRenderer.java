@@ -25,15 +25,8 @@ public final class CaseDocumentHtmlRenderer {
                 kvRow("Status", model.statusName()),
                 kvRow("Practice Area", model.practiceAreaName())))));
 
-        body.append(section("Contacts", kvTable(List.of(
-                kvRow("Caller Name", model.callerName()),
-                kvRow("Caller Phone", model.callerPhone()),
-                kvRow("Caller Address", model.callerAddress()),
-                kvRow("Caller Email", model.callerEmail()),
-                kvRow("Client Name", model.clientName()),
-                kvRow("Client Phone", model.clientPhone()),
-                kvRow("Client Address", model.clientAddress()),
-                kvRow("Client Email", model.clientEmail())))));
+        body.append(section("Contacts", renderContactsColumns(model)));
+        body.append(section("Defendants", renderDefendantLines(6)));
 
         List<String> dateRows = new ArrayList<>();
         addIfPresent(dateRows, kvRow("Incident Date", fmt(model.incidentDate())));
@@ -54,7 +47,6 @@ public final class CaseDocumentHtmlRenderer {
         }
 
         body.append(section("Updates", renderUpdates(model.updates())));
-        body.append(section("Defendants", renderDefendantLines(6)));
 
         return """
 <!DOCTYPE html>
@@ -76,6 +68,11 @@ public final class CaseDocumentHtmlRenderer {
     .kv-table tr { vertical-align: top; }
     .kv-table th { width: 34%%; text-align: left; font-weight: 600; color: #4b5563; padding: 4px 10px 4px 0; }
     .kv-table td { color: #111827; padding: 4px 0; }
+    .contacts-columns { width: 100%%; border-collapse: collapse; table-layout: fixed; }
+    .contacts-columns td { width: 50%%; vertical-align: top; padding-right: 14px; }
+    .contacts-columns td:last-child { padding-right: 0; padding-left: 14px; }
+    .contact-card { border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 10px; }
+    .contact-card-title { font-weight: 600; color: #374151; margin-bottom: 6px; }
     .description { white-space: normal; }
     .updates-list { margin: 0; padding: 0; list-style: none; }
     .update-item { margin: 0 0 12px 0; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 4px; }
@@ -87,6 +84,8 @@ public final class CaseDocumentHtmlRenderer {
       .section-title { page-break-after: avoid; }
       .section { page-break-inside: avoid; }
       .kv-table { page-break-inside: avoid; }
+      .contacts-columns { page-break-inside: avoid; }
+      .contact-card { page-break-inside: avoid; }
       .update-item { page-break-inside: avoid; }
     }
   </style>
@@ -122,6 +121,26 @@ public final class CaseDocumentHtmlRenderer {
         }
         html.append("</ul>");
         return html.toString();
+    }
+
+    private String renderContactsColumns(CaseDocumentModel model) {
+        String caller = contactCard("Caller", List.of(
+                kvRow("Name", model.callerName()),
+                kvRow("Phone", model.callerPhone()),
+                kvRow("Address", model.callerAddress()),
+                kvRow("Email", model.callerEmail())));
+        String client = contactCard("Client", List.of(
+                kvRow("Name", model.clientName()),
+                kvRow("Phone", model.clientPhone()),
+                kvRow("Address", model.clientAddress()),
+                kvRow("Email", model.clientEmail())));
+
+        return "<table class=\"contacts-columns\"><tbody><tr><td>" + caller + "</td><td>" + client + "</td></tr></tbody></table>";
+    }
+
+    private String contactCard(String title, List<String> rows) {
+        return "<div class=\"contact-card\"><div class=\"contact-card-title\">" + escape(title) + "</div>"
+                + kvTable(rows) + "</div>";
     }
 
     private String renderDefendantLines(int count) {
