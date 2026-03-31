@@ -9,6 +9,7 @@ import java.util.Objects;
  * Overview screen needs.
  */
 public final class CaseOverviewDto {
+	public record ContactSummary(Integer contactId, String displayName) {}
 
 	private final long caseId;
 
@@ -41,6 +42,7 @@ public final class CaseOverviewDto {
 	private final Integer primaryClientContactId;
 	private final String caller;
 	private final String client;
+	private final List<ContactSummary> clients;
 	private final String opposingCounsel;
 	private final Integer primaryOpposingCounselContactId;
 
@@ -75,6 +77,7 @@ public final class CaseOverviewDto {
 			Integer primaryOpposingCounselContactId,
 			String caller,
 			String client,
+			List<ContactSummary> clients,
 			String opposingCounsel,
 			List<String> team,
 			String description) {
@@ -105,6 +108,7 @@ public final class CaseOverviewDto {
 		this.primaryOpposingCounselContactId = primaryOpposingCounselContactId;
 		this.caller = safe(caller);
 		this.client = safe(client);
+		this.clients = clients == null ? List.of() : List.copyOf(clients);
 		this.opposingCounsel = safe(opposingCounsel);
 
 		this.team = team == null ? List.of() : List.copyOf(team);
@@ -185,6 +189,10 @@ public final class CaseOverviewDto {
 
 	public String getClient() {
 		return client;
+	}
+
+	public List<ContactSummary> getClients() {
+		return clients;
 	}
 
 	public String getOpposingCounsel() {
