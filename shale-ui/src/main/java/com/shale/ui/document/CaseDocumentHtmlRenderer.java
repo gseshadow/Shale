@@ -19,24 +19,14 @@ public final class CaseDocumentHtmlRenderer {
 
         LocalDateTime at = generatedAt == null ? LocalDateTime.now() : generatedAt;
         StringBuilder body = new StringBuilder();
+
         body.append(section("Case Information", kvTable(List.of(
                 kvRow("Case Name", model.caseName()),
                 kvRow("Status", model.statusName()),
-                kvRow("Responsible Attorney", model.responsibleAttorneyName()),
                 kvRow("Practice Area", model.practiceAreaName())))));
-        body.append(section("Contacts", kvTable(List.of(
-                kvRow("Caller", model.callerName()),
-                kvRow("Client", model.clientName()),
-                kvRow("Opposing Counsel", model.opposingCounselName())))));
 
-        List<String> team = teamLines(model.teamMembers());
-        if (!team.isEmpty()) {
-            body.append(section("Team", toListHtml(team)));
-        }
-        List<String> orgs = orgLines(model.organizations());
-        if (!orgs.isEmpty()) {
-            body.append(section("Organizations", toListHtml(orgs)));
-        }
+        body.append(section("Contacts", renderContactsColumns(model)));
+        body.append(section("Defendants", renderDefendantLines(6)));
 
         List<String> dateRows = new ArrayList<>();
         addIfPresent(dateRows, kvRow("Incident Date", fmt(model.incidentDate())));
@@ -44,50 +34,19 @@ public final class CaseDocumentHtmlRenderer {
         addIfPresent(dateRows, kvRow("Accepted Date", fmt(model.acceptedDate())));
         addIfPresent(dateRows, kvRow("Denied Date", fmt(model.deniedDate())));
         addIfPresent(dateRows, kvRow("Closed Date", fmt(model.closedDate())));
-        addIfPresent(dateRows, kvRow("Intake Date", fmt(model.callerDate())));
-        addIfPresent(dateRows, kvRow("Intake Time", model.callerTime()));
-        addIfPresent(dateRows, kvRow("Medical Negligence Date", fmt(model.dateOfMedicalNegligence())));
-        addIfPresent(dateRows, kvRow("Negligence Discovery Date", fmt(model.dateMedicalNegligenceWasDiscovered())));
-        addIfPresent(dateRows, kvRow("Tort Notice Deadline", fmt(model.tortNoticeDeadline())));
-        addIfPresent(dateRows, kvRow("Discovery Deadline", fmt(model.discoveryDeadline())));
-        addIfPresent(dateRows, kvRow("Fee Agreement Date", fmt(model.dateFeeAgreementSigned())));
         if (!dateRows.isEmpty()) {
             body.append(section("Dates / Status Details", kvTable(dateRows)));
-        }
-
-        List<String> additionalRows = new ArrayList<>();
-        addIfPresent(additionalRows, kvRow("Office Case Code", model.officeCaseCode()));
-        addIfPresent(additionalRows, kvRow("Estate Case", model.clientEstate()));
-        addIfPresent(additionalRows, kvRow("Medical Records Received", yesNo(model.medicalRecordsReceived())));
-        addIfPresent(additionalRows, kvRow("Fee Agreement Signed", yesNo(model.feeAgreementSigned())));
-        addIfPresent(additionalRows, kvRow("Accepted Chronology", yesNo(model.acceptedChronology())));
-        addIfPresent(additionalRows, kvRow("Consultant Expert Search", yesNo(model.acceptedConsultantExpertSearch())));
-        addIfPresent(additionalRows, kvRow("Testifying Expert Search", yesNo(model.acceptedTestifyingExpertSearch())));
-        addIfPresent(additionalRows, kvRow("Accepted Medical Literature", yesNo(model.acceptedMedicalLiterature())));
-        addIfPresent(additionalRows, kvRow("Denied Chronology", yesNo(model.deniedChronology())));
-        addIfPresent(additionalRows, kvRow("Received Updates", model.receivedUpdates()));
-        addIfPresent(additionalRows, kvRow("Summary (Detail Field)", model.summary()));
-
-        StringBuilder additionalBlock = new StringBuilder();
-        if (!additionalRows.isEmpty()) {
-            additionalBlock.append(kvTable(additionalRows));
-        }
-        if (!isBlank(model.acceptedDetail())) {
-            additionalBlock.append(block("Accepted Detail", model.acceptedDetail()));
-        }
-        if (!isBlank(model.deniedDetail())) {
-            additionalBlock.append(block("Denied Detail", model.deniedDetail()));
-        }
-        if (!additionalBlock.isEmpty()) {
-            body.append(section("Additional Case Details", additionalBlock.toString()));
         }
 
         if (!isBlank(model.description())) {
             body.append(section("Description", "<div class=\"description\">" + safe(model.description()) + "</div>"));
         }
-        if (!isBlank(model.caseSummary())) {
-            body.append(section("Case Summary", "<div class=\"description\">" + safe(model.caseSummary()) + "</div>"));
+
+        if (!isBlank(model.summary())) {
+            body.append(section("Summary", "<div class=\"description\">" + safe(model.summary()) + "</div>"));
         }
+
+        body.append(section("Updates", renderUpdates(model.updates())));
 
         return """
 <!DOCTYPE html>
@@ -109,16 +68,25 @@ public final class CaseDocumentHtmlRenderer {
     .kv-table tr { vertical-align: top; }
     .kv-table th { width: 34%%; text-align: left; font-weight: 600; color: #4b5563; padding: 4px 10px 4px 0; }
     .kv-table td { color: #111827; padding: 4px 0; }
-    .text-block { margin-top: 12px; }
-    .text-title { font-weight: 600; color: #374151; margin-bottom: 4px; }
-    ul { margin: 0; padding-left: 20px; }
-    li { margin: 5px 0; }
+    .contacts-columns { width: 100%%; border-collapse: collapse; table-layout: fixed; }
+    .contacts-columns td { width: 50%%; vertical-align: top; padding-right: 14px; }
+    .contacts-columns td:last-child { padding-right: 0; padding-left: 14px; }
+    .contact-card { border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 10px; }
+    .contact-card-title { font-weight: 600; color: #374151; margin-bottom: 6px; }
     .description { white-space: normal; }
+    .updates-list { margin: 0; padding: 0; list-style: none; }
+    .update-item { margin: 0 0 12px 0; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 4px; }
+    .update-meta { font-size: 12px; color: #6b7280; margin-bottom: 6px; }
+    .update-body { white-space: normal; }
+    .defendant-lines { margin-top: 6px; }
+    .defendant-line { height: 28px; border-bottom: 1px solid #9ca3af; margin-bottom: 8px; }
     @media print {
       .section-title { page-break-after: avoid; }
       .section { page-break-inside: avoid; }
       .kv-table { page-break-inside: avoid; }
-      .text-block { page-break-inside: avoid; }
+      .contacts-columns { page-break-inside: avoid; }
+      .contact-card { page-break-inside: avoid; }
+      .update-item { page-break-inside: avoid; }
     }
   </style>
 </head>
@@ -131,6 +99,71 @@ public final class CaseDocumentHtmlRenderer {
 </html>
 """.formatted(escape(TS_FORMAT.format(at)), body);
     }
+
+    private String renderUpdates(List<CaseDocumentModel.UpdateEntry> updates) {
+        if (updates == null || updates.isEmpty()) {
+            return "<div class=\"description\">&mdash;</div>";
+        }
+        StringBuilder html = new StringBuilder("<ul class=\"updates-list\">");
+        for (CaseDocumentModel.UpdateEntry update : updates) {
+            if (update == null) {
+                continue;
+            }
+            String meta = joinMeta(fmtTs(update.createdAt()), update.author());
+            html.append("<li class=\"update-item\">")
+                    .append("<div class=\"update-meta\">")
+                    .append(safe(meta))
+                    .append("</div>")
+                    .append("<div class=\"update-body\">")
+                    .append(safe(update.body()))
+                    .append("</div>")
+                    .append("</li>");
+        }
+        html.append("</ul>");
+        return html.toString();
+    }
+
+    private String renderContactsColumns(CaseDocumentModel model) {
+        String caller = contactCard("Caller", List.of(
+                kvRow("Name", model.callerName()),
+                kvRow("Phone", model.callerPhone()),
+                kvRow("Address", model.callerAddress()),
+                kvRow("Email", model.callerEmail())));
+        String client = contactCard("Client", List.of(
+                kvRow("Name", model.clientName()),
+                kvRow("Phone", model.clientPhone()),
+                kvRow("Address", model.clientAddress()),
+                kvRow("Email", model.clientEmail())));
+
+        return "<table class=\"contacts-columns\"><tbody><tr><td>" + caller + "</td><td>" + client + "</td></tr></tbody></table>";
+    }
+
+    private String contactCard(String title, List<String> rows) {
+        return "<div class=\"contact-card\"><div class=\"contact-card-title\">" + escape(title) + "</div>"
+                + kvTable(rows) + "</div>";
+    }
+
+    private String renderDefendantLines(int count) {
+        int lines = Math.max(3, count);
+        StringBuilder html = new StringBuilder("<div class=\"defendant-lines\">");
+        for (int i = 0; i < lines; i++) {
+            html.append("<div class=\"defendant-line\"></div>");
+        }
+        html.append("</div>");
+        return html.toString();
+    }
+
+    private String joinMeta(String timestamp, String author) {
+        boolean hasTime = !isBlank(timestamp);
+        boolean hasAuthor = !isBlank(author);
+        if (hasTime && hasAuthor) return timestamp + " — " + author;
+        if (hasTime) return timestamp;
+        if (hasAuthor) return author;
+        return "—";
+    }
+
+    private String fmt(LocalDate date) { return date == null ? "" : DATE_FORMAT.format(date); }
+    private String fmtTs(LocalDateTime dateTime) { return dateTime == null ? "" : TS_FORMAT.format(dateTime); }
 
     private String section(String title, String content) {
         if (content == null || content.isBlank()) return "";
@@ -146,37 +179,9 @@ public final class CaseDocumentHtmlRenderer {
         return "<tr><th scope=\"row\">" + escape(key) + "</th><td>" + safe(value) + "</td></tr>";
     }
 
-    private String block(String title, String text) {
-        return "<div class=\"text-block\"><div class=\"text-title\">" + escape(title) + "</div><div class=\"description\">" + safe(text) + "</div></div>";
-    }
-
     private void addIfPresent(List<String> rows, String kv) {
         if (kv == null || kv.contains("&mdash;")) return;
         rows.add(kv);
-    }
-
-    private String fmt(LocalDate date) { return date == null ? "" : DATE_FORMAT.format(date); }
-    private String yesNo(Boolean value) { return value == null ? "" : (value ? "Yes" : "No"); }
-
-    private List<String> teamLines(List<CaseDocumentModel.TeamEntry> members) {
-        if (members == null || members.isEmpty()) return List.of();
-        return members.stream().filter(Objects::nonNull)
-                .map(t -> isBlank(t.roleName()) ? blank(t.name()) : blank(t.name()) + " — " + blank(t.roleName()))
-                .filter(v -> !v.isBlank())
-                .toList();
-    }
-
-    private List<String> orgLines(List<CaseDocumentModel.OrganizationEntry> orgs) {
-        if (orgs == null || orgs.isEmpty()) return List.of();
-        return orgs.stream().filter(Objects::nonNull).map(CaseDocumentModel.OrganizationEntry::name).map(this::blank)
-                .filter(v -> !v.isBlank()).toList();
-    }
-
-    private String toListHtml(List<String> items) {
-        StringBuilder sb = new StringBuilder("<ul>");
-        for (String i : items) sb.append("<li>").append(escape(i)).append("</li>");
-        sb.append("</ul>");
-        return sb.toString();
     }
 
     private String safe(String v) {
@@ -186,6 +191,7 @@ public final class CaseDocumentHtmlRenderer {
         }
         return escape(t).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br />");
     }
+
     private String blank(String v) { return v == null ? "" : v.trim(); }
     private boolean isBlank(String v) { return blank(v).isBlank(); }
 

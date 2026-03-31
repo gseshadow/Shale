@@ -57,6 +57,7 @@ import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
@@ -225,6 +226,8 @@ public class CaseController {
 	private MenuItem generateSummaryHtmlMenuItem;
 	@FXML
 	private MenuItem generateSummaryPdfMenuItem;
+	@FXML
+	private Label summaryGenerationStatusLabel;
 
 	@FXML
 	private Button detailsEditButton;
@@ -496,7 +499,7 @@ public class CaseController {
 		this.contactDao = contactDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
-		this.caseDocumentService = caseDao == null ? null : new CaseDocumentService(caseDao);
+		this.caseDocumentService = (caseDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, contactDao);
 		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
 		this.onCaseDeleted = onCaseDeleted;
 		refreshHeader();
@@ -634,19 +637,62 @@ public class CaseController {
 			return;
 		}
 
-		int tenantId = appState.getShaleClientId();
-		try {
-			System.out.println("[Document] Generating " + format + " CASE_SUMMARY for caseId=" + caseId + " shaleClientId=" + tenantId);
-			GeneratedDocument generated = caseDocumentExportService.exportCaseSummary(caseId, tenantId, CaseDocumentType.CASE_SUMMARY, format);
-			boolean opened = runtimeBridge != null && runtimeBridge.openPath(generated.path());
-			if (!opened) {
-				throw new IllegalStateException("Unable to open generated summary preview.");
+		final int tenantId = appState.getShaleClientId();
+		final int activeCaseId = caseId;
+		final String loadingText = format == CaseDocumentFormat.PDF ? "Generating PDF summary..." : "Generating HTML summary...";
+		setSummaryGenerationBusy(true, loadingText);
+
+		Task<GeneratedDocument> task = new Task<>() {
+			@Override
+			protected GeneratedDocument call() throws Exception {
+				System.out.println("[Document] Generating " + format + " CASE_SUMMARY for caseId=" + activeCaseId + " shaleClientId=" + tenantId);
+				return caseDocumentExportService.exportCaseSummary(activeCaseId, tenantId, CaseDocumentType.CASE_SUMMARY, format);
 			}
-			System.out.println("[Document] Generated case summary " + format + " at " + generated.path());
-		} catch (Exception ex) {
-			System.err.println("[Document] Failed to generate case summary " + format + ": " + ex.getMessage());
-			showError("Could not generate case summary " + format.name().toLowerCase() + ". Please try again.");
+		};
+
+		task.setOnSucceeded(event -> {
+			setSummaryGenerationBusy(false, null);
+			GeneratedDocument generated = task.getValue();
+			try {
+				boolean opened = runtimeBridge != null && runtimeBridge.openPath(generated.path());
+				if (!opened) {
+					throw new IllegalStateException("Unable to open generated summary preview.");
+				}
+				System.out.println("[Document] Generated case summary " + format + " at " + generated.path());
+			} catch (Exception ex) {
+				System.err.println("[Document] Failed to open generated case summary " + format + ": " + ex.getMessage());
+				showSummaryGenerationError("Could not open generated case summary.");
+			}
+		});
+
+		task.setOnFailed(event -> {
+			setSummaryGenerationBusy(false, null);
+			Throwable ex = task.getException();
+			System.err.println("[Document] Failed to generate case summary " + format + ": " + (ex == null ? "<unknown>" : ex.getMessage()));
+			showSummaryGenerationError("Could not generate case summary " + format.name().toLowerCase() + ". Please try again.");
+		});
+
+		Thread worker = new Thread(task, "case-summary-export-" + format.name().toLowerCase() + "-" + activeCaseId);
+		worker.setDaemon(true);
+		worker.start();
+	}
+
+	private void setSummaryGenerationBusy(boolean busy, String message) {
+		if (generateSummaryMenuButton != null) {
+			generateSummaryMenuButton.setDisable(busy);
 		}
+		if (summaryGenerationStatusLabel != null) {
+			boolean show = busy && message != null && !message.isBlank();
+			summaryGenerationStatusLabel.setText(show ? message : "");
+			summaryGenerationStatusLabel.setVisible(show);
+			summaryGenerationStatusLabel.setManaged(show);
+		}
+	}
+
+	private void showSummaryGenerationError(String message) {
+		showError(message);
+		Window owner = caseRootPane == null || caseRootPane.getScene() == null ? null : caseRootPane.getScene().getWindow();
+		AppDialogs.showError(owner, "Case Summary", message);
 	}
 
 	private void setupRelatedEntitiesLayout() {

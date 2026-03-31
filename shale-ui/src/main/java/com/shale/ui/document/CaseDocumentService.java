@@ -1,23 +1,28 @@
 package com.shale.ui.document;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseUpdateDto;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.ContactDao;
 
 public final class CaseDocumentService {
     private final CaseDao caseDao;
+    private final ContactDao contactDao;
     private final CaseDocumentRenderer renderer;
 
-    public CaseDocumentService(CaseDao caseDao) {
-        this(caseDao, new CaseDocumentRenderer());
+    public CaseDocumentService(CaseDao caseDao, ContactDao contactDao) {
+        this(caseDao, contactDao, new CaseDocumentRenderer());
     }
 
-    public CaseDocumentService(CaseDao caseDao, CaseDocumentRenderer renderer) {
+    public CaseDocumentService(CaseDao caseDao, ContactDao contactDao, CaseDocumentRenderer renderer) {
         this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
+        this.contactDao = Objects.requireNonNull(contactDao, "contactDao");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
     }
 
@@ -33,65 +38,56 @@ public final class CaseDocumentService {
         CaseDetailDto detail = caseDao.getDetail(caseId);
         if (overview == null || detail == null) throw new IllegalStateException("Case not found for id=" + caseId);
 
-        List<CaseDocumentModel.TeamEntry> team = caseDao.listCaseTeamRows(caseId).stream()
-                .filter(Objects::nonNull)
-                .map(row -> new CaseDocumentModel.TeamEntry(row.displayName(), roleLabel(row.roleId())))
-                .toList();
+        ContactDao.ContactDetailRow caller = loadContact(overview.getPrimaryCallerContactId(), shaleClientId);
+        ContactDao.ContactDetailRow client = loadContact(overview.getPrimaryClientContactId(), shaleClientId);
 
-        List<CaseDocumentModel.OrganizationEntry> orgs = caseDao.findRelatedOrganizations(caseId).stream()
-                .filter(Objects::nonNull)
-                .map(row -> new CaseDocumentModel.OrganizationEntry(row.name()))
+        List<CaseDocumentModel.UpdateEntry> updates = caseDao.listCaseUpdates(caseId).stream()
+                .sorted(Comparator
+                        .comparing(CaseUpdateDto::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparingLong(CaseUpdateDto::getId))
+                .map(this::toUpdateEntry)
                 .toList();
 
         return new CaseDocumentModel(
                 overview.getCaseName(),
                 overview.getCaseStatus(),
-                overview.getResponsibleAttorney(),
                 overview.getPracticeArea(),
-                overview.getCaller(),
-                overview.getClient(),
-                overview.getOpposingCounsel(),
-                team,
-                orgs,
+                coalesceName(overview.getCaller(), caller),
+                caller == null ? "" : caller.phone(),
+                caller == null ? "" : caller.addressHome(),
+                caller == null ? "" : caller.email(),
+                coalesceName(overview.getClient(), client),
+                client == null ? "" : client.phone(),
+                client == null ? "" : client.addressHome(),
+                client == null ? "" : client.email(),
                 overview.getIncidentDate(),
                 overview.getSolDate(),
-                overview.getDescription(),
-                detail.getSummary(),
-                detail.getCallerDate(),
-                detail.getCallerTime(),
                 detail.getAcceptedDate(),
                 detail.getDeniedDate(),
                 detail.getClosedDate(),
-                detail.getDateOfMedicalNegligence(),
-                detail.getDateMedicalNegligenceWasDiscovered(),
-                detail.getTortNoticeDeadline(),
-                detail.getDiscoveryDeadline(),
-                detail.getDateFeeAgreementSigned(),
-                detail.getOfficePrinterCode(),
-                detail.getClientEstate(),
-                detail.getMedicalRecordsReceived(),
-                detail.getFeeAgreementSigned(),
-                detail.getAcceptedChronology(),
-                detail.getAcceptedConsultantExpertSearch(),
-                detail.getAcceptedTestifyingExpertSearch(),
-                detail.getAcceptedMedicalLiterature(),
-                detail.getAcceptedDetail(),
-                detail.getDeniedChronology(),
-                detail.getDeniedDetail(),
-                detail.getReceivedUpdates(),
-                detail.getSummary());
+                overview.getDescription(),
+                detail.getSummary(),
+                updates);
     }
 
-    private String roleLabel(int roleId) {
-        return switch (roleId) {
-            case 4 -> "Responsible Attorney";
-            case 5 -> "Intake Staff";
-            case 7 -> "Attorney";
-            case 11 -> "Legal Assistant";
-            case 12 -> "Paralegal";
-            case 13 -> "Law Clerk";
-            case 14 -> "Co-counsel";
-            default -> "";
-        };
+    private ContactDao.ContactDetailRow loadContact(Integer contactId, int shaleClientId) {
+        if (contactId == null || contactId <= 0) {
+            return null;
+        }
+        return contactDao.findById(contactId, shaleClientId);
+    }
+
+    private String coalesceName(String preferredName, ContactDao.ContactDetailRow detail) {
+        if (preferredName != null && !preferredName.isBlank()) {
+            return preferredName;
+        }
+        if (detail == null) {
+            return "";
+        }
+        return detail.displayName();
+    }
+
+    private CaseDocumentModel.UpdateEntry toUpdateEntry(CaseUpdateDto dto) {
+        return new CaseDocumentModel.UpdateEntry(dto.getCreatedAt(), dto.getCreatedByDisplayName(), dto.getNoteText());
     }
 }
