@@ -1838,6 +1838,41 @@ public final class CaseDao {
 		}
 	}
 
+	public boolean updateCaseNote(long caseUpdateId, long caseId, int shaleClientId, int actorUserId, String noteText) {
+		String trimmedText = noteText == null ? "" : noteText.trim();
+		if (trimmedText.isBlank()) {
+			throw new IllegalArgumentException("Case update text is required.");
+		}
+		if (actorUserId <= 0) {
+			throw new IllegalArgumentException("actorUserId is required.");
+		}
+
+		String sql = """
+				UPDATE dbo.CaseUpdates
+				SET NoteText = ?,
+				    UpdatedAt = SYSDATETIME(),
+				    EditedByUserId = ?
+				WHERE Id = ?
+				  AND CaseId = ?
+				  AND ShaleClientId = ?
+				  AND ISNULL(IsDeleted, 0) = 0
+				  AND CreatedByUserId = ?;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setString(1, trimmedText);
+			ps.setInt(2, actorUserId);
+			ps.setLong(3, caseUpdateId);
+			ps.setLong(4, caseId);
+			ps.setInt(5, shaleClientId);
+			ps.setInt(6, actorUserId);
+			return ps.executeUpdate() == 1;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update case update (id=" + caseUpdateId + ")", e);
+		}
+	}
+
 	// ---- helpers ----
 
 	private static LocalDate toLocalDate(java.sql.Date d) {
