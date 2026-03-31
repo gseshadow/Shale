@@ -1176,6 +1176,9 @@ public final class CaseDao {
 					if (!rs.next())
 						return null;
 					List<String> team = loadTeamMembers(con, caseId);
+					List<com.shale.core.dto.CaseOverviewDto.ContactSummary> clients = listCaseContactsByRole(con, caseId, ROLE_CASECONTACT_CLIENT);
+					Integer primaryClientContactId = clients.isEmpty() ? null : clients.get(0).contactId();
+					String primaryClientName = clients.isEmpty() ? null : clients.get(0).displayName();
 					return new com.shale.core.dto.CaseOverviewDto(
 						rs.getLong("Id"),
 						rs.getString("CaseNumber"),
@@ -1193,10 +1196,11 @@ public final class CaseDao {
 						toLocalDate(rs.getDate("DateOfInjury")),
 						toLocalDate(rs.getDate("StatuteOfLimitations")),
 						getNullableInt(rs, "PrimaryCallerContactId"),
-						getNullableInt(rs, "PrimaryClientContactId"),
+						primaryClientContactId,
 						getNullableInt(rs, "PrimaryOpposingCounselContactId"),
 						rs.getString("CallerName"),
-						rs.getString("ClientName"),
+						primaryClientName,
+						clients,
 						rs.getString("OpposingCounselName"),
 						team,
 						rs.getString("Description")
@@ -1205,6 +1209,45 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load case overview (caseId=" + caseId + ")", e);
+		}
+	}
+
+	private List<com.shale.core.dto.CaseOverviewDto.ContactSummary> listCaseContactsByRole(Connection con, long caseId, int roleId) throws SQLException {
+		String sql = """
+				SELECT
+				  cc.ContactId,
+				  LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )) AS DisplayName
+				FROM dbo.CaseContacts cc
+				INNER JOIN dbo.Contacts ct ON ct.Id = cc.ContactId
+				WHERE cc.CaseId = ?
+				  AND cc.Role = ?
+				  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				ORDER BY CASE WHEN cc.IsPrimary = 1 THEN 0 ELSE 1 END, cc.UpdatedAt DESC, cc.CreatedAt DESC, cc.Id DESC;
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, roleId);
+			try (ResultSet rs = ps.executeQuery()) {
+				List<com.shale.core.dto.CaseOverviewDto.ContactSummary> out = new ArrayList<>();
+				while (rs.next()) {
+					String name = rs.getString("DisplayName");
+					if (name == null || name.isBlank())
+						continue;
+					out.add(new com.shale.core.dto.CaseOverviewDto.ContactSummary(rs.getInt("ContactId"), name));
+				}
+				return out;
+			}
 		}
 	}
 
@@ -2705,6 +2748,85 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException(
 					"Failed to set primary case contact (caseId=" + caseId + ", role=" + role + ")",
+					e
+			);
+		}
+	}
+
+	public void replaceCaseContactsForRole(
+			long caseId,
+			int shaleClientId,
+			int role,
+			List<Integer> contactIds,
+			String notes) {
+		List<Integer> normalized = (contactIds == null ? List.<Integer>of() : contactIds).stream()
+				.filter(Objects::nonNull)
+				.map(Integer::intValue)
+				.filter(id -> id > 0)
+				.distinct()
+				.toList();
+		String cleanNotes = (notes == null || notes.isBlank()) ? null : notes.trim();
+		try (Connection con = db.requireConnection()) {
+			con.setAutoCommit(false);
+			try {
+				for (Integer contactId : normalized) {
+					String ensureContactSql = """
+							SELECT 1
+							FROM dbo.Contacts ct
+							WHERE ct.Id = ?
+							  AND ct.ShaleClientId = ?
+							  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL);
+							""";
+					try (PreparedStatement ps = con.prepareStatement(ensureContactSql)) {
+						ps.setInt(1, contactId);
+						ps.setInt(2, shaleClientId);
+						try (ResultSet rs = ps.executeQuery()) {
+							if (!rs.next())
+								throw new IllegalArgumentException("Contact not found for tenant: " + contactId);
+						}
+					}
+				}
+
+				String deleteSql = """
+						DELETE FROM dbo.CaseContacts
+						WHERE CaseId = ?
+						  AND Role = ?;
+						""";
+				try (PreparedStatement ps = con.prepareStatement(deleteSql)) {
+					ps.setLong(1, caseId);
+					ps.setInt(2, role);
+					ps.executeUpdate();
+				}
+
+				if (!normalized.isEmpty()) {
+					String insertSql = """
+							INSERT INTO dbo.CaseContacts
+							  (CaseId, ContactId, Role, Side, IsPrimary, Notes, AddedAt, CreatedAt, UpdatedAt)
+							VALUES
+							  (?, ?, ?, NULL, ?, ?, SYSDATETIME(), SYSDATETIME(), SYSDATETIME());
+							""";
+					try (PreparedStatement ps = con.prepareStatement(insertSql)) {
+						for (int i = 0; i < normalized.size(); i++) {
+							ps.setLong(1, caseId);
+							ps.setInt(2, normalized.get(i));
+							ps.setInt(3, role);
+							ps.setBoolean(4, i == 0);
+							ps.setString(5, cleanNotes);
+							ps.addBatch();
+						}
+						ps.executeBatch();
+					}
+				}
+				con.commit();
+			} catch (Exception ex) {
+				con.rollback();
+				throw ex;
+			} finally {
+				con.setAutoCommit(true);
+			}
+		} catch (Exception e) {
+			throw new RuntimeException(
+					"Failed to replace case contacts for role (caseId=" + caseId + ", role=" + role + ")",
 					e
 			);
 		}
