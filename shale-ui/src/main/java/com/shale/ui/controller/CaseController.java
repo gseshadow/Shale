@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTimelineEventDto;
@@ -383,6 +384,7 @@ public class CaseController {
 
 	private static final List<String> SECTIONS = List.of(
 			"Overview",
+			"Parties",
 			"Tasks",
 			"Timeline",
 			"Details",
@@ -468,6 +470,7 @@ public class CaseController {
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
 	private List<CaseDao.RelatedContactRow> relatedContacts = List.of();
 	private List<CaseDao.RelatedOrganizationRow> relatedOrganizations = List.of();
+	private List<CasePartyDto> caseParties = List.of();
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private Long editingCaseUpdateId;
@@ -828,6 +831,7 @@ public class CaseController {
 		setActiveSectionButton(sectionName);
 		switch (sectionName) {
 		case "Overview" -> showOverview();
+		case "Parties" -> showParties();
 		case "Tasks" -> showTasksTab();
 		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
@@ -931,6 +935,28 @@ public class CaseController {
 		loadCaseTimelineEventsAsync();
 	}
 
+	private void showParties() {
+		setUpdatesPaneVisible(false);
+		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, true);
+		setPaneVisible(tasksPanel, false);
+
+		if (genericTitleLabel != null)
+			genericTitleLabel.setText("Parties");
+
+		setVisibleManaged(addOrganizationButton, false);
+		setVisibleManaged(placeholderTextArea, false);
+		setVisibleManaged(organizationsScrollPane, false);
+		setVisibleManaged(organizationsFlow, false);
+		setVisibleManaged(organizationsEmptyLabel, false);
+		setVisibleManaged(timelineScrollPane, true);
+		setVisibleManaged(timelineListBox, true);
+		setVisibleManaged(timelineEmptyLabel, false);
+		renderPartiesSection();
+	}
+
 	private void loadCaseTimelineEventsAsync() {
 		if (caseDao == null || caseId == null) {
 			renderTimelineEvents(List.of());
@@ -1005,6 +1031,135 @@ public class CaseController {
 		card.setPadding(new Insets(10, 12, 10, 12));
 		card.getStyleClass().add("secondary-panel");
 		return card;
+	}
+
+	private void renderPartiesSection() {
+		if (timelineListBox == null)
+			return;
+
+		boolean partiesSectionActive = isSectionActive("Parties");
+		timelineListBox.getChildren().clear();
+		List<CasePartyDto> safeParties = caseParties == null ? List.of() : caseParties;
+		if (safeParties.isEmpty()) {
+			if (partiesSectionActive) {
+				if (timelineEmptyLabel != null)
+					timelineEmptyLabel.setText("No parties yet.");
+				setVisibleManaged(timelineEmptyLabel, true);
+			}
+			return;
+		}
+
+		if (partiesSectionActive) {
+			setVisibleManaged(timelineEmptyLabel, false);
+		}
+
+		Map<String, List<CasePartyDto>> grouped = safeParties.stream()
+				.filter(Objects::nonNull)
+				.collect(Collectors.groupingBy(
+						p -> normalizedPartySideKey(p.getSide()),
+						LinkedHashMap::new,
+						Collectors.toList()));
+
+		List<String> sideOrder = List.of("represented", "opposing", "neutral", "unclassified");
+		for (String sideKey : sideOrder) {
+			List<CasePartyDto> group = grouped.get(sideKey);
+			if (group == null || group.isEmpty()) {
+				continue;
+			}
+
+			Label heading = new Label(toPartySideLabel(sideKey));
+			heading.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-opacity: 0.92;");
+			timelineListBox.getChildren().add(heading);
+
+			List<CasePartyDto> sorted = group.stream()
+					.sorted((a, b) -> {
+						int primaryCompare = Boolean.compare(b.isPrimary(), a.isPrimary());
+						if (primaryCompare != 0)
+							return primaryCompare;
+						return safeText(a.getDisplayName()).compareToIgnoreCase(safeText(b.getDisplayName()));
+					})
+					.toList();
+
+			for (CasePartyDto party : sorted) {
+				timelineListBox.getChildren().add(createPartyCard(party));
+			}
+		}
+	}
+
+	private Node createPartyCard(CasePartyDto party) {
+		String displayName = safeText(party.getDisplayName()).isBlank() ? "—" : safeText(party.getDisplayName());
+		String entityLabel = toEntityLabel(party.getEntityType());
+		String roleLabel = toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId());
+		String sideLabel = toPartySideLabel(normalizedPartySideKey(party.getSide()));
+
+		Label nameLabel = new Label(displayName);
+		nameLabel.setStyle("-fx-font-weight: bold;");
+		nameLabel.setWrapText(true);
+
+		String meta = entityLabel + " • " + roleLabel + (party.isPrimary() ? " • Primary" : "");
+		Label metaLabel = new Label(meta);
+		metaLabel.setStyle("-fx-opacity: 0.86;");
+		metaLabel.setWrapText(true);
+
+		Label sideLabelNode = new Label("Side: " + sideLabel);
+		sideLabelNode.setStyle("-fx-opacity: 0.8;");
+
+		VBox content = new VBox(4, nameLabel, metaLabel, sideLabelNode);
+		String notes = safeText(party.getNotes()).trim();
+		if (!notes.isBlank()) {
+			Label notesLabel = new Label(notes);
+			notesLabel.setWrapText(true);
+			notesLabel.setStyle("-fx-opacity: 0.9;");
+			content.getChildren().add(notesLabel);
+		}
+
+		VBox card = new VBox(content);
+		card.setPadding(new Insets(10, 12, 10, 12));
+		card.getStyleClass().add("secondary-panel");
+		return card;
+	}
+
+	private String normalizedPartySideKey(String side) {
+		String normalized = safeText(side).trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+			case "represented" -> "represented";
+			case "opposing" -> "opposing";
+			case "neutral" -> "neutral";
+			default -> "unclassified";
+		};
+	}
+
+	private String toPartySideLabel(String sideKey) {
+		return switch (safeText(sideKey).trim().toLowerCase(Locale.ROOT)) {
+			case "represented" -> "Represented";
+			case "opposing" -> "Opposing";
+			case "neutral" -> "Neutral";
+			default -> "Unclassified";
+		};
+	}
+
+	private String toEntityLabel(String entityType) {
+		return switch (safeText(entityType).trim().toLowerCase(Locale.ROOT)) {
+			case "organization" -> "Organization";
+			case "contact" -> "Contact";
+			default -> "Party";
+		};
+	}
+
+	private String toPartyRoleLabel(String roleName, long roleId) {
+		String normalized = safeText(roleName).trim().replace('_', ' ');
+		if (normalized.isBlank()) {
+			return "Role " + roleId;
+		}
+		String[] tokens = normalized.split("\\s+");
+		for (int i = 0; i < tokens.length; i++) {
+			String token = tokens[i];
+			if (token.isBlank()) {
+				continue;
+			}
+			tokens[i] = token.substring(0, 1).toUpperCase(Locale.ROOT) + token.substring(1).toLowerCase(Locale.ROOT);
+		}
+		return String.join(" ", tokens);
 	}
 
 
@@ -2098,6 +2253,7 @@ public class CaseController {
 			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
 			List<CaseDao.RelatedContactRow> loadedContacts = List.of();
 			List<CaseDao.RelatedOrganizationRow> loadedOrganizations = List.of();
+			List<CasePartyDto> loadedParties = List.of();
 			try {
 				loadedContacts = caseDao.findRelatedContacts(activeCaseId);
 			} catch (Exception contactLoadError) {
@@ -2108,8 +2264,14 @@ public class CaseController {
 			} catch (Exception orgLoadError) {
 				System.err.println("Case organizations load failed for caseId=" + activeCaseId + ": " + orgLoadError.getMessage());
 			}
+			try {
+				loadedParties = caseDao.listCaseParties(activeCaseId);
+			} catch (Exception partiesLoadError) {
+				System.err.println("Case parties load failed for caseId=" + activeCaseId + ": " + partiesLoadError.getMessage());
+			}
 			final List<CaseDao.RelatedContactRow> contacts = loadedContacts;
 			final List<CaseDao.RelatedOrganizationRow> organizations = loadedOrganizations;
+			final List<CasePartyDto> parties = loadedParties;
 
 			runOnFx(() ->
 			{
@@ -2125,6 +2287,8 @@ public class CaseController {
 
 				relatedOrganizations = organizations == null ? List.of() : organizations;
 				renderOrganizationsSection();
+				caseParties = parties == null ? List.of() : parties;
+				renderPartiesSection();
 
 				current = detail;
 				detailsLocalViewOverride = null;
@@ -2354,8 +2518,10 @@ public class CaseController {
 		currentOverview = null;
 		relatedContacts = List.of();
 		relatedOrganizations = List.of();
+		caseParties = List.of();
 		renderContactsSection();
 		renderOrganizationsSection();
+		renderPartiesSection();
 		refreshDeleteAction();
 		navigateAfterDelete();
 	}
