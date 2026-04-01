@@ -1515,8 +1515,10 @@ public class CaseController {
 		Dialog<AddPartyDraft> dialog = new Dialog<>();
 		dialog.setTitle("Add Party");
 		dialog.initOwner(organizationDialogOwner());
-		ButtonType saveType = new ButtonType("Add Party", ButtonData.OK_DONE);
-		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+		ButtonType backType = new ButtonType("Back", ButtonData.LEFT);
+		ButtonType nextType = new ButtonType("Next", ButtonData.NEXT_FORWARD);
+		ButtonType addType = new ButtonType("Add Party", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(backType, nextType, addType, ButtonType.CANCEL);
 
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
 		partyRoles.stream().map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id()))).forEach(roleChoice.getItems()::add);
@@ -1546,18 +1548,13 @@ public class CaseController {
 		notesArea.setPrefRowCount(3);
 		notesArea.setWrapText(true);
 
-		ChoiceBox<String> modeChoice = new ChoiceBox<>();
-		modeChoice.getItems().addAll("Create New", "Select Existing");
-		modeChoice.setValue("Select Existing");
-
-		ChoiceBox<String> entityTypeChoice = new ChoiceBox<>();
-		entityTypeChoice.getItems().addAll("Contact", "Organization");
-		entityTypeChoice.setValue("Contact");
-
+		TextField firstNameField = new TextField();
+		TextField lastNameField = new TextField();
+		TextField organizationNameField = new TextField();
 		TextField searchField = new TextField();
 		searchField.setPromptText("Search by name");
 		javafx.scene.control.ListView<PartyEntityOption> existingList = new javafx.scene.control.ListView<>();
-		existingList.setPrefHeight(220);
+		existingList.setPrefHeight(240);
 		existingList.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
 			@Override
 			protected void updateItem(PartyEntityOption item, boolean empty) {
@@ -1566,137 +1563,219 @@ public class CaseController {
 			}
 		});
 
-		TextField firstNameField = new TextField();
-		TextField lastNameField = new TextField();
-		TextField organizationNameField = new TextField();
+		javafx.scene.control.ToggleGroup modeGroup = new javafx.scene.control.ToggleGroup();
+		javafx.scene.control.RadioButton createNewRadio = new javafx.scene.control.RadioButton("Create New");
+		createNewRadio.setToggleGroup(modeGroup);
+		javafx.scene.control.RadioButton selectExistingRadio = new javafx.scene.control.RadioButton("Select Existing");
+		selectExistingRadio.setToggleGroup(modeGroup);
 
-		VBox content = new VBox(10);
-		content.setPadding(new Insets(10));
-		Label step1Label = new Label("Step 1: Create new or select from existing");
-		Label step2Label = new Label("Step 2: Contact or Organization");
-		Label step3Label = new Label("Step 3: Details");
+		javafx.scene.control.ToggleGroup entityGroup = new javafx.scene.control.ToggleGroup();
+		javafx.scene.control.RadioButton contactRadio = new javafx.scene.control.RadioButton("Contact");
+		contactRadio.setToggleGroup(entityGroup);
+		javafx.scene.control.RadioButton organizationRadio = new javafx.scene.control.RadioButton("Organization");
+		organizationRadio.setToggleGroup(entityGroup);
 
-		GridPane relationshipGrid = new GridPane();
-		relationshipGrid.setHgap(10);
-		relationshipGrid.setVgap(8);
-		relationshipGrid.add(new Label("Party Role"), 0, 0);
-		relationshipGrid.add(roleChoice, 1, 0);
-		relationshipGrid.add(new Label("Affiliation"), 0, 1);
-		relationshipGrid.add(sideChoice, 1, 1);
-		relationshipGrid.add(primaryCheck, 1, 2);
-		relationshipGrid.add(new Label("Notes"), 0, 3);
-		relationshipGrid.add(notesArea, 1, 3);
+		VBox step1Pane = new VBox(12,
+				new Label("Step 1: Create new or select from existing"),
+				createNewRadio,
+				selectExistingRadio);
+		step1Pane.setPadding(new Insets(12));
+
+		VBox step2Pane = new VBox(12,
+				new Label("Step 2: Contact or Organization"),
+				contactRadio,
+				organizationRadio);
+		step2Pane.setPadding(new Insets(12));
 
 		GridPane createGrid = new GridPane();
 		createGrid.setHgap(10);
 		createGrid.setVgap(8);
+		GridPane createRelationshipGrid = new GridPane();
+		createRelationshipGrid.setHgap(10);
+		createRelationshipGrid.setVgap(8);
+		createRelationshipGrid.add(new Label("Party Role"), 0, 0);
+		createRelationshipGrid.add(roleChoice, 1, 0);
+		createRelationshipGrid.add(new Label("Affiliation"), 0, 1);
+		createRelationshipGrid.add(sideChoice, 1, 1);
 
-		content.getChildren().addAll(
-				step1Label,
-				modeChoice,
-				step2Label,
-				entityTypeChoice,
-				step3Label,
+		VBox step3CreatePane = new VBox(12,
+				new Label("Step 3: Create New"),
 				createGrid,
-				relationshipGrid);
-		dialog.getDialogPane().setContent(content);
+				createRelationshipGrid);
+		step3CreatePane.setPadding(new Insets(12));
 
-		Runnable refreshStep3 = () -> {
-			boolean createNew = "Create New".equalsIgnoreCase(modeChoice.getValue());
-			boolean isContact = "Contact".equalsIgnoreCase(entityTypeChoice.getValue());
-			createGrid.getChildren().clear();
-			if (createNew) {
-				if (isContact) {
-					createGrid.add(new Label("First Name"), 0, 0);
-					createGrid.add(firstNameField, 1, 0);
-					createGrid.add(new Label("Last Name"), 0, 1);
-					createGrid.add(lastNameField, 1, 1);
-				} else {
-					createGrid.add(new Label("Name"), 0, 0);
-					createGrid.add(organizationNameField, 1, 0);
+		GridPane selectRelationshipGrid = new GridPane();
+		selectRelationshipGrid.setHgap(10);
+		selectRelationshipGrid.setVgap(8);
+		selectRelationshipGrid.add(new Label("Party Role"), 0, 0);
+		selectRelationshipGrid.add(roleChoice, 1, 0);
+		selectRelationshipGrid.add(new Label("Affiliation"), 0, 1);
+		selectRelationshipGrid.add(sideChoice, 1, 1);
+		selectRelationshipGrid.add(primaryCheck, 1, 2);
+		selectRelationshipGrid.add(new Label("Notes"), 0, 3);
+		selectRelationshipGrid.add(notesArea, 1, 3);
+
+		VBox step3SelectPane = new VBox(12,
+				new Label("Step 3: Select Existing"),
+				searchField,
+				existingList,
+				selectRelationshipGrid);
+		step3SelectPane.setPadding(new Insets(12));
+
+		StackPane contentHost = new StackPane(step1Pane, step2Pane, step3CreatePane, step3SelectPane);
+		contentHost.setPrefWidth(560);
+		dialog.getDialogPane().setContent(contentHost);
+
+		Runnable loadExistingOptions = () -> {
+			boolean isContact = contactRadio.isSelected();
+			List<PartyEntityOption> options = new java.util.ArrayList<>();
+			if (isContact) {
+				for (CaseDao.SelectableContactRow contact : contacts) {
+					String name = safeText(contact.displayName());
+					if (name.isBlank()) {
+						name = "Contact #" + contact.id();
+					}
+					String secondary = safeText(contact.email());
+					if (secondary.isBlank()) {
+						secondary = safeText(contact.phone());
+					}
+					String label = secondary.isBlank() ? name : name + " — " + secondary;
+					options.add(new PartyEntityOption("contact", Long.valueOf(contact.id()), label));
 				}
-				setVisibleManaged(searchField, false);
-				setVisibleManaged(existingList, false);
 			} else {
-				setVisibleManaged(searchField, true);
-				setVisibleManaged(existingList, true);
-				if (!content.getChildren().contains(searchField)) {
-					content.getChildren().add(5, searchField);
-					content.getChildren().add(6, existingList);
-				}
-				List<PartyEntityOption> options = new java.util.ArrayList<>();
-				if (isContact) {
-						for (CaseDao.SelectableContactRow contact : contacts) {
-							String name = safeText(contact.displayName());
-							if (name.isBlank()) {
-								name = "Contact #" + contact.id();
-							}
-						String detail = safeText(contact.email());
-						if (detail.isBlank()) {
-							detail = safeText(contact.phone());
-						}
-						String label = detail.isBlank() ? name : name + " — " + detail;
-						options.add(new PartyEntityOption("contact", Long.valueOf(contact.id()), label));
+				for (CaseDao.SelectableOrganizationRow org : organizations) {
+					String name = safeText(org.name());
+					if (name.isBlank()) {
+						name = "Organization #" + org.id();
 					}
-				} else {
-					for (CaseDao.SelectableOrganizationRow org : organizations) {
-						String name = safeText(org.name());
-						if (name.isBlank()) {
-							name = "Organization #" + org.id();
-						}
-						String type = safeText(org.organizationTypeName());
-						String label = type.isBlank() ? name : name + " — " + type;
-						options.add(new PartyEntityOption("organization", Long.valueOf(org.id()), label));
-					}
+					String type = safeText(org.organizationTypeName());
+					String label = type.isBlank() ? name : name + " — " + type;
+					options.add(new PartyEntityOption("organization", Long.valueOf(org.id()), label));
 				}
-				existingList.getItems().setAll(options);
-				if (!existingList.getItems().isEmpty() && existingList.getSelectionModel().getSelectedItem() == null) {
-					existingList.getSelectionModel().selectFirst();
-				}
+			}
+			String query = safeText(searchField.getText()).toLowerCase(Locale.ROOT);
+			if (!query.isBlank()) {
+				options = options.stream().filter(o -> safeText(o.label()).toLowerCase(Locale.ROOT).contains(query)).toList();
+			}
+			existingList.getItems().setAll(options);
+			if (!options.isEmpty()) {
+				existingList.getSelectionModel().selectFirst();
 			}
 		};
 
-		searchField.textProperty().addListener((obs, oldVal, newVal) -> {
-			String q = safeText(newVal).toLowerCase(Locale.ROOT);
-			if (q.isBlank()) {
-				refreshStep3.run();
-				return;
+		javafx.beans.property.IntegerProperty currentStep = new javafx.beans.property.SimpleIntegerProperty(1);
+		Runnable refreshCreateFields = () -> {
+			createGrid.getChildren().clear();
+			if (contactRadio.isSelected()) {
+				createGrid.add(new Label("First Name"), 0, 0);
+				createGrid.add(firstNameField, 1, 0);
+				createGrid.add(new Label("Last Name"), 0, 1);
+				createGrid.add(lastNameField, 1, 1);
+			} else {
+				createGrid.add(new Label("Name"), 0, 0);
+				createGrid.add(organizationNameField, 1, 0);
 			}
-			List<PartyEntityOption> filtered = existingList.getItems().stream()
-					.filter(o -> safeText(o.label()).toLowerCase(Locale.ROOT).contains(q))
-					.toList();
-			existingList.getItems().setAll(filtered);
-			if (!existingList.getItems().isEmpty()) {
-				existingList.getSelectionModel().selectFirst();
+		};
+
+		Runnable refreshWizardUi = () -> {
+			int step = currentStep.get();
+			boolean createNew = createNewRadio.isSelected();
+			setVisibleManaged(step1Pane, step == 1);
+			setVisibleManaged(step2Pane, step == 2);
+			setVisibleManaged(step3CreatePane, step == 3 && createNew);
+			setVisibleManaged(step3SelectPane, step == 3 && !createNew);
+			refreshCreateFields.run();
+			if (step == 3 && !createNew) {
+				loadExistingOptions.run();
+			}
+			dialog.setResizable(step == 3);
+			if (step < 3) {
+				dialog.getDialogPane().setPrefHeight(220);
+			} else if (createNew) {
+				dialog.getDialogPane().setPrefHeight(300);
+			} else {
+				dialog.getDialogPane().setPrefHeight(560);
+			}
+		};
+
+		Node backButton = dialog.getDialogPane().lookupButton(backType);
+		Node nextButton = dialog.getDialogPane().lookupButton(nextType);
+		Node addButton = dialog.getDialogPane().lookupButton(addType);
+		setVisibleManaged(backButton, false);
+		setVisibleManaged(addButton, false);
+
+		backButton.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+			e.consume();
+			if (currentStep.get() > 1) {
+				currentStep.set(currentStep.get() - 1);
+				refreshWizardUi.run();
+			}
+		});
+		nextButton.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+			e.consume();
+			if (currentStep.get() < 3) {
+				currentStep.set(currentStep.get() + 1);
+				refreshWizardUi.run();
 			}
 		});
 
-		modeChoice.getSelectionModel().selectedItemProperty().addListener((obs, ov, nv) -> refreshStep3.run());
-		entityTypeChoice.getSelectionModel().selectedItemProperty().addListener((obs, ov, nv) -> refreshStep3.run());
-		refreshStep3.run();
+		Runnable refreshButtonState = () -> {
+			int step = currentStep.get();
+			boolean createNew = createNewRadio.isSelected();
+			setVisibleManaged(backButton, step > 1);
+			setVisibleManaged(nextButton, step < 3);
+			setVisibleManaged(addButton, step == 3);
 
-		Node addButton = dialog.getDialogPane().lookupButton(saveType);
-		addButton.disableProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(() -> {
-			boolean createNew = "Create New".equalsIgnoreCase(modeChoice.getValue());
-			boolean isContact = "Contact".equalsIgnoreCase(entityTypeChoice.getValue());
+			if (step == 1) {
+				nextButton.setDisable(modeGroup.getSelectedToggle() == null);
+				addButton.setDisable(true);
+				return;
+			}
+			if (step == 2) {
+				nextButton.setDisable(entityGroup.getSelectedToggle() == null);
+				addButton.setDisable(true);
+				return;
+			}
+
+			nextButton.setDisable(true);
 			if (roleChoice.getValue() == null || sideChoice.getValue() == null) {
-				return true;
+				addButton.setDisable(true);
+				return;
 			}
 			if (createNew) {
-				if (isContact) {
-					return safeText(firstNameField.getText()).isBlank() && safeText(lastNameField.getText()).isBlank();
+				if (contactRadio.isSelected()) {
+					addButton.setDisable(safeText(firstNameField.getText()).isBlank() && safeText(lastNameField.getText()).isBlank());
+				} else {
+					addButton.setDisable(safeText(organizationNameField.getText()).isBlank());
 				}
-				return safeText(organizationNameField.getText()).isBlank();
+			} else {
+				addButton.setDisable(existingList.getSelectionModel().getSelectedItem() == null);
 			}
-			return existingList.getSelectionModel().getSelectedItem() == null;
-		}, modeChoice.valueProperty(), entityTypeChoice.valueProperty(), roleChoice.valueProperty(), sideChoice.valueProperty(), firstNameField.textProperty(), lastNameField.textProperty(), organizationNameField.textProperty(), existingList.getSelectionModel().selectedItemProperty()));
+		};
+
+		modeGroup.selectedToggleProperty().addListener((obs, ov, nv) -> { refreshWizardUi.run(); refreshButtonState.run(); });
+		entityGroup.selectedToggleProperty().addListener((obs, ov, nv) -> { refreshWizardUi.run(); refreshButtonState.run(); });
+		roleChoice.valueProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
+		sideChoice.valueProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
+		firstNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
+		lastNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
+		organizationNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
+		searchField.textProperty().addListener((obs, ov, nv) -> { if (currentStep.get() == 3 && selectExistingRadio.isSelected()) loadExistingOptions.run(); refreshButtonState.run(); });
+		existingList.getSelectionModel().selectedItemProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
+		currentStep.addListener((obs, ov, nv) -> refreshButtonState.run());
+
+		createNewRadio.setSelected(false);
+		selectExistingRadio.setSelected(true);
+		contactRadio.setSelected(true);
+		refreshWizardUi.run();
+		refreshButtonState.run();
 
 		dialog.setResultConverter(button -> {
-			if (button != saveType) {
+			if (button != addType) {
 				return null;
 			}
-			boolean createNew = "Create New".equalsIgnoreCase(modeChoice.getValue());
-			boolean isContact = "Contact".equalsIgnoreCase(entityTypeChoice.getValue());
+			boolean createNew = createNewRadio.isSelected();
+			boolean isContact = contactRadio.isSelected();
 			PartyRoleOption role = roleChoice.getValue();
 			PartySideOption side = sideChoice.getValue();
 			if (role == null || side == null) {
@@ -1708,8 +1787,8 @@ public class CaseController {
 					null,
 					role.id,
 					side.value,
-					primaryCheck.isSelected(),
-					notesArea.getText(),
+					false,
+					null,
 					true,
 					firstNameField.getText(),
 					lastNameField.getText(),
