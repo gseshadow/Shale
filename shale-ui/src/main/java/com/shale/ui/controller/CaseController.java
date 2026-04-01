@@ -392,8 +392,6 @@ public class CaseController {
 			"Tasks",
 			"Timeline",
 			"Details",
-			"Contacts",
-			"Organizations",
 			"Documents"
 	);
 
@@ -845,8 +843,6 @@ public class CaseController {
 		case "Tasks" -> showTasksTab();
 		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
-		case "Contacts" -> showContacts();
-		case "Organizations" -> showOrganizations();
 		default -> showGeneric(sectionName);
 		}
 	}
@@ -1762,16 +1758,9 @@ public class CaseController {
 	}
 
 	private void onAddRelatedEntity() {
-		String section = genericTitleLabel == null ? "" : safe(genericTitleLabel.getText());
-		if ("Parties".equalsIgnoreCase(section)) {
+		if (isSectionActive("Parties")) {
 			onAddParty();
-			return;
 		}
-		if ("Contacts".equalsIgnoreCase(section)) {
-			onAddContact();
-			return;
-		}
-		onAddOrganization();
 	}
 
 	private void onAddContact() {
