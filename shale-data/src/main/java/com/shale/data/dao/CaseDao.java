@@ -1094,9 +1094,6 @@ public final class CaseDao {
 					  callerContact.PrimaryCallerContactId,
 					  callerContact.CallerName,
 
-					  clientContact.PrimaryClientContactId,
-					  clientContact.ClientName AS ClientName,
-
 					  oppContact.PrimaryOpposingCounselContactId,
 					  oppContact.FullName AS OpposingCounselName
 
