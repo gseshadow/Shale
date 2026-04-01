@@ -59,8 +59,6 @@ public final class ContactViewController {
     @FXML private DatePicker dateOfBirthEditor;
     @FXML private Label conditionValue;
     @FXML private TextArea conditionEditor;
-    @FXML private Label clientValue;
-    @FXML private CheckBox clientEditor;
     @FXML private Label deceasedValue;
     @FXML private CheckBox deceasedEditor;
 
@@ -202,7 +200,7 @@ public final class ContactViewController {
                 dateOfBirthEditor == null ? null : dateOfBirthEditor.getValue(),
                 safeText(conditionEditor == null ? null : conditionEditor.getText()),
                 deceasedEditor != null && deceasedEditor.isSelected(),
-                clientEditor != null && clientEditor.isSelected());
+                currentContact.client());
 
         setBusy(true);
         dbExec.submit(() -> {
@@ -353,9 +351,6 @@ public final class ContactViewController {
         if (conditionValue != null) {
             conditionValue.setText(fallback(currentContact.condition()));
         }
-        if (clientValue != null) {
-            clientValue.setText(booleanLabel(currentContact.client()));
-        }
         if (deceasedValue != null) {
             deceasedValue.setText(booleanLabel(currentContact.deceased()));
         }
@@ -390,9 +385,6 @@ public final class ContactViewController {
         }
         if (conditionEditor != null) {
             conditionEditor.setText(safe(currentContact.condition()));
-        }
-        if (clientEditor != null) {
-            clientEditor.setSelected(currentContact.client());
         }
         if (deceasedEditor != null) {
             deceasedEditor.setSelected(currentContact.deceased());
@@ -471,7 +463,6 @@ public final class ContactViewController {
         toggleField(addressHomeValue, addressHomeEditor, editMode);
         toggleField(dateOfBirthValue, dateOfBirthEditor, editMode);
         toggleField(conditionValue, conditionEditor, editMode);
-        toggleField(clientValue, clientEditor, editMode);
         toggleField(deceasedValue, deceasedEditor, editMode);
     }
 

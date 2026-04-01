@@ -35,7 +35,6 @@ import javafx.stage.Window;
 public final class OrganizationController {
 
 	@FXML private Label organizationTitleLabel;
-	@FXML private Label organizationTypeLabel;
 	@FXML private Label lastUpdatedLabel;
 	@FXML private Label errorLabel;
 	@FXML private Button editButton;
@@ -467,7 +466,6 @@ public final class OrganizationController {
 
 		organizationTitleLabel.setText(fallback(o.getName()));
 		String type = fallback(o.getOrganizationTypeName());
-		organizationTypeLabel.setText("Type: " + type);
 		typeValue.setText(type);
 		nameValue.setText(fallback(o.getName()));
 		phoneValue.setText(fallback(o.getPhone()));
