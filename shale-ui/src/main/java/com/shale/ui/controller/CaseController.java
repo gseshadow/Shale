@@ -30,6 +30,8 @@ import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.ui.component.ContactCard;
+import com.shale.ui.component.OrganizationCard;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.document.CaseDocumentExportService;
 import com.shale.ui.document.CaseDocumentFormat;
@@ -1133,6 +1135,7 @@ public class CaseController {
 	}
 
 	private Node createPartyEntityCard(CasePartyDto party) {
+		final double partiesCardWidth = 300;
 		String entityType = safeText(party.getEntityType()).trim().toLowerCase(Locale.ROOT);
 		if ("organization".equals(entityType) && party.getOrganizationId() != null) {
 			OrganizationCardFactory factory = organizationCardFactory != null
@@ -1155,7 +1158,13 @@ public class CaseController {
 					null,
 					null
 			);
-			return factory.create(model, OrganizationCardFactory.Variant.COMPACT);
+			OrganizationCard card = factory.create(model, OrganizationCardFactory.Variant.COMPACT);
+			card.setSuppressPlaceholderLines(true);
+			card.applyCompact();
+			card.setMinWidth(partiesCardWidth);
+			card.setPrefWidth(partiesCardWidth);
+			card.setMaxWidth(partiesCardWidth);
+			return card;
 		}
 
 		if ("contact".equals(entityType) && party.getContactId() != null) {
@@ -1170,7 +1179,13 @@ public class CaseController {
 					null,
 					null
 			);
-			return factory.create(model, ContactCardFactory.Variant.COMPACT);
+			ContactCard card = factory.create(model, ContactCardFactory.Variant.COMPACT);
+			card.setSuppressPlaceholderLines(true);
+			card.applyCompact();
+			card.setMinWidth(partiesCardWidth);
+			card.setPrefWidth(partiesCardWidth);
+			card.setMaxWidth(partiesCardWidth);
+			return card;
 		}
 
 		Label fallback = new Label(safeText(party.getDisplayName()).isBlank() ? "—" : safeText(party.getDisplayName()));
