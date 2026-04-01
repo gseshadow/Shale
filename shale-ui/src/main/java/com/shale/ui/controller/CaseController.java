@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTimelineEventDto;
@@ -73,6 +74,7 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
@@ -83,6 +85,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.Node;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -383,6 +386,7 @@ public class CaseController {
 
 	private static final List<String> SECTIONS = List.of(
 			"Overview",
+			"Parties",
 			"Tasks",
 			"Timeline",
 			"Details",
@@ -468,6 +472,7 @@ public class CaseController {
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
 	private List<CaseDao.RelatedContactRow> relatedContacts = List.of();
 	private List<CaseDao.RelatedOrganizationRow> relatedOrganizations = List.of();
+	private List<CasePartyDto> caseParties = List.of();
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private Long editingCaseUpdateId;
@@ -489,6 +494,11 @@ public class CaseController {
 	private CaseDetailsDraft detailsDraft;
 	private CaseDetailsDraft detailsBaseline;
 	private CaseDetailsDraft detailsLocalViewOverride;
+
+	private record PartyRoleOption(long id, String label) {}
+	private record PartyEntityOption(String entityType, Long id, String label) {}
+	private record PartySideOption(String label, String value) {}
+	private record PartyEditorResult(String entityType, Long entityId, long partyRoleId, String side, boolean primary, String notes) {}
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -828,6 +838,7 @@ public class CaseController {
 		setActiveSectionButton(sectionName);
 		switch (sectionName) {
 		case "Overview" -> showOverview();
+		case "Parties" -> showParties();
 		case "Tasks" -> showTasksTab();
 		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
@@ -931,6 +942,31 @@ public class CaseController {
 		loadCaseTimelineEventsAsync();
 	}
 
+	private void showParties() {
+		setUpdatesPaneVisible(false);
+		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, true);
+		setPaneVisible(tasksPanel, false);
+
+		if (genericTitleLabel != null)
+			genericTitleLabel.setText("Parties");
+
+		setVisibleManaged(addOrganizationButton, true);
+		if (addOrganizationButton != null) {
+			addOrganizationButton.setText("Add Party");
+		}
+		setVisibleManaged(placeholderTextArea, false);
+		setVisibleManaged(organizationsScrollPane, false);
+		setVisibleManaged(organizationsFlow, false);
+		setVisibleManaged(organizationsEmptyLabel, false);
+		setVisibleManaged(timelineScrollPane, true);
+		setVisibleManaged(timelineListBox, true);
+		setVisibleManaged(timelineEmptyLabel, false);
+		renderPartiesSection();
+	}
+
 	private void loadCaseTimelineEventsAsync() {
 		if (caseDao == null || caseId == null) {
 			renderTimelineEvents(List.of());
@@ -1005,6 +1041,419 @@ public class CaseController {
 		card.setPadding(new Insets(10, 12, 10, 12));
 		card.getStyleClass().add("secondary-panel");
 		return card;
+	}
+
+	private void renderPartiesSection() {
+		if (timelineListBox == null)
+			return;
+
+		boolean partiesSectionActive = isSectionActive("Parties");
+		timelineListBox.getChildren().clear();
+		List<CasePartyDto> safeParties = caseParties == null ? List.of() : caseParties;
+		if (safeParties.isEmpty()) {
+			if (partiesSectionActive) {
+				if (timelineEmptyLabel != null)
+					timelineEmptyLabel.setText("No parties yet.");
+				setVisibleManaged(timelineEmptyLabel, true);
+			}
+			return;
+		}
+
+		if (partiesSectionActive) {
+			setVisibleManaged(timelineEmptyLabel, false);
+		}
+
+		Map<String, List<CasePartyDto>> grouped = safeParties.stream()
+				.filter(Objects::nonNull)
+				.collect(Collectors.groupingBy(
+						p -> normalizedPartySideKey(p.getSide()),
+						LinkedHashMap::new,
+						Collectors.toList()));
+
+		List<String> sideOrder = List.of("represented", "opposing", "neutral", "unclassified");
+		for (String sideKey : sideOrder) {
+			List<CasePartyDto> group = grouped.get(sideKey);
+			if (group == null || group.isEmpty()) {
+				continue;
+			}
+
+			Label heading = new Label(toPartySideLabel(sideKey));
+			heading.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-opacity: 0.92;");
+			timelineListBox.getChildren().add(heading);
+
+			List<CasePartyDto> sorted = group.stream()
+					.sorted((a, b) -> {
+						int primaryCompare = Boolean.compare(b.isPrimary(), a.isPrimary());
+						if (primaryCompare != 0)
+							return primaryCompare;
+						return safeText(a.getDisplayName()).compareToIgnoreCase(safeText(b.getDisplayName()));
+					})
+					.toList();
+
+			for (CasePartyDto party : sorted) {
+				timelineListBox.getChildren().add(createPartyCard(party));
+			}
+		}
+	}
+
+	private Node createPartyCard(CasePartyDto party) {
+		String displayName = safeText(party.getDisplayName()).isBlank() ? "—" : safeText(party.getDisplayName());
+		String entityLabel = toEntityLabel(party.getEntityType());
+		String roleLabel = toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId());
+		String sideLabel = toPartySideLabel(normalizedPartySideKey(party.getSide()));
+		String notes = safeText(party.getNotes()).trim();
+		String titleSuffix = party.isPrimary() ? " • Primary" : "";
+
+		Node summaryCard = createPartyEntityCard(party, roleLabel + " • " + sideLabel + titleSuffix);
+
+		Label metaLabel = new Label(entityLabel + " • " + roleLabel + " • " + sideLabel + titleSuffix);
+		metaLabel.setStyle("-fx-opacity: 0.86;");
+		metaLabel.setWrapText(true);
+
+		VBox content = new VBox(6, summaryCard, metaLabel);
+		if (!notes.isBlank()) {
+			Label notesLabel = new Label(notes);
+			notesLabel.setWrapText(true);
+			notesLabel.setStyle("-fx-opacity: 0.9;");
+			content.getChildren().add(notesLabel);
+		}
+
+		Button editButton = new Button("Edit");
+		editButton.getStyleClass().add("button-secondary");
+		editButton.setOnAction(e -> onEditParty(party));
+
+		Button removeButton = new Button("Remove");
+		removeButton.getStyleClass().add("button-secondary");
+		removeButton.setOnAction(e -> onRemoveParty(party));
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox actions = new HBox(8, spacer, editButton, removeButton);
+
+		VBox card = new VBox(6, content, actions);
+		card.setPadding(new Insets(10, 12, 10, 12));
+		card.getStyleClass().add("secondary-panel");
+		return card;
+	}
+
+	private Node createPartyEntityCard(CasePartyDto party, String subtitle) {
+		String entityType = safeText(party.getEntityType()).trim().toLowerCase(Locale.ROOT);
+		if ("organization".equals(entityType) && party.getOrganizationId() != null) {
+			OrganizationCardFactory factory = organizationCardFactory != null
+					? organizationCardFactory
+					: new OrganizationCardFactory(this::openOrganization);
+			OrganizationCardFactory.OrganizationCardModel model = new OrganizationCardFactory.OrganizationCardModel(
+					party.getOrganizationId().intValue(),
+					safeText(party.getDisplayName()),
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					subtitle,
+					null
+			);
+			return factory.create(model, OrganizationCardFactory.Variant.COMPACT);
+		}
+
+		if ("contact".equals(entityType) && party.getContactId() != null) {
+			ContactCardFactory factory = contactCardFactory != null
+					? contactCardFactory
+					: new ContactCardFactory(onOpenContact == null ? id -> {
+					} : onOpenContact);
+			ContactCardFactory.ContactCardModel model = new ContactCardFactory.ContactCardModel(
+					party.getContactId().intValue(),
+					safeText(party.getDisplayName()),
+					subtitle,
+					null,
+					null
+			);
+			return factory.create(model, ContactCardFactory.Variant.FULL);
+		}
+
+		Label fallback = new Label(safeText(party.getDisplayName()).isBlank() ? "—" : safeText(party.getDisplayName()));
+		fallback.setStyle("-fx-font-weight: bold;");
+		fallback.setWrapText(true);
+		return fallback;
+	}
+
+	private String normalizedPartySideKey(String side) {
+		String normalized = safeText(side).trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+			case "represented" -> "represented";
+			case "opposing" -> "opposing";
+			case "neutral" -> "neutral";
+			default -> "unclassified";
+		};
+	}
+
+	private String toPartySideLabel(String sideKey) {
+		return switch (safeText(sideKey).trim().toLowerCase(Locale.ROOT)) {
+			case "represented" -> "Represented";
+			case "opposing" -> "Opposing";
+			case "neutral" -> "Neutral";
+			default -> "Unclassified";
+		};
+	}
+
+	private String toEntityLabel(String entityType) {
+		return switch (safeText(entityType).trim().toLowerCase(Locale.ROOT)) {
+			case "organization" -> "Organization";
+			case "contact" -> "Contact";
+			default -> "Party";
+		};
+	}
+
+	private String toPartyRoleLabel(String roleName, long roleId) {
+		String normalized = safeText(roleName).trim().replace('_', ' ');
+		if (normalized.isBlank()) {
+			return "Role " + roleId;
+		}
+		String[] tokens = normalized.split("\\s+");
+		for (int i = 0; i < tokens.length; i++) {
+			String token = tokens[i];
+			if (token.isBlank()) {
+				continue;
+			}
+			tokens[i] = token.substring(0, 1).toUpperCase(Locale.ROOT) + token.substring(1).toLowerCase(Locale.ROOT);
+		}
+		return String.join(" ", tokens);
+	}
+
+	private void onAddParty() {
+		if (caseDao == null || caseId == null || appState == null || appState.getShaleClientId() <= 0)
+			return;
+		PartyEditorResult result = showPartyEditorDialog(null);
+		if (result == null)
+			return;
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				caseDao.addCaseParty(
+						activeCaseId,
+						result.entityType.equals("contact") ? result.entityId : null,
+						result.entityType.equals("organization") ? result.entityId : null,
+						result.partyRoleId,
+						result.side,
+						result.primary,
+						result.notes);
+				runOnFx(this::refreshPartiesSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to add party. " + ex.getMessage()));
+			}
+		}, "case-add-party-" + activeCaseId).start();
+	}
+
+	private void onEditParty(CasePartyDto party) {
+		if (party == null || caseDao == null || caseId == null)
+			return;
+		PartyEditorResult result = showPartyEditorDialog(party);
+		if (result == null)
+			return;
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				caseDao.updateCaseParty(
+						party.getId(),
+						activeCaseId,
+						result.entityType.equals("contact") ? result.entityId : null,
+						result.entityType.equals("organization") ? result.entityId : null,
+						result.partyRoleId,
+						result.side,
+						result.primary,
+						result.notes);
+				runOnFx(this::refreshPartiesSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to update party. " + ex.getMessage()));
+			}
+		}, "case-edit-party-" + activeCaseId + "-" + party.getId()).start();
+	}
+
+	private void onRemoveParty(CasePartyDto party) {
+		if (party == null || caseDao == null || caseId == null)
+			return;
+		boolean confirmed = AppDialogs.showConfirmation(
+				organizationDialogOwner(),
+				"Remove Party",
+				"Remove this party from the case?",
+				safeText(party.getDisplayName()),
+				"Remove Party",
+				AppDialogs.DialogActionKind.DANGER);
+		if (!confirmed)
+			return;
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				caseDao.removeCaseParty(party.getId());
+				runOnFx(this::refreshPartiesSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to remove party. " + ex.getMessage()));
+			}
+		}, "case-remove-party-" + activeCaseId + "-" + party.getId()).start();
+	}
+
+	private void refreshPartiesSectionAsync() {
+		if (caseDao == null || caseId == null)
+			return;
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				List<CasePartyDto> refreshed = caseDao.listCaseParties(activeCaseId);
+				runOnFx(() -> {
+					caseParties = refreshed == null ? List.of() : refreshed;
+					renderPartiesSection();
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to refresh parties for this case."));
+			}
+		}, "case-refresh-parties-" + activeCaseId).start();
+	}
+
+	private PartyEditorResult showPartyEditorDialog(CasePartyDto existing) {
+		if (appState == null || appState.getShaleClientId() <= 0 || caseId == null || caseId <= 0) {
+			showError("Unable to edit parties without an active client/case context.");
+			return null;
+		}
+		List<CaseDao.PartyRoleRow> partyRoles = caseDao.listPartyRoles();
+		List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(appState.getShaleClientId());
+		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
+
+		Dialog<PartyEditorResult> dialog = new Dialog<>();
+		dialog.setTitle(existing == null ? "Add Party" : "Edit Party");
+		dialog.initOwner(organizationDialogOwner());
+		ButtonType saveType = new ButtonType(existing == null ? "Add" : "Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+
+		ChoiceBox<String> entityTypeChoice = new ChoiceBox<>();
+		entityTypeChoice.getItems().addAll("Contact", "Organization");
+
+		ChoiceBox<PartyEntityOption> entityChoice = new ChoiceBox<>();
+		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
+		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
+		sideChoice.getItems().addAll(
+				new PartySideOption("Represented", "represented"),
+				new PartySideOption("Opposing", "opposing"),
+				new PartySideOption("Neutral", "neutral"),
+				new PartySideOption("Unclassified", null)
+		);
+		sideChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
+			@Override public PartySideOption fromString(String string) { return null; }
+		});
+
+		CheckBox primaryCheck = new CheckBox("Primary");
+		TextArea notesArea = new TextArea();
+		notesArea.setPrefRowCount(3);
+		notesArea.setWrapText(true);
+
+		partyRoles.stream()
+				.map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id())))
+				.forEach(roleChoice.getItems()::add);
+		roleChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartyRoleOption object) { return object == null ? "" : object.label; }
+			@Override public PartyRoleOption fromString(String string) { return null; }
+		});
+		entityChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartyEntityOption object) { return object == null ? "" : object.label; }
+			@Override public PartyEntityOption fromString(String string) { return null; }
+		});
+
+		Runnable loadEntities = () -> {
+			String selectedType = entityTypeChoice.getValue();
+			entityChoice.getItems().clear();
+			if ("Organization".equalsIgnoreCase(selectedType)) {
+				for (CaseDao.SelectableOrganizationRow org : organizations) {
+					entityChoice.getItems().add(new PartyEntityOption("organization", Long.valueOf(org.id()), safeText(org.name())));
+				}
+			} else {
+				for (CaseDao.ContactRow contact : contacts) {
+					entityChoice.getItems().add(new PartyEntityOption("contact", Long.valueOf(contact.id()), safeText(contact.displayName())));
+				}
+			}
+			if (!entityChoice.getItems().isEmpty()) {
+				entityChoice.setValue(entityChoice.getItems().get(0));
+			}
+		};
+		entityTypeChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> loadEntities.run());
+
+		if (existing == null) {
+			entityTypeChoice.setValue("Contact");
+			loadEntities.run();
+			if (!roleChoice.getItems().isEmpty())
+				roleChoice.setValue(roleChoice.getItems().get(0));
+			sideChoice.setValue(sideChoice.getItems().get(3));
+		} else {
+			entityTypeChoice.setValue("organization".equalsIgnoreCase(existing.getEntityType()) ? "Organization" : "Contact");
+			loadEntities.run();
+			entityChoice.getItems().stream()
+					.filter(o -> Objects.equals(o.entityType, safeText(existing.getEntityType()).toLowerCase(Locale.ROOT))
+							&& Objects.equals(o.id, "organization".equalsIgnoreCase(existing.getEntityType()) ? existing.getOrganizationId() : existing.getContactId()))
+					.findFirst()
+					.ifPresent(entityChoice::setValue);
+			roleChoice.getItems().stream()
+					.filter(r -> r.id == existing.getPartyRoleId())
+					.findFirst()
+					.ifPresent(roleChoice::setValue);
+			sideChoice.getItems().stream()
+					.filter(s -> Objects.equals(s.value, normalizeSideForStorage(existing.getSide())))
+					.findFirst()
+					.ifPresentOrElse(sideChoice::setValue, () -> sideChoice.setValue(sideChoice.getItems().get(3)));
+			primaryCheck.setSelected(existing.isPrimary());
+			notesArea.setText(safeText(existing.getNotes()));
+		}
+
+		GridPane grid = new GridPane();
+		grid.setHgap(10);
+		grid.setVgap(10);
+		grid.add(new Label("Entity Type"), 0, 0);
+		grid.add(entityTypeChoice, 1, 0);
+		grid.add(new Label("Entity"), 0, 1);
+		grid.add(entityChoice, 1, 1);
+		grid.add(new Label("Party Role"), 0, 2);
+		grid.add(roleChoice, 1, 2);
+		grid.add(new Label("Side"), 0, 3);
+		grid.add(sideChoice, 1, 3);
+		grid.add(primaryCheck, 1, 4);
+		grid.add(new Label("Notes"), 0, 5);
+		grid.add(notesArea, 1, 5);
+		dialog.getDialogPane().setContent(grid);
+
+		Node saveButton = dialog.getDialogPane().lookupButton(saveType);
+		saveButton.disableProperty().bind(
+				entityChoice.valueProperty().isNull()
+						.or(roleChoice.valueProperty().isNull())
+						.or(sideChoice.valueProperty().isNull())
+		);
+
+		dialog.setResultConverter(button -> {
+			if (button != saveType)
+				return null;
+			PartyEntityOption entity = entityChoice.getValue();
+			PartyRoleOption role = roleChoice.getValue();
+			PartySideOption side = sideChoice.getValue();
+			if (entity == null || role == null || side == null)
+				return null;
+			return new PartyEditorResult(entity.entityType, entity.id, role.id, side.value, primaryCheck.isSelected(), notesArea.getText());
+		});
+
+		return dialog.showAndWait().orElse(null);
+	}
+
+	private static String normalizeSideForStorage(String side) {
+		String normalized = side == null ? "" : side.trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+			case "represented", "opposing", "neutral" -> normalized;
+			default -> null;
+		};
 	}
 
 
@@ -1283,6 +1732,10 @@ public class CaseController {
 
 	private void onAddRelatedEntity() {
 		String section = genericTitleLabel == null ? "" : safe(genericTitleLabel.getText());
+		if ("Parties".equalsIgnoreCase(section)) {
+			onAddParty();
+			return;
+		}
 		if ("Contacts".equalsIgnoreCase(section)) {
 			onAddContact();
 			return;
@@ -2098,6 +2551,7 @@ public class CaseController {
 			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
 			List<CaseDao.RelatedContactRow> loadedContacts = List.of();
 			List<CaseDao.RelatedOrganizationRow> loadedOrganizations = List.of();
+			List<CasePartyDto> loadedParties = List.of();
 			try {
 				loadedContacts = caseDao.findRelatedContacts(activeCaseId);
 			} catch (Exception contactLoadError) {
@@ -2108,8 +2562,14 @@ public class CaseController {
 			} catch (Exception orgLoadError) {
 				System.err.println("Case organizations load failed for caseId=" + activeCaseId + ": " + orgLoadError.getMessage());
 			}
+			try {
+				loadedParties = caseDao.listCaseParties(activeCaseId);
+			} catch (Exception partiesLoadError) {
+				System.err.println("Case parties load failed for caseId=" + activeCaseId + ": " + partiesLoadError.getMessage());
+			}
 			final List<CaseDao.RelatedContactRow> contacts = loadedContacts;
 			final List<CaseDao.RelatedOrganizationRow> organizations = loadedOrganizations;
+			final List<CasePartyDto> parties = loadedParties;
 
 			runOnFx(() ->
 			{
@@ -2125,6 +2585,8 @@ public class CaseController {
 
 				relatedOrganizations = organizations == null ? List.of() : organizations;
 				renderOrganizationsSection();
+				caseParties = parties == null ? List.of() : parties;
+				renderPartiesSection();
 
 				current = detail;
 				detailsLocalViewOverride = null;
@@ -2354,8 +2816,10 @@ public class CaseController {
 		currentOverview = null;
 		relatedContacts = List.of();
 		relatedOrganizations = List.of();
+		caseParties = List.of();
 		renderContactsSection();
 		renderOrganizationsSection();
+		renderPartiesSection();
 		refreshDeleteAction();
 		navigateAfterDelete();
 	}
