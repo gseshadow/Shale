@@ -592,7 +592,20 @@ public final class OrganizationController {
 			region.setMaxWidth(Double.MAX_VALUE);
 			region.setPrefWidth(330);
 		}
-		return card;
+		Label relationshipMeta = new Label(formatRelationshipMeta(row.partyRoleName(), row.side(), row.primary()));
+		relationshipMeta.getStyleClass().add("muted");
+		relationshipMeta.setWrapText(true);
+		return new VBox(4, card, relationshipMeta);
+	}
+
+	private static String formatRelationshipMeta(String roleName, String side, boolean primary) {
+		String role = safe(roleName).isBlank() ? "Relationship" : safe(roleName).trim();
+		String sideLabel = safe(side).isBlank() ? "unclassified" : safe(side).trim();
+		return primary ? role + " • " + sideLabel + " • primary" : role + " • " + sideLabel;
+	}
+
+	private static String safe(String value) {
+		return value == null ? "" : value;
 	}
 
 	private void resetRelatedCaseControls() {

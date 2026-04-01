@@ -441,8 +441,18 @@ public final class ContactViewController {
             region.setMaxWidth(Double.MAX_VALUE);
             region.setPrefWidth(300);
         }
-        VBox.setVgrow(card, javafx.scene.layout.Priority.NEVER);
-        return card;
+        Label relationshipMeta = new Label(formatRelationshipMeta(row.partyRoleName(), row.side(), row.primary()));
+        relationshipMeta.getStyleClass().add("muted");
+        relationshipMeta.setWrapText(true);
+        VBox container = new VBox(4, card, relationshipMeta);
+        VBox.setVgrow(container, javafx.scene.layout.Priority.NEVER);
+        return container;
+    }
+
+    private static String formatRelationshipMeta(String roleName, String side, boolean primary) {
+        String role = safe(roleName).isBlank() ? "Relationship" : safe(roleName).trim();
+        String sideLabel = safe(side).isBlank() ? "unclassified" : safe(side).trim();
+        return primary ? role + " • " + sideLabel + " • primary" : role + " • " + sideLabel;
     }
 
     private void setEditMode(boolean enabled) {
