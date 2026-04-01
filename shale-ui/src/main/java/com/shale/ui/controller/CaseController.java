@@ -501,6 +501,7 @@ public class CaseController {
 	private record PartyEntityOption(String entityType, Long id, String label) {}
 	private record PartySideOption(String label, String value) {}
 	private record PartyEditorResult(String entityType, Long entityId, long partyRoleId, String side, boolean primary, String notes) {}
+	private record CallerPartySelection(Integer contactId, String displayName) {}
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -2608,8 +2609,6 @@ public class CaseController {
 					return;
 				}
 
-				applyOverviewEditSafe(overview);
-
 				relatedContacts = contacts == null ? List.of() : contacts;
 				renderContactsSection();
 
@@ -2617,6 +2616,8 @@ public class CaseController {
 				renderOrganizationsSection();
 				caseParties = parties == null ? List.of() : parties;
 				renderPartiesSection();
+				CaseOverviewDto effectiveOverview = applyCallerFromCaseParties(overview, caseParties);
+				applyOverviewEditSafe(effectiveOverview);
 
 				current = detail;
 				detailsLocalViewOverride = null;
@@ -2654,6 +2655,72 @@ public class CaseController {
 			} catch (Exception ignored) {
 			}
 		}, "case-refresh-last-updated-" + activeCaseId).start();
+	}
+
+	private CaseOverviewDto applyCallerFromCaseParties(CaseOverviewDto overview, List<CasePartyDto> parties) {
+		if (overview == null) {
+			return null;
+		}
+		CallerPartySelection caller = resolveCallerFromCaseParties(parties);
+		if (caller == null) {
+			return overview;
+		}
+		if (Objects.equals(overview.getPrimaryCallerContactId(), caller.contactId())
+				&& Objects.equals(safeText(overview.getCaller()), safeText(caller.displayName()))) {
+			return overview;
+		}
+
+		return new CaseOverviewDto(
+				overview.getCaseId(),
+				overview.getCaseNumber(),
+				overview.getCaseName(),
+				overview.getCaseStatus(),
+				overview.getPrimaryStatusId(),
+				overview.getPrimaryStatusColor(),
+				overview.getResponsibleAttorneyUserId(),
+				overview.getResponsibleAttorney(),
+				overview.getResponsibleAttorneyColor(),
+				overview.getPracticeAreaId(),
+				overview.getPracticeArea(),
+				overview.getPracticeAreaColor(),
+				overview.getIntakeDate(),
+				overview.getIncidentDate(),
+				overview.getSolDate(),
+				caller.contactId(),
+				overview.getPrimaryClientContactId(),
+				overview.getPrimaryOpposingCounselContactId(),
+				caller.displayName(),
+				overview.getClient(),
+				overview.getClients(),
+				overview.getOpposingCounsel(),
+				overview.getTeam(),
+				overview.getDescription());
+	}
+
+	private CallerPartySelection resolveCallerFromCaseParties(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return null;
+		}
+		CasePartyDto firstFallback = null;
+		for (CasePartyDto party : parties) {
+			if (party == null || party.getContactId() == null) {
+				continue;
+			}
+			String role = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
+			if (!"caller".equals(role)) {
+				continue;
+			}
+			if (party.isPrimary()) {
+				return new CallerPartySelection(party.getContactId().intValue(), safeText(party.getDisplayName()));
+			}
+			if (firstFallback == null) {
+				firstFallback = party;
+			}
+		}
+		if (firstFallback == null) {
+			return null;
+		}
+		return new CallerPartySelection(firstFallback.getContactId().intValue(), safeText(firstFallback.getDisplayName()));
 	}
 
 	private void applyLastUpdatedLabel(LocalDateTime updatedAt) {
@@ -4670,8 +4737,8 @@ public class CaseController {
 
 			if (computation.callerChanged()) {
 				requireTenant(request.tenantId());
-				caseDao.setPrimaryCaseContact(
-						request.saveCaseId(), request.tenantId(), ROLE_CASECONTACT_CALLER, request.desired().desiredCallerContactId(), request.userId(), null
+				caseDao.setPrimaryCasePartyCaller(
+						request.saveCaseId(), request.tenantId(), request.desired().desiredCallerContactId(), request.userId(), null
 				);
 			}
 

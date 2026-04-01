@@ -35,6 +35,7 @@ public final class CaseDao {
 
 	// CaseUsers.RoleId (int) for Responsible Attorney
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+	private static final String PARTY_ROLE_NAME_CALLER = "caller";
 
 	public static final class CaseTimelineEventTypes {
 		public static final String CASE_CREATED = "CASE_CREATED";
@@ -3146,6 +3147,112 @@ public final class CaseDao {
 					"Failed to set primary case contact (caseId=" + caseId + ", role=" + role + ")",
 					e
 			);
+		}
+	}
+
+	public void setPrimaryCasePartyCaller(
+			long caseId,
+			int shaleClientId,
+			int contactId,
+			Integer changedByUserId,
+			String notes) {
+		String sql = """
+				BEGIN TRY
+				  BEGIN TRAN;
+
+				  DECLARE @now datetime2 = SYSUTCDATETIME();
+				  DECLARE @callerRoleId bigint;
+
+				  SELECT TOP (1) @callerRoleId = pr.Id
+				  FROM dbo.PartyRoles pr
+				  WHERE LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?;
+
+				  IF @callerRoleId IS NULL
+				  BEGIN
+				    THROW 50001, 'Caller PartyRole is missing.', 1;
+				  END
+
+				  IF NOT EXISTS (
+				    SELECT 1
+				    FROM dbo.Contacts ct
+				    WHERE ct.Id = ?
+				      AND ct.ShaleClientId = ?
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				  )
+				  BEGIN
+				    THROW 50002, 'Contact not found for tenant.', 1;
+				  END
+
+				  UPDATE cp
+				  SET cp.IsPrimary = 0,
+				      cp.UpdatedAt = @now
+				  FROM dbo.CaseParties cp
+				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
+				  WHERE cp.CaseId = ?
+				    AND cp.PartyRoleId = @callerRoleId
+				    AND c.ShaleClientId = ?
+				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+
+				  UPDATE cp
+				  SET cp.OrganizationId = NULL,
+				      cp.ContactId = ?,
+				      cp.IsPrimary = 1,
+				      cp.Notes = ?,
+				      cp.UpdatedAt = @now
+				  FROM dbo.CaseParties cp
+				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
+				  WHERE cp.CaseId = ?
+				    AND cp.PartyRoleId = @callerRoleId
+				    AND cp.ContactId = ?
+				    AND c.ShaleClientId = ?
+				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+
+				  IF @@ROWCOUNT = 0
+				  BEGIN
+				    INSERT INTO dbo.CaseParties
+				      (CaseId, ContactId, OrganizationId, PartyRoleId, Side, IsPrimary, Notes, CreatedAt, UpdatedAt)
+				    SELECT
+				      ?, ?, NULL, @callerRoleId, NULL, 1, ?, @now, @now
+				    WHERE EXISTS (
+				      SELECT 1
+				      FROM dbo.Cases c
+				      WHERE c.Id = ?
+				        AND c.ShaleClientId = ?
+				        AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				    );
+				  END
+
+				  COMMIT;
+				END TRY
+				BEGIN CATCH
+				  IF @@TRANCOUNT > 0 ROLLBACK;
+				  THROW;
+				END CATCH;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			String cleanNotes = (notes == null || notes.isBlank()) ? null : notes.trim();
+			int i = 1;
+			ps.setString(i++, PARTY_ROLE_NAME_CALLER);
+			ps.setInt(i++, contactId);
+			ps.setInt(i++, shaleClientId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, contactId);
+			ps.setString(i++, cleanNotes);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, contactId);
+			ps.setInt(i++, shaleClientId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, contactId);
+			ps.setString(i++, cleanNotes);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to set primary caller via case parties (caseId=" + caseId + ")", e);
 		}
 	}
 
