@@ -1097,16 +1097,12 @@ public class CaseController {
 	}
 
 	private Node createPartyCard(CasePartyDto party) {
-		String displayName = safeText(party.getDisplayName()).isBlank() ? "—" : safeText(party.getDisplayName());
-		String entityLabel = toEntityLabel(party.getEntityType());
 		String roleLabel = toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId());
 		String sideLabel = toPartySideLabel(normalizedPartySideKey(party.getSide()));
 		String notes = safeText(party.getNotes()).trim();
-		String titleSuffix = party.isPrimary() ? " • Primary" : "";
+		Node summaryCard = createPartyEntityCard(party);
 
-		Node summaryCard = createPartyEntityCard(party, roleLabel + " • " + sideLabel + titleSuffix);
-
-		Label metaLabel = new Label(entityLabel + " • " + roleLabel + " • " + sideLabel + titleSuffix);
+		Label metaLabel = new Label(formatPartyRelationshipMeta(roleLabel, sideLabel, party.isPrimary()));
 		metaLabel.setStyle("-fx-opacity: 0.86;");
 		metaLabel.setWrapText(true);
 
@@ -1136,7 +1132,7 @@ public class CaseController {
 		return card;
 	}
 
-	private Node createPartyEntityCard(CasePartyDto party, String subtitle) {
+	private Node createPartyEntityCard(CasePartyDto party) {
 		String entityType = safeText(party.getEntityType()).trim().toLowerCase(Locale.ROOT);
 		if ("organization".equals(entityType) && party.getOrganizationId() != null) {
 			OrganizationCardFactory factory = organizationCardFactory != null
@@ -1156,10 +1152,10 @@ public class CaseController {
 					null,
 					null,
 					null,
-					subtitle,
+					null,
 					null
 			);
-			return factory.create(model, OrganizationCardFactory.Variant.COMPACT);
+			return factory.create(model, OrganizationCardFactory.Variant.MINI);
 		}
 
 		if ("contact".equals(entityType) && party.getContactId() != null) {
@@ -1170,17 +1166,22 @@ public class CaseController {
 			ContactCardFactory.ContactCardModel model = new ContactCardFactory.ContactCardModel(
 					party.getContactId().intValue(),
 					safeText(party.getDisplayName()),
-					subtitle,
+					null,
 					null,
 					null
 			);
-			return factory.create(model, ContactCardFactory.Variant.FULL);
+			return factory.create(model, ContactCardFactory.Variant.MINI);
 		}
 
 		Label fallback = new Label(safeText(party.getDisplayName()).isBlank() ? "—" : safeText(party.getDisplayName()));
 		fallback.setStyle("-fx-font-weight: bold;");
 		fallback.setWrapText(true);
 		return fallback;
+	}
+
+	private String formatPartyRelationshipMeta(String roleLabel, String sideLabel, boolean primary) {
+		String base = roleLabel + " · " + sideLabel;
+		return primary ? base + " · Primary" : base;
 	}
 
 	private String normalizedPartySideKey(String side) {
@@ -1199,14 +1200,6 @@ public class CaseController {
 			case "opposing" -> "Opposing";
 			case "neutral" -> "Neutral";
 			default -> "Unclassified";
-		};
-	}
-
-	private String toEntityLabel(String entityType) {
-		return switch (safeText(entityType).trim().toLowerCase(Locale.ROOT)) {
-			case "organization" -> "Organization";
-			case "contact" -> "Contact";
-			default -> "Party";
 		};
 	}
 
@@ -1324,7 +1317,7 @@ public class CaseController {
 			return null;
 		}
 		List<CaseDao.PartyRoleRow> partyRoles = caseDao.listPartyRoles();
-		List<CaseDao.ContactRow> contacts = caseDao.listContactsForTenant(appState.getShaleClientId());
+		List<CaseDao.SelectableContactRow> contacts = caseDao.findLinkableContacts(caseId.longValue());
 		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
 
 		Dialog<PartyEditorResult> dialog = new Dialog<>();
@@ -1370,15 +1363,28 @@ public class CaseController {
 		Runnable loadEntities = () -> {
 			String selectedType = entityTypeChoice.getValue();
 			entityChoice.getItems().clear();
-			if ("Organization".equalsIgnoreCase(selectedType)) {
-				for (CaseDao.SelectableOrganizationRow org : organizations) {
-					entityChoice.getItems().add(new PartyEntityOption("organization", Long.valueOf(org.id()), safeText(org.name())));
+				if ("Organization".equalsIgnoreCase(selectedType)) {
+					for (CaseDao.SelectableOrganizationRow org : organizations) {
+						String label = safeText(org.name());
+						String type = safeText(org.organizationTypeName());
+						if (!type.isBlank()) {
+							label = label + " — " + type;
+						}
+						entityChoice.getItems().add(new PartyEntityOption("organization", Long.valueOf(org.id()), label));
+					}
+				} else {
+					for (CaseDao.SelectableContactRow contact : contacts) {
+						String displayName = safeText(contact.displayName());
+						if (displayName.isBlank()) {
+							displayName = "Contact #" + contact.id();
+						}
+						String secondary = !safeText(contact.phone()).isBlank()
+								? safeText(contact.phone())
+								: safeText(contact.email());
+						String label = secondary.isBlank() ? displayName : displayName + " — " + secondary;
+						entityChoice.getItems().add(new PartyEntityOption("contact", Long.valueOf(contact.id()), label));
+					}
 				}
-			} else {
-				for (CaseDao.ContactRow contact : contacts) {
-					entityChoice.getItems().add(new PartyEntityOption("contact", Long.valueOf(contact.id()), safeText(contact.displayName())));
-				}
-			}
 			if (!entityChoice.getItems().isEmpty()) {
 				entityChoice.setValue(entityChoice.getItems().get(0));
 			}
@@ -1394,11 +1400,20 @@ public class CaseController {
 		} else {
 			entityTypeChoice.setValue("organization".equalsIgnoreCase(existing.getEntityType()) ? "Organization" : "Contact");
 			loadEntities.run();
-			entityChoice.getItems().stream()
-					.filter(o -> Objects.equals(o.entityType, safeText(existing.getEntityType()).toLowerCase(Locale.ROOT))
-							&& Objects.equals(o.id, "organization".equalsIgnoreCase(existing.getEntityType()) ? existing.getOrganizationId() : existing.getContactId()))
-					.findFirst()
-					.ifPresent(entityChoice::setValue);
+				entityChoice.getItems().stream()
+						.filter(o -> Objects.equals(o.entityType, safeText(existing.getEntityType()).toLowerCase(Locale.ROOT))
+								&& Objects.equals(o.id, "organization".equalsIgnoreCase(existing.getEntityType()) ? existing.getOrganizationId() : existing.getContactId()))
+						.findFirst()
+						.ifPresentOrElse(entityChoice::setValue, () -> {
+							Long existingId = "organization".equalsIgnoreCase(existing.getEntityType()) ? existing.getOrganizationId() : existing.getContactId();
+							String fallbackLabel = safeText(existing.getDisplayName()).isBlank() ? "Party #" + existingId : safeText(existing.getDisplayName());
+							PartyEntityOption fallback = new PartyEntityOption(
+									safeText(existing.getEntityType()).toLowerCase(Locale.ROOT),
+									existingId,
+									fallbackLabel);
+							entityChoice.getItems().add(0, fallback);
+							entityChoice.setValue(fallback);
+						});
 			roleChoice.getItems().stream()
 					.filter(r -> r.id == existing.getPartyRoleId())
 					.findFirst()
