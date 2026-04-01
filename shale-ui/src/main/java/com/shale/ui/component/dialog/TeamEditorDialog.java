@@ -16,7 +16,7 @@ import javafx.stage.Stage;
 public final class TeamEditorDialog {
 
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
-	private static final int ROLE_INTAKE_STAFF = 5;
+	private static final int ROLE_PRELITIGATION_STAFF = 5;
 	private static final int ROLE_ATTORNEY = 7;
 	private static final int ROLE_LEGAL_ASSISTANT = 11;
 	private static final int ROLE_PARALEGAL = 12;
@@ -29,7 +29,7 @@ public final class TeamEditorDialog {
 			new RoleOption(ROLE_LEGAL_ASSISTANT, "Legal Assistant"),
 			new RoleOption(ROLE_PARALEGAL, "Paralegal"),
 			new RoleOption(ROLE_LAW_CLERK, "Law Clerk"),
-			new RoleOption(ROLE_INTAKE_STAFF, "Intake Staff")
+			new RoleOption(ROLE_PRELITIGATION_STAFF, "Prelitigation Staff")
 	);
 
 	public record TeamAssignment(int userId, int roleId) {
@@ -383,7 +383,7 @@ public final class TeamEditorDialog {
 	private static String roleName(int roleId) {
 		return switch (roleId) {
 		case ROLE_RESPONSIBLE_ATTORNEY -> "Responsible Attorney";
-		case ROLE_INTAKE_STAFF -> "Intake Staff";
+		case ROLE_PRELITIGATION_STAFF -> "Prelitigation Staff";
 		case ROLE_ATTORNEY -> "Attorney";
 		case ROLE_LEGAL_ASSISTANT -> "Legal Assistant";
 		case ROLE_PARALEGAL -> "Paralegal";
