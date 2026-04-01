@@ -1155,7 +1155,7 @@ public class CaseController {
 					null,
 					null
 			);
-			return factory.create(model, OrganizationCardFactory.Variant.MINI);
+			return factory.create(model, OrganizationCardFactory.Variant.COMPACT);
 		}
 
 		if ("contact".equals(entityType) && party.getContactId() != null) {
@@ -1170,7 +1170,7 @@ public class CaseController {
 					null,
 					null
 			);
-			return factory.create(model, ContactCardFactory.Variant.MINI);
+			return factory.create(model, ContactCardFactory.Variant.COMPACT);
 		}
 
 		Label fallback = new Label(safeText(party.getDisplayName()).isBlank() ? "—" : safeText(party.getDisplayName()));
