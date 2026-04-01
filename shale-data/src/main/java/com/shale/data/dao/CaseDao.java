@@ -3478,10 +3478,9 @@ public final class CaseDao {
 		}
 	}
 
-	public void replaceCaseContactsForRole(
+	public void syncRepresentedPartyContacts(
 			long caseId,
 			int shaleClientId,
-			int role,
 			List<Integer> contactIds,
 			String notes) {
 		List<Integer> normalized = (contactIds == null ? List.<Integer>of() : contactIds).stream()
@@ -3506,37 +3505,50 @@ public final class CaseDao {
 						ps.setInt(1, contactId);
 						ps.setInt(2, shaleClientId);
 						try (ResultSet rs = ps.executeQuery()) {
-							if (!rs.next())
+							if (!rs.next()) {
 								throw new IllegalArgumentException("Contact not found for tenant: " + contactId);
+							}
 						}
 					}
 				}
 
 				String deleteSql = """
-						DELETE FROM dbo.CaseContacts
-						WHERE CaseId = ?
-						  AND Role = ?;
+						DELETE cp
+						FROM dbo.CaseParties cp
+						INNER JOIN dbo.Cases c
+						  ON c.Id = cp.CaseId
+						INNER JOIN dbo.PartyRoles pr
+						  ON pr.Id = cp.PartyRoleId
+						WHERE cp.CaseId = ?
+						  AND c.ShaleClientId = ?
+						  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+						  AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?
+						  AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
+						  AND cp.ContactId IS NOT NULL;
 						""";
 				try (PreparedStatement ps = con.prepareStatement(deleteSql)) {
 					ps.setLong(1, caseId);
-					ps.setInt(2, role);
+					ps.setInt(2, shaleClientId);
+					ps.setString(3, PARTY_ROLE_NAME_PARTY);
 					ps.executeUpdate();
 				}
 
 				if (!normalized.isEmpty()) {
 					String insertSql = """
-							INSERT INTO dbo.CaseContacts
-							  (CaseId, ContactId, Role, Side, IsPrimary, Notes, AddedAt, CreatedAt, UpdatedAt)
-							VALUES
-							  (?, ?, ?, NULL, ?, ?, SYSDATETIME(), SYSDATETIME(), SYSDATETIME());
+							INSERT INTO dbo.CaseParties
+							  (CaseId, ContactId, OrganizationId, PartyRoleId, Side, IsPrimary, Notes, CreatedAt, UpdatedAt)
+							SELECT
+							  ?, ?, NULL, pr.Id, 'represented', ?, ?, SYSUTCDATETIME(), SYSUTCDATETIME()
+							FROM dbo.PartyRoles pr
+							WHERE LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?;
 							""";
 					try (PreparedStatement ps = con.prepareStatement(insertSql)) {
 						for (int i = 0; i < normalized.size(); i++) {
 							ps.setLong(1, caseId);
 							ps.setInt(2, normalized.get(i));
-							ps.setInt(3, role);
-							ps.setBoolean(4, i == 0);
-							ps.setString(5, cleanNotes);
+							ps.setBoolean(3, i == 0);
+							ps.setString(4, cleanNotes);
+							ps.setString(5, PARTY_ROLE_NAME_PARTY);
 							ps.addBatch();
 						}
 						ps.executeBatch();
@@ -3552,7 +3564,7 @@ public final class CaseDao {
 			}
 		} catch (Exception e) {
 			throw new RuntimeException(
-					"Failed to replace case contacts for role (caseId=" + caseId + ", role=" + role + ")",
+					"Failed to sync represented party contacts (caseId=" + caseId + ")",
 					e
 			);
 		}
