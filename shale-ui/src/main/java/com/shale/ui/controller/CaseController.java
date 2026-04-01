@@ -1317,6 +1317,10 @@ public class CaseController {
 				runOnFx(() -> {
 					caseParties = refreshed == null ? List.of() : refreshed;
 					renderPartiesSection();
+					if (currentOverview != null) {
+						currentOverview = applyCallerFromCaseParties(currentOverview, caseParties);
+						applyOverviewEditSafe(currentOverview);
+					}
 				});
 			} catch (Exception ex) {
 				runOnFx(() -> showError("Failed to refresh parties for this case."));
@@ -2653,8 +2657,13 @@ public class CaseController {
 		}
 		CallerPartySelection caller = resolveCallerFromCaseParties(parties);
 		List<CaseOverviewDto.ContactSummary> representedClients = resolveRepresentedClientsFromCaseParties(parties);
-		Integer effectiveCallerId = caller == null ? overview.getPrimaryCallerContactId() : caller.contactId();
-		String effectiveCallerName = caller == null ? overview.getCaller() : caller.displayName();
+		boolean hasAnyCallerRows = hasCallerRows(parties);
+		Integer effectiveCallerId = caller == null
+				? (hasAnyCallerRows ? overview.getPrimaryCallerContactId() : null)
+				: caller.contactId();
+		String effectiveCallerName = caller == null
+				? (hasAnyCallerRows ? overview.getCaller() : null)
+				: caller.displayName();
 		if (Objects.equals(overview.getPrimaryCallerContactId(), effectiveCallerId)
 				&& Objects.equals(safeText(overview.getCaller()), safeText(effectiveCallerName))
 				&& Objects.equals(overview.getClients(), representedClients)) {
@@ -2686,6 +2695,15 @@ public class CaseController {
 				overview.getOpposingCounsel(),
 				overview.getTeam(),
 				overview.getDescription());
+	}
+
+	private boolean hasCallerRows(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return false;
+		}
+		return parties.stream()
+				.filter(Objects::nonNull)
+				.anyMatch(party -> "caller".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()));
 	}
 
 	private List<CaseOverviewDto.ContactSummary> resolveRepresentedClientsFromCaseParties(List<CasePartyDto> parties) {

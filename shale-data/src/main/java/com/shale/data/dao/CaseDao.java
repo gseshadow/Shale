@@ -2819,6 +2819,7 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			int shaleClientId = requireCurrentShaleClientId(con);
+			con.setAutoCommit(false);
 			int idx = 1;
 			ps.setLong(idx++, caseId);
 			setNullableLong(ps, idx++, contactId);
@@ -2838,11 +2839,14 @@ public final class CaseDao {
 			ps.setInt(idx++, shaleClientId);
 
 			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next()) {
-					throw new RuntimeException("Failed to add case party (caseId=" + caseId + ").");
+					if (!rs.next()) {
+						throw new RuntimeException("Failed to add case party (caseId=" + caseId + ").");
+					}
+					long insertedId = rs.getLong(1);
+					normalizeCasePartyRelationshipPrimaries(con, caseId, shaleClientId);
+					con.commit();
+					return insertedId;
 				}
-				return rs.getLong(1);
-			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to add case party (caseId=" + caseId + ")", e);
 		}
@@ -2911,6 +2915,7 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			int shaleClientId = requireCurrentShaleClientId(con);
+			con.setAutoCommit(false);
 			int idx = 1;
 			setNullableLong(ps, idx++, contactId);
 			setNullableLong(ps, idx++, organizationId);
@@ -2933,6 +2938,8 @@ public final class CaseDao {
 			if (rows != 1) {
 				throw new RuntimeException("Failed to update case party (id=" + casePartyId + ", caseId=" + caseId + ").");
 			}
+			normalizeCasePartyRelationshipPrimaries(con, caseId, shaleClientId);
+			con.commit();
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update case party (id=" + casePartyId + ", caseId=" + caseId + ")", e);
 		}
@@ -2945,6 +2952,7 @@ public final class CaseDao {
 
 		String sql = """
 				DELETE cp
+				OUTPUT DELETED.CaseId
 				FROM dbo.CaseParties cp
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cp.CaseId
@@ -2956,14 +2964,79 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			int shaleClientId = requireCurrentShaleClientId(con);
+			con.setAutoCommit(false);
 			ps.setLong(1, casePartyId);
 			ps.setInt(2, shaleClientId);
-			int rows = ps.executeUpdate();
-			if (rows != 1) {
+			Long deletedCaseId = null;
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) {
+					deletedCaseId = rs.getLong(1);
+				}
+			}
+			if (deletedCaseId == null) {
 				throw new RuntimeException("Failed to remove case party (id=" + casePartyId + ").");
 			}
+			normalizeCasePartyRelationshipPrimaries(con, deletedCaseId, shaleClientId);
+			con.commit();
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to remove case party (id=" + casePartyId + ")", e);
+		}
+	}
+
+	private void normalizeCasePartyRelationshipPrimaries(Connection con, long caseId, int shaleClientId) throws SQLException {
+		String sql = """
+				DECLARE @now datetime2 = SYSUTCDATETIME();
+
+				WITH caller_bucket AS (
+				  SELECT cp.Id,
+				         ROW_NUMBER() OVER (
+				           ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.Id ASC
+				         ) AS rn
+				  FROM dbo.CaseParties cp
+				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
+				  INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+				  WHERE cp.CaseId = ?
+				    AND c.ShaleClientId = ?
+				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				    AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?
+				)
+				UPDATE cp
+				SET cp.IsPrimary = CASE WHEN cb.rn = 1 THEN 1 ELSE 0 END,
+				    cp.UpdatedAt = @now
+				FROM dbo.CaseParties cp
+				INNER JOIN caller_bucket cb ON cb.Id = cp.Id
+				WHERE COALESCE(cp.IsPrimary, 0) <> CASE WHEN cb.rn = 1 THEN 1 ELSE 0 END;
+
+				WITH represented_bucket AS (
+				  SELECT cp.Id,
+				         ROW_NUMBER() OVER (
+				           ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.Id ASC
+				         ) AS rn
+				  FROM dbo.CaseParties cp
+				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
+				  INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+				  WHERE cp.CaseId = ?
+				    AND c.ShaleClientId = ?
+				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				    AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?
+				    AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
+				)
+				UPDATE cp
+				SET cp.IsPrimary = CASE WHEN rb.rn = 1 THEN 1 ELSE 0 END,
+				    cp.UpdatedAt = @now
+				FROM dbo.CaseParties cp
+				INNER JOIN represented_bucket rb ON rb.Id = cp.Id
+				WHERE COALESCE(cp.IsPrimary, 0) <> CASE WHEN rb.rn = 1 THEN 1 ELSE 0 END;
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setString(idx++, PARTY_ROLE_NAME_CALLER);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setString(idx++, PARTY_ROLE_NAME_PARTY);
+			ps.executeUpdate();
 		}
 	}
 
@@ -3333,6 +3406,7 @@ public final class CaseDao {
 						ps.executeBatch();
 					}
 				}
+				normalizeCasePartyRelationshipPrimaries(con, caseId, shaleClientId);
 				con.commit();
 			} catch (Exception ex) {
 				con.rollback();
