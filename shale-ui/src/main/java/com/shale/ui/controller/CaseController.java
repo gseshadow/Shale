@@ -501,6 +501,7 @@ public class CaseController {
 	private record PartySideOption(String label, String value) {}
 	private record PartyEditorResult(String entityType, Long entityId, long partyRoleId, String side, boolean primary, String notes) {}
 	private record CallerPartySelection(Integer contactId, String displayName) {}
+	private record OpposingCounselPartySelection(Integer contactId, String displayName) {}
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -2656,16 +2657,26 @@ public class CaseController {
 			return null;
 		}
 		CallerPartySelection caller = resolveCallerFromCaseParties(parties);
+		OpposingCounselPartySelection opposingCounsel = resolveOpposingCounselFromCaseParties(parties);
 		List<CaseOverviewDto.ContactSummary> representedClients = resolveRepresentedClientsFromCaseParties(parties);
 		boolean hasAnyCallerRows = hasCallerRows(parties);
+		boolean hasAnyOpposingCounselRows = hasOpposingCounselRows(parties);
 		Integer effectiveCallerId = caller == null
 				? (hasAnyCallerRows ? overview.getPrimaryCallerContactId() : null)
 				: caller.contactId();
 		String effectiveCallerName = caller == null
 				? (hasAnyCallerRows ? overview.getCaller() : null)
 				: caller.displayName();
+		Integer effectiveOpposingCounselId = opposingCounsel == null
+				? (hasAnyOpposingCounselRows ? overview.getPrimaryOpposingCounselContactId() : null)
+				: opposingCounsel.contactId();
+		String effectiveOpposingCounselName = opposingCounsel == null
+				? (hasAnyOpposingCounselRows ? overview.getOpposingCounsel() : null)
+				: opposingCounsel.displayName();
 		if (Objects.equals(overview.getPrimaryCallerContactId(), effectiveCallerId)
 				&& Objects.equals(safeText(overview.getCaller()), safeText(effectiveCallerName))
+				&& Objects.equals(overview.getPrimaryOpposingCounselContactId(), effectiveOpposingCounselId)
+				&& Objects.equals(safeText(overview.getOpposingCounsel()), safeText(effectiveOpposingCounselName))
 				&& Objects.equals(overview.getClients(), representedClients)) {
 			return overview;
 		}
@@ -2686,15 +2697,15 @@ public class CaseController {
 				overview.getIntakeDate(),
 				overview.getIncidentDate(),
 				overview.getSolDate(),
-				effectiveCallerId,
-				overview.getPrimaryClientContactId(),
-				overview.getPrimaryOpposingCounselContactId(),
-				effectiveCallerName,
-				overview.getClient(),
-				representedClients,
-				overview.getOpposingCounsel(),
-				overview.getTeam(),
-				overview.getDescription());
+					effectiveCallerId,
+					overview.getPrimaryClientContactId(),
+					effectiveOpposingCounselId,
+					effectiveCallerName,
+					overview.getClient(),
+					representedClients,
+					effectiveOpposingCounselName,
+					overview.getTeam(),
+					overview.getDescription());
 	}
 
 	private boolean hasCallerRows(List<CasePartyDto> parties) {
@@ -2704,6 +2715,16 @@ public class CaseController {
 		return parties.stream()
 				.filter(Objects::nonNull)
 				.anyMatch(party -> "caller".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()));
+	}
+
+	private boolean hasOpposingCounselRows(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return false;
+		}
+		return parties.stream()
+				.filter(Objects::nonNull)
+				.filter(party -> "counsel".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()))
+				.anyMatch(party -> "opposing".equalsIgnoreCase(safeText(party.getSide()).trim()));
 	}
 
 	private List<CaseOverviewDto.ContactSummary> resolveRepresentedClientsFromCaseParties(List<CasePartyDto> parties) {
@@ -2748,6 +2769,33 @@ public class CaseController {
 			return null;
 		}
 		return new CallerPartySelection(firstFallback.getContactId().intValue(), safeText(firstFallback.getDisplayName()));
+	}
+
+	private OpposingCounselPartySelection resolveOpposingCounselFromCaseParties(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return null;
+		}
+		CasePartyDto firstFallback = null;
+		for (CasePartyDto party : parties) {
+			if (party == null || party.getContactId() == null) {
+				continue;
+			}
+			String role = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
+			String side = safeText(party.getSide()).trim().toLowerCase(Locale.ROOT);
+			if (!"counsel".equals(role) || !"opposing".equals(side)) {
+				continue;
+			}
+			if (party.isPrimary()) {
+				return new OpposingCounselPartySelection(party.getContactId().intValue(), safeText(party.getDisplayName()));
+			}
+			if (firstFallback == null) {
+				firstFallback = party;
+			}
+		}
+		if (firstFallback == null) {
+			return null;
+		}
+		return new OpposingCounselPartySelection(firstFallback.getContactId().intValue(), safeText(firstFallback.getDisplayName()));
 	}
 
 	private void applyLastUpdatedLabel(LocalDateTime updatedAt) {
@@ -4791,8 +4839,8 @@ public class CaseController {
 
 			if (computation.opposingCounselChanged()) {
 				requireTenant(request.tenantId());
-				caseDao.setPrimaryCaseContact(
-						request.saveCaseId(), request.tenantId(), ROLE_CASECONTACT_OPPOSING_COUNSEL,
+				caseDao.setPrimaryCasePartyOpposingCounsel(
+						request.saveCaseId(), request.tenantId(),
 						request.desired().desiredOpposingCounselContactId(), request.userId(), null
 				);
 			}

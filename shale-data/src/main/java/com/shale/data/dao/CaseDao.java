@@ -28,15 +28,11 @@ public final class CaseDao {
 	private static final String USERS_TABLE = "Users";
 	private static final String CASE_STATUSES_TABLE = "CaseStatuses";
 	private static final String STATUSES_TABLE = "Statuses";
-	// CaseContacts.Role values
-	private static final int ROLE_CASECONTACT_CLIENT = 1;
-	private static final int ROLE_CASECONTACT_CALLER = 2;
-	private static final int ROLE_CASECONTACT_OPPOSING_COUNSEL = 6;
-
 	// CaseUsers.RoleId (int) for Responsible Attorney
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
 	private static final String PARTY_ROLE_NAME_CALLER = "caller";
 	private static final String PARTY_ROLE_NAME_PARTY = "party";
+	private static final String PARTY_ROLE_NAME_COUNSEL = "counsel";
 
 	public static final class CaseTimelineEventTypes {
 		public static final String CASE_CREATED = "CASE_CREATED";
@@ -301,8 +297,9 @@ public final class CaseDao {
 			}
 
 			long caseId = insertCase(con, request, now);
-			insertCaseContact(con, caseId, clientContactId, ROLE_CASECONTACT_CLIENT, now);
-			insertCaseContact(con, caseId, callerContactId, ROLE_CASECONTACT_CALLER, now);
+			insertCaseParty(con, caseId, clientContactId, PARTY_ROLE_NAME_PARTY, "represented", true, now, request.shaleClientId());
+			insertCaseParty(con, caseId, callerContactId, PARTY_ROLE_NAME_CALLER, "represented", true, now, request.shaleClientId());
+			normalizeCasePartyRelationshipPrimaries(con, caseId, request.shaleClientId());
 			insertCaseStatus(con, caseId, request.statusId(), now);
 
 			con.commit();
@@ -448,32 +445,53 @@ public final class CaseDao {
 		}
 	}
 
-	private void insertCaseContact(Connection con, long caseId, int contactId, int role, Timestamp now) throws SQLException {
+	private void insertCaseParty(
+			Connection con,
+			long caseId,
+			int contactId,
+			String roleName,
+			String side,
+			boolean primary,
+			Timestamp now,
+			int shaleClientId) throws SQLException {
 		String sql = """
-				INSERT INTO dbo.CaseContacts (
+				INSERT INTO dbo.CaseParties (
 				  CaseId,
 				  ContactId,
-				  Role,
+				  OrganizationId,
+				  PartyRoleId,
 				  Side,
 				  IsPrimary,
 				  Notes,
-				  AddedAt,
 				  CreatedAt,
 				  UpdatedAt
 				)
-				VALUES (?, ?, ?, NULL, 1, NULL, ?, ?, ?);
+				SELECT
+				  ?, ?, NULL, pr.Id, ?, ?, NULL, ?, ?
+				FROM dbo.PartyRoles pr
+				WHERE LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.Contacts ct
+				    WHERE ct.Id = ?
+				      AND ct.ShaleClientId = ?
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				  );
 				""";
 
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId);
 			ps.setInt(2, contactId);
-			ps.setInt(3, role);
-			ps.setTimestamp(4, now);
+			ps.setString(3, side);
+			ps.setBoolean(4, primary);
 			ps.setTimestamp(5, now);
 			ps.setTimestamp(6, now);
+			ps.setString(7, roleName);
+			ps.setInt(8, contactId);
+			ps.setInt(9, shaleClientId);
 			int rows = ps.executeUpdate();
 			if (rows != 1)
-				throw new RuntimeException("Failed to create case contact (role=" + role + ").");
+				throw new RuntimeException("Failed to create case party (role=" + roleName + ").");
 		}
 	}
 
@@ -1109,7 +1127,7 @@ public final class CaseDao {
 					) current_status
 					OUTER APPLY (
 					    SELECT TOP (1)
-					      cc.ContactId AS PrimaryCallerContactId,
+					      cp.ContactId AS PrimaryCallerContactId,
 					      CASE
 					        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
 					          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
@@ -1120,38 +1138,19 @@ public final class CaseDao {
 					            ))
 					        ELSE COALESCE(ct.Name, '')
 					      END AS CallerName
-					    FROM CaseContacts cc
-					    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
-					    WHERE cc.CaseId = c.Id
-					      AND cc.Role = ?
-					      AND cc.IsPrimary = 1
+					    FROM dbo.CaseParties cp
+					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    WHERE cp.CaseId = c.Id
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'caller'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
+					    ORDER BY
+					      CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+					      cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) callerContact
 					OUTER APPLY (
 					    SELECT TOP (1)
-					      cc.ContactId AS PrimaryClientContactId,
-					      CASE
-					        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-					          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-					        THEN LTRIM(RTRIM(
-					              COALESCE(ct.FirstName, '') +
-					              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-					              COALESCE(ct.LastName, '')
-					            ))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS ClientName
-					    FROM CaseContacts cc
-					    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
-					    WHERE cc.CaseId = c.Id
-					      AND cc.Role = ?
-					      AND cc.IsPrimary = 1
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
-					) clientContact
-					OUTER APPLY (
-					    SELECT TOP (1)
-					      cc.ContactId AS PrimaryOpposingCounselContactId,
+					      cp.ContactId AS PrimaryOpposingCounselContactId,
 					      CASE
 					        WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
 					          OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
@@ -1162,13 +1161,16 @@ public final class CaseDao {
 					            ))
 					        ELSE COALESCE(ct.Name, '')
 					      END AS FullName
-					    FROM CaseContacts cc
-					    INNER JOIN Contacts ct ON ct.Id = cc.ContactId
-					    WHERE cc.CaseId = c.Id
-					      AND cc.Role = ?
-					      AND cc.IsPrimary = 1
+					    FROM dbo.CaseParties cp
+					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    WHERE cp.CaseId = c.Id
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY cc.UpdatedAt DESC, cc.CreatedAt DESC
+					    ORDER BY
+					      CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+					      cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) oppContact
 					WHERE c.Id = ?
 					  AND %s;
@@ -1177,16 +1179,13 @@ public final class CaseDao {
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
 				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setInt(idx++, ROLE_CASECONTACT_CALLER);
-				ps.setInt(idx++, ROLE_CASECONTACT_CLIENT);
-				ps.setInt(idx++, ROLE_CASECONTACT_OPPOSING_COUNSEL);
 				ps.setLong(idx++, caseId);
 
 				try (ResultSet rs = ps.executeQuery()) {
 					if (!rs.next())
 						return null;
 					List<String> team = loadTeamMembers(con, caseId);
-					List<com.shale.core.dto.CaseOverviewDto.ContactSummary> clients = listCaseContactsByRole(con, caseId, ROLE_CASECONTACT_CLIENT);
+					List<com.shale.core.dto.CaseOverviewDto.ContactSummary> clients = listCasePartiesContactsByRoleAndSide(con, caseId, PARTY_ROLE_NAME_PARTY, "represented");
 					Integer primaryClientContactId = clients.isEmpty() ? null : clients.get(0).contactId();
 					String primaryClientName = clients.isEmpty() ? null : clients.get(0).displayName();
 					return new com.shale.core.dto.CaseOverviewDto(
@@ -1222,10 +1221,14 @@ public final class CaseDao {
 		}
 	}
 
-	private List<com.shale.core.dto.CaseOverviewDto.ContactSummary> listCaseContactsByRole(Connection con, long caseId, int roleId) throws SQLException {
+	private List<com.shale.core.dto.CaseOverviewDto.ContactSummary> listCasePartiesContactsByRoleAndSide(
+			Connection con,
+			long caseId,
+			String roleName,
+			String side) throws SQLException {
 		String sql = """
 				SELECT
-				  cc.ContactId,
+				  cp.ContactId,
 				  LTRIM(RTRIM(
 				    CASE
 				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
@@ -1238,20 +1241,23 @@ public final class CaseDao {
 				        COALESCE(ct.Name, '')
 				    END
 				  )) AS DisplayName
-				FROM dbo.CaseContacts cc
-				INNER JOIN dbo.Contacts ct ON ct.Id = cc.ContactId
-				WHERE cc.CaseId = ?
-				  AND cc.Role = ?
+				FROM dbo.CaseParties cp
+				INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+				INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
+				WHERE cp.CaseId = ?
+				  AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?
+				  AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = ?
 				  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 				ORDER BY
-				  CASE WHEN cc.IsPrimary = 1 THEN 0 ELSE 1 END,
-				  cc.UpdatedAt DESC,
-				  cc.CreatedAt DESC,
-				  cc.ContactId DESC;
+				  CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+				  cp.UpdatedAt DESC,
+				  cp.CreatedAt DESC,
+				  cp.ContactId DESC;
 				""";
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId);
-			ps.setInt(2, roleId);
+			ps.setString(2, roleName == null ? "" : roleName.trim().toLowerCase(Locale.ROOT));
+			ps.setString(3, side == null ? "" : side.trim().toLowerCase(Locale.ROOT));
 			try (ResultSet rs = ps.executeQuery()) {
 				List<com.shale.core.dto.CaseOverviewDto.ContactSummary> out = new ArrayList<>();
 				while (rs.next()) {
@@ -3027,6 +3033,27 @@ public final class CaseDao {
 				FROM dbo.CaseParties cp
 				INNER JOIN represented_bucket rb ON rb.Id = cp.Id
 				WHERE COALESCE(cp.IsPrimary, 0) <> CASE WHEN rb.rn = 1 THEN 1 ELSE 0 END;
+
+				WITH opposing_counsel_bucket AS (
+				  SELECT cp.Id,
+				         ROW_NUMBER() OVER (
+				           ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.Id ASC
+				         ) AS rn
+				  FROM dbo.CaseParties cp
+				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
+				  INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+				  WHERE cp.CaseId = ?
+				    AND c.ShaleClientId = ?
+				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				    AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?
+				    AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+				)
+				UPDATE cp
+				SET cp.IsPrimary = CASE WHEN ocb.rn = 1 THEN 1 ELSE 0 END,
+				    cp.UpdatedAt = @now
+				FROM dbo.CaseParties cp
+				INNER JOIN opposing_counsel_bucket ocb ON ocb.Id = cp.Id
+				WHERE COALESCE(cp.IsPrimary, 0) <> CASE WHEN ocb.rn = 1 THEN 1 ELSE 0 END;
 				""";
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			int idx = 1;
@@ -3036,7 +3063,119 @@ public final class CaseDao {
 			ps.setLong(idx++, caseId);
 			ps.setInt(idx++, shaleClientId);
 			ps.setString(idx++, PARTY_ROLE_NAME_PARTY);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setString(idx++, PARTY_ROLE_NAME_COUNSEL);
 			ps.executeUpdate();
+		}
+	}
+
+	public void setPrimaryCasePartyOpposingCounsel(
+			long caseId,
+			int shaleClientId,
+			int contactId,
+			Integer changedByUserId,
+			String notes) {
+		String sql = """
+				BEGIN TRY
+				  BEGIN TRAN;
+
+				  DECLARE @now datetime2 = SYSUTCDATETIME();
+				  DECLARE @counselRoleId bigint;
+
+				  SELECT TOP (1) @counselRoleId = pr.Id
+				  FROM dbo.PartyRoles pr
+				  WHERE LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?;
+
+				  IF @counselRoleId IS NULL
+				  BEGIN
+				    THROW 50001, 'Counsel PartyRole is missing.', 1;
+				  END
+
+				  IF NOT EXISTS (
+				    SELECT 1
+				    FROM dbo.Contacts ct
+				    WHERE ct.Id = ?
+				      AND ct.ShaleClientId = ?
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				  )
+				  BEGIN
+				    THROW 50002, 'Contact not found for tenant.', 1;
+				  END
+
+				  UPDATE cp
+				  SET cp.IsPrimary = 0,
+				      cp.UpdatedAt = @now
+				  FROM dbo.CaseParties cp
+				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
+				  WHERE cp.CaseId = ?
+				    AND cp.PartyRoleId = @counselRoleId
+				    AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+				    AND c.ShaleClientId = ?
+				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+
+				  UPDATE cp
+				  SET cp.OrganizationId = NULL,
+				      cp.ContactId = ?,
+				      cp.IsPrimary = 1,
+				      cp.Side = 'opposing',
+				      cp.Notes = ?,
+				      cp.UpdatedAt = @now
+				  FROM dbo.CaseParties cp
+				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
+				  WHERE cp.CaseId = ?
+				    AND cp.PartyRoleId = @counselRoleId
+				    AND cp.ContactId = ?
+				    AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+				    AND c.ShaleClientId = ?
+				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+
+				  IF @@ROWCOUNT = 0
+				  BEGIN
+				    INSERT INTO dbo.CaseParties
+				      (CaseId, ContactId, OrganizationId, PartyRoleId, Side, IsPrimary, Notes, CreatedAt, UpdatedAt)
+				    SELECT
+				      ?, ?, NULL, @counselRoleId, 'opposing', 1, ?, @now, @now
+				    WHERE EXISTS (
+				      SELECT 1
+				      FROM dbo.Cases c
+				      WHERE c.Id = ?
+				        AND c.ShaleClientId = ?
+				        AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				    );
+				  END
+
+				  COMMIT;
+				END TRY
+				BEGIN CATCH
+				  IF @@TRANCOUNT > 0 ROLLBACK;
+				  THROW;
+				END CATCH;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			String cleanNotes = (notes == null || notes.isBlank()) ? null : notes.trim();
+			int i = 1;
+			ps.setString(i++, PARTY_ROLE_NAME_COUNSEL);
+			ps.setInt(i++, contactId);
+			ps.setInt(i++, shaleClientId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, contactId);
+			ps.setString(i++, cleanNotes);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, contactId);
+			ps.setInt(i++, shaleClientId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, contactId);
+			ps.setString(i++, cleanNotes);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to set primary opposing counsel via case parties (caseId=" + caseId + ")", e);
 		}
 	}
 
