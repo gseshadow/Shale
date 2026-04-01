@@ -29,6 +29,7 @@ public class OrganizationCard extends HBox {
 	private Consumer<Integer> onOpen;
 	private String backgroundCss;
 	private boolean hovered;
+	private boolean suppressPlaceholderLines;
 
 	public OrganizationCard() {
 		buildUiMiniDefaults();
@@ -109,6 +110,10 @@ public class OrganizationCard extends HBox {
 		refreshSurfaceStyle();
 	}
 
+	public void setSuppressPlaceholderLines(boolean suppressPlaceholderLines) {
+		this.suppressPlaceholderLines = suppressPlaceholderLines;
+	}
+
 	public void applyMini() {
 		getChildren().clear();
 
@@ -134,7 +139,13 @@ public class OrganizationCard extends HBox {
 		typeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
 		phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
 
-		VBox text = new VBox(4, nameLabel, typeLabel, phoneLabel);
+		VBox text = new VBox(4, nameLabel);
+		if (!(suppressPlaceholderLines && "Type: Unknown".equals(typeLabel.getText()))) {
+			text.getChildren().add(typeLabel);
+		}
+		if (!(suppressPlaceholderLines && "Phone: —".equals(phoneLabel.getText()))) {
+			text.getChildren().add(phoneLabel);
+		}
 		getChildren().addAll(avatar, text);
 	}
 

@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
+import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.runtime.DbSessionProvider;
@@ -34,6 +35,7 @@ public final class CaseDao {
 
 	// CaseUsers.RoleId (int) for Responsible Attorney
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+	private static final String PARTY_ROLE_NAME_CALLER = "caller";
 
 	public static final class CaseTimelineEventTypes {
 		public static final String CASE_CREATED = "CASE_CREATED";
@@ -207,6 +209,12 @@ public final class CaseDao {
 			int id,
 			String name,
 			String organizationTypeName
+	) {
+	}
+
+	public record PartyRoleRow(
+			long id,
+			String name
 	) {
 	}
 
@@ -1960,6 +1968,36 @@ public final class CaseDao {
 			ps.setString(idx, trimmed);
 	}
 
+	private static void setNullableLong(PreparedStatement ps, int idx, Long value) throws SQLException {
+		if (value == null) {
+			ps.setNull(idx, java.sql.Types.BIGINT);
+		} else {
+			ps.setLong(idx, value);
+		}
+	}
+
+	private static void validateSinglePartyEntity(Long contactId, Long organizationId) {
+		boolean hasContact = contactId != null && contactId > 0;
+		boolean hasOrganization = organizationId != null && organizationId > 0;
+		if (hasContact == hasOrganization) {
+			throw new IllegalArgumentException("Exactly one of contactId or organizationId must be provided.");
+		}
+	}
+
+	private static String normalizeCasePartySide(String side) {
+		if (side == null) {
+			return null;
+		}
+		String normalized = side.trim().toLowerCase(Locale.ROOT);
+		if (normalized.isBlank()) {
+			return null;
+		}
+		return switch (normalized) {
+			case "represented", "opposing", "neutral" -> normalized;
+			default -> throw new IllegalArgumentException("side must be one of represented, opposing, neutral, or null.");
+		};
+	}
+
 	private static String safeUserDisplayName(String displayName, Integer userId) {
 		String trimmed = displayName == null ? "" : displayName.trim();
 		if (!trimmed.isBlank())
@@ -1985,6 +2023,15 @@ public final class CaseDao {
 		if (o instanceof Number n)
 			return n.intValue();
 		return Integer.valueOf(o.toString());
+	}
+
+	private static Long getNullableLong(ResultSet rs, String col) throws SQLException {
+		Object o = rs.getObject(col);
+		if (o == null)
+			return null;
+		if (o instanceof Number n)
+			return n.longValue();
+		return Long.valueOf(o.toString());
 	}
 
 	private static int requireCurrentShaleClientId(Connection con) throws SQLException {
@@ -2303,6 +2350,31 @@ public final class CaseDao {
 		}
 	}
 
+	public List<PartyRoleRow> listPartyRoles() {
+		String sql = """
+				SELECT
+				  pr.Id,
+				  pr.Name
+				FROM dbo.PartyRoles pr
+				ORDER BY pr.Name ASC, pr.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+			List<PartyRoleRow> out = new ArrayList<>();
+			while (rs.next()) {
+				out.add(new PartyRoleRow(
+						rs.getLong("Id"),
+						rs.getString("Name")
+				));
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load party roles", e);
+		}
+	}
+
 	public boolean linkContactToCase(long caseId, int contactId, int roleId) {
 		if (caseId <= 0) {
 			throw new IllegalArgumentException("caseId must be > 0");
@@ -2558,6 +2630,342 @@ public final class CaseDao {
 		}
 	}
 
+	public List<CasePartyDto> listCaseParties(long caseId) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+
+		String sql = """
+				SELECT
+				  cp.Id,
+				  cp.CaseId,
+				  cp.ContactId,
+				  cp.OrganizationId,
+				  cp.PartyRoleId,
+				  pr.Name AS PartyRoleName,
+				  cp.Side,
+				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
+				  cp.Notes,
+				  cp.CreatedAt,
+				  cp.UpdatedAt,
+				  CASE
+				    WHEN cp.ContactId IS NOT NULL THEN 'contact'
+				    ELSE 'organization'
+				  END AS EntityType,
+				  COALESCE(
+				    NULLIF(LTRIM(RTRIM(
+				      CASE
+				        WHEN cp.ContactId IS NOT NULL THEN
+				          CASE
+				            WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				              OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				            THEN
+				              COALESCE(ct.FirstName, '') +
+				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				              COALESCE(ct.LastName, '')
+				            ELSE
+				              COALESCE(ct.Name, '')
+				          END
+				        ELSE COALESCE(o.Name, '')
+				      END
+				    )), ''),
+				    CASE
+				      WHEN cp.ContactId IS NOT NULL THEN 'Contact #' + CAST(cp.ContactId AS varchar(32))
+				      ELSE 'Organization #' + CAST(cp.OrganizationId AS varchar(32))
+				    END
+				  ) AS DisplayName
+				FROM dbo.CaseParties cp
+				INNER JOIN dbo.Cases c
+				  ON c.Id = cp.CaseId
+				INNER JOIN dbo.PartyRoles pr
+				  ON pr.Id = cp.PartyRoleId
+				LEFT JOIN dbo.Contacts ct
+				  ON ct.Id = cp.ContactId
+				LEFT JOIN dbo.Organizations o
+				  ON o.Id = cp.OrganizationId
+				WHERE cp.CaseId = ?
+				  AND c.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				ORDER BY
+				  COALESCE(cp.IsPrimary, 0) DESC,
+				  CASE cp.Side
+				    WHEN 'represented' THEN 0
+				    WHEN 'opposing' THEN 1
+				    WHEN 'neutral' THEN 2
+				    ELSE 3
+				  END,
+				  COALESCE(
+				    NULLIF(LTRIM(RTRIM(
+				      CASE
+				        WHEN cp.ContactId IS NOT NULL THEN
+				          CASE
+				            WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				              OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				            THEN
+				              COALESCE(ct.FirstName, '') +
+				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				              COALESCE(ct.LastName, '')
+				            ELSE
+				              COALESCE(ct.Name, '')
+				          END
+				        ELSE COALESCE(o.Name, '')
+				      END
+				    )), ''),
+				    CASE
+				      WHEN cp.ContactId IS NOT NULL THEN 'Contact #' + CAST(cp.ContactId AS varchar(32))
+				      ELSE 'Organization #' + CAST(cp.OrganizationId AS varchar(32))
+				    END
+				  ) ASC,
+				  cp.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			ps.setLong(1, caseId);
+			ps.setInt(2, shaleClientId);
+
+			List<CasePartyDto> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new CasePartyDto(
+							rs.getLong("Id"),
+							rs.getLong("CaseId"),
+							getNullableLong(rs, "ContactId"),
+							getNullableLong(rs, "OrganizationId"),
+							rs.getLong("PartyRoleId"),
+							rs.getString("PartyRoleName"),
+							rs.getString("Side"),
+							rs.getBoolean("IsPrimary"),
+							rs.getString("Notes"),
+							toLocalDateTime(rs.getTimestamp("CreatedAt")),
+							toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+							rs.getString("EntityType"),
+							rs.getString("DisplayName")
+					));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list case parties (caseId=" + caseId + ")", e);
+		}
+	}
+
+	public long addCaseParty(long caseId, Long contactId, Long organizationId, long partyRoleId, String side, boolean primary, String notes) {
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+		if (partyRoleId <= 0) {
+			throw new IllegalArgumentException("partyRoleId must be > 0");
+		}
+		validateSinglePartyEntity(contactId, organizationId);
+		String normalizedSide = normalizeCasePartySide(side);
+
+		String sql = """
+				INSERT INTO dbo.CaseParties (
+				  CaseId,
+				  ContactId,
+				  OrganizationId,
+				  PartyRoleId,
+				  Side,
+				  IsPrimary,
+				  Notes,
+				  CreatedAt,
+				  UpdatedAt
+				)
+				OUTPUT INSERTED.Id
+				SELECT
+				  ?,
+				  ?,
+				  ?,
+				  ?,
+				  ?,
+				  ?,
+				  ?,
+				  SYSUTCDATETIME(),
+				  SYSUTCDATETIME()
+				WHERE EXISTS (
+				    SELECT 1
+				    FROM dbo.Cases c
+				    WHERE c.Id = ?
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.PartyRoles pr
+				    WHERE pr.Id = ?
+				  )
+				  AND (
+				    (? IS NOT NULL AND EXISTS (
+				      SELECT 1
+				      FROM dbo.Contacts ct
+				      WHERE ct.Id = ?
+				        AND ct.ShaleClientId = ?
+				        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				    ))
+				    OR
+				    (? IS NOT NULL AND EXISTS (
+				      SELECT 1
+				      FROM dbo.Organizations o
+				      WHERE o.Id = ?
+				        AND o.ShaleClientId = ?
+				        AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				    ))
+				  );
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			setNullableLong(ps, idx++, contactId);
+			setNullableLong(ps, idx++, organizationId);
+			ps.setLong(idx++, partyRoleId);
+			setNullableString(ps, idx++, normalizedSide);
+			ps.setBoolean(idx++, primary);
+			setNullableString(ps, idx++, notes);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, partyRoleId);
+			setNullableLong(ps, idx++, contactId);
+			setNullableLong(ps, idx++, contactId);
+			ps.setInt(idx++, shaleClientId);
+			setNullableLong(ps, idx++, organizationId);
+			setNullableLong(ps, idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) {
+					throw new RuntimeException("Failed to add case party (caseId=" + caseId + ").");
+				}
+				return rs.getLong(1);
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to add case party (caseId=" + caseId + ")", e);
+		}
+	}
+
+	public void updateCaseParty(long casePartyId,
+			long caseId,
+			Long contactId,
+			Long organizationId,
+			long partyRoleId,
+			String side,
+			boolean primary,
+			String notes) {
+		if (casePartyId <= 0) {
+			throw new IllegalArgumentException("casePartyId must be > 0");
+		}
+		if (caseId <= 0) {
+			throw new IllegalArgumentException("caseId must be > 0");
+		}
+		if (partyRoleId <= 0) {
+			throw new IllegalArgumentException("partyRoleId must be > 0");
+		}
+		validateSinglePartyEntity(contactId, organizationId);
+		String normalizedSide = normalizeCasePartySide(side);
+
+		String sql = """
+				UPDATE cp
+				SET cp.ContactId = ?,
+				    cp.OrganizationId = ?,
+				    cp.PartyRoleId = ?,
+				    cp.Side = ?,
+				    cp.IsPrimary = ?,
+				    cp.Notes = ?,
+				    cp.UpdatedAt = SYSUTCDATETIME()
+				FROM dbo.CaseParties cp
+				INNER JOIN dbo.Cases c
+				  ON c.Id = cp.CaseId
+				WHERE cp.Id = ?
+				  AND cp.CaseId = ?
+				  AND c.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.PartyRoles pr
+				    WHERE pr.Id = ?
+				  )
+				  AND (
+				    (? IS NOT NULL AND EXISTS (
+				      SELECT 1
+				      FROM dbo.Contacts ct
+				      WHERE ct.Id = ?
+				        AND ct.ShaleClientId = ?
+				        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				    ))
+				    OR
+				    (? IS NOT NULL AND EXISTS (
+				      SELECT 1
+				      FROM dbo.Organizations o
+				      WHERE o.Id = ?
+				        AND o.ShaleClientId = ?
+				        AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				    ))
+				  );
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int idx = 1;
+			setNullableLong(ps, idx++, contactId);
+			setNullableLong(ps, idx++, organizationId);
+			ps.setLong(idx++, partyRoleId);
+			setNullableString(ps, idx++, normalizedSide);
+			ps.setBoolean(idx++, primary);
+			setNullableString(ps, idx++, notes);
+			ps.setLong(idx++, casePartyId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, partyRoleId);
+			setNullableLong(ps, idx++, contactId);
+			setNullableLong(ps, idx++, contactId);
+			ps.setInt(idx++, shaleClientId);
+			setNullableLong(ps, idx++, organizationId);
+			setNullableLong(ps, idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
+
+			int rows = ps.executeUpdate();
+			if (rows != 1) {
+				throw new RuntimeException("Failed to update case party (id=" + casePartyId + ", caseId=" + caseId + ").");
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update case party (id=" + casePartyId + ", caseId=" + caseId + ")", e);
+		}
+	}
+
+	public void removeCaseParty(long casePartyId) {
+		if (casePartyId <= 0) {
+			throw new IllegalArgumentException("casePartyId must be > 0");
+		}
+
+		String sql = """
+				DELETE cp
+				FROM dbo.CaseParties cp
+				INNER JOIN dbo.Cases c
+				  ON c.Id = cp.CaseId
+				WHERE cp.Id = ?
+				  AND c.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			ps.setLong(1, casePartyId);
+			ps.setInt(2, shaleClientId);
+			int rows = ps.executeUpdate();
+			if (rows != 1) {
+				throw new RuntimeException("Failed to remove case party (id=" + casePartyId + ").");
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to remove case party (id=" + casePartyId + ")", e);
+		}
+	}
+
 	public boolean unlinkContactFromCase(long caseId, int contactId) {
 		if (caseId <= 0) {
 			throw new IllegalArgumentException("caseId must be > 0");
@@ -2751,6 +3159,112 @@ public final class CaseDao {
 					"Failed to set primary case contact (caseId=" + caseId + ", role=" + role + ")",
 					e
 			);
+		}
+	}
+
+	public void setPrimaryCasePartyCaller(
+			long caseId,
+			int shaleClientId,
+			int contactId,
+			Integer changedByUserId,
+			String notes) {
+		String sql = """
+				BEGIN TRY
+				  BEGIN TRAN;
+
+				  DECLARE @now datetime2 = SYSUTCDATETIME();
+				  DECLARE @callerRoleId bigint;
+
+				  SELECT TOP (1) @callerRoleId = pr.Id
+				  FROM dbo.PartyRoles pr
+				  WHERE LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?;
+
+				  IF @callerRoleId IS NULL
+				  BEGIN
+				    THROW 50001, 'Caller PartyRole is missing.', 1;
+				  END
+
+				  IF NOT EXISTS (
+				    SELECT 1
+				    FROM dbo.Contacts ct
+				    WHERE ct.Id = ?
+				      AND ct.ShaleClientId = ?
+				      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				  )
+				  BEGIN
+				    THROW 50002, 'Contact not found for tenant.', 1;
+				  END
+
+				  UPDATE cp
+				  SET cp.IsPrimary = 0,
+				      cp.UpdatedAt = @now
+				  FROM dbo.CaseParties cp
+				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
+				  WHERE cp.CaseId = ?
+				    AND cp.PartyRoleId = @callerRoleId
+				    AND c.ShaleClientId = ?
+				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+
+				  UPDATE cp
+				  SET cp.OrganizationId = NULL,
+				      cp.ContactId = ?,
+				      cp.IsPrimary = 1,
+				      cp.Notes = ?,
+				      cp.UpdatedAt = @now
+				  FROM dbo.CaseParties cp
+				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
+				  WHERE cp.CaseId = ?
+				    AND cp.PartyRoleId = @callerRoleId
+				    AND cp.ContactId = ?
+				    AND c.ShaleClientId = ?
+				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+
+				  IF @@ROWCOUNT = 0
+				  BEGIN
+				    INSERT INTO dbo.CaseParties
+				      (CaseId, ContactId, OrganizationId, PartyRoleId, Side, IsPrimary, Notes, CreatedAt, UpdatedAt)
+				    SELECT
+				      ?, ?, NULL, @callerRoleId, NULL, 1, ?, @now, @now
+				    WHERE EXISTS (
+				      SELECT 1
+				      FROM dbo.Cases c
+				      WHERE c.Id = ?
+				        AND c.ShaleClientId = ?
+				        AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				    );
+				  END
+
+				  COMMIT;
+				END TRY
+				BEGIN CATCH
+				  IF @@TRANCOUNT > 0 ROLLBACK;
+				  THROW;
+				END CATCH;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			String cleanNotes = (notes == null || notes.isBlank()) ? null : notes.trim();
+			int i = 1;
+			ps.setString(i++, PARTY_ROLE_NAME_CALLER);
+			ps.setInt(i++, contactId);
+			ps.setInt(i++, shaleClientId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, contactId);
+			ps.setString(i++, cleanNotes);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, contactId);
+			ps.setInt(i++, shaleClientId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, contactId);
+			ps.setString(i++, cleanNotes);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to set primary caller via case parties (caseId=" + caseId + ")", e);
 		}
 	}
 
