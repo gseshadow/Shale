@@ -2018,6 +2018,15 @@ public final class CaseDao {
 		return Integer.valueOf(o.toString());
 	}
 
+	private static Long getNullableLong(ResultSet rs, String col) throws SQLException {
+		Object o = rs.getObject(col);
+		if (o == null)
+			return null;
+		if (o instanceof Number n)
+			return n.longValue();
+		return Long.valueOf(o.toString());
+	}
+
 	private static int requireCurrentShaleClientId(Connection con) throws SQLException {
 		String sql = "SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT);";
 		try (PreparedStatement ps = con.prepareStatement(sql);
@@ -2678,8 +2687,8 @@ public final class CaseDao {
 					out.add(new CasePartyDto(
 							rs.getLong("Id"),
 							rs.getLong("CaseId"),
-							(Long) rs.getObject("ContactId"),
-							(Long) rs.getObject("OrganizationId"),
+							getNullableLong(rs, "ContactId"),
+							getNullableLong(rs, "OrganizationId"),
 							rs.getLong("PartyRoleId"),
 							rs.getString("PartyRoleName"),
 							rs.getString("Side"),
