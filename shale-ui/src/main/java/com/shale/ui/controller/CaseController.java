@@ -1516,9 +1516,8 @@ public class CaseController {
 		dialog.setTitle("Add Party");
 		dialog.initOwner(organizationDialogOwner());
 		ButtonType backType = new ButtonType("Back", ButtonData.LEFT);
-		ButtonType nextType = new ButtonType("Next", ButtonData.NEXT_FORWARD);
 		ButtonType addType = new ButtonType("Add Party", ButtonData.OK_DONE);
-		dialog.getDialogPane().getButtonTypes().addAll(backType, nextType, addType, ButtonType.CANCEL);
+		dialog.getDialogPane().getButtonTypes().addAll(backType, addType, ButtonType.CANCEL);
 
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
 		partyRoles.stream().map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id()))).forEach(roleChoice.getItems()::add);
@@ -1635,18 +1634,38 @@ public class CaseController {
 
 		Runnable applyChoiceButtonStyles = () -> {
 			boolean createNew = "create".equals(selectedMode.get());
-			createNewButton.getStyleClass().setAll(createNew ? "button-primary" : "button-secondary");
-			selectExistingButton.getStyleClass().setAll(!createNew && selectedMode.get() != null ? "button-primary" : "button-secondary");
+			createNewButton.setStyle(createNew
+					? "-fx-font-size: 14px; -fx-font-weight: 700; -fx-padding: 12 18 12 18;"
+					: "-fx-font-size: 14px; -fx-padding: 12 18 12 18;");
+			selectExistingButton.setStyle(!createNew && selectedMode.get() != null
+					? "-fx-font-size: 14px; -fx-font-weight: 700; -fx-padding: 12 18 12 18;"
+					: "-fx-font-size: 14px; -fx-padding: 12 18 12 18;");
 
 			boolean contactSelected = "contact".equals(selectedEntityType.get());
-			contactButton.getStyleClass().setAll(contactSelected ? "button-primary" : "button-secondary");
-			organizationButton.getStyleClass().setAll(!contactSelected && selectedEntityType.get() != null ? "button-primary" : "button-secondary");
+			contactButton.setStyle(contactSelected
+					? "-fx-font-size: 14px; -fx-font-weight: 700; -fx-padding: 12 18 12 18;"
+					: "-fx-font-size: 14px; -fx-padding: 12 18 12 18;");
+			organizationButton.setStyle(!contactSelected && selectedEntityType.get() != null
+					? "-fx-font-size: 14px; -fx-font-weight: 700; -fx-padding: 12 18 12 18;"
+					: "-fx-font-size: 14px; -fx-padding: 12 18 12 18;");
 		};
 
-		createNewButton.setOnAction(e -> { selectedMode.set("create"); applyChoiceButtonStyles.run(); });
-		selectExistingButton.setOnAction(e -> { selectedMode.set("select"); applyChoiceButtonStyles.run(); });
-		contactButton.setOnAction(e -> { selectedEntityType.set("contact"); applyChoiceButtonStyles.run(); });
-		organizationButton.setOnAction(e -> { selectedEntityType.set("organization"); applyChoiceButtonStyles.run(); });
+		createNewButton.setOnAction(e -> {
+			selectedMode.set("create");
+			applyChoiceButtonStyles.run();
+		});
+		selectExistingButton.setOnAction(e -> {
+			selectedMode.set("select");
+			applyChoiceButtonStyles.run();
+		});
+		contactButton.setOnAction(e -> {
+			selectedEntityType.set("contact");
+			applyChoiceButtonStyles.run();
+		});
+		organizationButton.setOnAction(e -> {
+			selectedEntityType.set("organization");
+			applyChoiceButtonStyles.run();
+		});
 
 		Runnable loadExistingOptions = () -> {
 			boolean isContact = "contact".equals(selectedEntityType.get());
@@ -1731,20 +1750,15 @@ public class CaseController {
 		};
 
 		Node backButton = dialog.getDialogPane().lookupButton(backType);
-		Node nextButton = dialog.getDialogPane().lookupButton(nextType);
 		Node addButton = dialog.getDialogPane().lookupButton(addType);
 
 		backButton.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
 			e.consume();
-			if (currentStep.get() > 1) {
-				currentStep.set(currentStep.get() - 1);
+			if (currentStep.get() == 3) {
+				currentStep.set(2);
 				refreshWizardUi.run();
-			}
-		});
-		nextButton.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
-			e.consume();
-			if (currentStep.get() < 3) {
-				currentStep.set(currentStep.get() + 1);
+			} else if (currentStep.get() == 2) {
+				currentStep.set(1);
 				refreshWizardUi.run();
 			}
 		});
@@ -1753,21 +1767,17 @@ public class CaseController {
 			int step = currentStep.get();
 			boolean createPath = "create".equals(selectedMode.get());
 			setVisibleManaged(backButton, step > 1);
-			setVisibleManaged(nextButton, step < 3);
 			setVisibleManaged(addButton, step == 3);
 
 			if (step == 1) {
-				nextButton.setDisable(selectedMode.get() == null);
 				addButton.setDisable(true);
 				return;
 			}
 			if (step == 2) {
-				nextButton.setDisable(selectedEntityType.get() == null);
 				addButton.setDisable(true);
 				return;
 			}
 
-			nextButton.setDisable(true);
 			if (roleChoice.getValue() == null || sideChoice.getValue() == null) {
 				addButton.setDisable(true);
 				return;
@@ -1783,8 +1793,22 @@ public class CaseController {
 			}
 		};
 
-		selectedMode.addListener((obs, ov, nv) -> { applyChoiceButtonStyles.run(); refreshWizardUi.run(); refreshButtonState.run(); });
-		selectedEntityType.addListener((obs, ov, nv) -> { applyChoiceButtonStyles.run(); refreshWizardUi.run(); refreshButtonState.run(); });
+		selectedMode.addListener((obs, ov, nv) -> {
+			if (currentStep.get() == 1 && nv != null) {
+				currentStep.set(2);
+			}
+			applyChoiceButtonStyles.run();
+			refreshWizardUi.run();
+			refreshButtonState.run();
+		});
+		selectedEntityType.addListener((obs, ov, nv) -> {
+			if (currentStep.get() == 2 && nv != null) {
+				currentStep.set(3);
+			}
+			applyChoiceButtonStyles.run();
+			refreshWizardUi.run();
+			refreshButtonState.run();
+		});
 		roleChoice.valueProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
 		sideChoice.valueProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
 		firstNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
