@@ -27,6 +27,7 @@ public class ContactCard extends HBox {
     private Consumer<Integer> onOpen;
     private String backgroundCss;
     private boolean hovered;
+    private boolean suppressPlaceholderLines;
 
     public ContactCard() {
         buildUiMiniDefaults();
@@ -65,6 +66,10 @@ public class ContactCard extends HBox {
         refreshSurfaceStyle();
     }
 
+    public void setSuppressPlaceholderLines(boolean suppressPlaceholderLines) {
+        this.suppressPlaceholderLines = suppressPlaceholderLines;
+    }
+
     public void applyMini() {
         getChildren().clear();
 
@@ -96,7 +101,9 @@ public class ContactCard extends HBox {
         if (roleLabel.isManaged()) {
             text.getChildren().add(roleLabel);
         }
-        text.getChildren().add(emailLabel);
+        if (!(suppressPlaceholderLines && "—".equals(emailLabel.getText()))) {
+            text.getChildren().add(emailLabel);
+        }
         getChildren().add(text);
     }
 
