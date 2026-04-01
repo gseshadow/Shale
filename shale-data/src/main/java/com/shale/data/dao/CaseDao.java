@@ -211,6 +211,12 @@ public final class CaseDao {
 	) {
 	}
 
+	public record PartyRoleRow(
+			long id,
+			String name
+	) {
+	}
+
 	private record CaseSchema(String deletedColumn) {
 	}
 
@@ -2340,6 +2346,31 @@ public final class CaseDao {
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load linkable contacts for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public List<PartyRoleRow> listPartyRoles() {
+		String sql = """
+				SELECT
+				  pr.Id,
+				  pr.Name
+				FROM dbo.PartyRoles pr
+				ORDER BY pr.Name ASC, pr.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+			List<PartyRoleRow> out = new ArrayList<>();
+			while (rs.next()) {
+				out.add(new PartyRoleRow(
+						rs.getLong("Id"),
+						rs.getString("Name")
+				));
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load party roles", e);
 		}
 	}
 
