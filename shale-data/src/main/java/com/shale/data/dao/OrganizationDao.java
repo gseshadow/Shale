@@ -33,7 +33,11 @@ public final class OrganizationDao {
 			java.time.LocalDate intakeDate,
 			java.time.LocalDate statuteOfLimitationsDate,
 			String responsibleAttorneyName,
-			String responsibleAttorneyColor
+			String responsibleAttorneyColor,
+			String partyRoleName,
+			String side,
+			boolean primary,
+			String notes
 	) {
 	}
 
@@ -586,29 +590,40 @@ public final class OrganizationDao {
 				  c.Name,
 				  c.CallerDate,
 				  c.StatuteOfLimitations,
+				  pr.Name AS PartyRoleName,
+				  cp.Side,
+				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
+				  cp.Notes,
 				  u.color AS ResponsibleAttorneyColor,
 				  LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
 				    COALESCE(u.name_last, '')
 				  )) AS ResponsibleAttorneyName
-				FROM CaseOrganizations co
-				INNER JOIN Cases c
-				  ON c.Id = co.CaseId
+				FROM dbo.CaseParties cp
+				INNER JOIN dbo.Cases c
+				  ON c.Id = cp.CaseId
+				INNER JOIN dbo.PartyRoles pr
+				  ON pr.Id = cp.PartyRoleId
 				OUTER APPLY (
-				    SELECT TOP (1) cu.UserId
-				    FROM CaseUsers cu
+				    SELECT TOP (1)
+				      cu.UserId
+				    FROM dbo.CaseUsers cu
 				    WHERE cu.CaseId = c.Id
 				      AND cu.RoleId = 4
 				      AND cu.IsPrimary = 1
 				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
 				) ra
-				LEFT JOIN Users u
+				LEFT JOIN dbo.Users u
 				  ON u.Id = ra.UserId
-				WHERE co.OrganizationId = ?
+				WHERE cp.OrganizationId = ?
 				  AND c.ShaleClientId = ?
 				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
-				ORDER BY c.Name ASC, c.Id ASC;
+				ORDER BY
+				  CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+				  c.Name ASC,
+				  c.Id ASC,
+				  cp.Id ASC;
 				""";
 
 		try (Connection con = db.requireConnection();
@@ -628,7 +643,11 @@ public final class OrganizationDao {
 						toLocalDate(rs.getDate("CallerDate")),
 						toLocalDate(rs.getDate("StatuteOfLimitations")),
 						rs.getString("ResponsibleAttorneyName"),
-						rs.getString("ResponsibleAttorneyColor")
+						rs.getString("ResponsibleAttorneyColor"),
+						rs.getString("PartyRoleName"),
+						rs.getString("Side"),
+						rs.getBoolean("IsPrimary"),
+						rs.getString("Notes")
 					));
 				}
 			}
