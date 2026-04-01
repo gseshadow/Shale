@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -2651,11 +2652,12 @@ public class CaseController {
 			return null;
 		}
 		CallerPartySelection caller = resolveCallerFromCaseParties(parties);
-		if (caller == null) {
-			return overview;
-		}
-		if (Objects.equals(overview.getPrimaryCallerContactId(), caller.contactId())
-				&& Objects.equals(safeText(overview.getCaller()), safeText(caller.displayName()))) {
+		List<CaseOverviewDto.ContactSummary> representedClients = resolveRepresentedClientsFromCaseParties(parties);
+		Integer effectiveCallerId = caller == null ? overview.getPrimaryCallerContactId() : caller.contactId();
+		String effectiveCallerName = caller == null ? overview.getCaller() : caller.displayName();
+		if (Objects.equals(overview.getPrimaryCallerContactId(), effectiveCallerId)
+				&& Objects.equals(safeText(overview.getCaller()), safeText(effectiveCallerName))
+				&& Objects.equals(overview.getClients(), representedClients)) {
 			return overview;
 		}
 
@@ -2675,15 +2677,33 @@ public class CaseController {
 				overview.getIntakeDate(),
 				overview.getIncidentDate(),
 				overview.getSolDate(),
-				caller.contactId(),
+				effectiveCallerId,
 				overview.getPrimaryClientContactId(),
 				overview.getPrimaryOpposingCounselContactId(),
-				caller.displayName(),
+				effectiveCallerName,
 				overview.getClient(),
-				overview.getClients(),
+				representedClients,
 				overview.getOpposingCounsel(),
 				overview.getTeam(),
 				overview.getDescription());
+	}
+
+	private List<CaseOverviewDto.ContactSummary> resolveRepresentedClientsFromCaseParties(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return List.of();
+		}
+		return parties.stream()
+				.filter(Objects::nonNull)
+				.filter(party -> "party".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()))
+				.filter(party -> "represented".equalsIgnoreCase(safeText(party.getSide()).trim()))
+				.sorted(Comparator
+						.comparing(CasePartyDto::isPrimary, Comparator.reverseOrder())
+						.thenComparing(p -> safeText(p.getDisplayName()), String.CASE_INSENSITIVE_ORDER)
+						.thenComparing(CasePartyDto::getId))
+				.map(party -> new CaseOverviewDto.ContactSummary(
+						party.getContactId() == null ? null : party.getContactId().intValue(),
+						safeText(party.getDisplayName())))
+				.toList();
 	}
 
 	private CallerPartySelection resolveCallerFromCaseParties(List<CasePartyDto> parties) {
@@ -3818,7 +3838,6 @@ public class CaseController {
 
 		List<CaseOverviewDto.ContactSummary> safeClients = clients == null ? List.of() : clients.stream()
 				.filter(Objects::nonNull)
-				.filter(c -> c.contactId() != null && c.contactId() > 0)
 				.toList();
 		if (safeClients.isEmpty()) {
 			ovClientHost.getChildren().setAll(contactCardFactory.createMini(null, "—"));
@@ -4739,8 +4758,8 @@ public class CaseController {
 						.filter(Objects::nonNull)
 						.distinct()
 						.toList();
-				caseDao.replaceCaseContactsForRole(
-						request.saveCaseId(), request.tenantId(), ROLE_CASECONTACT_CLIENT, desiredClientIds, null
+				caseDao.syncRepresentedPartyContacts(
+						request.saveCaseId(), request.tenantId(), desiredClientIds, null
 				);
 			}
 
@@ -5321,11 +5340,18 @@ public class CaseController {
 			List<CaseOverviewDto.ContactSummary> initial = draftClientContacts != null
 					? draftClientContacts
 					: (currentOverview == null ? List.of() : currentOverview.getClients());
+			if (initial == null) {
+				initial = List.of();
+			}
+			List<CaseOverviewDto.ContactSummary> contactOnlyInitial = initial.stream()
+					.filter(Objects::nonNull)
+					.filter(client -> client.contactId() != null && client.contactId() > 0)
+					.toList();
 			Window owner = dialogOwner(changeClientButton);
 			ClientAssignmentDialog dialog = new ClientAssignmentDialog(
 					owner,
 					cleaned,
-					initial,
+					contactOnlyInitial,
 					(firstName, lastName) -> {
 						if (contactDao == null || appState == null || appState.getShaleClientId() == null || appState.getShaleClientId() <= 0)
 							throw new IllegalStateException("Cannot create contact without an active tenant.");
