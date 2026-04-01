@@ -1554,7 +1554,7 @@ public class CaseController {
 		TextField searchField = new TextField();
 		searchField.setPromptText("Search by name");
 		javafx.scene.control.ListView<PartyEntityOption> existingList = new javafx.scene.control.ListView<>();
-		existingList.setPrefHeight(240);
+		existingList.setPrefHeight(280);
 		existingList.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
 			@Override
 			protected void updateItem(PartyEntityOption item, boolean empty) {
@@ -1563,33 +1563,37 @@ public class CaseController {
 			}
 		});
 
-		javafx.scene.control.ToggleGroup modeGroup = new javafx.scene.control.ToggleGroup();
-		javafx.scene.control.RadioButton createNewRadio = new javafx.scene.control.RadioButton("Create New");
-		createNewRadio.setToggleGroup(modeGroup);
-		javafx.scene.control.RadioButton selectExistingRadio = new javafx.scene.control.RadioButton("Select Existing");
-		selectExistingRadio.setToggleGroup(modeGroup);
+		javafx.beans.property.ObjectProperty<String> selectedMode = new javafx.beans.property.SimpleObjectProperty<>();
+		javafx.beans.property.ObjectProperty<String> selectedEntityType = new javafx.beans.property.SimpleObjectProperty<>();
 
-		javafx.scene.control.ToggleGroup entityGroup = new javafx.scene.control.ToggleGroup();
-		javafx.scene.control.RadioButton contactRadio = new javafx.scene.control.RadioButton("Contact");
-		contactRadio.setToggleGroup(entityGroup);
-		javafx.scene.control.RadioButton organizationRadio = new javafx.scene.control.RadioButton("Organization");
-		organizationRadio.setToggleGroup(entityGroup);
+		Label step1Title = new Label("Step 1: Create new or select from existing");
+		step1Title.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
+		Button createNewButton = new Button("Create New");
+		Button selectExistingButton = new Button("Select Existing");
+		createNewButton.setPrefWidth(180);
+		selectExistingButton.setPrefWidth(180);
+		HBox step1Choices = new HBox(12, createNewButton, selectExistingButton);
+		step1Choices.setAlignment(Pos.CENTER);
+		VBox step1Pane = new VBox(20, step1Title, step1Choices);
+		step1Pane.setAlignment(Pos.CENTER);
+		step1Pane.setPadding(new Insets(20));
 
-		VBox step1Pane = new VBox(12,
-				new Label("Step 1: Create new or select from existing"),
-				createNewRadio,
-				selectExistingRadio);
-		step1Pane.setPadding(new Insets(12));
-
-		VBox step2Pane = new VBox(12,
-				new Label("Step 2: Contact or Organization"),
-				contactRadio,
-				organizationRadio);
-		step2Pane.setPadding(new Insets(12));
+		Label step2Title = new Label("Step 2: Contact or Organization");
+		step2Title.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
+		Button contactButton = new Button("Contact");
+		Button organizationButton = new Button("Organization");
+		contactButton.setPrefWidth(180);
+		organizationButton.setPrefWidth(180);
+		HBox step2Choices = new HBox(12, contactButton, organizationButton);
+		step2Choices.setAlignment(Pos.CENTER);
+		VBox step2Pane = new VBox(20, step2Title, step2Choices);
+		step2Pane.setAlignment(Pos.CENTER);
+		step2Pane.setPadding(new Insets(20));
 
 		GridPane createGrid = new GridPane();
 		createGrid.setHgap(10);
 		createGrid.setVgap(8);
+
 		GridPane createRelationshipGrid = new GridPane();
 		createRelationshipGrid.setHgap(10);
 		createRelationshipGrid.setVgap(8);
@@ -1598,11 +1602,12 @@ public class CaseController {
 		createRelationshipGrid.add(new Label("Affiliation"), 0, 1);
 		createRelationshipGrid.add(sideChoice, 1, 1);
 
-		VBox step3CreatePane = new VBox(12,
-				new Label("Step 3: Create New"),
-				createGrid,
-				createRelationshipGrid);
-		step3CreatePane.setPadding(new Insets(12));
+		Label step3CreateTitle = new Label("Step 3: Create New");
+		step3CreateTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
+		VBox step3CreatePane = new VBox(14, step3CreateTitle, createGrid, createRelationshipGrid);
+		step3CreatePane.setAlignment(Pos.TOP_CENTER);
+		step3CreatePane.setPadding(new Insets(16));
+		step3CreatePane.setMaxWidth(620);
 
 		GridPane selectRelationshipGrid = new GridPane();
 		selectRelationshipGrid.setHgap(10);
@@ -1615,19 +1620,36 @@ public class CaseController {
 		selectRelationshipGrid.add(new Label("Notes"), 0, 3);
 		selectRelationshipGrid.add(notesArea, 1, 3);
 
-		VBox step3SelectPane = new VBox(12,
-				new Label("Step 3: Select Existing"),
-				searchField,
-				existingList,
-				selectRelationshipGrid);
-		step3SelectPane.setPadding(new Insets(12));
+		Label step3SelectTitle = new Label("Step 3: Select Existing");
+		step3SelectTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
+		VBox step3SelectPane = new VBox(12, step3SelectTitle, searchField, existingList, selectRelationshipGrid);
+		step3SelectPane.setAlignment(Pos.TOP_CENTER);
+		step3SelectPane.setPadding(new Insets(16));
+		step3SelectPane.setMaxWidth(700);
 
-		StackPane contentHost = new StackPane(step1Pane, step2Pane, step3CreatePane, step3SelectPane);
-		contentHost.setPrefWidth(560);
-		dialog.getDialogPane().setContent(contentHost);
+		StackPane stepHost = new StackPane(step1Pane, step2Pane, step3CreatePane, step3SelectPane);
+		stepHost.setAlignment(Pos.CENTER);
+		BorderPane root = new BorderPane(stepHost);
+		root.setPadding(new Insets(8));
+		dialog.getDialogPane().setContent(root);
+
+		Runnable applyChoiceButtonStyles = () -> {
+			boolean createNew = "create".equals(selectedMode.get());
+			createNewButton.getStyleClass().setAll(createNew ? "button-primary" : "button-secondary");
+			selectExistingButton.getStyleClass().setAll(!createNew && selectedMode.get() != null ? "button-primary" : "button-secondary");
+
+			boolean contactSelected = "contact".equals(selectedEntityType.get());
+			contactButton.getStyleClass().setAll(contactSelected ? "button-primary" : "button-secondary");
+			organizationButton.getStyleClass().setAll(!contactSelected && selectedEntityType.get() != null ? "button-primary" : "button-secondary");
+		};
+
+		createNewButton.setOnAction(e -> { selectedMode.set("create"); applyChoiceButtonStyles.run(); });
+		selectExistingButton.setOnAction(e -> { selectedMode.set("select"); applyChoiceButtonStyles.run(); });
+		contactButton.setOnAction(e -> { selectedEntityType.set("contact"); applyChoiceButtonStyles.run(); });
+		organizationButton.setOnAction(e -> { selectedEntityType.set("organization"); applyChoiceButtonStyles.run(); });
 
 		Runnable loadExistingOptions = () -> {
-			boolean isContact = contactRadio.isSelected();
+			boolean isContact = "contact".equals(selectedEntityType.get());
 			List<PartyEntityOption> options = new java.util.ArrayList<>();
 			if (isContact) {
 				for (CaseDao.SelectableContactRow contact : contacts) {
@@ -1663,10 +1685,9 @@ public class CaseController {
 			}
 		};
 
-		javafx.beans.property.IntegerProperty currentStep = new javafx.beans.property.SimpleIntegerProperty(1);
 		Runnable refreshCreateFields = () -> {
 			createGrid.getChildren().clear();
-			if (contactRadio.isSelected()) {
+			if ("contact".equals(selectedEntityType.get())) {
 				createGrid.add(new Label("First Name"), 0, 0);
 				createGrid.add(firstNameField, 1, 0);
 				createGrid.add(new Label("Last Name"), 0, 1);
@@ -1677,32 +1698,41 @@ public class CaseController {
 			}
 		};
 
+		javafx.beans.property.IntegerProperty currentStep = new javafx.beans.property.SimpleIntegerProperty(1);
 		Runnable refreshWizardUi = () -> {
 			int step = currentStep.get();
-			boolean createNew = createNewRadio.isSelected();
+			boolean createPath = "create".equals(selectedMode.get());
+
 			setVisibleManaged(step1Pane, step == 1);
 			setVisibleManaged(step2Pane, step == 2);
-			setVisibleManaged(step3CreatePane, step == 3 && createNew);
-			setVisibleManaged(step3SelectPane, step == 3 && !createNew);
-			refreshCreateFields.run();
-			if (step == 3 && !createNew) {
+			setVisibleManaged(step3CreatePane, step == 3 && createPath);
+			setVisibleManaged(step3SelectPane, step == 3 && !createPath);
+
+			if (step == 3 && createPath) {
+				refreshCreateFields.run();
+			}
+			if (step == 3 && !createPath) {
 				loadExistingOptions.run();
 			}
-			dialog.setResizable(step == 3);
-			if (step < 3) {
-				dialog.getDialogPane().setPrefHeight(220);
-			} else if (createNew) {
-				dialog.getDialogPane().setPrefHeight(300);
+
+			if (step == 1 || step == 2) {
+				dialog.getDialogPane().setPrefSize(560, 280);
+				dialog.getDialogPane().setMinSize(560, 280);
+			} else if (createPath) {
+				dialog.getDialogPane().setPrefSize(700, 420);
+				dialog.getDialogPane().setMinSize(700, 420);
 			} else {
-				dialog.getDialogPane().setPrefHeight(560);
+				dialog.getDialogPane().setPrefSize(780, 640);
+				dialog.getDialogPane().setMinSize(780, 640);
+			}
+			if (dialog.getDialogPane().getScene() != null && dialog.getDialogPane().getScene().getWindow() != null) {
+				dialog.getDialogPane().getScene().getWindow().sizeToScene();
 			}
 		};
 
 		Node backButton = dialog.getDialogPane().lookupButton(backType);
 		Node nextButton = dialog.getDialogPane().lookupButton(nextType);
 		Node addButton = dialog.getDialogPane().lookupButton(addType);
-		setVisibleManaged(backButton, false);
-		setVisibleManaged(addButton, false);
 
 		backButton.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
 			e.consume();
@@ -1721,18 +1751,18 @@ public class CaseController {
 
 		Runnable refreshButtonState = () -> {
 			int step = currentStep.get();
-			boolean createNew = createNewRadio.isSelected();
+			boolean createPath = "create".equals(selectedMode.get());
 			setVisibleManaged(backButton, step > 1);
 			setVisibleManaged(nextButton, step < 3);
 			setVisibleManaged(addButton, step == 3);
 
 			if (step == 1) {
-				nextButton.setDisable(modeGroup.getSelectedToggle() == null);
+				nextButton.setDisable(selectedMode.get() == null);
 				addButton.setDisable(true);
 				return;
 			}
 			if (step == 2) {
-				nextButton.setDisable(entityGroup.getSelectedToggle() == null);
+				nextButton.setDisable(selectedEntityType.get() == null);
 				addButton.setDisable(true);
 				return;
 			}
@@ -1742,8 +1772,8 @@ public class CaseController {
 				addButton.setDisable(true);
 				return;
 			}
-			if (createNew) {
-				if (contactRadio.isSelected()) {
+			if (createPath) {
+				if ("contact".equals(selectedEntityType.get())) {
 					addButton.setDisable(safeText(firstNameField.getText()).isBlank() && safeText(lastNameField.getText()).isBlank());
 				} else {
 					addButton.setDisable(safeText(organizationNameField.getText()).isBlank());
@@ -1753,20 +1783,25 @@ public class CaseController {
 			}
 		};
 
-		modeGroup.selectedToggleProperty().addListener((obs, ov, nv) -> { refreshWizardUi.run(); refreshButtonState.run(); });
-		entityGroup.selectedToggleProperty().addListener((obs, ov, nv) -> { refreshWizardUi.run(); refreshButtonState.run(); });
+		selectedMode.addListener((obs, ov, nv) -> { applyChoiceButtonStyles.run(); refreshWizardUi.run(); refreshButtonState.run(); });
+		selectedEntityType.addListener((obs, ov, nv) -> { applyChoiceButtonStyles.run(); refreshWizardUi.run(); refreshButtonState.run(); });
 		roleChoice.valueProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
 		sideChoice.valueProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
 		firstNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
 		lastNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
 		organizationNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
-		searchField.textProperty().addListener((obs, ov, nv) -> { if (currentStep.get() == 3 && selectExistingRadio.isSelected()) loadExistingOptions.run(); refreshButtonState.run(); });
+		searchField.textProperty().addListener((obs, ov, nv) -> {
+			if (currentStep.get() == 3 && "select".equals(selectedMode.get())) {
+				loadExistingOptions.run();
+			}
+			refreshButtonState.run();
+		});
 		existingList.getSelectionModel().selectedItemProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
 		currentStep.addListener((obs, ov, nv) -> refreshButtonState.run());
 
-		createNewRadio.setSelected(false);
-		selectExistingRadio.setSelected(true);
-		contactRadio.setSelected(true);
+		selectedMode.set("select");
+		selectedEntityType.set("contact");
+		applyChoiceButtonStyles.run();
 		refreshWizardUi.run();
 		refreshButtonState.run();
 
@@ -1774,8 +1809,8 @@ public class CaseController {
 			if (button != addType) {
 				return null;
 			}
-			boolean createNew = createNewRadio.isSelected();
-			boolean isContact = contactRadio.isSelected();
+			boolean createNew = "create".equals(selectedMode.get());
+			boolean isContact = "contact".equals(selectedEntityType.get());
 			PartyRoleOption role = roleChoice.getValue();
 			PartySideOption side = sideChoice.getValue();
 			if (role == null || side == null) {
