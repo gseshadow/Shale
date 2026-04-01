@@ -2652,22 +2652,28 @@ public final class CaseDao {
 				    WHEN cp.ContactId IS NOT NULL THEN 'contact'
 				    ELSE 'organization'
 				  END AS EntityType,
-				  LTRIM(RTRIM(
+				  COALESCE(
+				    NULLIF(LTRIM(RTRIM(
+				      CASE
+				        WHEN cp.ContactId IS NOT NULL THEN
+				          CASE
+				            WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				              OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				            THEN
+				              COALESCE(ct.FirstName, '') +
+				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				              COALESCE(ct.LastName, '')
+				            ELSE
+				              COALESCE(ct.Name, '')
+				          END
+				        ELSE COALESCE(o.Name, '')
+				      END
+				    )), ''),
 				    CASE
-				      WHEN cp.ContactId IS NOT NULL THEN
-				        CASE
-				          WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-				            OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-				          THEN
-				            COALESCE(ct.FirstName, '') +
-				            CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-				            COALESCE(ct.LastName, '')
-				          ELSE
-				            COALESCE(ct.Name, '')
-				        END
-				      ELSE COALESCE(o.Name, '')
+				      WHEN cp.ContactId IS NOT NULL THEN 'Contact #' + CAST(cp.ContactId AS varchar(32))
+				      ELSE 'Organization #' + CAST(cp.OrganizationId AS varchar(32))
 				    END
-				  )) AS DisplayName
+				  ) AS DisplayName
 				FROM dbo.CaseParties cp
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cp.CaseId
@@ -2688,22 +2694,28 @@ public final class CaseDao {
 				    WHEN 'neutral' THEN 2
 				    ELSE 3
 				  END,
-				  LTRIM(RTRIM(
+				  COALESCE(
+				    NULLIF(LTRIM(RTRIM(
+				      CASE
+				        WHEN cp.ContactId IS NOT NULL THEN
+				          CASE
+				            WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				              OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				            THEN
+				              COALESCE(ct.FirstName, '') +
+				              CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				              COALESCE(ct.LastName, '')
+				            ELSE
+				              COALESCE(ct.Name, '')
+				          END
+				        ELSE COALESCE(o.Name, '')
+				      END
+				    )), ''),
 				    CASE
-				      WHEN cp.ContactId IS NOT NULL THEN
-				        CASE
-				          WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
-				            OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
-				          THEN
-				            COALESCE(ct.FirstName, '') +
-				            CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
-				            COALESCE(ct.LastName, '')
-				          ELSE
-				            COALESCE(ct.Name, '')
-				        END
-				      ELSE COALESCE(o.Name, '')
+				      WHEN cp.ContactId IS NOT NULL THEN 'Contact #' + CAST(cp.ContactId AS varchar(32))
+				      ELSE 'Organization #' + CAST(cp.OrganizationId AS varchar(32))
 				    END
-				  )) ASC,
+				  ) ASC,
 				  cp.Id ASC;
 				""";
 
