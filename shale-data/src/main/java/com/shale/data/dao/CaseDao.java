@@ -3554,6 +3554,98 @@ public final class CaseDao {
 						ps.executeBatch();
 					}
 				}
+				normalizeCasePartyRelationshipPrimaries(con, caseId, shaleClientId);
+				con.commit();
+			} catch (Exception ex) {
+				con.rollback();
+				throw ex;
+			} finally {
+				con.setAutoCommit(true);
+			}
+		} catch (Exception e) {
+			throw new RuntimeException(
+					"Failed to sync represented party contacts (caseId=" + caseId + ")",
+					e
+			);
+		}
+	}
+
+	public void syncRepresentedPartyContacts(
+			long caseId,
+			int shaleClientId,
+			List<Integer> contactIds,
+			String notes) {
+		List<Integer> normalized = (contactIds == null ? List.<Integer>of() : contactIds).stream()
+				.filter(Objects::nonNull)
+				.map(Integer::intValue)
+				.filter(id -> id > 0)
+				.distinct()
+				.toList();
+		String cleanNotes = (notes == null || notes.isBlank()) ? null : notes.trim();
+		try (Connection con = db.requireConnection()) {
+			con.setAutoCommit(false);
+			try {
+				for (Integer contactId : normalized) {
+					String ensureContactSql = """
+							SELECT 1
+							FROM dbo.Contacts ct
+							WHERE ct.Id = ?
+							  AND ct.ShaleClientId = ?
+							  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL);
+							""";
+					try (PreparedStatement ps = con.prepareStatement(ensureContactSql)) {
+						ps.setInt(1, contactId);
+						ps.setInt(2, shaleClientId);
+						try (ResultSet rs = ps.executeQuery()) {
+							if (!rs.next()) {
+								throw new IllegalArgumentException("Contact not found for tenant: " + contactId);
+							}
+						}
+					}
+				}
+
+				String deleteSql = """
+						DELETE cp
+						FROM dbo.CaseParties cp
+						INNER JOIN dbo.Cases c
+						  ON c.Id = cp.CaseId
+						INNER JOIN dbo.PartyRoles pr
+						  ON pr.Id = cp.PartyRoleId
+						WHERE cp.CaseId = ?
+						  AND c.ShaleClientId = ?
+						  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+						  AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?
+						  AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
+						  AND cp.ContactId IS NOT NULL;
+						""";
+				try (PreparedStatement ps = con.prepareStatement(deleteSql)) {
+					ps.setLong(1, caseId);
+					ps.setInt(2, shaleClientId);
+					ps.setString(3, PARTY_ROLE_NAME_PARTY);
+					ps.executeUpdate();
+				}
+
+				if (!normalized.isEmpty()) {
+					String insertSql = """
+							INSERT INTO dbo.CaseParties
+							  (CaseId, ContactId, OrganizationId, PartyRoleId, Side, IsPrimary, Notes, CreatedAt, UpdatedAt)
+							SELECT
+							  ?, ?, NULL, pr.Id, 'represented', ?, ?, SYSUTCDATETIME(), SYSUTCDATETIME()
+							FROM dbo.PartyRoles pr
+							WHERE LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?;
+							""";
+					try (PreparedStatement ps = con.prepareStatement(insertSql)) {
+						for (int i = 0; i < normalized.size(); i++) {
+							ps.setLong(1, caseId);
+							ps.setInt(2, normalized.get(i));
+							ps.setBoolean(3, i == 0);
+							ps.setString(4, cleanNotes);
+							ps.setString(5, PARTY_ROLE_NAME_PARTY);
+							ps.addBatch();
+						}
+						ps.executeBatch();
+					}
+				}
 				con.commit();
 			} catch (Exception ex) {
 				con.rollback();
