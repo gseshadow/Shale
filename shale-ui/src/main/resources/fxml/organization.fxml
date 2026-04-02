@@ -25,7 +25,6 @@
             </HBox>
 
             <HBox spacing="10.0" alignment="CENTER_LEFT">
-                <Label fx:id="organizationTypeLabel" text="Type: —" style="-fx-opacity: 0.8;" />
                 <Region HBox.hgrow="ALWAYS" />
                 <Label fx:id="lastUpdatedLabel" text="Last updated: —" style="-fx-opacity: 0.7;" />
             </HBox>
