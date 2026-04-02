@@ -1008,6 +1008,88 @@ public final class CaseDao {
 		return countAll(includeClosedDenied, userId);
 	}
 
+	public long countForCasesView(String query, Set<Integer> selectedStatusIds) {
+		String normalizedQuery = normalizeSearchQuery(query);
+		Set<Integer> effectiveStatusIds = selectedStatusIds == null ? Set.of() : new HashSet<>(selectedStatusIds);
+
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			StringBuilder sql = new StringBuilder("""
+					SELECT COUNT(1)
+					FROM %s c
+					OUTER APPLY (
+					    SELECT TOP (1) s.Id AS PrimaryStatusId
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					OUTER APPLY (
+					    SELECT TOP (1) cu.UserId
+					    FROM %s cu
+					    WHERE cu.CaseId = c.Id
+					      AND cu.RoleId = ?
+					      AND cu.IsPrimary = 1
+					    ORDER BY
+					      cu.UpdatedAt DESC,
+					      cu.CreatedAt DESC,
+					      cu.Id DESC
+					) ra
+					LEFT JOIN %s u
+					  ON u.id = ra.UserId
+					WHERE %s
+					  AND c.ShaleClientId = ?
+					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c")));
+
+			if (!normalizedQuery.isBlank()) {
+				sql.append("""
+						  AND (
+						    LOWER(COALESCE(c.Name, '')) LIKE ?
+						    OR LOWER(LTRIM(RTRIM(
+						      COALESCE(u.name_first, '') +
+						      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+						      COALESCE(u.name_last, '')
+						    ))) LIKE ?
+						  )
+						""");
+			}
+
+			sql.append("  AND (current_status.PrimaryStatusId IS NULL");
+			if (!effectiveStatusIds.isEmpty()) {
+				sql.append(" OR current_status.PrimaryStatusId IN (");
+				sql.append("?,".repeat(effectiveStatusIds.size()));
+				sql.setLength(sql.length() - 1);
+				sql.append(")");
+			}
+			sql.append(");");
+
+			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+				int idx = 1;
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, requireCurrentShaleClientId(con));
+				if (!normalizedQuery.isBlank()) {
+					String pattern = containsPattern(normalizedQuery);
+					ps.setString(idx++, pattern);
+					ps.setString(idx++, pattern);
+				}
+				for (Integer statusId : effectiveStatusIds) {
+					ps.setInt(idx++, statusId);
+				}
+
+				try (ResultSet rs = ps.executeQuery()) {
+					rs.next();
+					return rs.getLong(1);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to count cases for cases view", e);
+		}
+	}
+
 	private long countAll(boolean includeClosedDenied, Integer restrictToUserId) {
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
