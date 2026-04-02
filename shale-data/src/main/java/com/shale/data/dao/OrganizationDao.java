@@ -417,18 +417,45 @@ public final class OrganizationDao {
 				  AND ShaleClientId = ?
 				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
 				""".formatted(ORGANIZATIONS_TABLE);
+		String cleanupCasePartiesSql = """
+				DELETE cp
+				FROM dbo.CaseParties cp
+				WHERE cp.OrganizationId = ?
+				  AND EXISTS (
+				      SELECT 1
+				      FROM dbo.Cases c
+				      WHERE c.Id = cp.CaseId
+				        AND c.ShaleClientId = ?
+				  );
+				""";
 
 		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+				PreparedStatement ps = con.prepareStatement(sql);
+				PreparedStatement cleanupPs = con.prepareStatement(cleanupCasePartiesSql)) {
 			int currentShaleClientId = requireCurrentShaleClientId(con);
 			if (shaleClientId.intValue() != currentShaleClientId) {
 				throw new IllegalArgumentException("shaleClientId does not match current session");
 			}
 
-			int idx = 1;
-			ps.setInt(idx++, organizationId);
-			ps.setInt(idx++, shaleClientId);
-			return ps.executeUpdate() > 0;
+			boolean previousAutoCommit = con.getAutoCommit();
+			con.setAutoCommit(false);
+			try {
+				cleanupPs.setInt(1, organizationId);
+				cleanupPs.setInt(2, shaleClientId);
+				cleanupPs.executeUpdate();
+
+				int idx = 1;
+				ps.setInt(idx++, organizationId);
+				ps.setInt(idx++, shaleClientId);
+				boolean deleted = ps.executeUpdate() > 0;
+				con.commit();
+				return deleted;
+			} catch (SQLException e) {
+				con.rollback();
+				throw e;
+			} finally {
+				con.setAutoCommit(previousAutoCommit);
+			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to soft delete organization (id=" + organizationId + ")", e);
 		}

@@ -592,6 +592,18 @@ public final class ContactDao {
                 throw new IllegalStateException("Contacts table does not support soft delete.");
             }
 
+            String cleanupCasePartiesSql = """
+                    DELETE cp
+                    FROM dbo.CaseParties cp
+                    WHERE cp.ContactId = ?
+                      AND EXISTS (
+                          SELECT 1
+                          FROM dbo.Cases c
+                          WHERE c.Id = cp.CaseId
+                            AND c.ShaleClientId = ?
+                      );
+                    """;
+
             StringBuilder sql = new StringBuilder("""
                     UPDATE dbo.Contacts
                     SET
@@ -604,10 +616,29 @@ public final class ContactDao {
             sql.append(activeFilter(schema.deletedColumn(), null));
             sql.append(';');
 
-            try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
-                ps.setInt(1, contactId);
-                ps.setInt(2, shaleClientId);
-                return ps.executeUpdate() > 0;
+            boolean previousAutoCommit = con.getAutoCommit();
+            con.setAutoCommit(false);
+            try {
+                try (PreparedStatement cleanupPs = con.prepareStatement(cleanupCasePartiesSql)) {
+                    cleanupPs.setInt(1, contactId);
+                    cleanupPs.setInt(2, shaleClientId);
+                    cleanupPs.executeUpdate();
+                }
+
+                boolean deleted;
+                try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+                    ps.setInt(1, contactId);
+                    ps.setInt(2, shaleClientId);
+                    deleted = ps.executeUpdate() > 0;
+                }
+
+                con.commit();
+                return deleted;
+            } catch (SQLException e) {
+                con.rollback();
+                throw e;
+            } finally {
+                con.setAutoCommit(previousAutoCommit);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to soft delete contact (id=" + contactId + ")", e);
