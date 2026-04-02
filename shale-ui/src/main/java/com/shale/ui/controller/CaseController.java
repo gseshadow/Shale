@@ -1214,6 +1214,15 @@ public class CaseController {
 		return primary ? base + " · Primary" : base;
 	}
 
+	private List<PartySideOption> defaultPartySideOptions() {
+		return List.of(
+				new PartySideOption("Represented", "represented"),
+				new PartySideOption("Opposing", "opposing"),
+				new PartySideOption("Neutral", "neutral"),
+				new PartySideOption("Unaffiliated", null)
+		);
+	}
+
 	private String normalizedPartySideKey(String side) {
 		String normalized = safeText(side).trim().toLowerCase(Locale.ROOT);
 		return switch (normalized) {
@@ -1229,7 +1238,7 @@ public class CaseController {
 			case "represented" -> "Represented";
 			case "opposing" -> "Opposing";
 			case "neutral" -> "Neutral";
-			default -> "Unclassified";
+			default -> "Unaffiliated";
 		};
 	}
 
@@ -1381,12 +1390,7 @@ public class CaseController {
 		ChoiceBox<PartyEntityOption> entityChoice = new ChoiceBox<>();
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
-		sideChoice.getItems().addAll(
-				new PartySideOption("Represented", "represented"),
-				new PartySideOption("Opposing", "opposing"),
-				new PartySideOption("Neutral", "neutral"),
-				new PartySideOption("Unclassified", null)
-		);
+		sideChoice.getItems().addAll(defaultPartySideOptions());
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
 			@Override public PartySideOption fromString(String string) { return null; }
@@ -1489,6 +1493,10 @@ public class CaseController {
 						.or(roleChoice.valueProperty().isNull())
 						.or(sideChoice.valueProperty().isNull())
 		);
+		sideChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
+			@Override public PartySideOption fromString(String string) { return null; }
+		});
 
 		dialog.setResultConverter(button -> {
 			if (button != saveType)
@@ -1588,12 +1596,7 @@ public class CaseController {
 		}
 
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
-		sideChoice.getItems().addAll(
-				new PartySideOption("Represented", "represented"),
-				new PartySideOption("Opposing", "opposing"),
-				new PartySideOption("Neutral", "neutral"),
-				new PartySideOption("Unaffiliated", null)
-		);
+		sideChoice.getItems().addAll(defaultPartySideOptions());
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
 			@Override public PartySideOption fromString(String string) { return null; }
