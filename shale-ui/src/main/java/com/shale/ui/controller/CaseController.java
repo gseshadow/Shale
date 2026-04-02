@@ -6198,11 +6198,11 @@ public class CaseController {
 		LocalDate effectiveAcceptedDate = acceptedDate;
 		LocalDate effectiveClosedDate = closedDate;
 		LocalDate effectiveDeniedDate = deniedDate;
-		if ("accepted".equals(lifecycleKey) && effectiveAcceptedDate == null)
+		if (CaseDao.LIFECYCLE_KEY_ACCEPTED.equals(lifecycleKey) && effectiveAcceptedDate == null)
 			effectiveAcceptedDate = today;
-		if ("closed".equals(lifecycleKey) && effectiveClosedDate == null)
+		if (CaseDao.LIFECYCLE_KEY_CLOSED.equals(lifecycleKey) && effectiveClosedDate == null)
 			effectiveClosedDate = today;
-		if ("denied".equals(lifecycleKey) && effectiveDeniedDate == null)
+		if (CaseDao.LIFECYCLE_KEY_DENIED.equals(lifecycleKey) && effectiveDeniedDate == null)
 			effectiveDeniedDate = today;
 		return new LifecycleDates(effectiveAcceptedDate, effectiveClosedDate, effectiveDeniedDate);
 	}
@@ -6216,10 +6216,7 @@ public class CaseController {
 		for (CaseDao.StatusRow status : statuses) {
 			if (status == null || status.id() != savedStatusId)
 				continue;
-			String normalized = safeText(status.name()).trim().toLowerCase(Locale.ROOT);
-			if ("accepted".equals(normalized) || "closed".equals(normalized) || "denied".equals(normalized))
-				return normalized;
-			return null;
+			return CaseDao.normalizeLifecycleKey(status.lifecycleKey());
 		}
 		return null;
 	}

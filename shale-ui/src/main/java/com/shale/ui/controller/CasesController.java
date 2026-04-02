@@ -67,7 +67,8 @@ public final class CasesController {
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
 
-	private final Set<Integer> selectedStatusIds = CaseListUiSupport.defaultSelectedStatuses();
+	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
+	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 
 	// Background DB executor (so UI doesn’t freeze)
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
@@ -401,7 +402,7 @@ public final class CasesController {
 				.toList();
 		refreshResultsCountAsync(q, selectedStatusIds);
 
-		boolean statusFilterActive = selectedStatusIds.size() < CaseListUiSupport.STATUS_FILTER_OPTIONS.size();
+		boolean statusFilterActive = selectedStatusIds.size() < statusFilterOptions.size();
 		if (( !q.isEmpty() || statusFilterActive ) && filtered.size() < pageSize && hasMore && !loading) {
 			loadNextPage();
 		}
@@ -447,12 +448,54 @@ public final class CasesController {
 	}
 
 	private boolean includeClosedDeniedInQuery() {
-		return selectedStatusIds.contains(CaseListUiSupport.STATUS_CLOSED)
-				|| selectedStatusIds.contains(CaseListUiSupport.STATUS_DENIED);
+		if (statusFilterOptions.isEmpty()) {
+			return false;
+		}
+		for (CaseListUiSupport.StatusFilterOption option : statusFilterOptions) {
+			if (option != null && option.isClosed() && selectedStatusIds.contains(option.id())) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void initializeStatusFilter() {
-		CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, this::loadFirstPage);
+		reloadStatusFilterOptionsAndThen(this::loadFirstPage);
+	}
+
+	private void reloadStatusFilterOptionsAndThen(Runnable onLoaded) {
+		Integer tenantId = appState == null ? null : appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0 || caseDao == null) {
+			statusFilterOptions = List.of();
+			selectedStatusIds.clear();
+			CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+			return;
+		}
+
+		dbExec.submit(() -> {
+			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+			List<CaseListUiSupport.StatusFilterOption> options = statuses == null
+					? List.of()
+					: statuses.stream()
+							.filter(Objects::nonNull)
+							.map(status -> new CaseListUiSupport.StatusFilterOption(
+									status.id(),
+									safe(status.name()).isBlank() ? ("Status #" + status.id()) : safe(status.name()),
+									status.isClosed()))
+							.toList();
+
+			Platform.runLater(() -> {
+				Set<Integer> statusIds = options.stream()
+						.map(CaseListUiSupport.StatusFilterOption::id)
+						.collect(java.util.stream.Collectors.toSet());
+				selectedStatusIds.removeIf(id -> !statusIds.contains(id));
+				if (selectedStatusIds.isEmpty()) {
+					selectedStatusIds.addAll(CaseListUiSupport.defaultSelectedStatuses(options));
+				}
+				statusFilterOptions = options;
+				CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+			});
+		});
 	}
 
 	private boolean matchesSelectedStatus(CaseCardVm vm) {
