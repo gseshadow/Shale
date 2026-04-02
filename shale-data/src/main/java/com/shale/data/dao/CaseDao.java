@@ -26,6 +26,10 @@ public final class CaseDao {
 	private static final String CASES_TABLE = "Cases";
 	private static final String CASE_USERS_TABLE = "CaseUsers";
 	private static final String USERS_TABLE = "Users";
+
+	public static final String LIFECYCLE_KEY_ACCEPTED = "accepted";
+	public static final String LIFECYCLE_KEY_DENIED = "denied";
+	public static final String LIFECYCLE_KEY_CLOSED = "closed";
 	private static final String CASE_STATUSES_TABLE = "CaseStatuses";
 	private static final String STATUSES_TABLE = "Statuses";
 	// CaseUsers.RoleId (int) for Responsible Attorney
@@ -3726,9 +3730,17 @@ public final class CaseDao {
 		}
 	}
 
-	public void populateLifecycleDateIfNull(long caseId, String normalizedStatusName) {
-		String normalized = (normalizedStatusName == null) ? "" : normalizedStatusName.trim().toLowerCase(Locale.ROOT);
-		if (!"accepted".equals(normalized) && !"denied".equals(normalized) && !"closed".equals(normalized))
+	public static String normalizeLifecycleKey(String lifecycleKey) {
+		String normalized = (lifecycleKey == null) ? "" : lifecycleKey.trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+		case LIFECYCLE_KEY_ACCEPTED, LIFECYCLE_KEY_DENIED, LIFECYCLE_KEY_CLOSED -> normalized;
+		default -> null;
+		};
+	}
+
+	public void populateLifecycleDateIfNull(long caseId, String lifecycleKey) {
+		String normalized = normalizeLifecycleKey(lifecycleKey);
+		if (normalized == null)
 			return;
 
 		String sql = """
@@ -3767,7 +3779,8 @@ public final class CaseDao {
 			String name,
 			boolean isClosed,
 			int sortOrder,
-			String color
+			String color,
+			String lifecycleKey
 	) {
 	}
 
@@ -3831,30 +3844,34 @@ public final class CaseDao {
 	}
 
 	public List<StatusRow> listStatusesForTenant(int shaleClientId) {
-		String sql = """
-				SELECT Id, Name, IsClosed, SortOrder, Color
-				FROM %s
-				WHERE ShaleClientId = ?
-				ORDER BY SortOrder, Name;
-				""".formatted(STATUSES_TABLE);
+		try (Connection con = db.requireConnection()) {
+			boolean hasLifecycleKey = tableHasColumn(con, "Statuses", "LifecycleKey");
+			String lifecycleKeySelect = hasLifecycleKey ? "LifecycleKey" : "NULL AS LifecycleKey";
+			String sql = """
+					SELECT Id, Name, IsClosed, SortOrder, Color, %s
+					FROM %s
+					WHERE ShaleClientId = ?
+					ORDER BY SortOrder, Name;
+					""".formatted(lifecycleKeySelect, STATUSES_TABLE);
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
 
-			ps.setInt(1, shaleClientId);
+				ps.setInt(1, shaleClientId);
 
-			try (ResultSet rs = ps.executeQuery()) {
-				List<StatusRow> out = new ArrayList<>();
-				while (rs.next()) {
-					out.add(new StatusRow(
-							rs.getInt("Id"),
-							rs.getString("Name"),
-							rs.getBoolean("IsClosed"),
-							rs.getInt("SortOrder"),
-							rs.getString("Color")
-					));
+				try (ResultSet rs = ps.executeQuery()) {
+					List<StatusRow> out = new ArrayList<>();
+					while (rs.next()) {
+						out.add(new StatusRow(
+								rs.getInt("Id"),
+								rs.getString("Name"),
+								rs.getBoolean("IsClosed"),
+								rs.getInt("SortOrder"),
+								rs.getString("Color"),
+								normalizeLifecycleKey(rs.getString("LifecycleKey"))
+						));
+					}
+					return out;
 				}
-				return out;
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list statuses (clientId=" + shaleClientId + ")", e);
