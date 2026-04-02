@@ -2544,13 +2544,30 @@ public final class CaseDao {
 				 AND ot.ShaleClientId = o.ShaleClientId
 				WHERE o.ShaleClientId = ?
 				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.Cases c
+				    WHERE c.Id = ?
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  )
+				  AND NOT EXISTS (
+				    SELECT 1
+				    FROM dbo.CaseParties cp
+				    WHERE cp.CaseId = ?
+				      AND cp.OrganizationId = o.Id
+				  )
 				ORDER BY o.Name ASC, o.Id ASC;
 				""";
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			int shaleClientId = requireCurrentShaleClientId(con);
-			ps.setInt(1, shaleClientId);
+			int idx = 1;
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, caseId);
 
 			List<SelectableOrganizationRow> out = new ArrayList<>();
 			try (ResultSet rs = ps.executeQuery()) {
