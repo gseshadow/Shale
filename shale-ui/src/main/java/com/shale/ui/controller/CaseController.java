@@ -1493,6 +1493,10 @@ public class CaseController {
 						.or(roleChoice.valueProperty().isNull())
 						.or(sideChoice.valueProperty().isNull())
 		);
+		sideChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
+			@Override public PartySideOption fromString(String string) { return null; }
+		});
 
 		dialog.setResultConverter(button -> {
 			if (button != saveType)
