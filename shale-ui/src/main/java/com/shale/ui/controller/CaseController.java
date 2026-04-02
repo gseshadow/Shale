@@ -1564,6 +1564,7 @@ public class CaseController {
 
 		javafx.beans.property.ObjectProperty<String> selectedMode = new javafx.beans.property.SimpleObjectProperty<>();
 		javafx.beans.property.ObjectProperty<String> selectedEntityType = new javafx.beans.property.SimpleObjectProperty<>();
+		javafx.beans.property.IntegerProperty currentStep = new javafx.beans.property.SimpleIntegerProperty(1);
 
 		Label step1Title = new Label("Step 1: Create new or select from existing");
 		step1Title.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
@@ -1652,19 +1653,19 @@ public class CaseController {
 
 		createNewButton.setOnAction(e -> {
 			selectedMode.set("create");
-			applyChoiceButtonStyles.run();
+			currentStep.set(2);
 		});
 		selectExistingButton.setOnAction(e -> {
 			selectedMode.set("select");
-			applyChoiceButtonStyles.run();
+			currentStep.set(2);
 		});
 		contactButton.setOnAction(e -> {
 			selectedEntityType.set("contact");
-			applyChoiceButtonStyles.run();
+			currentStep.set(3);
 		});
 		organizationButton.setOnAction(e -> {
 			selectedEntityType.set("organization");
-			applyChoiceButtonStyles.run();
+			currentStep.set(3);
 		});
 
 		Runnable loadExistingOptions = () -> {
@@ -1717,7 +1718,6 @@ public class CaseController {
 			}
 		};
 
-		javafx.beans.property.IntegerProperty currentStep = new javafx.beans.property.SimpleIntegerProperty(1);
 		Runnable refreshWizardUi = () -> {
 			int step = currentStep.get();
 			boolean createPath = "create".equals(selectedMode.get());
@@ -1794,17 +1794,11 @@ public class CaseController {
 		};
 
 		selectedMode.addListener((obs, ov, nv) -> {
-			if (currentStep.get() == 1 && nv != null) {
-				currentStep.set(2);
-			}
 			applyChoiceButtonStyles.run();
 			refreshWizardUi.run();
 			refreshButtonState.run();
 		});
 		selectedEntityType.addListener((obs, ov, nv) -> {
-			if (currentStep.get() == 2 && nv != null) {
-				currentStep.set(3);
-			}
 			applyChoiceButtonStyles.run();
 			refreshWizardUi.run();
 			refreshButtonState.run();
@@ -1823,8 +1817,6 @@ public class CaseController {
 		existingList.getSelectionModel().selectedItemProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
 		currentStep.addListener((obs, ov, nv) -> refreshButtonState.run());
 
-		selectedMode.set("select");
-		selectedEntityType.set("contact");
 		applyChoiceButtonStyles.run();
 		refreshWizardUi.run();
 		refreshButtonState.run();
