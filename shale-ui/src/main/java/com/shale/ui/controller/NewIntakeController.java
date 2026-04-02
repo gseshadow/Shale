@@ -26,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -239,20 +240,17 @@ public final class NewIntakeController {
 		}
 		try {
 			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(requireClientId());
-			Optional<CaseDao.StatusRow> potentialStatus = statuses.stream()
-					.filter(status -> "potential".equals(normalizeStatusName(status.name())))
+			Optional<CaseDao.StatusRow> defaultOpenStatus = statuses.stream()
+					.filter(Objects::nonNull)
+					.filter(status -> !status.isClosed())
 					.findFirst();
-			if (potentialStatus.isPresent()) {
-				selectedStatus = potentialStatus.get();
+			if (defaultOpenStatus.isPresent()) {
+				selectedStatus = defaultOpenStatus.get();
 				renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
 			}
 		} catch (RuntimeException ignored) {
 			// If statuses cannot be loaded at initialization time, keep existing fallback (unselected).
 		}
-	}
-
-	private String normalizeStatusName(String value) {
-		return value == null ? "" : value.trim().toLowerCase();
 	}
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorCss) {
