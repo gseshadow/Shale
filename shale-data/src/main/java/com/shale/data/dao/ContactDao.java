@@ -73,7 +73,11 @@ public final class ContactDao {
             LocalDate intakeDate,
             LocalDate statuteOfLimitationsDate,
             String responsibleAttorneyName,
-            String responsibleAttorneyColor
+            String responsibleAttorneyColor,
+            String partyRoleName,
+            String side,
+            boolean primary,
+            String notes
     ) {
     }
 
@@ -335,17 +339,23 @@ public final class ContactDao {
                   c.Name,
                   c.CallerDate,
                   c.StatuteOfLimitations,
+                  pr.Name AS PartyRoleName,
+                  cp.Side,
+                  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
+                  cp.Notes,
                   u.color AS ResponsibleAttorneyColor,
                   LTRIM(RTRIM(
                     COALESCE(u.name_first, '') +
                     CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
                     COALESCE(u.name_last, '')
                   )) AS ResponsibleAttorneyName
-                FROM dbo.CaseContacts cc
+                FROM dbo.CaseParties cp
                 INNER JOIN dbo.Cases c
-                  ON c.Id = cc.CaseId
+                  ON c.Id = cp.CaseId
+                INNER JOIN dbo.PartyRoles pr
+                  ON pr.Id = cp.PartyRoleId
                 INNER JOIN dbo.Contacts ct
-                  ON ct.Id = cc.ContactId
+                  ON ct.Id = cp.ContactId
                 OUTER APPLY (
                     SELECT TOP (1) cu.UserId
                     FROM dbo.CaseUsers cu
@@ -356,13 +366,17 @@ public final class ContactDao {
                 ) ra
                 LEFT JOIN dbo.Users u
                   ON u.Id = ra.UserId
-                WHERE cc.ContactId = ?
+                WHERE cp.ContactId = ?
                   AND c.ShaleClientId = ?
                   AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
-                  AND ct.Id = cc.ContactId
+                  AND ct.Id = cp.ContactId
                   AND ct.ShaleClientId = ?
                   AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-                ORDER BY c.Name ASC, c.Id ASC;
+                ORDER BY
+                  CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                  c.Name ASC,
+                  c.Id ASC,
+                  cp.Id ASC;
                 """;
 
         try (Connection con = db.requireConnection()) {
@@ -381,7 +395,11 @@ public final class ContactDao {
                                 toLocalDate(rs.getDate("CallerDate")),
                                 toLocalDate(rs.getDate("StatuteOfLimitations")),
                                 rs.getString("ResponsibleAttorneyName"),
-                                rs.getString("ResponsibleAttorneyColor")));
+                                rs.getString("ResponsibleAttorneyColor"),
+                                rs.getString("PartyRoleName"),
+                                rs.getString("Side"),
+                                rs.getBoolean("IsPrimary"),
+                                rs.getString("Notes")));
                     }
                 }
                 return List.copyOf(out);
