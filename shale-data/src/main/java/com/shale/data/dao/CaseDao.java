@@ -2322,9 +2322,9 @@ public final class CaseDao {
 				  )
 				  AND NOT EXISTS (
 				    SELECT 1
-				    FROM dbo.CaseContacts cc
-				    WHERE cc.CaseId = ?
-				      AND cc.ContactId = ct.Id
+				    FROM dbo.CaseParties cp
+				    WHERE cp.CaseId = ?
+				      AND cp.ContactId = ct.Id
 				  )
 				ORDER BY DisplayName ASC, ct.Id ASC;
 				""";
