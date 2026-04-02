@@ -1513,6 +1513,11 @@ public class CaseController {
 		List<CaseDao.SelectableContactRow> contacts = caseDao.findLinkableContacts(caseId.longValue());
 		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
 		List<OrganizationDao.OrganizationTypeRow> organizationTypes = organizationDao == null ? List.of() : organizationDao.findOrganizationTypes();
+		Long defaultPartyRoleId = partyRoles.stream()
+			.filter(r -> "party".equalsIgnoreCase(safeText(r.name())))
+			.map(CaseDao.PartyRoleRow::id)
+			.findFirst()
+			.orElse(partyRoles.isEmpty() ? null : partyRoles.get(0).id());
 
 		class WizardState {
 			int step = 1;
@@ -1523,7 +1528,7 @@ public class CaseController {
 			String createContactLastName = null;
 			String createOrganizationName = null;
 			Integer createOrganizationTypeId = organizationTypes.isEmpty() ? null : organizationTypes.get(0).organizationTypeId();
-			Long partyRoleId = partyRoles.isEmpty() ? null : partyRoles.get(0).id();
+			Long partyRoleId = defaultPartyRoleId;
 			String affiliation = null;
 			boolean primary = false;
 			String notes = null;
@@ -1542,6 +1547,8 @@ public class CaseController {
 
 		Label titleLabel = new Label();
 		titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
+		Label subtitleLabel = new Label();
+		subtitleLabel.setWrapText(true);
 
 		Button createNewButton = new Button("Create New");
 		Button selectExistingButton = new Button("Select Existing");
@@ -1573,7 +1580,11 @@ public class CaseController {
 			@Override public PartyRoleOption fromString(String string) { return null; }
 		});
 		if (!roleChoice.getItems().isEmpty()) {
-			roleChoice.setValue(roleChoice.getItems().get(0));
+			PartyRoleOption defaultRole = roleChoice.getItems().stream()
+				.filter(r -> r.id() == defaultPartyRoleId)
+				.findFirst()
+				.orElse(roleChoice.getItems().get(0));
+			roleChoice.setValue(defaultRole);
 		}
 
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
@@ -1581,7 +1592,7 @@ public class CaseController {
 				new PartySideOption("Represented", "represented"),
 				new PartySideOption("Opposing", "opposing"),
 				new PartySideOption("Neutral", "neutral"),
-				new PartySideOption("Unclassified", null)
+				new PartySideOption("Unaffiliated", null)
 		);
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
@@ -1606,10 +1617,10 @@ public class CaseController {
 			}
 		});
 
-		VBox contentBox = new VBox(14);
+		VBox contentBox = new VBox(10);
 		contentBox.setAlignment(Pos.TOP_CENTER);
 		contentBox.setPadding(new Insets(16));
-		contentBox.getChildren().add(titleLabel);
+		contentBox.getChildren().addAll(titleLabel, subtitleLabel);
 		dialog.getDialogPane().setContent(contentBox);
 
 		Runnable refreshExistingList = () -> {
@@ -1683,16 +1694,18 @@ public class CaseController {
 		};
 
 		Runnable renderStep = () -> {
-			contentBox.getChildren().setAll(titleLabel);
+			contentBox.getChildren().setAll(titleLabel, subtitleLabel);
 			if (state.step == 1) {
-				titleLabel.setText("Step 1: Create new or select from existing");
+				titleLabel.setText("Step 1");
+				subtitleLabel.setText("Create new or select from existing");
 				HBox choices = new HBox(14, createNewButton, selectExistingButton);
 				choices.setAlignment(Pos.CENTER);
 				contentBox.getChildren().add(choices);
 				dialog.getDialogPane().setPrefSize(560, 260);
 				dialog.getDialogPane().setMinSize(560, 260);
 			} else if (state.step == 2) {
-				titleLabel.setText("Step 2: Contact or Organization");
+				titleLabel.setText("Step 2");
+				subtitleLabel.setText("Contact or Organization");
 				HBox choices = new HBox(14, contactButton, organizationButton);
 				choices.setAlignment(Pos.CENTER);
 				contentBox.getChildren().add(choices);
@@ -1700,9 +1713,10 @@ public class CaseController {
 				dialog.getDialogPane().setMinSize(560, 260);
 			} else if ("create".equals(state.mode)) {
 				titleLabel.setText("Step 3: Create New");
+				subtitleLabel.setText("Enter party details");
 				GridPane form = new GridPane();
 				form.setHgap(10);
-				form.setVgap(8);
+				form.setVgap(10);
 				if ("organization".equals(state.entityType)) {
 					form.add(new Label("Name"), 0, 0);
 					form.add(createOrganizationNameField, 1, 0);
@@ -1722,15 +1736,19 @@ public class CaseController {
 					form.add(new Label("Affiliation"), 0, 3);
 					form.add(sideChoice, 1, 3);
 				}
-				contentBox.getChildren().add(form);
+				VBox formHost = new VBox(form);
+				formHost.setAlignment(Pos.TOP_LEFT);
+				formHost.setPadding(new Insets(8, 20, 8, 20));
+				contentBox.getChildren().add(formHost);
 				dialog.getDialogPane().setPrefSize(720, 420);
 				dialog.getDialogPane().setMinSize(720, 420);
 			} else {
 				titleLabel.setText("Step 3: Select Existing");
+				subtitleLabel.setText("Choose an existing contact or organization");
 				refreshExistingList.run();
 				GridPane relationships = new GridPane();
 				relationships.setHgap(10);
-				relationships.setVgap(8);
+				relationships.setVgap(10);
 				relationships.add(new Label("Party Role"), 0, 0);
 				relationships.add(roleChoice, 1, 0);
 				relationships.add(new Label("Affiliation"), 0, 1);
@@ -1738,7 +1756,10 @@ public class CaseController {
 				relationships.add(primaryCheck, 1, 2);
 				relationships.add(new Label("Notes"), 0, 3);
 				relationships.add(notesArea, 1, 3);
-				contentBox.getChildren().addAll(searchField, existingList, relationships);
+				VBox relationshipsHost = new VBox(relationships);
+				relationshipsHost.setAlignment(Pos.TOP_LEFT);
+				relationshipsHost.setPadding(new Insets(8, 20, 8, 20));
+				contentBox.getChildren().addAll(searchField, existingList, relationshipsHost);
 				dialog.getDialogPane().setPrefSize(820, 660);
 				dialog.getDialogPane().setMinSize(820, 660);
 			}
