@@ -17,6 +17,7 @@
 				promptText="Search cases…" HBox.hgrow="ALWAYS" />
 			<MenuButton fx:id="statusFilterMenuButton" text="Status (8/8)" />
 			<ChoiceBox fx:id="casesSortChoice" prefWidth="220" />
+			<Label fx:id="resultsCountLabel" text="0 results" styleClass="cases-results-count" />
 		</HBox>
 	</top>
 

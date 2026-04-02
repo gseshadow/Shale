@@ -24,6 +24,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -38,6 +39,8 @@ public final class CasesController {
 	private ChoiceBox<String> casesSortChoice;
 	@FXML
 	private MenuButton statusFilterMenuButton;
+	@FXML
+	private Label resultsCountLabel;
 
 	// NEW: FlowPane layout (add these IDs in FXML)
 	@FXML
@@ -55,6 +58,7 @@ public final class CasesController {
 	private boolean loading = false;
 	private boolean hasMore = true;
 	private int loadGeneration = 0;
+	private int resultsCountGeneration = 0;
 
 	// Loaded items (we keep these so search/sort can re-render)
 	private final List<CaseCardVm> loaded = new ArrayList<>();
@@ -316,6 +320,7 @@ public final class CasesController {
 		loaded.clear();
 		if (casesFlow != null)
 			casesFlow.getChildren().clear();
+		updateResultsCountLabel(0);
 
 		loadNextPage();
 	}
@@ -394,6 +399,7 @@ public final class CasesController {
 				.filter(vm -> matchesQuery(vm, q) && matchesSelectedStatus(vm))
 				.sorted(comp)
 				.toList();
+		refreshResultsCountAsync(q, selectedStatusIds);
 
 		boolean statusFilterActive = selectedStatusIds.size() < CaseListUiSupport.STATUS_FILTER_OPTIONS.size();
 		if (( !q.isEmpty() || statusFilterActive ) && filtered.size() < pageSize && hasMore && !loading) {
@@ -403,6 +409,41 @@ public final class CasesController {
 		List<CaseCardVm> view = q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList();
 
 		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
+	}
+
+	private void refreshResultsCountAsync(String normalizedQuery, Set<Integer> selectedStatuses) {
+		if (caseDao == null) {
+			updateResultsCountLabel(0);
+			return;
+		}
+
+		final int generationAtSubmit = ++resultsCountGeneration;
+		final String query = normalizedQuery == null ? "" : normalizedQuery;
+		final Set<Integer> statusesSnapshot = new LinkedHashSet<>(selectedStatuses);
+
+		dbExec.submit(() ->
+		{
+			try {
+				long total = caseDao.countForCasesView(query, statusesSnapshot);
+				Platform.runLater(() ->
+				{
+					if (generationAtSubmit != resultsCountGeneration) {
+						return;
+					}
+					updateResultsCountLabel(total);
+				});
+			} catch (Exception ex) {
+				Platform.runLater(ex::printStackTrace);
+			}
+		});
+	}
+
+	private void updateResultsCountLabel(long total) {
+		if (resultsCountLabel == null) {
+			return;
+		}
+		String suffix = total == 1 ? "result" : "results";
+		resultsCountLabel.setText(total + " " + suffix);
 	}
 
 	private boolean includeClosedDeniedInQuery() {
