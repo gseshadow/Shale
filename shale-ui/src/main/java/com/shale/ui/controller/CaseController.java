@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -19,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTimelineEventDto;
@@ -29,6 +31,8 @@ import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.ui.component.ContactCard;
+import com.shale.ui.component.OrganizationCard;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.document.CaseDocumentExportService;
 import com.shale.ui.document.CaseDocumentFormat;
@@ -73,6 +77,7 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
@@ -83,6 +88,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.Node;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -360,9 +366,6 @@ public class CaseController {
 	// Constants
 	// ----------------------------
 
-	private static final int ROLE_CASECONTACT_CALLER = 2;
-	private static final int ROLE_CASECONTACT_CLIENT = 1;
-	private static final int ROLE_CASECONTACT_OPPOSING_COUNSEL = 6;
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
 	private static final int ROLE_PRELITIGATION_STAFF = 5;
 	private static final int ROLE_ATTORNEY = 7;
@@ -383,11 +386,10 @@ public class CaseController {
 
 	private static final List<String> SECTIONS = List.of(
 			"Overview",
+			"Parties",
 			"Tasks",
 			"Timeline",
 			"Details",
-			"Contacts",
-			"Organizations",
 			"Documents"
 	);
 
@@ -466,8 +468,7 @@ public class CaseController {
 	private LocalDate draftIncidentDate;
 	private LocalDate draftSolDate;
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
-	private List<CaseDao.RelatedContactRow> relatedContacts = List.of();
-	private List<CaseDao.RelatedOrganizationRow> relatedOrganizations = List.of();
+	private List<CasePartyDto> caseParties = List.of();
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private Long editingCaseUpdateId;
@@ -489,6 +490,25 @@ public class CaseController {
 	private CaseDetailsDraft detailsDraft;
 	private CaseDetailsDraft detailsBaseline;
 	private CaseDetailsDraft detailsLocalViewOverride;
+
+	private record PartyRoleOption(long id, String label) {}
+	private record PartyEntityOption(String entityType, Long id, String label) {}
+	private record PartySideOption(String label, String value) {}
+	private record PartyEditorResult(String entityType, Long entityId, long partyRoleId, String side, boolean primary, String notes) {}
+	private record AddPartyDraft(
+			String entityType,
+			Long entityId,
+			long partyRoleId,
+			String side,
+			boolean primary,
+			String notes,
+			boolean createNew,
+			String contactFirstName,
+			String contactLastName,
+			String organizationName,
+			Integer organizationTypeId) {}
+	private record CallerPartySelection(Integer contactId, String displayName) {}
+	private record OpposingCounselPartySelection(Integer contactId, String displayName) {}
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -546,6 +566,15 @@ public class CaseController {
 	public void setOnOpenOrganization(Consumer<Integer> onOpenOrganization) {
 		this.onOpenOrganization = onOpenOrganization;
 		this.organizationCardFactory = new OrganizationCardFactory(onOpenOrganization);
+	}
+
+	private TaskCardFactory buildTaskCardFactory(Consumer<Long> openTaskHandler) {
+		Consumer<Long> resolvedOpenHandler = openTaskHandler == null ? taskId -> {} : openTaskHandler;
+		return new TaskCardFactory(
+				resolvedOpenHandler,
+				this::onToggleTaskComplete,
+				onOpenCase,
+				onOpenUser);
 	}
 
 	// ----------------------------
@@ -828,11 +857,10 @@ public class CaseController {
 		setActiveSectionButton(sectionName);
 		switch (sectionName) {
 		case "Overview" -> showOverview();
+		case "Parties" -> showParties();
 		case "Tasks" -> showTasksTab();
 		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
-		case "Contacts" -> showContacts();
-		case "Organizations" -> showOrganizations();
 		default -> showGeneric(sectionName);
 		}
 	}
@@ -931,6 +959,31 @@ public class CaseController {
 		loadCaseTimelineEventsAsync();
 	}
 
+	private void showParties() {
+		setUpdatesPaneVisible(false);
+		setPaneVisible(overviewPane, false);
+		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(genericPane, true);
+		setPaneVisible(tasksPanel, false);
+
+		if (genericTitleLabel != null)
+			genericTitleLabel.setText("Parties");
+
+		setVisibleManaged(addOrganizationButton, true);
+		if (addOrganizationButton != null) {
+			addOrganizationButton.setText("Add Party");
+		}
+		setVisibleManaged(placeholderTextArea, false);
+		setVisibleManaged(organizationsScrollPane, false);
+		setVisibleManaged(organizationsFlow, false);
+		setVisibleManaged(organizationsEmptyLabel, false);
+		setVisibleManaged(timelineScrollPane, true);
+		setVisibleManaged(timelineListBox, true);
+		setVisibleManaged(timelineEmptyLabel, false);
+		renderPartiesSection();
+	}
+
 	private void loadCaseTimelineEventsAsync() {
 		if (caseDao == null || caseId == null) {
 			renderTimelineEvents(List.of());
@@ -1007,124 +1060,863 @@ public class CaseController {
 		return card;
 	}
 
-
-	private void showContacts() {
-		setUpdatesPaneVisible(false);
-		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
-		setPaneVisible(tasksTabPane, false);
-		setPaneVisible(genericPane, true);
-		setPaneVisible(tasksPanel, false);
-
-		if (genericTitleLabel != null)
-			genericTitleLabel.setText("Contacts");
-
-		setVisibleManaged(addOrganizationButton, true);
-		if (addOrganizationButton != null) {
-			addOrganizationButton.setText("Add Contact");
-		}
-		setVisibleManaged(placeholderTextArea, false);
-		setVisibleManaged(timelineScrollPane, false);
-		setVisibleManaged(timelineListBox, false);
-		setVisibleManaged(timelineEmptyLabel, false);
-		renderContactsSection();
-	}
-
-	private void renderContactsSection() {
-		if (organizationsScrollPane == null || organizationsFlow == null || organizationsEmptyLabel == null)
+	private void renderPartiesSection() {
+		if (timelineListBox == null)
 			return;
-		boolean contactsSectionActive = isSectionActive("Contacts");
 
-		organizationsFlow.getChildren().clear();
-		if (relatedContacts == null || relatedContacts.isEmpty()) {
-			if (contactsSectionActive) {
-				setVisibleManaged(organizationsScrollPane, false);
-				setVisibleManaged(organizationsFlow, false);
-				setVisibleManaged(organizationsEmptyLabel, true);
-				organizationsEmptyLabel.setText("No contacts");
+		boolean partiesSectionActive = isSectionActive("Parties");
+		timelineListBox.getChildren().clear();
+		List<CasePartyDto> safeParties = caseParties == null ? List.of() : caseParties;
+		if (safeParties.isEmpty()) {
+			if (partiesSectionActive) {
+				if (timelineEmptyLabel != null)
+					timelineEmptyLabel.setText("No parties yet.");
+				setVisibleManaged(timelineEmptyLabel, true);
 			}
 			return;
 		}
 
-		ContactCardFactory factory = contactCardFactory != null
-				? contactCardFactory
-				: new ContactCardFactory(onOpenContact == null ? id -> {
-				} : onOpenContact);
-		for (CaseDao.RelatedContactRow contact : relatedContacts) {
-			organizationsFlow.getChildren().add(createRelatedContactCard(factory, contact));
+		if (partiesSectionActive) {
+			setVisibleManaged(timelineEmptyLabel, false);
 		}
 
-		if (contactsSectionActive) {
-			setVisibleManaged(organizationsScrollPane, true);
-			setVisibleManaged(organizationsFlow, true);
-			setVisibleManaged(organizationsEmptyLabel, false);
+		Map<String, List<CasePartyDto>> grouped = safeParties.stream()
+				.filter(Objects::nonNull)
+				.collect(Collectors.groupingBy(
+						p -> normalizedPartySideKey(p.getSide()),
+						LinkedHashMap::new,
+						Collectors.toList()));
+
+		List<String> sideOrder = List.of("represented", "opposing", "neutral", "unclassified");
+		for (String sideKey : sideOrder) {
+			List<CasePartyDto> group = grouped.get(sideKey);
+			if (group == null || group.isEmpty()) {
+				continue;
+			}
+
+			Label heading = new Label(toPartySideLabel(sideKey));
+			heading.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-opacity: 0.92;");
+			timelineListBox.getChildren().add(heading);
+
+			List<CasePartyDto> sorted = group.stream()
+					.sorted((a, b) -> {
+						int primaryCompare = Boolean.compare(b.isPrimary(), a.isPrimary());
+						if (primaryCompare != 0)
+							return primaryCompare;
+						return safeText(a.getDisplayName()).compareToIgnoreCase(safeText(b.getDisplayName()));
+					})
+					.toList();
+
+			for (CasePartyDto party : sorted) {
+				timelineListBox.getChildren().add(createPartyCard(party));
+			}
 		}
 	}
 
-	private Node createRelatedContactCard(ContactCardFactory factory, CaseDao.RelatedContactRow contact) {
-		var card = factory.create(new com.shale.ui.component.factory.ContactCardFactory.ContactCardModel(
-				contact.id(),
-				safe(contact.displayName()).isBlank() ? "—" : contact.displayName(),
-				caseContactRoleLabel(contact.roleName(), contact.roleId(), contact.primary()),
-				contact.email(),
-				contact.phone()), ContactCardFactory.Variant.FULL);
-		card.setPrefWidth(340);
-		card.setMaxWidth(340);
-		card.setMinHeight(84);
+	private Node createPartyCard(CasePartyDto party) {
+		String roleLabel = toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId());
+		String sideLabel = toPartySideLabel(normalizedPartySideKey(party.getSide()));
+		String notes = safeText(party.getNotes()).trim();
+		Node summaryCard = createPartyEntityCard(party);
+
+		Label metaLabel = new Label(formatPartyRelationshipMeta(roleLabel, sideLabel, party.isPrimary()));
+		metaLabel.setStyle("-fx-opacity: 0.86;");
+		metaLabel.setWrapText(true);
+
+		VBox content = new VBox(6, summaryCard, metaLabel);
+		if (!notes.isBlank()) {
+			Label notesLabel = new Label(notes);
+			notesLabel.setWrapText(true);
+			notesLabel.setStyle("-fx-opacity: 0.9;");
+			content.getChildren().add(notesLabel);
+		}
+
+		Button editButton = new Button("Edit");
+		editButton.getStyleClass().add("button-secondary");
+		editButton.setOnAction(e -> onEditParty(party));
 
 		Button removeButton = new Button("Remove");
 		removeButton.getStyleClass().add("button-secondary");
-		removeButton.setOnAction(e -> onRemoveContact(contact));
+		removeButton.setOnAction(e -> onRemoveParty(party));
 
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox actions = new HBox(8, spacer, removeButton);
+		HBox actions = new HBox(8, spacer, editButton, removeButton);
 
-		VBox container = new VBox(6, card, actions);
-		container.setMinWidth(340);
-		container.setPrefWidth(340);
-		container.setMaxWidth(340);
-		return container;
+		VBox card = new VBox(6, content, actions);
+		card.setPadding(new Insets(10, 12, 10, 12));
+		card.getStyleClass().add("secondary-panel");
+		return card;
 	}
 
-	private String caseContactRoleLabel(String roleName, Integer roleId, boolean primary) {
-		String base = safe(roleName).trim();
-		if (base.isBlank()) {
-			if (roleId == null) {
-				base = "No role assigned";
-			} else {
-				base = switch (roleId.intValue()) {
-				case ROLE_CASECONTACT_CLIENT -> "Client";
-				case ROLE_CASECONTACT_CALLER -> "Caller";
-				case ROLE_CASECONTACT_OPPOSING_COUNSEL -> "Opposing Counsel";
-				default -> "Role " + roleId;
-				};
+	private Node createPartyEntityCard(CasePartyDto party) {
+		final double partiesCardWidth = 300;
+		String entityType = safeText(party.getEntityType()).trim().toLowerCase(Locale.ROOT);
+		if ("organization".equals(entityType) && party.getOrganizationId() != null) {
+			OrganizationCardFactory factory = organizationCardFactory != null
+					? organizationCardFactory
+					: new OrganizationCardFactory(this::openOrganization);
+			OrganizationCardFactory.OrganizationCardModel model = new OrganizationCardFactory.OrganizationCardModel(
+					party.getOrganizationId().intValue(),
+					safeText(party.getDisplayName()),
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null
+			);
+			OrganizationCard card = factory.create(model, OrganizationCardFactory.Variant.COMPACT);
+			card.setSuppressPlaceholderLines(true);
+			card.applyCompact();
+			card.setMinWidth(partiesCardWidth);
+			card.setPrefWidth(partiesCardWidth);
+			card.setMaxWidth(partiesCardWidth);
+			return card;
+		}
+
+		if ("contact".equals(entityType) && party.getContactId() != null) {
+			ContactCardFactory factory = contactCardFactory != null
+					? contactCardFactory
+					: new ContactCardFactory(onOpenContact == null ? id -> {
+					} : onOpenContact);
+			ContactCardFactory.ContactCardModel model = new ContactCardFactory.ContactCardModel(
+					party.getContactId().intValue(),
+					safeText(party.getDisplayName()),
+					null,
+					null,
+					null
+			);
+			ContactCard card = factory.create(model, ContactCardFactory.Variant.COMPACT);
+			card.setSuppressPlaceholderLines(true);
+			card.applyCompact();
+			card.setMinWidth(partiesCardWidth);
+			card.setPrefWidth(partiesCardWidth);
+			card.setMaxWidth(partiesCardWidth);
+			return card;
+		}
+
+		Label fallback = new Label(safeText(party.getDisplayName()).isBlank() ? "—" : safeText(party.getDisplayName()));
+		fallback.setStyle("-fx-font-weight: bold;");
+		fallback.setWrapText(true);
+		return fallback;
+	}
+
+	private String formatPartyRelationshipMeta(String roleLabel, String sideLabel, boolean primary) {
+		String base = roleLabel + " · " + sideLabel;
+		return primary ? base + " · Primary" : base;
+	}
+
+	private List<PartySideOption> defaultPartySideOptions() {
+		return List.of(
+				new PartySideOption("Represented", "represented"),
+				new PartySideOption("Opposing", "opposing"),
+				new PartySideOption("Neutral", "neutral"),
+				new PartySideOption("Unaffiliated", null)
+		);
+	}
+
+	private String normalizedPartySideKey(String side) {
+		String normalized = safeText(side).trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+			case "represented" -> "represented";
+			case "opposing" -> "opposing";
+			case "neutral" -> "neutral";
+			default -> "unclassified";
+		};
+	}
+
+	private String toPartySideLabel(String sideKey) {
+		return switch (safeText(sideKey).trim().toLowerCase(Locale.ROOT)) {
+			case "represented" -> "Represented";
+			case "opposing" -> "Opposing";
+			case "neutral" -> "Neutral";
+			default -> "Unaffiliated";
+		};
+	}
+
+	private String toPartyRoleLabel(String roleName, long roleId) {
+		String normalized = safeText(roleName).trim().replace('_', ' ');
+		if (normalized.isBlank()) {
+			return "Role " + roleId;
+		}
+		String[] tokens = normalized.split("\\s+");
+		for (int i = 0; i < tokens.length; i++) {
+			String token = tokens[i];
+			if (token.isBlank()) {
+				continue;
 			}
+			tokens[i] = token.substring(0, 1).toUpperCase(Locale.ROOT) + token.substring(1).toLowerCase(Locale.ROOT);
 		}
-		return primary ? base + " (Primary)" : base;
+		return String.join(" ", tokens);
 	}
 
-	private void showOrganizations() {
-		setUpdatesPaneVisible(false);
-		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
-		setPaneVisible(tasksTabPane, false);
-		setPaneVisible(genericPane, true);
-		setPaneVisible(tasksPanel, false);
+	private void onAddParty() {
+		if (caseDao == null || caseId == null || appState == null || appState.getShaleClientId() <= 0)
+			return;
+		AddPartyDraft draft = showAddPartyWizardDialog();
+		if (draft == null)
+			return;
 
-		if (genericTitleLabel != null)
-			genericTitleLabel.setText("Organizations");
-
-		setVisibleManaged(addOrganizationButton, true);
-		if (addOrganizationButton != null) {
-			addOrganizationButton.setText("Add Organization");
-		}
-		setVisibleManaged(placeholderTextArea, false);
-		setVisibleManaged(timelineScrollPane, false);
-		setVisibleManaged(timelineListBox, false);
-		setVisibleManaged(timelineEmptyLabel, false);
-		renderOrganizationsSection();
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				Long entityId = draft.entityId();
+				if (draft.createNew()) {
+					entityId = createEntityForNewPartyDraft(draft);
+				}
+				if (entityId == null || entityId <= 0) {
+					throw new IllegalStateException("A party entity must be selected or created.");
+				}
+				caseDao.addCaseParty(
+							activeCaseId,
+							draft.entityType().equals("contact") ? entityId : null,
+							draft.entityType().equals("organization") ? entityId : null,
+							draft.partyRoleId(),
+							draft.side(),
+							draft.primary(),
+							draft.notes());
+					runOnFx(this::refreshPartiesSectionAsync);
+				} catch (Exception ex) {
+					runOnFx(() -> showError("Failed to add party. " + ex.getMessage()));
+				}
+			}, "case-add-party-" + activeCaseId).start();
 	}
+
+	private void onEditParty(CasePartyDto party) {
+		if (party == null || caseDao == null || caseId == null)
+			return;
+		PartyEditorResult result = showPartyEditorDialog(party);
+		if (result == null)
+			return;
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				caseDao.updateCaseParty(
+						party.getId(),
+						activeCaseId,
+						result.entityType.equals("contact") ? result.entityId : null,
+						result.entityType.equals("organization") ? result.entityId : null,
+						result.partyRoleId,
+						result.side,
+						result.primary,
+						result.notes);
+				runOnFx(this::refreshPartiesSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to update party. " + ex.getMessage()));
+			}
+		}, "case-edit-party-" + activeCaseId + "-" + party.getId()).start();
+	}
+
+	private void onRemoveParty(CasePartyDto party) {
+		if (party == null || caseDao == null || caseId == null)
+			return;
+		boolean confirmed = AppDialogs.showConfirmation(
+				organizationDialogOwner(),
+				"Remove Party",
+				"Remove this party from the case?",
+				safeText(party.getDisplayName()),
+				"Remove Party",
+				AppDialogs.DialogActionKind.DANGER);
+		if (!confirmed)
+			return;
+
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				caseDao.removeCaseParty(party.getId());
+				runOnFx(this::refreshPartiesSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to remove party. " + ex.getMessage()));
+			}
+		}, "case-remove-party-" + activeCaseId + "-" + party.getId()).start();
+	}
+
+	private void refreshPartiesSectionAsync() {
+		if (caseDao == null || caseId == null)
+			return;
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				List<CasePartyDto> refreshed = caseDao.listCaseParties(activeCaseId);
+				runOnFx(() -> {
+					caseParties = refreshed == null ? List.of() : refreshed;
+					renderPartiesSection();
+					if (currentOverview != null) {
+						currentOverview = applyCallerFromCaseParties(currentOverview, caseParties);
+						applyOverviewEditSafe(currentOverview);
+					}
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to refresh parties for this case."));
+			}
+		}, "case-refresh-parties-" + activeCaseId).start();
+	}
+
+	private PartyEditorResult showPartyEditorDialog(CasePartyDto existing) {
+		if (existing == null) {
+			AddPartyDraft draft = showAddPartyWizardDialog();
+			if (draft == null || draft.entityId() == null) {
+				return null;
+			}
+			return new PartyEditorResult(draft.entityType(), draft.entityId(), draft.partyRoleId(), draft.side(), draft.primary(), draft.notes());
+		}
+
+		if (appState == null || appState.getShaleClientId() <= 0 || caseId == null || caseId <= 0) {
+			showError("Unable to edit parties without an active client/case context.");
+			return null;
+		}
+		List<CaseDao.PartyRoleRow> partyRoles = caseDao.listPartyRoles();
+		List<CaseDao.SelectableContactRow> contacts = caseDao.findLinkableContacts(caseId.longValue());
+		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
+
+		Dialog<PartyEditorResult> dialog = new Dialog<>();
+		dialog.setTitle("Edit Party");
+		dialog.initOwner(organizationDialogOwner());
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+
+		ChoiceBox<String> entityTypeChoice = new ChoiceBox<>();
+		entityTypeChoice.getItems().addAll("Contact", "Organization");
+
+		ChoiceBox<PartyEntityOption> entityChoice = new ChoiceBox<>();
+		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
+		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
+		sideChoice.getItems().addAll(defaultPartySideOptions());
+		sideChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
+			@Override public PartySideOption fromString(String string) { return null; }
+		});
+
+		CheckBox primaryCheck = new CheckBox("Primary");
+		TextArea notesArea = new TextArea();
+		notesArea.setPrefRowCount(3);
+		notesArea.setWrapText(true);
+
+		partyRoles.stream()
+				.map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id())))
+				.forEach(roleChoice.getItems()::add);
+		roleChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartyRoleOption object) { return object == null ? "" : object.label; }
+			@Override public PartyRoleOption fromString(String string) { return null; }
+		});
+		entityChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartyEntityOption object) { return object == null ? "" : object.label; }
+			@Override public PartyEntityOption fromString(String string) { return null; }
+		});
+
+		Runnable loadEntities = () -> {
+			String selectedType = entityTypeChoice.getValue();
+			entityChoice.getItems().clear();
+			if ("Organization".equalsIgnoreCase(selectedType)) {
+				for (CaseDao.SelectableOrganizationRow org : organizations) {
+					String label = safeText(org.name());
+					String type = safeText(org.organizationTypeName());
+					if (!type.isBlank()) {
+						label = label + " — " + type;
+					}
+					entityChoice.getItems().add(new PartyEntityOption("organization", Long.valueOf(org.id()), label));
+				}
+			} else {
+				for (CaseDao.SelectableContactRow contact : contacts) {
+					String displayName = safeText(contact.displayName());
+					if (displayName.isBlank()) {
+						displayName = "Contact #" + contact.id();
+					}
+					String secondary = !safeText(contact.phone()).isBlank()
+							? safeText(contact.phone())
+							: safeText(contact.email());
+					String label = secondary.isBlank() ? displayName : displayName + " — " + secondary;
+					entityChoice.getItems().add(new PartyEntityOption("contact", Long.valueOf(contact.id()), label));
+				}
+			}
+			if (!entityChoice.getItems().isEmpty()) {
+				entityChoice.setValue(entityChoice.getItems().get(0));
+			}
+		};
+		entityTypeChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> loadEntities.run());
+
+		entityTypeChoice.setValue("organization".equalsIgnoreCase(existing.getEntityType()) ? "Organization" : "Contact");
+		loadEntities.run();
+		entityChoice.getItems().stream()
+				.filter(o -> Objects.equals(o.entityType, safeText(existing.getEntityType()).toLowerCase(Locale.ROOT))
+						&& Objects.equals(o.id, "organization".equalsIgnoreCase(existing.getEntityType()) ? existing.getOrganizationId() : existing.getContactId()))
+				.findFirst()
+				.ifPresentOrElse(entityChoice::setValue, () -> {
+					Long existingId = "organization".equalsIgnoreCase(existing.getEntityType()) ? existing.getOrganizationId() : existing.getContactId();
+					String fallbackLabel = safeText(existing.getDisplayName()).isBlank() ? "Party #" + existingId : safeText(existing.getDisplayName());
+					PartyEntityOption fallback = new PartyEntityOption(
+							safeText(existing.getEntityType()).toLowerCase(Locale.ROOT),
+							existingId,
+							fallbackLabel);
+					entityChoice.getItems().add(0, fallback);
+					entityChoice.setValue(fallback);
+				});
+		roleChoice.getItems().stream()
+				.filter(r -> r.id == existing.getPartyRoleId())
+				.findFirst()
+				.ifPresent(roleChoice::setValue);
+		sideChoice.getItems().stream()
+				.filter(s -> Objects.equals(s.value, normalizeSideForStorage(existing.getSide())))
+				.findFirst()
+				.ifPresentOrElse(sideChoice::setValue, () -> sideChoice.setValue(sideChoice.getItems().get(3)));
+		primaryCheck.setSelected(existing.isPrimary());
+		notesArea.setText(safeText(existing.getNotes()));
+
+		GridPane grid = new GridPane();
+		grid.setHgap(10);
+		grid.setVgap(10);
+		grid.add(new Label("Entity Type"), 0, 0);
+		grid.add(entityTypeChoice, 1, 0);
+		grid.add(new Label("Entity"), 0, 1);
+		grid.add(entityChoice, 1, 1);
+		grid.add(new Label("Party Role"), 0, 2);
+		grid.add(roleChoice, 1, 2);
+		grid.add(new Label("Side"), 0, 3);
+		grid.add(sideChoice, 1, 3);
+		grid.add(primaryCheck, 1, 4);
+		grid.add(new Label("Notes"), 0, 5);
+		grid.add(notesArea, 1, 5);
+		dialog.getDialogPane().setContent(grid);
+
+		Node saveButton = dialog.getDialogPane().lookupButton(saveType);
+		saveButton.disableProperty().bind(
+				entityChoice.valueProperty().isNull()
+						.or(roleChoice.valueProperty().isNull())
+						.or(sideChoice.valueProperty().isNull())
+		);
+
+		dialog.setResultConverter(button -> {
+			if (button != saveType)
+				return null;
+			PartyEntityOption entity = entityChoice.getValue();
+			PartyRoleOption role = roleChoice.getValue();
+			PartySideOption side = sideChoice.getValue();
+			if (entity == null || role == null || side == null)
+				return null;
+			return new PartyEditorResult(entity.entityType, entity.id, role.id, side.value, primaryCheck.isSelected(), notesArea.getText());
+		});
+
+		return dialog.showAndWait().orElse(null);
+	}
+
+	private AddPartyDraft showAddPartyWizardDialog() {
+		if (appState == null || appState.getShaleClientId() <= 0 || caseId == null || caseId <= 0) {
+			showError("Unable to add parties without an active client/case context.");
+			return null;
+		}
+		List<CaseDao.PartyRoleRow> partyRoles = caseDao.listPartyRoles();
+		List<CaseDao.SelectableContactRow> contacts = caseDao.findLinkableContacts(caseId.longValue());
+		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
+		List<OrganizationDao.OrganizationTypeRow> organizationTypes = organizationDao == null ? List.of() : organizationDao.findOrganizationTypes();
+		Long defaultPartyRoleId = partyRoles.stream()
+			.filter(r -> "party".equalsIgnoreCase(safeText(r.name())))
+			.map(CaseDao.PartyRoleRow::id)
+			.findFirst()
+			.orElse(partyRoles.isEmpty() ? null : partyRoles.get(0).id());
+
+		class WizardState {
+			int step = 1;
+			String mode = null; // create | select
+			String entityType = null; // contact | organization
+			PartyEntityOption selectedEntity = null;
+			String createContactFirstName = null;
+			String createContactLastName = null;
+			String createOrganizationName = null;
+			Integer createOrganizationTypeId = organizationTypes.isEmpty() ? null : organizationTypes.get(0).organizationTypeId();
+			Long partyRoleId = defaultPartyRoleId;
+			String affiliation = null;
+			boolean primary = false;
+			String notes = null;
+		}
+		WizardState state = new WizardState();
+
+		Dialog<AddPartyDraft> dialog = new Dialog<>();
+		dialog.setTitle("Add Party");
+		dialog.initOwner(organizationDialogOwner());
+		ButtonType backType = new ButtonType("Back", ButtonData.LEFT);
+		ButtonType addType = new ButtonType("Add Party", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(backType, addType, ButtonType.CANCEL);
+
+		Node backButton = dialog.getDialogPane().lookupButton(backType);
+		Node addButton = dialog.getDialogPane().lookupButton(addType);
+
+		Label titleLabel = new Label();
+		titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
+		Label subtitleLabel = new Label();
+		subtitleLabel.setWrapText(true);
+
+		Button createNewButton = new Button("Create New");
+		Button selectExistingButton = new Button("Select Existing");
+		createNewButton.setMinWidth(200);
+		selectExistingButton.setMinWidth(200);
+
+		Button contactButton = new Button("Contact");
+		Button organizationButton = new Button("Organization");
+		contactButton.setMinWidth(200);
+		organizationButton.setMinWidth(200);
+
+		TextField createFirstNameField = new TextField();
+		TextField createLastNameField = new TextField();
+		TextField createOrganizationNameField = new TextField();
+		ChoiceBox<OrganizationDao.OrganizationTypeRow> createOrganizationTypeChoice = new ChoiceBox<>();
+		createOrganizationTypeChoice.getItems().setAll(organizationTypes);
+		createOrganizationTypeChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(OrganizationDao.OrganizationTypeRow object) { return object == null ? "" : safeText(object.name()); }
+			@Override public OrganizationDao.OrganizationTypeRow fromString(String string) { return null; }
+		});
+		if (!organizationTypes.isEmpty()) {
+			createOrganizationTypeChoice.setValue(organizationTypes.get(0));
+		}
+
+		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
+		partyRoles.stream().map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id()))).forEach(roleChoice.getItems()::add);
+		roleChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartyRoleOption object) { return object == null ? "" : object.label; }
+			@Override public PartyRoleOption fromString(String string) { return null; }
+		});
+		if (!roleChoice.getItems().isEmpty()) {
+			PartyRoleOption defaultRole = roleChoice.getItems().stream()
+				.filter(r -> r.id() == defaultPartyRoleId)
+				.findFirst()
+				.orElse(roleChoice.getItems().get(0));
+			roleChoice.setValue(defaultRole);
+		}
+
+		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
+		sideChoice.getItems().addAll(defaultPartySideOptions());
+		sideChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
+			@Override public PartySideOption fromString(String string) { return null; }
+		});
+		sideChoice.setValue(sideChoice.getItems().get(3));
+
+		CheckBox primaryCheck = new CheckBox("Primary");
+		TextArea notesArea = new TextArea();
+		notesArea.setPrefRowCount(3);
+		notesArea.setWrapText(true);
+
+		TextField searchField = new TextField();
+		searchField.setPromptText("Search by name");
+		javafx.scene.control.ListView<PartyEntityOption> existingList = new javafx.scene.control.ListView<>();
+		existingList.setPrefHeight(260);
+		existingList.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
+			@Override
+			protected void updateItem(PartyEntityOption item, boolean empty) {
+				super.updateItem(item, empty);
+				setText(empty || item == null ? null : item.label());
+			}
+		});
+
+		VBox contentBox = new VBox(10);
+		contentBox.setAlignment(Pos.TOP_CENTER);
+		contentBox.setPadding(new Insets(16));
+		contentBox.getChildren().addAll(titleLabel, subtitleLabel);
+		dialog.getDialogPane().setContent(contentBox);
+
+		Runnable refreshExistingList = () -> {
+			String query = safeText(searchField.getText()).toLowerCase(Locale.ROOT);
+			List<PartyEntityOption> options = new java.util.ArrayList<>();
+			if ("organization".equals(state.entityType)) {
+				for (CaseDao.SelectableOrganizationRow org : organizations) {
+					String name = safeText(org.name());
+					if (name.isBlank()) name = "Organization #" + org.id();
+					String type = safeText(org.organizationTypeName());
+					String label = type.isBlank() ? name : name + " — " + type;
+					options.add(new PartyEntityOption("organization", Long.valueOf(org.id()), label));
+				}
+			} else {
+				for (CaseDao.SelectableContactRow contact : contacts) {
+					String name = safeText(contact.displayName());
+					if (name.isBlank()) name = "Contact #" + contact.id();
+					String secondary = safeText(contact.email());
+					if (secondary.isBlank()) secondary = safeText(contact.phone());
+					String label = secondary.isBlank() ? name : name + " — " + secondary;
+					options.add(new PartyEntityOption("contact", Long.valueOf(contact.id()), label));
+				}
+			}
+			if (!query.isBlank()) {
+				options = options.stream().filter(o -> safeText(o.label()).toLowerCase(Locale.ROOT).contains(query)).toList();
+			}
+			existingList.getItems().setAll(options);
+			if (state.selectedEntity != null) {
+				existingList.getItems().stream()
+					.filter(o -> Objects.equals(o.entityType(), state.selectedEntity.entityType()) && Objects.equals(o.id(), state.selectedEntity.id()))
+					.findFirst().ifPresent(existingList.getSelectionModel()::select);
+			}
+			if (existingList.getSelectionModel().getSelectedItem() == null && !options.isEmpty()) {
+				existingList.getSelectionModel().selectFirst();
+				state.selectedEntity = existingList.getSelectionModel().getSelectedItem();
+			}
+		};
+
+		Runnable syncStateFromControls = () -> {
+			PartyRoleOption role = roleChoice.getValue();
+			PartySideOption side = sideChoice.getValue();
+			state.partyRoleId = role == null ? null : role.id();
+			state.affiliation = side == null ? null : side.value();
+			state.primary = primaryCheck.isSelected();
+			state.notes = notesArea.getText();
+			state.createContactFirstName = createFirstNameField.getText();
+			state.createContactLastName = createLastNameField.getText();
+			state.createOrganizationName = createOrganizationNameField.getText();
+			OrganizationDao.OrganizationTypeRow orgType = createOrganizationTypeChoice.getValue();
+			state.createOrganizationTypeId = orgType == null ? null : orgType.organizationTypeId();
+			state.selectedEntity = existingList.getSelectionModel().getSelectedItem();
+		};
+
+		Runnable refreshAddButtonState = () -> {
+			syncStateFromControls.run();
+			boolean enabled = false;
+			if (state.step == 3 && state.partyRoleId != null && state.affiliation != null) {
+				if ("create".equals(state.mode)) {
+					if ("contact".equals(state.entityType)) {
+						enabled = !safeText(state.createContactFirstName).isBlank() || !safeText(state.createContactLastName).isBlank();
+					} else if ("organization".equals(state.entityType)) {
+						enabled = !safeText(state.createOrganizationName).isBlank() && state.createOrganizationTypeId != null && state.createOrganizationTypeId > 0;
+					}
+				} else if ("select".equals(state.mode)) {
+					enabled = state.selectedEntity != null;
+				}
+			}
+			addButton.setDisable(!enabled);
+			setVisibleManaged(addButton, state.step == 3);
+			setVisibleManaged(backButton, state.step > 1);
+		};
+
+		Runnable renderStep = () -> {
+			contentBox.getChildren().setAll(titleLabel, subtitleLabel);
+			if (state.step == 1) {
+				titleLabel.setText("Step 1");
+				subtitleLabel.setText("Create new or select from existing");
+				HBox choices = new HBox(14, createNewButton, selectExistingButton);
+				choices.setAlignment(Pos.CENTER);
+				contentBox.getChildren().add(choices);
+				dialog.getDialogPane().setPrefSize(560, 260);
+				dialog.getDialogPane().setMinSize(560, 260);
+			} else if (state.step == 2) {
+				titleLabel.setText("Step 2");
+				subtitleLabel.setText("Contact or Organization");
+				HBox choices = new HBox(14, contactButton, organizationButton);
+				choices.setAlignment(Pos.CENTER);
+				contentBox.getChildren().add(choices);
+				dialog.getDialogPane().setPrefSize(560, 260);
+				dialog.getDialogPane().setMinSize(560, 260);
+			} else if ("create".equals(state.mode)) {
+				titleLabel.setText("Step 3: Create New");
+				subtitleLabel.setText("Enter party details");
+				GridPane form = new GridPane();
+				form.setHgap(10);
+				form.setVgap(10);
+				if ("organization".equals(state.entityType)) {
+					form.add(new Label("Name"), 0, 0);
+					form.add(createOrganizationNameField, 1, 0);
+					form.add(new Label("Organization Type"), 0, 1);
+					form.add(createOrganizationTypeChoice, 1, 1);
+					form.add(new Label("Party Role"), 0, 2);
+					form.add(roleChoice, 1, 2);
+					form.add(new Label("Affiliation"), 0, 3);
+					form.add(sideChoice, 1, 3);
+				} else {
+					form.add(new Label("First Name"), 0, 0);
+					form.add(createFirstNameField, 1, 0);
+					form.add(new Label("Last Name"), 0, 1);
+					form.add(createLastNameField, 1, 1);
+					form.add(new Label("Party Role"), 0, 2);
+					form.add(roleChoice, 1, 2);
+					form.add(new Label("Affiliation"), 0, 3);
+					form.add(sideChoice, 1, 3);
+				}
+				VBox formHost = new VBox(form);
+				formHost.setAlignment(Pos.TOP_LEFT);
+				formHost.setPadding(new Insets(8, 20, 8, 20));
+				contentBox.getChildren().add(formHost);
+				dialog.getDialogPane().setPrefSize(720, 420);
+				dialog.getDialogPane().setMinSize(720, 420);
+			} else {
+				titleLabel.setText("Step 3: Select Existing");
+				subtitleLabel.setText("Choose an existing contact or organization");
+				refreshExistingList.run();
+				GridPane relationships = new GridPane();
+				relationships.setHgap(10);
+				relationships.setVgap(10);
+				relationships.add(new Label("Party Role"), 0, 0);
+				relationships.add(roleChoice, 1, 0);
+				relationships.add(new Label("Affiliation"), 0, 1);
+				relationships.add(sideChoice, 1, 1);
+				relationships.add(primaryCheck, 1, 2);
+				relationships.add(new Label("Notes"), 0, 3);
+				relationships.add(notesArea, 1, 3);
+				VBox relationshipsHost = new VBox(relationships);
+				relationshipsHost.setAlignment(Pos.TOP_LEFT);
+				relationshipsHost.setPadding(new Insets(8, 20, 8, 20));
+				contentBox.getChildren().addAll(searchField, existingList, relationshipsHost);
+				dialog.getDialogPane().setPrefSize(820, 660);
+				dialog.getDialogPane().setMinSize(820, 660);
+			}
+			if (dialog.getDialogPane().getScene() != null && dialog.getDialogPane().getScene().getWindow() != null) {
+				dialog.getDialogPane().getScene().getWindow().sizeToScene();
+			}
+			refreshAddButtonState.run();
+		};
+
+		createNewButton.setOnAction(e -> {
+			state.mode = "create";
+			state.step = 2;
+			renderStep.run();
+		});
+		selectExistingButton.setOnAction(e -> {
+			state.mode = "select";
+			state.step = 2;
+			renderStep.run();
+		});
+		contactButton.setOnAction(e -> {
+			state.entityType = "contact";
+			state.step = 3;
+			renderStep.run();
+		});
+		organizationButton.setOnAction(e -> {
+			state.entityType = "organization";
+			state.step = 3;
+			renderStep.run();
+		});
+
+		backButton.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+			e.consume();
+			syncStateFromControls.run();
+			if (state.step == 3) {
+				state.step = 2;
+			} else if (state.step == 2) {
+				state.step = 1;
+			}
+			renderStep.run();
+		});
+
+		searchField.textProperty().addListener((obs, ov, nv) -> {
+			if (state.step == 3 && "select".equals(state.mode)) {
+				refreshExistingList.run();
+				refreshAddButtonState.run();
+			}
+		});
+		existingList.getSelectionModel().selectedItemProperty().addListener((obs, ov, nv) -> {
+			state.selectedEntity = nv;
+			refreshAddButtonState.run();
+		});
+		roleChoice.valueProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		sideChoice.valueProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		createFirstNameField.textProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		createLastNameField.textProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		createOrganizationNameField.textProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		createOrganizationTypeChoice.valueProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		primaryCheck.selectedProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		notesArea.textProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+
+		renderStep.run();
+
+		dialog.setResultConverter(button -> {
+			if (button != addType) {
+				return null;
+			}
+			syncStateFromControls.run();
+			if (state.partyRoleId == null || state.affiliation == null || state.entityType == null || state.mode == null) {
+				return null;
+			}
+			if ("create".equals(state.mode)) {
+				return new AddPartyDraft(
+					state.entityType,
+					null,
+					state.partyRoleId,
+					state.affiliation,
+					false,
+					null,
+					true,
+					state.createContactFirstName,
+					state.createContactLastName,
+					state.createOrganizationName,
+					state.createOrganizationTypeId);
+			}
+			if (state.selectedEntity == null) {
+				return null;
+			}
+			return new AddPartyDraft(
+					state.selectedEntity.entityType(),
+					state.selectedEntity.id(),
+					state.partyRoleId,
+					state.affiliation,
+					state.primary,
+					state.notes,
+					false,
+					null,
+					null,
+					null,
+					null);
+		});
+
+		return dialog.showAndWait().orElse(null);
+	}
+
+	private Long createEntityForNewPartyDraft(AddPartyDraft draft) {
+		if (draft == null || !draft.createNew()) {
+			return draft == null ? null : draft.entityId();
+		}
+		Integer shaleClientId = appState == null ? null : appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			throw new IllegalStateException("No active tenant selected.");
+		}
+		if ("contact".equalsIgnoreCase(draft.entityType())) {
+			if (contactDao == null) {
+				throw new IllegalStateException("Contact creation is unavailable.");
+			}
+			int contactId = contactDao.createContact(new ContactDao.CreateContactRequest(
+					shaleClientId,
+					safeText(draft.contactFirstName()),
+					safeText(draft.contactLastName()),
+					null,
+					null,
+					false));
+			return Long.valueOf(contactId);
+		}
+		if (organizationDao == null) {
+			throw new IllegalStateException("Organization creation is unavailable.");
+		}
+		Integer organizationTypeId = draft.organizationTypeId();
+		if (organizationTypeId == null || organizationTypeId <= 0) {
+			throw new IllegalStateException("Organization Type is required.");
+		}
+		int organizationId = organizationDao.create(new OrganizationDao.OrganizationCreateRequest(
+				shaleClientId,
+				organizationTypeId,
+				safeText(draft.organizationName()),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null));
+		return Long.valueOf(organizationId);
+	}
+
+	private static String normalizeSideForStorage(String side) {
+		String normalized = side == null ? "" : side.trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+			case "represented", "opposing", "neutral" -> normalized;
+			default -> null;
+		};
+	}
+
 
 
 	private void loadCaseTasksAsync() {
@@ -1211,378 +2003,18 @@ public class CaseController {
 		setVisibleManaged(tasksTabEmptyLabel, false);
 	}
 
-	private void renderOrganizationsSection() {
-		if (organizationsScrollPane == null || organizationsFlow == null || organizationsEmptyLabel == null)
-			return;
-		boolean organizationsSectionActive = isSectionActive("Organizations");
-
-		organizationsFlow.getChildren().clear();
-		if (relatedOrganizations == null || relatedOrganizations.isEmpty()) {
-			if (organizationsSectionActive) {
-				setVisibleManaged(organizationsScrollPane, false);
-				setVisibleManaged(organizationsFlow, false);
-				setVisibleManaged(organizationsEmptyLabel, true);
-				organizationsEmptyLabel.setText("No organizations");
-			}
-			return;
-		}
-
-		OrganizationCardFactory factory = organizationCardFactory != null
-				? organizationCardFactory
-				: new OrganizationCardFactory(this::openOrganization);
-		for (CaseDao.RelatedOrganizationRow org : relatedOrganizations) {
-			organizationsFlow.getChildren().add(createRelatedOrganizationCardContainer(factory, org));
-		}
-
-		if (organizationsSectionActive) {
-			setVisibleManaged(organizationsScrollPane, true);
-			setVisibleManaged(organizationsFlow, true);
-			setVisibleManaged(organizationsEmptyLabel, false);
-		}
-	}
 
 	private boolean isSectionActive(String sectionName) {
 		return Objects.equals(activeSectionName, sectionName);
 	}
 
-	private Node createRelatedOrganizationCardContainer(OrganizationCardFactory factory, CaseDao.RelatedOrganizationRow org) {
-		OrganizationCardFactory.OrganizationCardModel model = new OrganizationCardFactory.OrganizationCardModel(
-				org.id(),
-				org.name(),
-				org.organizationTypeId(),
-				org.organizationTypeName(),
-				org.phone(),
-				org.email(),
-				org.website(),
-				org.address1(),
-				org.address2(),
-				org.city(),
-				org.state(),
-				org.postalCode(),
-				org.country(),
-				org.notes(),
-				org.color()
-		);
-
-		Node card = factory.create(model, OrganizationCardFactory.Variant.COMPACT);
-
-		Button removeButton = new Button("Remove");
-		removeButton.getStyleClass().add("button-secondary");
-		removeButton.setOnAction(e -> onRemoveOrganization(org));
-
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox actions = new HBox(8, spacer, removeButton);
-
-		VBox container = new VBox(6, card, actions);
-		container.setMinWidth(280);
-		container.setPrefWidth(280);
-		container.setMaxWidth(280);
-		return container;
-	}
 
 	private void onAddRelatedEntity() {
-		String section = genericTitleLabel == null ? "" : safe(genericTitleLabel.getText());
-		if ("Contacts".equalsIgnoreCase(section)) {
-			onAddContact();
-			return;
+		if (isSectionActive("Parties")) {
+			onAddParty();
 		}
-		onAddOrganization();
 	}
 
-	private void onAddContact() {
-		if (caseDao == null || contactDao == null || caseId == null || addOrganizationButton == null) {
-			return;
-		}
-
-		Window owner = organizationDialogOwner();
-		Optional<String> choice = AppDialogs.showChoice(
-				owner,
-				"Add Contact",
-				"Add a contact to this case",
-				"Choose whether to link an existing contact or create a new one.",
-				List.of(
-						AppDialogs.DialogAction.cancel("Cancel", null),
-						AppDialogs.DialogAction.of("Select Existing Contact", "existing", AppDialogs.DialogActionKind.SECONDARY, false, false),
-						AppDialogs.DialogAction.of("Create New Contact", "create", AppDialogs.DialogActionKind.PRIMARY, true, false)));
-		if (choice.isEmpty()) {
-			return;
-		}
-
-		if ("existing".equals(choice.get())) {
-			loadLinkableContactsAndShowPicker(owner);
-			return;
-		}
-
-		showCreateContactDialog(owner);
-	}
-
-	private void loadLinkableContactsAndShowPicker(Window owner) {
-		if (caseDao == null || caseId == null) {
-			return;
-		}
-
-		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
-			try {
-				List<CaseDao.SelectableContactRow> selectable = caseDao.findLinkableContacts(activeCaseId);
-				runOnFx(() -> showLinkContactPicker(owner, selectable));
-			} catch (Exception ex) {
-				runOnFx(() -> showContactActionError("Failed to load contacts for linking."));
-			}
-		}, "case-linkable-contacts-" + activeCaseId).start();
-	}
-
-	private void showLinkContactPicker(Window owner, List<CaseDao.SelectableContactRow> selectable) {
-		List<CaseDao.SelectableContactRow> options = selectable == null ? List.of() : selectable;
-		if (options.isEmpty()) {
-			showContactActionInfo("No available contacts to link.");
-			return;
-		}
-
-		ContactPickerDialog<CaseDao.SelectableContactRow> picker = new ContactPickerDialog<>(
-				owner,
-				"Add Contact",
-				options,
-				this::formatSelectableContact,
-				null);
-
-		Optional<CaseDao.SelectableContactRow> selected = picker.showAndWait();
-		if (selected.isEmpty()) {
-			return;
-		}
-
-		promptForRoleAndLinkContact(owner, selected.get().id(), false);
-	}
-
-	private void showCreateContactDialog(Window owner) {
-		if (appState == null || appState.getShaleClientId() == null || appState.getShaleClientId() <= 0) {
-			showContactActionError("A tenant must be selected before creating a contact.");
-			return;
-		}
-
-		CreateContactDialog dialog = new CreateContactDialog(owner);
-		Optional<ContactDao.CreateContactRequest> request = dialog.showAndWait(appState.getShaleClientId());
-		if (request.isEmpty()) {
-			return;
-		}
-
-		createAndLinkContact(owner, request.get());
-	}
-
-	private void createAndLinkContact(Window owner, ContactDao.CreateContactRequest request) {
-		if (contactDao == null || caseDao == null || caseId == null || request == null) {
-			return;
-		}
-		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
-			try {
-				int contactId = contactDao.createContact(request);
-				runOnFx(() -> promptForRoleAndLinkContact(owner, contactId, true));
-			} catch (Exception ex) {
-				runOnFx(() -> showContactActionError("Failed to create contact for this case."));
-			}
-		}, "case-create-contact-" + activeCaseId).start();
-	}
-
-	private void promptForRoleAndLinkContact(Window owner, int contactId, boolean createdFlow) {
-		if (caseDao == null || contactId <= 0) {
-			return;
-		}
-		new Thread(() -> {
-			try {
-				List<CaseDao.CaseContactRoleOption> roles = caseDao.findActiveCaseContactRoles();
-				runOnFx(() -> showCaseContactRolePicker(owner, contactId, roles, createdFlow));
-			} catch (Exception ex) {
-				runOnFx(() -> showContactActionError(createdFlow
-						? "Contact was created, but loading case contact roles failed."
-						: "Failed to load case contact roles."));
-			}
-		}, "case-contact-roles-" + contactId).start();
-	}
-
-	private void showCaseContactRolePicker(Window owner, int contactId, List<CaseDao.CaseContactRoleOption> roles, boolean createdFlow) {
-		List<CaseDao.CaseContactRoleOption> options = roles == null ? List.of() : roles;
-		if (options.isEmpty()) {
-			showContactActionError(createdFlow
-					? "Contact was created, but no active case contact roles are configured."
-					: "No active case contact roles are configured.");
-			return;
-		}
-
-		CaseDao.CaseContactRoleOption preselect = findPreferredCaseContactRole(options);
-		ContactPickerDialog<CaseDao.CaseContactRoleOption> picker = new ContactPickerDialog<>(
-				owner,
-				"Select Contact Role",
-				options,
-				this::formatCaseContactRole,
-				preselect);
-		Optional<CaseDao.CaseContactRoleOption> selected = picker.showAndWait();
-		if (selected.isEmpty()) {
-			if (createdFlow) {
-				showContactActionInfo("Contact was created, but it was not linked because no role was selected.");
-			}
-			return;
-		}
-
-		linkContactToCurrentCase(contactId, selected.get().id(), createdFlow);
-	}
-
-	private CaseDao.CaseContactRoleOption findPreferredCaseContactRole(List<CaseDao.CaseContactRoleOption> roles) {
-		if (roles == null || roles.isEmpty()) {
-			return null;
-		}
-		for (CaseDao.CaseContactRoleOption role : roles) {
-			if (role != null && "contact".equalsIgnoreCase(safe(role.name()).trim())) {
-				return role;
-			}
-		}
-		return roles.get(0);
-	}
-
-	private void linkContactToCurrentCase(int contactId, int roleId, boolean createdFlow) {
-		if (caseDao == null || caseId == null || contactId <= 0 || roleId <= 0) {
-			return;
-		}
-
-		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
-			try {
-				boolean inserted = caseDao.linkContactToCase(activeCaseId, contactId, roleId);
-				runOnFx(() -> {
-					if (!inserted) {
-						showContactActionInfo(createdFlow
-								? "Contact was created, but it is already linked to this case."
-								: "That contact is already linked to this case.");
-						refreshContactsSectionAsync();
-						return;
-					}
-					refreshContactsSectionAsync();
-				});
-			} catch (Exception ex) {
-				runOnFx(() -> showContactActionError(createdFlow
-						? "Contact was created, but linking it to the case failed."
-						: "Failed to link contact to this case."));
-			}
-		}, "case-link-contact-" + activeCaseId + "-" + contactId + "-" + roleId).start();
-	}
-
-	private void refreshContactsSectionAsync() {
-		if (caseDao == null || caseId == null) {
-			return;
-		}
-
-		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
-			try {
-				List<CaseDao.RelatedContactRow> contacts = caseDao.findRelatedContacts(activeCaseId);
-				runOnFx(() -> {
-					relatedContacts = contacts == null ? List.of() : contacts;
-					renderContactsSection();
-				});
-			} catch (Exception ex) {
-				runOnFx(() -> showContactActionError("Failed to refresh contacts for this case."));
-			}
-		}, "case-refresh-contacts-" + activeCaseId).start();
-	}
-
-	private void onRemoveContact(CaseDao.RelatedContactRow contact) {
-		if (contact == null || caseDao == null || caseId == null) {
-			return;
-		}
-
-		if (!confirmContactUnlink(contact)) {
-			return;
-		}
-
-		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
-			try {
-				caseDao.unlinkContactFromCase(activeCaseId, contact.id());
-				runOnFx(this::refreshContactsSectionAsync);
-			} catch (Exception ex) {
-				runOnFx(() -> showContactActionError("Failed to remove contact from this case."));
-			}
-		}, "case-unlink-contact-" + activeCaseId + "-" + contact.id()).start();
-	}
-
-	private boolean confirmContactUnlink(CaseDao.RelatedContactRow contact) {
-		return AppDialogs.showConfirmation(
-				organizationDialogOwner(),
-				"Remove Contact",
-				"Remove this contact from the case?",
-				formatRelatedContact(contact),
-				"Remove Contact",
-				AppDialogs.DialogActionKind.DANGER);
-	}
-
-	private String formatRelatedContact(CaseDao.RelatedContactRow contact) {
-		if (contact == null) {
-			return "";
-		}
-		String name = safe(contact.displayName());
-		String role = caseContactRoleLabel(contact.roleName(), contact.roleId(), contact.primary());
-		if (role.isBlank()) {
-			return name;
-		}
-		return name + " — " + role;
-	}
-
-	private void showContactActionInfo(String message) {
-		showContactActionAlert(AppDialogs.DialogActionKind.PRIMARY, message);
-	}
-
-	private void showContactActionError(String message) {
-		showContactActionAlert(AppDialogs.DialogActionKind.DANGER, message);
-	}
-
-	private void showContactActionAlert(AppDialogs.DialogActionKind type, String message) {
-		if (type == AppDialogs.DialogActionKind.DANGER) {
-			AppDialogs.showError(organizationDialogOwner(), "Contacts", message);
-			return;
-		}
-		AppDialogs.showInfo(organizationDialogOwner(), "Contacts", message);
-	}
-
-	private String formatCaseContactRole(CaseDao.CaseContactRoleOption role) {
-		if (role == null) {
-			return "";
-		}
-		String name = safe(role.name());
-		String description = safe(role.description()).trim();
-		if (description.isBlank()) {
-			return name + " (#" + role.id() + ")";
-		}
-		return name + " — " + description + " (#" + role.id() + ")";
-	}
-
-	private String formatSelectableContact(CaseDao.SelectableContactRow row) {
-		if (row == null) {
-			return "";
-		}
-		String name = safe(row.displayName());
-		String email = safe(row.email());
-		String phone = safe(row.phone());
-		String detail = !email.isBlank() ? email : phone;
-		if (detail.isBlank()) {
-			return name + " (#" + row.id() + ")";
-		}
-		return name + " — " + detail + " (#" + row.id() + ")";
-	}
-
-	private void openTask(Long taskId) {
-		showTaskDetailPopup(taskId);
-	}
-
-	private TaskCardFactory buildTaskCardFactory(Consumer<Long> onOpenTaskAction) {
-		return new TaskCardFactory(
-				onOpenTaskAction,
-				this::onToggleTaskComplete,
-				onOpenCase == null ? id -> {
-				} : onOpenCase,
-				onOpenUser == null ? id -> {
-				} : onOpenUser);
-	}
 
 	private void onAddTask() {
 		if (caseTaskService == null || caseId == null || appState == null) {
@@ -1845,199 +2277,20 @@ public class CaseController {
 		return null;
 	}
 
+	private void openTask(Long taskId) {
+		if (taskId == null || onOpenTask == null) {
+			return;
+		}
+		onOpenTask.accept(taskId);
+	}
+
 	private void openOrganization(Integer organizationId) {
-		if (organizationId == null)
-			return;
-		if (onOpenOrganization != null) {
-			onOpenOrganization.accept(organizationId);
-		}
-	}
-
-
-	private void onAddOrganization() {
-		if (caseDao == null || organizationDao == null || caseId == null || addOrganizationButton == null) {
+		if (organizationId == null || onOpenOrganization == null) {
 			return;
 		}
-
-		Window owner = addOrganizationButton.getScene() == null ? null : addOrganizationButton.getScene().getWindow();
-		Optional<String> choice = AppDialogs.showChoice(
-				owner,
-				"Add Organization",
-				"Add an organization to this case",
-				"Choose whether to link an existing organization or create a new one.",
-				List.of(
-						AppDialogs.DialogAction.cancel("Cancel", null),
-						AppDialogs.DialogAction.of("Select Existing Organization", "existing", AppDialogs.DialogActionKind.SECONDARY, false, false),
-						AppDialogs.DialogAction.of("Create New Organization", "create", AppDialogs.DialogActionKind.PRIMARY, true, false)));
-		if (choice.isEmpty()) {
-			return;
-		}
-
-		if ("existing".equals(choice.get())) {
-			loadLinkableOrganizationsAndShowPicker(owner);
-			return;
-		}
-
-		showCreateOrganizationDialog(owner);
+		onOpenOrganization.accept(organizationId);
 	}
 
-	private void loadLinkableOrganizationsAndShowPicker(Window owner) {
-		if (caseDao == null || caseId == null) {
-			return;
-		}
-
-		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
-			try {
-				List<CaseDao.SelectableOrganizationRow> selectable = caseDao.findLinkableOrganizations(activeCaseId);
-				runOnFx(() -> showLinkOrganizationPicker(owner, selectable));
-			} catch (Exception ex) {
-				runOnFx(() -> showOrganizationActionError("Failed to load organizations for linking."));
-			}
-		}, "case-linkable-organizations-" + activeCaseId).start();
-	}
-
-	private void showLinkOrganizationPicker(Window owner, List<CaseDao.SelectableOrganizationRow> selectable) {
-		List<CaseDao.SelectableOrganizationRow> options = selectable == null ? List.of() : selectable;
-		if (options.isEmpty()) {
-			showOrganizationActionInfo("No available organizations to link.");
-			return;
-		}
-
-		ContactPickerDialog<CaseDao.SelectableOrganizationRow> picker = new ContactPickerDialog<>(
-				owner,
-				"Add Organization",
-				options,
-				this::formatSelectableOrganization,
-				null);
-
-		Optional<CaseDao.SelectableOrganizationRow> selected = picker.showAndWait();
-		if (selected.isEmpty()) {
-			return;
-		}
-
-		linkOrganizationToCurrentCase(selected.get().id(), false);
-	}
-
-	private void showCreateOrganizationDialog(Window owner) {
-		try {
-			URL url = Objects.requireNonNull(getClass().getResource("/fxml/new-organization.fxml"), "Missing FXML: /fxml/new-organization.fxml");
-			FXMLLoader loader = new FXMLLoader(url);
-			Parent root = loader.load();
-
-			Stage dialog = new Stage();
-			if (owner != null) {
-				dialog.initOwner(owner);
-			}
-			dialog.initModality(Modality.WINDOW_MODAL);
-			dialog.setTitle("New Organization");
-
-			NewOrganizationController controller = loader.getController();
-			controller.init(appState, organizationDao, dialog, organizationId -> linkOrganizationToCurrentCase(organizationId, true));
-
-			Scene dialogScene = new Scene(root);
-			dialogScene.getStylesheets().add(Objects.requireNonNull(
-					getClass().getResource("/css/app.css")).toExternalForm());
-			dialog.setScene(dialogScene);
-			dialog.setMinWidth(760);
-			dialog.setMinHeight(720);
-			dialog.showAndWait();
-		} catch (IOException e) {
-			throw new RuntimeException("Failed to open New Organization dialog", e);
-		}
-	}
-
-	private void linkOrganizationToCurrentCase(int organizationId, boolean createdFlow) {
-		if (caseDao == null || caseId == null || organizationId <= 0) {
-			return;
-		}
-
-		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
-			try {
-				boolean inserted = caseDao.linkOrganizationToCase(activeCaseId, organizationId);
-				runOnFx(() -> {
-					if (!inserted) {
-						showOrganizationActionInfo(createdFlow
-								? "Organization was created, but it is already linked to this case."
-								: "That organization is already linked to this case.");
-						refreshOrganizationsSectionAsync();
-						return;
-					}
-					refreshOrganizationsSectionAsync();
-				});
-			} catch (Exception ex) {
-				runOnFx(() -> showOrganizationActionError(createdFlow
-						? "Organization was created, but linking it to the case failed."
-						: "Failed to link organization to this case."));
-			}
-		}, "case-link-organization-" + activeCaseId + "-" + organizationId).start();
-	}
-
-	private void onRemoveOrganization(CaseDao.RelatedOrganizationRow org) {
-		if (org == null || caseDao == null || caseId == null) {
-			return;
-		}
-
-		if (!confirmOrganizationUnlink(org)) {
-			return;
-		}
-
-		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
-			try {
-				caseDao.unlinkOrganizationFromCase(activeCaseId, org.id());
-				runOnFx(this::refreshOrganizationsSectionAsync);
-			} catch (Exception ex) {
-				runOnFx(() -> showOrganizationActionError("Failed to remove organization from this case."));
-			}
-		}, "case-unlink-organization-" + activeCaseId + "-" + org.id()).start();
-	}
-
-	private boolean confirmOrganizationUnlink(CaseDao.RelatedOrganizationRow org) {
-		return AppDialogs.showConfirmation(
-				organizationDialogOwner(),
-				"Remove Organization",
-				"Remove this organization from the case?",
-				formatRelatedOrganization(org),
-				"Remove Organization",
-				AppDialogs.DialogActionKind.DANGER);
-	}
-
-	private void refreshOrganizationsSectionAsync() {
-		if (caseDao == null || caseId == null) {
-			return;
-		}
-
-		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
-			try {
-				List<CaseDao.RelatedOrganizationRow> organizations = caseDao.findRelatedOrganizations(activeCaseId);
-				runOnFx(() -> {
-					relatedOrganizations = organizations == null ? List.of() : organizations;
-					renderOrganizationsSection();
-				});
-			} catch (Exception ex) {
-				runOnFx(() -> showOrganizationActionError("Failed to refresh organizations for this case."));
-			}
-		}, "case-refresh-organizations-" + activeCaseId).start();
-	}
-
-	private void showOrganizationActionInfo(String message) {
-		showOrganizationActionAlert(AppDialogs.DialogActionKind.PRIMARY, message);
-	}
-
-	private void showOrganizationActionError(String message) {
-		showOrganizationActionAlert(AppDialogs.DialogActionKind.DANGER, message);
-	}
-
-	private void showOrganizationActionAlert(AppDialogs.DialogActionKind type, String message) {
-		if (type == AppDialogs.DialogActionKind.DANGER) {
-			AppDialogs.showError(organizationDialogOwner(), "Organizations", message);
-			return;
-		}
-		AppDialogs.showInfo(organizationDialogOwner(), "Organizations", message);
-	}
 
 	private Window organizationDialogOwner() {
 		if (addOrganizationButton != null && addOrganizationButton.getScene() != null) {
@@ -2046,29 +2299,6 @@ public class CaseController {
 		return null;
 	}
 
-	private String formatSelectableOrganization(CaseDao.SelectableOrganizationRow row) {
-		if (row == null) {
-			return "";
-		}
-		String name = safe(row.name());
-		String type = row.organizationTypeName() == null ? "" : row.organizationTypeName().trim();
-		if (type.isBlank()) {
-			return name + " (#" + row.id() + ")";
-		}
-		return name + " — " + type + " (#" + row.id() + ")";
-	}
-
-	private String formatRelatedOrganization(CaseDao.RelatedOrganizationRow row) {
-		if (row == null) {
-			return "";
-		}
-		String name = safe(row.name());
-		String type = row.organizationTypeName() == null ? "" : row.organizationTypeName().trim();
-		if (type.isBlank()) {
-			return name + " (#" + row.id() + ")";
-		}
-		return name + " — " + type + " (#" + row.id() + ")";
-	}
 
 	// ----------------------------
 	// Overview loading
@@ -2096,20 +2326,13 @@ public class CaseController {
 		{
 			CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
 			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
-			List<CaseDao.RelatedContactRow> loadedContacts = List.of();
-			List<CaseDao.RelatedOrganizationRow> loadedOrganizations = List.of();
+			List<CasePartyDto> loadedParties = List.of();
 			try {
-				loadedContacts = caseDao.findRelatedContacts(activeCaseId);
-			} catch (Exception contactLoadError) {
-				System.err.println("Case contacts load failed for caseId=" + activeCaseId + ": " + contactLoadError.getMessage());
+				loadedParties = caseDao.listCaseParties(activeCaseId);
+			} catch (Exception partiesLoadError) {
+				System.err.println("Case parties load failed for caseId=" + activeCaseId + ": " + partiesLoadError.getMessage());
 			}
-			try {
-				loadedOrganizations = caseDao.findRelatedOrganizations(activeCaseId);
-			} catch (Exception orgLoadError) {
-				System.err.println("Case organizations load failed for caseId=" + activeCaseId + ": " + orgLoadError.getMessage());
-			}
-			final List<CaseDao.RelatedContactRow> contacts = loadedContacts;
-			final List<CaseDao.RelatedOrganizationRow> organizations = loadedOrganizations;
+			final List<CasePartyDto> parties = loadedParties;
 
 			runOnFx(() ->
 			{
@@ -2118,13 +2341,10 @@ public class CaseController {
 					return;
 				}
 
-				applyOverviewEditSafe(overview);
-
-				relatedContacts = contacts == null ? List.of() : contacts;
-				renderContactsSection();
-
-				relatedOrganizations = organizations == null ? List.of() : organizations;
-				renderOrganizationsSection();
+				caseParties = parties == null ? List.of() : parties;
+				renderPartiesSection();
+				CaseOverviewDto effectiveOverview = applyCallerFromCaseParties(overview, caseParties);
+				applyOverviewEditSafe(effectiveOverview);
 
 				current = detail;
 				detailsLocalViewOverride = null;
@@ -2162,6 +2382,152 @@ public class CaseController {
 			} catch (Exception ignored) {
 			}
 		}, "case-refresh-last-updated-" + activeCaseId).start();
+	}
+
+	private CaseOverviewDto applyCallerFromCaseParties(CaseOverviewDto overview, List<CasePartyDto> parties) {
+		if (overview == null) {
+			return null;
+		}
+		CallerPartySelection caller = resolveCallerFromCaseParties(parties);
+		OpposingCounselPartySelection opposingCounsel = resolveOpposingCounselFromCaseParties(parties);
+		List<CaseOverviewDto.ContactSummary> representedClients = resolveRepresentedClientsFromCaseParties(parties);
+		boolean hasAnyCallerRows = hasCallerRows(parties);
+		boolean hasAnyOpposingCounselRows = hasOpposingCounselRows(parties);
+		Integer effectiveCallerId = caller == null
+				? (hasAnyCallerRows ? overview.getPrimaryCallerContactId() : null)
+				: caller.contactId();
+		String effectiveCallerName = caller == null
+				? (hasAnyCallerRows ? overview.getCaller() : null)
+				: caller.displayName();
+		Integer effectiveOpposingCounselId = opposingCounsel == null
+				? (hasAnyOpposingCounselRows ? overview.getPrimaryOpposingCounselContactId() : null)
+				: opposingCounsel.contactId();
+		String effectiveOpposingCounselName = opposingCounsel == null
+				? (hasAnyOpposingCounselRows ? overview.getOpposingCounsel() : null)
+				: opposingCounsel.displayName();
+		if (Objects.equals(overview.getPrimaryCallerContactId(), effectiveCallerId)
+				&& Objects.equals(safeText(overview.getCaller()), safeText(effectiveCallerName))
+				&& Objects.equals(overview.getPrimaryOpposingCounselContactId(), effectiveOpposingCounselId)
+				&& Objects.equals(safeText(overview.getOpposingCounsel()), safeText(effectiveOpposingCounselName))
+				&& Objects.equals(overview.getClients(), representedClients)) {
+			return overview;
+		}
+
+		return new CaseOverviewDto(
+				overview.getCaseId(),
+				overview.getCaseNumber(),
+				overview.getCaseName(),
+				overview.getCaseStatus(),
+				overview.getPrimaryStatusId(),
+				overview.getPrimaryStatusColor(),
+				overview.getResponsibleAttorneyUserId(),
+				overview.getResponsibleAttorney(),
+				overview.getResponsibleAttorneyColor(),
+				overview.getPracticeAreaId(),
+				overview.getPracticeArea(),
+				overview.getPracticeAreaColor(),
+				overview.getIntakeDate(),
+				overview.getIncidentDate(),
+				overview.getSolDate(),
+					effectiveCallerId,
+					overview.getPrimaryClientContactId(),
+					effectiveOpposingCounselId,
+					effectiveCallerName,
+					overview.getClient(),
+					representedClients,
+					effectiveOpposingCounselName,
+					overview.getTeam(),
+					overview.getDescription());
+	}
+
+	private boolean hasCallerRows(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return false;
+		}
+		return parties.stream()
+				.filter(Objects::nonNull)
+				.anyMatch(party -> "caller".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()));
+	}
+
+	private boolean hasOpposingCounselRows(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return false;
+		}
+		return parties.stream()
+				.filter(Objects::nonNull)
+				.filter(party -> "counsel".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()))
+				.anyMatch(party -> "opposing".equalsIgnoreCase(safeText(party.getSide()).trim()));
+	}
+
+	private List<CaseOverviewDto.ContactSummary> resolveRepresentedClientsFromCaseParties(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return List.of();
+		}
+		return parties.stream()
+				.filter(Objects::nonNull)
+				.filter(party -> "party".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()))
+				.filter(party -> "represented".equalsIgnoreCase(safeText(party.getSide()).trim()))
+				.sorted(Comparator
+						.comparing(CasePartyDto::isPrimary, Comparator.reverseOrder())
+						.thenComparing(p -> safeText(p.getDisplayName()), String.CASE_INSENSITIVE_ORDER)
+						.thenComparing(CasePartyDto::getId))
+				.map(party -> new CaseOverviewDto.ContactSummary(
+						party.getContactId() == null ? null : party.getContactId().intValue(),
+						safeText(party.getDisplayName())))
+				.toList();
+	}
+
+	private CallerPartySelection resolveCallerFromCaseParties(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return null;
+		}
+		CasePartyDto firstFallback = null;
+		for (CasePartyDto party : parties) {
+			if (party == null || party.getContactId() == null) {
+				continue;
+			}
+			String role = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
+			if (!"caller".equals(role)) {
+				continue;
+			}
+			if (party.isPrimary()) {
+				return new CallerPartySelection(party.getContactId().intValue(), safeText(party.getDisplayName()));
+			}
+			if (firstFallback == null) {
+				firstFallback = party;
+			}
+		}
+		if (firstFallback == null) {
+			return null;
+		}
+		return new CallerPartySelection(firstFallback.getContactId().intValue(), safeText(firstFallback.getDisplayName()));
+	}
+
+	private OpposingCounselPartySelection resolveOpposingCounselFromCaseParties(List<CasePartyDto> parties) {
+		if (parties == null || parties.isEmpty()) {
+			return null;
+		}
+		CasePartyDto firstFallback = null;
+		for (CasePartyDto party : parties) {
+			if (party == null || party.getContactId() == null) {
+				continue;
+			}
+			String role = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
+			String side = safeText(party.getSide()).trim().toLowerCase(Locale.ROOT);
+			if (!"counsel".equals(role) || !"opposing".equals(side)) {
+				continue;
+			}
+			if (party.isPrimary()) {
+				return new OpposingCounselPartySelection(party.getContactId().intValue(), safeText(party.getDisplayName()));
+			}
+			if (firstFallback == null) {
+				firstFallback = party;
+			}
+		}
+		if (firstFallback == null) {
+			return null;
+		}
+		return new OpposingCounselPartySelection(firstFallback.getContactId().intValue(), safeText(firstFallback.getDisplayName()));
 	}
 
 	private void applyLastUpdatedLabel(LocalDateTime updatedAt) {
@@ -2352,10 +2718,8 @@ public class CaseController {
 	private void handleMissingCase() {
 		current = null;
 		currentOverview = null;
-		relatedContacts = List.of();
-		relatedOrganizations = List.of();
-		renderContactsSection();
-		renderOrganizationsSection();
+		caseParties = List.of();
+		renderPartiesSection();
 		refreshDeleteAction();
 		navigateAfterDelete();
 	}
@@ -3268,7 +3632,6 @@ public class CaseController {
 
 		List<CaseOverviewDto.ContactSummary> safeClients = clients == null ? List.of() : clients.stream()
 				.filter(Objects::nonNull)
-				.filter(c -> c.contactId() != null && c.contactId() > 0)
 				.toList();
 		if (safeClients.isEmpty()) {
 			ovClientHost.getChildren().setAll(contactCardFactory.createMini(null, "—"));
@@ -4176,8 +4539,8 @@ public class CaseController {
 
 			if (computation.callerChanged()) {
 				requireTenant(request.tenantId());
-				caseDao.setPrimaryCaseContact(
-						request.saveCaseId(), request.tenantId(), ROLE_CASECONTACT_CALLER, request.desired().desiredCallerContactId(), request.userId(), null
+				caseDao.setPrimaryCasePartyCaller(
+						request.saveCaseId(), request.tenantId(), request.desired().desiredCallerContactId(), request.userId(), null
 				);
 			}
 
@@ -4189,8 +4552,8 @@ public class CaseController {
 						.filter(Objects::nonNull)
 						.distinct()
 						.toList();
-				caseDao.replaceCaseContactsForRole(
-						request.saveCaseId(), request.tenantId(), ROLE_CASECONTACT_CLIENT, desiredClientIds, null
+				caseDao.syncRepresentedPartyContacts(
+						request.saveCaseId(), request.tenantId(), desiredClientIds, null
 				);
 			}
 
@@ -4204,8 +4567,8 @@ public class CaseController {
 
 			if (computation.opposingCounselChanged()) {
 				requireTenant(request.tenantId());
-				caseDao.setPrimaryCaseContact(
-						request.saveCaseId(), request.tenantId(), ROLE_CASECONTACT_OPPOSING_COUNSEL,
+				caseDao.setPrimaryCasePartyOpposingCounsel(
+						request.saveCaseId(), request.tenantId(),
 						request.desired().desiredOpposingCounselContactId(), request.userId(), null
 				);
 			}
@@ -4771,11 +5134,18 @@ public class CaseController {
 			List<CaseOverviewDto.ContactSummary> initial = draftClientContacts != null
 					? draftClientContacts
 					: (currentOverview == null ? List.of() : currentOverview.getClients());
+			if (initial == null) {
+				initial = List.of();
+			}
+			List<CaseOverviewDto.ContactSummary> contactOnlyInitial = initial.stream()
+					.filter(Objects::nonNull)
+					.filter(client -> client.contactId() != null && client.contactId() > 0)
+					.toList();
 			Window owner = dialogOwner(changeClientButton);
 			ClientAssignmentDialog dialog = new ClientAssignmentDialog(
 					owner,
 					cleaned,
-					initial,
+					contactOnlyInitial,
 					(firstName, lastName) -> {
 						if (contactDao == null || appState == null || appState.getShaleClientId() == null || appState.getShaleClientId() <= 0)
 							throw new IllegalStateException("Cannot create contact without an active tenant.");
