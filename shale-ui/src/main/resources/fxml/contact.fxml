@@ -104,13 +104,9 @@
                             <Label fx:id="conditionValue" text="—" wrapText="true" GridPane.rowIndex="8" GridPane.columnIndex="1" />
                             <TextArea fx:id="conditionEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" GridPane.rowIndex="8" GridPane.columnIndex="1" />
 
-                            <Label text="Client:" style="-fx-opacity: 0.8;" GridPane.rowIndex="9" />
-                            <Label fx:id="clientValue" text="—" wrapText="true" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-                            <CheckBox fx:id="clientEditor" text="Is Client" visible="false" managed="false" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-
-                            <Label text="Deceased:" style="-fx-opacity: 0.8;" GridPane.rowIndex="10" />
-                            <Label fx:id="deceasedValue" text="—" wrapText="true" GridPane.rowIndex="10" GridPane.columnIndex="1" />
-                            <CheckBox fx:id="deceasedEditor" text="Is Deceased" visible="false" managed="false" GridPane.rowIndex="10" GridPane.columnIndex="1" />
+                            <Label text="Deceased:" style="-fx-opacity: 0.8;" GridPane.rowIndex="9" />
+                            <Label fx:id="deceasedValue" text="—" wrapText="true" GridPane.rowIndex="9" GridPane.columnIndex="1" />
+                            <CheckBox fx:id="deceasedEditor" text="Is Deceased" visible="false" managed="false" GridPane.rowIndex="9" GridPane.columnIndex="1" />
                         </GridPane>
                     </VBox>
 
