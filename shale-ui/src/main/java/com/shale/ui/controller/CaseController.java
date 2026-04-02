@@ -505,7 +505,8 @@ public class CaseController {
 			boolean createNew,
 			String contactFirstName,
 			String contactLastName,
-			String organizationName) {}
+			String organizationName,
+			Integer organizationTypeId) {}
 	private record CallerPartySelection(Integer contactId, String displayName) {}
 	private record OpposingCounselPartySelection(Integer contactId, String displayName) {}
 
@@ -1511,6 +1512,23 @@ public class CaseController {
 		List<CaseDao.PartyRoleRow> partyRoles = caseDao.listPartyRoles();
 		List<CaseDao.SelectableContactRow> contacts = caseDao.findLinkableContacts(caseId.longValue());
 		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
+		List<OrganizationDao.OrganizationTypeRow> organizationTypes = organizationDao == null ? List.of() : organizationDao.findOrganizationTypes();
+
+		class WizardState {
+			int step = 1;
+			String mode = null; // create | select
+			String entityType = null; // contact | organization
+			PartyEntityOption selectedEntity = null;
+			String createContactFirstName = null;
+			String createContactLastName = null;
+			String createOrganizationName = null;
+			Integer createOrganizationTypeId = organizationTypes.isEmpty() ? null : organizationTypes.get(0).organizationTypeId();
+			Long partyRoleId = partyRoles.isEmpty() ? null : partyRoles.get(0).id();
+			String affiliation = null;
+			boolean primary = false;
+			String notes = null;
+		}
+		WizardState state = new WizardState();
 
 		Dialog<AddPartyDraft> dialog = new Dialog<>();
 		dialog.setTitle("Add Party");
@@ -1519,15 +1537,44 @@ public class CaseController {
 		ButtonType addType = new ButtonType("Add Party", ButtonData.OK_DONE);
 		dialog.getDialogPane().getButtonTypes().addAll(backType, addType, ButtonType.CANCEL);
 
+		Node backButton = dialog.getDialogPane().lookupButton(backType);
+		Node addButton = dialog.getDialogPane().lookupButton(addType);
+
+		Label titleLabel = new Label();
+		titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
+
+		Button createNewButton = new Button("Create New");
+		Button selectExistingButton = new Button("Select Existing");
+		createNewButton.setMinWidth(200);
+		selectExistingButton.setMinWidth(200);
+
+		Button contactButton = new Button("Contact");
+		Button organizationButton = new Button("Organization");
+		contactButton.setMinWidth(200);
+		organizationButton.setMinWidth(200);
+
+		TextField createFirstNameField = new TextField();
+		TextField createLastNameField = new TextField();
+		TextField createOrganizationNameField = new TextField();
+		ChoiceBox<OrganizationDao.OrganizationTypeRow> createOrganizationTypeChoice = new ChoiceBox<>();
+		createOrganizationTypeChoice.getItems().setAll(organizationTypes);
+		createOrganizationTypeChoice.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(OrganizationDao.OrganizationTypeRow object) { return object == null ? "" : safeText(object.name()); }
+			@Override public OrganizationDao.OrganizationTypeRow fromString(String string) { return null; }
+		});
+		if (!organizationTypes.isEmpty()) {
+			createOrganizationTypeChoice.setValue(organizationTypes.get(0));
+		}
+
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
 		partyRoles.stream().map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id()))).forEach(roleChoice.getItems()::add);
-		if (!roleChoice.getItems().isEmpty()) {
-			roleChoice.setValue(roleChoice.getItems().get(0));
-		}
 		roleChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartyRoleOption object) { return object == null ? "" : object.label; }
 			@Override public PartyRoleOption fromString(String string) { return null; }
 		});
+		if (!roleChoice.getItems().isEmpty()) {
+			roleChoice.setValue(roleChoice.getItems().get(0));
+		}
 
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
 		sideChoice.getItems().addAll(
@@ -1536,24 +1583,21 @@ public class CaseController {
 				new PartySideOption("Neutral", "neutral"),
 				new PartySideOption("Unclassified", null)
 		);
-		sideChoice.setValue(sideChoice.getItems().get(3));
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
 			@Override public PartySideOption fromString(String string) { return null; }
 		});
+		sideChoice.setValue(sideChoice.getItems().get(3));
 
 		CheckBox primaryCheck = new CheckBox("Primary");
 		TextArea notesArea = new TextArea();
 		notesArea.setPrefRowCount(3);
 		notesArea.setWrapText(true);
 
-		TextField firstNameField = new TextField();
-		TextField lastNameField = new TextField();
-		TextField organizationNameField = new TextField();
 		TextField searchField = new TextField();
 		searchField.setPromptText("Search by name");
 		javafx.scene.control.ListView<PartyEntityOption> existingList = new javafx.scene.control.ListView<>();
-		existingList.setPrefHeight(280);
+		existingList.setPrefHeight(260);
 		existingList.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
 			@Override
 			protected void updateItem(PartyEntityOption item, boolean empty) {
@@ -1562,301 +1606,235 @@ public class CaseController {
 			}
 		});
 
-		javafx.beans.property.ObjectProperty<String> selectedMode = new javafx.beans.property.SimpleObjectProperty<>();
-		javafx.beans.property.ObjectProperty<String> selectedEntityType = new javafx.beans.property.SimpleObjectProperty<>();
-		javafx.beans.property.IntegerProperty currentStep = new javafx.beans.property.SimpleIntegerProperty(1);
+		VBox contentBox = new VBox(14);
+		contentBox.setAlignment(Pos.TOP_CENTER);
+		contentBox.setPadding(new Insets(16));
+		contentBox.getChildren().add(titleLabel);
+		dialog.getDialogPane().setContent(contentBox);
 
-		Label step1Title = new Label("Step 1: Create new or select from existing");
-		step1Title.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
-		Button createNewButton = new Button("Create New");
-		Button selectExistingButton = new Button("Select Existing");
-		createNewButton.setPrefWidth(180);
-		selectExistingButton.setPrefWidth(180);
-		HBox step1Choices = new HBox(12, createNewButton, selectExistingButton);
-		step1Choices.setAlignment(Pos.CENTER);
-		VBox step1Pane = new VBox(20, step1Title, step1Choices);
-		step1Pane.setAlignment(Pos.CENTER);
-		step1Pane.setPadding(new Insets(20));
-
-		Label step2Title = new Label("Step 2: Contact or Organization");
-		step2Title.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
-		Button contactButton = new Button("Contact");
-		Button organizationButton = new Button("Organization");
-		contactButton.setPrefWidth(180);
-		organizationButton.setPrefWidth(180);
-		HBox step2Choices = new HBox(12, contactButton, organizationButton);
-		step2Choices.setAlignment(Pos.CENTER);
-		VBox step2Pane = new VBox(20, step2Title, step2Choices);
-		step2Pane.setAlignment(Pos.CENTER);
-		step2Pane.setPadding(new Insets(20));
-
-		GridPane createGrid = new GridPane();
-		createGrid.setHgap(10);
-		createGrid.setVgap(8);
-
-		GridPane createRelationshipGrid = new GridPane();
-		createRelationshipGrid.setHgap(10);
-		createRelationshipGrid.setVgap(8);
-		createRelationshipGrid.add(new Label("Party Role"), 0, 0);
-		createRelationshipGrid.add(roleChoice, 1, 0);
-		createRelationshipGrid.add(new Label("Affiliation"), 0, 1);
-		createRelationshipGrid.add(sideChoice, 1, 1);
-
-		Label step3CreateTitle = new Label("Step 3: Create New");
-		step3CreateTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
-		VBox step3CreatePane = new VBox(14, step3CreateTitle, createGrid, createRelationshipGrid);
-		step3CreatePane.setAlignment(Pos.TOP_CENTER);
-		step3CreatePane.setPadding(new Insets(16));
-		step3CreatePane.setMaxWidth(620);
-
-		GridPane selectRelationshipGrid = new GridPane();
-		selectRelationshipGrid.setHgap(10);
-		selectRelationshipGrid.setVgap(8);
-		selectRelationshipGrid.add(new Label("Party Role"), 0, 0);
-		selectRelationshipGrid.add(roleChoice, 1, 0);
-		selectRelationshipGrid.add(new Label("Affiliation"), 0, 1);
-		selectRelationshipGrid.add(sideChoice, 1, 1);
-		selectRelationshipGrid.add(primaryCheck, 1, 2);
-		selectRelationshipGrid.add(new Label("Notes"), 0, 3);
-		selectRelationshipGrid.add(notesArea, 1, 3);
-
-		Label step3SelectTitle = new Label("Step 3: Select Existing");
-		step3SelectTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
-		VBox step3SelectPane = new VBox(12, step3SelectTitle, searchField, existingList, selectRelationshipGrid);
-		step3SelectPane.setAlignment(Pos.TOP_CENTER);
-		step3SelectPane.setPadding(new Insets(16));
-		step3SelectPane.setMaxWidth(700);
-
-		StackPane stepHost = new StackPane(step1Pane, step2Pane, step3CreatePane, step3SelectPane);
-		stepHost.setAlignment(Pos.CENTER);
-		BorderPane root = new BorderPane(stepHost);
-		root.setPadding(new Insets(8));
-		dialog.getDialogPane().setContent(root);
-
-		Runnable applyChoiceButtonStyles = () -> {
-			boolean createNew = "create".equals(selectedMode.get());
-			createNewButton.setStyle(createNew
-					? "-fx-font-size: 14px; -fx-font-weight: 700; -fx-padding: 12 18 12 18;"
-					: "-fx-font-size: 14px; -fx-padding: 12 18 12 18;");
-			selectExistingButton.setStyle(!createNew && selectedMode.get() != null
-					? "-fx-font-size: 14px; -fx-font-weight: 700; -fx-padding: 12 18 12 18;"
-					: "-fx-font-size: 14px; -fx-padding: 12 18 12 18;");
-
-			boolean contactSelected = "contact".equals(selectedEntityType.get());
-			contactButton.setStyle(contactSelected
-					? "-fx-font-size: 14px; -fx-font-weight: 700; -fx-padding: 12 18 12 18;"
-					: "-fx-font-size: 14px; -fx-padding: 12 18 12 18;");
-			organizationButton.setStyle(!contactSelected && selectedEntityType.get() != null
-					? "-fx-font-size: 14px; -fx-font-weight: 700; -fx-padding: 12 18 12 18;"
-					: "-fx-font-size: 14px; -fx-padding: 12 18 12 18;");
-		};
-
-		createNewButton.setOnAction(e -> {
-			selectedMode.set("create");
-			currentStep.set(2);
-		});
-		selectExistingButton.setOnAction(e -> {
-			selectedMode.set("select");
-			currentStep.set(2);
-		});
-		contactButton.setOnAction(e -> {
-			selectedEntityType.set("contact");
-			currentStep.set(3);
-		});
-		organizationButton.setOnAction(e -> {
-			selectedEntityType.set("organization");
-			currentStep.set(3);
-		});
-
-		Runnable loadExistingOptions = () -> {
-			boolean isContact = "contact".equals(selectedEntityType.get());
+		Runnable refreshExistingList = () -> {
+			String query = safeText(searchField.getText()).toLowerCase(Locale.ROOT);
 			List<PartyEntityOption> options = new java.util.ArrayList<>();
-			if (isContact) {
-				for (CaseDao.SelectableContactRow contact : contacts) {
-					String name = safeText(contact.displayName());
-					if (name.isBlank()) {
-						name = "Contact #" + contact.id();
-					}
-					String secondary = safeText(contact.email());
-					if (secondary.isBlank()) {
-						secondary = safeText(contact.phone());
-					}
-					String label = secondary.isBlank() ? name : name + " — " + secondary;
-					options.add(new PartyEntityOption("contact", Long.valueOf(contact.id()), label));
-				}
-			} else {
+			if ("organization".equals(state.entityType)) {
 				for (CaseDao.SelectableOrganizationRow org : organizations) {
 					String name = safeText(org.name());
-					if (name.isBlank()) {
-						name = "Organization #" + org.id();
-					}
+					if (name.isBlank()) name = "Organization #" + org.id();
 					String type = safeText(org.organizationTypeName());
 					String label = type.isBlank() ? name : name + " — " + type;
 					options.add(new PartyEntityOption("organization", Long.valueOf(org.id()), label));
 				}
+			} else {
+				for (CaseDao.SelectableContactRow contact : contacts) {
+					String name = safeText(contact.displayName());
+					if (name.isBlank()) name = "Contact #" + contact.id();
+					String secondary = safeText(contact.email());
+					if (secondary.isBlank()) secondary = safeText(contact.phone());
+					String label = secondary.isBlank() ? name : name + " — " + secondary;
+					options.add(new PartyEntityOption("contact", Long.valueOf(contact.id()), label));
+				}
 			}
-			String query = safeText(searchField.getText()).toLowerCase(Locale.ROOT);
 			if (!query.isBlank()) {
 				options = options.stream().filter(o -> safeText(o.label()).toLowerCase(Locale.ROOT).contains(query)).toList();
 			}
 			existingList.getItems().setAll(options);
-			if (!options.isEmpty()) {
+			if (state.selectedEntity != null) {
+				existingList.getItems().stream()
+					.filter(o -> Objects.equals(o.entityType(), state.selectedEntity.entityType()) && Objects.equals(o.id(), state.selectedEntity.id()))
+					.findFirst().ifPresent(existingList.getSelectionModel()::select);
+			}
+			if (existingList.getSelectionModel().getSelectedItem() == null && !options.isEmpty()) {
 				existingList.getSelectionModel().selectFirst();
+				state.selectedEntity = existingList.getSelectionModel().getSelectedItem();
 			}
 		};
 
-		Runnable refreshCreateFields = () -> {
-			createGrid.getChildren().clear();
-			if ("contact".equals(selectedEntityType.get())) {
-				createGrid.add(new Label("First Name"), 0, 0);
-				createGrid.add(firstNameField, 1, 0);
-				createGrid.add(new Label("Last Name"), 0, 1);
-				createGrid.add(lastNameField, 1, 1);
-			} else {
-				createGrid.add(new Label("Name"), 0, 0);
-				createGrid.add(organizationNameField, 1, 0);
-			}
+		Runnable syncStateFromControls = () -> {
+			PartyRoleOption role = roleChoice.getValue();
+			PartySideOption side = sideChoice.getValue();
+			state.partyRoleId = role == null ? null : role.id();
+			state.affiliation = side == null ? null : side.value();
+			state.primary = primaryCheck.isSelected();
+			state.notes = notesArea.getText();
+			state.createContactFirstName = createFirstNameField.getText();
+			state.createContactLastName = createLastNameField.getText();
+			state.createOrganizationName = createOrganizationNameField.getText();
+			OrganizationDao.OrganizationTypeRow orgType = createOrganizationTypeChoice.getValue();
+			state.createOrganizationTypeId = orgType == null ? null : orgType.organizationTypeId();
+			state.selectedEntity = existingList.getSelectionModel().getSelectedItem();
 		};
 
-		Runnable refreshWizardUi = () -> {
-			int step = currentStep.get();
-			boolean createPath = "create".equals(selectedMode.get());
-
-			setVisibleManaged(step1Pane, step == 1);
-			setVisibleManaged(step2Pane, step == 2);
-			setVisibleManaged(step3CreatePane, step == 3 && createPath);
-			setVisibleManaged(step3SelectPane, step == 3 && !createPath);
-
-			if (step == 3 && createPath) {
-				refreshCreateFields.run();
+		Runnable refreshAddButtonState = () -> {
+			syncStateFromControls.run();
+			boolean enabled = false;
+			if (state.step == 3 && state.partyRoleId != null && state.affiliation != null) {
+				if ("create".equals(state.mode)) {
+					if ("contact".equals(state.entityType)) {
+						enabled = !safeText(state.createContactFirstName).isBlank() || !safeText(state.createContactLastName).isBlank();
+					} else if ("organization".equals(state.entityType)) {
+						enabled = !safeText(state.createOrganizationName).isBlank() && state.createOrganizationTypeId != null && state.createOrganizationTypeId > 0;
+					}
+				} else if ("select".equals(state.mode)) {
+					enabled = state.selectedEntity != null;
+				}
 			}
-			if (step == 3 && !createPath) {
-				loadExistingOptions.run();
-			}
+			addButton.setDisable(!enabled);
+			setVisibleManaged(addButton, state.step == 3);
+			setVisibleManaged(backButton, state.step > 1);
+		};
 
-			if (step == 1 || step == 2) {
-				dialog.getDialogPane().setPrefSize(560, 280);
-				dialog.getDialogPane().setMinSize(560, 280);
-			} else if (createPath) {
-				dialog.getDialogPane().setPrefSize(700, 420);
-				dialog.getDialogPane().setMinSize(700, 420);
+		Runnable renderStep = () -> {
+			contentBox.getChildren().setAll(titleLabel);
+			if (state.step == 1) {
+				titleLabel.setText("Step 1: Create new or select from existing");
+				HBox choices = new HBox(14, createNewButton, selectExistingButton);
+				choices.setAlignment(Pos.CENTER);
+				contentBox.getChildren().add(choices);
+				dialog.getDialogPane().setPrefSize(560, 260);
+				dialog.getDialogPane().setMinSize(560, 260);
+			} else if (state.step == 2) {
+				titleLabel.setText("Step 2: Contact or Organization");
+				HBox choices = new HBox(14, contactButton, organizationButton);
+				choices.setAlignment(Pos.CENTER);
+				contentBox.getChildren().add(choices);
+				dialog.getDialogPane().setPrefSize(560, 260);
+				dialog.getDialogPane().setMinSize(560, 260);
+			} else if ("create".equals(state.mode)) {
+				titleLabel.setText("Step 3: Create New");
+				GridPane form = new GridPane();
+				form.setHgap(10);
+				form.setVgap(8);
+				if ("organization".equals(state.entityType)) {
+					form.add(new Label("Name"), 0, 0);
+					form.add(createOrganizationNameField, 1, 0);
+					form.add(new Label("Organization Type"), 0, 1);
+					form.add(createOrganizationTypeChoice, 1, 1);
+					form.add(new Label("Party Role"), 0, 2);
+					form.add(roleChoice, 1, 2);
+					form.add(new Label("Affiliation"), 0, 3);
+					form.add(sideChoice, 1, 3);
+				} else {
+					form.add(new Label("First Name"), 0, 0);
+					form.add(createFirstNameField, 1, 0);
+					form.add(new Label("Last Name"), 0, 1);
+					form.add(createLastNameField, 1, 1);
+					form.add(new Label("Party Role"), 0, 2);
+					form.add(roleChoice, 1, 2);
+					form.add(new Label("Affiliation"), 0, 3);
+					form.add(sideChoice, 1, 3);
+				}
+				contentBox.getChildren().add(form);
+				dialog.getDialogPane().setPrefSize(720, 420);
+				dialog.getDialogPane().setMinSize(720, 420);
 			} else {
-				dialog.getDialogPane().setPrefSize(780, 640);
-				dialog.getDialogPane().setMinSize(780, 640);
+				titleLabel.setText("Step 3: Select Existing");
+				refreshExistingList.run();
+				GridPane relationships = new GridPane();
+				relationships.setHgap(10);
+				relationships.setVgap(8);
+				relationships.add(new Label("Party Role"), 0, 0);
+				relationships.add(roleChoice, 1, 0);
+				relationships.add(new Label("Affiliation"), 0, 1);
+				relationships.add(sideChoice, 1, 1);
+				relationships.add(primaryCheck, 1, 2);
+				relationships.add(new Label("Notes"), 0, 3);
+				relationships.add(notesArea, 1, 3);
+				contentBox.getChildren().addAll(searchField, existingList, relationships);
+				dialog.getDialogPane().setPrefSize(820, 660);
+				dialog.getDialogPane().setMinSize(820, 660);
 			}
 			if (dialog.getDialogPane().getScene() != null && dialog.getDialogPane().getScene().getWindow() != null) {
 				dialog.getDialogPane().getScene().getWindow().sizeToScene();
 			}
+			refreshAddButtonState.run();
 		};
 
-		Node backButton = dialog.getDialogPane().lookupButton(backType);
-		Node addButton = dialog.getDialogPane().lookupButton(addType);
+		createNewButton.setOnAction(e -> {
+			state.mode = "create";
+			state.step = 2;
+			renderStep.run();
+		});
+		selectExistingButton.setOnAction(e -> {
+			state.mode = "select";
+			state.step = 2;
+			renderStep.run();
+		});
+		contactButton.setOnAction(e -> {
+			state.entityType = "contact";
+			state.step = 3;
+			renderStep.run();
+		});
+		organizationButton.setOnAction(e -> {
+			state.entityType = "organization";
+			state.step = 3;
+			renderStep.run();
+		});
 
 		backButton.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
 			e.consume();
-			if (currentStep.get() == 3) {
-				currentStep.set(2);
-				refreshWizardUi.run();
-			} else if (currentStep.get() == 2) {
-				currentStep.set(1);
-				refreshWizardUi.run();
+			syncStateFromControls.run();
+			if (state.step == 3) {
+				state.step = 2;
+			} else if (state.step == 2) {
+				state.step = 1;
 			}
+			renderStep.run();
 		});
 
-		Runnable refreshButtonState = () -> {
-			int step = currentStep.get();
-			boolean createPath = "create".equals(selectedMode.get());
-			setVisibleManaged(backButton, step > 1);
-			setVisibleManaged(addButton, step == 3);
-
-			if (step == 1) {
-				addButton.setDisable(true);
-				return;
-			}
-			if (step == 2) {
-				addButton.setDisable(true);
-				return;
-			}
-
-			if (roleChoice.getValue() == null || sideChoice.getValue() == null) {
-				addButton.setDisable(true);
-				return;
-			}
-			if (createPath) {
-				if ("contact".equals(selectedEntityType.get())) {
-					addButton.setDisable(safeText(firstNameField.getText()).isBlank() && safeText(lastNameField.getText()).isBlank());
-				} else {
-					addButton.setDisable(safeText(organizationNameField.getText()).isBlank());
-				}
-			} else {
-				addButton.setDisable(existingList.getSelectionModel().getSelectedItem() == null);
-			}
-		};
-
-		selectedMode.addListener((obs, ov, nv) -> {
-			applyChoiceButtonStyles.run();
-			refreshWizardUi.run();
-			refreshButtonState.run();
-		});
-		selectedEntityType.addListener((obs, ov, nv) -> {
-			applyChoiceButtonStyles.run();
-			refreshWizardUi.run();
-			refreshButtonState.run();
-		});
-		roleChoice.valueProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
-		sideChoice.valueProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
-		firstNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
-		lastNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
-		organizationNameField.textProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
 		searchField.textProperty().addListener((obs, ov, nv) -> {
-			if (currentStep.get() == 3 && "select".equals(selectedMode.get())) {
-				loadExistingOptions.run();
+			if (state.step == 3 && "select".equals(state.mode)) {
+				refreshExistingList.run();
+				refreshAddButtonState.run();
 			}
-			refreshButtonState.run();
 		});
-		existingList.getSelectionModel().selectedItemProperty().addListener((obs, ov, nv) -> refreshButtonState.run());
-		currentStep.addListener((obs, ov, nv) -> refreshButtonState.run());
+		existingList.getSelectionModel().selectedItemProperty().addListener((obs, ov, nv) -> {
+			state.selectedEntity = nv;
+			refreshAddButtonState.run();
+		});
+		roleChoice.valueProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		sideChoice.valueProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		createFirstNameField.textProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		createLastNameField.textProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		createOrganizationNameField.textProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		createOrganizationTypeChoice.valueProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		primaryCheck.selectedProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
+		notesArea.textProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
 
-		applyChoiceButtonStyles.run();
-		refreshWizardUi.run();
-		refreshButtonState.run();
+		renderStep.run();
 
 		dialog.setResultConverter(button -> {
 			if (button != addType) {
 				return null;
 			}
-			boolean createNew = "create".equals(selectedMode.get());
-			boolean isContact = "contact".equals(selectedEntityType.get());
-			PartyRoleOption role = roleChoice.getValue();
-			PartySideOption side = sideChoice.getValue();
-			if (role == null || side == null) {
+			syncStateFromControls.run();
+			if (state.partyRoleId == null || state.affiliation == null || state.entityType == null || state.mode == null) {
 				return null;
 			}
-			if (createNew) {
+			if ("create".equals(state.mode)) {
 				return new AddPartyDraft(
-					isContact ? "contact" : "organization",
+					state.entityType,
 					null,
-					role.id,
-					side.value,
+					state.partyRoleId,
+					state.affiliation,
 					false,
 					null,
 					true,
-					firstNameField.getText(),
-					lastNameField.getText(),
-					organizationNameField.getText());
+					state.createContactFirstName,
+					state.createContactLastName,
+					state.createOrganizationName,
+					state.createOrganizationTypeId);
 			}
-			PartyEntityOption entity = existingList.getSelectionModel().getSelectedItem();
-			if (entity == null) {
+			if (state.selectedEntity == null) {
 				return null;
 			}
 			return new AddPartyDraft(
-					entity.entityType,
-					entity.id,
-					role.id,
-					side.value,
-					primaryCheck.isSelected(),
-					notesArea.getText(),
+					state.selectedEntity.entityType(),
+					state.selectedEntity.id(),
+					state.partyRoleId,
+					state.affiliation,
+					state.primary,
+					state.notes,
 					false,
+					null,
 					null,
 					null,
 					null);
@@ -1889,13 +1867,13 @@ public class CaseController {
 		if (organizationDao == null) {
 			throw new IllegalStateException("Organization creation is unavailable.");
 		}
-		List<OrganizationDao.OrganizationTypeRow> types = organizationDao.findOrganizationTypes();
-		if (types == null || types.isEmpty()) {
-			throw new IllegalStateException("No organization types are configured.");
+		Integer organizationTypeId = draft.organizationTypeId();
+		if (organizationTypeId == null || organizationTypeId <= 0) {
+			throw new IllegalStateException("Organization Type is required.");
 		}
 		int organizationId = organizationDao.create(new OrganizationDao.OrganizationCreateRequest(
 				shaleClientId,
-				types.get(0).organizationTypeId(),
+				organizationTypeId,
 				safeText(draft.organizationName()),
 				null,
 				null,
