@@ -129,6 +129,12 @@
     -fx-font-weight: 600;
 }
 
+.cases-results-count {
+    -fx-text-fill: rgba(17, 37, 66, 0.72);
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
 .case-main-surface,
 .form-surface {
     -fx-background-color: rgba(245, 249, 253, 0.78);
