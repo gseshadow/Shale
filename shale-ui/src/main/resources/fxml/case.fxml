@@ -4,8 +4,10 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<BorderPane fx:id="caseRootPane" xmlns:fx="http://javafx.com/fxml"
-	fx:controller="com.shale.ui.controller.CaseController" styleClass="app-shell">
+<BorderPane fx:id="caseRootPane"
+	xmlns:fx="http://javafx.com/fxml"
+	fx:controller="com.shale.ui.controller.CaseController"
+	styleClass="app-shell">
 
 	<!-- TOP: Header / Command Bar (slightly tighter) -->
 	<top>
@@ -45,7 +47,8 @@
 
 	<!-- LEFT: Case navigation -->
 	<left>
-		<VBox spacing="8.0" BorderPane.alignment="TOP_LEFT" styleClass="case-nav-pane nav-rail">
+		<VBox spacing="8.0" BorderPane.alignment="TOP_LEFT"
+			styleClass="case-nav-pane nav-rail">
 			<padding>
 				<Insets top="10" right="10" bottom="10" left="12" />
 			</padding>
@@ -65,7 +68,8 @@
 			<!-- OVERVIEW PANE -->
 			<ScrollPane fx:id="overviewScrollPane" fitToWidth="true"
 				hbarPolicy="NEVER" styleClass="surface-scroll">
-				<VBox fx:id="overviewPane" spacing="10" maxWidth="980" styleClass="case-main-surface">
+				<VBox fx:id="overviewPane" spacing="10" maxWidth="980"
+					styleClass="case-main-surface">
 					<padding>
 						<Insets top="12" right="12" bottom="12" left="12" />
 					</padding>
@@ -73,18 +77,22 @@
 						<Label fx:id="contentTitleLabel" text="Overview"
 							style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 						<Region HBox.hgrow="ALWAYS" />
-						<Button fx:id="deleteCaseButton" text="Delete Case" visible="false" managed="false" />
+						<Button fx:id="deleteCaseButton" text="Delete Case"
+							visible="false" managed="false" />
 						<Button fx:id="editButton" text="Edit" />
-							<MenuButton fx:id="generateSummaryMenuButton" text="Generate Summary">
-									<items>
-										<MenuItem fx:id="generateSummaryHtmlMenuItem" text="Preview HTML" />
-										<MenuItem fx:id="generateSummaryPdfMenuItem" text="Export PDF" />
-									</items>
-								</MenuButton>
-							<Label fx:id="summaryGenerationStatusLabel" text="" visible="false" managed="false"
-								style="-fx-opacity: 0.75;" />
-							<Button fx:id="saveButton" text="Save" visible="false"
-								managed="false" />
+						<MenuButton fx:id="generateSummaryMenuButton"
+							text="Generate Summary">
+							<items>
+								<MenuItem fx:id="generateSummaryHtmlMenuItem"
+									text="Preview HTML" />
+								<MenuItem fx:id="generateSummaryPdfMenuItem"
+									text="Export PDF" />
+							</items>
+						</MenuButton>
+						<Label fx:id="summaryGenerationStatusLabel" text=""
+							visible="false" managed="false" style="-fx-opacity: 0.75;" />
+						<Button fx:id="saveButton" text="Save" visible="false"
+							managed="false" />
 						<Button fx:id="cancelButton" text="Cancel" visible="false"
 							managed="false" />
 					</HBox>
@@ -101,11 +109,15 @@
 						<Button fx:id="reloadRemoteButton" text="Reload" />
 					</HBox>
 
-					<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
+					<GridPane hgap="14" vgap="10"
+						style="-fx-alignment: TOP_LEFT;">
 						<columnConstraints>
-							<ColumnConstraints minWidth="160" prefWidth="180" />
-							<ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
-							<ColumnConstraints minWidth="100" prefWidth="110" maxWidth="110" halignment="RIGHT" />
+							<ColumnConstraints minWidth="160"
+								prefWidth="180" />
+							<ColumnConstraints hgrow="ALWAYS"
+								fillWidth="true" />
+							<ColumnConstraints minWidth="100"
+								prefWidth="110" maxWidth="110" halignment="RIGHT" />
 						</columnConstraints>
 
 						<Label text="Case name:" style="-fx-opacity: 0.8;"
@@ -113,14 +125,16 @@
 						<Label fx:id="ovCaseNameValue" text="—" wrapText="true"
 							GridPane.rowIndex="0" GridPane.columnIndex="1" />
 						<TextField fx:id="ovCaseNameEditor" visible="false"
-							managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							managed="false" maxWidth="1.7976931348623157E308"
+							GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
 						<Label text="Case number:" style="-fx-opacity: 0.8;"
 							GridPane.rowIndex="1" GridPane.columnIndex="0" />
 						<Label fx:id="ovCaseNumberValue" text="—" wrapText="true"
 							GridPane.rowIndex="1" GridPane.columnIndex="1" />
 						<TextField fx:id="ovCaseNumberEditor" visible="false"
-							managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							managed="false" maxWidth="1.7976931348623157E308"
+							GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
 						<Label text="Responsible atty:" style="-fx-opacity: 0.8;"
 							GridPane.rowIndex="2" GridPane.columnIndex="0" />
@@ -215,128 +229,363 @@
 			</ScrollPane>
 
 			<!-- DETAILS PANE -->
-			<ScrollPane fx:id="detailsScrollPane" fitToWidth="true" hbarPolicy="NEVER" visible="false" managed="false"
+			<ScrollPane fx:id="detailsScrollPane" fitToWidth="true"
+				hbarPolicy="NEVER" visible="false" managed="false"
 				styleClass="surface-scroll">
-				<VBox fx:id="detailsPane" spacing="10" maxWidth="980" styleClass="case-main-surface">
+				<VBox fx:id="detailsPane" spacing="10" maxWidth="980"
+					styleClass="case-main-surface">
 					<padding>
 						<Insets top="12" right="12" bottom="12" left="12" />
 					</padding>
 					<HBox alignment="CENTER_LEFT" spacing="8">
-						<Label text="Details" style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+						<Label text="Details"
+							style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 						<Region HBox.hgrow="ALWAYS" />
 						<Button fx:id="detailsEditButton" text="Edit" />
-						<Button fx:id="detailsSaveButton" text="Save" visible="false" managed="false" />
-						<Button fx:id="detailsCancelButton" text="Cancel" visible="false" managed="false" />
+						<Button fx:id="detailsSaveButton" text="Save"
+							visible="false" managed="false" />
+						<Button fx:id="detailsCancelButton" text="Cancel"
+							visible="false" managed="false" />
 					</HBox>
 
 					<HBox spacing="8" alignment="CENTER_LEFT">
-							<Label fx:id="detailsErrorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
-						</HBox>
+						<Label fx:id="detailsErrorLabel" textFill="#b42318"
+							wrapText="true" visible="false" managed="false" />
+					</HBox>
 
 					<VBox spacing="10" styleClass="secondary-panel">
-						<Label text="Core" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
-								<columnConstraints>
-									<ColumnConstraints minWidth="210" prefWidth="230" />
-									<ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
-									<ColumnConstraints minWidth="100" prefWidth="110" maxWidth="110" halignment="RIGHT" />
-								</columnConstraints>
-								<Label text="Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
-								<Label fx:id="detNameValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-								<TextField fx:id="detNameEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+						<Label text="Core"
+							style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="14" vgap="10"
+							style="-fx-alignment: TOP_LEFT;">
+							<columnConstraints>
+								<ColumnConstraints minWidth="210"
+									prefWidth="230" />
+								<ColumnConstraints hgrow="ALWAYS"
+									fillWidth="true" />
+								<ColumnConstraints minWidth="100"
+									prefWidth="110" maxWidth="110" halignment="RIGHT" />
+							</columnConstraints>
+							<Label text="Name:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="0" />
+							<Label fx:id="detNameValue" text="—" GridPane.rowIndex="0"
+								GridPane.columnIndex="1" />
+							<TextField fx:id="detNameEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
-								<Label text="Case Number:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
-								<Label fx:id="detCaseNumberValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-								<TextField fx:id="detCaseNumberEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Case Number:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="1" />
+							<Label fx:id="detCaseNumberValue" text="—"
+								GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<TextField fx:id="detCaseNumberEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
-								<Label text="Status:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
-								<Label fx:id="detCaseStatusValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-								<HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2" fx:id="detCaseStatusEditorRow" visible="false" managed="false">
-									<StackPane fx:id="detCaseStatusHost" />
-									<Region HBox.hgrow="ALWAYS" />
-									<Button fx:id="detChangeStatusButton" text="Change" />
-								</HBox>
+							<Label text="Status:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="2" />
+							<Label fx:id="detCaseStatusValue" text="—"
+								GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<HBox spacing="8" alignment="CENTER_LEFT"
+								GridPane.rowIndex="2" GridPane.columnIndex="1"
+								GridPane.columnSpan="2" fx:id="detCaseStatusEditorRow"
+								visible="false" managed="false">
+								<StackPane fx:id="detCaseStatusHost" />
+								<Region HBox.hgrow="ALWAYS" />
+								<Button fx:id="detChangeStatusButton" text="Change" />
+							</HBox>
 
-								<Label text="Practice Area:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
-								<Label fx:id="detPracticeAreaIdValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-								<HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.columnIndex="1" GridPane.columnSpan="2" fx:id="detPracticeAreaEditorRow" visible="false" managed="false">
-									<StackPane fx:id="detPracticeAreaHost" />
-									<Region HBox.hgrow="ALWAYS" />
-									<Button fx:id="detChangePracticeAreaButton" text="Change" />
-								</HBox>
+							<Label text="Practice Area:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="3" />
+							<Label fx:id="detPracticeAreaIdValue" text="—"
+								GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<HBox spacing="8" alignment="CENTER_LEFT"
+								GridPane.rowIndex="3" GridPane.columnIndex="1"
+								GridPane.columnSpan="2" fx:id="detPracticeAreaEditorRow"
+								visible="false" managed="false">
+								<StackPane fx:id="detPracticeAreaHost" />
+								<Region HBox.hgrow="ALWAYS" />
+								<Button fx:id="detChangePracticeAreaButton" text="Change" />
+							</HBox>
 
-								<Label text="Description:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
-								<Label fx:id="detDescriptionValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-								<TextArea fx:id="detDescriptionEditor" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-							</GridPane>
-					</VBox>
-
-					<VBox spacing="10" styleClass="secondary-panel">
-						<Label text="Lifecycle" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
-							<columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
-							<Label text="Date of Intake:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detCallerDateValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><DatePicker fx:id="detCallerDateEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="Time of Intake:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" /><Label fx:id="detCallerTimeValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextField fx:id="detCallerTimeEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="Date Accepted:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" /><Label fx:id="detAcceptedDateValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><DatePicker fx:id="detAcceptedDateEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="Date Closed:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" /><Label fx:id="detClosedDateValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><DatePicker fx:id="detClosedDateEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<Label text="Date Denied:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" /><Label fx:id="detDeniedDateValue" text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" /><DatePicker fx:id="detDeniedDateEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<Label text="Description:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="4" />
+							<Label fx:id="detDescriptionValue" text="—" wrapText="true"
+								GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<TextArea fx:id="detDescriptionEditor"
+								maxWidth="1.7976931348623157E308" prefRowCount="4"
+								wrapText="true" visible="false" managed="false"
+								GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
 					<VBox spacing="10" styleClass="secondary-panel">
-						<Label text="Incident &amp; Deadlines" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
-							<Label text="Date of Medical Negligence:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detDateOfMedicalNegligenceValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><DatePicker fx:id="detDateOfMedicalNegligenceEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="Date Medical Negligence Was Discovered:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" /><Label fx:id="detDateMedicalNegligenceWasDiscoveredValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><DatePicker fx:id="detDateMedicalNegligenceWasDiscoveredEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="Date of Injury:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" /><Label fx:id="detDateOfInjuryValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><DatePicker fx:id="detDateOfInjuryEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="Statute of Limitations:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" /><Label fx:id="detStatuteOfLimitationsValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><DatePicker fx:id="detStatuteOfLimitationsEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<Label text="Tort Notice Deadline:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" /><Label fx:id="detTortNoticeDeadlineValue" text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" /><DatePicker fx:id="detTortNoticeDeadlineEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-							<Label text="Discovery Deadline:" style="-fx-opacity: 0.8;" GridPane.rowIndex="5" /><Label fx:id="detDiscoveryDeadlineValue" text="—" GridPane.rowIndex="5" GridPane.columnIndex="1" /><DatePicker fx:id="detDiscoveryDeadlineEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+						<Label text="Notes"
+							style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="14" vgap="10"
+							style="-fx-alignment: TOP_LEFT;">
+							<columnConstraints>
+								<ColumnConstraints minWidth="210"
+									prefWidth="230" />
+								<ColumnConstraints hgrow="ALWAYS"
+									fillWidth="true" />
+							</columnConstraints>
+							<Label text="Summary:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="0" />
+							<Label fx:id="detSummaryValue" text="—" wrapText="true"
+								GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<TextArea fx:id="detSummaryEditor"
+								maxWidth="1.7976931348623157E308" prefRowCount="3"
+								wrapText="true" visible="false" managed="false"
+								GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Received Updates:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="1" />
+							<Label fx:id="detReceivedUpdatesValue" text="—"
+								GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<CheckBox fx:id="detReceivedUpdatesEditor"
+								visible="false" managed="false" GridPane.rowIndex="1"
+								GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
 					<VBox spacing="10" styleClass="secondary-panel">
-						<Label text="Administrative" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
-							<Label text="Estate Case:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detClientEstateValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detClientEstateEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="Office Case Code:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" /><Label fx:id="detOfficePrinterCodeValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextField fx:id="detOfficePrinterCodeEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="Medical Records Received:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" /><Label fx:id="detMedicalRecordsReceivedValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><CheckBox fx:id="detMedicalRecordsReceivedEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="Fee Agreement Signed:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" /><Label fx:id="detFeeAgreementSignedValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><CheckBox fx:id="detFeeAgreementSignedEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<Label text="Fee Agreement Date:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" /><Label fx:id="detDateFeeAgreementSignedValue" text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" /><DatePicker fx:id="detDateFeeAgreementSignedEditor" maxWidth="1.7976931348623157E308" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+						<Label text="Lifecycle"
+							style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="14" vgap="10"
+							style="-fx-alignment: TOP_LEFT;">
+							<columnConstraints>
+								<ColumnConstraints minWidth="210"
+									prefWidth="230" />
+								<ColumnConstraints hgrow="ALWAYS"
+									fillWidth="true" />
+							</columnConstraints>
+							<Label text="Date of Intake:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="0" />
+							<Label fx:id="detCallerDateValue" text="—"
+								GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detCallerDateEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Time of Intake:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="1" />
+							<Label fx:id="detCallerTimeValue" text="—"
+								GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<TextField fx:id="detCallerTimeEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Date Accepted:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="2" />
+							<Label fx:id="detAcceptedDateValue" text="—"
+								GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detAcceptedDateEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<Label text="Date Closed:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="3" />
+							<Label fx:id="detClosedDateValue" text="—"
+								GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detClosedDateEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<Label text="Date Denied:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="4" />
+							<Label fx:id="detDeniedDateValue" text="—"
+								GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDeniedDateEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
 					<VBox spacing="10" styleClass="secondary-panel">
-						<Label text="Accepted" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
-							<Label text="Chronology:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detAcceptedChronologyValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedChronologyEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="Consultant Expert Search:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" /><Label fx:id="detAcceptedConsultantExpertSearchValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedConsultantExpertSearchEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="Testifying Expert Search:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" /><Label fx:id="detAcceptedTestifyingExpertSearchValue" text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedTestifyingExpertSearchEditor" visible="false" managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="Medical Literature:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" /><Label fx:id="detAcceptedMedicalLiteratureValue" text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" /><CheckBox fx:id="detAcceptedMedicalLiteratureEditor" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<Label text="Detail:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" /><Label fx:id="detAcceptedDetailValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" /><TextArea fx:id="detAcceptedDetailEditor" maxWidth="1.7976931348623157E308" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+						<Label text="Incident &amp; Deadlines"
+							style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="14" vgap="10"
+							style="-fx-alignment: TOP_LEFT;">
+							<columnConstraints>
+								<ColumnConstraints minWidth="210"
+									prefWidth="230" />
+								<ColumnConstraints hgrow="ALWAYS"
+									fillWidth="true" />
+							</columnConstraints>
+							<Label text="Date of Medical Negligence:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
+							<Label fx:id="detDateOfMedicalNegligenceValue" text="—"
+								GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDateOfMedicalNegligenceEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Date Medical Negligence Was Discovered:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
+							<Label fx:id="detDateMedicalNegligenceWasDiscoveredValue"
+								text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<DatePicker
+								fx:id="detDateMedicalNegligenceWasDiscoveredEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Date of Injury:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="2" />
+							<Label fx:id="detDateOfInjuryValue" text="—"
+								GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDateOfInjuryEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<Label text="Statute of Limitations:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
+							<Label fx:id="detStatuteOfLimitationsValue" text="—"
+								GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detStatuteOfLimitationsEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<Label text="Tort Notice Deadline:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
+							<Label fx:id="detTortNoticeDeadlineValue" text="—"
+								GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detTortNoticeDeadlineEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<Label text="Discovery Deadline:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="5" />
+							<Label fx:id="detDiscoveryDeadlineValue" text="—"
+								GridPane.rowIndex="5" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDiscoveryDeadlineEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="5" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
 					<VBox spacing="10" styleClass="secondary-panel">
-						<Label text="Denied" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
-							<Label text="Chronology:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detDeniedChronologyValue" text="—" GridPane.rowIndex="0" GridPane.columnIndex="1" /><CheckBox fx:id="detDeniedChronologyEditor" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="Detail:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" /><Label fx:id="detDeniedDetailValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" /><TextArea fx:id="detDeniedDetailEditor" maxWidth="1.7976931348623157E308" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+						<Label text="Administrative"
+							style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="14" vgap="10"
+							style="-fx-alignment: TOP_LEFT;">
+							<columnConstraints>
+								<ColumnConstraints minWidth="210"
+									prefWidth="230" />
+								<ColumnConstraints hgrow="ALWAYS"
+									fillWidth="true" />
+							</columnConstraints>
+							<Label text="Estate Case:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="0" />
+							<Label fx:id="detClientEstateValue" text="—"
+								GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<CheckBox fx:id="detClientEstateEditor" visible="false"
+								managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Office Case Code:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="1" />
+							<Label fx:id="detOfficePrinterCodeValue" text="—"
+								GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<TextField fx:id="detOfficePrinterCodeEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Medical Records Received:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
+							<Label fx:id="detMedicalRecordsReceivedValue" text="—"
+								GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<CheckBox fx:id="detMedicalRecordsReceivedEditor"
+								visible="false" managed="false" GridPane.rowIndex="2"
+								GridPane.columnIndex="1" />
+							<Label text="Fee Agreement Signed:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
+							<Label fx:id="detFeeAgreementSignedValue" text="—"
+								GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<CheckBox fx:id="detFeeAgreementSignedEditor"
+								visible="false" managed="false" GridPane.rowIndex="3"
+								GridPane.columnIndex="1" />
+							<Label text="Fee Agreement Date:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="4" />
+							<Label fx:id="detDateFeeAgreementSignedValue" text="—"
+								GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDateFeeAgreementSignedEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
 					<VBox spacing="10" styleClass="secondary-panel">
-						<Label text="Notes" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-						<GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;"><columnConstraints><ColumnConstraints minWidth="210" prefWidth="230" /><ColumnConstraints hgrow="ALWAYS" fillWidth="true" /></columnConstraints>
-							<Label text="Summary:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" /><Label fx:id="detSummaryValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" /><TextArea fx:id="detSummaryEditor" maxWidth="1.7976931348623157E308" prefRowCount="3" wrapText="true" visible="false" managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="Received Updates:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" /><Label fx:id="detReceivedUpdatesValue" text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" /><CheckBox fx:id="detReceivedUpdatesEditor" visible="false" managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+						<Label text="Accepted"
+							style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="14" vgap="10"
+							style="-fx-alignment: TOP_LEFT;">
+							<columnConstraints>
+								<ColumnConstraints minWidth="210"
+									prefWidth="230" />
+								<ColumnConstraints hgrow="ALWAYS"
+									fillWidth="true" />
+							</columnConstraints>
+							<Label text="Chronology:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="0" />
+							<Label fx:id="detAcceptedChronologyValue" text="—"
+								GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<CheckBox fx:id="detAcceptedChronologyEditor"
+								visible="false" managed="false" GridPane.rowIndex="0"
+								GridPane.columnIndex="1" />
+							<Label text="Consultant Expert Search:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
+							<Label fx:id="detAcceptedConsultantExpertSearchValue"
+								text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<CheckBox
+								fx:id="detAcceptedConsultantExpertSearchEditor" visible="false"
+								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Testifying Expert Search:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
+							<Label fx:id="detAcceptedTestifyingExpertSearchValue"
+								text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<CheckBox
+								fx:id="detAcceptedTestifyingExpertSearchEditor" visible="false"
+								managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<Label text="Medical Literature:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="3" />
+							<Label fx:id="detAcceptedMedicalLiteratureValue" text="—"
+								GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<CheckBox fx:id="detAcceptedMedicalLiteratureEditor"
+								visible="false" managed="false" GridPane.rowIndex="3"
+								GridPane.columnIndex="1" />
+							<Label text="Detail:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="4" />
+							<Label fx:id="detAcceptedDetailValue" text="—"
+								wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<TextArea fx:id="detAcceptedDetailEditor"
+								maxWidth="1.7976931348623157E308" prefRowCount="3"
+								wrapText="true" visible="false" managed="false"
+								GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
+
+					<VBox spacing="10" styleClass="secondary-panel">
+						<Label text="Denied"
+							style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="14" vgap="10"
+							style="-fx-alignment: TOP_LEFT;">
+							<columnConstraints>
+								<ColumnConstraints minWidth="210"
+									prefWidth="230" />
+								<ColumnConstraints hgrow="ALWAYS"
+									fillWidth="true" />
+							</columnConstraints>
+							<Label text="Chronology:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="0" />
+							<Label fx:id="detDeniedChronologyValue" text="—"
+								GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<CheckBox fx:id="detDeniedChronologyEditor"
+								visible="false" managed="false" GridPane.rowIndex="0"
+								GridPane.columnIndex="1" />
+							<Label text="Detail:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="1" />
+							<Label fx:id="detDeniedDetailValue" text="—"
+								wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<TextArea fx:id="detDeniedDetailEditor"
+								maxWidth="1.7976931348623157E308" prefRowCount="3"
+								wrapText="true" visible="false" managed="false"
+								GridPane.rowIndex="1" GridPane.columnIndex="1" />
+						</GridPane>
+					</VBox>
+
 				</VBox>
 			</ScrollPane>
 			<!-- TASKS TAB PANE (center) -->
-			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980" styleClass="case-main-surface"
-				visible="false" managed="false">
+			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980"
+				styleClass="case-main-surface" visible="false" managed="false">
 				<padding>
 					<Insets top="12" right="12" bottom="12" left="12" />
 				</padding>
@@ -348,11 +597,14 @@
 					<ChoiceBox fx:id="caseTasksSortChoice" prefWidth="190" />
 					<Button fx:id="addTaskButton" text="New Task" />
 				</HBox>
-				<Label fx:id="tasksTabEmptyLabel" text="No tasks for this case yet."
-					visible="false" managed="false" style="-fx-opacity: 0.7;" />
-				<ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
+				<Label fx:id="tasksTabEmptyLabel"
+					text="No tasks for this case yet." visible="false" managed="false"
+					style="-fx-opacity: 0.7;" />
+				<ScrollPane fitToWidth="true" hbarPolicy="NEVER"
+					VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
 					<content>
-						<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12" prefWrapLength="880" maxWidth="1.7976931348623157E308">
+						<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12"
+							prefWrapLength="880" maxWidth="1.7976931348623157E308">
 							<padding>
 								<Insets top="2" right="2" bottom="2" left="2" />
 							</padding>
@@ -362,8 +614,8 @@
 			</VBox>
 
 			<!-- GENERIC PLACEHOLDER PANE -->
-			<VBox fx:id="genericPane" spacing="10" maxWidth="980" styleClass="case-main-surface"
-				visible="false" managed="false">
+			<VBox fx:id="genericPane" spacing="10" maxWidth="980"
+				styleClass="case-main-surface" visible="false" managed="false">
 				<padding>
 					<Insets top="12" right="12" bottom="12" left="12" />
 				</padding>
@@ -371,25 +623,31 @@
 					<Label fx:id="genericTitleLabel" text="Section"
 						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 					<Region HBox.hgrow="ALWAYS" />
-					<Button fx:id="addOrganizationButton" text="Add Organization"
-						visible="false" managed="false" />
+					<Button fx:id="addOrganizationButton"
+						text="Add Organization" visible="false" managed="false" />
 				</HBox>
 				<Label fx:id="organizationsEmptyLabel" text="No organizations"
 					visible="false" managed="false" style="-fx-opacity: 0.75;" />
-				<Label fx:id="timelineEmptyLabel" text="No timeline events yet."
-					visible="false" managed="false" style="-fx-opacity: 0.75;" />
-				<ScrollPane fx:id="organizationsScrollPane" fitToWidth="true" hbarPolicy="NEVER"
-					vbarPolicy="AS_NEEDED" visible="false" managed="false" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
-					<FlowPane fx:id="organizationsFlow" hgap="14" vgap="14" alignment="TOP_LEFT"
-						visible="false" managed="false" maxWidth="1.7976931348623157E308">
+				<Label fx:id="timelineEmptyLabel"
+					text="No timeline events yet." visible="false" managed="false"
+					style="-fx-opacity: 0.75;" />
+				<ScrollPane fx:id="organizationsScrollPane"
+					fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED"
+					visible="false" managed="false" VBox.vgrow="ALWAYS"
+					styleClass="transparent-scroll">
+					<FlowPane fx:id="organizationsFlow" hgap="14" vgap="14"
+						alignment="TOP_LEFT" visible="false" managed="false"
+						maxWidth="1.7976931348623157E308">
 						<padding>
 							<Insets top="4" right="4" bottom="4" left="4" />
 						</padding>
 					</FlowPane>
 				</ScrollPane>
-				<ScrollPane fx:id="timelineScrollPane" fitToWidth="true" hbarPolicy="NEVER"
-					vbarPolicy="AS_NEEDED" visible="false" managed="false" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
-					<VBox fx:id="timelineListBox" spacing="10.0" visible="false" managed="false">
+				<ScrollPane fx:id="timelineScrollPane" fitToWidth="true"
+					hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" visible="false"
+					managed="false" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
+					<VBox fx:id="timelineListBox" spacing="10.0" visible="false"
+						managed="false">
 						<padding>
 							<Insets top="4" right="4" bottom="4" left="4" />
 						</padding>
@@ -403,7 +661,9 @@
 	</center>
 
 	<right>
-		<VBox fx:id="caseUpdatesPane" spacing="10.0" prefWidth="320.0" styleClass="case-right-pane strong-panel" BorderPane.alignment="TOP_LEFT">
+		<VBox fx:id="caseUpdatesPane" spacing="10.0" prefWidth="320.0"
+			styleClass="case-right-pane strong-panel"
+			BorderPane.alignment="TOP_LEFT">
 			<padding>
 				<Insets top="10" right="12" bottom="12" left="10" />
 			</padding>
