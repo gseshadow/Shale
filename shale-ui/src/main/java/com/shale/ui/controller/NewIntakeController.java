@@ -278,7 +278,6 @@ public final class NewIntakeController {
 		StatusCardModel model = new StatusCardModel(
 				statusId,
 				(statusName == null || statusName.isBlank()) ? "—" : statusName,
-				false,
 				null,
 				statusColorCss
 		);

@@ -3794,7 +3794,6 @@ public final class CaseDao {
 	public record StatusRow(
 			int id,
 			String name,
-			boolean isClosed,
 			int sortOrder,
 			String color,
 			String lifecycleKey,
@@ -3884,7 +3883,6 @@ public final class CaseDao {
 		return new StatusRow(
 				rs.getInt("Id"),
 				rs.getString("Name"),
-				rs.getBoolean("IsClosed"),
 				rs.getInt("SortOrder"),
 				rs.getString("Color"),
 				resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name")),
@@ -3955,7 +3953,7 @@ public final class CaseDao {
 			String lifecycleKeySelect = hasLifecycleKey ? "LifecycleKey" : "NULL AS LifecycleKey";
 			String systemKeySelect = hasSystemKey ? "SystemKey" : "NULL AS SystemKey";
 			String sql = """
-					SELECT Id, Name, IsClosed, SortOrder, Color, %s, %s
+					SELECT Id, Name, SortOrder, Color, %s, %s
 					FROM %s
 					WHERE ShaleClientId = ?
 					ORDER BY SortOrder, Name;
@@ -3969,7 +3967,7 @@ public final class CaseDao {
 						tenantStatuses.add(mapStatusRow(rs));
 					}
 					String globalSql = """
-							SELECT Id, Name, IsClosed, SortOrder, Color, %s, %s
+							SELECT Id, Name, SortOrder, Color, %s, %s
 							FROM %s
 							WHERE ShaleClientId IS NULL
 							ORDER BY SortOrder, Name;
