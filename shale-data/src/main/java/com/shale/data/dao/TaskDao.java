@@ -839,16 +839,24 @@ public final class TaskDao {
     }
 
     private static int resolveDefaultTaskStatusId(Connection con, int shaleClientId) throws SQLException {
+        boolean hasLifecycleKey = hasColumn(con, "dbo.Statuses", "LifecycleKey");
+        boolean hasSystemKey = hasColumn(con, "dbo.Statuses", "SystemKey");
+        String lifecycleExpr = hasLifecycleKey
+                ? "LOWER(LTRIM(RTRIM(ISNULL(s.LifecycleKey, ''))))"
+                : "''";
+        String systemExpr = hasSystemKey
+                ? "LOWER(LTRIM(RTRIM(ISNULL(s.SystemKey, ''))))"
+                : "''";
         String sql = """
                 SELECT TOP (1) s.Id
                 FROM dbo.Statuses s
                 WHERE s.ShaleClientId = ?
-                  AND ISNULL(s.IsClosed, 0) = 0
+                  AND NOT (%s IN ('closed', 'denied') OR %s IN ('closed', 'denied'))
                 ORDER BY
                   CASE WHEN LOWER(LTRIM(RTRIM(ISNULL(s.Name, '')))) IN ('open', 'todo', 'to do', 'active') THEN 0 ELSE 1 END,
                   ISNULL(s.SortOrder, 2147483647),
                   s.Id;
-                """;
+                """.formatted(lifecycleExpr, systemExpr);
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {

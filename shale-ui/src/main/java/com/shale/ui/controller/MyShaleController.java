@@ -3,6 +3,7 @@ package com.shale.ui.controller;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -87,7 +88,8 @@ public final class MyShaleController {
 
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
-	private final Set<Integer> selectedStatusIds = CaseListUiSupport.defaultSelectedStatuses();
+	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
+	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "my-cases-loader");
@@ -135,7 +137,7 @@ public final class MyShaleController {
 					.addListener((obs, oldV, newV) -> refreshMyTasks());
 		}
 
-		CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, this::rerender);
+		reloadStatusFilterOptionsAndThen(this::rerender);
 
 		Platform.runLater(() -> {
 			wireInfiniteScroll();
@@ -197,6 +199,41 @@ public final class MyShaleController {
 
 		System.out.println("[DEBUG LIVE][MY_CASES] event accepted -> scheduling targeted refresh");
 		refreshCaseIncremental(event.caseId());
+	}
+
+	private void reloadStatusFilterOptionsAndThen(Runnable onLoaded) {
+		Integer tenantId = appState == null ? null : appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0 || caseDao == null) {
+			statusFilterOptions = List.of();
+			selectedStatusIds.clear();
+			CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+			return;
+		}
+
+		dbExec.submit(() -> {
+			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+			List<CaseListUiSupport.StatusFilterOption> options = statuses == null
+					? List.of()
+					: statuses.stream()
+							.filter(Objects::nonNull)
+							.map(status -> new CaseListUiSupport.StatusFilterOption(
+									status.id(),
+									safe(status.name()).isBlank() ? ("Status #" + status.id()) : safe(status.name()),
+									CaseDao.isTerminalStatus(status)))
+							.toList();
+
+			Platform.runLater(() -> {
+				Set<Integer> statusIds = options.stream()
+						.map(CaseListUiSupport.StatusFilterOption::id)
+						.collect(java.util.stream.Collectors.toSet());
+				selectedStatusIds.removeIf(id -> !statusIds.contains(id));
+				if (selectedStatusIds.isEmpty()) {
+					selectedStatusIds.addAll(CaseListUiSupport.defaultSelectedStatuses(options));
+				}
+				statusFilterOptions = options;
+				CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+			});
+		});
 	}
 
 

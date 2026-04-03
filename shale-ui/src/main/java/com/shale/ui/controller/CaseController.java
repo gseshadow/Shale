@@ -3493,7 +3493,6 @@ public class CaseController {
 		StatusCardModel model = new StatusCardModel(
 				statusId,
 				(statusName == null || statusName.isBlank()) ? "—" : statusName,
-				false,
 				null,
 				statusColorCss
 		);
@@ -3538,7 +3537,6 @@ public class CaseController {
 		}
 		StatusCardModel model = new StatusCardModel(statusId,
 				(statusName == null || statusName.isBlank()) ? "—" : statusName,
-				false,
 				null,
 				statusColorCss);
 		detCaseStatusHost.getChildren().setAll(statusCardFactory.create(model, StatusCardFactory.Variant.MINI));
@@ -4967,7 +4965,7 @@ public class CaseController {
 							? draftPrimaryStatusId
 							: (currentOverview == null ? null : currentOverview.getPrimaryStatusId()));
 			for (CaseDao.StatusRow s : statuses) {
-				String label = s.name() + (s.isClosed() ? " (Closed)" : "");
+				String label = s.name() + (CaseDao.isTerminalStatus(s) ? " (Terminal)" : "");
 				labelToRow.put(label, s);
 				if (currentId != null && currentId == s.id())
 					preselect = label;
@@ -6198,11 +6196,11 @@ public class CaseController {
 		LocalDate effectiveAcceptedDate = acceptedDate;
 		LocalDate effectiveClosedDate = closedDate;
 		LocalDate effectiveDeniedDate = deniedDate;
-		if ("accepted".equals(lifecycleKey) && effectiveAcceptedDate == null)
+		if (CaseDao.LIFECYCLE_KEY_ACCEPTED.equals(lifecycleKey) && effectiveAcceptedDate == null)
 			effectiveAcceptedDate = today;
-		if ("closed".equals(lifecycleKey) && effectiveClosedDate == null)
+		if (CaseDao.LIFECYCLE_KEY_CLOSED.equals(lifecycleKey) && effectiveClosedDate == null)
 			effectiveClosedDate = today;
-		if ("denied".equals(lifecycleKey) && effectiveDeniedDate == null)
+		if (CaseDao.LIFECYCLE_KEY_DENIED.equals(lifecycleKey) && effectiveDeniedDate == null)
 			effectiveDeniedDate = today;
 		return new LifecycleDates(effectiveAcceptedDate, effectiveClosedDate, effectiveDeniedDate);
 	}
@@ -6210,18 +6208,7 @@ public class CaseController {
 	private String resolvePrimaryStatusLifecycleKey(Integer savedStatusId, Integer tenantId) {
 		if (caseDao == null || savedStatusId == null || tenantId == null || tenantId <= 0)
 			return null;
-		List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
-		if (statuses == null || statuses.isEmpty())
-			return null;
-		for (CaseDao.StatusRow status : statuses) {
-			if (status == null || status.id() != savedStatusId)
-				continue;
-			String normalized = safeText(status.name()).trim().toLowerCase(Locale.ROOT);
-			if ("accepted".equals(normalized) || "closed".equals(normalized) || "denied".equals(normalized))
-				return normalized;
-			return null;
-		}
-		return null;
+		return caseDao.findLifecycleKeyForStatus(tenantId, savedStatusId);
 	}
 
 	private void addStatusChangedTimelineEvent(
