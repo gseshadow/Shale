@@ -1,15 +1,11 @@
 /*
-  Phase 2 (statuses): introduce SystemKey for modular tenant/global status resolution.
+  Status modularization prep pass (tenant rows remain active).
 
-  Objectives:
-  - Add dbo.Statuses.SystemKey (nullable) for stable built-in identity.
-  - Keep LifecycleKey as lifecycle semantics source (accepted/denied/closed).
-  - Backfill SystemKey for known built-in statuses on existing tenant rows.
-
-  Notes:
-  - Global/default rows are expected at ShaleClientId IS NULL.
-  - Tenant rows can override global built-ins by matching SystemKey.
-  - Tenant custom statuses may keep SystemKey = NULL.
+  This script is intentionally conservative:
+  - Ensure dbo.Statuses.SystemKey exists.
+  - Normalize/backfill known built-in keys on existing tenant rows.
+  - Do NOT create global rows (ShaleClientId IS NULL) yet.
+  - Do NOT migrate case-history StatusId references.
 */
 
 SET NOCOUNT ON;
@@ -20,76 +16,50 @@ BEGIN
     ADD SystemKey nvarchar(64) NULL;
 END;
 
--- Optional integrity guardrail for known built-in status identities.
-IF OBJECT_ID('dbo.CK_Statuses_SystemKey', 'C') IS NULL
-BEGIN
-    ALTER TABLE dbo.Statuses
-    ADD CONSTRAINT CK_Statuses_SystemKey
-    CHECK (
-        SystemKey IS NULL
-        OR SystemKey IN (
-            'active',
-            'potential',
-            'prelitigation',
-            'accepted',
-            'denied',
-            'closed'
-        )
-    );
-END;
+-- Normalize existing key formatting where present.
+UPDATE s
+SET SystemKey = LOWER(LTRIM(RTRIM(s.SystemKey)))
+FROM dbo.Statuses s
+WHERE s.SystemKey IS NOT NULL
+  AND s.SystemKey <> LOWER(LTRIM(RTRIM(s.SystemKey)));
 
--- Backfill lifecycle-driven built-ins first when available.
+-- Backfill lifecycle-driven built-ins first.
 UPDATE s
 SET SystemKey = 'accepted'
 FROM dbo.Statuses s
 WHERE s.SystemKey IS NULL
-  AND (
-      LOWER(LTRIM(RTRIM(COALESCE(s.LifecycleKey, '')))) = 'accepted'
-      OR LOWER(LTRIM(RTRIM(COALESCE(s.Name, '')))) = 'accepted'
-  );
+  AND LOWER(LTRIM(RTRIM(COALESCE(s.LifecycleKey, '')))) = 'accepted';
 
 UPDATE s
 SET SystemKey = 'denied'
 FROM dbo.Statuses s
 WHERE s.SystemKey IS NULL
-  AND (
-      LOWER(LTRIM(RTRIM(COALESCE(s.LifecycleKey, '')))) = 'denied'
-      OR LOWER(LTRIM(RTRIM(COALESCE(s.Name, '')))) = 'denied'
-  );
+  AND LOWER(LTRIM(RTRIM(COALESCE(s.LifecycleKey, '')))) = 'denied';
 
 UPDATE s
 SET SystemKey = 'closed'
 FROM dbo.Statuses s
 WHERE s.SystemKey IS NULL
-  AND (
-      LOWER(LTRIM(RTRIM(COALESCE(s.LifecycleKey, '')))) = 'closed'
-      OR LOWER(LTRIM(RTRIM(COALESCE(s.Name, '')))) = 'closed'
-  );
+  AND LOWER(LTRIM(RTRIM(COALESCE(s.LifecycleKey, '')))) = 'closed';
 
--- Backfill common non-lifecycle built-in identities by label.
+-- Backfill intake/open pipeline identity for legacy prelitigation labels.
 UPDATE s
-SET SystemKey = 'active'
+SET SystemKey = 'intake'
 FROM dbo.Statuses s
 WHERE s.SystemKey IS NULL
-  AND LOWER(LTRIM(RTRIM(COALESCE(s.Name, '')))) = 'active';
+  AND LOWER(LTRIM(RTRIM(COALESCE(s.Name, '')))) IN ('prelitigation', 'pre-litigation', 'intake');
 
-UPDATE s
-SET SystemKey = 'potential'
-FROM dbo.Statuses s
-WHERE s.SystemKey IS NULL
-  AND LOWER(LTRIM(RTRIM(COALESCE(s.Name, '')))) = 'potential';
-
-UPDATE s
-SET SystemKey = 'prelitigation'
-FROM dbo.Statuses s
-WHERE s.SystemKey IS NULL
-  AND LOWER(LTRIM(RTRIM(COALESCE(s.Name, '')))) IN ('prelitigation', 'pre-litigation');
-
--- Optional operational query (manual follow-up):
--- identify duplicate scoped built-ins that should be merged/cleaned up before adding a unique filtered index.
+-- Optional diagnostics for manual cleanup before a later true global-layer pass.
 --
+-- Duplicate built-in identities inside a scope (tenant/global):
 -- SELECT ShaleClientId, SystemKey, COUNT(*) AS Cnt
 -- FROM dbo.Statuses
 -- WHERE SystemKey IS NOT NULL
 -- GROUP BY ShaleClientId, SystemKey
 -- HAVING COUNT(*) > 1;
+--
+-- Global/default status rows currently configured:
+-- SELECT Id, Name, SystemKey, LifecycleKey, SortOrder
+-- FROM dbo.Statuses
+-- WHERE ShaleClientId IS NULL
+-- ORDER BY SortOrder, Name, Id;

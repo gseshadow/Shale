@@ -3976,31 +3976,34 @@ public final class CaseDao {
 	}
 
 	public String findLifecycleKeyForStatus(int shaleClientId, int statusId) {
-		try (Connection con = db.requireConnection()) {
-			boolean hasLifecycleKey = tableHasColumn(con, "Statuses", "LifecycleKey");
-			String lifecycleKeySelect = hasLifecycleKey ? "LifecycleKey" : "NULL AS LifecycleKey";
-			String sql = """
-					SELECT Id, Name, %s
-					FROM %s
-					WHERE (ShaleClientId = ? OR ShaleClientId IS NULL)
-					  AND Id = ?;
-					""".formatted(lifecycleKeySelect, STATUSES_TABLE);
+		StatusRow status = findStatusForTenantById(shaleClientId, statusId);
+		return status == null ? null : status.lifecycleKey();
+	}
 
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				ps.setInt(1, shaleClientId);
-				ps.setInt(2, statusId);
-				try (ResultSet rs = ps.executeQuery()) {
-					if (!rs.next())
-						return null;
-					return resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name"));
-				}
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException(
-					"Failed to resolve lifecycle key (clientId=" + shaleClientId + ", statusId=" + statusId + ")",
-					e
-			);
+	public StatusRow findStatusForTenantById(int shaleClientId, int statusId) {
+		if (shaleClientId <= 0 || statusId <= 0)
+			return null;
+		List<StatusRow> statuses = listStatusesForTenant(shaleClientId);
+		for (StatusRow status : statuses) {
+			if (status == null || status.id() != statusId)
+				continue;
+			return status;
 		}
+		return null;
+	}
+
+	public StatusRow findStatusForTenantBySystemKey(int shaleClientId, String systemKey) {
+		String normalized = normalizeSystemKey(systemKey);
+		if (shaleClientId <= 0 || normalized == null)
+			return null;
+		List<StatusRow> statuses = listStatusesForTenant(shaleClientId);
+		for (StatusRow status : statuses) {
+			if (status == null)
+				continue;
+			if (Objects.equals(normalized, normalizeSystemKey(status.systemKey())))
+				return status;
+		}
+		return null;
 	}
 
 	public record PracticeAreaRow(
