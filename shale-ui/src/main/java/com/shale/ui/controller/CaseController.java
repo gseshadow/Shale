@@ -4967,7 +4967,7 @@ public class CaseController {
 							? draftPrimaryStatusId
 							: (currentOverview == null ? null : currentOverview.getPrimaryStatusId()));
 			for (CaseDao.StatusRow s : statuses) {
-				String label = s.name() + (s.isClosed() ? " (Closed)" : "");
+				String label = s.name() + (CaseDao.isTerminalStatus(s) ? " (Terminal)" : "");
 				labelToRow.put(label, s);
 				if (currentId != null && currentId == s.id())
 					preselect = label;
@@ -6210,15 +6210,7 @@ public class CaseController {
 	private String resolvePrimaryStatusLifecycleKey(Integer savedStatusId, Integer tenantId) {
 		if (caseDao == null || savedStatusId == null || tenantId == null || tenantId <= 0)
 			return null;
-		List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
-		if (statuses == null || statuses.isEmpty())
-			return null;
-		for (CaseDao.StatusRow status : statuses) {
-			if (status == null || status.id() != savedStatusId)
-				continue;
-			return CaseDao.normalizeLifecycleKey(status.lifecycleKey());
-		}
-		return null;
+		return caseDao.findLifecycleKeyForStatus(tenantId, savedStatusId);
 	}
 
 	private void addStatusChangedTimelineEvent(

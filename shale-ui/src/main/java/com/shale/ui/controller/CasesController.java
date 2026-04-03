@@ -452,7 +452,7 @@ public final class CasesController {
 			return false;
 		}
 		for (CaseListUiSupport.StatusFilterOption option : statusFilterOptions) {
-			if (option != null && option.isClosed() && selectedStatusIds.contains(option.id())) {
+			if (option != null && option.terminal() && selectedStatusIds.contains(option.id())) {
 				return true;
 			}
 		}
@@ -481,7 +481,7 @@ public final class CasesController {
 							.map(status -> new CaseListUiSupport.StatusFilterOption(
 									status.id(),
 									safe(status.name()).isBlank() ? ("Status #" + status.id()) : safe(status.name()),
-									status.isClosed()))
+									CaseDao.isTerminalStatus(status)))
 							.toList();
 
 			Platform.runLater(() -> {

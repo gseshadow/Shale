@@ -11,8 +11,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -3738,6 +3740,21 @@ public final class CaseDao {
 		};
 	}
 
+	private static String normalizeLegacyLifecycleKeyFromStatusName(String statusName) {
+		String normalized = (statusName == null) ? "" : statusName.trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+		case LIFECYCLE_KEY_ACCEPTED, LIFECYCLE_KEY_DENIED, LIFECYCLE_KEY_CLOSED -> normalized;
+		default -> null;
+		};
+	}
+
+	public static String resolveLifecycleKey(String lifecycleKey, String statusName) {
+		String normalizedLifecycleKey = normalizeLifecycleKey(lifecycleKey);
+		if (normalizedLifecycleKey != null)
+			return normalizedLifecycleKey;
+		return normalizeLegacyLifecycleKeyFromStatusName(statusName);
+	}
+
 	public void populateLifecycleDateIfNull(long caseId, String lifecycleKey) {
 		String normalized = normalizeLifecycleKey(lifecycleKey);
 		if (normalized == null)
@@ -3780,7 +3797,8 @@ public final class CaseDao {
 			boolean isClosed,
 			int sortOrder,
 			String color,
-			String lifecycleKey
+			String lifecycleKey,
+			String systemKey
 	) {
 	}
 
@@ -3843,39 +3861,163 @@ public final class CaseDao {
 		}
 	}
 
+	private static String normalizeSystemKey(String systemKey) {
+		String normalized = (systemKey == null) ? "" : systemKey.trim().toLowerCase(Locale.ROOT);
+		return normalized.isBlank() ? null : normalized;
+	}
+
+	public static boolean isTerminalStatus(String lifecycleKey, String systemKey) {
+		String normalizedLifecycle = normalizeLifecycleKey(lifecycleKey);
+		if (LIFECYCLE_KEY_CLOSED.equals(normalizedLifecycle) || LIFECYCLE_KEY_DENIED.equals(normalizedLifecycle))
+			return true;
+		String normalizedSystem = normalizeSystemKey(systemKey);
+		return LIFECYCLE_KEY_CLOSED.equals(normalizedSystem) || LIFECYCLE_KEY_DENIED.equals(normalizedSystem);
+	}
+
+	public static boolean isTerminalStatus(StatusRow status) {
+		if (status == null)
+			return false;
+		return isTerminalStatus(status.lifecycleKey(), status.systemKey());
+	}
+
+	private static StatusRow mapStatusRow(ResultSet rs) throws SQLException {
+		return new StatusRow(
+				rs.getInt("Id"),
+				rs.getString("Name"),
+				rs.getBoolean("IsClosed"),
+				rs.getInt("SortOrder"),
+				rs.getString("Color"),
+				resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name")),
+				normalizeSystemKey(rs.getString("SystemKey"))
+		);
+	}
+
+	private static List<StatusRow> resolveEffectiveStatuses(List<StatusRow> globalStatuses, List<StatusRow> tenantStatuses) {
+		List<StatusRow> globalUnkeyed = new ArrayList<>();
+		List<StatusRow> tenantUnkeyed = new ArrayList<>();
+		Map<String, StatusRow> bySystemKey = new LinkedHashMap<>();
+
+		if (globalStatuses != null) {
+			for (StatusRow status : globalStatuses) {
+				if (status == null)
+					continue;
+				String systemKey = normalizeSystemKey(status.systemKey());
+				if (systemKey == null) {
+					globalUnkeyed.add(status);
+					continue;
+				}
+				bySystemKey.putIfAbsent(systemKey, status);
+			}
+		}
+
+		if (tenantStatuses != null) {
+			for (StatusRow status : tenantStatuses) {
+				if (status == null)
+					continue;
+				String systemKey = normalizeSystemKey(status.systemKey());
+				if (systemKey == null) {
+					tenantUnkeyed.add(status);
+					continue;
+				}
+				// Tenant status overrides matching global/default status by stable SystemKey.
+				bySystemKey.put(systemKey, status);
+			}
+		}
+
+		List<StatusRow> merged = new ArrayList<>(globalUnkeyed.size() + bySystemKey.size() + tenantUnkeyed.size());
+		merged.addAll(globalUnkeyed);
+		merged.addAll(bySystemKey.values());
+		merged.addAll(tenantUnkeyed);
+		merged.sort((a, b) -> {
+			if (a == b)
+				return 0;
+			if (a == null)
+				return 1;
+			if (b == null)
+				return -1;
+			int bySortOrder = Integer.compare(a.sortOrder(), b.sortOrder());
+			if (bySortOrder != 0)
+				return bySortOrder;
+			String aName = a.name() == null ? "" : a.name();
+			String bName = b.name() == null ? "" : b.name();
+			int byName = aName.compareToIgnoreCase(bName);
+			if (byName != 0)
+				return byName;
+			return Integer.compare(a.id(), b.id());
+		});
+		return merged;
+	}
+
 	public List<StatusRow> listStatusesForTenant(int shaleClientId) {
 		try (Connection con = db.requireConnection()) {
 			boolean hasLifecycleKey = tableHasColumn(con, "Statuses", "LifecycleKey");
+			boolean hasSystemKey = tableHasColumn(con, "Statuses", "SystemKey");
 			String lifecycleKeySelect = hasLifecycleKey ? "LifecycleKey" : "NULL AS LifecycleKey";
+			String systemKeySelect = hasSystemKey ? "SystemKey" : "NULL AS SystemKey";
 			String sql = """
-					SELECT Id, Name, IsClosed, SortOrder, Color, %s
+					SELECT Id, Name, IsClosed, SortOrder, Color, %s, %s
 					FROM %s
 					WHERE ShaleClientId = ?
 					ORDER BY SortOrder, Name;
-					""".formatted(lifecycleKeySelect, STATUSES_TABLE);
+					""".formatted(lifecycleKeySelect, systemKeySelect, STATUSES_TABLE);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
-
 				ps.setInt(1, shaleClientId);
-
 				try (ResultSet rs = ps.executeQuery()) {
-					List<StatusRow> out = new ArrayList<>();
+					List<StatusRow> tenantStatuses = new ArrayList<>();
 					while (rs.next()) {
-						out.add(new StatusRow(
-								rs.getInt("Id"),
-								rs.getString("Name"),
-								rs.getBoolean("IsClosed"),
-								rs.getInt("SortOrder"),
-								rs.getString("Color"),
-								normalizeLifecycleKey(rs.getString("LifecycleKey"))
-						));
+						tenantStatuses.add(mapStatusRow(rs));
 					}
-					return out;
+					String globalSql = """
+							SELECT Id, Name, IsClosed, SortOrder, Color, %s, %s
+							FROM %s
+							WHERE ShaleClientId IS NULL
+							ORDER BY SortOrder, Name;
+							""".formatted(lifecycleKeySelect, systemKeySelect, STATUSES_TABLE);
+					try (PreparedStatement globalPs = con.prepareStatement(globalSql);
+							ResultSet globalRs = globalPs.executeQuery()) {
+						List<StatusRow> globalStatuses = new ArrayList<>();
+						while (globalRs.next()) {
+							globalStatuses.add(mapStatusRow(globalRs));
+						}
+						return resolveEffectiveStatuses(globalStatuses, tenantStatuses);
+					}
 				}
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list statuses (clientId=" + shaleClientId + ")", e);
 		}
+	}
+
+	public String findLifecycleKeyForStatus(int shaleClientId, int statusId) {
+		StatusRow status = findStatusForTenantById(shaleClientId, statusId);
+		return status == null ? null : status.lifecycleKey();
+	}
+
+	public StatusRow findStatusForTenantById(int shaleClientId, int statusId) {
+		if (shaleClientId <= 0 || statusId <= 0)
+			return null;
+		List<StatusRow> statuses = listStatusesForTenant(shaleClientId);
+		for (StatusRow status : statuses) {
+			if (status == null || status.id() != statusId)
+				continue;
+			return status;
+		}
+		return null;
+	}
+
+	public StatusRow findStatusForTenantBySystemKey(int shaleClientId, String systemKey) {
+		String normalized = normalizeSystemKey(systemKey);
+		if (shaleClientId <= 0 || normalized == null)
+			return null;
+		List<StatusRow> statuses = listStatusesForTenant(shaleClientId);
+		for (StatusRow status : statuses) {
+			if (status == null)
+				continue;
+			if (Objects.equals(normalized, normalizeSystemKey(status.systemKey())))
+				return status;
+		}
+		return null;
 	}
 
 	public record PracticeAreaRow(

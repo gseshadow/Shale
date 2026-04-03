@@ -14,7 +14,7 @@ public final class CaseListUiSupport {
 	private CaseListUiSupport() {
 	}
 
-	public record StatusFilterOption(int id, String label, boolean isClosed) {
+	public record StatusFilterOption(int id, String label, boolean terminal) {
 	}
 
 	public static Set<Integer> defaultSelectedStatuses(List<StatusFilterOption> options) {
@@ -23,7 +23,7 @@ public final class CaseListUiSupport {
 			return defaults;
 		}
 		for (StatusFilterOption option : options) {
-			if (option == null || option.isClosed()) {
+			if (option == null || option.terminal()) {
 				continue;
 			}
 			defaults.add(option.id());
