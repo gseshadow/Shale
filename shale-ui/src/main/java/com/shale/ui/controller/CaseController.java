@@ -4967,7 +4967,7 @@ public class CaseController {
 							? draftPrimaryStatusId
 							: (currentOverview == null ? null : currentOverview.getPrimaryStatusId()));
 			for (CaseDao.StatusRow s : statuses) {
-				String label = s.name() + (s.isClosed() ? " (Closed)" : "");
+				String label = s.name() + (CaseDao.isTerminalStatus(s) ? " (Terminal)" : "");
 				labelToRow.put(label, s);
 				if (currentId != null && currentId == s.id())
 					preselect = label;

@@ -242,7 +242,7 @@ public final class NewIntakeController {
 			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(requireClientId());
 			Optional<CaseDao.StatusRow> defaultOpenStatus = statuses.stream()
 					.filter(Objects::nonNull)
-					.filter(status -> !status.isClosed())
+					.filter(status -> !CaseDao.isTerminalStatus(status))
 					.findFirst();
 			if (defaultOpenStatus.isPresent()) {
 				selectedStatus = defaultOpenStatus.get();

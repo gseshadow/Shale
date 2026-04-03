@@ -219,7 +219,7 @@ public final class MyShaleController {
 							.map(status -> new CaseListUiSupport.StatusFilterOption(
 									status.id(),
 									safe(status.name()).isBlank() ? ("Status #" + status.id()) : safe(status.name()),
-									status.isClosed()))
+									CaseDao.isTerminalStatus(status)))
 							.toList();
 
 			Platform.runLater(() -> {

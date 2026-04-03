@@ -3866,6 +3866,20 @@ public final class CaseDao {
 		return normalized.isBlank() ? null : normalized;
 	}
 
+	public static boolean isTerminalStatus(String lifecycleKey, String systemKey) {
+		String normalizedLifecycle = normalizeLifecycleKey(lifecycleKey);
+		if (LIFECYCLE_KEY_CLOSED.equals(normalizedLifecycle) || LIFECYCLE_KEY_DENIED.equals(normalizedLifecycle))
+			return true;
+		String normalizedSystem = normalizeSystemKey(systemKey);
+		return LIFECYCLE_KEY_CLOSED.equals(normalizedSystem) || LIFECYCLE_KEY_DENIED.equals(normalizedSystem);
+	}
+
+	public static boolean isTerminalStatus(StatusRow status) {
+		if (status == null)
+			return false;
+		return isTerminalStatus(status.lifecycleKey(), status.systemKey());
+	}
+
 	private static StatusRow mapStatusRow(ResultSet rs) throws SQLException {
 		return new StatusRow(
 				rs.getInt("Id"),
