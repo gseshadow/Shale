@@ -3738,6 +3738,21 @@ public final class CaseDao {
 		};
 	}
 
+	private static String normalizeLegacyLifecycleKeyFromStatusName(String statusName) {
+		String normalized = (statusName == null) ? "" : statusName.trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+		case LIFECYCLE_KEY_ACCEPTED, LIFECYCLE_KEY_DENIED, LIFECYCLE_KEY_CLOSED -> normalized;
+		default -> null;
+		};
+	}
+
+	public static String resolveLifecycleKey(String lifecycleKey, String statusName) {
+		String normalizedLifecycleKey = normalizeLifecycleKey(lifecycleKey);
+		if (normalizedLifecycleKey != null)
+			return normalizedLifecycleKey;
+		return normalizeLegacyLifecycleKeyFromStatusName(statusName);
+	}
+
 	public void populateLifecycleDateIfNull(long caseId, String lifecycleKey) {
 		String normalized = normalizeLifecycleKey(lifecycleKey);
 		if (normalized == null)
@@ -3867,7 +3882,7 @@ public final class CaseDao {
 								rs.getBoolean("IsClosed"),
 								rs.getInt("SortOrder"),
 								rs.getString("Color"),
-								normalizeLifecycleKey(rs.getString("LifecycleKey"))
+								resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name"))
 						));
 					}
 					return out;
@@ -3875,6 +3890,34 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list statuses (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public String findLifecycleKeyForStatus(int shaleClientId, int statusId) {
+		try (Connection con = db.requireConnection()) {
+			boolean hasLifecycleKey = tableHasColumn(con, "Statuses", "LifecycleKey");
+			String lifecycleKeySelect = hasLifecycleKey ? "LifecycleKey" : "NULL AS LifecycleKey";
+			String sql = """
+					SELECT Id, Name, %s
+					FROM %s
+					WHERE ShaleClientId = ?
+					  AND Id = ?;
+					""".formatted(lifecycleKeySelect, STATUSES_TABLE);
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, shaleClientId);
+				ps.setInt(2, statusId);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next())
+						return null;
+					return resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name"));
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException(
+					"Failed to resolve lifecycle key (clientId=" + shaleClientId + ", statusId=" + statusId + ")",
+					e
+			);
 		}
 	}
 
