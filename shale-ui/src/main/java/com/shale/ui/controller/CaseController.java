@@ -6210,15 +6210,7 @@ public class CaseController {
 	private String resolvePrimaryStatusLifecycleKey(Integer savedStatusId, Integer tenantId) {
 		if (caseDao == null || savedStatusId == null || tenantId == null || tenantId <= 0)
 			return null;
-		List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
-		if (statuses == null || statuses.isEmpty())
-			return null;
-		for (CaseDao.StatusRow status : statuses) {
-			if (status == null || status.id() != savedStatusId)
-				continue;
-			return CaseDao.normalizeLifecycleKey(status.lifecycleKey());
-		}
-		return null;
+		return caseDao.findLifecycleKeyForStatus(tenantId, savedStatusId);
 	}
 
 	private void addStatusChangedTimelineEvent(
