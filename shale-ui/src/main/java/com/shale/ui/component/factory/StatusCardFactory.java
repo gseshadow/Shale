@@ -15,7 +15,6 @@ public class StatusCardFactory {
     public record StatusCardModel(
             Integer statusId,
             String name,
-            boolean isClosed,
             Integer sortOrder,
             String colorCss
     ) {

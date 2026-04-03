@@ -3493,7 +3493,6 @@ public class CaseController {
 		StatusCardModel model = new StatusCardModel(
 				statusId,
 				(statusName == null || statusName.isBlank()) ? "—" : statusName,
-				false,
 				null,
 				statusColorCss
 		);
@@ -3538,7 +3537,6 @@ public class CaseController {
 		}
 		StatusCardModel model = new StatusCardModel(statusId,
 				(statusName == null || statusName.isBlank()) ? "—" : statusName,
-				false,
 				null,
 				statusColorCss);
 		detCaseStatusHost.getChildren().setAll(statusCardFactory.create(model, StatusCardFactory.Variant.MINI));
