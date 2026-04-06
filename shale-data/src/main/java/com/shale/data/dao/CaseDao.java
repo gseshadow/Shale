@@ -3812,7 +3812,7 @@ public final class CaseDao {
 				    SELECT 1
 				    FROM dbo.PracticeAreas pa
 				    WHERE pa.Id = ?
-				      AND pa.ShaleClientId = ?
+				      AND (pa.ShaleClientId = ? OR pa.ShaleClientId IS NULL)
 				      AND pa.IsActive = 1
 				      AND pa.IsDeleted = 0
 				  )
@@ -4314,39 +4314,127 @@ public final class CaseDao {
 	public record PracticeAreaRow(
 			int id,
 			String name,
-			String color
+			String color,
+			String systemKey
 	) {
 	}
 
 	public List<PracticeAreaRow> listPracticeAreasForTenant(int shaleClientId) {
-		String sql = """
-				SELECT Id, Name, Color
-				FROM dbo.PracticeAreas
-				WHERE ShaleClientId = ?
-				  AND IsActive = 1
-				  AND IsDeleted = 0
-				ORDER BY Name, Id;
-				""";
-
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-
-			ps.setInt(1, shaleClientId);
-
-			try (ResultSet rs = ps.executeQuery()) {
-				List<PracticeAreaRow> out = new ArrayList<>();
-				while (rs.next()) {
-					out.add(new PracticeAreaRow(
-							rs.getInt("Id"),
-							rs.getString("Name"),
-							rs.getString("Color")
-					));
+		try (Connection con = db.requireConnection()) {
+			boolean hasSystemKey = tableHasColumn(con, "PracticeAreas", "SystemKey");
+			String systemKeySelect = hasSystemKey ? "SystemKey" : "NULL AS SystemKey";
+			String tenantSql = """
+					SELECT Id, Name, Color, %s
+					FROM dbo.PracticeAreas
+					WHERE ShaleClientId = ?
+					  AND IsActive = 1
+					  AND IsDeleted = 0
+					ORDER BY Name, Id;
+					""".formatted(systemKeySelect);
+			try (PreparedStatement tenantPs = con.prepareStatement(tenantSql)) {
+				tenantPs.setInt(1, shaleClientId);
+				try (ResultSet tenantRs = tenantPs.executeQuery()) {
+					List<PracticeAreaRow> tenantAreas = new ArrayList<>();
+					while (tenantRs.next()) {
+						tenantAreas.add(new PracticeAreaRow(
+								tenantRs.getInt("Id"),
+								tenantRs.getString("Name"),
+								tenantRs.getString("Color"),
+								normalizeSystemKey(tenantRs.getString("SystemKey"))
+						));
+					}
+					String globalSql = """
+							SELECT Id, Name, Color, %s
+							FROM dbo.PracticeAreas
+							WHERE ShaleClientId IS NULL
+							  AND IsActive = 1
+							  AND IsDeleted = 0
+							ORDER BY Name, Id;
+							""".formatted(systemKeySelect);
+					try (PreparedStatement globalPs = con.prepareStatement(globalSql);
+							ResultSet globalRs = globalPs.executeQuery()) {
+						List<PracticeAreaRow> globalAreas = new ArrayList<>();
+						while (globalRs.next()) {
+							globalAreas.add(new PracticeAreaRow(
+									globalRs.getInt("Id"),
+									globalRs.getString("Name"),
+									globalRs.getString("Color"),
+									normalizeSystemKey(globalRs.getString("SystemKey"))
+							));
+						}
+						return resolveEffectivePracticeAreas(globalAreas, tenantAreas);
+					}
 				}
-				return out;
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list practice areas (clientId=" + shaleClientId + ")", e);
 		}
+	}
+
+	private static List<PracticeAreaRow> resolveEffectivePracticeAreas(List<PracticeAreaRow> globalAreas, List<PracticeAreaRow> tenantAreas) {
+		List<PracticeAreaRow> globalUnkeyed = new ArrayList<>();
+		List<PracticeAreaRow> tenantUnkeyed = new ArrayList<>();
+		Map<String, PracticeAreaRow> bySystemKey = new LinkedHashMap<>();
+
+		if (globalAreas != null) {
+			for (PracticeAreaRow area : globalAreas) {
+				if (area == null)
+					continue;
+				String systemKey = normalizeSystemKey(area.systemKey());
+				if (systemKey == null) {
+					globalUnkeyed.add(area);
+					continue;
+				}
+				bySystemKey.putIfAbsent(systemKey, area);
+			}
+		}
+
+		if (tenantAreas != null) {
+			for (PracticeAreaRow area : tenantAreas) {
+				if (area == null)
+					continue;
+				String systemKey = normalizeSystemKey(area.systemKey());
+				if (systemKey == null) {
+					tenantUnkeyed.add(area);
+					continue;
+				}
+				bySystemKey.put(systemKey, area);
+			}
+		}
+
+		List<PracticeAreaRow> merged = new ArrayList<>(globalUnkeyed.size() + bySystemKey.size() + tenantUnkeyed.size());
+		merged.addAll(globalUnkeyed);
+		merged.addAll(bySystemKey.values());
+		merged.addAll(tenantUnkeyed);
+		merged.sort((a, b) -> {
+			if (a == b)
+				return 0;
+			if (a == null)
+				return 1;
+			if (b == null)
+				return -1;
+			String aName = a.name() == null ? "" : a.name();
+			String bName = b.name() == null ? "" : b.name();
+			int byName = aName.compareToIgnoreCase(bName);
+			if (byName != 0)
+				return byName;
+			return Integer.compare(a.id(), b.id());
+		});
+		return merged;
+	}
+
+	public PracticeAreaRow findPracticeAreaForTenantBySystemKey(int shaleClientId, String systemKey) {
+		String normalized = normalizeSystemKey(systemKey);
+		if (shaleClientId <= 0 || normalized == null)
+			return null;
+		List<PracticeAreaRow> areas = listPracticeAreasForTenant(shaleClientId);
+		for (PracticeAreaRow area : areas) {
+			if (area == null)
+				continue;
+			if (Objects.equals(normalized, normalizeSystemKey(area.systemKey())))
+				return area;
+		}
+		return null;
 	}
 
 	public void setResponsibleAttorney(long caseId, int userId) {
