@@ -13,6 +13,7 @@ This runbook defines a **safe, repeatable execution order** for modularization m
 Use this runbook with:
 
 - `docs/sql/2026-04-06_modularization_gating_checks.sql` (read-only diagnostics)
+- `docs/modularization_release_checklist.md` (pass/fail checklist artifact)
 - Existing migration scripts under `docs/sql/`
 
 ---
@@ -169,4 +170,3 @@ If a step fails:
 3. Re-run diagnostics and review diffs.
 4. Execute Phase 2 status activation scripts.
 5. Re-run diagnostics and archive final verification outputs.
-
