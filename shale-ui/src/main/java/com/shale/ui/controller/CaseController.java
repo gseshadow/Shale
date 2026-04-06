@@ -2321,10 +2321,7 @@ public class CaseController {
 	}
 
 	private void openTask(Long taskId) {
-		if (taskId == null || onOpenTask == null) {
-			return;
-		}
-		onOpenTask.accept(taskId);
+		showTaskDetailPopup(taskId);
 	}
 
 	private void openOrganization(Integer organizationId) {
