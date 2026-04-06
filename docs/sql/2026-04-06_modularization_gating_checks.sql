@@ -133,6 +133,11 @@ BEGIN
         WHERE (ShaleClientId = @tenantId OR ShaleClientId IS NULL)
           AND SystemKey IN ('represented', 'opposing', 'neutral')
         ORDER BY CASE WHEN ShaleClientId IS NULL THEN 0 ELSE 1 END, SystemKey, Id;
+
+        SELECT
+            SUM(CASE WHEN ShaleClientId = @tenantId AND SystemKey IN ('represented', 'opposing', 'neutral') THEN 1 ELSE 0 END) AS Tenant7BuiltinCount,
+            SUM(CASE WHEN ShaleClientId IS NULL AND SystemKey IN ('represented', 'opposing', 'neutral') THEN 1 ELSE 0 END) AS GlobalBuiltinCount
+        FROM dbo.PartySides;
     END
     ELSE
         SELECT 'PartySides.SystemKey missing: duplicate and built-in checks skipped.' AS Note;
