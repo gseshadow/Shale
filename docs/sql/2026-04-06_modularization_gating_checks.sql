@@ -100,6 +100,11 @@ BEGIN
         WHERE (ShaleClientId = @tenantId OR ShaleClientId IS NULL)
           AND SystemKey IN ('caller', 'party', 'counsel')
         ORDER BY CASE WHEN ShaleClientId IS NULL THEN 0 ELSE 1 END, SystemKey, Id;
+
+        SELECT
+            SUM(CASE WHEN ShaleClientId = @tenantId AND SystemKey IN ('caller', 'party', 'counsel') THEN 1 ELSE 0 END) AS Tenant7BuiltinCount,
+            SUM(CASE WHEN ShaleClientId IS NULL AND SystemKey IN ('caller', 'party', 'counsel') THEN 1 ELSE 0 END) AS GlobalBuiltinCount
+        FROM dbo.PartyRoles;
     END
     ELSE
         SELECT 'PartyRoles.SystemKey missing: duplicate and built-in checks skipped.' AS Note;

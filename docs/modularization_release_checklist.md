@@ -39,6 +39,7 @@ This checklist is for **read-only readiness assessment** before rollout and befo
 
 1. For any table targeted for global overlay activation:
    - `ShaleClientIdIsNullable = 1`
+   - For PartyRoles activation specifically, global built-ins `caller`, `party`, `counsel` are present with `ShaleClientId IS NULL`
 2. Duplicate-key report by `(ShaleClientId, SystemKey)` is clean for rows intended to be unique by scope.
 3. Global built-in rows are present where activation policy requires them.
 4. No unresolved readiness-summary hints indicating missing prep prerequisites.
