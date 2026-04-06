@@ -1,5 +1,6 @@
 package com.shale.data.dao;
 
+import com.shale.core.semantics.RoleSemantics;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.runtime.RuntimeSessionService;
 
@@ -12,9 +13,6 @@ import java.util.List;
 import java.util.Objects;
 
 public final class UserDao {
-	private static final int ROLE_ADMIN = 1;
-	private static final int ROLE_ATTORNEY = 7;
-
 	public record DirectoryUserRow(
 			int id,
 			String firstName,
@@ -262,13 +260,13 @@ public final class UserDao {
 			sql.append("""
 					  COALESCE(u.Color, '') AS Color,
 					  COALESCE(u.Initials, '') AS Initials,
-					  COALESCE(u.is_admin, 0) AS IsAdmin,
-					  COALESCE(u.is_attorney, 0) AS IsAttorney,
+					  COALESCE(u.%s, 0) AS IsAdmin,
+					  COALESCE(u.%s, 0) AS IsAttorney,
 					  COALESCE(u.is_deleted, 0) AS IsDeleted
 					FROM dbo.Users u
 					WHERE u.Id = ?
 					  AND u.ShaleClientId = ?
-					""");
+					""".formatted(RoleSemantics.FLAG_IS_ADMIN, RoleSemantics.FLAG_IS_ATTORNEY));
 			appendUserVisibilityFilters(sql, con, "u");
 			sql.append(";");
 
@@ -355,12 +353,12 @@ public final class UserDao {
 			verifyTenantMatchesSession(con, shaleClientId);
 			String sql = """
 					SELECT
-					  COALESCE(u.is_admin, 0) AS IsAdmin,
-					  COALESCE(u.is_attorney, 0) AS IsAttorney
+					  COALESCE(u.%s, 0) AS IsAdmin,
+					  COALESCE(u.%s, 0) AS IsAttorney
 					FROM dbo.Users u
 					WHERE u.Id = ?
 					  AND u.ShaleClientId = ?
-					""";
+					""".formatted(RoleSemantics.FLAG_IS_ADMIN, RoleSemantics.FLAG_IS_ATTORNEY);
 			StringBuilder sqlBuilder = new StringBuilder(sql);
 			appendUserVisibilityFilters(sqlBuilder, con, "u");
 			try (PreparedStatement ps = con.prepareStatement(sqlBuilder.toString())) {
@@ -372,10 +370,10 @@ public final class UserDao {
 					}
 					List<UserRoleRow> out = new ArrayList<>();
 					if (rs.getBoolean("IsAdmin")) {
-						out.add(new UserRoleRow(ROLE_ADMIN, "Admin"));
+						out.add(new UserRoleRow(RoleSemantics.ROLE_ADMIN, RoleSemantics.roleLabel(RoleSemantics.ROLE_ADMIN)));
 					}
 					if (rs.getBoolean("IsAttorney")) {
-						out.add(new UserRoleRow(ROLE_ATTORNEY, "Attorney"));
+						out.add(new UserRoleRow(RoleSemantics.ROLE_ATTORNEY, RoleSemantics.roleLabel(RoleSemantics.ROLE_ATTORNEY)));
 					}
 					return out;
 				}
@@ -396,11 +394,11 @@ public final class UserDao {
 			assignedIds.add(row.roleId());
 		}
 		List<UserRoleRow> available = new ArrayList<>();
-		if (!assignedIds.contains(ROLE_ADMIN)) {
-			available.add(new UserRoleRow(ROLE_ADMIN, "Admin"));
+		if (!assignedIds.contains(RoleSemantics.ROLE_ADMIN)) {
+			available.add(new UserRoleRow(RoleSemantics.ROLE_ADMIN, RoleSemantics.roleLabel(RoleSemantics.ROLE_ADMIN)));
 		}
-		if (!assignedIds.contains(ROLE_ATTORNEY)) {
-			available.add(new UserRoleRow(ROLE_ATTORNEY, "Attorney"));
+		if (!assignedIds.contains(RoleSemantics.ROLE_ATTORNEY)) {
+			available.add(new UserRoleRow(RoleSemantics.ROLE_ATTORNEY, RoleSemantics.roleLabel(RoleSemantics.ROLE_ATTORNEY)));
 		}
 		return available;
 	}
@@ -444,11 +442,7 @@ public final class UserDao {
 	}
 
 	private static String roleFlagColumn(int roleId) {
-		return switch (roleId) {
-		case ROLE_ADMIN -> "is_admin";
-		case ROLE_ATTORNEY -> "is_attorney";
-		default -> throw new IllegalArgumentException("Unsupported role id: " + roleId);
-		};
+		return RoleSemantics.roleFlagColumn(roleId);
 	}
 
 	private static String existingPhoneColumn(Connection con) throws SQLException {
