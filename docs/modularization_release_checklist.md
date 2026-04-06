@@ -19,7 +19,7 @@ This checklist is for **read-only readiness assessment** before rollout and befo
    - Statuses: `intake`, `accepted`, `denied`, `closed`
    - PartyRoles: `caller`, `party`, `counsel`
    - PartySides: `represented`, `opposing`, `neutral`
-   - Priorities: `normal`
+   - Priorities: `low`, `normal`, `high`
    - PracticeAreas: `medical_malpractice`, `personal_injury`, `sexual_assault`
 4. Confirm no severe unexpected schema drift in diagnostics output.
 
@@ -41,6 +41,7 @@ This checklist is for **read-only readiness assessment** before rollout and befo
    - `ShaleClientIdIsNullable = 1`
    - For PartyRoles activation specifically, global built-ins `caller`, `party`, `counsel` are present with `ShaleClientId IS NULL`
    - For PartySides activation specifically, global built-ins `represented`, `opposing`, `neutral` are present with `ShaleClientId IS NULL`
+   - For Priorities activation specifically, global built-ins `low`, `normal`, `high` are present with `ShaleClientId IS NULL`
 2. Duplicate-key report by `(ShaleClientId, SystemKey)` is clean for rows intended to be unique by scope.
 3. Global built-in rows are present where activation policy requires them.
 4. No unresolved readiness-summary hints indicating missing prep prerequisites.

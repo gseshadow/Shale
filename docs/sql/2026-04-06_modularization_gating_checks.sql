@@ -192,6 +192,22 @@ BEGIN
           WHERE (ShaleClientId = @tenantId OR ShaleClientId IS NULL)
           ORDER BY CASE WHEN ShaleClientId IS NULL THEN 0 ELSE 1 END, Id;';
     EXEC sp_executesql @prioritiesDetail, N'@tenantId int', @tenantId = @tenantId;
+
+    IF COL_LENGTH('dbo.Priorities', 'SystemKey') IS NOT NULL
+    BEGIN
+        SELECT Id, ShaleClientId, Name, SortOrder, IsActive, SystemKey
+        FROM dbo.Priorities
+        WHERE (ShaleClientId = @tenantId OR ShaleClientId IS NULL)
+          AND SystemKey IN ('low', 'normal', 'high')
+        ORDER BY CASE WHEN ShaleClientId IS NULL THEN 0 ELSE 1 END, SystemKey, Id;
+
+        SELECT
+            SUM(CASE WHEN ShaleClientId = @tenantId AND SystemKey IN ('low', 'normal', 'high') THEN 1 ELSE 0 END) AS Tenant7BuiltinCount,
+            SUM(CASE WHEN ShaleClientId IS NULL AND SystemKey IN ('low', 'normal', 'high') THEN 1 ELSE 0 END) AS GlobalBuiltinCount
+        FROM dbo.Priorities;
+    END
+    ELSE
+        SELECT 'Priorities.SystemKey missing: built-in checks skipped.' AS Note;
 END;
 
 PRINT '=== 6) PracticeAreas diagnostics ===';
@@ -326,12 +342,12 @@ SELECT
         ) d
     ) END,
     CASE WHEN OBJECT_ID('dbo.Priorities', 'U') IS NULL OR COL_LENGTH('dbo.Priorities', 'SystemKey') IS NULL THEN NULL ELSE (
-        SELECT COUNT(*) FROM dbo.Priorities WHERE ShaleClientId = @tenantId AND SystemKey = 'normal'
+        SELECT COUNT(*) FROM dbo.Priorities WHERE ShaleClientId = @tenantId AND SystemKey IN ('low','normal','high')
     ) END,
     CASE WHEN OBJECT_ID('dbo.Priorities', 'U') IS NULL OR COL_LENGTH('dbo.Priorities', 'SystemKey') IS NULL THEN NULL ELSE (
-        SELECT COUNT(*) FROM dbo.Priorities WHERE ShaleClientId IS NULL AND SystemKey = 'normal'
+        SELECT COUNT(*) FROM dbo.Priorities WHERE ShaleClientId IS NULL AND SystemKey IN ('low','normal','high')
     ) END,
-    N'normal key is core built-in identity; medium/default names are legacy aliases'
+    N'Priorities activation expects built-ins low/normal/high in both tenant and global scopes; normal remains default semantic'
 UNION ALL
 SELECT
     'PracticeAreas',

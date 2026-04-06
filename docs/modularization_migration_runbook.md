@@ -60,19 +60,23 @@ Use this runbook with:
    - **Type:** prep + conditional activation  
    - **Purpose:** add/backfill `Priorities.SystemKey` (`normal` semantics), conditionally seed global row.
 
+9. `2026-04-06_priorities_global_activation_phase3.sql`
+   - **Type:** activation step (Priorities-specific)
+   - **Purpose:** make `Priorities.ShaleClientId` nullable if needed and seed explicit global built-ins (`low`, `normal`, `high`) while retaining tenant rows and existing task history.
+
 ### E. PracticeAreas
 
-9. `2026-04-06_practiceareas_system_key_phase1.sql`  
+10. `2026-04-06_practiceareas_system_key_phase1.sql`
    - **Type:** prep + conditional activation  
    - **Purpose:** add/normalize `SystemKey`, conservative backfill, conditionally seed global rows.
 
-10. `2026-04-06_practiceareas_system_key_phase2_builtin_mapping.sql`  
+11. `2026-04-06_practiceareas_system_key_phase2_builtin_mapping.sql`
    - **Type:** prep-only follow-up  
    - **Purpose:** explicit tenant-7 mapping for built-ins without moving tenant rows to global.
 
 ### F. Integrity hardening (post-rollout)
 
-11. `2026-04-06_modularized_unique_systemkey_indexes_phase1.sql`  
+12. `2026-04-06_modularized_unique_systemkey_indexes_phase1.sql`
    - **Type:** post-rollout hardening / activation safety  
    - **Purpose:** add filtered unique indexes on `(ShaleClientId, SystemKey)` where `SystemKey IS NOT NULL` for modularized tables, with fail-fast duplicate prechecks.
 
@@ -132,11 +136,13 @@ Then rerun `2026-04-06_modularization_gating_checks.sql`.
 
 Run:
 
-1. `2026-04-06_modularized_unique_systemkey_indexes_phase1.sql`
+1. `2026-04-06_priorities_global_activation_phase3.sql`
+2. `2026-04-06_modularized_unique_systemkey_indexes_phase1.sql`
 
 Then rerun `2026-04-06_modularization_gating_checks.sql`.
 
 **Expected outcome:**
+- Priorities now supports explicit global rows (`ShaleClientId IS NULL`) with separate global built-ins (`low`, `normal`, `high`) while tenant rows remain active.
 - Optional filtered unique indexes present for eligible modularized tables.
 - New accidental duplicate keyed rows per scope are blocked at write-time.
 
