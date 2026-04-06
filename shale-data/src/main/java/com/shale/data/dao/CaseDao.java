@@ -44,6 +44,9 @@ public final class CaseDao {
 	private static final String PARTY_SIDE_KEY_OPPOSING = "opposing";
 	private static final String PARTY_SIDE_KEY_NEUTRAL = "neutral";
 	private static final String PARTY_SIDES_TABLE = "PartySides";
+	public static final String PRACTICE_AREA_KEY_MEDICAL_MALPRACTICE = "medical_malpractice";
+	public static final String PRACTICE_AREA_KEY_PERSONAL_INJURY = "personal_injury";
+	public static final String PRACTICE_AREA_KEY_SEXUAL_ASSAULT = "sexual_assault";
 
 	public static final class CaseTimelineEventTypes {
 		public static final String CASE_CREATED = "CASE_CREATED";
@@ -4435,6 +4438,18 @@ public final class CaseDao {
 				return area;
 		}
 		return null;
+	}
+
+	public PracticeAreaRow findMedicalMalpracticePracticeAreaForTenant(int shaleClientId) {
+		return findPracticeAreaForTenantBySystemKey(shaleClientId, PRACTICE_AREA_KEY_MEDICAL_MALPRACTICE);
+	}
+
+	public PracticeAreaRow findPersonalInjuryPracticeAreaForTenant(int shaleClientId) {
+		return findPracticeAreaForTenantBySystemKey(shaleClientId, PRACTICE_AREA_KEY_PERSONAL_INJURY);
+	}
+
+	public PracticeAreaRow findSexualAssaultPracticeAreaForTenant(int shaleClientId) {
+		return findPracticeAreaForTenantBySystemKey(shaleClientId, PRACTICE_AREA_KEY_SEXUAL_ASSAULT);
 	}
 
 	public void setResponsibleAttorney(long caseId, int userId) {
