@@ -8,18 +8,22 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.semantics.RoleSemantics;
 
 /**
  * DAO for task reads used by case task sections.
  */
 public final class TaskDao {
-    private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+    private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
+    private static final String PRIORITIES_TABLE = "dbo.Priorities";
+    private static final String PRIORITY_SYSTEM_KEY_NORMAL = "normal";
 
     public enum MyTaskSort {
         DEFAULT,
@@ -41,6 +45,9 @@ public final class TaskDao {
      * assignment-role semantics yet, so we use a single internal default code.
      */
     public static final byte DEFAULT_PRIMARY_ASSIGNMENT_ROLE = 1;
+
+    private record PriorityLookupRow(int id, String name, Integer sortOrder, String systemKey) {
+    }
 
     private final DbSessionProvider db;
 
@@ -118,7 +125,7 @@ public final class TaskDao {
                  AND c.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Priorities p
                   ON p.Id = t.PriorityId
-                 AND p.ShaleClientId = t.ShaleClientId
+                 AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -240,7 +247,7 @@ public final class TaskDao {
                  AND c.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Priorities p
                   ON p.Id = t.PriorityId
-                 AND p.ShaleClientId = t.ShaleClientId
+                 AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -509,46 +516,21 @@ public final class TaskDao {
         }
 
         try (Connection con = db.requireConnection()) {
-            String tableName = "dbo.Priorities";
-            if (!tableExists(con, tableName)) {
+            if (!tableExists(con, PRIORITIES_TABLE)) {
                 return List.of();
             }
-
-            boolean hasName = hasColumn(con, tableName, "Name");
-            boolean hasSortOrder = hasColumn(con, tableName, "SortOrder");
-            boolean hasIsActive = hasColumn(con, tableName, "IsActive");
-
-            StringBuilder sql = new StringBuilder("SELECT p.Id");
-            if (hasName) {
-                sql.append(", p.Name");
-            }
-            if (hasSortOrder) {
-                sql.append(", p.SortOrder");
-            }
-            sql.append("\nFROM dbo.Priorities p\nWHERE p.ShaleClientId = ?");
-            if (hasIsActive) {
-                sql.append("\n  AND ISNULL(p.IsActive, 1) = 1");
-            }
-            sql.append("\nORDER BY ");
-            if (hasSortOrder) {
-                sql.append("ISNULL(p.SortOrder, 2147483647), ");
-            }
-            sql.append("p.Id;");
-
-            try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
-                ps.setInt(1, shaleClientId);
-                try (ResultSet rs = ps.executeQuery()) {
-                    List<TaskPriorityOptionDto> out = new ArrayList<>();
-                    while (rs.next()) {
-                        int id = rs.getInt("Id");
-                        String name = hasName ? rs.getString("Name") : null;
-                        Integer sortOrder = hasSortOrder ? (Integer) rs.getObject("SortOrder") : null;
-                        String displayName = name == null || name.isBlank() ? "Priority " + id : name.trim();
-                        out.add(new TaskPriorityOptionDto(id, displayName, sortOrder));
-                    }
-                    return out;
+            List<PriorityLookupRow> effective = listEffectivePrioritiesForTenant(con, shaleClientId, true);
+            List<TaskPriorityOptionDto> out = new ArrayList<>(effective.size());
+            for (PriorityLookupRow row : effective) {
+                if (row == null) {
+                    continue;
                 }
+                String displayName = row.name() == null || row.name().isBlank()
+                        ? "Priority " + row.id()
+                        : row.name().trim();
+                out.add(new TaskPriorityOptionDto(row.id(), displayName, row.sortOrder()));
             }
+            return out;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to list task priorities for shaleClientId=" + shaleClientId, e);
         }
@@ -838,6 +820,150 @@ public final class TaskDao {
         ps.setObject(index, value);
     }
 
+    private static String normalizeSystemKey(String systemKey) {
+        String normalized = systemKey == null ? "" : systemKey.trim().toLowerCase(Locale.ROOT);
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private static String resolveLegacyPrioritySystemKeyFromName(String name) {
+        String normalized = name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "normal", "medium", "default", "standard" -> PRIORITY_SYSTEM_KEY_NORMAL;
+            default -> null;
+        };
+    }
+
+    private static String resolvePrioritySystemKey(String systemKey, String name) {
+        String normalizedSystem = normalizeSystemKey(systemKey);
+        if (normalizedSystem != null) {
+            return normalizedSystem;
+        }
+        return resolveLegacyPrioritySystemKeyFromName(name);
+    }
+
+    private static PriorityLookupRow mapPriorityLookupRow(ResultSet rs, boolean hasName, boolean hasSortOrder) throws SQLException {
+        return new PriorityLookupRow(
+                rs.getInt("Id"),
+                hasName ? rs.getString("Name") : null,
+                hasSortOrder ? (Integer) rs.getObject("SortOrder") : null,
+                resolvePrioritySystemKey(rs.getString("SystemKey"), hasName ? rs.getString("Name") : null)
+        );
+    }
+
+    private static List<PriorityLookupRow> resolveEffectivePriorities(List<PriorityLookupRow> globalPriorities, List<PriorityLookupRow> tenantPriorities) {
+        List<PriorityLookupRow> globalUnkeyed = new ArrayList<>();
+        List<PriorityLookupRow> tenantUnkeyed = new ArrayList<>();
+        java.util.Map<String, PriorityLookupRow> bySystemKey = new java.util.LinkedHashMap<>();
+
+        if (globalPriorities != null) {
+            for (PriorityLookupRow priority : globalPriorities) {
+                if (priority == null) {
+                    continue;
+                }
+                String systemKey = resolvePrioritySystemKey(priority.systemKey(), priority.name());
+                if (systemKey == null) {
+                    globalUnkeyed.add(priority);
+                    continue;
+                }
+                bySystemKey.putIfAbsent(systemKey, priority);
+            }
+        }
+
+        if (tenantPriorities != null) {
+            for (PriorityLookupRow priority : tenantPriorities) {
+                if (priority == null) {
+                    continue;
+                }
+                String systemKey = resolvePrioritySystemKey(priority.systemKey(), priority.name());
+                if (systemKey == null) {
+                    tenantUnkeyed.add(priority);
+                    continue;
+                }
+                bySystemKey.put(systemKey, priority);
+            }
+        }
+
+        List<PriorityLookupRow> merged = new ArrayList<>(globalUnkeyed.size() + bySystemKey.size() + tenantUnkeyed.size());
+        merged.addAll(globalUnkeyed);
+        merged.addAll(bySystemKey.values());
+        merged.addAll(tenantUnkeyed);
+        merged.sort((a, b) -> {
+            if (a == b) {
+                return 0;
+            }
+            if (a == null) {
+                return 1;
+            }
+            if (b == null) {
+                return -1;
+            }
+            int aSort = a.sortOrder() == null ? Integer.MAX_VALUE : a.sortOrder();
+            int bSort = b.sortOrder() == null ? Integer.MAX_VALUE : b.sortOrder();
+            int bySort = Integer.compare(aSort, bSort);
+            if (bySort != 0) {
+                return bySort;
+            }
+            return Integer.compare(a.id(), b.id());
+        });
+        return merged;
+    }
+
+    private static List<PriorityLookupRow> listEffectivePrioritiesForTenant(Connection con, int shaleClientId, boolean activeOnly) throws SQLException {
+        if (!tableExists(con, PRIORITIES_TABLE)) {
+            return List.of();
+        }
+        boolean hasName = hasColumn(con, PRIORITIES_TABLE, "Name");
+        boolean hasSortOrder = hasColumn(con, PRIORITIES_TABLE, "SortOrder");
+        boolean hasIsActive = hasColumn(con, PRIORITIES_TABLE, "IsActive");
+        boolean hasSystemKey = hasColumn(con, PRIORITIES_TABLE, "SystemKey");
+
+        String nameSelect = hasName ? "p.Name" : "NULL AS Name";
+        String sortOrderSelect = hasSortOrder ? "p.SortOrder" : "NULL AS SortOrder";
+        String systemKeySelect = hasSystemKey ? "p.SystemKey" : "NULL AS SystemKey";
+        String activeFilter = (activeOnly && hasIsActive) ? "\n  AND ISNULL(p.IsActive, 1) = 1" : "";
+
+        String tenantSql = """
+                SELECT p.Id, %s, %s, %s
+                FROM dbo.Priorities p
+                WHERE p.ShaleClientId = ?%s
+                ORDER BY %s, p.Id;
+                """.formatted(
+                nameSelect,
+                sortOrderSelect,
+                systemKeySelect,
+                activeFilter,
+                hasSortOrder ? "ISNULL(p.SortOrder, 2147483647)" : "p.Id");
+        try (PreparedStatement tenantPs = con.prepareStatement(tenantSql)) {
+            tenantPs.setInt(1, shaleClientId);
+            try (ResultSet tenantRs = tenantPs.executeQuery()) {
+                List<PriorityLookupRow> tenantPriorities = new ArrayList<>();
+                while (tenantRs.next()) {
+                    tenantPriorities.add(mapPriorityLookupRow(tenantRs, hasName, hasSortOrder));
+                }
+
+                String globalSql = """
+                        SELECT p.Id, %s, %s, %s
+                        FROM dbo.Priorities p
+                        WHERE p.ShaleClientId IS NULL%s
+                        ORDER BY %s, p.Id;
+                        """.formatted(
+                        nameSelect,
+                        sortOrderSelect,
+                        systemKeySelect,
+                        activeFilter,
+                        hasSortOrder ? "ISNULL(p.SortOrder, 2147483647)" : "p.Id");
+                try (PreparedStatement globalPs = con.prepareStatement(globalSql);
+                     ResultSet globalRs = globalPs.executeQuery()) {
+                    List<PriorityLookupRow> globalPriorities = new ArrayList<>();
+                    while (globalRs.next()) {
+                        globalPriorities.add(mapPriorityLookupRow(globalRs, hasName, hasSortOrder));
+                    }
+                    return resolveEffectivePriorities(globalPriorities, tenantPriorities);
+                }
+            }
+        }
+    }
+
     private static int resolveDefaultTaskStatusId(Connection con, int shaleClientId) throws SQLException {
         boolean hasLifecycleKey = hasColumn(con, "dbo.Statuses", "LifecycleKey");
         boolean hasSystemKey = hasColumn(con, "dbo.Statuses", "SystemKey");
@@ -869,40 +995,17 @@ public final class TaskDao {
     }
 
     private static int resolveDefaultTaskPriorityId(Connection con, int shaleClientId) throws SQLException {
-        String tableName = "dbo.Priorities";
-        if (!tableExists(con, tableName)) {
-            throw new IllegalStateException("Priority resolution failed: table " + tableName + " does not exist.");
-        }
-
-        boolean hasName = hasColumn(con, tableName, "Name");
-        boolean hasSortOrder = hasColumn(con, tableName, "SortOrder");
-        boolean hasIsActive = hasColumn(con, tableName, "IsActive");
-
-        StringBuilder sql = new StringBuilder("""
-                SELECT TOP (1) p.Id
-                FROM dbo.Priorities p
-                WHERE p.ShaleClientId = ?
-                """);
-        if (hasIsActive) {
-            sql.append("\n  AND ISNULL(p.IsActive, 1) = 1");
-        }
-
-        sql.append("\nORDER BY ");
-        if (hasName) {
-            sql.append("\n  CASE WHEN LOWER(LTRIM(RTRIM(ISNULL(p.Name, '')))) IN ('normal', 'medium', 'default', 'standard') THEN 0 ELSE 1 END,");
-        }
-        if (hasSortOrder) {
-            sql.append("\n  ISNULL(p.SortOrder, 2147483647),");
-        }
-        sql.append("\n  p.Id;");
-
-        try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
-            ps.setInt(1, shaleClientId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
-                }
+        List<PriorityLookupRow> effective = listEffectivePrioritiesForTenant(con, shaleClientId, true);
+        for (PriorityLookupRow row : effective) {
+            if (row == null) {
+                continue;
             }
+            if (PRIORITY_SYSTEM_KEY_NORMAL.equals(normalizeSystemKey(row.systemKey()))) {
+                return row.id();
+            }
+        }
+        if (!effective.isEmpty()) {
+            return effective.get(0).id();
         }
         throw new IllegalStateException("No default task priority found for shaleClientId=" + shaleClientId);
     }
@@ -916,17 +1019,16 @@ public final class TaskDao {
     }
 
     private static boolean isPrioritySelectable(Connection con, int shaleClientId, int priorityId) throws SQLException {
-        String tableName = "dbo.Priorities";
-        if (!tableExists(con, tableName)) {
+        if (!tableExists(con, PRIORITIES_TABLE)) {
             return false;
         }
-        boolean hasIsActive = hasColumn(con, tableName, "IsActive");
+        boolean hasIsActive = hasColumn(con, PRIORITIES_TABLE, "IsActive");
         StringBuilder sql = new StringBuilder("""
                 SELECT CASE WHEN EXISTS (
                     SELECT 1
                     FROM dbo.Priorities p
                     WHERE p.Id = ?
-                      AND p.ShaleClientId = ?
+                      AND (p.ShaleClientId = ? OR p.ShaleClientId IS NULL)
                 """);
         if (hasIsActive) {
             sql.append("\n  AND ISNULL(p.IsActive, 1) = 1");
