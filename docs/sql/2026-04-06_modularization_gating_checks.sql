@@ -356,3 +356,23 @@ UNION ALL SELECT 'BLOCK_POST_ROLLOUT_ACTIVATION', 'Duplicate (ShaleClientId,Syst
 UNION ALL SELECT 'BLOCK_POST_ROLLOUT_ACTIVATION', 'ShaleClientId still NOT NULL for a table where global overlay is being activated'
 UNION ALL SELECT 'EXPECTED_TODAY', 'Global built-in rows absent when nullability not yet enabled or seeding intentionally deferred'
 UNION ALL SELECT 'EXPECTED_TODAY', 'Tenant and global rows can coexist by SystemKey (overlay pattern)';
+
+PRINT '=== 9) Optional integrity index presence (post-hardening) ===';
+SELECT
+    t.TableName,
+    i.name AS ExpectedIndexName,
+    CASE WHEN i.index_id IS NULL THEN 0 ELSE 1 END AS IndexPresent,
+    i.is_unique,
+    i.has_filter,
+    i.filter_definition
+FROM (
+    SELECT 'Statuses' AS TableName, 'UX_Statuses_ShaleClientId_SystemKey_NonNull' AS IndexName UNION ALL
+    SELECT 'PartyRoles', 'UX_PartyRoles_ShaleClientId_SystemKey_NonNull' UNION ALL
+    SELECT 'PartySides', 'UX_PartySides_ShaleClientId_SystemKey_NonNull' UNION ALL
+    SELECT 'Priorities', 'UX_Priorities_ShaleClientId_SystemKey_NonNull' UNION ALL
+    SELECT 'PracticeAreas', 'UX_PracticeAreas_ShaleClientId_SystemKey_NonNull'
+) t
+LEFT JOIN sys.indexes i
+  ON i.object_id = OBJECT_ID('dbo.' + t.TableName)
+ AND i.name = t.IndexName
+ORDER BY t.TableName;

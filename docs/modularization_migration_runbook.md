@@ -62,6 +62,12 @@ Use this runbook with:
    - **Type:** prep-only follow-up  
    - **Purpose:** explicit tenant-7 mapping for built-ins without moving tenant rows to global.
 
+### F. Integrity hardening (post-rollout)
+
+9. `2026-04-06_modularized_unique_systemkey_indexes_phase1.sql`  
+   - **Type:** post-rollout hardening / activation safety  
+   - **Purpose:** add filtered unique indexes on `(ShaleClientId, SystemKey)` where `SystemKey IS NOT NULL` for modularized tables, with fail-fast duplicate prechecks.
+
 ---
 
 ## 3) Recommended execution order
@@ -107,6 +113,20 @@ Then rerun `2026-04-06_modularization_gating_checks.sql`.
 **Expected outcome:**
 - Statuses now supports explicit global rows (`ShaleClientId IS NULL`).
 - Runtime overlay resolves by `SystemKey` with tenant override behavior.
+
+---
+
+## Phase 3 — Post-rollout integrity hardening (optional but recommended)
+
+Run:
+
+1. `2026-04-06_modularized_unique_systemkey_indexes_phase1.sql`
+
+Then rerun `2026-04-06_modularization_gating_checks.sql`.
+
+**Expected outcome:**
+- Optional filtered unique indexes present for eligible modularized tables.
+- New accidental duplicate keyed rows per scope are blocked at write-time.
 
 ---
 

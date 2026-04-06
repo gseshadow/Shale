@@ -42,6 +42,7 @@ This checklist is for **read-only readiness assessment** before rollout and befo
 2. Duplicate-key report by `(ShaleClientId, SystemKey)` is clean for rows intended to be unique by scope.
 3. Global built-in rows are present where activation policy requires them.
 4. No unresolved readiness-summary hints indicating missing prep prerequisites.
+5. If integrity hardening is in scope, expected filtered unique indexes are present in diagnostics section 9.
 
 **Block post-rollout activation if any fail.**
 
@@ -60,4 +61,3 @@ This checklist is for **read-only readiness assessment** before rollout and befo
 - Timestamped diagnostics SQL output (before + after migration execution).
 - Operator decision note: `ROLL_FORWARD` / `ABORT` with reasons.
 - List of migrations executed and execution order.
-
