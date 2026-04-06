@@ -1086,6 +1086,7 @@ public class CaseController {
 						p -> normalizedPartySideKey(p.getSide()),
 						LinkedHashMap::new,
 						Collectors.toList()));
+		Map<String, String> sideLabelsByKey = loadPartySideLabelMap();
 
 		List<String> sideOrder = List.of("represented", "opposing", "neutral", "unclassified");
 		for (String sideKey : sideOrder) {
@@ -1094,7 +1095,7 @@ public class CaseController {
 				continue;
 			}
 
-			Label heading = new Label(toPartySideLabel(sideKey));
+			Label heading = new Label(toPartySideLabel(sideLabelsByKey, sideKey));
 			heading.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-opacity: 0.92;");
 			timelineListBox.getChildren().add(heading);
 
@@ -1108,14 +1109,14 @@ public class CaseController {
 					.toList();
 
 			for (CasePartyDto party : sorted) {
-				timelineListBox.getChildren().add(createPartyCard(party));
+				timelineListBox.getChildren().add(createPartyCard(party, sideLabelsByKey));
 			}
 		}
 	}
 
-	private Node createPartyCard(CasePartyDto party) {
+	private Node createPartyCard(CasePartyDto party, Map<String, String> sideLabelsByKey) {
 		String roleLabel = toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId());
-		String sideLabel = toPartySideLabel(normalizedPartySideKey(party.getSide()));
+		String sideLabel = toPartySideLabel(sideLabelsByKey, normalizedPartySideKey(party.getSide()));
 		String notes = safeText(party.getNotes()).trim();
 		Node summaryCard = createPartyEntityCard(party);
 
@@ -1223,6 +1224,34 @@ public class CaseController {
 		);
 	}
 
+	private List<PartySideOption> loadPartySideOptions() {
+		if (caseDao == null) {
+			return defaultPartySideOptions();
+		}
+		try {
+			List<CaseDao.PartySideRow> sides = caseDao.listPartySides();
+			List<PartySideOption> out = new java.util.ArrayList<>();
+			for (CaseDao.PartySideRow side : sides) {
+				if (side == null)
+					continue;
+				String key = safeText(side.systemKey()).trim().toLowerCase(Locale.ROOT);
+				if (key.isBlank())
+					continue;
+				String label = safeText(side.name()).trim();
+				if (label.isBlank())
+					label = toPartySideLabel(Map.of(), key);
+				out.add(new PartySideOption(label, key));
+			}
+			if (out.isEmpty()) {
+				return defaultPartySideOptions();
+			}
+			out.add(new PartySideOption("Unaffiliated", null));
+			return List.copyOf(out);
+		} catch (Exception ignored) {
+			return defaultPartySideOptions();
+		}
+	}
+
 	private String normalizedPartySideKey(String side) {
 		String normalized = safeText(side).trim().toLowerCase(Locale.ROOT);
 		return switch (normalized) {
@@ -1233,8 +1262,23 @@ public class CaseController {
 		};
 	}
 
-	private String toPartySideLabel(String sideKey) {
-		return switch (safeText(sideKey).trim().toLowerCase(Locale.ROOT)) {
+	private Map<String, String> loadPartySideLabelMap() {
+		Map<String, String> labels = new LinkedHashMap<>();
+		for (PartySideOption option : loadPartySideOptions()) {
+			if (option == null || option.value == null)
+				continue;
+			labels.putIfAbsent(safeText(option.value).trim().toLowerCase(Locale.ROOT), safeText(option.label).trim());
+		}
+		return labels;
+	}
+
+	private String toPartySideLabel(Map<String, String> sideLabelsByKey, String sideKey) {
+		String normalized = safeText(sideKey).trim().toLowerCase(Locale.ROOT);
+		String mapped = sideLabelsByKey == null ? null : sideLabelsByKey.get(normalized);
+		if (mapped != null && !mapped.isBlank()) {
+			return mapped;
+		}
+		return switch (normalized) {
 			case "represented" -> "Represented";
 			case "opposing" -> "Opposing";
 			case "neutral" -> "Neutral";
@@ -1390,7 +1434,7 @@ public class CaseController {
 		ChoiceBox<PartyEntityOption> entityChoice = new ChoiceBox<>();
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
-		sideChoice.getItems().addAll(defaultPartySideOptions());
+		sideChoice.getItems().addAll(loadPartySideOptions());
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
 			@Override public PartySideOption fromString(String string) { return null; }
@@ -1467,7 +1511,11 @@ public class CaseController {
 		sideChoice.getItems().stream()
 				.filter(s -> Objects.equals(s.value, normalizeSideForStorage(existing.getSide())))
 				.findFirst()
-				.ifPresentOrElse(sideChoice::setValue, () -> sideChoice.setValue(sideChoice.getItems().get(3)));
+				.ifPresentOrElse(sideChoice::setValue, () -> sideChoice.setValue(
+						sideChoice.getItems().stream()
+								.filter(s -> s != null && s.value == null)
+								.findFirst()
+								.orElse(sideChoice.getItems().isEmpty() ? null : sideChoice.getItems().get(0))));
 		primaryCheck.setSelected(existing.isPrimary());
 		notesArea.setText(safeText(existing.getNotes()));
 
@@ -1596,12 +1644,15 @@ public class CaseController {
 		}
 
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
-		sideChoice.getItems().addAll(defaultPartySideOptions());
+		sideChoice.getItems().addAll(loadPartySideOptions());
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
 			@Override public PartySideOption fromString(String string) { return null; }
 		});
-		sideChoice.setValue(sideChoice.getItems().get(3));
+		sideChoice.setValue(sideChoice.getItems().stream()
+				.filter(s -> s != null && s.value == null)
+				.findFirst()
+				.orElse(sideChoice.getItems().isEmpty() ? null : sideChoice.getItems().get(0)));
 
 		CheckBox primaryCheck = new CheckBox("Primary");
 		TextArea notesArea = new TextArea();
@@ -2450,7 +2501,7 @@ public class CaseController {
 		}
 		return parties.stream()
 				.filter(Objects::nonNull)
-				.anyMatch(party -> "caller".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()));
+				.anyMatch(party -> matchesPartyRoleSystemKey(party, "caller"));
 	}
 
 	private boolean hasOpposingCounselRows(List<CasePartyDto> parties) {
@@ -2459,7 +2510,7 @@ public class CaseController {
 		}
 		return parties.stream()
 				.filter(Objects::nonNull)
-				.filter(party -> "counsel".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()))
+				.filter(party -> matchesPartyRoleSystemKey(party, "counsel"))
 				.anyMatch(party -> "opposing".equalsIgnoreCase(safeText(party.getSide()).trim()));
 	}
 
@@ -2469,7 +2520,7 @@ public class CaseController {
 		}
 		return parties.stream()
 				.filter(Objects::nonNull)
-				.filter(party -> "party".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()))
+				.filter(party -> matchesPartyRoleSystemKey(party, "party"))
 				.filter(party -> "represented".equalsIgnoreCase(safeText(party.getSide()).trim()))
 				.sorted(Comparator
 						.comparing(CasePartyDto::isPrimary, Comparator.reverseOrder())
@@ -2490,8 +2541,7 @@ public class CaseController {
 			if (party == null || party.getContactId() == null) {
 				continue;
 			}
-			String role = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
-			if (!"caller".equals(role)) {
+			if (!matchesPartyRoleSystemKey(party, "caller")) {
 				continue;
 			}
 			if (party.isPrimary()) {
@@ -2516,9 +2566,8 @@ public class CaseController {
 			if (party == null || party.getContactId() == null) {
 				continue;
 			}
-			String role = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
 			String side = safeText(party.getSide()).trim().toLowerCase(Locale.ROOT);
-			if (!"counsel".equals(role) || !"opposing".equals(side)) {
+			if (!matchesPartyRoleSystemKey(party, "counsel") || !"opposing".equals(side)) {
 				continue;
 			}
 			if (party.isPrimary()) {
@@ -2532,6 +2581,22 @@ public class CaseController {
 			return null;
 		}
 		return new OpposingCounselPartySelection(firstFallback.getContactId().intValue(), safeText(firstFallback.getDisplayName()));
+	}
+
+	private boolean matchesPartyRoleSystemKey(CasePartyDto party, String systemKey) {
+		if (party == null) {
+			return false;
+		}
+		String normalizedKey = safeText(systemKey).trim().toLowerCase(Locale.ROOT);
+		if (normalizedKey.isBlank()) {
+			return false;
+		}
+		String partySystemKey = safeText(party.getPartyRoleSystemKey()).trim().toLowerCase(Locale.ROOT);
+		if (normalizedKey.equals(partySystemKey)) {
+			return true;
+		}
+		String legacyNameFallback = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
+		return normalizedKey.equals(legacyNameFallback);
 	}
 
 	private void applyLastUpdatedLabel(LocalDateTime updatedAt) {
