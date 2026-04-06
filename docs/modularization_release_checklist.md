@@ -5,7 +5,7 @@ Use this checklist with:
 - `docs/modularization_migration_runbook.md`
 - `docs/sql/2026-04-06_modularization_gating_checks.sql`
 
-This checklist is for **read-only readiness assessment** before rollout and before post-rollout activation/consolidation work.
+This checklist is for **read-only readiness assessment** across rollout, activation, and post-activation cleanup audits.
 
 ---
 
@@ -27,11 +27,11 @@ This checklist is for **read-only readiness assessment** before rollout and befo
 
 ---
 
-## 2) Findings expected today (not blockers by themselves)
+## 2) Findings that may still be acceptable in partially activated environments
 
-1. Global built-in rows may be missing for a table when `ShaleClientId` is still NOT NULL.
-2. PracticeAreas global rows may be intentionally deferred in current phase.
-3. Coexisting tenant/global rows by `SystemKey` can be valid (overlay model).
+1. Global built-in rows may be missing for a table only if that environment has not completed activation for that table yet.
+2. Coexisting tenant/global rows by `SystemKey` are valid (overlay model).
+3. Legacy name/text fallbacks may still exist in code paths until a separate deprecation pass is approved.
 
 ---
 
@@ -64,3 +64,12 @@ This checklist is for **read-only readiness assessment** before rollout and befo
 - Timestamped diagnostics SQL output (before + after migration execution).
 - Operator decision note: `ROLL_FORWARD` / `ABORT` with reasons.
 - List of migrations executed and execution order.
+
+---
+
+## 6) Post-activation cleanup audit (non-destructive)
+
+1. Run diagnostics SQL and review the **post-activation cleanup cues** section.
+2. Verify no duplicate `(ShaleClientId, SystemKey)` rows exist for activated tables.
+3. Verify built-in tenant/global counts for activated tables are present and stable.
+4. Record any remaining compatibility fallbacks (name/text aliases, schema-drift branches) as explicit backlog items before removal.

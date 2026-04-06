@@ -402,3 +402,32 @@ LEFT JOIN sys.indexes i
   ON i.object_id = OBJECT_ID('dbo.' + t.TableName)
  AND i.name = t.IndexName
 ORDER BY t.TableName;
+
+PRINT '=== 10) Post-activation cleanup cues (read-only, non-blocking) ===';
+IF OBJECT_ID('dbo.Priorities', 'U') IS NOT NULL
+BEGIN
+    SELECT 'PriorityNameAliasStillUsed' AS Cue, Name, COUNT(*) AS Cnt
+    FROM dbo.Priorities
+    WHERE SystemKey = 'normal'
+      AND LOWER(LTRIM(RTRIM(COALESCE(Name, '')))) IN ('medium', 'default', 'standard')
+    GROUP BY Name
+    ORDER BY Cnt DESC, Name;
+END;
+
+IF OBJECT_ID('dbo.CaseParties', 'U') IS NOT NULL AND COL_LENGTH('dbo.CaseParties', 'Side') IS NOT NULL
+BEGIN
+    SELECT 'CasePartiesSideTextOutsideBuiltins' AS Cue, cp.Side, COUNT(*) AS Cnt
+    FROM dbo.CaseParties cp
+    WHERE LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) NOT IN ('represented', 'opposing', 'neutral')
+    GROUP BY cp.Side
+    ORDER BY Cnt DESC, cp.Side;
+END;
+
+IF OBJECT_ID('dbo.PartyRoles', 'U') IS NOT NULL
+BEGIN
+    SELECT 'PartyRolesBuiltinNameFallbackCandidates' AS Cue, pr.ShaleClientId, pr.Id, pr.Name, pr.SystemKey
+    FROM dbo.PartyRoles pr
+    WHERE LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) IN ('caller', 'party', 'counsel')
+      AND pr.SystemKey IS NULL
+    ORDER BY pr.ShaleClientId, pr.Id;
+END;

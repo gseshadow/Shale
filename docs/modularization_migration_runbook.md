@@ -1,6 +1,6 @@
 # Shale Modularization Migration Runbook (Operator Guide)
 
-**Last updated:** 2026-04-06  
+**Last updated:** 2026-04-06
 **Scope:** Statuses, PartyRoles, PartySides, Priorities, PracticeAreas modularization support migrations.  
 **Non-goals in this runbook:** destructive cleanup, fallback removal, constraint tightening.
 
@@ -201,10 +201,25 @@ If a step fails:
 
 ---
 
-## 8) Operator quick-start
+## 8) Post-activation cleanup audit guidance (non-destructive)
+
+After all activation phases are complete in an environment:
+
+1. Re-run `2026-04-06_modularization_gating_checks.sql`.
+2. Review duplicate-key outputs, built-in tenant/global counts, and index presence.
+3. Review post-activation cleanup cues in diagnostics output to identify:
+   - legacy alias/fallback dependencies that can be considered for later removal,
+   - text-side compatibility that should remain until a dedicated migration plan exists,
+   - any drift that must be fixed before deprecating compatibility code.
+4. Keep this pass read-only: do not delete tenant/global rows and do not rewrite FK/history references.
+
+---
+
+## 9) Operator quick-start
 
 1. Run diagnostics: `2026-04-06_modularization_gating_checks.sql`
 2. Execute Phase 1 scripts (in listed order).
 3. Re-run diagnostics and review diffs.
 4. Execute Phase 2 status activation scripts.
-5. Re-run diagnostics and archive final verification outputs.
+5. Execute Phase 3 scripts (Priorities activation + optional index hardening).
+6. Re-run diagnostics and archive final verification outputs.
