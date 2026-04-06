@@ -2,6 +2,7 @@ package com.shale.ui.component.dialog;
 
 import java.util.*;
 
+import com.shale.core.semantics.RoleSemantics;
 import com.shale.data.dao.CaseDao;
 
 import javafx.collections.FXCollections;
@@ -15,22 +16,13 @@ import javafx.stage.Stage;
 
 public final class TeamEditorDialog {
 
-	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
-	private static final int ROLE_PRELITIGATION_STAFF = 5;
-	private static final int ROLE_ATTORNEY = 7;
-	private static final int ROLE_LEGAL_ASSISTANT = 11;
-	private static final int ROLE_PARALEGAL = 12;
-	private static final int ROLE_LAW_CLERK = 13;
-	private static final int ROLE_CO_COUNSEL = 14;
+	private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
+	private static final int ROLE_ATTORNEY = RoleSemantics.ROLE_ATTORNEY;
+	private static final int ROLE_LEGAL_ASSISTANT = RoleSemantics.ROLE_LEGAL_ASSISTANT;
 
-	private static final List<RoleOption> ROLE_OPTIONS = List.of(
-			new RoleOption(ROLE_ATTORNEY, "Attorney"),
-			new RoleOption(ROLE_CO_COUNSEL, "Co-counsel"),
-			new RoleOption(ROLE_LEGAL_ASSISTANT, "Legal Assistant"),
-			new RoleOption(ROLE_PARALEGAL, "Paralegal"),
-			new RoleOption(ROLE_LAW_CLERK, "Law Clerk"),
-			new RoleOption(ROLE_PRELITIGATION_STAFF, "Prelitigation Staff")
-	);
+	private static final List<RoleOption> ROLE_OPTIONS = RoleSemantics.TEAM_EDITOR_ASSIGNABLE_ROLE_IDS.stream()
+			.map(roleId -> new RoleOption(roleId, RoleSemantics.caseTeamRoleLabel(roleId)))
+			.toList();
 
 	public record TeamAssignment(int userId, int roleId) {
 	}
@@ -146,7 +138,6 @@ public final class TeamEditorDialog {
 
 		final Integer[] primaryUserIdRef = new Integer[] { primaryUserId };
 
-		// ✅ ADD: default role depends on attorney status
 		btnAdd.setOnAction(e ->
 		{
 			var sel = lvAvailable.getSelectionModel().getSelectedItem();
@@ -211,7 +202,6 @@ public final class TeamEditorDialog {
 			rebuildPrimaryOptions(primaryUserIdRef[0]);
 		});
 
-		// ✅ Show only displayName in primary dropdown
 		cbPrimary.setConverter(new javafx.util.StringConverter<>() {
 			@Override
 			public String toString(CaseDao.UserRow u) {
@@ -239,7 +229,6 @@ public final class TeamEditorDialog {
 			}
 		});
 
-		// ✅ Primary dropdown (filtered to attorneys only)
 		rebuildPrimaryOptions(primaryUserIdRef[0]);
 
 //		HBox primaryRow = new HBox(10, new Label("Primary (Responsible Attorney):"), cbPrimary);
@@ -365,14 +354,14 @@ public final class TeamEditorDialog {
 
 	private Integer findResponsibleAttorneyUserId() {
 		for (var a : assignedItems) {
-			if (a.roleId == ROLE_RESPONSIBLE_ATTORNEY)
+			if (RoleSemantics.isResponsibleAttorneyRoleId(a.roleId))
 				return a.user.id();
 		}
 		return null;
 	}
 
 	private static int normalizeRoleForSave(int roleId) {
-		return roleId == ROLE_RESPONSIBLE_ATTORNEY ? ROLE_ATTORNEY : roleId;
+		return RoleSemantics.normalizeCaseTeamRoleForSave(roleId);
 	}
 
 	private void sortLists() {
@@ -381,16 +370,7 @@ public final class TeamEditorDialog {
 	}
 
 	private static String roleName(int roleId) {
-		return switch (roleId) {
-		case ROLE_RESPONSIBLE_ATTORNEY -> "Responsible Attorney";
-		case ROLE_PRELITIGATION_STAFF -> "Prelitigation Staff";
-		case ROLE_ATTORNEY -> "Attorney";
-		case ROLE_LEGAL_ASSISTANT -> "Legal Assistant";
-		case ROLE_PARALEGAL -> "Paralegal";
-		case ROLE_LAW_CLERK -> "Law Clerk";
-		case ROLE_CO_COUNSEL -> "Co-counsel";
-		default -> "Role " + roleId;
-		};
+		return RoleSemantics.caseTeamRoleLabel(roleId);
 	}
 
 	private static String safeText(String s) {

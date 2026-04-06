@@ -1,0 +1,75 @@
+# Modularization Release Checklist (Operator Quick Artifact)
+
+Use this checklist with:
+
+- `docs/modularization_migration_runbook.md`
+- `docs/sql/2026-04-06_modularization_gating_checks.sql`
+
+This checklist is for **read-only readiness assessment** across rollout, activation, and post-activation cleanup audits.
+
+---
+
+## 1) Pre-rollout checklist (must pass)
+
+1. Run diagnostics SQL and save output snapshot.
+2. For each target table (`Statuses`, `PartyRoles`, `PartySides`, `Priorities`, `PracticeAreas`):
+   - `TableExists = 1`
+   - `HasSystemKey = 1` (after intended prep migrations)
+3. Confirm tenant 7 built-in rows appear in readiness summary:
+   - Statuses: `intake`, `accepted`, `denied`, `closed`
+   - PartyRoles: `caller`, `party`, `counsel`
+   - PartySides: `represented`, `opposing`, `neutral`
+   - Priorities: `low`, `normal`, `high`
+   - PracticeAreas: `medical_malpractice`, `personal_injury`, `sexual_assault`
+4. Confirm no severe unexpected schema drift in diagnostics output.
+
+**Block rollout if any fail.**
+
+---
+
+## 2) Findings that may still be acceptable in partially activated environments
+
+1. Global built-in rows may be missing for a table only if that environment has not completed activation for that table yet.
+2. Coexisting tenant/global rows by `SystemKey` are valid (overlay model).
+3. Legacy name/text fallbacks may still exist in code paths until a separate deprecation pass is approved.
+
+---
+
+## 3) Post-rollout activation checklist (must pass before activation/consolidation)
+
+1. For any table targeted for global overlay activation:
+   - `ShaleClientIdIsNullable = 1`
+   - For PartyRoles activation specifically, global built-ins `caller`, `party`, `counsel` are present with `ShaleClientId IS NULL`
+   - For PartySides activation specifically, global built-ins `represented`, `opposing`, `neutral` are present with `ShaleClientId IS NULL`
+   - For Priorities activation specifically, global built-ins `low`, `normal`, `high` are present with `ShaleClientId IS NULL`
+2. Duplicate-key report by `(ShaleClientId, SystemKey)` is clean for rows intended to be unique by scope.
+3. Global built-in rows are present where activation policy requires them.
+4. No unresolved readiness-summary hints indicating missing prep prerequisites.
+5. If integrity hardening is in scope, expected filtered unique indexes are present in diagnostics section 9.
+
+**Block post-rollout activation if any fail.**
+
+---
+
+## 4) Explicit do-not-do reminders
+
+1. Do **not** remove compatibility fallback behavior yet.
+2. Do **not** deduplicate tenant/global rows blindly.
+3. Do **not** add constraints/indexes as part of this checklist step.
+
+---
+
+## 5) Evidence to archive per release
+
+- Timestamped diagnostics SQL output (before + after migration execution).
+- Operator decision note: `ROLL_FORWARD` / `ABORT` with reasons.
+- List of migrations executed and execution order.
+
+---
+
+## 6) Post-activation cleanup audit (non-destructive)
+
+1. Run diagnostics SQL and review the **post-activation cleanup cues** section.
+2. Verify no duplicate `(ShaleClientId, SystemKey)` rows exist for activated tables.
+3. Verify built-in tenant/global counts for activated tables are present and stable.
+4. Record any remaining compatibility fallbacks (name/text aliases, schema-drift branches) as explicit backlog items before removal.

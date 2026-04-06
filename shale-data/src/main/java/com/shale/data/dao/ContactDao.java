@@ -1,5 +1,6 @@
 package com.shale.data.dao;
 
+import com.shale.core.semantics.RoleSemantics;
 import com.shale.core.runtime.DbSessionProvider;
 
 import java.sql.Connection;
@@ -360,7 +361,7 @@ public final class ContactDao {
                     SELECT TOP (1) cu.UserId
                     FROM dbo.CaseUsers cu
                     WHERE cu.CaseId = c.Id
-                      AND cu.RoleId = 4
+                      AND cu.RoleId = ?
                       AND cu.IsPrimary = 1
                     ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
                 ) ra
@@ -382,9 +383,10 @@ public final class ContactDao {
         try (Connection con = db.requireConnection()) {
             verifyTenantMatchesSession(con, shaleClientId);
             try (PreparedStatement ps = con.prepareStatement(sql)) {
-                ps.setInt(1, contactId);
-                ps.setInt(2, shaleClientId);
+                ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+                ps.setInt(2, contactId);
                 ps.setInt(3, shaleClientId);
+                ps.setInt(4, shaleClientId);
 
                 List<RelatedCaseRow> out = new ArrayList<>();
                 try (ResultSet rs = ps.executeQuery()) {
