@@ -2450,7 +2450,7 @@ public class CaseController {
 		}
 		return parties.stream()
 				.filter(Objects::nonNull)
-				.anyMatch(party -> "caller".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()));
+				.anyMatch(party -> matchesPartyRoleSystemKey(party, "caller"));
 	}
 
 	private boolean hasOpposingCounselRows(List<CasePartyDto> parties) {
@@ -2459,7 +2459,7 @@ public class CaseController {
 		}
 		return parties.stream()
 				.filter(Objects::nonNull)
-				.filter(party -> "counsel".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()))
+				.filter(party -> matchesPartyRoleSystemKey(party, "counsel"))
 				.anyMatch(party -> "opposing".equalsIgnoreCase(safeText(party.getSide()).trim()));
 	}
 
@@ -2469,7 +2469,7 @@ public class CaseController {
 		}
 		return parties.stream()
 				.filter(Objects::nonNull)
-				.filter(party -> "party".equalsIgnoreCase(safeText(party.getPartyRoleName()).trim()))
+				.filter(party -> matchesPartyRoleSystemKey(party, "party"))
 				.filter(party -> "represented".equalsIgnoreCase(safeText(party.getSide()).trim()))
 				.sorted(Comparator
 						.comparing(CasePartyDto::isPrimary, Comparator.reverseOrder())
@@ -2490,8 +2490,7 @@ public class CaseController {
 			if (party == null || party.getContactId() == null) {
 				continue;
 			}
-			String role = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
-			if (!"caller".equals(role)) {
+			if (!matchesPartyRoleSystemKey(party, "caller")) {
 				continue;
 			}
 			if (party.isPrimary()) {
@@ -2516,9 +2515,8 @@ public class CaseController {
 			if (party == null || party.getContactId() == null) {
 				continue;
 			}
-			String role = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
 			String side = safeText(party.getSide()).trim().toLowerCase(Locale.ROOT);
-			if (!"counsel".equals(role) || !"opposing".equals(side)) {
+			if (!matchesPartyRoleSystemKey(party, "counsel") || !"opposing".equals(side)) {
 				continue;
 			}
 			if (party.isPrimary()) {
@@ -2532,6 +2530,22 @@ public class CaseController {
 			return null;
 		}
 		return new OpposingCounselPartySelection(firstFallback.getContactId().intValue(), safeText(firstFallback.getDisplayName()));
+	}
+
+	private boolean matchesPartyRoleSystemKey(CasePartyDto party, String systemKey) {
+		if (party == null) {
+			return false;
+		}
+		String normalizedKey = safeText(systemKey).trim().toLowerCase(Locale.ROOT);
+		if (normalizedKey.isBlank()) {
+			return false;
+		}
+		String partySystemKey = safeText(party.getPartyRoleSystemKey()).trim().toLowerCase(Locale.ROOT);
+		if (normalizedKey.equals(partySystemKey)) {
+			return true;
+		}
+		String legacyNameFallback = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
+		return normalizedKey.equals(legacyNameFallback);
 	}
 
 	private void applyLastUpdatedLabel(LocalDateTime updatedAt) {
