@@ -368,22 +368,9 @@ public class CaseController {
 	// ----------------------------
 
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
-	private static final int ROLE_PRELITIGATION_STAFF = 5;
 	private static final int ROLE_ATTORNEY = RoleSemantics.ROLE_ATTORNEY;
-	private static final int ROLE_LEGAL_ASSISTANT = 11;
-	private static final int ROLE_PARALEGAL = 12;
-	private static final int ROLE_LAW_CLERK = 13;
-	private static final int ROLE_CO_COUNSEL = 14;
 
-	private static final java.util.Set<Integer> TEAM_ROLE_IDS = java.util.Set.of(
-			ROLE_RESPONSIBLE_ATTORNEY,
-			ROLE_PRELITIGATION_STAFF,
-			ROLE_ATTORNEY,
-			ROLE_LEGAL_ASSISTANT,
-			ROLE_PARALEGAL,
-			ROLE_LAW_CLERK,
-			ROLE_CO_COUNSEL
-	);
+	private static final java.util.Set<Integer> TEAM_ROLE_IDS = java.util.Set.copyOf(RoleSemantics.CASE_TEAM_ROLE_IDS);
 
 	private static final List<String> SECTIONS = List.of(
 			"Overview",
@@ -3067,16 +3054,7 @@ public class CaseController {
 	}
 
 	private String roleLabel(int roleId) {
-		return switch (roleId) {
-		case ROLE_RESPONSIBLE_ATTORNEY -> RoleSemantics.roleLabel(roleId);
-		case ROLE_PRELITIGATION_STAFF -> "Prelitigation Staff";
-		case ROLE_ATTORNEY -> RoleSemantics.roleLabel(roleId);
-		case ROLE_LEGAL_ASSISTANT -> "Legal Assistant";
-		case ROLE_PARALEGAL -> "Paralegal";
-		case ROLE_LAW_CLERK -> "Law Clerk";
-		case ROLE_CO_COUNSEL -> "Co-counsel";
-		default -> "Role " + roleId;
-		};
+		return RoleSemantics.caseTeamRoleLabel(roleId);
 	}
 
 	@FXML
