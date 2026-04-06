@@ -13,6 +13,7 @@ public final class CasePartyDto {
 	private final Long organizationId;
 	private final long partyRoleId;
 	private final String partyRoleName;
+	private final String partyRoleSystemKey;
 	private final String side;
 	private final boolean primary;
 	private final String notes;
@@ -27,6 +28,7 @@ public final class CasePartyDto {
 			Long organizationId,
 			long partyRoleId,
 			String partyRoleName,
+			String partyRoleSystemKey,
 			String side,
 			boolean primary,
 			String notes,
@@ -40,6 +42,7 @@ public final class CasePartyDto {
 		this.organizationId = organizationId;
 		this.partyRoleId = partyRoleId;
 		this.partyRoleName = partyRoleName == null ? "" : partyRoleName;
+		this.partyRoleSystemKey = partyRoleSystemKey == null ? "" : partyRoleSystemKey;
 		this.side = side == null ? "" : side;
 		this.primary = primary;
 		this.notes = notes == null ? "" : notes;
@@ -55,6 +58,7 @@ public final class CasePartyDto {
 	public Long getOrganizationId() { return organizationId; }
 	public long getPartyRoleId() { return partyRoleId; }
 	public String getPartyRoleName() { return partyRoleName; }
+	public String getPartyRoleSystemKey() { return partyRoleSystemKey; }
 	public String getSide() { return side; }
 	public boolean isPrimary() { return primary; }
 	public String getNotes() { return notes; }

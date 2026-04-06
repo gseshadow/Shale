@@ -12,6 +12,7 @@ import java.util.Objects;
 
 import com.shale.core.model.Organization;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.semantics.RoleSemantics;
 
 public final class OrganizationDao {
 
@@ -637,7 +638,7 @@ public final class OrganizationDao {
 				      cu.UserId
 				    FROM dbo.CaseUsers cu
 				    WHERE cu.CaseId = c.Id
-				      AND cu.RoleId = 4
+				      AND cu.RoleId = ?
 				      AND cu.IsPrimary = 1
 				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
 				) ra
@@ -658,6 +659,7 @@ public final class OrganizationDao {
 
 			int shaleClientId = requireCurrentShaleClientId(con);
 			int idx = 1;
+			ps.setInt(idx++, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
 			ps.setInt(idx++, organizationId);
 			ps.setInt(idx++, shaleClientId);
 
