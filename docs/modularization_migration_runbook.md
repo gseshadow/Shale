@@ -1,6 +1,6 @@
 # Shale Modularization Migration Runbook (Operator Guide)
 
-**Last updated:** 2026-04-06  
+**Last updated:** 2026-04-06
 **Scope:** Statuses, PartyRoles, PartySides, Priorities, PracticeAreas modularization support migrations.  
 **Non-goals in this runbook:** destructive cleanup, fallback removal, constraint tightening.
 
@@ -40,27 +40,45 @@ Use this runbook with:
    - **Type:** prep + conditional activation  
    - **Purpose:** add/backfill `PartyRoles.SystemKey`; seed global rows only if nullable is already allowed.
 
+5. `2026-04-06_partyroles_global_activation_phase2.sql`  
+   - **Type:** activation step (PartyRoles-specific)  
+   - **Purpose:** make `PartyRoles.ShaleClientId` nullable if needed and seed explicit global built-ins (`caller`, `party`, `counsel`) while retaining tenant rows.
+
 ### C. PartySides
 
-5. `2026-04-06_partysides_system_key_phase1.sql`  
+6. `2026-04-06_partysides_system_key_phase1.sql`  
    - **Type:** prep + conditional activation  
    - **Purpose:** ensure table/column exists, backfill built-ins, seed tenant 7 built-ins if needed, conditionally seed global rows.
 
+7. `2026-04-06_partysides_global_activation_phase2.sql`  
+   - **Type:** activation step (PartySides-specific)  
+   - **Purpose:** make `PartySides.ShaleClientId` nullable if needed and seed explicit global built-ins (`represented`, `opposing`, `neutral`) while retaining tenant rows.
+
 ### D. Priorities
 
-6. `2026-04-06_priorities_system_key_phase1.sql`  
+8. `2026-04-06_priorities_system_key_phase1.sql`  
    - **Type:** prep + conditional activation  
    - **Purpose:** add/backfill `Priorities.SystemKey` (`normal` semantics), conditionally seed global row.
 
+9. `2026-04-06_priorities_global_activation_phase3.sql`
+   - **Type:** activation step (Priorities-specific)
+   - **Purpose:** make `Priorities.ShaleClientId` nullable if needed and seed explicit global built-ins (`low`, `normal`, `high`) while retaining tenant rows and existing task history.
+
 ### E. PracticeAreas
 
-7. `2026-04-06_practiceareas_system_key_phase1.sql`  
+10. `2026-04-06_practiceareas_system_key_phase1.sql`
    - **Type:** prep + conditional activation  
    - **Purpose:** add/normalize `SystemKey`, conservative backfill, conditionally seed global rows.
 
-8. `2026-04-06_practiceareas_system_key_phase2_builtin_mapping.sql`  
+11. `2026-04-06_practiceareas_system_key_phase2_builtin_mapping.sql`
    - **Type:** prep-only follow-up  
    - **Purpose:** explicit tenant-7 mapping for built-ins without moving tenant rows to global.
+
+### F. Integrity hardening (post-rollout)
+
+12. `2026-04-06_modularized_unique_systemkey_indexes_phase1.sql`
+   - **Type:** post-rollout hardening / activation safety  
+   - **Purpose:** add filtered unique indexes on `(ShaleClientId, SystemKey)` where `SystemKey IS NOT NULL` for modularized tables, with fail-fast duplicate prechecks.
 
 ---
 
@@ -99,14 +117,34 @@ Then rerun `2026-04-06_modularization_gating_checks.sql`.
 
 Run:
 
-1. `2026-04-03_statuses_shaleclientid_nullable_phase2.sql`
-2. `2026-04-03_statuses_system_key_phase1.sql`
+1. `2026-04-06_partyroles_global_activation_phase2.sql`
+2. `2026-04-06_partysides_global_activation_phase2.sql`
+3. `2026-04-03_statuses_shaleclientid_nullable_phase2.sql`
+4. `2026-04-03_statuses_system_key_phase1.sql`
 
 Then rerun `2026-04-06_modularization_gating_checks.sql`.
 
 **Expected outcome:**
 - Statuses now supports explicit global rows (`ShaleClientId IS NULL`).
+- PartyRoles now supports explicit global rows (`ShaleClientId IS NULL`) with separate global built-ins (`caller`, `party`, `counsel`).
+- PartySides now supports explicit global rows (`ShaleClientId IS NULL`) with separate global built-ins (`represented`, `opposing`, `neutral`).
 - Runtime overlay resolves by `SystemKey` with tenant override behavior.
+
+---
+
+## Phase 3 — Post-rollout integrity hardening (optional but recommended)
+
+Run:
+
+1. `2026-04-06_priorities_global_activation_phase3.sql`
+2. `2026-04-06_modularized_unique_systemkey_indexes_phase1.sql`
+
+Then rerun `2026-04-06_modularization_gating_checks.sql`.
+
+**Expected outcome:**
+- Priorities now supports explicit global rows (`ShaleClientId IS NULL`) with separate global built-ins (`low`, `normal`, `high`) while tenant rows remain active.
+- Optional filtered unique indexes present for eligible modularized tables.
+- New accidental duplicate keyed rows per scope are blocked at write-time.
 
 ---
 
@@ -163,10 +201,25 @@ If a step fails:
 
 ---
 
-## 8) Operator quick-start
+## 8) Post-activation cleanup audit guidance (non-destructive)
+
+After all activation phases are complete in an environment:
+
+1. Re-run `2026-04-06_modularization_gating_checks.sql`.
+2. Review duplicate-key outputs, built-in tenant/global counts, and index presence.
+3. Review post-activation cleanup cues in diagnostics output to identify:
+   - legacy alias/fallback dependencies that can be considered for later removal,
+   - text-side compatibility that should remain until a dedicated migration plan exists,
+   - any drift that must be fixed before deprecating compatibility code.
+4. Keep this pass read-only: do not delete tenant/global rows and do not rewrite FK/history references.
+
+---
+
+## 9) Operator quick-start
 
 1. Run diagnostics: `2026-04-06_modularization_gating_checks.sql`
 2. Execute Phase 1 scripts (in listed order).
 3. Re-run diagnostics and review diffs.
 4. Execute Phase 2 status activation scripts.
-5. Re-run diagnostics and archive final verification outputs.
+5. Execute Phase 3 scripts (Priorities activation + optional index hardening).
+6. Re-run diagnostics and archive final verification outputs.

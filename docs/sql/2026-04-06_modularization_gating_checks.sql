@@ -100,6 +100,11 @@ BEGIN
         WHERE (ShaleClientId = @tenantId OR ShaleClientId IS NULL)
           AND SystemKey IN ('caller', 'party', 'counsel')
         ORDER BY CASE WHEN ShaleClientId IS NULL THEN 0 ELSE 1 END, SystemKey, Id;
+
+        SELECT
+            SUM(CASE WHEN ShaleClientId = @tenantId AND SystemKey IN ('caller', 'party', 'counsel') THEN 1 ELSE 0 END) AS Tenant7BuiltinCount,
+            SUM(CASE WHEN ShaleClientId IS NULL AND SystemKey IN ('caller', 'party', 'counsel') THEN 1 ELSE 0 END) AS GlobalBuiltinCount
+        FROM dbo.PartyRoles;
     END
     ELSE
         SELECT 'PartyRoles.SystemKey missing: duplicate and built-in checks skipped.' AS Note;
@@ -128,6 +133,11 @@ BEGIN
         WHERE (ShaleClientId = @tenantId OR ShaleClientId IS NULL)
           AND SystemKey IN ('represented', 'opposing', 'neutral')
         ORDER BY CASE WHEN ShaleClientId IS NULL THEN 0 ELSE 1 END, SystemKey, Id;
+
+        SELECT
+            SUM(CASE WHEN ShaleClientId = @tenantId AND SystemKey IN ('represented', 'opposing', 'neutral') THEN 1 ELSE 0 END) AS Tenant7BuiltinCount,
+            SUM(CASE WHEN ShaleClientId IS NULL AND SystemKey IN ('represented', 'opposing', 'neutral') THEN 1 ELSE 0 END) AS GlobalBuiltinCount
+        FROM dbo.PartySides;
     END
     ELSE
         SELECT 'PartySides.SystemKey missing: duplicate and built-in checks skipped.' AS Note;
@@ -182,6 +192,22 @@ BEGIN
           WHERE (ShaleClientId = @tenantId OR ShaleClientId IS NULL)
           ORDER BY CASE WHEN ShaleClientId IS NULL THEN 0 ELSE 1 END, Id;';
     EXEC sp_executesql @prioritiesDetail, N'@tenantId int', @tenantId = @tenantId;
+
+    IF COL_LENGTH('dbo.Priorities', 'SystemKey') IS NOT NULL
+    BEGIN
+        SELECT Id, ShaleClientId, Name, SortOrder, IsActive, SystemKey
+        FROM dbo.Priorities
+        WHERE (ShaleClientId = @tenantId OR ShaleClientId IS NULL)
+          AND SystemKey IN ('low', 'normal', 'high')
+        ORDER BY CASE WHEN ShaleClientId IS NULL THEN 0 ELSE 1 END, SystemKey, Id;
+
+        SELECT
+            SUM(CASE WHEN ShaleClientId = @tenantId AND SystemKey IN ('low', 'normal', 'high') THEN 1 ELSE 0 END) AS Tenant7BuiltinCount,
+            SUM(CASE WHEN ShaleClientId IS NULL AND SystemKey IN ('low', 'normal', 'high') THEN 1 ELSE 0 END) AS GlobalBuiltinCount
+        FROM dbo.Priorities;
+    END
+    ELSE
+        SELECT 'Priorities.SystemKey missing: built-in checks skipped.' AS Note;
 END;
 
 PRINT '=== 6) PracticeAreas diagnostics ===';
@@ -316,12 +342,12 @@ SELECT
         ) d
     ) END,
     CASE WHEN OBJECT_ID('dbo.Priorities', 'U') IS NULL OR COL_LENGTH('dbo.Priorities', 'SystemKey') IS NULL THEN NULL ELSE (
-        SELECT COUNT(*) FROM dbo.Priorities WHERE ShaleClientId = @tenantId AND SystemKey = 'normal'
+        SELECT COUNT(*) FROM dbo.Priorities WHERE ShaleClientId = @tenantId AND SystemKey IN ('low','normal','high')
     ) END,
     CASE WHEN OBJECT_ID('dbo.Priorities', 'U') IS NULL OR COL_LENGTH('dbo.Priorities', 'SystemKey') IS NULL THEN NULL ELSE (
-        SELECT COUNT(*) FROM dbo.Priorities WHERE ShaleClientId IS NULL AND SystemKey = 'normal'
+        SELECT COUNT(*) FROM dbo.Priorities WHERE ShaleClientId IS NULL AND SystemKey IN ('low','normal','high')
     ) END,
-    N'normal key is core built-in identity; medium/default names are legacy aliases'
+    N'Priorities activation expects built-ins low/normal/high in both tenant and global scopes; normal remains default semantic'
 UNION ALL
 SELECT
     'PracticeAreas',
@@ -356,3 +382,52 @@ UNION ALL SELECT 'BLOCK_POST_ROLLOUT_ACTIVATION', 'Duplicate (ShaleClientId,Syst
 UNION ALL SELECT 'BLOCK_POST_ROLLOUT_ACTIVATION', 'ShaleClientId still NOT NULL for a table where global overlay is being activated'
 UNION ALL SELECT 'EXPECTED_TODAY', 'Global built-in rows absent when nullability not yet enabled or seeding intentionally deferred'
 UNION ALL SELECT 'EXPECTED_TODAY', 'Tenant and global rows can coexist by SystemKey (overlay pattern)';
+
+PRINT '=== 9) Optional integrity index presence (post-hardening) ===';
+SELECT
+    t.TableName,
+    i.name AS ExpectedIndexName,
+    CASE WHEN i.index_id IS NULL THEN 0 ELSE 1 END AS IndexPresent,
+    i.is_unique,
+    i.has_filter,
+    i.filter_definition
+FROM (
+    SELECT 'Statuses' AS TableName, 'UX_Statuses_ShaleClientId_SystemKey_NonNull' AS IndexName UNION ALL
+    SELECT 'PartyRoles', 'UX_PartyRoles_ShaleClientId_SystemKey_NonNull' UNION ALL
+    SELECT 'PartySides', 'UX_PartySides_ShaleClientId_SystemKey_NonNull' UNION ALL
+    SELECT 'Priorities', 'UX_Priorities_ShaleClientId_SystemKey_NonNull' UNION ALL
+    SELECT 'PracticeAreas', 'UX_PracticeAreas_ShaleClientId_SystemKey_NonNull'
+) t
+LEFT JOIN sys.indexes i
+  ON i.object_id = OBJECT_ID('dbo.' + t.TableName)
+ AND i.name = t.IndexName
+ORDER BY t.TableName;
+
+PRINT '=== 10) Post-activation cleanup cues (read-only, non-blocking) ===';
+IF OBJECT_ID('dbo.Priorities', 'U') IS NOT NULL
+BEGIN
+    SELECT 'PriorityNameAliasStillUsed' AS Cue, Name, COUNT(*) AS Cnt
+    FROM dbo.Priorities
+    WHERE SystemKey = 'normal'
+      AND LOWER(LTRIM(RTRIM(COALESCE(Name, '')))) IN ('medium', 'default', 'standard')
+    GROUP BY Name
+    ORDER BY Cnt DESC, Name;
+END;
+
+IF OBJECT_ID('dbo.CaseParties', 'U') IS NOT NULL AND COL_LENGTH('dbo.CaseParties', 'Side') IS NOT NULL
+BEGIN
+    SELECT 'CasePartiesSideTextOutsideBuiltins' AS Cue, cp.Side, COUNT(*) AS Cnt
+    FROM dbo.CaseParties cp
+    WHERE LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) NOT IN ('represented', 'opposing', 'neutral')
+    GROUP BY cp.Side
+    ORDER BY Cnt DESC, cp.Side;
+END;
+
+IF OBJECT_ID('dbo.PartyRoles', 'U') IS NOT NULL
+BEGIN
+    SELECT 'PartyRolesBuiltinNameFallbackCandidates' AS Cue, pr.ShaleClientId, pr.Id, pr.Name, pr.SystemKey
+    FROM dbo.PartyRoles pr
+    WHERE LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) IN ('caller', 'party', 'counsel')
+      AND pr.SystemKey IS NULL
+    ORDER BY pr.ShaleClientId, pr.Id;
+END;

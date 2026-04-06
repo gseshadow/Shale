@@ -17,12 +17,8 @@ import javafx.stage.Stage;
 public final class TeamEditorDialog {
 
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
-	private static final int ROLE_PRELITIGATION_STAFF = RoleSemantics.ROLE_PRELITIGATION_STAFF;
 	private static final int ROLE_ATTORNEY = RoleSemantics.ROLE_ATTORNEY;
 	private static final int ROLE_LEGAL_ASSISTANT = RoleSemantics.ROLE_LEGAL_ASSISTANT;
-	private static final int ROLE_PARALEGAL = RoleSemantics.ROLE_PARALEGAL;
-	private static final int ROLE_LAW_CLERK = RoleSemantics.ROLE_LAW_CLERK;
-	private static final int ROLE_CO_COUNSEL = RoleSemantics.ROLE_CO_COUNSEL;
 
 	private static final List<RoleOption> ROLE_OPTIONS = RoleSemantics.TEAM_EDITOR_ASSIGNABLE_ROLE_IDS.stream()
 			.map(roleId -> new RoleOption(roleId, RoleSemantics.caseTeamRoleLabel(roleId)))
@@ -142,7 +138,6 @@ public final class TeamEditorDialog {
 
 		final Integer[] primaryUserIdRef = new Integer[] { primaryUserId };
 
-		// ✅ ADD: default role depends on attorney status
 		btnAdd.setOnAction(e ->
 		{
 			var sel = lvAvailable.getSelectionModel().getSelectedItem();
@@ -207,7 +202,6 @@ public final class TeamEditorDialog {
 			rebuildPrimaryOptions(primaryUserIdRef[0]);
 		});
 
-		// ✅ Show only displayName in primary dropdown
 		cbPrimary.setConverter(new javafx.util.StringConverter<>() {
 			@Override
 			public String toString(CaseDao.UserRow u) {
@@ -235,7 +229,6 @@ public final class TeamEditorDialog {
 			}
 		});
 
-		// ✅ Primary dropdown (filtered to attorneys only)
 		rebuildPrimaryOptions(primaryUserIdRef[0]);
 
 //		HBox primaryRow = new HBox(10, new Label("Primary (Responsible Attorney):"), cbPrimary);
