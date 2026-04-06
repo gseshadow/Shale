@@ -40,6 +40,10 @@ public final class CaseDao {
 	private static final String PARTY_ROLE_NAME_PARTY = "party";
 	private static final String PARTY_ROLE_NAME_COUNSEL = "counsel";
 	private static final String PARTY_ROLES_TABLE = "PartyRoles";
+	private static final String PARTY_SIDE_KEY_REPRESENTED = "represented";
+	private static final String PARTY_SIDE_KEY_OPPOSING = "opposing";
+	private static final String PARTY_SIDE_KEY_NEUTRAL = "neutral";
+	private static final String PARTY_SIDES_TABLE = "PartySides";
 
 	public static final class CaseTimelineEventTypes {
 		public static final String CASE_CREATED = "CASE_CREATED";
@@ -222,6 +226,13 @@ public final class CaseDao {
 	) {
 	}
 
+	public record PartySideRow(
+			Long id,
+			String name,
+			String systemKey
+	) {
+	}
+
 	private record CaseSchema(String deletedColumn) {
 	}
 
@@ -304,8 +315,8 @@ public final class CaseDao {
 			}
 
 			long caseId = insertCase(con, request, now);
-			insertCaseParty(con, caseId, clientContactId, PARTY_ROLE_NAME_PARTY, "represented", true, now, request.shaleClientId());
-			insertCaseParty(con, caseId, callerContactId, PARTY_ROLE_NAME_CALLER, "represented", true, now, request.shaleClientId());
+			insertCaseParty(con, caseId, clientContactId, PARTY_ROLE_NAME_PARTY, PARTY_SIDE_KEY_REPRESENTED, true, now, request.shaleClientId());
+			insertCaseParty(con, caseId, callerContactId, PARTY_ROLE_NAME_CALLER, PARTY_SIDE_KEY_REPRESENTED, true, now, request.shaleClientId());
 			normalizeCasePartyRelationshipPrimaries(con, caseId, request.shaleClientId());
 			insertCaseStatus(con, caseId, request.statusId(), now);
 
@@ -1260,7 +1271,7 @@ public final class CaseDao {
 					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
 					      AND %s
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = '%s'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY
 					      CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
@@ -1272,11 +1283,12 @@ public final class CaseDao {
 							CASES_TABLE,
 							CASE_USERS_TABLE,
 							USERS_TABLE,
-							CASE_STATUSES_TABLE,
-							STATUSES_TABLE,
-							callerRolePredicate,
-							counselRolePredicate,
-							activeFilter(schema.deletedColumn(), "c"));
+								CASE_STATUSES_TABLE,
+								STATUSES_TABLE,
+								callerRolePredicate,
+								counselRolePredicate,
+								PARTY_SIDE_KEY_OPPOSING,
+								activeFilter(schema.deletedColumn(), "c"));
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
@@ -1287,7 +1299,7 @@ public final class CaseDao {
 					if (!rs.next())
 						return null;
 					List<String> team = loadTeamMembers(con, caseId);
-					List<com.shale.core.dto.CaseOverviewDto.ContactSummary> clients = listCasePartiesContactsByRoleAndSide(con, caseId, PARTY_ROLE_NAME_PARTY, "represented");
+					List<com.shale.core.dto.CaseOverviewDto.ContactSummary> clients = listCasePartiesContactsByRoleAndSide(con, caseId, PARTY_ROLE_NAME_PARTY, PARTY_SIDE_KEY_REPRESENTED);
 					Integer primaryClientContactId = clients.isEmpty() ? null : clients.get(0).contactId();
 					String primaryClientName = clients.isEmpty() ? null : clients.get(0).displayName();
 					return new com.shale.core.dto.CaseOverviewDto(
@@ -2102,7 +2114,7 @@ public final class CaseDao {
 		}
 	}
 
-	private static String normalizeCasePartySide(String side) {
+	private String normalizeCasePartySide(Connection con, int shaleClientId, String side) throws SQLException {
 		if (side == null) {
 			return null;
 		}
@@ -2110,10 +2122,10 @@ public final class CaseDao {
 		if (normalized.isBlank()) {
 			return null;
 		}
-		return switch (normalized) {
-			case "represented", "opposing", "neutral" -> normalized;
-			default -> throw new IllegalArgumentException("side must be one of represented, opposing, neutral, or null.");
-		};
+		if (isAllowedPartySideSystemKey(con, shaleClientId, normalized)) {
+			return normalized;
+		}
+		throw new IllegalArgumentException("side must be a configured PartySide SystemKey or null.");
 	}
 
 	private static String safeUserDisplayName(String displayName, Integer userId) {
@@ -2820,9 +2832,9 @@ public final class CaseDao {
 				ORDER BY
 				  COALESCE(cp.IsPrimary, 0) DESC,
 				  CASE cp.Side
-				    WHEN 'represented' THEN 0
-				    WHEN 'opposing' THEN 1
-				    WHEN 'neutral' THEN 2
+				    WHEN '%s' THEN 0
+				    WHEN '%s' THEN 1
+				    WHEN '%s' THEN 2
 				    ELSE 3
 				  END,
 				  COALESCE(
@@ -2848,7 +2860,11 @@ public final class CaseDao {
 				    END
 				  ) ASC,
 				  cp.Id ASC;
-				""".formatted(partyRoleSystemKeySelect);
+				""".formatted(
+						partyRoleSystemKeySelect,
+						PARTY_SIDE_KEY_REPRESENTED,
+						PARTY_SIDE_KEY_OPPOSING,
+						PARTY_SIDE_KEY_NEUTRAL);
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId);
 			ps.setInt(2, shaleClientId);
@@ -2889,8 +2905,6 @@ public final class CaseDao {
 			throw new IllegalArgumentException("partyRoleId must be > 0");
 		}
 		validateSinglePartyEntity(contactId, organizationId);
-		String normalizedSide = normalizeCasePartySide(side);
-
 		String sql = """
 				INSERT INTO dbo.CaseParties (
 				  CaseId,
@@ -2949,6 +2963,7 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			int shaleClientId = requireCurrentShaleClientId(con);
+			String normalizedSide = normalizeCasePartySide(con, shaleClientId, side);
 			con.setAutoCommit(false);
 			int idx = 1;
 			ps.setLong(idx++, caseId);
@@ -3001,8 +3016,6 @@ public final class CaseDao {
 			throw new IllegalArgumentException("partyRoleId must be > 0");
 		}
 		validateSinglePartyEntity(contactId, organizationId);
-		String normalizedSide = normalizeCasePartySide(side);
-
 		String sql = """
 				UPDATE cp
 				SET cp.ContactId = ?,
@@ -3047,6 +3060,7 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			int shaleClientId = requireCurrentShaleClientId(con);
+			String normalizedSide = normalizeCasePartySide(con, shaleClientId, side);
 			con.setAutoCommit(false);
 			int idx = 1;
 			setNullableLong(ps, idx++, contactId);
@@ -3121,8 +3135,8 @@ public final class CaseDao {
 		Long partyRoleId = findPartyRoleIdForTenantBySystemKey(con, shaleClientId, PARTY_ROLE_NAME_PARTY);
 		Long counselRoleId = findPartyRoleIdForTenantBySystemKey(con, shaleClientId, PARTY_ROLE_NAME_COUNSEL);
 		normalizeCasePartyPrimaryBucket(con, caseId, shaleClientId, callerRoleId, null);
-		normalizeCasePartyPrimaryBucket(con, caseId, shaleClientId, partyRoleId, "represented");
-		normalizeCasePartyPrimaryBucket(con, caseId, shaleClientId, counselRoleId, "opposing");
+		normalizeCasePartyPrimaryBucket(con, caseId, shaleClientId, partyRoleId, PARTY_SIDE_KEY_REPRESENTED);
+		normalizeCasePartyPrimaryBucket(con, caseId, shaleClientId, counselRoleId, PARTY_SIDE_KEY_OPPOSING);
 	}
 
 	private void normalizeCasePartyPrimaryBucket(Connection con, long caseId, int shaleClientId, Long partyRoleId, String side) throws SQLException {
@@ -3191,7 +3205,7 @@ public final class CaseDao {
 				  INNER JOIN dbo.Cases c ON c.Id = cp.CaseId
 				  WHERE cp.CaseId = ?
 				    AND cp.PartyRoleId = ?
-				    AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+				    AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = ?
 				    AND c.ShaleClientId = ?
 				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
 
@@ -3199,7 +3213,7 @@ public final class CaseDao {
 				  SET cp.OrganizationId = NULL,
 				      cp.ContactId = ?,
 				      cp.IsPrimary = 1,
-				      cp.Side = 'opposing',
+				      cp.Side = ?,
 				      cp.Notes = ?,
 				      cp.UpdatedAt = @now
 				  FROM dbo.CaseParties cp
@@ -3207,7 +3221,7 @@ public final class CaseDao {
 				  WHERE cp.CaseId = ?
 				    AND cp.PartyRoleId = ?
 				    AND cp.ContactId = ?
-				    AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+				    AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = ?
 				    AND c.ShaleClientId = ?
 				    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
 
@@ -3216,7 +3230,7 @@ public final class CaseDao {
 				    INSERT INTO dbo.CaseParties
 				      (CaseId, ContactId, OrganizationId, PartyRoleId, Side, IsPrimary, Notes, CreatedAt, UpdatedAt)
 				    SELECT
-				      ?, ?, NULL, ?, 'opposing', 1, ?, @now, @now
+				      ?, ?, NULL, ?, ?, 1, ?, @now, @now
 				    WHERE EXISTS (
 				      SELECT 1
 				      FROM dbo.Cases c
@@ -3246,16 +3260,20 @@ public final class CaseDao {
 			ps.setInt(i++, shaleClientId);
 			ps.setLong(i++, caseId);
 			ps.setLong(i++, counselRoleId.longValue());
+			ps.setString(i++, PARTY_SIDE_KEY_OPPOSING);
 			ps.setInt(i++, shaleClientId);
 			ps.setInt(i++, contactId);
+			ps.setString(i++, PARTY_SIDE_KEY_OPPOSING);
 			ps.setString(i++, cleanNotes);
 			ps.setLong(i++, caseId);
 			ps.setLong(i++, counselRoleId.longValue());
 			ps.setInt(i++, contactId);
+			ps.setString(i++, PARTY_SIDE_KEY_OPPOSING);
 			ps.setInt(i++, shaleClientId);
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, contactId);
 			ps.setLong(i++, counselRoleId.longValue());
+			ps.setString(i++, PARTY_SIDE_KEY_OPPOSING);
 			ps.setString(i++, cleanNotes);
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, shaleClientId);
@@ -3609,30 +3627,32 @@ public final class CaseDao {
 						  AND c.ShaleClientId = ?
 						  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
 						  AND cp.PartyRoleId = ?
-						  AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
+						  AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = ?
 						  AND cp.ContactId IS NOT NULL;
 						""";
 				try (PreparedStatement ps = con.prepareStatement(deleteSql)) {
 					ps.setLong(1, caseId);
 					ps.setInt(2, shaleClientId);
 					ps.setLong(3, partyRoleId.longValue());
+					ps.setString(4, PARTY_SIDE_KEY_REPRESENTED);
 					ps.executeUpdate();
 				}
 
 				if (!normalized.isEmpty()) {
 					String insertSql = """
-							INSERT INTO dbo.CaseParties
-							  (CaseId, ContactId, OrganizationId, PartyRoleId, Side, IsPrimary, Notes, CreatedAt, UpdatedAt)
-							VALUES
-							  (?, ?, NULL, ?, 'represented', ?, ?, SYSUTCDATETIME(), SYSUTCDATETIME());
-							""";
+								INSERT INTO dbo.CaseParties
+								  (CaseId, ContactId, OrganizationId, PartyRoleId, Side, IsPrimary, Notes, CreatedAt, UpdatedAt)
+								VALUES
+								  (?, ?, NULL, ?, ?, ?, ?, SYSUTCDATETIME(), SYSUTCDATETIME());
+								""";
 					try (PreparedStatement ps = con.prepareStatement(insertSql)) {
 						for (int i = 0; i < normalized.size(); i++) {
 							ps.setLong(1, caseId);
 							ps.setInt(2, normalized.get(i));
 							ps.setLong(3, partyRoleId.longValue());
-							ps.setBoolean(4, i == 0);
-							ps.setString(5, cleanNotes);
+							ps.setString(4, PARTY_SIDE_KEY_REPRESENTED);
+							ps.setBoolean(5, i == 0);
+							ps.setString(6, cleanNotes);
 							ps.addBatch();
 						}
 						ps.executeBatch();
@@ -3859,8 +3879,30 @@ public final class CaseDao {
 		return resolveLegacyPartyRoleSystemKeyFromName(roleName);
 	}
 
+	private static String resolveLegacyPartySideSystemKeyFromName(String sideName) {
+		String normalized = (sideName == null) ? "" : sideName.trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+		case PARTY_SIDE_KEY_REPRESENTED, PARTY_SIDE_KEY_OPPOSING, PARTY_SIDE_KEY_NEUTRAL -> normalized;
+		default -> null;
+		};
+	}
+
+	private static String resolvePartySideSystemKey(String systemKey, String sideName) {
+		String normalizedSystemKey = normalizeSystemKey(systemKey);
+		if (normalizedSystemKey != null)
+			return normalizedSystemKey;
+		return resolveLegacyPartySideSystemKeyFromName(sideName);
+	}
+
 	private record PartyRoleLookupRow(
 			long id,
+			String name,
+			String systemKey
+	) {
+	}
+
+	private record PartySideLookupRow(
+			Long id,
 			String name,
 			String systemKey
 	) {
@@ -3871,6 +3913,14 @@ public final class CaseDao {
 				rs.getLong("Id"),
 				rs.getString("Name"),
 				resolvePartyRoleSystemKey(rs.getString("SystemKey"), rs.getString("Name"))
+		);
+	}
+
+	private static PartySideLookupRow mapPartySideLookupRow(ResultSet rs) throws SQLException {
+		return new PartySideLookupRow(
+				getNullableLong(rs, "Id"),
+				rs.getString("Name"),
+				resolvePartySideSystemKey(rs.getString("SystemKey"), rs.getString("Name"))
 		);
 	}
 
@@ -3926,6 +3976,60 @@ public final class CaseDao {
 		return merged;
 	}
 
+	private static List<PartySideLookupRow> resolveEffectivePartySides(List<PartySideLookupRow> globalSides, List<PartySideLookupRow> tenantSides) {
+		List<PartySideLookupRow> globalUnkeyed = new ArrayList<>();
+		List<PartySideLookupRow> tenantUnkeyed = new ArrayList<>();
+		Map<String, PartySideLookupRow> bySystemKey = new LinkedHashMap<>();
+
+		if (globalSides != null) {
+			for (PartySideLookupRow side : globalSides) {
+				if (side == null)
+					continue;
+				String systemKey = resolvePartySideSystemKey(side.systemKey(), side.name());
+				if (systemKey == null) {
+					globalUnkeyed.add(side);
+					continue;
+				}
+				bySystemKey.putIfAbsent(systemKey, side);
+			}
+		}
+
+		if (tenantSides != null) {
+			for (PartySideLookupRow side : tenantSides) {
+				if (side == null)
+					continue;
+				String systemKey = resolvePartySideSystemKey(side.systemKey(), side.name());
+				if (systemKey == null) {
+					tenantUnkeyed.add(side);
+					continue;
+				}
+				bySystemKey.put(systemKey, side);
+			}
+		}
+
+		List<PartySideLookupRow> merged = new ArrayList<>(globalUnkeyed.size() + bySystemKey.size() + tenantUnkeyed.size());
+		merged.addAll(globalUnkeyed);
+		merged.addAll(bySystemKey.values());
+		merged.addAll(tenantUnkeyed);
+		merged.sort((a, b) -> {
+			if (a == b)
+				return 0;
+			if (a == null)
+				return 1;
+			if (b == null)
+				return -1;
+			String aName = a.name() == null ? "" : a.name();
+			String bName = b.name() == null ? "" : b.name();
+			int byName = aName.compareToIgnoreCase(bName);
+			if (byName != 0)
+				return byName;
+			long aId = a.id() == null ? Long.MAX_VALUE : a.id().longValue();
+			long bId = b.id() == null ? Long.MAX_VALUE : b.id().longValue();
+			return Long.compare(aId, bId);
+		});
+		return merged;
+	}
+
 	private List<PartyRoleLookupRow> listPartyRoleLookupRowsForTenant(Connection con, int shaleClientId) throws SQLException {
 		boolean hasSystemKey = tableHasColumn(con, PARTY_ROLES_TABLE, "SystemKey");
 		String systemKeySelect = hasSystemKey ? "SystemKey" : "NULL AS SystemKey";
@@ -3958,6 +4062,86 @@ public final class CaseDao {
 				}
 			}
 		}
+	}
+
+	private List<PartySideLookupRow> defaultBuiltinPartySides() {
+		return List.of(
+				new PartySideLookupRow(null, "Represented", PARTY_SIDE_KEY_REPRESENTED),
+				new PartySideLookupRow(null, "Opposing", PARTY_SIDE_KEY_OPPOSING),
+				new PartySideLookupRow(null, "Neutral", PARTY_SIDE_KEY_NEUTRAL)
+		);
+	}
+
+	private List<PartySideLookupRow> listPartySideLookupRowsForTenant(Connection con, int shaleClientId) throws SQLException {
+		if (!tableHasColumn(con, PARTY_SIDES_TABLE, "Name")) {
+			return defaultBuiltinPartySides();
+		}
+		boolean hasSystemKey = tableHasColumn(con, PARTY_SIDES_TABLE, "SystemKey");
+		String systemKeySelect = hasSystemKey ? "SystemKey" : "NULL AS SystemKey";
+		String idSelect = tableHasColumn(con, PARTY_SIDES_TABLE, "Id") ? "Id" : "NULL AS Id";
+		String tenantSql = """
+				SELECT %s, Name, %s
+				FROM dbo.PartySides
+				WHERE ShaleClientId = ?
+				ORDER BY Name, %s;
+				""".formatted(idSelect, systemKeySelect, idSelect);
+		try (PreparedStatement tenantPs = con.prepareStatement(tenantSql)) {
+			tenantPs.setInt(1, shaleClientId);
+			try (ResultSet tenantRs = tenantPs.executeQuery()) {
+				List<PartySideLookupRow> tenantSides = new ArrayList<>();
+				while (tenantRs.next()) {
+					tenantSides.add(mapPartySideLookupRow(tenantRs));
+				}
+				String globalSql = """
+						SELECT %s, Name, %s
+						FROM dbo.PartySides
+						WHERE ShaleClientId IS NULL
+						ORDER BY Name, %s;
+						""".formatted(idSelect, systemKeySelect, idSelect);
+				try (PreparedStatement globalPs = con.prepareStatement(globalSql);
+						ResultSet globalRs = globalPs.executeQuery()) {
+					List<PartySideLookupRow> globalSides = new ArrayList<>();
+					while (globalRs.next()) {
+						globalSides.add(mapPartySideLookupRow(globalRs));
+					}
+					List<PartySideLookupRow> merged = resolveEffectivePartySides(globalSides, tenantSides);
+					if (merged.isEmpty()) {
+						return defaultBuiltinPartySides();
+					}
+					return merged;
+				}
+			}
+		}
+	}
+
+	public List<PartySideRow> listPartySides() {
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			List<PartySideLookupRow> effective = listPartySideLookupRowsForTenant(con, shaleClientId);
+			List<PartySideRow> out = new ArrayList<>(effective.size());
+			for (PartySideLookupRow side : effective) {
+				if (side == null)
+					continue;
+				out.add(new PartySideRow(side.id(), side.name(), resolvePartySideSystemKey(side.systemKey(), side.name())));
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load party sides", e);
+		}
+	}
+
+	private boolean isAllowedPartySideSystemKey(Connection con, int shaleClientId, String systemKey) throws SQLException {
+		String normalized = normalizeSystemKey(systemKey);
+		if (normalized == null)
+			return false;
+		List<PartySideLookupRow> sides = listPartySideLookupRowsForTenant(con, shaleClientId);
+		for (PartySideLookupRow side : sides) {
+			if (side == null)
+				continue;
+			if (Objects.equals(normalized, resolvePartySideSystemKey(side.systemKey(), side.name())))
+				return true;
+		}
+		return false;
 	}
 
 	private Long findPartyRoleIdForTenantBySystemKey(Connection con, int shaleClientId, String systemKey) throws SQLException {
