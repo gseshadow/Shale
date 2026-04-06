@@ -28,6 +28,7 @@ import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.semantics.RoleSemantics;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
@@ -366,9 +367,9 @@ public class CaseController {
 	// Constants
 	// ----------------------------
 
-	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+	private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
 	private static final int ROLE_PRELITIGATION_STAFF = 5;
-	private static final int ROLE_ATTORNEY = 7;
+	private static final int ROLE_ATTORNEY = RoleSemantics.ROLE_ATTORNEY;
 	private static final int ROLE_LEGAL_ASSISTANT = 11;
 	private static final int ROLE_PARALEGAL = 12;
 	private static final int ROLE_LAW_CLERK = 13;
@@ -3032,7 +3033,7 @@ public class CaseController {
 		List<CaseDao.CaseUserTeamRow> filtered = rows.stream()
 				.filter(r -> r != null && TEAM_ROLE_IDS.contains(r.roleId()))
 				.sorted(java.util.Comparator
-						.comparing((CaseDao.CaseUserTeamRow r) -> !(r.roleId() == ROLE_RESPONSIBLE_ATTORNEY && r.isPrimary()))
+						.comparing((CaseDao.CaseUserTeamRow r) -> !(RoleSemantics.isResponsibleAttorneyRoleId(r.roleId()) && r.isPrimary()))
 						.thenComparingInt(CaseDao.CaseUserTeamRow::roleId)
 						.thenComparing(r -> safeText(r.displayName()), String.CASE_INSENSITIVE_ORDER))
 				.toList();
@@ -3067,9 +3068,9 @@ public class CaseController {
 
 	private String roleLabel(int roleId) {
 		return switch (roleId) {
-		case ROLE_RESPONSIBLE_ATTORNEY -> "Responsible Attorney";
+		case ROLE_RESPONSIBLE_ATTORNEY -> RoleSemantics.roleLabel(roleId);
 		case ROLE_PRELITIGATION_STAFF -> "Prelitigation Staff";
-		case ROLE_ATTORNEY -> "Attorney";
+		case ROLE_ATTORNEY -> RoleSemantics.roleLabel(roleId);
 		case ROLE_LEGAL_ASSISTANT -> "Legal Assistant";
 		case ROLE_PARALEGAL -> "Paralegal";
 		case ROLE_LAW_CLERK -> "Law Clerk";
@@ -3198,7 +3199,7 @@ public class CaseController {
 			String color = (u == null) ? null : u.color();
 			String initials = null; // if you have initials in UserRow, use it; otherwise leave null
 
-			boolean isPrimary = (a.roleId() == ROLE_RESPONSIBLE_ATTORNEY);
+			boolean isPrimary = RoleSemantics.isResponsibleAttorneyRoleId(a.roleId());
 			rows.add(new CaseDao.CaseUserTeamRow(a.userId(), name, color, initials, a.roleId(), isPrimary));
 		}
 

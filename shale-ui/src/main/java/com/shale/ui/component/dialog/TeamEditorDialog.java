@@ -2,6 +2,7 @@ package com.shale.ui.component.dialog;
 
 import java.util.*;
 
+import com.shale.core.semantics.RoleSemantics;
 import com.shale.data.dao.CaseDao;
 
 import javafx.collections.FXCollections;
@@ -15,9 +16,9 @@ import javafx.stage.Stage;
 
 public final class TeamEditorDialog {
 
-	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+	private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
 	private static final int ROLE_PRELITIGATION_STAFF = 5;
-	private static final int ROLE_ATTORNEY = 7;
+	private static final int ROLE_ATTORNEY = RoleSemantics.ROLE_ATTORNEY;
 	private static final int ROLE_LEGAL_ASSISTANT = 11;
 	private static final int ROLE_PARALEGAL = 12;
 	private static final int ROLE_LAW_CLERK = 13;
@@ -365,14 +366,14 @@ public final class TeamEditorDialog {
 
 	private Integer findResponsibleAttorneyUserId() {
 		for (var a : assignedItems) {
-			if (a.roleId == ROLE_RESPONSIBLE_ATTORNEY)
+			if (RoleSemantics.isResponsibleAttorneyRoleId(a.roleId))
 				return a.user.id();
 		}
 		return null;
 	}
 
 	private static int normalizeRoleForSave(int roleId) {
-		return roleId == ROLE_RESPONSIBLE_ATTORNEY ? ROLE_ATTORNEY : roleId;
+		return RoleSemantics.normalizeCaseTeamRoleForSave(roleId);
 	}
 
 	private void sortLists() {
@@ -382,9 +383,9 @@ public final class TeamEditorDialog {
 
 	private static String roleName(int roleId) {
 		return switch (roleId) {
-		case ROLE_RESPONSIBLE_ATTORNEY -> "Responsible Attorney";
+		case ROLE_RESPONSIBLE_ATTORNEY -> RoleSemantics.roleLabel(roleId);
 		case ROLE_PRELITIGATION_STAFF -> "Prelitigation Staff";
-		case ROLE_ATTORNEY -> "Attorney";
+		case ROLE_ATTORNEY -> RoleSemantics.roleLabel(roleId);
 		case ROLE_LEGAL_ASSISTANT -> "Legal Assistant";
 		case ROLE_PARALEGAL -> "Paralegal";
 		case ROLE_LAW_CLERK -> "Law Clerk";

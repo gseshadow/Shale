@@ -15,12 +15,13 @@ import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.semantics.RoleSemantics;
 
 /**
  * DAO for task reads used by case task sections.
  */
 public final class TaskDao {
-    private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+    private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
     private static final String PRIORITIES_TABLE = "dbo.Priorities";
     private static final String PRIORITY_SYSTEM_KEY_NORMAL = "normal";
 

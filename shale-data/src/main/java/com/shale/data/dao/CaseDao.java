@@ -22,6 +22,7 @@ import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.semantics.RoleSemantics;
 
 public final class CaseDao {
 
@@ -35,7 +36,7 @@ public final class CaseDao {
 	private static final String CASE_STATUSES_TABLE = "CaseStatuses";
 	private static final String STATUSES_TABLE = "Statuses";
 	// CaseUsers.RoleId (int) for Responsible Attorney
-	private static final int ROLE_RESPONSIBLE_ATTORNEY = 4;
+	private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
 	private static final String PARTY_ROLE_NAME_CALLER = "caller";
 	private static final String PARTY_ROLE_NAME_PARTY = "party";
 	private static final String PARTY_ROLE_NAME_COUNSEL = "counsel";
@@ -4503,13 +4504,13 @@ public final class CaseDao {
 				  u.Color
 				FROM dbo.Users u
 				WHERE u.ShaleClientId = ?
-				  AND COALESCE(u.is_attorney, 0) = 1
+				  AND COALESCE(u.%s, 0) = 1
 				  AND NULLIF(LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
 				    COALESCE(u.name_last, '')
 				  )), '') IS NOT NULL
-				""";
+				""".formatted(RoleSemantics.FLAG_IS_ATTORNEY);
 
 		String orderSql = """
 				ORDER BY u.name_last, u.name_first, u.Id;
@@ -4844,7 +4845,7 @@ public final class CaseDao {
 				INNER JOIN dbo.Users u ON u.Id = cu.UserId
 				WHERE cu.CaseId = ?
 				ORDER BY
-				  CASE WHEN cu.RoleId = 4 AND cu.IsPrimary = 1 THEN 0 ELSE 1 END,
+				  CASE WHEN cu.RoleId = ? AND cu.IsPrimary = 1 THEN 0 ELSE 1 END,
 				  cu.RoleId,
 				  u.name_last,
 				  u.name_first,
@@ -4855,6 +4856,7 @@ public final class CaseDao {
 				PreparedStatement ps = con.prepareStatement(sql)) {
 
 			ps.setLong(1, caseId);
+			ps.setInt(2, ROLE_RESPONSIBLE_ATTORNEY);
 
 			try (ResultSet rs = ps.executeQuery()) {
 				List<CaseUserTeamRow> out = new ArrayList<>();
@@ -4902,7 +4904,7 @@ public final class CaseDao {
 			if (assignments != null && !assignments.isEmpty()) {
 				try (PreparedStatement ps = con.prepareStatement(insertRow)) {
 					for (TeamAssignmentRow a : assignments) {
-						boolean isPrimary = (a.roleId() == ROLE_RESPONSIBLE_ATTORNEY);
+						boolean isPrimary = RoleSemantics.isResponsibleAttorneyRoleId(a.roleId());
 
 						ps.setLong(1, caseId);
 						ps.setInt(2, a.userId());
@@ -4943,8 +4945,8 @@ public final class CaseDao {
 				SELECT u.Id
 				FROM dbo.Users u
 				WHERE u.ShaleClientId = ?
-				  AND u.is_attorney = 1
-				""";
+				  AND u.%s = 1
+				""".formatted(RoleSemantics.FLAG_IS_ATTORNEY);
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
