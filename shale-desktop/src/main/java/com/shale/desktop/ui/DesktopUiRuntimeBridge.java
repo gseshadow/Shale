@@ -62,12 +62,14 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 			LiveBus bus = new LiveBus(negotiateClient, shaleClientId, userId);
 			bus.onEvent(dispatcher::dispatch);
+			bus.onConnectivityChange(dispatcher::dispatchConnectivity);
 
 			bus.connectAndJoin()
 					.whenComplete((ok, ex) ->
 					{
 						if (ex != null) {
 							System.out.println("LiveBus connect failed: " + ex.getMessage());
+							dispatcher.dispatchConnectivity(false, "Connect failed");
 							return;
 						}
 						liveBus = bus;
@@ -86,6 +88,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		if (bus != null) {
 			bus.shutdown();
 		}
+		dispatcher.dispatchConnectivity(false, "Signed out");
 
 		dbProvider.clear();
 		if (runtimeSessionService != null) {
@@ -181,5 +184,15 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	@Override
 	public void unsubscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
 		dispatcher.unsubscribeEntityUpdated(handler);
+	}
+
+	@Override
+	public void subscribeConnectivity(Consumer<ConnectivityEvent> handler) {
+		dispatcher.subscribeConnectivity(handler);
+	}
+
+	@Override
+	public void unsubscribeConnectivity(Consumer<ConnectivityEvent> handler) {
+		dispatcher.unsubscribeConnectivity(handler);
 	}
 }
