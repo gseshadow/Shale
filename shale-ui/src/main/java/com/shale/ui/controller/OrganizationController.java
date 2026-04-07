@@ -213,6 +213,9 @@ public final class OrganizationController {
 		dbExec.submit(() -> {
 			try {
 				List<OrganizationDao.RelatedCaseRow> loadedRelatedCases = organizationDao.findRelatedCases(organizationId);
+				int rowCount = loadedRelatedCases == null ? 0 : loadedRelatedCases.size();
+				System.out.println("Organization related-cases UI load: organizationId=" + organizationId
+						+ ", queryPath=OrganizationDao.findRelatedCases(CaseOrganizationsOnly), rowCount=" + rowCount);
 				Platform.runLater(() -> {
 					relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
 					renderRelatedCases();
