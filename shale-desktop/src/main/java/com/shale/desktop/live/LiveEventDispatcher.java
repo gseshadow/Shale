@@ -11,6 +11,7 @@ import com.google.gson.reflect.TypeToken;
 import com.shale.desktop.net.LiveBus;
 import com.shale.ui.services.UiRuntimeBridge.CaseUpdatedEvent;
 import com.shale.ui.services.UiRuntimeBridge.EntityUpdatedEvent;
+import com.shale.ui.services.UiRuntimeBridge.ConnectivityEvent;
 
 public final class LiveEventDispatcher {
 
@@ -25,6 +26,7 @@ public final class LiveEventDispatcher {
 
 	// Generic subscribers (recommended)
 	private final List<Consumer<EntityUpdatedEvent>> entityUpdatedSubscribers = new CopyOnWriteArrayList<>();
+	private final List<Consumer<ConnectivityEvent>> connectivitySubscribers = new CopyOnWriteArrayList<>();
 
 	public void subscribe(Consumer<String> handler) {
 		if (handler != null)
@@ -63,6 +65,26 @@ public final class LiveEventDispatcher {
 	public void unsubscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
 		if (handler != null)
 			entityUpdatedSubscribers.remove(handler);
+	}
+
+	public void subscribeConnectivity(Consumer<ConnectivityEvent> handler) {
+		if (handler != null)
+			connectivitySubscribers.add(handler);
+	}
+
+	public void unsubscribeConnectivity(Consumer<ConnectivityEvent> handler) {
+		if (handler != null)
+			connectivitySubscribers.remove(handler);
+	}
+
+	public void dispatchConnectivity(boolean online, String detail) {
+		ConnectivityEvent event = new ConnectivityEvent(online, detail == null ? "" : detail);
+		for (var handler : connectivitySubscribers) {
+			try {
+				handler.accept(event);
+			} catch (Exception ignored) {
+			}
+		}
 	}
 
 	public void dispatch(LiveBus.Event event) {
