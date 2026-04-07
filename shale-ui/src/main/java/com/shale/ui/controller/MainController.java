@@ -30,6 +30,9 @@ public final class MainController {
 	private Button newIntakeButton;
 
 	@FXML
+	private Button backButton;
+
+	@FXML
 	private Button updateButton;
 
 	// Sidebar nav buttons
@@ -102,11 +105,7 @@ public final class MainController {
 				userEmailLabel.setText(email);
 			}
 		}
-
-		showMyShale();
 	}
-
-	// === Global search (shell-level for now) ===
 
 	@FXML
 	private void onGlobalSearch() {
@@ -116,48 +115,32 @@ public final class MainController {
 		if (query.isEmpty()) {
 			return;
 		}
-
-		showSearchResults(query);
+		sceneManager.openSearchView(query);
 	}
-
-	// === Navigation handlers ===
 
 	@FXML
 	private void onNavMyShale() {
-		highlightNav(navMyShaleButton);
-		sectionTitleLabel.setText("My Shale");
-		sectionSubtitleLabel.setText("Overview of your tasks, assigned cases, and recent activity.");
-		showMyShale();
+		sceneManager.openMyShaleView();
 	}
 
 	@FXML
 	private void onNavCases() {
-		showCasesList();
+		sceneManager.openCasesListView();
 	}
 
 	@FXML
 	private void onNavContacts() {
-		showContactsList();
+		sceneManager.openContactsListView();
 	}
 
 	@FXML
 	private void onNavOrganizations() {
-		highlightNav(navOrganizationsButton);
-		sectionTitleLabel.setText("Organizations");
-		sectionSubtitleLabel.setText("Browse, search, and manage organizations.");
-
-		Node organizationsRoot = sceneManager.createOrganizationsView(this::openOrganization);
-		sectionContent.getChildren().setAll(organizationsRoot);
+		sceneManager.openOrganizationsListView();
 	}
 
 	@FXML
 	private void onNavTeam() {
-		highlightNav(navTeamButton);
-		sectionTitleLabel.setText("Team");
-		sectionSubtitleLabel.setText("See and manage your team members.");
-
-		Node teamRoot = sceneManager.createTeamView(sceneManager::openUserProfile);
-		sectionContent.getChildren().setAll(teamRoot);
+		sceneManager.openTeamListView();
 	}
 
 	@FXML
@@ -170,7 +153,12 @@ public final class MainController {
 
 	@FXML
 	private void onNewIntake() {
-		sceneManager.showNewIntakeDialog(this::openCase);
+		sceneManager.showNewIntakeDialog(caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"));
+	}
+
+	@FXML
+	private void onBack() {
+		sceneManager.goBack();
 	}
 
 	@FXML
@@ -203,28 +191,74 @@ public final class MainController {
 		sceneManager.showLogin();
 	}
 
-	// === Helpers ===
-	public void openCase(int caseId) {
+	public void showMyShaleView() {
+		highlightNav(navMyShaleButton);
+		sectionTitleLabel.setText("My Shale");
+		sectionSubtitleLabel.setText("Overview of your tasks, assigned cases, and recent activity.");
+		Node myShaleRoot = sceneManager.createMyShaleView(
+				caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"),
+				sceneManager::openUserProfile);
+		sectionContent.getChildren().setAll(myShaleRoot);
+	}
+
+	public void showCasesListView() {
+		highlightNav(navCasesButton);
+		sectionTitleLabel.setText("Cases");
+		sectionSubtitleLabel.setText("Browse, search, and manage cases.");
+		Node casesRoot = sceneManager.createCasesView(caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"));
+		sectionContent.getChildren().setAll(casesRoot);
+	}
+
+	public void showContactsListView() {
+		highlightNav(navContactsButton);
+		sectionTitleLabel.setText("Contacts");
+		sectionSubtitleLabel.setText("Manage clients, experts, and other contacts.");
+		Node contactsRoot = sceneManager.createContactsView(sceneManager::openContactProfile);
+		sectionContent.getChildren().setAll(contactsRoot);
+	}
+
+	public void showOrganizationsListView() {
+		highlightNav(navOrganizationsButton);
+		sectionTitleLabel.setText("Organizations");
+		sectionSubtitleLabel.setText("Browse, search, and manage organizations.");
+		Node organizationsRoot = sceneManager.createOrganizationsView(sceneManager::openOrganizationProfile);
+		sectionContent.getChildren().setAll(organizationsRoot);
+	}
+
+	public void showTeamListView() {
+		highlightNav(navTeamButton);
+		sectionTitleLabel.setText("Team");
+		sectionSubtitleLabel.setText("See and manage your team members.");
+		Node teamRoot = sceneManager.createTeamView(sceneManager::openUserProfile);
+		sectionContent.getChildren().setAll(teamRoot);
+	}
+
+	public void showSearchResultsView(String query) {
+		highlightNav(null);
+		sectionTitleLabel.setText("Search");
+		sectionSubtitleLabel.setText("Results for: \"" + query + "\"");
+		Node searchRoot = sceneManager.createSearchView(
+				query,
+				caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"),
+				sceneManager::openContactProfile,
+				sceneManager::openOrganizationProfile,
+				sceneManager::openUserProfile);
+		sectionContent.getChildren().setAll(searchRoot);
+	}
+
+	public void showCaseProfileView(int caseId, String sectionKey) {
 		highlightNav(navCasesButton);
 		sectionTitleLabel.setText("Case");
 		sectionSubtitleLabel.setText("Case #" + caseId);
-
-		Node caseRoot = sceneManager.createCaseView(caseId, this::openOrganization, this::showCasesList);
+		Node caseRoot = sceneManager.createCaseView(caseId, sectionKey, sceneManager::openOrganizationProfile, sceneManager::openCasesListView);
 		sectionContent.getChildren().setAll(caseRoot);
 	}
 
-
-	public void openOrganization(int organizationId) {
+	public void showOrganizationProfileView(int organizationId, Node organizationRoot) {
 		highlightNav(navOrganizationsButton);
 		sectionTitleLabel.setText("Organization");
 		sectionSubtitleLabel.setText("Organization #" + organizationId);
-
-		Node organizationRoot = sceneManager.createOrganizationView(organizationId, this::openCase, this::showOrganizationsList);
 		sectionContent.getChildren().setAll(organizationRoot);
-	}
-
-	public void openUser(int userId) {
-		sceneManager.openUserProfile(userId);
 	}
 
 	public void showUserView(int userId, Node userRoot) {
@@ -234,15 +268,6 @@ public final class MainController {
 		sectionContent.getChildren().setAll(userRoot);
 	}
 
-	public void openContact(int contactId) {
-		highlightNav(navContactsButton);
-		sectionTitleLabel.setText("Contact");
-		sectionSubtitleLabel.setText("Contact #" + contactId);
-
-		Node contactRoot = sceneManager.createContactView(contactId, this::openCase, this::showContactsList);
-		sectionContent.getChildren().setAll(contactRoot);
-	}
-
 	public void showContactView(int contactId, Node contactRoot) {
 		highlightNav(navContactsButton);
 		sectionTitleLabel.setText("Contact");
@@ -250,49 +275,10 @@ public final class MainController {
 		sectionContent.getChildren().setAll(contactRoot);
 	}
 
-	private void showCasesList() {
-		highlightNav(navCasesButton);
-		sectionTitleLabel.setText("Cases");
-		sectionSubtitleLabel.setText("Browse, search, and manage cases.");
-
-		Node casesRoot = sceneManager.createCasesView(this::openCase);
-		sectionContent.getChildren().setAll(casesRoot);
-	}
-
-	private void showContactsList() {
-		highlightNav(navContactsButton);
-		sectionTitleLabel.setText("Contacts");
-		sectionSubtitleLabel.setText("Manage clients, experts, and other contacts.");
-
-		Node contactsRoot = sceneManager.createContactsView(this::openContact);
-		sectionContent.getChildren().setAll(contactsRoot);
-	}
-
-	public void showContactsListView() {
-		showContactsList();
-	}
-
-	private void showOrganizationsList() {
-		highlightNav(navOrganizationsButton);
-		sectionTitleLabel.setText("Organizations");
-		sectionSubtitleLabel.setText("Browse, search, and manage organizations.");
-
-		Node organizationsRoot = sceneManager.createOrganizationsView(this::openOrganization);
-		sectionContent.getChildren().setAll(organizationsRoot);
-	}
-
-	private void showSearchResults(String query) {
-		highlightNav(null);
-		sectionTitleLabel.setText("Search");
-		sectionSubtitleLabel.setText("Results for: \"" + query + "\"");
-
-		Node searchRoot = sceneManager.createSearchView(query, this::openCase, this::openContact, this::openOrganization, sceneManager::openUserProfile);
-		sectionContent.getChildren().setAll(searchRoot);
-	}
-
-	private void showMyShale() {
-		Node myShaleRoot = sceneManager.createMyShaleView(this::openCase, sceneManager::openUserProfile);
-		sectionContent.getChildren().setAll(myShaleRoot);
+	public void updateBackButtonState(boolean canGoBack) {
+		if (backButton != null) {
+			backButton.setDisable(!canGoBack);
+		}
 	}
 
 	private void styleNavigationButtons() {

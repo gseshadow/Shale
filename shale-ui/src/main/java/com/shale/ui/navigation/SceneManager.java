@@ -48,10 +48,9 @@ public final class SceneManager {
 	private final AppState appState;
 	private final UiAuthService authService;
 	private final UiRuntimeBridge runtimeBridge;
-
 	private final DbSessionProvider dbSessionProvider;
-
 	private final UiUpdateLauncher updateLauncher;
+	private final NavigationManager navigationManager = new NavigationManager();
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -86,6 +85,154 @@ public final class SceneManager {
 			return c;
 		});
 		setScene(root, "Shale");
+		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
+		navigationManager.resetTo(AppRoute.myShale());
+		showRouteInternal(AppRoute.myShale());
+		notifyBackAvailabilityChanged();
+	}
+
+	public boolean canGoBack() {
+		return navigationManager.canGoBack();
+	}
+
+	public void goBack() {
+		navigationManager.popBackDestination().ifPresentOrElse(route -> {
+			System.out.println("[Navigation] Back destination -> " + route);
+			showRouteInternal(route);
+			notifyBackAvailabilityChanged();
+		}, () -> {
+			System.out.println("[Navigation] Back ignored; stack is empty.");
+			notifyBackAvailabilityChanged();
+		});
+	}
+
+	public void openMyShaleView() {
+		navigateTo(AppRoute.myShale(), true);
+	}
+
+	public void openCasesListView() {
+		navigateTo(AppRoute.casesList(), true);
+	}
+
+	public void openContactsListView() {
+		navigateTo(AppRoute.contactsList(), true);
+	}
+
+	public void openOrganizationsListView() {
+		navigateTo(AppRoute.organizationsList(), true);
+	}
+
+	public void openTeamListView() {
+		navigateTo(AppRoute.teamList(), true);
+	}
+
+	public void openSearchView(String query) {
+		navigateTo(AppRoute.search(query), true);
+	}
+
+	public void openCaseProfile(Integer caseId, String sectionKey) {
+		if (caseId == null || caseId <= 0) {
+			System.err.println("Ignoring case navigation for invalid caseId: " + caseId);
+			return;
+		}
+		navigateTo(AppRoute.caseProfile(caseId, sectionKey == null ? "OVERVIEW" : sectionKey), true);
+	}
+
+	public void openOrganizationProfile(Integer organizationId) {
+		if (organizationId == null || organizationId <= 0) {
+			System.err.println("Ignoring organization navigation for invalid organizationId: " + organizationId);
+			return;
+		}
+		navigateTo(AppRoute.organizationProfile(organizationId), true);
+	}
+
+	public void openUserProfile(Integer userId) {
+		System.out.println("[TRACE ASSIGNED_CASES][SceneManager.openUserProfile] selectedUserId=" + userId);
+		if (userId == null || userId <= 0) {
+			System.err.println("Ignoring user navigation for invalid userId: " + userId);
+			return;
+		}
+		navigateTo(AppRoute.userProfile(userId), true);
+	}
+
+	public void openContactProfile(Integer contactId) {
+		if (contactId == null || contactId <= 0) {
+			System.err.println("Ignoring contact navigation for invalid contactId: " + contactId);
+			return;
+		}
+		navigateTo(AppRoute.contactProfile(contactId), true);
+	}
+
+	private void navigateTo(AppRoute route, boolean addToHistory) {
+		Objects.requireNonNull(route, "route");
+		if (addToHistory) {
+			boolean recorded = navigationManager.recordNavigation(route);
+			if (!recorded) {
+				System.out.println("[Navigation] Ignored duplicate route: " + route);
+				return;
+			}
+			System.out.println("[Navigation] Route push -> " + route);
+		} else {
+			navigationManager.resetTo(route);
+			System.out.println("[Navigation] Route reset -> " + route);
+		}
+
+		showRouteInternal(route);
+		notifyBackAvailabilityChanged();
+	}
+
+	private void showRouteInternal(AppRoute route) {
+		MainController mainController = resolveMainController();
+		if (mainController == null) {
+			System.err.println("Unable to navigate; main controller is unavailable for route " + route);
+			return;
+		}
+
+		try {
+			switch (route.type()) {
+			case MY_SHALE -> mainController.showMyShaleView();
+			case CASES_LIST -> mainController.showCasesListView();
+			case CONTACTS_LIST -> mainController.showContactsListView();
+			case ORGANIZATIONS_LIST -> mainController.showOrganizationsListView();
+			case TEAM_LIST -> mainController.showTeamListView();
+			case SEARCH -> mainController.showSearchResultsView(route.searchQuery() == null ? "" : route.searchQuery());
+			case CASE_PROFILE -> mainController.showCaseProfileView(route.entityId(), route.sectionKey());
+			case CONTACT_PROFILE -> {
+				Parent contactRoot = createContactView(
+						route.entityId(),
+						caseId -> {
+							System.out.println("[Navigation] Rewired contact->case callback via SceneManager.openCaseProfile");
+							openCaseProfile(caseId, "OVERVIEW");
+						},
+						() -> {
+							System.out.println("[Navigation] Rewired contact delete/list callback via SceneManager.openContactsListView");
+							openContactsListView();
+						});
+				mainController.showContactView(route.entityId(), contactRoot);
+			}
+			case ORGANIZATION_PROFILE -> {
+				Parent organizationRoot = createOrganizationView(
+						route.entityId(),
+						caseId -> openCaseProfile(caseId, "OVERVIEW"),
+						this::openOrganizationsListView);
+				mainController.showOrganizationProfileView(route.entityId(), organizationRoot);
+			}
+			case USER_PROFILE -> {
+				Parent userRoot = createUserView(route.entityId());
+				mainController.showUserView(route.entityId(), userRoot);
+			}
+			default -> System.err.println("Unhandled route: " + route);
+			}
+		} catch (RuntimeException ex) {
+			System.err.println("Failed to open route " + route + ": " + ex.getMessage());
+		}
+	}
+
+	private void notifyBackAvailabilityChanged() {
+		MainController mainController = resolveMainController();
+		if (mainController != null) {
+			mainController.updateBackButtonState(canGoBack());
+		}
 	}
 
 	/** Backwards-compatible: no callback. */
@@ -102,15 +249,11 @@ public final class SceneManager {
 		{
 			CasesController c = (CasesController) controller;
 
-			// DB access is enforced inside DbSessionProvider (throws if not logged in)
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-
-			// NOTE: this requires you to update CasesController.init(...) to accept the callback
 			c.init(appState, runtimeBridge, caseDao, onOpenCase);
 			return c;
 		});
 	}
-
 
 	public Parent createOrganizationsView(Consumer<Integer> onOpenOrganization) {
 		return load("/fxml/organizations.fxml", controller ->
@@ -172,10 +315,8 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			UserDetailService userDetailService = new UserDetailService(userDao, caseDao);
 			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId -> {
-				MainController mainController = resolveMainController();
-				if (mainController != null) {
-					mainController.openCase(relatedCaseId);
-				}
+				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
+				openCaseProfile(relatedCaseId, "OVERVIEW");
 			});
 			return c;
 		});
@@ -210,7 +351,6 @@ public final class SceneManager {
 		});
 	}
 
-
 	public Parent createMyShaleView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser) {
 		return load("/fxml/my-shale.fxml", controller ->
 		{
@@ -224,11 +364,10 @@ public final class SceneManager {
 		});
 	}
 
-	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {
+	public Parent createCaseView(int caseId, String sectionKey, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {
 		return load("/fxml/case.fxml", controller ->
 		{
 			CaseController c = (CaseController) controller;
-
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
@@ -237,15 +376,19 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
 			c.init(caseId, caseDao, caseDetailService, caseTaskService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
-
+			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
 			c.setOnOpenContact(this::openContactProfile);
 			c.setOnOpenCase(relatedCaseId -> {
-				MainController mainController = resolveMainController();
-				if (mainController != null) {
-					mainController.openCase(relatedCaseId);
+				System.out.println("[Navigation] Rewired case related-case callback via SceneManager.openCaseProfile");
+				openCaseProfile(relatedCaseId, "OVERVIEW");
+			});
+			c.setOnSectionNavigation(selectedSectionKey -> {
+				if (selectedSectionKey == null) {
+					return;
 				}
+				openCaseProfile(caseId, selectedSectionKey);
 			});
 			c.setOnOpenTask(this::openTaskProfile);
 			c.setOnOpenOrganization(onOpenOrganization);
@@ -253,8 +396,12 @@ public final class SceneManager {
 		});
 	}
 
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {
+		return createCaseView(caseId, "OVERVIEW", onOpenOrganization, onCaseDeleted);
+	}
+
 	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
-		return createCaseView(caseId, onOpenOrganization, null);
+		return createCaseView(caseId, "OVERVIEW", onOpenOrganization, null);
 	}
 
 	public void showNewOrganizationDialog(Consumer<Integer> onOrganizationCreated) {
@@ -312,51 +459,9 @@ public final class SceneManager {
 		}
 	}
 
-	public void openUserProfile(Integer userId) {
-		System.out.println("[TRACE ASSIGNED_CASES][SceneManager.openUserProfile] selectedUserId=" + userId);
-		if (userId == null || userId <= 0) {
-			System.err.println("Ignoring user navigation for invalid userId: " + userId);
-			return;
-		}
-
-		try {
-			Parent userRoot = createUserView(userId);
-			MainController mainController = resolveMainController();
-			if (mainController == null) {
-				System.err.println("Unable to navigate to user profile; main controller is unavailable.");
-				return;
-			}
-			mainController.showUserView(userId, userRoot);
-		} catch (RuntimeException ex) {
-			System.err.println("Failed to open user profile for userId " + userId + ": " + ex.getMessage());
-		}
-	}
-
 	private void openStatusProfile(Integer statusId) {
 		System.out.println("Navigate to Status: " + statusId);
-		// TODO later:
-		// navigate to status manager / filter view / status editor
 	}
-
-	public void openContactProfile(Integer contactId) {
-		if (contactId == null || contactId <= 0) {
-			System.err.println("Ignoring contact navigation for invalid contactId: " + contactId);
-			return;
-		}
-
-		try {
-			MainController mainController = resolveMainController();
-			if (mainController == null) {
-				System.err.println("Unable to navigate to contact profile; main controller is unavailable.");
-				return;
-			}
-			Parent contactRoot = createContactView(contactId, mainController::openCase, mainController::showContactsListView);
-			mainController.showContactView(contactId, contactRoot);
-		} catch (RuntimeException ex) {
-			System.err.println("Failed to open contact profile for contactId " + contactId + ": " + ex.getMessage());
-		}
-	}
-
 
 	public void openTaskProfile(Long taskId) {
 		if (taskId == null || taskId <= 0) {
@@ -364,9 +469,7 @@ public final class SceneManager {
 			return;
 		}
 		System.out.println("navigate to task " + taskId);
-		// TODO: wire real task detail scene in Phase 2+
 	}
-
 
 	private MainController resolveMainController() {
 		Scene scene = stage.getScene();
@@ -392,7 +495,6 @@ public final class SceneManager {
 			URL url = Objects.requireNonNull(getClass().getResource(fxmlPath), "Missing FXML: " + fxmlPath);
 			FXMLLoader loader = new FXMLLoader(url);
 
-			// Defer controller instantiation so we can inject dependencies
 			loader.setControllerFactory(clz ->
 			{
 				try {
