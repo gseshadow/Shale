@@ -15,6 +15,8 @@ public final class AppNotification {
 	private final Instant createdAt;
 	private final NotificationTargetScope targetScope;
 	private final boolean showAsBanner;
+	private final Long durableNotificationId;
+	private final String eventKey;
 	private final BooleanProperty unread;
 
 	public AppNotification(
@@ -27,6 +29,21 @@ public final class AppNotification {
 			boolean unread,
 			boolean showAsBanner,
 			NotificationTargetScope targetScope) {
+		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, null, null);
+	}
+
+	public AppNotification(
+			String id,
+			NotificationCategory category,
+			NotificationSeverity severity,
+			String title,
+			String message,
+			Instant createdAt,
+			boolean unread,
+			boolean showAsBanner,
+			NotificationTargetScope targetScope,
+			Long durableNotificationId,
+			String eventKey) {
 		this.id = Objects.requireNonNull(id, "id");
 		this.category = Objects.requireNonNull(category, "category");
 		this.severity = Objects.requireNonNull(severity, "severity");
@@ -36,6 +53,8 @@ public final class AppNotification {
 		this.unread = new SimpleBooleanProperty(unread);
 		this.showAsBanner = showAsBanner;
 		this.targetScope = Objects.requireNonNull(targetScope, "targetScope");
+		this.durableNotificationId = durableNotificationId;
+		this.eventKey = eventKey;
 	}
 
 	public String getId() {
@@ -65,6 +84,14 @@ public final class AppNotification {
 
 	public NotificationTargetScope getTargetScope() {
 		return targetScope;
+	}
+
+	public Long getDurableNotificationId() {
+		return durableNotificationId;
+	}
+
+	public String getEventKey() {
+		return eventKey;
 	}
 	public boolean isShowAsBanner() {
 		return showAsBanner;

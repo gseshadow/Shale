@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.function.Consumer;
 
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyIntegerProperty;
@@ -26,6 +27,7 @@ public final class NotificationCenterService {
 			Comparator.comparing(AppNotification::getCreatedAt).reversed());
 	private final ReadOnlyIntegerWrapper unreadCount = new ReadOnlyIntegerWrapper(0);
 	private final ReadOnlyObjectWrapper<AppNotification> activeBanner = new ReadOnlyObjectWrapper<>();
+	private Consumer<List<AppNotification>> readListener = ignored -> {};
 
 	public NotificationCenterService() {
 		notifications.addListener((ListChangeListener<AppNotification>) change -> {
@@ -77,10 +79,33 @@ public final class NotificationCenterService {
 			return;
 		}
 		if (Platform.isFxApplicationThread()) {
-			notifications.add(notification);
+			pushNotificationInternal(notification);
 		} else {
-			Platform.runLater(() -> notifications.add(notification));
+			Platform.runLater(() -> pushNotificationInternal(notification));
 		}
+	}
+
+	private void pushNotificationInternal(AppNotification notification) {
+		boolean exists = notifications.stream().anyMatch(existing -> isSameNotification(existing, notification));
+		if (!exists) {
+			notifications.add(notification);
+		}
+	}
+
+	private static boolean isSameNotification(AppNotification left, AppNotification right) {
+		if (left == null || right == null) {
+			return false;
+		}
+		Long leftDurableId = left.getDurableNotificationId();
+		Long rightDurableId = right.getDurableNotificationId();
+		if (leftDurableId != null && rightDurableId != null) {
+			return leftDurableId.equals(rightDurableId);
+		}
+		String leftEventKey = left.getEventKey();
+		String rightEventKey = right.getEventKey();
+		return leftEventKey != null && !leftEventKey.isBlank()
+				&& rightEventKey != null
+				&& leftEventKey.equals(rightEventKey);
 	}
 
 	public void markReadById(String notificationId) {
@@ -135,23 +160,31 @@ public final class NotificationCenterService {
 	}
 
 	private void markMatchingReadInternal(Predicate<AppNotification> predicate) {
-		notifications.stream()
+		List<AppNotification> changed = notifications.stream()
 				.filter(predicate)
 				.filter(AppNotification::isUnread)
-				.forEach(item -> item.setUnread(false));
+				.toList();
+		changed.forEach(item -> item.setUnread(false));
 		recomputeDerivedState();
+		if (!changed.isEmpty()) {
+			readListener.accept(changed);
+		}
 	}
 
 	public void markAllRead() {
-		notifications.stream().filter(AppNotification::isUnread).forEach(notification -> notification.setUnread(false));
-		recomputeDerivedState();
+		markMatchingReadInternal(item -> true);
 	}
 
 	public void markRead(AppNotification notification) {
 		if (notification != null && notification.isUnread()) {
 			notification.setUnread(false);
 			recomputeDerivedState();
+			readListener.accept(List.of(notification));
 		}
+	}
+
+	public void setReadListener(Consumer<List<AppNotification>> listener) {
+		this.readListener = listener == null ? ignored -> {} : listener;
 	}
 
 	private void seed(Clock clock) {

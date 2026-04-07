@@ -82,6 +82,10 @@ public final class LiveUpdateNotificationBridge {
 		Instant createdAt = parseTimestamp(event.timestamp());
 		String title = "Task assigned to you";
 		String message = taskNotificationMessage(event);
+		Integer durableIdInt = intValue(event.patch().get("durableNotificationId"));
+		Long durableNotificationId = durableIdInt == null ? null : Long.valueOf(durableIdInt.longValue());
+		Object eventKeyValue = event.patch().get("eventKey");
+		String eventKey = eventKeyValue == null ? null : String.valueOf(eventKeyValue);
 		notificationCenterService.pushNotification(new AppNotification(
 				event.eventId() == null || event.eventId().isBlank()
 						? "task-" + event.entityId() + "-" + createdAt.toEpochMilli()
@@ -90,10 +94,12 @@ public final class LiveUpdateNotificationBridge {
 					NotificationSeverity.INFO,
 					title,
 					message,
-				createdAt,
-				true,
-				true,
-				NotificationTargetScope.USER_SCOPED));
+					createdAt,
+					true,
+					true,
+					NotificationTargetScope.USER_SCOPED,
+					durableNotificationId,
+					eventKey));
 	}
 
 	private boolean isTaskEventForCurrentUser(UiRuntimeBridge.EntityUpdatedEvent event) {

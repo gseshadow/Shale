@@ -10,6 +10,7 @@ import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.UserDao;
+import com.shale.data.dao.NotificationDao;
 
 /**
  * Thin case-task service facade for UI.
@@ -32,11 +33,13 @@ public final class CaseTaskService {
     private final TaskDao taskDao;
     private final UserDao userDao;
     private final UiRuntimeBridge runtimeBridge;
+    private final NotificationDao notificationDao;
 
-    public CaseTaskService(TaskDao taskDao, UserDao userDao, UiRuntimeBridge runtimeBridge) {
+    public CaseTaskService(TaskDao taskDao, UserDao userDao, UiRuntimeBridge runtimeBridge, NotificationDao notificationDao) {
         this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
         this.userDao = Objects.requireNonNull(userDao, "userDao");
         this.runtimeBridge = Objects.requireNonNull(runtimeBridge, "runtimeBridge");
+        this.notificationDao = Objects.requireNonNull(notificationDao, "notificationDao");
     }
 
     public List<CaseTaskListItemDto> loadTasksForCase(long caseId, int shaleClientId) {
@@ -179,10 +182,32 @@ public final class CaseTaskService {
             String caseName,
             Integer assigneeUserId,
             Integer previousAssigneeUserId) {
+        if (assigneeUserId == null || assigneeUserId <= 0) {
+            return;
+        }
+        if (updatedByUserId > 0 && updatedByUserId == assigneeUserId) {
+            return;
+        }
+        String eventKey = "task-assigned:" + taskId + ":" + (previousAssigneeUserId == null ? 0 : previousAssigneeUserId)
+                + ":" + assigneeUserId + ":" + updatedByUserId;
+        String message = buildTaskAssignedMessage(title, caseId, caseName, taskId);
+        Long durableId = notificationDao.createTaskAssignedNotification(
+                shaleClientId,
+                assigneeUserId,
+                "Task assigned to you",
+                message,
+                taskId,
+                updatedByUserId,
+                eventKey);
+
         StringBuilder patch = new StringBuilder("{");
         patch.append("\"assigneeUserId\":").append(assigneeUserId);
         if (previousAssigneeUserId != null) {
             patch.append(",\"previousAssigneeUserId\":").append(previousAssigneeUserId);
+        }
+        patch.append(",\"eventKey\":\"").append(escapeJson(eventKey)).append('"');
+        if (durableId != null) {
+            patch.append(",\"durableNotificationId\":").append(durableId);
         }
         if (title != null && !title.isBlank()) {
             patch.append(",\"title\":\"").append(escapeJson(title)).append('"');
@@ -198,6 +223,20 @@ public final class CaseTaskService {
                 .append('"');
         patch.append('}');
         runtimeBridge.publishEntityUpdated("Task", taskId, shaleClientId, updatedByUserId, patch.toString());
+    }
+
+    private static String buildTaskAssignedMessage(String title, Long caseId, String caseName, long taskId) {
+        String trimmedTitle = title == null ? "" : title.trim();
+        if (trimmedTitle.isBlank()) {
+            trimmedTitle = "Task #" + taskId;
+        }
+        if (caseName != null && !caseName.isBlank()) {
+            return "Task: " + trimmedTitle + " • Case: " + caseName;
+        }
+        if (caseId != null && caseId > 0) {
+            return "Task: " + trimmedTitle + " • Case #" + caseId;
+        }
+        return "Task: " + trimmedTitle;
     }
 
     private static String escapeJson(String text) {
