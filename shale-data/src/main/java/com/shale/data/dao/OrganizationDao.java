@@ -630,9 +630,9 @@ public final class OrganizationDao {
 				  )) AS ResponsibleAttorneyName
 				FROM dbo.CaseOrganizations co
 				INNER JOIN dbo.Cases c
-				  ON c.Id = co.CaseId
+				  ON c.Id = cp.CaseId
 				LEFT JOIN dbo.PartyRoles pr
-				  ON pr.Id = co.RoleId
+				  ON pr.Id = cp.PartyRoleId
 				OUTER APPLY (
 				    SELECT TOP (1)
 				      cu.UserId
@@ -689,7 +689,7 @@ public final class OrganizationDao {
 				}
 			}
 			System.out.println("Organization related-cases load: organizationId=" + organizationId
-					+ ", queryPath=CaseOrganizationsOnly, rowCount=" + out.size());
+					+ ", queryPath=CasePartiesOnly, rowCount=" + out.size());
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related cases for organization (id=" + organizationId + ")", e);
