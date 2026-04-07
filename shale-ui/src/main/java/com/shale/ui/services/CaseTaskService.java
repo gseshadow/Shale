@@ -1,5 +1,7 @@
 package com.shale.ui.services;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 
@@ -29,10 +31,12 @@ public final class CaseTaskService {
 
     private final TaskDao taskDao;
     private final UserDao userDao;
+    private final UiRuntimeBridge runtimeBridge;
 
-    public CaseTaskService(TaskDao taskDao, UserDao userDao) {
+    public CaseTaskService(TaskDao taskDao, UserDao userDao, UiRuntimeBridge runtimeBridge) {
         this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
         this.userDao = Objects.requireNonNull(userDao, "userDao");
+        this.runtimeBridge = Objects.requireNonNull(runtimeBridge, "runtimeBridge");
     }
 
     public List<CaseTaskListItemDto> loadTasksForCase(long caseId, int shaleClientId) {
@@ -80,6 +84,15 @@ public final class CaseTaskService {
                     request.shaleClientId(),
                     assigneeUserId,
                     request.createdByUserId());
+            publishTaskAssignmentEvent(
+                    taskId,
+                    request.shaleClientId(),
+                    request.createdByUserId(),
+                    request.title(),
+                    request.caseId(),
+                    null,
+                    assigneeUserId,
+                    null);
         }
         return taskId;
     }
@@ -102,6 +115,8 @@ public final class CaseTaskService {
 
     public void updateTask(UpdateTaskRequest request) {
         Objects.requireNonNull(request, "request");
+        TaskDetailDto before = taskDao.findTaskDetail(request.taskId(), request.shaleClientId());
+        Integer previousAssigneeUserId = before == null ? null : before.assignedUserId();
         taskDao.updateTask(
                 request.taskId(),
                 request.shaleClientId(),
@@ -119,6 +134,26 @@ public final class CaseTaskService {
         } else {
             taskDao.clearPrimaryUserAssignment(request.taskId(), request.shaleClientId());
         }
+        Integer nextAssigneeUserId = request.assigneeUserId() != null && request.assigneeUserId() > 0
+                ? request.assigneeUserId()
+                : null;
+        if (!Objects.equals(previousAssigneeUserId, nextAssigneeUserId) && nextAssigneeUserId != null) {
+            String title = request.title();
+            if ((title == null || title.isBlank()) && before != null) {
+                title = before.title();
+            }
+            Long caseId = before == null ? null : before.caseId();
+            String caseName = before == null ? null : before.caseName();
+            publishTaskAssignmentEvent(
+                    request.taskId(),
+                    request.shaleClientId(),
+                    request.changedByUserId(),
+                    title,
+                    caseId,
+                    caseName,
+                    nextAssigneeUserId,
+                    previousAssigneeUserId);
+        }
     }
 
     public void assignUserToTask(long taskId, int shaleClientId, int userId, int assignedByUserId) {
@@ -133,6 +168,43 @@ public final class CaseTaskService {
         return userDao.listUsersForTenant(shaleClientId).stream()
                 .map(row -> new AssignableUserOption(row.id(), row.displayName(), row.color()))
                 .toList();
+    }
+
+    private void publishTaskAssignmentEvent(
+            long taskId,
+            int shaleClientId,
+            int updatedByUserId,
+            String title,
+            Long caseId,
+            String caseName,
+            Integer assigneeUserId,
+            Integer previousAssigneeUserId) {
+        StringBuilder patch = new StringBuilder("{");
+        patch.append("\"assigneeUserId\":").append(assigneeUserId);
+        if (previousAssigneeUserId != null) {
+            patch.append(",\"previousAssigneeUserId\":").append(previousAssigneeUserId);
+        }
+        if (title != null && !title.isBlank()) {
+            patch.append(",\"title\":\"").append(escapeJson(title)).append('"');
+        }
+        if (caseId != null && caseId > 0) {
+            patch.append(",\"caseId\":").append(caseId);
+        }
+        if (caseName != null && !caseName.isBlank()) {
+            patch.append(",\"caseName\":\"").append(escapeJson(caseName)).append('"');
+        }
+        patch.append(",\"updatedAtUtc\":\"")
+                .append(LocalDateTime.now().atOffset(ZoneOffset.UTC))
+                .append('"');
+        patch.append('}');
+        runtimeBridge.publishEntityUpdated("Task", taskId, shaleClientId, updatedByUserId, patch.toString());
+    }
+
+    private static String escapeJson(String text) {
+        return text.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\r", "\\r")
+                .replace("\n", "\\n");
     }
 
     public record CreateTaskRequest(

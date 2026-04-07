@@ -398,7 +398,7 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge);
 			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser);
 			return c;
 		});
@@ -414,7 +414,7 @@ public final class SceneManager {
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge);
 			c.init(caseId, caseDao, caseDetailService, caseTaskService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
 			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);

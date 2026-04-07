@@ -69,29 +69,27 @@ public final class LiveUpdateNotificationBridge {
 		if (!isTaskEventForCurrentUser(event)) {
 			return;
 		}
+		if (isSelfAssignment(event)) {
+			return;
+		}
 		if (isDuplicate(event)) {
 			return;
 		}
-
-		boolean dueSoon = isDueSoon(event.patch());
-		NotificationPreferenceKey preferenceKey = dueSoon
-				? NotificationPreferenceKey.TASK_DUE_SOON
-				: NotificationPreferenceKey.TASK_ASSIGNED_TO_ME;
-		if (!notificationPreferencesService.isEnabled(preferenceKey)) {
+		if (!notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_ASSIGNED_TO_ME)) {
 			return;
 		}
 
 		Instant createdAt = parseTimestamp(event.timestamp());
-		String title = dueSoon ? "Task due soon" : "Task assigned to you";
+		String title = "Task assigned to you";
 		String message = taskNotificationMessage(event);
 		notificationCenterService.pushNotification(new AppNotification(
 				event.eventId() == null || event.eventId().isBlank()
 						? "task-" + event.entityId() + "-" + createdAt.toEpochMilli()
 						: event.eventId(),
-				NotificationCategory.TASK,
-				dueSoon ? NotificationSeverity.WARNING : NotificationSeverity.INFO,
-				title,
-				message,
+					NotificationCategory.TASK,
+					NotificationSeverity.INFO,
+					title,
+					message,
 				createdAt,
 				true,
 				true,
@@ -110,17 +108,19 @@ public final class LiveUpdateNotificationBridge {
 			return false;
 		}
 
-		Integer assigneeId = intValue(event.patch().get("assigneeUserId"));
-		if (assigneeId == null) {
-			assigneeId = intValue(event.patch().get("assignedUserId"));
-		}
-		if (assigneeId == null) {
-			assigneeId = intValue(event.patch().get("userId"));
-		}
-		if (assigneeId == null) {
+		Integer newAssigneeUserId = assigneeUserId(event.patch());
+		if (newAssigneeUserId == null || !newAssigneeUserId.equals(currentUserId)) {
 			return false;
 		}
-		return assigneeId.equals(currentUserId);
+		Integer previousAssigneeUserId = previousAssigneeUserId(event.patch());
+		return previousAssigneeUserId == null || !previousAssigneeUserId.equals(currentUserId);
+	}
+
+	private boolean isSelfAssignment(UiRuntimeBridge.EntityUpdatedEvent event) {
+		Integer currentUserId = appState.getUserId();
+		return currentUserId != null
+				&& currentUserId > 0
+				&& currentUserId.equals(event.updatedByUserId());
 	}
 
 	private boolean isDuplicate(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -184,34 +184,46 @@ public final class LiveUpdateNotificationBridge {
 		}
 	}
 
-	private static boolean isDueSoon(Map<String, Object> patch) {
+	private static Integer assigneeUserId(Map<String, Object> patch) {
 		if (patch == null) {
-			return false;
+			return null;
 		}
-		Object dueSoon = patch.get("dueSoon");
-		if (dueSoon instanceof Boolean bool) {
-			return bool;
+		Integer assigneeId = intValue(patch.get("assigneeUserId"));
+		if (assigneeId == null) {
+			assigneeId = intValue(patch.get("assignedUserId"));
 		}
-		Object dueAt = patch.get("dueAtUtc");
-		if (dueAt == null) {
-			dueAt = patch.get("dueAt");
+		if (assigneeId == null) {
+			assigneeId = intValue(patch.get("userId"));
 		}
-		if (!(dueAt instanceof String dueText) || dueText.isBlank()) {
-			return false;
+		return assigneeId;
+	}
+
+	private static Integer previousAssigneeUserId(Map<String, Object> patch) {
+		if (patch == null) {
+			return null;
 		}
-		try {
-			Instant due = OffsetDateTime.parse(dueText).toInstant();
-			Instant now = Instant.now();
-			return !due.isBefore(now.minusSeconds(60)) && due.isBefore(now.plusSeconds(48 * 3600));
-		} catch (DateTimeParseException ignored) {
-			return false;
+		Integer previous = intValue(patch.get("previousAssigneeUserId"));
+		if (previous == null) {
+			previous = intValue(patch.get("oldAssigneeUserId"));
 		}
+		if (previous == null) {
+			previous = intValue(patch.get("previousAssignedUserId"));
+		}
+		return previous;
 	}
 
 	private static String taskNotificationMessage(UiRuntimeBridge.EntityUpdatedEvent event) {
 		Object titleValue = event.patch().get("title");
 		String title = titleValue == null ? "" : String.valueOf(titleValue).trim();
 		if (!title.isBlank()) {
+			Object caseName = event.patch().get("caseName");
+			if (caseName != null && !String.valueOf(caseName).isBlank()) {
+				return "Task: " + title + " • Case: " + caseName;
+			}
+			Object caseId = event.patch().get("caseId");
+			if (caseId != null) {
+				return "Task: " + title + " • Case #" + caseId;
+			}
 			return "Task: " + title;
 		}
 		return "Task #" + event.entityId() + " was assigned to your queue.";
