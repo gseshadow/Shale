@@ -67,6 +67,39 @@
     -fx-font-weight: 600;
 }
 
+
+.topbar-back-button {
+    -fx-min-width: 32;
+    -fx-min-height: 32;
+    -fx-pref-width: 32;
+    -fx-pref-height: 32;
+    -fx-max-width: 32;
+    -fx-max-height: 32;
+    -fx-padding: 0;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-background-color: #4b7fce;
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+    -fx-alignment: center;
+    -fx-content-display: center;
+    -fx-cursor: hand;
+}
+
+.topbar-back-button:hover {
+    -fx-background-color: #5b8fe0;
+}
+
+.topbar-back-button:pressed {
+    -fx-background-color: #3f6fbc;
+}
+
+.topbar-back-button:disabled {
+    -fx-background-color: rgba(126, 148, 183, 0.62);
+    -fx-text-fill: rgba(255, 255, 255, 0.82);
+}
+
 /* Navigation rail and shell wrappers */
 .nav-rail,
 .sidebar,
