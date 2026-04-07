@@ -181,6 +181,7 @@ public final class MainController {
 		if (updateLauncher != null) {
 			try {
 				updateLauncher.launchUpdater();
+				sceneManager.onUpdaterLaunchSucceeded();
 			} catch (RuntimeException ex) {
 				sceneManager.showError(ex.getMessage());
 			}

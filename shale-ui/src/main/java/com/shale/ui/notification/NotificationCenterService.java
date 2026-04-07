@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyIntegerProperty;
@@ -82,6 +83,28 @@ public final class NotificationCenterService {
 		}
 	}
 
+	public void markReadById(String notificationId) {
+		if (notificationId == null || notificationId.isBlank()) {
+			return;
+		}
+		if (Platform.isFxApplicationThread()) {
+			markMatchingRead(item -> notificationId.equals(item.getId()));
+		} else {
+			Platform.runLater(() -> markMatchingRead(item -> notificationId.equals(item.getId())));
+		}
+	}
+
+	private void markMatchingRead(Predicate<AppNotification> predicate) {
+		if (predicate == null) {
+			return;
+		}
+		notifications.stream()
+				.filter(predicate)
+				.filter(AppNotification::isUnread)
+				.forEach(item -> item.setUnread(false));
+		recomputeDerivedState();
+	}
+
 	public void markAllRead() {
 		notifications.stream().filter(AppNotification::isUnread).forEach(notification -> notification.setUnread(false));
 		recomputeDerivedState();
@@ -148,9 +171,23 @@ public final class NotificationCenterService {
 
 	private void recomputeDerivedState() {
 		unreadCount.set((int) notifications.stream().filter(AppNotification::isUnread).count());
-		activeBanner.set(notificationsNewestFirst.stream()
+		activeBanner.set(notifications.stream()
 				.filter(AppNotification::isShowAsBanner)
-				.findFirst()
+				.filter(AppNotification::isUnread)
+				.max(Comparator
+						.comparingInt((AppNotification item) -> severityRank(item.getSeverity()))
+						.thenComparing(AppNotification::getCreatedAt))
 				.orElse(null));
+	}
+
+	private static int severityRank(NotificationSeverity severity) {
+		if (severity == null) {
+			return 0;
+		}
+		return switch (severity) {
+		case CRITICAL -> 3;
+		case WARNING -> 2;
+		case INFO -> 1;
+		};
 	}
 }
