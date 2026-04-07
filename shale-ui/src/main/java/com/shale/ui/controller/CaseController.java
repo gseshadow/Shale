@@ -465,6 +465,8 @@ public class CaseController {
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSectionName = "Overview";
+	private String initialSectionName = "Overview";
+	private Consumer<String> onSectionNavigation;
 
 	private final CaseOverviewRenderer overviewRenderer = new CaseOverviewRenderer();
 	private final CaseOverviewEditor overviewEditor = new CaseOverviewEditor();
@@ -537,6 +539,17 @@ public class CaseController {
 	public void setOnOpenCase(Consumer<Integer> onOpenCase) {
 		this.onOpenCase = onOpenCase;
 		this.taskCardFactory = buildTaskCardFactory(this::openTask);
+	}
+
+	public void setOnSectionNavigation(Consumer<String> onSectionNavigation) {
+		this.onSectionNavigation = onSectionNavigation;
+	}
+
+	public void setInitialSection(String sectionKey) {
+		String resolved = fromSectionKey(sectionKey);
+		if (resolved != null) {
+			this.initialSectionName = resolved;
+		}
 	}
 
 	/** Optional - if you don’t set this, card click will Sys.out for now */
@@ -769,12 +782,12 @@ public class CaseController {
 
 		for (String section : SECTIONS) {
 			Button button = createSectionButton(section);
-			button.setOnAction(e -> onSectionSelected(section));
+			button.setOnAction(e -> onSectionSelected(section, true));
 			sectionButtons.put(section, button);
 			sectionButtonsBox.getChildren().add(button);
 		}
 
-		onSectionSelected("Overview");
+		onSectionSelected(initialSectionName, false);
 	}
 
 	private Button createSectionButton(String section) {
@@ -837,7 +850,7 @@ public class CaseController {
 	// Section navigation
 	// ----------------------------
 
-	private void onSectionSelected(String sectionName) {
+	private void onSectionSelected(String sectionName, boolean userInitiated) {
 		if (sectionName == null)
 			return;
 
@@ -851,6 +864,42 @@ public class CaseController {
 		case "Details" -> showDetails();
 		default -> showGeneric(sectionName);
 		}
+
+		if (userInitiated && onSectionNavigation != null) {
+			onSectionNavigation.accept(toSectionKey(sectionName));
+		}
+	}
+
+
+	private static String toSectionKey(String sectionName) {
+		if (sectionName == null) {
+			return null;
+		}
+		return switch (sectionName) {
+		case "Overview" -> "OVERVIEW";
+		case "Tasks" -> "TASKS";
+		case "Timeline" -> "TIMELINE";
+		case "Details" -> "DETAILS";
+		case "Parties" -> "PARTIES";
+		case "Documents" -> "DOCUMENTS";
+		default -> sectionName.toUpperCase(Locale.ROOT);
+		};
+	}
+
+	private static String fromSectionKey(String sectionKey) {
+		if (sectionKey == null || sectionKey.isBlank()) {
+			return null;
+		}
+		String normalized = sectionKey.trim().toUpperCase(Locale.ROOT);
+		return switch (normalized) {
+		case "OVERVIEW" -> "Overview";
+		case "TASKS" -> "Tasks";
+		case "TIMELINE" -> "Timeline";
+		case "DETAILS" -> "Details";
+		case "PARTIES" -> "Parties";
+		case "DOCUMENTS" -> "Documents";
+		default -> null;
+		};
 	}
 
 	private void setActiveSectionButton(String activeSection) {
