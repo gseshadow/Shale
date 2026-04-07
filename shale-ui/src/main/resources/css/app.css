@@ -61,7 +61,7 @@
 }
 .app-title {
     -fx-font-size: 18px;
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
 }
 .user-email {
     -fx-font-weight: 600;
@@ -75,13 +75,15 @@
     -fx-pref-height: 32;
     -fx-max-width: 32;
     -fx-max-height: 32;
-    -fx-padding: 0;
+    -fx-padding: 0 0 1 0;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
     -fx-background-color: #4b7fce;
+    -fx-border-color: rgba(255, 255, 255, 0.22);
+    -fx-border-width: 1;
     -fx-text-fill: white;
-    -fx-font-size: 16px;
-    -fx-font-weight: 700;
+    -fx-font-size: 19px;
+    -fx-font-weight: 800;
     -fx-alignment: center;
     -fx-content-display: center;
     -fx-cursor: hand;
@@ -96,8 +98,9 @@
 }
 
 .topbar-back-button:disabled {
-    -fx-background-color: rgba(126, 148, 183, 0.62);
-    -fx-text-fill: rgba(255, 255, 255, 0.82);
+    -fx-background-color: rgba(105, 130, 170, 0.82);
+    -fx-border-color: rgba(255, 255, 255, 0.18);
+    -fx-text-fill: rgba(255, 255, 255, 0.92);
 }
 
 /* Navigation rail and shell wrappers */
@@ -147,13 +150,13 @@
 
 .sidebar-header,
 .section-title {
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
     -fx-text-fill: #e8f2ff;
 }
 
 .search-section-title {
     -fx-font-size: 15px;
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
     -fx-text-fill: #112542;
 }
 
@@ -219,7 +222,7 @@
     -fx-background-color: rgba(72, 122, 193, 0.95);
     -fx-border-color: rgba(255, 255, 255, 0.38);
     -fx-text-fill: white;
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
 }
 
 .surface-scroll,
@@ -230,7 +233,7 @@
 .transparent-scroll {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
-    -fx-padding: 0;
+    -fx-padding: 0 0 1 0;
 }
 
 .transparent-scroll .viewport {
@@ -256,7 +259,7 @@
 
 .app-dialog-title {
     -fx-font-size: 18px;
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
     -fx-text-fill: #112542;
 }
 
