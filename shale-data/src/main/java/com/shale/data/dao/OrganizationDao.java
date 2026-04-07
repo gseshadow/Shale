@@ -619,20 +619,22 @@ public final class OrganizationDao {
 				  c.CallerDate,
 				  c.StatuteOfLimitations,
 				  pr.Name AS PartyRoleName,
-				  CAST(NULL AS nvarchar(50)) AS Side,
-				  COALESCE(co.IsPrimary, 0) AS IsPrimary,
-				  co.Notes,
+				  cp.Side,
+				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
+				  cp.Notes,
 				  u.color AS ResponsibleAttorneyColor,
 				  LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
 				    COALESCE(u.name_last, '')
 				  )) AS ResponsibleAttorneyName
-				FROM dbo.CaseOrganizations co
+				FROM dbo.CaseParties cp
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cp.CaseId
 				LEFT JOIN dbo.PartyRoles pr
 				  ON pr.Id = cp.PartyRoleId
+				INNER JOIN dbo.Organizations o
+				  ON o.Id = cp.OrganizationId
 				OUTER APPLY (
 				    SELECT TOP (1)
 				      cu.UserId
@@ -644,21 +646,16 @@ public final class OrganizationDao {
 				) ra
 				LEFT JOIN dbo.Users u
 				  ON u.Id = ra.UserId
-				WHERE co.OrganizationId = ?
-				  AND EXISTS (
-				    SELECT 1
-				    FROM dbo.Organizations o
-				    WHERE o.Id = co.OrganizationId
-				      AND o.ShaleClientId = ?
-				      AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-				  )
+				WHERE cp.OrganizationId = ?
+				  AND o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 				  AND c.ShaleClientId = ?
 				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
 				ORDER BY
-				  CASE WHEN COALESCE(co.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+				  CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
 				  c.Name ASC,
 				  c.Id ASC,
-				  co.Id ASC;
+				  cp.Id ASC;
 				""";
 
 		try (Connection con = db.requireConnection();
