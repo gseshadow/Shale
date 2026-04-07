@@ -619,20 +619,20 @@ public final class OrganizationDao {
 				  c.CallerDate,
 				  c.StatuteOfLimitations,
 				  pr.Name AS PartyRoleName,
-				  cp.Side,
-				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
-				  cp.Notes,
+				  CAST(NULL AS nvarchar(50)) AS Side,
+				  COALESCE(co.IsPrimary, 0) AS IsPrimary,
+				  co.Notes,
 				  u.color AS ResponsibleAttorneyColor,
 				  LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
 				    COALESCE(u.name_last, '')
 				  )) AS ResponsibleAttorneyName
-				FROM dbo.CaseParties cp
+				FROM dbo.CaseOrganizations co
 				INNER JOIN dbo.Cases c
-				  ON c.Id = cp.CaseId
-				INNER JOIN dbo.PartyRoles pr
-				  ON pr.Id = cp.PartyRoleId
+				  ON c.Id = co.CaseId
+				LEFT JOIN dbo.PartyRoles pr
+				  ON pr.Id = co.RoleId
 				OUTER APPLY (
 				    SELECT TOP (1)
 				      cu.UserId
@@ -644,14 +644,21 @@ public final class OrganizationDao {
 				) ra
 				LEFT JOIN dbo.Users u
 				  ON u.Id = ra.UserId
-				WHERE cp.OrganizationId = ?
+				WHERE co.OrganizationId = ?
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.Organizations o
+				    WHERE o.Id = co.OrganizationId
+				      AND o.ShaleClientId = ?
+				      AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				  )
 				  AND c.ShaleClientId = ?
 				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
 				ORDER BY
-				  CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+				  CASE WHEN COALESCE(co.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
 				  c.Name ASC,
 				  c.Id ASC,
-				  cp.Id ASC;
+				  co.Id ASC;
 				""";
 
 		try (Connection con = db.requireConnection();
@@ -661,6 +668,7 @@ public final class OrganizationDao {
 			int idx = 1;
 			ps.setInt(idx++, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
 			ps.setInt(idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
 			ps.setInt(idx++, shaleClientId);
 
 			List<RelatedCaseRow> out = new ArrayList<>();
@@ -680,6 +688,8 @@ public final class OrganizationDao {
 					));
 				}
 			}
+			System.out.println("Organization related-cases load: organizationId=" + organizationId
+					+ ", queryPath=CaseOrganizationsOnly, rowCount=" + out.size());
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related cases for organization (id=" + organizationId + ")", e);
