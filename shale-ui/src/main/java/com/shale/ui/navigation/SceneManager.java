@@ -43,6 +43,7 @@ import java.util.function.Function;
 
 import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.notification.NotificationCenterService;
+import com.shale.ui.notification.LiveUpdateNotificationBridge;
 
 public final class SceneManager {
 
@@ -54,6 +55,7 @@ public final class SceneManager {
 	private final UiUpdateLauncher updateLauncher;
 	private final NavigationManager navigationManager = new NavigationManager();
 	private final NotificationCenterService notificationCenterService;
+	private final LiveUpdateNotificationBridge liveUpdateNotificationBridge;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -68,9 +70,11 @@ public final class SceneManager {
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
 		this.notificationCenterService = NotificationCenterService.seeded(Clock.systemUTC());
+		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService);
 	}
 
 	public void showLogin() {
+		liveUpdateNotificationBridge.stop();
 		var root = load("/fxml/login.fxml", controller ->
 		{
 			LoginController c = (LoginController) controller;
@@ -89,6 +93,7 @@ public final class SceneManager {
 			return c;
 		});
 		setScene(root, "Shale");
+		liveUpdateNotificationBridge.start();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());

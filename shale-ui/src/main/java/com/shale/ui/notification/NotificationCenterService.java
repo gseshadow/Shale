@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyIntegerProperty;
 import javafx.beans.property.ReadOnlyIntegerWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
@@ -38,6 +39,11 @@ public final class NotificationCenterService {
 		});
 	}
 
+
+	public static NotificationCenterService empty() {
+		return new NotificationCenterService();
+	}
+
 	public static NotificationCenterService seeded(Clock clock) {
 		NotificationCenterService service = new NotificationCenterService();
 		service.seed(Objects.requireNonNull(clock, "clock"));
@@ -62,6 +68,18 @@ public final class NotificationCenterService {
 
 	public Optional<AppNotification> getActiveBanner() {
 		return Optional.ofNullable(activeBanner.get());
+	}
+
+
+	public void pushNotification(AppNotification notification) {
+		if (notification == null) {
+			return;
+		}
+		if (Platform.isFxApplicationThread()) {
+			notifications.add(notification);
+		} else {
+			Platform.runLater(() -> notifications.add(notification));
+		}
 	}
 
 	public void markAllRead() {
