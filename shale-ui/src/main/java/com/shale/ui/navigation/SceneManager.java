@@ -47,6 +47,7 @@ import com.shale.ui.notification.NotificationCenterService;
 import com.shale.ui.notification.LiveUpdateNotificationBridge;
 import com.shale.ui.notification.ConnectivityNotificationProducer;
 import com.shale.ui.notification.SystemUpdateNotificationProducer;
+import com.shale.ui.notification.NotificationPreferencesService;
 
 public final class SceneManager {
 
@@ -61,6 +62,7 @@ public final class SceneManager {
 	private final LiveUpdateNotificationBridge liveUpdateNotificationBridge;
 	private final ConnectivityNotificationProducer connectivityNotificationProducer;
 	private final SystemUpdateNotificationProducer systemUpdateNotificationProducer;
+	private final NotificationPreferencesService notificationPreferencesService;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -75,9 +77,10 @@ public final class SceneManager {
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
 		this.notificationCenterService = NotificationCenterService.seeded(Clock.systemUTC());
-		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService);
-		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService);
-		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService);
+		this.notificationPreferencesService = new NotificationPreferencesService(appState);
+		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
+		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
+		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
 	}
 
 	public void showLogin() {
@@ -101,6 +104,7 @@ public final class SceneManager {
 			return c;
 		});
 		setScene(root, "Shale");
+		notificationPreferencesService.refreshActivePreferences();
 		liveUpdateNotificationBridge.start();
 		connectivityNotificationProducer.start();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");

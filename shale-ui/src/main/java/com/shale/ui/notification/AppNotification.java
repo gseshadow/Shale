@@ -13,6 +13,7 @@ public final class AppNotification {
 	private final String title;
 	private final String message;
 	private final Instant createdAt;
+	private final NotificationTargetScope targetScope;
 	private final boolean showAsBanner;
 	private final BooleanProperty unread;
 
@@ -24,7 +25,8 @@ public final class AppNotification {
 			String message,
 			Instant createdAt,
 			boolean unread,
-			boolean showAsBanner) {
+			boolean showAsBanner,
+			NotificationTargetScope targetScope) {
 		this.id = Objects.requireNonNull(id, "id");
 		this.category = Objects.requireNonNull(category, "category");
 		this.severity = Objects.requireNonNull(severity, "severity");
@@ -33,6 +35,7 @@ public final class AppNotification {
 		this.createdAt = Objects.requireNonNull(createdAt, "createdAt");
 		this.unread = new SimpleBooleanProperty(unread);
 		this.showAsBanner = showAsBanner;
+		this.targetScope = Objects.requireNonNull(targetScope, "targetScope");
 	}
 
 	public String getId() {
@@ -59,6 +62,10 @@ public final class AppNotification {
 		return createdAt;
 	}
 
+
+	public NotificationTargetScope getTargetScope() {
+		return targetScope;
+	}
 	public boolean isShowAsBanner() {
 		return showAsBanner;
 	}

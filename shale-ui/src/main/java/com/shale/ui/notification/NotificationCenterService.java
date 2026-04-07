@@ -132,7 +132,8 @@ public final class NotificationCenterService {
 						"A new Shale desktop release is ready to install.",
 						now.minus(15, ChronoUnit.MINUTES),
 						true,
-						true),
+						true,
+						NotificationTargetScope.SESSION_SYSTEM),
 				new AppNotification(
 						UUID.randomUUID().toString(),
 						NotificationCategory.CONNECTIVITY,
@@ -141,7 +142,8 @@ public final class NotificationCenterService {
 						"Connection to live services is degraded; data may be delayed.",
 						now.minus(45, ChronoUnit.MINUTES),
 						true,
-						true),
+						true,
+						NotificationTargetScope.SESSION_SYSTEM),
 				new AppNotification(
 						UUID.randomUUID().toString(),
 						NotificationCategory.TASK,
@@ -150,7 +152,8 @@ public final class NotificationCenterService {
 						"Prepare witness packet for Case #142 by tomorrow morning.",
 						now.minus(2, ChronoUnit.HOURS),
 						true,
-						true),
+						true,
+						NotificationTargetScope.USER_SCOPED),
 				new AppNotification(
 						UUID.randomUUID().toString(),
 						NotificationCategory.CASE,
@@ -159,7 +162,8 @@ public final class NotificationCenterService {
 						"Case #87 has a new note from opposing counsel.",
 						now.minus(1, ChronoUnit.DAYS),
 						false,
-						false),
+						false,
+						NotificationTargetScope.USER_SCOPED),
 				new AppNotification(
 						UUID.randomUUID().toString(),
 						NotificationCategory.TASK,
@@ -168,7 +172,8 @@ public final class NotificationCenterService {
 						"Filing deadline for Case #203 is in 48 hours.",
 						now.minus(2, ChronoUnit.DAYS),
 						true,
-						false))
+						false,
+						NotificationTargetScope.USER_SCOPED))
 				.forEach(notifications::add);
 		recomputeDerivedState();
 	}

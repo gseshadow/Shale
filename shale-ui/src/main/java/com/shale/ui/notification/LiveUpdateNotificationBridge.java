@@ -20,6 +20,7 @@ public final class LiveUpdateNotificationBridge {
 	private final UiRuntimeBridge runtimeBridge;
 	private final AppState appState;
 	private final NotificationCenterService notificationCenterService;
+	private final NotificationPreferencesService notificationPreferencesService;
 	private final Clock clock;
 	private final Map<String, Instant> recentEventKeys = new LinkedHashMap<>();
 	private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> eventHandler = this::handleEntityUpdated;
@@ -29,18 +30,21 @@ public final class LiveUpdateNotificationBridge {
 	public LiveUpdateNotificationBridge(
 			UiRuntimeBridge runtimeBridge,
 			AppState appState,
-			NotificationCenterService notificationCenterService) {
-		this(runtimeBridge, appState, notificationCenterService, Clock.systemUTC());
+			NotificationCenterService notificationCenterService,
+			NotificationPreferencesService notificationPreferencesService) {
+		this(runtimeBridge, appState, notificationCenterService, notificationPreferencesService, Clock.systemUTC());
 	}
 
 	LiveUpdateNotificationBridge(
 			UiRuntimeBridge runtimeBridge,
 			AppState appState,
 			NotificationCenterService notificationCenterService,
+			NotificationPreferencesService notificationPreferencesService,
 			Clock clock) {
 		this.runtimeBridge = Objects.requireNonNull(runtimeBridge, "runtimeBridge");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.notificationCenterService = Objects.requireNonNull(notificationCenterService, "notificationCenterService");
+		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.clock = Objects.requireNonNull(clock, "clock");
 	}
 
@@ -72,20 +76,29 @@ public final class LiveUpdateNotificationBridge {
 			return;
 		}
 
+		boolean dueSoon = isDueSoon(event.patch());
+		NotificationPreferenceKey preferenceKey = dueSoon
+				? NotificationPreferenceKey.TASK_DUE_SOON
+				: NotificationPreferenceKey.TASK_ASSIGNED_TO_ME;
+		if (!notificationPreferencesService.isEnabled(preferenceKey)) {
+			return;
+		}
+
 		Instant createdAt = parseTimestamp(event.timestamp());
-		String title = isDueSoon(event.patch()) ? "Task due soon" : "Task assigned to you";
+		String title = dueSoon ? "Task due soon" : "Task assigned to you";
 		String message = taskNotificationMessage(event);
 		notificationCenterService.pushNotification(new AppNotification(
 				event.eventId() == null || event.eventId().isBlank()
 						? "task-" + event.entityId() + "-" + createdAt.toEpochMilli()
 						: event.eventId(),
 				NotificationCategory.TASK,
-				isDueSoon(event.patch()) ? NotificationSeverity.WARNING : NotificationSeverity.INFO,
+				dueSoon ? NotificationSeverity.WARNING : NotificationSeverity.INFO,
 				title,
 				message,
 				createdAt,
 				true,
-				true));
+				true,
+				NotificationTargetScope.USER_SCOPED));
 	}
 
 	private boolean isTaskEventForCurrentUser(UiRuntimeBridge.EntityUpdatedEvent event) {

@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 public final class ConnectivityNotificationProducer {
 	private final UiRuntimeBridge runtimeBridge;
 	private final NotificationCenterService notificationCenterService;
+	private final NotificationPreferencesService notificationPreferencesService;
 	private final Clock clock;
 	private final Consumer<UiRuntimeBridge.ConnectivityEvent> handler = this::onConnectivityChanged;
 
@@ -18,13 +19,21 @@ public final class ConnectivityNotificationProducer {
 	private boolean hasSeenOnline;
 	private String activeOfflineNotificationId;
 
-	public ConnectivityNotificationProducer(UiRuntimeBridge runtimeBridge, NotificationCenterService notificationCenterService) {
-		this(runtimeBridge, notificationCenterService, Clock.systemUTC());
+	public ConnectivityNotificationProducer(
+			UiRuntimeBridge runtimeBridge,
+			NotificationCenterService notificationCenterService,
+			NotificationPreferencesService notificationPreferencesService) {
+		this(runtimeBridge, notificationCenterService, notificationPreferencesService, Clock.systemUTC());
 	}
 
-	ConnectivityNotificationProducer(UiRuntimeBridge runtimeBridge, NotificationCenterService notificationCenterService, Clock clock) {
+	ConnectivityNotificationProducer(
+			UiRuntimeBridge runtimeBridge,
+			NotificationCenterService notificationCenterService,
+			NotificationPreferencesService notificationPreferencesService,
+			Clock clock) {
 		this.runtimeBridge = Objects.requireNonNull(runtimeBridge, "runtimeBridge");
 		this.notificationCenterService = Objects.requireNonNull(notificationCenterService, "notificationCenterService");
+		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.clock = Objects.requireNonNull(clock, "clock");
 	}
 
@@ -69,6 +78,9 @@ public final class ConnectivityNotificationProducer {
 	}
 
 	private void handleOffline(UiRuntimeBridge.ConnectivityEvent event) {
+		if (!notificationPreferencesService.isEnabled(NotificationPreferenceKey.CONNECTIVITY_STATUS)) {
+			return;
+		}
 		activeOfflineNotificationId = "offline-" + Instant.now(clock).toEpochMilli();
 		notificationCenterService.pushNotification(new AppNotification(
 				activeOfflineNotificationId,
@@ -78,7 +90,8 @@ public final class ConnectivityNotificationProducer {
 				"Connection lost to live services." + suffix(event.detail()),
 				Instant.now(clock),
 				true,
-				true));
+				true,
+				NotificationTargetScope.SESSION_SYSTEM));
 	}
 
 	private void handleOnline(UiRuntimeBridge.ConnectivityEvent event) {
@@ -87,6 +100,9 @@ public final class ConnectivityNotificationProducer {
 			activeOfflineNotificationId = null;
 		}
 		notificationCenterService.markReadMatching(this::isOfflineBannerNotification);
+		if (!notificationPreferencesService.isEnabled(NotificationPreferenceKey.CONNECTIVITY_STATUS)) {
+			return;
+		}
 		notificationCenterService.pushNotification(new AppNotification(
 				"online-" + Instant.now(clock).toEpochMilli(),
 				NotificationCategory.NETWORK,
@@ -95,7 +111,8 @@ public final class ConnectivityNotificationProducer {
 				"Connection restored to live services." + suffix(event.detail()),
 				Instant.now(clock),
 				true,
-				false));
+				false,
+				NotificationTargetScope.SESSION_SYSTEM));
 	}
 
 	private boolean isOfflineBannerNotification(AppNotification notification) {
