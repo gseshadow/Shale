@@ -70,6 +70,7 @@ public final class LiveBus {
 	private volatile LiveBusClient wsClient;
 	private volatile String groupName;
 	private volatile String connectionId;
+	private volatile boolean suppressConnectivityNotifications;
 
 	private final String clientInstanceId = UUID.randomUUID().toString();
 
@@ -81,6 +82,7 @@ public final class LiveBus {
 	}
 
 	public CompletableFuture<Void> connectAndJoin() {
+		suppressConnectivityNotifications = false;
 		groupName = "client-" + shaleClientId;
 		return CompletableFuture.supplyAsync(() ->
 		{
@@ -189,7 +191,12 @@ public final class LiveBus {
 	}
 
 	public void shutdown() {
-		// no-op for now
+		suppressConnectivityNotifications = true;
+		LiveBusClient client = wsClient;
+		wsClient = null;
+		if (client != null) {
+			client.closeSilently();
+		}
 	}
 
 	private void handleInbound(String text) {
@@ -263,6 +270,9 @@ public final class LiveBus {
 	}
 
 	private void emitConnectivity(boolean online, String detail) {
+		if (suppressConnectivityNotifications) {
+			return;
+		}
 		for (var listener : connectivityListeners) {
 			try {
 				listener.accept(online, detail == null ? "" : detail);

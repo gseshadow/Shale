@@ -3,6 +3,7 @@ package com.shale.ui.notification;
 import com.shale.ui.services.UiRuntimeBridge;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -13,11 +14,14 @@ public final class ConnectivityNotificationProducer {
 	private final NotificationPreferencesService notificationPreferencesService;
 	private final Clock clock;
 	private final Consumer<UiRuntimeBridge.ConnectivityEvent> handler = this::onConnectivityChanged;
+	private static final Duration OFFLINE_TRANSITION_DEBOUNCE = Duration.ofSeconds(5);
 
 	private boolean started;
 	private Boolean onlineState;
-	private boolean hasSeenOnline;
+	private boolean baselineOnlineEstablished;
+	private Instant lastOnlineAt;
 	private String activeOfflineNotificationId;
+	private boolean offlineNotificationActive;
 
 	public ConnectivityNotificationProducer(
 			UiRuntimeBridge runtimeBridge,
@@ -52,8 +56,10 @@ public final class ConnectivityNotificationProducer {
 		runtimeBridge.unsubscribeConnectivity(handler);
 		started = false;
 		onlineState = null;
-		hasSeenOnline = false;
+		baselineOnlineEstablished = false;
+		lastOnlineAt = null;
 		activeOfflineNotificationId = null;
+		offlineNotificationActive = false;
 	}
 
 	private void onConnectivityChanged(UiRuntimeBridge.ConnectivityEvent event) {
@@ -64,55 +70,82 @@ public final class ConnectivityNotificationProducer {
 		if (onlineState != null && onlineState.booleanValue() == online) {
 			return;
 		}
-		boolean wasOnline = Boolean.TRUE.equals(onlineState);
 		onlineState = online;
 		if (online) {
-			hasSeenOnline = true;
 			handleOnline(event);
-			return;
-		}
-		if (!hasSeenOnline || !wasOnline) {
 			return;
 		}
 		handleOffline(event);
 	}
 
 	private void handleOffline(UiRuntimeBridge.ConnectivityEvent event) {
-		if (!notificationPreferencesService.isEnabled(NotificationPreferenceKey.CONNECTIVITY_STATUS)) {
+		if (!baselineOnlineEstablished || !Boolean.FALSE.equals(onlineState)) {
 			return;
 		}
-		activeOfflineNotificationId = "offline-" + Instant.now(clock).toEpochMilli();
+		if (isSuppressedOfflineDetail(event.detail())) {
+			return;
+		}
+		Instant now = Instant.now(clock);
+		if (lastOnlineAt != null && Duration.between(lastOnlineAt, now).compareTo(OFFLINE_TRANSITION_DEBOUNCE) < 0) {
+			return;
+		}
+		if (!notificationPreferencesService.isEnabled(NotificationPreferenceKey.CONNECTIVITY_STATUS)) {
+			offlineNotificationActive = true;
+			return;
+		}
+		activeOfflineNotificationId = "offline-" + now.toEpochMilli();
 		notificationCenterService.pushNotification(new AppNotification(
 				activeOfflineNotificationId,
 				NotificationCategory.NETWORK,
 				NotificationSeverity.CRITICAL,
 				"Offline",
 				"Connection lost to live services." + suffix(event.detail()),
-				Instant.now(clock),
+				now,
 				true,
 				true,
 				NotificationTargetScope.SESSION_SYSTEM));
+		offlineNotificationActive = true;
 	}
 
 	private void handleOnline(UiRuntimeBridge.ConnectivityEvent event) {
+		Instant now = Instant.now(clock);
+		lastOnlineAt = now;
+		if (!baselineOnlineEstablished) {
+			baselineOnlineEstablished = true;
+			return;
+		}
 		if (activeOfflineNotificationId != null) {
 			notificationCenterService.markReadById(activeOfflineNotificationId);
 			activeOfflineNotificationId = null;
 		}
 		notificationCenterService.markReadMatching(this::isOfflineBannerNotification);
+		if (!offlineNotificationActive) {
+			return;
+		}
+		offlineNotificationActive = false;
 		if (!notificationPreferencesService.isEnabled(NotificationPreferenceKey.CONNECTIVITY_STATUS)) {
 			return;
 		}
 		notificationCenterService.pushNotification(new AppNotification(
-				"online-" + Instant.now(clock).toEpochMilli(),
+				"online-" + now.toEpochMilli(),
 				NotificationCategory.NETWORK,
 				NotificationSeverity.INFO,
 				"Back online",
 				"Connection restored to live services." + suffix(event.detail()),
-				Instant.now(clock),
+				now,
 				true,
 				false,
 				NotificationTargetScope.SESSION_SYSTEM));
+	}
+
+	private static boolean isSuppressedOfflineDetail(String detail) {
+		if (detail == null) {
+			return false;
+		}
+		String normalized = detail.toLowerCase();
+		return normalized.contains("logout")
+				|| normalized.contains("signout")
+				|| normalized.contains("shutdown");
 	}
 
 	private boolean isOfflineBannerNotification(AppNotification notification) {
