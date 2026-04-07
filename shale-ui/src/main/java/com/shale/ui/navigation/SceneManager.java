@@ -6,6 +6,7 @@ import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.NotificationDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.ContactViewController;
@@ -35,12 +36,20 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.net.URL;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.shale.ui.services.UiUpdateLauncher;
+import com.shale.ui.services.UiUpdateLauncher.UpdateCheckResult;
+import com.shale.ui.notification.NotificationCenterService;
+import com.shale.ui.notification.LiveUpdateNotificationBridge;
+import com.shale.ui.notification.ConnectivityNotificationProducer;
+import com.shale.ui.notification.SystemUpdateNotificationProducer;
+import com.shale.ui.notification.NotificationPreferencesService;
+import com.shale.ui.notification.DurableNotificationService;
 
 public final class SceneManager {
 
@@ -51,6 +60,12 @@ public final class SceneManager {
 	private final DbSessionProvider dbSessionProvider;
 	private final UiUpdateLauncher updateLauncher;
 	private final NavigationManager navigationManager = new NavigationManager();
+	private final NotificationCenterService notificationCenterService;
+	private final LiveUpdateNotificationBridge liveUpdateNotificationBridge;
+	private final ConnectivityNotificationProducer connectivityNotificationProducer;
+	private final SystemUpdateNotificationProducer systemUpdateNotificationProducer;
+	private final NotificationPreferencesService notificationPreferencesService;
+	private final DurableNotificationService durableNotificationService;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -64,9 +79,27 @@ public final class SceneManager {
 		this.runtimeBridge = runtimeBridge;
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
+		this.notificationCenterService = createNotificationCenterService();
+		this.notificationPreferencesService = new NotificationPreferencesService(appState);
+		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState);
+		this.notificationCenterService.setReadListener(durableNotificationService::markRead);
+		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
+		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
+		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
+	}
+
+	private NotificationCenterService createNotificationCenterService() {
+		boolean seedDemoNotifications = Boolean.getBoolean("shale.notifications.seedDemo");
+		if (seedDemoNotifications) {
+			return NotificationCenterService.seeded(Clock.systemUTC());
+		}
+		return NotificationCenterService.empty();
 	}
 
 	public void showLogin() {
+		liveUpdateNotificationBridge.stop();
+		connectivityNotificationProducer.stop();
+		notificationCenterService.clearAll();
 		var root = load("/fxml/login.fxml", controller ->
 		{
 			LoginController c = (LoginController) controller;
@@ -80,15 +113,28 @@ public final class SceneManager {
 		var root = load("/fxml/main.fxml", controller ->
 		{
 			MainController c = (MainController) controller;
-			c.init(this, appState, runtimeBridge);
+			c.init(this, appState, runtimeBridge, notificationCenterService);
 			c.setUpdateLauncher(updateLauncher);
 			return c;
 		});
 		setScene(root, "Shale");
+		notificationPreferencesService.refreshActivePreferences();
+		durableNotificationService.loadUnreadInto(notificationCenterService);
+		liveUpdateNotificationBridge.start();
+		connectivityNotificationProducer.start();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());
 		notifyBackAvailabilityChanged();
+	}
+
+
+	public void onUpdateCheckCompleted(UpdateCheckResult result) {
+		systemUpdateNotificationProducer.onUpdateCheckResult(result);
+	}
+
+	public void onUpdaterLaunchSucceeded() {
+		systemUpdateNotificationProducer.onUpdaterLaunchSucceeded();
 	}
 
 	public boolean canGoBack() {
@@ -358,7 +404,8 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser);
 			return c;
 		});
@@ -374,7 +421,8 @@ public final class SceneManager {
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(caseId, caseDao, caseDetailService, caseTaskService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
 			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);
