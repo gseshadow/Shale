@@ -94,6 +94,7 @@ public final class SceneManager {
 	public void showLogin() {
 		liveUpdateNotificationBridge.stop();
 		connectivityNotificationProducer.stop();
+		notificationCenterService.clearAll();
 		var root = load("/fxml/login.fxml", controller ->
 		{
 			LoginController c = (LoginController) controller;

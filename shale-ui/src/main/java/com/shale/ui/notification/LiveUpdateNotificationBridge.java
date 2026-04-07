@@ -69,9 +69,6 @@ public final class LiveUpdateNotificationBridge {
 		if (!isTaskEventForCurrentUser(event)) {
 			return;
 		}
-		if (isOwnEcho(event)) {
-			return;
-		}
 		if (isDuplicate(event)) {
 			return;
 		}
@@ -124,11 +121,6 @@ public final class LiveUpdateNotificationBridge {
 			return false;
 		}
 		return assigneeId.equals(currentUserId);
-	}
-
-	private boolean isOwnEcho(UiRuntimeBridge.EntityUpdatedEvent event) {
-		String mine = runtimeBridge.getClientInstanceId();
-		return mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId());
 	}
 
 	private boolean isDuplicate(UiRuntimeBridge.EntityUpdatedEvent event) {

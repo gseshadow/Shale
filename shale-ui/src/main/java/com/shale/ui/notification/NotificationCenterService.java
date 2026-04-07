@@ -90,6 +90,39 @@ public final class NotificationCenterService {
 		markReadMatching(item -> notificationId.equals(item.getId()));
 	}
 
+	public void clearAll() {
+		if (Platform.isFxApplicationThread()) {
+			notifications.clear();
+			recomputeDerivedState();
+		} else {
+			Platform.runLater(() -> {
+				notifications.clear();
+				recomputeDerivedState();
+			});
+		}
+	}
+
+	public void clearSessionScoped() {
+		clearMatching(notification -> notification != null
+				&& notification.getTargetScope() == NotificationTargetScope.SESSION_SYSTEM);
+	}
+
+	public void clearMatching(Predicate<AppNotification> predicate) {
+		if (predicate == null) {
+			return;
+		}
+		if (Platform.isFxApplicationThread()) {
+			clearMatchingInternal(predicate);
+		} else {
+			Platform.runLater(() -> clearMatchingInternal(predicate));
+		}
+	}
+
+	private void clearMatchingInternal(Predicate<AppNotification> predicate) {
+		notifications.removeIf(predicate);
+		recomputeDerivedState();
+	}
+
 	public void markReadMatching(Predicate<AppNotification> predicate) {
 		if (predicate == null) {
 			return;
