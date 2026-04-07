@@ -116,11 +116,14 @@ public final class ConnectivityNotificationProducer {
 	}
 
 	private boolean isOfflineBannerNotification(AppNotification notification) {
-		return notification != null
-				&& notification.getCategory() == NotificationCategory.NETWORK
-				&& notification.isShowAsBanner()
-				&& "Offline".equals(notification.getTitle())
-				&& notification.isUnread();
+		if (notification == null || !notification.isUnread() || !notification.isShowAsBanner()) {
+			return false;
+		}
+		String title = notification.getTitle();
+		boolean looksOffline = title != null && title.toLowerCase().startsWith("offline");
+		return looksOffline
+				&& (notification.getCategory() == NotificationCategory.NETWORK
+						|| notification.getCategory() == NotificationCategory.CONNECTIVITY);
 	}
 
 	private static String suffix(String detail) {
