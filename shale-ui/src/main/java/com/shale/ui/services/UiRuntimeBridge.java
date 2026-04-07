@@ -46,6 +46,12 @@ public interface UiRuntimeBridge {
 	default void unsubscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
 	}
 
+	default void subscribeConnectivity(Consumer<ConnectivityEvent> handler) {
+	}
+
+	default void unsubscribeConnectivity(Consumer<ConnectivityEvent> handler) {
+	}
+
 	// --- Case-specific subscriptions (kept for now)
 	default void subscribeCaseUpdated(Consumer<CaseUpdatedEvent> handler) {
 	}
@@ -78,6 +84,12 @@ public interface UiRuntimeBridge {
 			String patchRaw,
 			Map<String, Object> patch,
 			String clientInstanceId
+	) {
+	}
+
+	record ConnectivityEvent(
+			boolean online,
+			String detail
 	) {
 	}
 
