@@ -35,12 +35,19 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.net.URL;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.shale.ui.services.UiUpdateLauncher;
+import com.shale.ui.services.UiUpdateLauncher.UpdateCheckResult;
+import com.shale.ui.notification.NotificationCenterService;
+import com.shale.ui.notification.LiveUpdateNotificationBridge;
+import com.shale.ui.notification.ConnectivityNotificationProducer;
+import com.shale.ui.notification.SystemUpdateNotificationProducer;
+import com.shale.ui.notification.NotificationPreferencesService;
 
 public final class SceneManager {
 
@@ -51,6 +58,11 @@ public final class SceneManager {
 	private final DbSessionProvider dbSessionProvider;
 	private final UiUpdateLauncher updateLauncher;
 	private final NavigationManager navigationManager = new NavigationManager();
+	private final NotificationCenterService notificationCenterService;
+	private final LiveUpdateNotificationBridge liveUpdateNotificationBridge;
+	private final ConnectivityNotificationProducer connectivityNotificationProducer;
+	private final SystemUpdateNotificationProducer systemUpdateNotificationProducer;
+	private final NotificationPreferencesService notificationPreferencesService;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -64,9 +76,25 @@ public final class SceneManager {
 		this.runtimeBridge = runtimeBridge;
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
+		this.notificationCenterService = createNotificationCenterService();
+		this.notificationPreferencesService = new NotificationPreferencesService(appState);
+		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
+		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
+		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
+	}
+
+	private NotificationCenterService createNotificationCenterService() {
+		boolean seedDemoNotifications = Boolean.getBoolean("shale.notifications.seedDemo");
+		if (seedDemoNotifications) {
+			return NotificationCenterService.seeded(Clock.systemUTC());
+		}
+		return NotificationCenterService.empty();
 	}
 
 	public void showLogin() {
+		liveUpdateNotificationBridge.stop();
+		connectivityNotificationProducer.stop();
+		notificationCenterService.clearAll();
 		var root = load("/fxml/login.fxml", controller ->
 		{
 			LoginController c = (LoginController) controller;
@@ -80,15 +108,27 @@ public final class SceneManager {
 		var root = load("/fxml/main.fxml", controller ->
 		{
 			MainController c = (MainController) controller;
-			c.init(this, appState, runtimeBridge);
+			c.init(this, appState, runtimeBridge, notificationCenterService);
 			c.setUpdateLauncher(updateLauncher);
 			return c;
 		});
 		setScene(root, "Shale");
+		notificationPreferencesService.refreshActivePreferences();
+		liveUpdateNotificationBridge.start();
+		connectivityNotificationProducer.start();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());
 		notifyBackAvailabilityChanged();
+	}
+
+
+	public void onUpdateCheckCompleted(UpdateCheckResult result) {
+		systemUpdateNotificationProducer.onUpdateCheckResult(result);
+	}
+
+	public void onUpdaterLaunchSucceeded() {
+		systemUpdateNotificationProducer.onUpdaterLaunchSucceeded();
 	}
 
 	public boolean canGoBack() {
