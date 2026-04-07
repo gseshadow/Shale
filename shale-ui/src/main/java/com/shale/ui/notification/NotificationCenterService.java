@@ -87,17 +87,21 @@ public final class NotificationCenterService {
 		if (notificationId == null || notificationId.isBlank()) {
 			return;
 		}
-		if (Platform.isFxApplicationThread()) {
-			markMatchingRead(item -> notificationId.equals(item.getId()));
-		} else {
-			Platform.runLater(() -> markMatchingRead(item -> notificationId.equals(item.getId())));
-		}
+		markReadMatching(item -> notificationId.equals(item.getId()));
 	}
 
-	private void markMatchingRead(Predicate<AppNotification> predicate) {
+	public void markReadMatching(Predicate<AppNotification> predicate) {
 		if (predicate == null) {
 			return;
 		}
+		if (Platform.isFxApplicationThread()) {
+			markMatchingReadInternal(predicate);
+		} else {
+			Platform.runLater(() -> markMatchingReadInternal(predicate));
+		}
+	}
+
+	private void markMatchingReadInternal(Predicate<AppNotification> predicate) {
 		notifications.stream()
 				.filter(predicate)
 				.filter(AppNotification::isUnread)

@@ -15,6 +15,7 @@ public final class ConnectivityNotificationProducer {
 
 	private boolean started;
 	private Boolean onlineState;
+	private boolean hasSeenOnline;
 	private String activeOfflineNotificationId;
 
 	public ConnectivityNotificationProducer(UiRuntimeBridge runtimeBridge, NotificationCenterService notificationCenterService) {
@@ -42,6 +43,7 @@ public final class ConnectivityNotificationProducer {
 		runtimeBridge.unsubscribeConnectivity(handler);
 		started = false;
 		onlineState = null;
+		hasSeenOnline = false;
 		activeOfflineNotificationId = null;
 	}
 
@@ -53,12 +55,17 @@ public final class ConnectivityNotificationProducer {
 		if (onlineState != null && onlineState.booleanValue() == online) {
 			return;
 		}
+		boolean wasOnline = Boolean.TRUE.equals(onlineState);
 		onlineState = online;
 		if (online) {
+			hasSeenOnline = true;
 			handleOnline(event);
-		} else {
-			handleOffline(event);
+			return;
 		}
+		if (!hasSeenOnline || !wasOnline) {
+			return;
+		}
+		handleOffline(event);
 	}
 
 	private void handleOffline(UiRuntimeBridge.ConnectivityEvent event) {
@@ -79,6 +86,7 @@ public final class ConnectivityNotificationProducer {
 			notificationCenterService.markReadById(activeOfflineNotificationId);
 			activeOfflineNotificationId = null;
 		}
+		notificationCenterService.markReadMatching(this::isOfflineBannerNotification);
 		notificationCenterService.pushNotification(new AppNotification(
 				"online-" + Instant.now(clock).toEpochMilli(),
 				NotificationCategory.NETWORK,
@@ -88,6 +96,14 @@ public final class ConnectivityNotificationProducer {
 				Instant.now(clock),
 				true,
 				false));
+	}
+
+	private boolean isOfflineBannerNotification(AppNotification notification) {
+		return notification != null
+				&& notification.getCategory() == NotificationCategory.NETWORK
+				&& notification.isShowAsBanner()
+				&& "Offline".equals(notification.getTitle())
+				&& notification.isUnread();
 	}
 
 	private static String suffix(String detail) {
