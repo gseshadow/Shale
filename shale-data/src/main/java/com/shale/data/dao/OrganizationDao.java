@@ -631,7 +631,7 @@ public final class OrganizationDao {
 				FROM dbo.CaseParties cp
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cp.CaseId
-				INNER JOIN dbo.PartyRoles pr
+				LEFT JOIN dbo.PartyRoles pr
 				  ON pr.Id = cp.PartyRoleId
 				OUTER APPLY (
 				    SELECT TOP (1)
@@ -680,6 +680,8 @@ public final class OrganizationDao {
 					));
 				}
 			}
+			System.out.println("Organization related-cases load: organizationId=" + organizationId
+					+ ", queryPath=CasePartiesOnly, rowCount=" + out.size());
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related cases for organization (id=" + organizationId + ")", e);
