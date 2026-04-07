@@ -27,6 +27,8 @@
 				<Label fx:id="userEmailLabel" text="user@example.com"
 					styleClass="user-email" />
 
+				<Button fx:id="backButton" text="Back" onAction="#onBack" disable="true" />
+
 				<Button fx:id="logoutButton" text="Logout"
 					onAction="#onLogout" />
 			</children>
