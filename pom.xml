@@ -6,7 +6,7 @@
 
     <groupId>com.shale</groupId>
     <artifactId>shale-parent</artifactId>
-    <version>1.0.67</version>
+    <version>1.0.69</version>
     <packaging>pom</packaging>
 
     <name>Shale</name>
