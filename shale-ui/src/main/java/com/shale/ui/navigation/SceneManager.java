@@ -76,11 +76,19 @@ public final class SceneManager {
 		this.runtimeBridge = runtimeBridge;
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
-		this.notificationCenterService = NotificationCenterService.seeded(Clock.systemUTC());
+		this.notificationCenterService = createNotificationCenterService();
 		this.notificationPreferencesService = new NotificationPreferencesService(appState);
 		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
+	}
+
+	private NotificationCenterService createNotificationCenterService() {
+		boolean seedDemoNotifications = Boolean.getBoolean("shale.notifications.seedDemo");
+		if (seedDemoNotifications) {
+			return NotificationCenterService.seeded(Clock.systemUTC());
+		}
+		return NotificationCenterService.empty();
 	}
 
 	public void showLogin() {
