@@ -1,17 +1,22 @@
 package com.shale.ui.controller;
 
+import com.shale.ui.component.dialog.NotificationCenterDialog;
 import com.shale.ui.navigation.SceneManager;
+import com.shale.ui.notification.AppNotification;
+import com.shale.ui.notification.NotificationCenterService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
 
 import java.util.List;
+import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 
 public final class MainController {
@@ -34,6 +39,15 @@ public final class MainController {
 
 	@FXML
 	private Button updateButton;
+
+	@FXML
+	private HBox notificationBannerHost;
+
+	@FXML
+	private Label notificationBannerLabel;
+
+	@FXML
+	private Button notificationBellButton;
 
 	// Sidebar nav buttons
 	@FXML
@@ -74,6 +88,7 @@ public final class MainController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private UiUpdateLauncher updateLauncher;
+	private NotificationCenterService notificationCenterService;
 
 	public MainController() {
 		System.out.println("MainController()");// TODO remove
@@ -82,11 +97,15 @@ public final class MainController {
 	// Injected by SceneManager
 	public void init(SceneManager sceneManager,
 			AppState appState,
-			UiRuntimeBridge runtimeBridge) {
+			UiRuntimeBridge runtimeBridge,
+			NotificationCenterService notificationCenterService) {
 		System.out.println("MainController.init()");// TODO remove
 		this.sceneManager = sceneManager;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
+		this.notificationCenterService = notificationCenterService;
+		refreshSessionLabel();
+		bindNotificationShell();
 	}
 
 	@FXML
@@ -99,12 +118,8 @@ public final class MainController {
 			globalSearchField.setOnAction(e -> onGlobalSearch());
 		}
 
-		if (appState != null) {
-			String email = appState.getUserEmail();
-			if (email != null && !email.isBlank() && userEmailLabel != null) {
-				userEmailLabel.setText(email);
-			}
-		}
+		refreshSessionLabel();
+		bindNotificationShell();
 	}
 
 	@FXML
@@ -166,6 +181,7 @@ public final class MainController {
 		if (updateLauncher != null) {
 			try {
 				updateLauncher.launchUpdater();
+				sceneManager.onUpdaterLaunchSucceeded();
 			} catch (RuntimeException ex) {
 				sceneManager.showError(ex.getMessage());
 			}
@@ -189,6 +205,14 @@ public final class MainController {
 		}
 
 		sceneManager.showLogin();
+	}
+
+	@FXML
+	private void onOpenNotificationCenter() {
+		if (notificationCenterService == null || notificationBellButton == null || notificationBellButton.getScene() == null) {
+			return;
+		}
+		NotificationCenterDialog.show(notificationBellButton.getScene().getWindow(), notificationCenterService);
 	}
 
 	public void showMyShaleView() {
@@ -323,5 +347,57 @@ public final class MainController {
 
 	public void setUpdateLauncher(UiUpdateLauncher updateLauncher) {
 		this.updateLauncher = updateLauncher;
+	}
+
+	private void refreshSessionLabel() {
+		if (appState == null || userEmailLabel == null) {
+			return;
+		}
+		String email = appState.getUserEmail();
+		if (email != null && !email.isBlank()) {
+			userEmailLabel.setText(email);
+		}
+	}
+
+	private void bindNotificationShell() {
+		if (notificationCenterService == null
+				|| notificationBellButton == null
+				|| notificationBannerHost == null
+				|| notificationBannerLabel == null) {
+			return;
+		}
+
+		notificationBellButton.textProperty().bind(
+				Bindings.createStringBinding(
+						() -> notificationCenterService.getUnreadCount() > 0
+								? "🔔 " + notificationCenterService.getUnreadCount()
+								: "🔔",
+						notificationCenterService.unreadCountProperty()));
+
+		notificationCenterService.unreadCountProperty().addListener((obs, oldValue, newValue) -> {
+			if (newValue.intValue() > 0) {
+				if (!notificationBellButton.getStyleClass().contains("notification-bell-button-unread")) {
+					notificationBellButton.getStyleClass().add("notification-bell-button-unread");
+				}
+			} else {
+				notificationBellButton.getStyleClass().remove("notification-bell-button-unread");
+			}
+		});
+		if (notificationCenterService.getUnreadCount() > 0
+				&& !notificationBellButton.getStyleClass().contains("notification-bell-button-unread")) {
+			notificationBellButton.getStyleClass().add("notification-bell-button-unread");
+		}
+
+		notificationCenterService.activeBannerProperty().addListener((obs, oldValue, newValue) -> showBanner(newValue));
+		showBanner(notificationCenterService.getActiveBanner().orElse(null));
+	}
+
+	private void showBanner(AppNotification bannerNotification) {
+		boolean hasBanner = bannerNotification != null;
+		notificationBannerHost.setVisible(hasBanner);
+		notificationBannerHost.setManaged(hasBanner);
+		if (hasBanner) {
+			notificationBannerLabel.setText(bannerNotification.getTitle());
+		}
 	}
 }

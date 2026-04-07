@@ -5,6 +5,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -65,6 +66,7 @@ public final class LiveBus {
 			.build();
 
 	private final CopyOnWriteArrayList<Consumer<Event>> listeners = new CopyOnWriteArrayList<>();
+	private final CopyOnWriteArrayList<BiConsumer<Boolean, String>> connectivityListeners = new CopyOnWriteArrayList<>();
 	private volatile LiveBusClient wsClient;
 	private volatile String groupName;
 	private volatile String connectionId;
@@ -91,8 +93,23 @@ public final class LiveBus {
 		{
 			wsClient = new LiveBusClient(new LiveBusClient.Handler() {
 				@Override
+				public void onOpen() {
+					emitConnectivity(true, "Connected");
+				}
+
+				@Override
 				public void onMessage(String text) {
 					handleInbound(text);
+				}
+
+				@Override
+				public void onClosed(int statusCode, String reason) {
+					emitConnectivity(false, "Connection closed");
+				}
+
+				@Override
+				public void onError(Throwable error) {
+					emitConnectivity(false, error == null ? "Connection error" : error.getMessage());
 				}
 			});
 			return wsClient.connect(wss);
@@ -163,6 +180,12 @@ public final class LiveBus {
 
 	public void onEvent(Consumer<Event> listener) {
 		listeners.add(listener);
+	}
+
+	public void onConnectivityChange(BiConsumer<Boolean, String> listener) {
+		if (listener != null) {
+			connectivityListeners.add(listener);
+		}
 	}
 
 	public void shutdown() {
@@ -237,6 +260,15 @@ public final class LiveBus {
 				type, entityType, entityId, by, tenantId, patchRaw, inboundClientInstanceId, raw);
 		for (var l : listeners)
 			l.accept(ev);
+	}
+
+	private void emitConnectivity(boolean online, String detail) {
+		for (var listener : connectivityListeners) {
+			try {
+				listener.accept(online, detail == null ? "" : detail);
+			} catch (Exception ignored) {
+			}
+		}
 	}
 
 	private static String getConfig(String key) {
