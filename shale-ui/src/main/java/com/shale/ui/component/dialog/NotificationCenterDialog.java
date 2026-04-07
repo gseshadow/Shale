@@ -8,6 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.Objects;
 
+import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -51,6 +52,12 @@ public final class NotificationCenterDialog {
 		listView.setItems(notificationService.getNotificationsNewestFirst());
 		listView.getStyleClass().add("notification-list");
 		listView.setCellFactory(view -> new NotificationCell(notificationService));
+		notificationService.unreadCountProperty().addListener((obs, oldValue, newValue) -> listView.refresh());
+
+		Button markAllReadButton = new Button("Mark all read");
+		markAllReadButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+		markAllReadButton.disableProperty().bind(notificationService.unreadCountProperty().lessThanOrEqualTo(0));
+		markAllReadButton.setOnAction(event -> notificationService.markAllRead());
 
 		Button closeButton = new Button("Close");
 		closeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
@@ -60,7 +67,7 @@ public final class NotificationCenterDialog {
 
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox actions = new HBox(10, spacer, closeButton);
+		HBox actions = new HBox(10, markAllReadButton, spacer, closeButton);
 
 		VBox.setVgrow(listView, Priority.ALWAYS);
 		root.getChildren().addAll(heading, subtitle, listView, actions);
@@ -69,26 +76,38 @@ public final class NotificationCenterDialog {
 		scene.getStylesheets().add(Objects.requireNonNull(
 				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
-
-		notificationService.markAllRead();
 		stage.showAndWait();
 	}
 
 	private static final class NotificationCell extends ListCell<AppNotification> {
 		private final NotificationCenterService notificationService;
+		private final ChangeListener<Boolean> unreadListener = (obs, oldValue, newValue) -> updateUnreadStyle();
+		private AppNotification observedItem;
 
 		private NotificationCell(NotificationCenterService notificationService) {
 			this.notificationService = notificationService;
+			setOnMouseClicked(event -> {
+				AppNotification selected = getItem();
+				if (selected != null) {
+					notificationService.markRead(selected);
+				}
+			});
 		}
 
 		@Override
 		protected void updateItem(AppNotification item, boolean empty) {
 			super.updateItem(item, empty);
+			if (observedItem != null) {
+				observedItem.unreadProperty().removeListener(unreadListener);
+				observedItem = null;
+			}
 			if (empty || item == null) {
 				setText(null);
 				setGraphic(null);
 				return;
 			}
+			observedItem = item;
+			observedItem.unreadProperty().addListener(unreadListener);
 
 			Label category = new Label(item.getCategory().name());
 			category.getStyleClass().add("notification-row-category");
@@ -109,12 +128,20 @@ public final class NotificationCenterDialog {
 
 			VBox wrapper = new VBox(6, topRow, title, message);
 			wrapper.getStyleClass().add("notification-row");
-			if (item.isUnread()) {
-				wrapper.getStyleClass().add("notification-row-unread");
-			}
 
 			setGraphic(wrapper);
-			setOnMouseClicked(event -> notificationService.markRead(item));
+			updateUnreadStyle();
+		}
+
+		private void updateUnreadStyle() {
+			if (!(getGraphic() instanceof VBox wrapper)) {
+				return;
+			}
+			wrapper.getStyleClass().remove("notification-row-unread");
+			AppNotification item = getItem();
+			if (item != null && item.isUnread()) {
+				wrapper.getStyleClass().add("notification-row-unread");
+			}
 		}
 	}
 }
