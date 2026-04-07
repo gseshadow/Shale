@@ -88,6 +88,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		if (bus != null) {
 			bus.shutdown();
 		}
+		dispatcher.dispatchConnectivity(false, "Signed out");
 
 		dbProvider.clear();
 		if (runtimeSessionService != null) {
