@@ -287,6 +287,19 @@ public final class SceneManager {
 		navigateTo(AppRoute.caseProfile(caseId, sectionKey == null ? "OVERVIEW" : sectionKey), true);
 	}
 
+	private void recordCaseSectionNavigation(Integer caseId, String sectionKey) {
+		if (caseId == null || caseId <= 0 || sectionKey == null || sectionKey.isBlank()) {
+			return;
+		}
+		AppRoute destination = AppRoute.caseProfile(caseId, sectionKey);
+		boolean recorded = navigationManager.recordNavigation(destination);
+		if (!recorded) {
+			return;
+		}
+		System.out.println("[Navigation] Route push (section only) -> " + destination);
+		notifyBackAvailabilityChanged();
+	}
+
 	public void openOrganizationProfile(Integer organizationId) {
 		if (organizationId == null || organizationId <= 0) {
 			System.err.println("Ignoring organization navigation for invalid organizationId: " + organizationId);
@@ -554,7 +567,7 @@ public final class SceneManager {
 				if (selectedSectionKey == null) {
 					return;
 				}
-				openCaseProfile(caseId, selectedSectionKey);
+				recordCaseSectionNavigation(caseId, selectedSectionKey);
 			});
 			c.setOnOpenTask(this::openTaskProfile);
 			c.setOnOpenOrganization(onOpenOrganization);
