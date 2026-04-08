@@ -48,6 +48,8 @@ public final class TaskDao {
 
     private record PriorityLookupRow(int id, String name, Integer sortOrder, String systemKey) {
     }
+    public record CaseTeamMemberRow(String displayName, String color) {
+    }
 
     private final DbSessionProvider db;
 
@@ -365,11 +367,22 @@ public final class TaskDao {
                   t.CompletedAt,
                   assignment.UserId AS AssignedUserId,
                   assignment.DisplayName AS AssignedUserDisplayName,
-                  assignment.Color AS AssignedUserColor
+                  assignment.Color AS AssignedUserColor,
+                  creator.DisplayName AS CreatedByDisplayName
                 FROM dbo.Tasks t
                 INNER JOIN dbo.Cases c
                   ON c.Id = t.CaseId
                  AND c.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.Users createdBy
+                  ON createdBy.Id = t.CreatedByUserId
+                 AND createdBy.ShaleClientId = t.ShaleClientId
+                OUTER APPLY (
+                  SELECT LTRIM(RTRIM(
+                    COALESCE(createdBy.name_first, '') +
+                    CASE WHEN COALESCE(createdBy.name_first, '') = '' OR COALESCE(createdBy.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(createdBy.name_last, '')
+                  )) AS DisplayName
+                ) creator
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -433,10 +446,61 @@ public final class TaskDao {
                         toLocalDateTime(rs.getTimestamp("CompletedAt")),
                         (Integer) rs.getObject("AssignedUserId"),
                         rs.getString("AssignedUserDisplayName"),
-                        rs.getString("AssignedUserColor"));
+                        rs.getString("AssignedUserColor"),
+                        rs.getString("CreatedByDisplayName"));
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load task detail for taskId=" + taskId, e);
+        }
+    }
+
+    public List<CaseTeamMemberRow> listCaseTeamMembers(long caseId, int shaleClientId) {
+        if (caseId <= 0) {
+            return List.of();
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        String sql = """
+                SELECT DISTINCT
+                  LTRIM(RTRIM(
+                    COALESCE(u.name_first, '') +
+                    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(u.name_last, '')
+                  )) AS DisplayName,
+                  u.Color
+                FROM dbo.CaseUsers cu
+                INNER JOIN dbo.Cases c
+                  ON c.Id = cu.CaseId
+                INNER JOIN dbo.Users u
+                  ON u.Id = cu.UserId
+                 AND u.ShaleClientId = c.ShaleClientId
+                WHERE cu.CaseId = ?
+                  AND c.ShaleClientId = ?
+                  AND ISNULL(c.IsDeleted, 0) = 0
+                  AND ISNULL(cu.IsDeleted, 0) = 0
+                  AND ISNULL(u.IsDeleted, 0) = 0
+                ORDER BY u.name_last, u.name_first, u.Id;
+                """;
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setLong(1, caseId);
+            ps.setInt(2, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<CaseTeamMemberRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(new CaseTeamMemberRow(
+                            rs.getString("DisplayName"),
+                            rs.getString("Color")));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Failed to list case team members for caseId=" + caseId + " shaleClientId=" + shaleClientId,
+                    e);
         }
     }
 
