@@ -10,6 +10,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -87,6 +88,32 @@ public final class AppDialogs {
 		}
 	}
 
+	public static void applySecondaryDialogShell(Dialog<?> dialog, String title) {
+		if (dialog == null) {
+			return;
+		}
+		dialog.initStyle(StageStyle.TRANSPARENT);
+		DialogPane pane = dialog.getDialogPane();
+		if (pane == null) {
+			return;
+		}
+		if (!pane.getStyleClass().contains("secondary-window-shell")) {
+			pane.getStyleClass().add("secondary-window-shell");
+		}
+		String appCss = Objects.requireNonNull(AppDialogs.class.getResource("/css/app.css")).toExternalForm();
+		if (!pane.getStylesheets().contains(appCss)) {
+			pane.getStylesheets().add(appCss);
+		}
+		Node header = createSecondaryDialogHeader(dialog, title);
+		pane.setHeader(null);
+		pane.setGraphic(header);
+		pane.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene != null) {
+				newScene.setFill(Color.TRANSPARENT);
+			}
+		});
+	}
+
 	public static HBox createSecondaryWindowHeader(Stage stage, String title, Runnable onClose) {
 		Objects.requireNonNull(stage, "stage");
 		Label titleLabel = new Label(isBlank(title) ? "" : title);
@@ -134,6 +161,31 @@ public final class AppDialogs {
 			stage.setX(event.getScreenX() - dragOffset[0]);
 			stage.setY(event.getScreenY() - dragOffset[1]);
 		});
+	}
+
+	private static Node createSecondaryDialogHeader(Dialog<?> dialog, String title) {
+		Label titleLabel = new Label(isBlank(title) ? "" : title);
+		titleLabel.getStyleClass().add("secondary-window-title");
+
+		Button closeButton = new Button("✕");
+		closeButton.setFocusTraversable(false);
+		closeButton.getStyleClass().add("secondary-window-close");
+		closeButton.setOnAction(event -> dialog.close());
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+
+		HBox header = new HBox(10, titleLabel, spacer, closeButton);
+		header.getStyleClass().add("secondary-window-header");
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.setPadding(new Insets(8, 10, 8, 12));
+		header.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null || !(newScene.getWindow() instanceof Stage stage)) {
+				return;
+			}
+			installDragToMove(stage, header);
+		});
+		return header;
 	}
 
 	private static void showMessage(

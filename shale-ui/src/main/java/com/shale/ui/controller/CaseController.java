@@ -1467,7 +1467,7 @@ public class CaseController {
 		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
 
 		Dialog<PartyEditorResult> dialog = new Dialog<>();
-		AppDialogs.applySecondaryWindowChrome(dialog);
+		AppDialogs.applySecondaryDialogShell(dialog, "Edit Party");
 		dialog.setTitle("Edit Party");
 		dialog.initOwner(organizationDialogOwner());
 		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
@@ -1637,7 +1637,7 @@ public class CaseController {
 		WizardState state = new WizardState();
 
 		Dialog<AddPartyDraft> dialog = new Dialog<>();
-		AppDialogs.applySecondaryWindowChrome(dialog);
+		AppDialogs.applySecondaryDialogShell(dialog, "Add Party");
 		dialog.setTitle("Add Party");
 		dialog.initOwner(organizationDialogOwner());
 		ButtonType backType = new ButtonType("Back", ButtonData.LEFT);
