@@ -603,6 +603,10 @@ public final class MyShaleController {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
 				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
+				List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
+						detail == null
+								? List.of()
+								: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
 
 				runOnFx(() -> {
 					try {
@@ -622,6 +626,12 @@ public final class MyShaleController {
 								detail.dueAt(),
 								detail.priorityId(),
 								detail.assignedUserId(),
+								detail.createdByDisplayName(),
+								assignedTeam.stream()
+										.map(member -> new TaskDetailDialog.AssignedTeamMember(
+												member.displayName(),
+												member.color()))
+										.toList(),
 								detail.completedAt() != null);
 						Optional<TaskDetailDialog.TaskDetailResult> result =
 								TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users, onOpenCase);

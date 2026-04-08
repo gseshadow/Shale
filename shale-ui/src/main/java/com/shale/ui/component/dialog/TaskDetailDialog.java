@@ -53,6 +53,8 @@ public final class TaskDetailDialog {
         heading.getStyleClass().add("app-dialog-title");
         Label message = new Label("Update task fields, assignee, completion, or delete the task.");
         message.getStyleClass().add("app-dialog-message");
+        Label createdByLabel = new Label("Created by: " + displayCreatedBy(model.createdByDisplayName()));
+        createdByLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.75);");
 
         TextField titleField = new TextField(safe(model.title()));
         TextArea descriptionArea = new TextArea(safe(model.description()));
@@ -118,13 +120,43 @@ public final class TaskDetailDialog {
             relatedCaseSection.setVisible(false);
         }
 
+        VBox assignedTeamSection = new VBox(6);
+        Label assignedTeamLabel = new Label("Assigned team");
+        assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+
+        VBox assignedTeamList = new VBox(6);
+        List<AssignedTeamMember> assignedTeamMembers = model.assignedTeamMembers() == null
+                ? List.of()
+                : model.assignedTeamMembers();
+        if (assignedTeamMembers.isEmpty()) {
+            Label emptyLabel = new Label("No users assigned");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            assignedTeamList.getChildren().add(emptyLabel);
+        } else {
+            UserCardFactory assignedTeamCardFactory = new UserCardFactory(id -> {
+            });
+            for (AssignedTeamMember member : assignedTeamMembers) {
+                if (member == null) {
+                    continue;
+                }
+                var card = assignedTeamCardFactory.create(
+                        new UserCardModel(null, safe(member.displayName()), member.colorCss(), null),
+                        UserCardFactory.Variant.MINI);
+                card.setMouseTransparent(true);
+                assignedTeamList.getChildren().add(card);
+            }
+        }
+        assignedTeamSection.getChildren().setAll(assignedTeamLabel, assignedTeamList);
+
         VBox content = new VBox(8,
+                createdByLabel,
                 new Label("Title"), titleField,
                 new Label("Description"), descriptionArea,
                 relatedCaseSection,
                 new Label("Priority"), priorityCombo,
                 new Label("Assignee"), assigneeCombo,
                 new Label("Due date/time"), dueRow,
+                assignedTeamSection,
                 completedCheck,
                 errorLabel);
         content.setPadding(new Insets(8, 2, 4, 2));
@@ -259,6 +291,11 @@ public final class TaskDetailDialog {
         return text == null ? "" : text;
     }
 
+    private static String displayCreatedBy(String name) {
+        String trimmed = safe(name).trim();
+        return trimmed.isBlank() ? "—" : trimmed;
+    }
+
     public record TaskDetailModel(
             long taskId,
             long caseId,
@@ -270,7 +307,14 @@ public final class TaskDetailDialog {
             LocalDateTime dueAt,
             Integer priorityId,
             Integer assignedUserId,
+            String createdByDisplayName,
+            List<AssignedTeamMember> assignedTeamMembers,
             boolean completed) {
+    }
+
+    public record AssignedTeamMember(
+            String displayName,
+            String colorCss) {
     }
 
     public record SaveTaskPayload(

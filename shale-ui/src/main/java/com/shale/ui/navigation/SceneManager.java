@@ -701,6 +701,8 @@ public final class SceneManager {
 			AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted.");
 			return;
 		}
+		List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
+				caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 				detail.id(),
 				detail.caseId(),
@@ -712,6 +714,12 @@ public final class SceneManager {
 				detail.dueAt(),
 				detail.priorityId(),
 				detail.assignedUserId(),
+				detail.createdByDisplayName(),
+				assignedTeam.stream()
+						.map(member -> new TaskDetailDialog.AssignedTeamMember(
+								member.displayName(),
+								member.color()))
+						.toList(),
 				detail.completedAt() != null);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
 		var result = TaskDetailDialog.showAndWait(

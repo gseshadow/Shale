@@ -70,6 +70,12 @@ public final class CaseTaskService {
         return taskDao.findTaskDetail(taskId, shaleClientId);
     }
 
+    public List<AssignedTaskUserOption> loadAssignedUsersForTask(long taskId, int shaleClientId) {
+        return taskDao.listAssignedUsersForTask(taskId, shaleClientId).stream()
+                .map(row -> new AssignedTaskUserOption(row.displayName(), row.color()))
+                .toList();
+    }
+
     public long createTask(CreateTaskRequest request) {
         Objects.requireNonNull(request, "request");
         long taskId = taskDao.createTask(
@@ -259,6 +265,11 @@ public final class CaseTaskService {
 
     public record AssignableUserOption(
             int id,
+            String displayName,
+            String color) {
+    }
+
+    public record AssignedTaskUserOption(
             String displayName,
             String color) {
     }
