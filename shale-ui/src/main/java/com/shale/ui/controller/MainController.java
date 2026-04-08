@@ -163,7 +163,8 @@ public final class MainController {
 		highlightNav(navSettingsButton);
 		sectionTitleLabel.setText("Settings");
 		sectionSubtitleLabel.setText("Configure Shale preferences and system settings.");
-		setSectionContentText("Settings tab is not implemented yet.");
+		Node settingsRoot = sceneManager.createSettingsView();
+		sectionContent.getChildren().setAll(settingsRoot);
 	}
 
 	@FXML

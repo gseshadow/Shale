@@ -21,6 +21,7 @@ import com.shale.ui.controller.NewOrganizationController;
 import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.controller.SearchController;
+import com.shale.ui.controller.SettingsController;
 import com.shale.ui.controller.TeamController;
 import com.shale.ui.controller.UserController;
 import com.shale.ui.component.dialog.AppDialogs;
@@ -98,11 +99,12 @@ public final class SceneManager {
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
 		this.notificationCenterService = createNotificationCenterService();
 		this.notificationPreferencesService = new NotificationPreferencesService(appState);
-		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState);
+		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
 		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
 				new TaskDao(dbSessionProvider),
 				new NotificationDao(dbSessionProvider),
 				appState,
+				notificationPreferencesService,
 				new AssignedUserTaskDueNotificationRecipientResolver());
 		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r -> {
 			Thread t = new Thread(r, "notification-startup-worker");
@@ -421,6 +423,15 @@ public final class SceneManager {
 			TeamController c = (TeamController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			c.init(appState, userDao, onOpenUser);
+			return c;
+		});
+	}
+
+	public Parent createSettingsView() {
+		return load("/fxml/settings.fxml", controller ->
+		{
+			SettingsController c = (SettingsController) controller;
+			c.init(notificationPreferencesService);
 			return c;
 		});
 	}

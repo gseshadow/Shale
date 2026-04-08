@@ -10,10 +10,12 @@ import java.util.Objects;
 public final class DurableNotificationService {
 	private final NotificationDao notificationDao;
 	private final AppState appState;
+	private final NotificationPreferencesService notificationPreferencesService;
 
-	public DurableNotificationService(NotificationDao notificationDao, AppState appState) {
+	public DurableNotificationService(NotificationDao notificationDao, AppState appState, NotificationPreferencesService notificationPreferencesService) {
 		this.notificationDao = Objects.requireNonNull(notificationDao, "notificationDao");
 		this.appState = Objects.requireNonNull(appState, "appState");
+		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 	}
 
 	public void loadUnreadInto(NotificationCenterService notificationCenterService) {
@@ -32,7 +34,8 @@ public final class DurableNotificationService {
 		}
 		List<NotificationRow> rows = notificationDao.listUnreadNotificationsForUser(shaleClientId, userId);
 		return rows.stream()
-				.map(DurableNotificationService::toAppNotification)
+				.map(this::toAppNotification)
+				.filter(Objects::nonNull)
 				.toList();
 	}
 
@@ -57,9 +60,12 @@ public final class DurableNotificationService {
 		notificationDao.markNotificationsRead(durableIds);
 	}
 
-	private static AppNotification toAppNotification(NotificationRow row) {
+	private AppNotification toAppNotification(NotificationRow row) {
 		NotificationCategory category = parseCategory(row.category());
 		NotificationSeverity severity = parseSeverity(row.severity());
+		if (!isEnabled(category, row.actionType())) {
+			return null;
+		}
 		String id = "db-" + row.id();
 		return new AppNotification(
 				id,
@@ -78,13 +84,28 @@ public final class DurableNotificationService {
 				null);
 	}
 
-	private static boolean shouldShowAsBanner(NotificationCategory category, String actionType, NotificationSeverity severity) {
+	private boolean isEnabled(NotificationCategory category, String actionType) {
+		if (category != NotificationCategory.TASK) {
+			return true;
+		}
+		String normalizedAction = actionType == null ? "" : actionType.trim().toUpperCase();
+		return switch (normalizedAction) {
+			case "DUE_OVERDUE" -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_OVERDUE);
+			case "DUE_TODAY" -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_TODAY);
+			case "DUE_TOMORROW" -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_TOMORROW);
+			default -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_ASSIGNED_TO_ME);
+		};
+	}
+
+	private boolean shouldShowAsBanner(NotificationCategory category, String actionType, NotificationSeverity severity) {
 		if (category != NotificationCategory.TASK) {
 			return false;
 		}
 		String normalizedAction = actionType == null ? "" : actionType.trim().toUpperCase();
 		if ("DUE_OVERDUE".equals(normalizedAction) || "DUE_TODAY".equals(normalizedAction)) {
-			return true;
+			return "DUE_OVERDUE".equals(normalizedAction)
+					? notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_OVERDUE_BANNER)
+					: notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_TODAY_BANNER);
 		}
 		return severity == NotificationSeverity.CRITICAL;
 	}
