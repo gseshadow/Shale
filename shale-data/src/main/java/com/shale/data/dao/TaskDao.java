@@ -48,7 +48,9 @@ public final class TaskDao {
 
     private record PriorityLookupRow(int id, String name, Integer sortOrder, String systemKey) {
     }
-    public record TaskAssignedUserRow(String displayName, String color) {
+    public record TaskAssignedUserRow(int userId, String displayName, String color) {
+    }
+    public record TaskAssignableUserRow(int id, String displayName, String color) {
     }
 
     private final DbSessionProvider db;
@@ -463,7 +465,8 @@ public final class TaskDao {
         }
 
         String sql = """
-                SELECT DISTINCT
+                SELECT
+                  u.Id AS UserId,
                   LTRIM(RTRIM(
                     COALESCE(u.name_first, '') +
                     CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -476,8 +479,6 @@ public final class TaskDao {
                  AND u.ShaleClientId = ta.ShaleClientId
                 WHERE ta.TaskId = ?
                   AND ta.ShaleClientId = ?
-                  AND ISNULL(ta.IsDeleted, 0) = 0
-                  AND ISNULL(u.IsDeleted, 0) = 0
                 ORDER BY
                   ta.IsPrimary DESC,
                   u.name_first ASC,
@@ -493,6 +494,7 @@ public final class TaskDao {
                 List<TaskAssignedUserRow> out = new ArrayList<>();
                 while (rs.next()) {
                     out.add(new TaskAssignedUserRow(
+                            rs.getInt("UserId"),
                             rs.getString("DisplayName"),
                             rs.getString("Color")));
                 }
@@ -501,6 +503,218 @@ public final class TaskDao {
         } catch (SQLException e) {
             throw new RuntimeException(
                     "Failed to list assigned users for taskId=" + taskId + " shaleClientId=" + shaleClientId,
+                    e);
+        }
+    }
+
+    public List<TaskAssignableUserRow> listAssignableUsersForTask(long taskId, int shaleClientId) {
+        if (taskId <= 0) {
+            return List.of();
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        String sql = """
+                SELECT
+                  u.Id,
+                  LTRIM(RTRIM(
+                    COALESCE(u.name_first, '') +
+                    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(u.name_last, '')
+                  )) AS DisplayName,
+                  u.Color
+                FROM dbo.Users u
+                WHERE u.ShaleClientId = ?
+                  AND NULLIF(LTRIM(RTRIM(
+                    COALESCE(u.name_first, '') +
+                    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(u.name_last, '')
+                  )), '') IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM dbo.TaskAssignments ta
+                    WHERE ta.TaskId = ?
+                      AND ta.ShaleClientId = ?
+                      AND ta.UserId = u.Id
+                  )
+                ORDER BY
+                  u.name_first ASC,
+                  u.name_last ASC,
+                  u.Id ASC;
+                """;
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, shaleClientId);
+            ps.setLong(2, taskId);
+            ps.setInt(3, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<TaskAssignableUserRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(new TaskAssignableUserRow(
+                            rs.getInt("Id"),
+                            rs.getString("DisplayName"),
+                            rs.getString("Color")));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Failed to list assignable users for taskId=" + taskId + " shaleClientId=" + shaleClientId,
+                    e);
+        }
+    }
+
+    public void addTaskAssignment(long taskId, int shaleClientId, int userId, int assignedByUserId) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (userId <= 0) {
+            throw new IllegalArgumentException("userId must be > 0");
+        }
+        if (assignedByUserId <= 0) {
+            throw new IllegalArgumentException("assignedByUserId must be > 0");
+        }
+
+        String sql = """
+                BEGIN TRY
+                  BEGIN TRAN;
+
+                  DECLARE @now datetime2 = SYSDATETIME();
+
+                  IF NOT EXISTS (
+                    SELECT 1
+                    FROM dbo.Tasks t
+                    WHERE t.Id = ?
+                      AND t.ShaleClientId = ?
+                      AND ISNULL(t.IsDeleted, 0) = 0
+                  )
+                  BEGIN
+                    THROW 50001, 'Task not found for tenant.', 1;
+                  END
+
+                  IF NOT EXISTS (
+                    SELECT 1
+                    FROM dbo.Users u
+                    WHERE u.Id = ?
+                      AND u.ShaleClientId = ?
+                  )
+                  BEGIN
+                    THROW 50002, 'Assignable user not found for tenant.', 1;
+                  END
+
+                  IF NOT EXISTS (
+                    SELECT 1
+                    FROM dbo.TaskAssignments ta
+                    WHERE ta.TaskId = ?
+                      AND ta.ShaleClientId = ?
+                      AND ta.UserId = ?
+                  )
+                  BEGIN
+                    INSERT INTO dbo.TaskAssignments (
+                      TaskId,
+                      UserId,
+                      ShaleClientId,
+                      Role,
+                      IsPrimary,
+                      AssignedByUserId,
+                      AssignedAt
+                    )
+                    VALUES (?, ?, ?, ?, 0, ?, @now);
+
+                    UPDATE dbo.Tasks
+                    SET UpdatedAt = @now
+                    WHERE Id = ?
+                      AND ShaleClientId = ?;
+                  END
+
+                  COMMIT;
+                END TRY
+                BEGIN CATCH
+                  IF @@TRANCOUNT > 0 ROLLBACK;
+                  THROW;
+                END CATCH;
+                """;
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            int i = 1;
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            ps.setInt(i++, userId);
+            ps.setInt(i++, shaleClientId);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            ps.setInt(i++, userId);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, userId);
+            ps.setInt(i++, shaleClientId);
+            ps.setByte(i++, DEFAULT_PRIMARY_ASSIGNMENT_ROLE);
+            ps.setInt(i++, assignedByUserId);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Failed to add assignment for taskId=" + taskId + " userId=" + userId + " shaleClientId=" + shaleClientId,
+                    e);
+        }
+    }
+
+    public void removeTaskAssignment(long taskId, int shaleClientId, int userId) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (userId <= 0) {
+            throw new IllegalArgumentException("userId must be > 0");
+        }
+
+        String sql = """
+                BEGIN TRY
+                  BEGIN TRAN;
+
+                  DECLARE @now datetime2 = SYSDATETIME();
+
+                  DELETE FROM dbo.TaskAssignments
+                  WHERE TaskId = ?
+                    AND ShaleClientId = ?
+                    AND UserId = ?;
+
+                  IF @@ROWCOUNT > 0
+                  BEGIN
+                    UPDATE dbo.Tasks
+                    SET UpdatedAt = @now
+                    WHERE Id = ?
+                      AND ShaleClientId = ?;
+                  END
+
+                  COMMIT;
+                END TRY
+                BEGIN CATCH
+                  IF @@TRANCOUNT > 0 ROLLBACK;
+                  THROW;
+                END CATCH;
+                """;
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            int i = 1;
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            ps.setInt(i++, userId);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Failed to remove assignment for taskId=" + taskId + " userId=" + userId + " shaleClientId=" + shaleClientId,
                     e);
         }
     }
