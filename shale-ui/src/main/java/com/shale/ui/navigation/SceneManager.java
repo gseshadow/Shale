@@ -50,6 +50,8 @@ import com.shale.ui.notification.ConnectivityNotificationProducer;
 import com.shale.ui.notification.SystemUpdateNotificationProducer;
 import com.shale.ui.notification.NotificationPreferencesService;
 import com.shale.ui.notification.DurableNotificationService;
+import com.shale.ui.notification.AssignedUserTaskDueNotificationRecipientResolver;
+import com.shale.ui.notification.TaskDueDateNotificationGenerator;
 
 public final class SceneManager {
 
@@ -66,6 +68,7 @@ public final class SceneManager {
 	private final SystemUpdateNotificationProducer systemUpdateNotificationProducer;
 	private final NotificationPreferencesService notificationPreferencesService;
 	private final DurableNotificationService durableNotificationService;
+	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -82,6 +85,11 @@ public final class SceneManager {
 		this.notificationCenterService = createNotificationCenterService();
 		this.notificationPreferencesService = new NotificationPreferencesService(appState);
 		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState);
+		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
+				new TaskDao(dbSessionProvider),
+				new NotificationDao(dbSessionProvider),
+				appState,
+				new AssignedUserTaskDueNotificationRecipientResolver());
 		this.notificationCenterService.setReadListener(durableNotificationService::markRead);
 		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
@@ -99,6 +107,7 @@ public final class SceneManager {
 	public void showLogin() {
 		liveUpdateNotificationBridge.stop();
 		connectivityNotificationProducer.stop();
+		taskDueDateNotificationGenerator.stop();
 		notificationCenterService.clearAll();
 		var root = load("/fxml/login.fxml", controller ->
 		{
@@ -119,9 +128,11 @@ public final class SceneManager {
 		});
 		setScene(root, "Shale");
 		notificationPreferencesService.refreshActivePreferences();
+		taskDueDateNotificationGenerator.runOnce();
 		durableNotificationService.loadUnreadInto(notificationCenterService);
 		liveUpdateNotificationBridge.start();
 		connectivityNotificationProducer.start();
+		taskDueDateNotificationGenerator.start();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());

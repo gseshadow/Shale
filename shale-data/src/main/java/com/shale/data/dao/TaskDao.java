@@ -440,6 +440,61 @@ public final class TaskDao {
         }
     }
 
+    public List<TaskDueNotificationCandidate> listDueNotificationCandidates(int shaleClientId) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        String sql = """
+                SELECT
+                  t.Id,
+                  t.ShaleClientId,
+                  t.CaseId,
+                  c.Name AS CaseName,
+                  t.Title,
+                  t.DueAt,
+                  t.CompletedAt,
+                  ISNULL(t.IsDeleted, 0) AS IsDeleted,
+                  assignment.UserId AS AssignedUserId
+                FROM dbo.Tasks t
+                INNER JOIN dbo.Cases c
+                  ON c.Id = t.CaseId
+                 AND c.ShaleClientId = t.ShaleClientId
+                OUTER APPLY (
+                  SELECT TOP (1) ta.UserId
+                  FROM dbo.TaskAssignments ta
+                  WHERE ta.TaskId = t.Id
+                    AND ta.ShaleClientId = t.ShaleClientId
+                    AND ta.IsPrimary = 1
+                  ORDER BY ta.AssignedAt DESC, ta.UserId DESC
+                ) assignment
+                WHERE t.ShaleClientId = ?
+                  AND t.DueAt IS NOT NULL
+                ORDER BY t.DueAt ASC, t.Id ASC;
+                """;
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<TaskDueNotificationCandidate> rows = new ArrayList<>();
+                while (rs.next()) {
+                    rows.add(new TaskDueNotificationCandidate(
+                            rs.getLong("Id"),
+                            rs.getInt("ShaleClientId"),
+                            rs.getLong("CaseId"),
+                            rs.getString("CaseName"),
+                            rs.getString("Title"),
+                            toLocalDateTime(rs.getTimestamp("DueAt")),
+                            toLocalDateTime(rs.getTimestamp("CompletedAt")),
+                            rs.getBoolean("IsDeleted"),
+                            (Integer) rs.getObject("AssignedUserId")));
+                }
+                return rows;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load due notification candidates", e);
+        }
+    }
+
     public long createTask(
             int shaleClientId,
             long caseId,
@@ -1074,5 +1129,17 @@ public final class TaskDao {
 
     private static LocalDateTime toLocalDateTime(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
+    }
+
+    public record TaskDueNotificationCandidate(
+            long taskId,
+            int shaleClientId,
+            long caseId,
+            String caseName,
+            String title,
+            LocalDateTime dueAt,
+            LocalDateTime completedAt,
+            boolean deleted,
+            Integer assignedUserId) {
     }
 }

@@ -31,33 +31,49 @@ public final class NotificationDao {
 			return null;
 		}
 		try (Connection con = db.requireConnection()) {
-			Long existing = findByEventKey(con, shaleClientId, userId, eventKey);
-			if (existing != null) {
-				return existing;
-			}
-			String insertSql = """
-					INSERT INTO dbo.Notifications
-						(ShaleClientId, UserId, Category, Severity, Title, Message, EntityType, EntityId, ActionType,
-						 IsRead, IsDismissed, CreatedAt, CreatedByUserId, EventKey)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, SYSUTCDATETIME(), ?, ?);
-					""";
-			try (PreparedStatement ps = con.prepareStatement(insertSql)) {
-				ps.setInt(1, shaleClientId);
-				ps.setInt(2, userId);
-				ps.setString(3, "TASK");
-				ps.setString(4, "INFO");
-				ps.setString(5, title);
-				ps.setString(6, message);
-				ps.setString(7, "Task");
-				ps.setLong(8, entityId);
-				ps.setString(9, "ASSIGNED");
-				ps.setInt(10, createdByUserId);
-				ps.setString(11, eventKey);
-				ps.executeUpdate();
-			}
-			return findByEventKey(con, shaleClientId, userId, eventKey);
+			return createIfAbsent(
+					con,
+					shaleClientId,
+					userId,
+					title,
+					message,
+					entityId,
+					createdByUserId,
+					"ASSIGNED",
+					"INFO",
+					eventKey);
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to create notification", e);
+		}
+	}
+
+	public Long createTaskDueDateNotification(
+			int shaleClientId,
+			int userId,
+			String title,
+			String message,
+			long entityId,
+			int createdByUserId,
+			String actionType,
+			String severity,
+			String eventKey) {
+		if (eventKey == null || eventKey.isBlank()) {
+			return null;
+		}
+		try (Connection con = db.requireConnection()) {
+			return createIfAbsent(
+					con,
+					shaleClientId,
+					userId,
+					title,
+					message,
+					entityId,
+					createdByUserId,
+					actionType,
+					severity,
+					eventKey);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create due-date notification", e);
 		}
 	}
 
@@ -146,6 +162,47 @@ public final class NotificationDao {
 				return null;
 			}
 		}
+	}
+
+	private static Long createIfAbsent(
+			Connection con,
+			int shaleClientId,
+			int userId,
+			String title,
+			String message,
+			long entityId,
+			int createdByUserId,
+			String actionType,
+			String severity,
+			String eventKey) throws SQLException {
+		if (shaleClientId <= 0 || userId <= 0 || entityId <= 0 || eventKey == null || eventKey.isBlank()) {
+			return null;
+		}
+		Long existing = findByEventKey(con, shaleClientId, userId, eventKey);
+		if (existing != null) {
+			return existing;
+		}
+		String insertSql = """
+				INSERT INTO dbo.Notifications
+					(ShaleClientId, UserId, Category, Severity, Title, Message, EntityType, EntityId, ActionType,
+					 IsRead, IsDismissed, CreatedAt, CreatedByUserId, EventKey)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, SYSUTCDATETIME(), ?, ?);
+				""";
+		try (PreparedStatement ps = con.prepareStatement(insertSql)) {
+			ps.setInt(1, shaleClientId);
+			ps.setInt(2, userId);
+			ps.setString(3, "TASK");
+			ps.setString(4, severity == null || severity.isBlank() ? "INFO" : severity);
+			ps.setString(5, title);
+			ps.setString(6, message);
+			ps.setString(7, "Task");
+			ps.setLong(8, entityId);
+			ps.setString(9, actionType);
+			ps.setInt(10, createdByUserId);
+			ps.setString(11, eventKey);
+			ps.executeUpdate();
+		}
+		return findByEventKey(con, shaleClientId, userId, eventKey);
 	}
 
 	public record NotificationRow(
