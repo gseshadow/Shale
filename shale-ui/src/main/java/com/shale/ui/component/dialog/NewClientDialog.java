@@ -28,6 +28,7 @@ public final class NewClientDialog {
 
 	public NewClientDialog(Window owner) {
 		stage = new Stage();
+		AppDialogs.applySecondaryWindowChrome(stage);
 		stage.initOwner(owner);
 		stage.initModality(Modality.APPLICATION_MODAL);
 		stage.setTitle("New Client");

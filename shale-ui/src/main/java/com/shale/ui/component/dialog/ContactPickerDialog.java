@@ -42,6 +42,8 @@ public final class ContactPickerDialog<T> {
 		this.allItems = FXCollections.observableArrayList(items);
 		this.labelFn = labelFn;
 
+		AppDialogs.applySecondaryWindowChrome(stage);
+
 		if (owner != null) {
 			stage.initOwner(owner);
 		}
