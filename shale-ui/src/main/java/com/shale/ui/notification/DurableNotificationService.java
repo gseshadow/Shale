@@ -72,7 +72,10 @@ public final class DurableNotificationService {
 				shouldShowAsBanner(category, row.actionType(), severity),
 				NotificationTargetScope.USER_SCOPED,
 				row.id(),
-				row.eventKey());
+				row.eventKey(),
+				row.entityType(),
+				row.entityId(),
+				null);
 	}
 
 	private static boolean shouldShowAsBanner(NotificationCategory category, String actionType, NotificationSeverity severity) {

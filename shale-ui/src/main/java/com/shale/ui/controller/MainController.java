@@ -212,7 +212,7 @@ public final class MainController {
 		if (notificationCenterService == null || notificationBellButton == null || notificationBellButton.getScene() == null) {
 			return;
 		}
-		NotificationCenterDialog.show(notificationBellButton.getScene().getWindow(), notificationCenterService);
+		NotificationCenterDialog.show(notificationBellButton.getScene().getWindow(), notificationCenterService, sceneManager::openTaskProfile);
 	}
 
 	public void showMyShaleView() {
