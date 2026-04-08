@@ -221,6 +221,15 @@ public final class SceneManager {
 		systemUpdateNotificationProducer.onUpdaterLaunchSucceeded();
 	}
 
+
+	public void onUpdateCheckCompleted(UpdateCheckResult result) {
+		systemUpdateNotificationProducer.onUpdateCheckResult(result);
+	}
+
+	public void onUpdaterLaunchSucceeded() {
+		systemUpdateNotificationProducer.onUpdaterLaunchSucceeded();
+	}
+
 	public boolean canGoBack() {
 		return navigationManager.canGoBack();
 	}
