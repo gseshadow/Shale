@@ -69,6 +69,7 @@ public final class TeamEditorDialog {
 		this.attorneyUserIds = (attorneyUserIds == null) ? Set.of() : attorneyUserIds;
 
 		this.stage = new Stage();
+		AppDialogs.applySecondaryWindowChrome(stage);
 		stage.initOwner(owner);
 		stage.initModality(Modality.APPLICATION_MODAL);
 		stage.setTitle("Edit Team");
@@ -290,7 +291,12 @@ public final class TeamEditorDialog {
 
 		HBox bottom = new HBox(10, spacer, btnCancel, btnSave);
 
-		VBox root = new VBox(12, lists, primaryRow, bottom);
+		HBox header = AppDialogs.createSecondaryWindowHeader(stage, "Edit Team", () -> {
+			result = Optional.empty();
+			stage.close();
+		});
+		VBox root = new VBox(12, header, lists, primaryRow, bottom);
+		root.getStyleClass().add("secondary-window-shell");
 		root.setPadding(new Insets(12));
 
 		Scene scene = new Scene(root, 780, 540);
