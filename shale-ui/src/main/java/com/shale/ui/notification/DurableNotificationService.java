@@ -80,7 +80,7 @@ public final class DurableNotificationService {
 			return false;
 		}
 		String normalizedAction = actionType == null ? "" : actionType.trim().toUpperCase();
-		if ("DUE_OVERDUE".equals(normalizedAction)) {
+		if ("DUE_OVERDUE".equals(normalizedAction) || "DUE_TODAY".equals(normalizedAction)) {
 			return true;
 		}
 		return severity == NotificationSeverity.CRITICAL;

@@ -98,8 +98,7 @@ public final class SceneManager {
 				new NotificationDao(dbSessionProvider),
 				appState,
 				new AssignedUserTaskDueNotificationRecipientResolver());
-		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r ->
-		{
+		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r -> {
 			Thread t = new Thread(r, "notification-startup-worker");
 			t.setDaemon(true);
 			return t;
@@ -170,8 +169,7 @@ public final class SceneManager {
 			return;
 		}
 		long generation = notificationStartupGeneration.incrementAndGet();
-		notificationStartupFuture = notificationStartupExecutor.submit(() ->
-		{
+		notificationStartupFuture = notificationStartupExecutor.submit(() -> {
 			long bootstrapStartNanos = System.nanoTime();
 			System.out.println("[StartupTiming] notification bootstrap start");
 			try {
@@ -189,8 +187,7 @@ public final class SceneManager {
 					System.out.println("[StartupTiming] notification bootstrap discarded (session changed)");
 					return;
 				}
-				Platform.runLater(() ->
-				{
+				Platform.runLater(() -> {
 					if (!isActiveSession(generation, shaleClientId, userId)) {
 						System.out.println("[StartupTiming] notification UI apply skipped (session changed)");
 						return;
@@ -214,6 +211,7 @@ public final class SceneManager {
 				&& currentShaleClientId == expectedShaleClientId
 				&& currentUserId == expectedUserId;
 	}
+
 
 	public void onUpdateCheckCompleted(UpdateCheckResult result) {
 		systemUpdateNotificationProducer.onUpdateCheckResult(result);
