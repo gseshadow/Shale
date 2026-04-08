@@ -90,7 +90,7 @@ public final class TaskDueDateNotificationGenerator {
 					if (recipientUserId == null || recipientUserId <= 0) {
 						continue;
 					}
-					String eventKey = state.eventKey(candidate.taskId(), recipientUserId, today);
+						String eventKey = state.eventKey(candidate.taskId(), recipientUserId, today);
 					notificationDao.createTaskDueDateNotification(
 							candidate.shaleClientId(),
 							recipientUserId,
@@ -125,7 +125,7 @@ public final class TaskDueDateNotificationGenerator {
 		return null;
 	}
 
-	private enum DueState {
+		private enum DueState {
 		OVERDUE("Task overdue", "DUE_OVERDUE", "WARNING", "task-overdue"),
 		DUE_TODAY("Task due today", "DUE_TODAY", "INFO", "task-due-today"),
 		DUE_TOMORROW("Task due tomorrow", "DUE_TOMORROW", "INFO", "task-due-tomorrow");
@@ -154,9 +154,14 @@ public final class TaskDueDateNotificationGenerator {
 			return severity;
 		}
 
-		String eventKey(long taskId, int userId, LocalDate today) {
-			return eventPrefix + ':' + taskId + ':' + userId + ':' + today;
-		}
+			String eventKey(long taskId, int userId, LocalDate today) {
+				if (this == OVERDUE) {
+					// Overdue reminders are intentionally one-time per task/user to avoid repeat noise.
+					return eventPrefix + ':' + taskId + ':' + userId;
+				}
+				// Due-today and due-tomorrow keys include a day bucket to dedupe repeated scans within a day.
+				return eventPrefix + ':' + taskId + ':' + userId + ':' + today;
+			}
 
 		String message(TaskDueNotificationCandidate candidate) {
 			String taskTitle = candidate.title() == null || candidate.title().isBlank()

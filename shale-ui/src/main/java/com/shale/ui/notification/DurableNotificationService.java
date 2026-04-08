@@ -52,10 +52,21 @@ public final class DurableNotificationService {
 				Objects.toString(row.message(), ""),
 				row.createdAt(),
 				!row.isRead(),
-				category == NotificationCategory.TASK,
+				shouldShowAsBanner(category, row.actionType(), severity),
 				NotificationTargetScope.USER_SCOPED,
 				row.id(),
 				row.eventKey());
+	}
+
+	private static boolean shouldShowAsBanner(NotificationCategory category, String actionType, NotificationSeverity severity) {
+		if (category != NotificationCategory.TASK) {
+			return false;
+		}
+		String normalizedAction = actionType == null ? "" : actionType.trim().toUpperCase();
+		if ("DUE_OVERDUE".equals(normalizedAction)) {
+			return true;
+		}
+		return severity == NotificationSeverity.CRITICAL;
 	}
 
 	private static NotificationCategory parseCategory(String value) {

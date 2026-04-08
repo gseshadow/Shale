@@ -469,6 +469,8 @@ public final class TaskDao {
                 ) assignment
                 WHERE t.ShaleClientId = ?
                   AND t.DueAt IS NOT NULL
+                  AND ISNULL(t.IsDeleted, 0) = 0
+                  AND t.CompletedAt IS NULL
                 ORDER BY t.DueAt ASC, t.Id ASC;
                 """;
         try (Connection con = db.requireConnection();
