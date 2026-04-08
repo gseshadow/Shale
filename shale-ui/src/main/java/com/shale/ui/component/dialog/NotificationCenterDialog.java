@@ -19,6 +19,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -206,6 +207,11 @@ public final class NotificationCenterDialog {
 			Button button = new Button("Dismiss");
 			button.getStyleClass().add("notification-row-dismiss");
 			button.addEventFilter(MouseEvent.MOUSE_PRESSED, MouseEvent::consume);
+			button.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
+			if (item == null || item.getDurableNotificationId() == null) {
+				button.setText("Dismiss (session)");
+				button.setTooltip(new Tooltip("This notification will be hidden for the current session only."));
+			}
 			button.setOnAction(event -> {
 				event.consume();
 				if (item != null) {
