@@ -3,32 +3,23 @@ package com.shale.ui.controller;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Optional;
-
 import com.shale.core.platform.AppPaths;
-import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.AppVersionProvider;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UiUpdateLauncher;
+import com.shale.ui.services.UpdateFlowCoordinator;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
 
 public final class LoginController {
 	@FXML
@@ -51,6 +42,7 @@ public final class LoginController {
 	private static final String APP_NAME = "Shale";
 
 	private UiUpdateLauncher updateLauncher;
+	private UpdateFlowCoordinator updateFlowCoordinator;
 
 	public LoginController() {
 		System.out.println("LoginController()");// TODO
@@ -65,6 +57,7 @@ public final class LoginController {
 		this.authService = authService;
 		this.runtimeBridge = runtimeBridge;
 		this.updateLauncher = updateLauncher;
+		this.updateFlowCoordinator = new UpdateFlowCoordinator(updateLauncher, sceneManager::onUpdaterLaunchSucceeded);
 	}
 
 	@FXML
@@ -184,104 +177,8 @@ public final class LoginController {
 			return;
 		}
 
-		if (updateCheck.mandatory()) {
-			showMandatoryUpdateDialog();
-			return;
-		}
-
-		showOptionalUpdateDialog();
-	}
-
-	private void showOptionalUpdateDialog() {
-		ButtonType updateNow = new ButtonType("Update now", ButtonBar.ButtonData.OK_DONE);
-		ButtonType skip = new ButtonType("Skip this time", ButtonBar.ButtonData.CANCEL_CLOSE);
-
-		Alert alert = new Alert(Alert.AlertType.INFORMATION);
-		AppDialogs.applySecondaryWindowChrome(alert);
-		alert.setTitle("Update Available");
-		alert.setHeaderText("A newer version of Shale is available.");
-		alert.setContentText("Would you like to update now?");
-		alert.getButtonTypes().setAll(updateNow, skip);
-
-		Optional<ButtonType> choice = alert.showAndWait();
-		if (choice.isPresent() && choice.get() == updateNow) {
-			startUpdateAndBlock();
-		} else {
-			sceneManager.showMain();
-		}
-	}
-
-	private void showMandatoryUpdateDialog() {
-		ButtonType updateNow = new ButtonType("Update now", ButtonBar.ButtonData.OK_DONE);
-		ButtonType exit = new ButtonType("Exit application", ButtonBar.ButtonData.CANCEL_CLOSE);
-
-		Alert alert = new Alert(Alert.AlertType.WARNING);
-		AppDialogs.applySecondaryWindowChrome(alert);
-		alert.setTitle("Update Required");
-		alert.setHeaderText("You must update Shale before continuing.");
-		alert.setContentText("An update is required to continue into the app.");
-		alert.getButtonTypes().setAll(updateNow, exit);
-
-		Optional<ButtonType> choice = alert.showAndWait();
-		if (choice.isPresent() && choice.get() == updateNow) {
-			startUpdateAndBlock();
-		} else {
-			Platform.exit();
-		}
-	}
-
-	private void startUpdateAndBlock() {
-		Alert progress = new Alert(Alert.AlertType.INFORMATION);
-		AppDialogs.applySecondaryWindowChrome(progress);
-		progress.setTitle("Update Started");
-		progress.setHeaderText("Updating…");
-
-		VBox content = new VBox();
-		content.setAlignment(Pos.CENTER);
-		content.setSpacing(15);
-
-		var gifStream = getClass().getResourceAsStream("/images/ShaleLoading.gif");
-		if (gifStream != null) {
-			ImageView loadingImage = new ImageView(new Image(gifStream));
-			loadingImage.setFitWidth(120);
-			loadingImage.setPreserveRatio(true);
-			loadingImage.setSmooth(true);
-			content.getChildren().add(loadingImage);
-		} else {
-			System.out.println("Loading gif resource not found: /images/ShaleLoading.gif");
-		}
-
-		Label messageLabel = new Label("Shale is launching the updater and will close shortly.");
-		messageLabel.setWrapText(true);
-		messageLabel.setContentDisplay(ContentDisplay.TEXT_ONLY);
-		content.getChildren().add(messageLabel);
-
-		progress.getDialogPane().setContent(content);
-		progress.getButtonTypes().setAll();
-		progress.initModality(Modality.APPLICATION_MODAL);
-		progress.show();
-
-		try {
-			System.out.println("[Updater] User accepted update; launching updater.");
-			updateLauncher.launchUpdater();
-			sceneManager.onUpdaterLaunchSucceeded();
-		} catch (RuntimeException ex) {
-			progress.close();
-			Alert error = new Alert(Alert.AlertType.ERROR);
-			AppDialogs.applySecondaryWindowChrome(error);
-			error.setTitle("Update Failed");
-			error.setHeaderText("Unable to launch updater.");
-			error.setContentText(ex.getMessage());
-			error.showAndWait();
-			return;
-		}
-
-		Platform.runLater(() ->
-		{
-			if (!progress.isShowing()) {
-				progress.show();
-			}
-		});
+		Runnable onDecline = updateCheck.mandatory() ? Platform::exit : sceneManager::showMain;
+		updateFlowCoordinator.presentAvailableUpdate(updateCheck.mandatory(), onDecline);
 	}
 
 	private void setBusy(boolean busy) {

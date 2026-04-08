@@ -4,8 +4,10 @@ import com.shale.ui.component.dialog.NotificationCenterDialog;
 import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCenterService;
+import com.shale.ui.notification.NotificationCategory;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UiUpdateLauncher;
+import com.shale.ui.services.UpdateFlowCoordinator;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
 
@@ -89,6 +91,7 @@ public final class MainController {
 	private UiRuntimeBridge runtimeBridge;
 	private UiUpdateLauncher updateLauncher;
 	private NotificationCenterService notificationCenterService;
+	private UpdateFlowCoordinator updateFlowCoordinator;
 
 	public MainController() {
 		System.out.println("MainController()");// TODO remove
@@ -209,7 +212,37 @@ public final class MainController {
 		if (notificationCenterService == null || notificationBellButton == null || notificationBellButton.getScene() == null) {
 			return;
 		}
-		NotificationCenterDialog.show(notificationBellButton.getScene().getWindow(), notificationCenterService, sceneManager::openTaskProfile);
+		NotificationCenterDialog.show(
+				notificationBellButton.getScene().getWindow(),
+				notificationCenterService,
+				sceneManager::openTaskProfile,
+				this::onNotificationActivated);
+	}
+
+
+	private void onNotificationActivated(AppNotification notification) {
+		if (notification == null || updateFlowCoordinator == null || !isAvailableUpdateNotification(notification)) {
+			return;
+		}
+		updateFlowCoordinator.presentAvailableUpdate(isMandatoryUpdateNotification(notification), () -> {});
+	}
+
+	private static boolean isAvailableUpdateNotification(AppNotification notification) {
+		return notification.getCategory() == NotificationCategory.APP_UPDATE
+				&& notification.getId() != null
+				&& notification.getId().startsWith("update-available-");
+	}
+
+	private static boolean isMandatoryUpdateNotification(AppNotification notification) {
+		if (notification == null) {
+			return false;
+		}
+		String id = notification.getId();
+		if (id != null && id.contains("mandatory")) {
+			return true;
+		}
+		String title = notification.getTitle();
+		return title != null && title.toLowerCase().contains("required");
 	}
 
 	public void showMyShaleView() {
@@ -352,6 +385,7 @@ public final class MainController {
 
 	public void setUpdateLauncher(UiUpdateLauncher updateLauncher) {
 		this.updateLauncher = updateLauncher;
+		this.updateFlowCoordinator = new UpdateFlowCoordinator(updateLauncher, sceneManager::onUpdaterLaunchSucceeded);
 	}
 
 	private void refreshSessionLabel() {
