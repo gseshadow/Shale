@@ -23,9 +23,26 @@ public final class DurableNotificationService {
 		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
 			return;
 		}
+		pushLoaded(notificationCenterService, listUnread(shaleClientId, userId));
+	}
+
+	public List<AppNotification> listUnread(int shaleClientId, int userId) {
+		if (shaleClientId <= 0 || userId <= 0) {
+			return List.of();
+		}
 		List<NotificationRow> rows = notificationDao.listUnreadNotificationsForUser(shaleClientId, userId);
-		for (NotificationRow row : rows) {
-			notificationCenterService.pushNotification(toAppNotification(row));
+		return rows.stream()
+				.map(DurableNotificationService::toAppNotification)
+				.toList();
+	}
+
+	public void pushLoaded(NotificationCenterService notificationCenterService, List<AppNotification> notifications) {
+		Objects.requireNonNull(notificationCenterService, "notificationCenterService");
+		if (notifications == null || notifications.isEmpty()) {
+			return;
+		}
+		for (AppNotification notification : notifications) {
+			notificationCenterService.pushNotification(notification);
 		}
 	}
 

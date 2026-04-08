@@ -29,6 +29,7 @@ import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -39,6 +40,10 @@ import java.io.IOException;
 import java.time.Clock;
 import java.net.URL;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -69,6 +74,9 @@ public final class SceneManager {
 	private final NotificationPreferencesService notificationPreferencesService;
 	private final DurableNotificationService durableNotificationService;
 	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
+	private final ExecutorService notificationStartupExecutor;
+	private final AtomicLong notificationStartupGeneration = new AtomicLong(0);
+	private volatile Future<?> notificationStartupFuture;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -90,6 +98,11 @@ public final class SceneManager {
 				new NotificationDao(dbSessionProvider),
 				appState,
 				new AssignedUserTaskDueNotificationRecipientResolver());
+		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r -> {
+			Thread t = new Thread(r, "notification-startup-worker");
+			t.setDaemon(true);
+			return t;
+		});
 		this.notificationCenterService.setReadListener(durableNotificationService::markRead);
 		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
@@ -105,6 +118,12 @@ public final class SceneManager {
 	}
 
 	public void showLogin() {
+		notificationStartupGeneration.incrementAndGet();
+		Future<?> startupFuture = notificationStartupFuture;
+		if (startupFuture != null) {
+			startupFuture.cancel(true);
+			notificationStartupFuture = null;
+		}
 		liveUpdateNotificationBridge.stop();
 		connectivityNotificationProducer.stop();
 		taskDueDateNotificationGenerator.stop();
@@ -119,6 +138,8 @@ public final class SceneManager {
 	}
 
 	public void showMain() {
+		long showMainStartNanos = System.nanoTime();
+		System.out.println("[StartupTiming] showMain entry");
 		var root = load("/fxml/main.fxml", controller ->
 		{
 			MainController c = (MainController) controller;
@@ -127,16 +148,77 @@ public final class SceneManager {
 			return c;
 		});
 		setScene(root, "Shale");
+		Platform.runLater(() -> System.out.println("[StartupTiming] main shell visible"));
 		notificationPreferencesService.refreshActivePreferences();
-		taskDueDateNotificationGenerator.runOnce();
-		durableNotificationService.loadUnreadInto(notificationCenterService);
 		liveUpdateNotificationBridge.start();
 		connectivityNotificationProducer.start();
 		taskDueDateNotificationGenerator.start();
+		startNotificationBootstrapAsync();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());
 		notifyBackAvailabilityChanged();
+		long showMainEndMs = (System.nanoTime() - showMainStartNanos) / 1_000_000;
+		System.out.println("[StartupTiming] showMain critical path complete in " + showMainEndMs + " ms");
+	}
+
+	private void startNotificationBootstrapAsync() {
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return;
+		}
+		long generation = notificationStartupGeneration.incrementAndGet();
+		notificationStartupFuture = notificationStartupExecutor.submit(() -> {
+			long bootstrapStartNanos = System.nanoTime();
+			System.out.println("[StartupTiming] notification bootstrap start");
+			try {
+				long dueStartNanos = System.nanoTime();
+				taskDueDateNotificationGenerator.runOnce();
+				long dueElapsedMs = (System.nanoTime() - dueStartNanos) / 1_000_000;
+				System.out.println("[StartupTiming] due-date initial pass complete in " + dueElapsedMs + " ms");
+
+				long hydrateStartNanos = System.nanoTime();
+				var unread = durableNotificationService.listUnread(shaleClientId, userId);
+				long hydrateElapsedMs = (System.nanoTime() - hydrateStartNanos) / 1_000_000;
+				System.out.println("[StartupTiming] durable notification load complete in " + hydrateElapsedMs + " ms");
+
+				if (!isActiveSession(generation, shaleClientId, userId)) {
+					System.out.println("[StartupTiming] notification bootstrap discarded (session changed)");
+					return;
+				}
+				Platform.runLater(() -> {
+					if (!isActiveSession(generation, shaleClientId, userId)) {
+						System.out.println("[StartupTiming] notification UI apply skipped (session changed)");
+						return;
+					}
+					durableNotificationService.pushLoaded(notificationCenterService, unread);
+					long bootstrapElapsedMs = (System.nanoTime() - bootstrapStartNanos) / 1_000_000;
+					System.out.println("[StartupTiming] notification bootstrap applied in " + bootstrapElapsedMs + " ms");
+				});
+			} catch (RuntimeException ex) {
+				System.err.println("[StartupTiming] notification bootstrap failed: " + ex.getMessage());
+			}
+		});
+	}
+
+	private boolean isActiveSession(long generation, int expectedShaleClientId, int expectedUserId) {
+		Integer currentShaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		return generation == notificationStartupGeneration.get()
+				&& currentShaleClientId != null
+				&& currentUserId != null
+				&& currentShaleClientId == expectedShaleClientId
+				&& currentUserId == expectedUserId;
+	}
+
+
+	public void onUpdateCheckCompleted(UpdateCheckResult result) {
+		systemUpdateNotificationProducer.onUpdateCheckResult(result);
+	}
+
+	public void onUpdaterLaunchSucceeded() {
+		systemUpdateNotificationProducer.onUpdaterLaunchSucceeded();
 	}
 
 
