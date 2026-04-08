@@ -52,6 +52,8 @@ public final class TaskDao {
     }
     public record TaskAssignableUserRow(int id, String displayName, String color) {
     }
+    public record TaskAssignableUserRow(int id, String displayName, String color) {
+    }
 
     private final DbSessionProvider db;
 
