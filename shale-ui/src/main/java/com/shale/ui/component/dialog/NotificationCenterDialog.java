@@ -3,6 +3,7 @@ package com.shale.ui.component.dialog;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCenterService;
 import com.shale.ui.notification.NotificationCategory;
+import com.shale.ui.component.factory.TaskCardFactory;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -85,12 +86,26 @@ public final class NotificationCenterDialog {
 	private static final class NotificationCell extends ListCell<AppNotification> {
 		private final NotificationCenterService notificationService;
 		private final Consumer<Long> onOpenTask;
+		private final TaskCardFactory taskCardFactory;
 		private final ChangeListener<Boolean> unreadListener = (obs, oldValue, newValue) -> updateUnreadStyle();
 		private AppNotification observedItem;
 
 		private NotificationCell(NotificationCenterService notificationService, Consumer<Long> onOpenTask) {
 			this.notificationService = notificationService;
 			this.onOpenTask = onOpenTask;
+			this.taskCardFactory = new TaskCardFactory(
+					taskId -> {
+						AppNotification selected = getItem();
+						if (selected != null) {
+							notificationService.markRead(selected);
+						}
+						if (this.onOpenTask != null) {
+							this.onOpenTask.accept(taskId);
+						}
+					},
+					ignored -> {},
+					ignored -> {},
+					ignored -> {});
 			setOnMouseClicked(event -> {
 				AppNotification selected = getItem();
 				if (selected != null) {
@@ -132,7 +147,7 @@ public final class NotificationCenterDialog {
 			message.getStyleClass().add("notification-row-message");
 
 			VBox wrapper = new VBox(6, topRow, title, message);
-			VBox taskPreview = createTaskPreview(item);
+			Region taskPreview = createTaskPreview(item);
 			if (taskPreview != null) {
 				wrapper.getChildren().add(taskPreview);
 			}
@@ -153,7 +168,7 @@ public final class NotificationCenterDialog {
 			}
 		}
 
-		private VBox createTaskPreview(AppNotification item) {
+		private Region createTaskPreview(AppNotification item) {
 			Long taskId = resolveTaskId(item);
 			if (taskId == null || taskId <= 0) {
 				return null;
@@ -163,22 +178,21 @@ public final class NotificationCenterDialog {
 				previewTitle = "Task #" + taskId;
 			}
 
-			Label taskTitle = new Label(previewTitle);
-			taskTitle.getStyleClass().add("notification-task-preview-title");
-
-			Label taskMeta = new Label("Open task details");
-			taskMeta.getStyleClass().add("notification-task-preview-meta");
-			VBox preview = new VBox(2, taskTitle, taskMeta);
-			preview.getStyleClass().add("notification-task-preview");
-			preview.setCursor(Cursor.HAND);
-			preview.setOnMouseClicked(event -> {
-				event.consume();
-				notificationService.markRead(item);
-				if (onOpenTask != null) {
-					onOpenTask.accept(taskId);
-				}
-			});
-			return preview;
+			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+					taskId,
+					null,
+					null,
+					null,
+					null,
+					previewTitle,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null);
+			return taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
 		}
 
 		private static Long resolveTaskId(AppNotification item) {
