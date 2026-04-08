@@ -602,7 +602,6 @@ public final class MyShaleController {
 			try {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
 				List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
 						detail == null
 								? List.of()
@@ -625,7 +624,6 @@ public final class MyShaleController {
 								detail.description(),
 								detail.dueAt(),
 								detail.priorityId(),
-								detail.assignedUserId(),
 								detail.createdByDisplayName(),
 								assignedTeam.stream()
 										.map(member -> new TaskDetailDialog.AssignedTeamMember(
@@ -634,7 +632,20 @@ public final class MyShaleController {
 										.toList(),
 								detail.completedAt() != null);
 						Optional<TaskDetailDialog.TaskDetailResult> result =
-								TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users, onOpenCase);
+								TaskDetailDialog.showAndWait(
+										taskDialogOwner(),
+										model,
+										priorities,
+										id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+										userId -> {
+											caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+											return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+													.map(member -> new TaskDetailDialog.AssignedTeamMember(
+															member.displayName(),
+															member.color()))
+													.toList();
+										},
+										onOpenCase);
 						if (result.isEmpty()) {
 							return;
 						}
@@ -673,7 +684,6 @@ public final class MyShaleController {
 				payload.description(),
 				payload.dueAt(),
 				payload.priorityId(),
-				payload.assigneeUserId(),
 				payload.completed(),
 				currentUserId);
 		new Thread(() -> {

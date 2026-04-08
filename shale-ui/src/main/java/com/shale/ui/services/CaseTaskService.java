@@ -124,8 +124,6 @@ public final class CaseTaskService {
 
     public void updateTask(UpdateTaskRequest request) {
         Objects.requireNonNull(request, "request");
-        TaskDetailDto before = taskDao.findTaskDetail(request.taskId(), request.shaleClientId());
-        Integer previousAssigneeUserId = before == null ? null : before.assignedUserId();
         taskDao.updateTask(
                 request.taskId(),
                 request.shaleClientId(),
@@ -134,43 +132,16 @@ public final class CaseTaskService {
                 request.dueAt(),
                 request.priorityId(),
                 request.completed());
-        if (request.assigneeUserId() != null && request.assigneeUserId() > 0) {
-            taskDao.assignPrimaryUserToTask(
-                    request.taskId(),
-                    request.shaleClientId(),
-                    request.assigneeUserId(),
-                    request.changedByUserId());
-        } else {
-            taskDao.clearPrimaryUserAssignment(request.taskId(), request.shaleClientId());
-        }
-        Integer nextAssigneeUserId = request.assigneeUserId() != null && request.assigneeUserId() > 0
-                ? request.assigneeUserId()
-                : null;
-        if (!Objects.equals(previousAssigneeUserId, nextAssigneeUserId) && nextAssigneeUserId != null) {
-            String title = request.title();
-            if ((title == null || title.isBlank()) && before != null) {
-                title = before.title();
-            }
-            Long caseId = before == null ? null : before.caseId();
-            String caseName = before == null ? null : before.caseName();
-            publishTaskAssignmentEvent(
-                    request.taskId(),
-                    request.shaleClientId(),
-                    request.changedByUserId(),
-                    title,
-                    caseId,
-                    caseName,
-                    nextAssigneeUserId,
-                    previousAssigneeUserId);
-        }
     }
 
-    public void assignUserToTask(long taskId, int shaleClientId, int userId, int assignedByUserId) {
-        taskDao.assignPrimaryUserToTask(taskId, shaleClientId, userId, assignedByUserId);
+    public List<AssignableUserOption> loadAssignableUsersForTask(long taskId, int shaleClientId) {
+        return taskDao.listAssignableUsersForTask(taskId, shaleClientId).stream()
+                .map(row -> new AssignableUserOption(row.id(), row.displayName(), row.color()))
+                .toList();
     }
 
-    public void clearTaskAssignee(long taskId, int shaleClientId) {
-        taskDao.clearPrimaryUserAssignment(taskId, shaleClientId);
+    public void addTaskAssignment(long taskId, int shaleClientId, int userId, int assignedByUserId) {
+        taskDao.addTaskAssignment(taskId, shaleClientId, userId, assignedByUserId);
     }
 
     public List<AssignableUserOption> loadAssignableUsers(int shaleClientId) {
@@ -281,7 +252,6 @@ public final class CaseTaskService {
             String description,
             java.time.LocalDateTime dueAt,
             Integer priorityId,
-            Integer assigneeUserId,
             boolean completed,
             int changedByUserId) {
     }

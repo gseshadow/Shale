@@ -682,8 +682,7 @@ public final class SceneManager {
 		try {
 			TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 			List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-			List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
-			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, priorities, users));
+			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, priorities));
 		} catch (Exception ex) {
 			Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
 		}
@@ -695,8 +694,7 @@ public final class SceneManager {
 			int currentUserId,
 			CaseTaskService caseTaskService,
 			TaskDetailDto detail,
-			List<TaskPriorityOptionDto> priorities,
-			List<CaseTaskService.AssignableUserOption> users) {
+			List<TaskPriorityOptionDto> priorities) {
 		if (detail == null) {
 			AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted.");
 			return;
@@ -713,7 +711,6 @@ public final class SceneManager {
 				detail.description(),
 				detail.dueAt(),
 				detail.priorityId(),
-				detail.assignedUserId(),
 				detail.createdByDisplayName(),
 				assignedTeam.stream()
 						.map(member -> new TaskDetailDialog.AssignedTeamMember(
@@ -726,7 +723,15 @@ public final class SceneManager {
 				owner,
 				model,
 				priorities,
-				users,
+				id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+				userId -> {
+					caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+					return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+							.map(member -> new TaskDetailDialog.AssignedTeamMember(
+									member.displayName(),
+									member.color()))
+							.toList();
+				},
 				caseId -> openCaseProfile(caseId, "OVERVIEW"));
 		if (result.isEmpty()) {
 			return;
@@ -753,7 +758,6 @@ public final class SceneManager {
 				payload.description(),
 				payload.dueAt(),
 				payload.priorityId(),
-				payload.assigneeUserId(),
 				payload.completed(),
 				currentUserId);
 		new Thread(() -> {

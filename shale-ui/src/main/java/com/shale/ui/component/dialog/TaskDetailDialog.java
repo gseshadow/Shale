@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -22,7 +23,6 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -43,7 +43,8 @@ public final class TaskDetailDialog {
             Window owner,
             TaskDetailModel model,
             List<TaskPriorityOptionDto> priorities,
-            List<CaseTaskService.AssignableUserOption> assignees,
+            Function<Long, List<CaseTaskService.AssignableUserOption>> loadAssignableUsersForTask,
+            AssignmentAdder assignmentAdder,
             Consumer<Integer> onOpenCase) {
         Stage stage = AppDialogs.createModalStage(owner, "Task Details");
 
@@ -51,7 +52,7 @@ public final class TaskDetailDialog {
 
         Label heading = new Label("Task details");
         heading.getStyleClass().add("app-dialog-title");
-        Label message = new Label("Update task fields, assignee, completion, or delete the task.");
+        Label message = new Label("Update task fields, assigned team, completion, or delete the task.");
         message.getStyleClass().add("app-dialog-message");
         Label createdByLabel = new Label("Created by: " + displayCreatedBy(model.createdByDisplayName()));
         createdByLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.75);");
@@ -74,22 +75,6 @@ public final class TaskDetailDialog {
         priorityCombo.setCellFactory(cb -> new PriorityListCell());
         priorityCombo.setButtonCell(new PriorityListCell());
         selectPriority(priorityCombo, safePriorities, model.priorityId());
-
-        ComboBox<AssigneeChoice> assigneeCombo = new ComboBox<>();
-        assigneeCombo.setMaxWidth(Double.MAX_VALUE);
-        UserCardFactory userCardFactory = new UserCardFactory(id -> {
-        });
-        assigneeCombo.setCellFactory(cb -> new AssigneeChoiceListCell(userCardFactory));
-        assigneeCombo.setButtonCell(new AssigneeChoiceButtonCell());
-        assigneeCombo.getItems().add(AssigneeChoice.unassigned());
-        List<CaseTaskService.AssignableUserOption> safeAssignees = assignees == null ? List.of() : assignees;
-        for (CaseTaskService.AssignableUserOption assignee : safeAssignees) {
-            if (assignee == null || assignee.id() <= 0) {
-                continue;
-            }
-            assigneeCombo.getItems().add(new AssigneeChoice(assignee.id(), assignee.displayName(), assignee.color()));
-        }
-        selectAssignee(assigneeCombo, model.assignedUserId());
 
         CheckBox completedCheck = new CheckBox("Completed");
         completedCheck.setSelected(model.completed());
@@ -123,30 +108,40 @@ public final class TaskDetailDialog {
         VBox assignedTeamSection = new VBox(6);
         Label assignedTeamLabel = new Label("Assigned team");
         assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        Button addAssignedUserButton = new Button("Add");
+        addAssignedUserButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        addAssignedUserButton.setFocusTraversable(false);
+        Region assignedHeaderSpacer = new Region();
+        HBox.setHgrow(assignedHeaderSpacer, Priority.ALWAYS);
+        HBox assignedTeamHeader = new HBox(8, assignedTeamLabel, assignedHeaderSpacer, addAssignedUserButton);
+        assignedTeamHeader.setAlignment(Pos.CENTER_LEFT);
 
+        UserCardFactory assignedTeamCardFactory = new UserCardFactory(id -> {
+        });
         VBox assignedTeamList = new VBox(6);
-        List<AssignedTeamMember> assignedTeamMembers = model.assignedTeamMembers() == null
+        List<AssignedTeamMember> initialAssignedTeamMembers = model.assignedTeamMembers() == null
                 ? List.of()
                 : model.assignedTeamMembers();
-        if (assignedTeamMembers.isEmpty()) {
-            Label emptyLabel = new Label("No users assigned");
-            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
-            assignedTeamList.getChildren().add(emptyLabel);
-        } else {
-            UserCardFactory assignedTeamCardFactory = new UserCardFactory(id -> {
-            });
-            for (AssignedTeamMember member : assignedTeamMembers) {
-                if (member == null) {
-                    continue;
-                }
-                var card = assignedTeamCardFactory.create(
-                        new UserCardModel(null, safe(member.displayName()), member.colorCss(), null),
-                        UserCardFactory.Variant.MINI);
-                card.setMouseTransparent(true);
-                assignedTeamList.getChildren().add(card);
+        renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, initialAssignedTeamMembers);
+        addAssignedUserButton.setOnAction(e -> {
+            List<CaseTaskService.AssignableUserOption> candidates = loadAssignableUsersForTask == null
+                    ? List.of()
+                    : loadAssignableUsersForTask.apply(model.taskId());
+            Optional<CaseTaskService.AssignableUserOption> selected = showAssignUserPicker(stage, candidates);
+            if (selected.isEmpty()) {
+                return;
             }
-        }
-        assignedTeamSection.getChildren().setAll(assignedTeamLabel, assignedTeamList);
+            CaseTaskService.AssignableUserOption user = selected.get();
+            try {
+                List<AssignedTeamMember> refreshed = assignmentAdder == null
+                        ? List.of()
+                        : assignmentAdder.addAndReload(user.id());
+                renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed);
+            } catch (Exception ex) {
+                showError(errorLabel, "Failed to add assigned user. " + rootCauseMessage(ex));
+            }
+        });
+        assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedTeamList);
 
         VBox content = new VBox(8,
                 createdByLabel,
@@ -154,7 +149,6 @@ public final class TaskDetailDialog {
                 new Label("Description"), descriptionArea,
                 relatedCaseSection,
                 new Label("Priority"), priorityCombo,
-                new Label("Assignee"), assigneeCombo,
                 new Label("Due date/time"), dueRow,
                 assignedTeamSection,
                 completedCheck,
@@ -204,13 +198,11 @@ public final class TaskDetailDialog {
                 showError(errorLabel, "Priority is required.");
                 return;
             }
-            Integer assigneeUserId = Optional.ofNullable(assigneeCombo.getValue()).map(AssigneeChoice::userId).orElse(null);
             result.value = TaskDetailResult.save(new SaveTaskPayload(
                     title,
                     descriptionArea.getText(),
                     dueAt,
                     priorityId,
-                    assigneeUserId,
                     completedCheck.isSelected()));
             stage.close();
         });
@@ -256,20 +248,6 @@ public final class TaskDetailDialog {
         priorityCombo.setValue(selected);
     }
 
-    private static void selectAssignee(ComboBox<AssigneeChoice> assigneeCombo, Integer assignedUserId) {
-        if (assignedUserId == null || assignedUserId <= 0) {
-            assigneeCombo.setValue(AssigneeChoice.unassigned());
-            return;
-        }
-        for (AssigneeChoice option : assigneeCombo.getItems()) {
-            if (option != null && option.userId() != null && option.userId() == assignedUserId) {
-                assigneeCombo.setValue(option);
-                return;
-            }
-        }
-        assigneeCombo.setValue(AssigneeChoice.unassigned());
-    }
-
     private static LocalDateTime parseDueAt(LocalDate dueDate, String dueTimeRaw) {
         if (dueDate == null) {
             return null;
@@ -296,6 +274,93 @@ public final class TaskDetailDialog {
         return trimmed.isBlank() ? "—" : trimmed;
     }
 
+    private static String rootCauseMessage(Throwable throwable) {
+        Throwable cursor = throwable;
+        String message = null;
+        while (cursor != null) {
+            if (cursor.getMessage() != null && !cursor.getMessage().isBlank()) {
+                message = cursor.getMessage().trim();
+            }
+            cursor = cursor.getCause();
+        }
+        return (message == null || message.isBlank()) ? "Unexpected error." : message;
+    }
+
+    private static void renderAssignedTeam(
+            VBox assignedTeamList,
+            UserCardFactory cardFactory,
+            List<AssignedTeamMember> members) {
+        assignedTeamList.getChildren().clear();
+        List<AssignedTeamMember> safeMembers = members == null ? List.of() : members;
+        if (safeMembers.isEmpty()) {
+            Label emptyLabel = new Label("No users assigned");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            assignedTeamList.getChildren().add(emptyLabel);
+            return;
+        }
+        for (AssignedTeamMember member : safeMembers) {
+            if (member == null) {
+                continue;
+            }
+            var card = cardFactory.create(
+                    new UserCardModel(null, safe(member.displayName()), member.colorCss(), null),
+                    UserCardFactory.Variant.MINI);
+            card.setMouseTransparent(true);
+            assignedTeamList.getChildren().add(card);
+        }
+    }
+
+    private static Optional<CaseTaskService.AssignableUserOption> showAssignUserPicker(
+            Window owner,
+            List<CaseTaskService.AssignableUserOption> candidates) {
+        Stage stage = AppDialogs.createModalStage(owner, "Add Assigned User");
+        Label heading = new Label("Add to assigned team");
+        heading.getStyleClass().add("app-dialog-title");
+
+        VBox list = new VBox(8);
+        UserCardFactory cardFactory = new UserCardFactory(id -> {
+        });
+        List<CaseTaskService.AssignableUserOption> safeCandidates = candidates == null ? List.of() : candidates;
+        ResultHolderAssignable holder = new ResultHolderAssignable();
+        if (safeCandidates.isEmpty()) {
+            Label emptyLabel = new Label("No additional users available");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            list.getChildren().add(emptyLabel);
+        } else {
+            for (CaseTaskService.AssignableUserOption user : safeCandidates) {
+                if (user == null || user.id() <= 0) {
+                    continue;
+                }
+                var card = cardFactory.create(
+                        new UserCardModel(user.id(), safe(user.displayName()), user.color(), null),
+                        UserCardFactory.Variant.MINI);
+                Button cardButton = new Button();
+                cardButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+                cardButton.setMaxWidth(Double.MAX_VALUE);
+                cardButton.setGraphic(card);
+                cardButton.setOnAction(e -> {
+                    holder.value = user;
+                    stage.close();
+                });
+                list.getChildren().add(cardButton);
+            }
+        }
+        Button closeButton = new Button("Close");
+        closeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        closeButton.setOnAction(e -> stage.close());
+
+        VBox root = new VBox(12, heading, list, closeButton);
+        root.getStyleClass().add("app-dialog-root");
+        root.setPadding(new Insets(18));
+        root.setMinWidth(380);
+        Scene scene = new Scene(root);
+        scene.getStylesheets().add(Objects.requireNonNull(
+                TaskDetailDialog.class.getResource("/css/app.css")).toExternalForm());
+        stage.setScene(scene);
+        stage.showAndWait();
+        return Optional.ofNullable(holder.value);
+    }
+
     public record TaskDetailModel(
             long taskId,
             long caseId,
@@ -306,7 +371,6 @@ public final class TaskDetailDialog {
             String description,
             LocalDateTime dueAt,
             Integer priorityId,
-            Integer assignedUserId,
             String createdByDisplayName,
             List<AssignedTeamMember> assignedTeamMembers,
             boolean completed) {
@@ -322,7 +386,6 @@ public final class TaskDetailDialog {
             String description,
             LocalDateTime dueAt,
             Integer priorityId,
-            Integer assigneeUserId,
             boolean completed) {
     }
 
@@ -343,11 +406,12 @@ public final class TaskDetailDialog {
     private static final class ResultHolder {
         private TaskDetailResult value;
     }
-
-    private record AssigneeChoice(Integer userId, String displayName, String colorCss) {
-        static AssigneeChoice unassigned() {
-            return new AssigneeChoice(null, "Unassigned", null);
-        }
+    private static final class ResultHolderAssignable {
+        private CaseTaskService.AssignableUserOption value;
+    }
+    @FunctionalInterface
+    public interface AssignmentAdder {
+        List<AssignedTeamMember> addAndReload(int userId);
     }
 
     private static final class PriorityListCell extends javafx.scene.control.ListCell<TaskPriorityOptionDto> {
@@ -358,60 +422,4 @@ public final class TaskDetailDialog {
         }
     }
 
-    private static final class AssigneeChoiceListCell extends javafx.scene.control.ListCell<AssigneeChoice> {
-        private final UserCardFactory userCardFactory;
-
-        private AssigneeChoiceListCell(UserCardFactory userCardFactory) {
-            this.userCardFactory = userCardFactory;
-        }
-
-        @Override
-        protected void updateItem(AssigneeChoice item, boolean empty) {
-            super.updateItem(item, empty);
-            if (empty || item == null) {
-                setText(null);
-                setGraphic(null);
-                return;
-            }
-            if (item.userId() == null) {
-                setText("Unassigned");
-                setGraphic(null);
-                return;
-            }
-            String text = item.displayName();
-            if (text == null || text.isBlank()) {
-                text = "User #" + item.userId();
-            }
-            var card = userCardFactory.create(
-                    new UserCardModel(item.userId(), text, item.colorCss(), null),
-                    UserCardFactory.Variant.MINI);
-            card.setMouseTransparent(true);
-            setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-            setText(null);
-            setGraphic(card);
-        }
-    }
-
-    private static final class AssigneeChoiceButtonCell extends javafx.scene.control.ListCell<AssigneeChoice> {
-        @Override
-        protected void updateItem(AssigneeChoice item, boolean empty) {
-            super.updateItem(item, empty);
-            if (empty || item == null) {
-                setText(null);
-                setGraphic(null);
-                return;
-            }
-            if (item.userId() == null) {
-                setText("Unassigned");
-                setGraphic(null);
-                return;
-            }
-            String text = item.displayName();
-            if (text == null || text.isBlank()) {
-                text = "User #" + item.userId();
-            }
-            setText(text);
-            setGraphic(null);
-        }
-    }
 }
