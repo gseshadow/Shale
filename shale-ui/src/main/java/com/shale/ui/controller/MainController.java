@@ -160,10 +160,7 @@ public final class MainController {
 
 	@FXML
 	private void onNavSettings() {
-		highlightNav(navSettingsButton);
-		sectionTitleLabel.setText("Settings");
-		sectionSubtitleLabel.setText("Configure Shale preferences and system settings.");
-		setSectionContentText("Settings tab is not implemented yet.");
+		sceneManager.openSettingsView();
 	}
 
 	@FXML
@@ -212,7 +209,7 @@ public final class MainController {
 		if (notificationCenterService == null || notificationBellButton == null || notificationBellButton.getScene() == null) {
 			return;
 		}
-		NotificationCenterDialog.show(notificationBellButton.getScene().getWindow(), notificationCenterService);
+		NotificationCenterDialog.show(notificationBellButton.getScene().getWindow(), notificationCenterService, sceneManager::openTaskProfile);
 	}
 
 	public void showMyShaleView() {
@@ -255,6 +252,14 @@ public final class MainController {
 		sectionSubtitleLabel.setText("See and manage your team members.");
 		Node teamRoot = sceneManager.createTeamView(sceneManager::openUserProfile);
 		sectionContent.getChildren().setAll(teamRoot);
+	}
+
+	public void showSettingsView() {
+		highlightNav(navSettingsButton);
+		sectionTitleLabel.setText("Settings");
+		sectionSubtitleLabel.setText("Configure Shale preferences and system settings.");
+		Node settingsRoot = sceneManager.createSettingsView();
+		sectionContent.getChildren().setAll(settingsRoot);
 	}
 
 	public void showSearchResultsView(String query) {
