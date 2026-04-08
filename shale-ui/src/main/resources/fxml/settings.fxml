@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<ScrollPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.shale.ui.controller.SettingsController"
+            fitToWidth="true"
+            hbarPolicy="NEVER"
+            vbarPolicy="AS_NEEDED"
+            styleClass="surface-scroll">
+    <content>
+        <VBox spacing="14" styleClass="cases-content-surface glass-panel">
+            <padding>
+                <Insets top="16" right="16" bottom="16" left="16"/>
+            </padding>
+
+            <Label text="Notifications" styleClass="search-section-title"/>
+            <Label text="Control which notifications are generated and when they appear as banners."
+                   styleClass="search-summary-text" wrapText="true"/>
+
+            <VBox spacing="8" styleClass="strong-panel">
+                <padding>
+                    <Insets top="12" right="12" bottom="12" left="12"/>
+                </padding>
+                <Label text="Categories" styleClass="app-dialog-field-label"/>
+                <CheckBox fx:id="taskAssignedToMeCheck" text="Task assigned to me"/>
+                <CheckBox fx:id="taskOverdueCheck" text="Task overdue"/>
+                <CheckBox fx:id="taskDueTodayCheck" text="Task due today"/>
+                <CheckBox fx:id="taskDueTomorrowCheck" text="Task due tomorrow"/>
+                <CheckBox fx:id="appUpdatesCheck" text="App updates"/>
+                <CheckBox fx:id="connectivityCheck" text="Connectivity"/>
+            </VBox>
+
+            <VBox spacing="8" styleClass="strong-panel">
+                <padding>
+                    <Insets top="12" right="12" bottom="12" left="12"/>
+                </padding>
+                <Label text="Banner behavior" styleClass="app-dialog-field-label"/>
+                <CheckBox fx:id="taskOverdueBannerCheck" text="Task overdue banner"/>
+                <CheckBox fx:id="taskDueTodayBannerCheck" text="Task due today banner"/>
+                <CheckBox fx:id="appUpdatesBannerCheck" text="App updates banner"/>
+                <CheckBox fx:id="connectivityBannerCheck" text="Connectivity banner"/>
+            </VBox>
+
+            <Separator/>
+
+            <HBox spacing="10">
+                <Button text="Apply" onAction="#onApplyNotificationPreferences" styleClass="button-primary"/>
+                <Button text="Reset" onAction="#onResetNotificationPreferences" styleClass="button-secondary"/>
+                <Label fx:id="notificationSettingsStatusLabel" styleClass="search-summary-text" wrapText="true">
+                    <HBox.margin>
+                        <Insets left="8"/>
+                    </HBox.margin>
+                </Label>
+            </HBox>
+        </VBox>
+    </content>
+</ScrollPane>

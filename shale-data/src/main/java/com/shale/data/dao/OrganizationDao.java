@@ -631,8 +631,10 @@ public final class OrganizationDao {
 				FROM dbo.CaseParties cp
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cp.CaseId
-				INNER JOIN dbo.PartyRoles pr
+				LEFT JOIN dbo.PartyRoles pr
 				  ON pr.Id = cp.PartyRoleId
+				INNER JOIN dbo.Organizations o
+				  ON o.Id = cp.OrganizationId
 				OUTER APPLY (
 				    SELECT TOP (1)
 				      cu.UserId
@@ -645,6 +647,8 @@ public final class OrganizationDao {
 				LEFT JOIN dbo.Users u
 				  ON u.Id = ra.UserId
 				WHERE cp.OrganizationId = ?
+				  AND o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 				  AND c.ShaleClientId = ?
 				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
 				ORDER BY
@@ -661,6 +665,7 @@ public final class OrganizationDao {
 			int idx = 1;
 			ps.setInt(idx++, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
 			ps.setInt(idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
 			ps.setInt(idx++, shaleClientId);
 
 			List<RelatedCaseRow> out = new ArrayList<>();
@@ -680,6 +685,8 @@ public final class OrganizationDao {
 					));
 				}
 			}
+			System.out.println("Organization related-cases load: organizationId=" + organizationId
+					+ ", queryPath=CasePartiesOnly, rowCount=" + out.size());
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related cases for organization (id=" + organizationId + ")", e);

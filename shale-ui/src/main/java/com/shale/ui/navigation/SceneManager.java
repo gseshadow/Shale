@@ -1,11 +1,15 @@
 package com.shale.ui.navigation;
 
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.dto.TaskDetailDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.NotificationDao;
+import com.shale.data.dao.UserPreferencesDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.ContactViewController;
@@ -18,8 +22,11 @@ import com.shale.ui.controller.NewOrganizationController;
 import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.controller.SearchController;
+import com.shale.ui.controller.SettingsController;
 import com.shale.ui.controller.TeamController;
 import com.shale.ui.controller.UserController;
+import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.CaseTaskService;
@@ -27,7 +34,9 @@ import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -35,12 +44,28 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.net.URL;
 import java.util.Objects;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javafx.stage.Window;
 
 import com.shale.ui.services.UiUpdateLauncher;
+import com.shale.ui.services.UiUpdateLauncher.UpdateCheckResult;
+import com.shale.ui.notification.NotificationCenterService;
+import com.shale.ui.notification.LiveUpdateNotificationBridge;
+import com.shale.ui.notification.ConnectivityNotificationProducer;
+import com.shale.ui.notification.SystemUpdateNotificationProducer;
+import com.shale.ui.notification.NotificationPreferencesService;
+import com.shale.ui.notification.DurableNotificationService;
+import com.shale.ui.notification.AssignedUserTaskDueNotificationRecipientResolver;
+import com.shale.ui.notification.TaskDueDateNotificationGenerator;
 
 public final class SceneManager {
 
@@ -48,10 +73,19 @@ public final class SceneManager {
 	private final AppState appState;
 	private final UiAuthService authService;
 	private final UiRuntimeBridge runtimeBridge;
-
 	private final DbSessionProvider dbSessionProvider;
-
 	private final UiUpdateLauncher updateLauncher;
+	private final NavigationManager navigationManager = new NavigationManager();
+	private final NotificationCenterService notificationCenterService;
+	private final LiveUpdateNotificationBridge liveUpdateNotificationBridge;
+	private final ConnectivityNotificationProducer connectivityNotificationProducer;
+	private final SystemUpdateNotificationProducer systemUpdateNotificationProducer;
+	private final NotificationPreferencesService notificationPreferencesService;
+	private final DurableNotificationService durableNotificationService;
+	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
+	private final ExecutorService notificationStartupExecutor;
+	private final AtomicLong notificationStartupGeneration = new AtomicLong(0);
+	private volatile Future<?> notificationStartupFuture;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -65,9 +99,47 @@ public final class SceneManager {
 		this.runtimeBridge = runtimeBridge;
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
+		this.notificationCenterService = createNotificationCenterService();
+		UserPreferencesService userPreferencesService = new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState);
+		this.notificationPreferencesService = new NotificationPreferencesService(appState, userPreferencesService);
+		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
+		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
+				new TaskDao(dbSessionProvider),
+				new NotificationDao(dbSessionProvider),
+				appState,
+				notificationPreferencesService,
+				new AssignedUserTaskDueNotificationRecipientResolver());
+		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r -> {
+			Thread t = new Thread(r, "notification-startup-worker");
+			t.setDaemon(true);
+			return t;
+		});
+		this.notificationCenterService.setReadListener(durableNotificationService::markRead);
+		this.notificationCenterService.setDismissListener(durableNotificationService::dismiss);
+		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
+		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
+		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
+	}
+
+	private NotificationCenterService createNotificationCenterService() {
+		boolean seedDemoNotifications = Boolean.getBoolean("shale.notifications.seedDemo");
+		if (seedDemoNotifications) {
+			return NotificationCenterService.seeded(Clock.systemUTC());
+		}
+		return NotificationCenterService.empty();
 	}
 
 	public void showLogin() {
+		notificationStartupGeneration.incrementAndGet();
+		Future<?> startupFuture = notificationStartupFuture;
+		if (startupFuture != null) {
+			startupFuture.cancel(true);
+			notificationStartupFuture = null;
+		}
+		liveUpdateNotificationBridge.stop();
+		connectivityNotificationProducer.stop();
+		taskDueDateNotificationGenerator.stop();
+		notificationCenterService.clearAll();
 		var root = load("/fxml/login.fxml", controller ->
 		{
 			LoginController c = (LoginController) controller;
@@ -78,14 +150,254 @@ public final class SceneManager {
 	}
 
 	public void showMain() {
+		long showMainStartNanos = System.nanoTime();
+		System.out.println("[StartupTiming] showMain entry");
 		var root = load("/fxml/main.fxml", controller ->
 		{
 			MainController c = (MainController) controller;
-			c.init(this, appState, runtimeBridge);
+			c.init(this, appState, runtimeBridge, notificationCenterService);
 			c.setUpdateLauncher(updateLauncher);
 			return c;
 		});
 		setScene(root, "Shale");
+		Platform.runLater(() -> System.out.println("[StartupTiming] main shell visible"));
+		notificationPreferencesService.refreshActivePreferences();
+		liveUpdateNotificationBridge.start();
+		connectivityNotificationProducer.start();
+		taskDueDateNotificationGenerator.start();
+		startNotificationBootstrapAsync();
+		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
+		navigationManager.resetTo(AppRoute.myShale());
+		showRouteInternal(AppRoute.myShale());
+		notifyBackAvailabilityChanged();
+		long showMainEndMs = (System.nanoTime() - showMainStartNanos) / 1_000_000;
+		System.out.println("[StartupTiming] showMain critical path complete in " + showMainEndMs + " ms");
+	}
+
+	private void startNotificationBootstrapAsync() {
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return;
+		}
+		long generation = notificationStartupGeneration.incrementAndGet();
+		notificationStartupFuture = notificationStartupExecutor.submit(() -> {
+			long bootstrapStartNanos = System.nanoTime();
+			System.out.println("[StartupTiming] notification bootstrap start");
+			try {
+				long dueStartNanos = System.nanoTime();
+				taskDueDateNotificationGenerator.runOnce();
+				long dueElapsedMs = (System.nanoTime() - dueStartNanos) / 1_000_000;
+				System.out.println("[StartupTiming] due-date initial pass complete in " + dueElapsedMs + " ms");
+
+				long hydrateStartNanos = System.nanoTime();
+				var unread = durableNotificationService.listUnread(shaleClientId, userId);
+				long hydrateElapsedMs = (System.nanoTime() - hydrateStartNanos) / 1_000_000;
+				System.out.println("[StartupTiming] durable notification load complete in " + hydrateElapsedMs + " ms");
+
+				if (!isActiveSession(generation, shaleClientId, userId)) {
+					System.out.println("[StartupTiming] notification bootstrap discarded (session changed)");
+					return;
+				}
+				Platform.runLater(() -> {
+					if (!isActiveSession(generation, shaleClientId, userId)) {
+						System.out.println("[StartupTiming] notification UI apply skipped (session changed)");
+						return;
+					}
+					durableNotificationService.pushLoaded(notificationCenterService, unread);
+					long bootstrapElapsedMs = (System.nanoTime() - bootstrapStartNanos) / 1_000_000;
+					System.out.println("[StartupTiming] notification bootstrap applied in " + bootstrapElapsedMs + " ms");
+				});
+			} catch (RuntimeException ex) {
+				System.err.println("[StartupTiming] notification bootstrap failed: " + ex.getMessage());
+				ex.printStackTrace(System.err);
+			}
+		});
+	}
+
+	private boolean isActiveSession(long generation, int expectedShaleClientId, int expectedUserId) {
+		Integer currentShaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		return generation == notificationStartupGeneration.get()
+				&& currentShaleClientId != null
+				&& currentUserId != null
+				&& currentShaleClientId == expectedShaleClientId
+				&& currentUserId == expectedUserId;
+	}
+
+
+	public void onUpdateCheckCompleted(UpdateCheckResult result) {
+		systemUpdateNotificationProducer.onUpdateCheckResult(result);
+	}
+
+	public void onUpdaterLaunchSucceeded() {
+		systemUpdateNotificationProducer.onUpdaterLaunchSucceeded();
+	}
+
+	public boolean canGoBack() {
+		return navigationManager.canGoBack();
+	}
+
+	public void goBack() {
+		navigationManager.popBackDestination().ifPresentOrElse(route ->
+		{
+			System.out.println("[Navigation] Back destination -> " + route);
+			showRouteInternal(route);
+			notifyBackAvailabilityChanged();
+		}, () ->
+		{
+			System.out.println("[Navigation] Back ignored; stack is empty.");
+			notifyBackAvailabilityChanged();
+		});
+	}
+
+	public void openMyShaleView() {
+		navigateTo(AppRoute.myShale(), true);
+	}
+
+	public void openCasesListView() {
+		navigateTo(AppRoute.casesList(), true);
+	}
+
+	public void openContactsListView() {
+		navigateTo(AppRoute.contactsList(), true);
+	}
+
+	public void openOrganizationsListView() {
+		navigateTo(AppRoute.organizationsList(), true);
+	}
+
+	public void openTeamListView() {
+		navigateTo(AppRoute.teamList(), true);
+	}
+
+	public void openSettingsView() {
+		navigateTo(AppRoute.settings(), true);
+	}
+
+	public void openSearchView(String query) {
+		navigateTo(AppRoute.search(query), true);
+	}
+
+	public void openCaseProfile(Integer caseId, String sectionKey) {
+		if (caseId == null || caseId <= 0) {
+			System.err.println("Ignoring case navigation for invalid caseId: " + caseId);
+			return;
+		}
+		navigateTo(AppRoute.caseProfile(caseId, sectionKey == null ? "OVERVIEW" : sectionKey), true);
+	}
+
+	private void recordCaseSectionNavigation(Integer caseId, String sectionKey) {
+		if (caseId == null || caseId <= 0 || sectionKey == null || sectionKey.isBlank()) {
+			return;
+		}
+		AppRoute destination = AppRoute.caseProfile(caseId, sectionKey);
+		boolean recorded = navigationManager.recordNavigation(destination);
+		if (!recorded) {
+			return;
+		}
+		System.out.println("[Navigation] Route push (section only) -> " + destination);
+		notifyBackAvailabilityChanged();
+	}
+
+	public void openOrganizationProfile(Integer organizationId) {
+		if (organizationId == null || organizationId <= 0) {
+			System.err.println("Ignoring organization navigation for invalid organizationId: " + organizationId);
+			return;
+		}
+		navigateTo(AppRoute.organizationProfile(organizationId), true);
+	}
+
+	public void openUserProfile(Integer userId) {
+		System.out.println("[TRACE ASSIGNED_CASES][SceneManager.openUserProfile] selectedUserId=" + userId);
+		if (userId == null || userId <= 0) {
+			System.err.println("Ignoring user navigation for invalid userId: " + userId);
+			return;
+		}
+		navigateTo(AppRoute.userProfile(userId), true);
+	}
+
+	public void openContactProfile(Integer contactId) {
+		if (contactId == null || contactId <= 0) {
+			System.err.println("Ignoring contact navigation for invalid contactId: " + contactId);
+			return;
+		}
+		navigateTo(AppRoute.contactProfile(contactId), true);
+	}
+
+	private void navigateTo(AppRoute route, boolean addToHistory) {
+		Objects.requireNonNull(route, "route");
+		if (addToHistory) {
+			boolean recorded = navigationManager.recordNavigation(route);
+			if (!recorded) {
+				System.out.println("[Navigation] Ignored duplicate route: " + route);
+				return;
+			}
+			System.out.println("[Navigation] Route push -> " + route);
+		} else {
+			navigationManager.resetTo(route);
+			System.out.println("[Navigation] Route reset -> " + route);
+		}
+
+		showRouteInternal(route);
+		notifyBackAvailabilityChanged();
+	}
+
+	private void showRouteInternal(AppRoute route) {
+		MainController mainController = resolveMainController();
+		if (mainController == null) {
+			System.err.println("Unable to navigate; main controller is unavailable for route " + route);
+			return;
+		}
+
+		try {
+			switch (route.type()) {
+			case MY_SHALE -> mainController.showMyShaleView();
+			case CASES_LIST -> mainController.showCasesListView();
+			case CONTACTS_LIST -> mainController.showContactsListView();
+			case ORGANIZATIONS_LIST -> mainController.showOrganizationsListView();
+			case TEAM_LIST -> mainController.showTeamListView();
+			case SETTINGS -> mainController.showSettingsView();
+			case SEARCH -> mainController.showSearchResultsView(route.searchQuery() == null ? "" : route.searchQuery());
+			case CASE_PROFILE -> mainController.showCaseProfileView(route.entityId(), route.sectionKey());
+			case CONTACT_PROFILE -> {
+				Parent contactRoot = createContactView(
+						route.entityId(),
+						caseId ->
+						{
+							System.out.println("[Navigation] Rewired contact->case callback via SceneManager.openCaseProfile");
+							openCaseProfile(caseId, "OVERVIEW");
+						},
+						() ->
+						{
+							System.out.println("[Navigation] Rewired contact delete/list callback via SceneManager.openContactsListView");
+							openContactsListView();
+						});
+				mainController.showContactView(route.entityId(), contactRoot);
+			}
+			case ORGANIZATION_PROFILE -> {
+				Parent organizationRoot = createOrganizationView(
+						route.entityId(),
+						caseId -> openCaseProfile(caseId, "OVERVIEW"),
+						this::openOrganizationsListView);
+				mainController.showOrganizationProfileView(route.entityId(), organizationRoot);
+			}
+			case USER_PROFILE -> {
+				Parent userRoot = createUserView(route.entityId());
+				mainController.showUserView(route.entityId(), userRoot);
+			}
+			default -> System.err.println("Unhandled route: " + route);
+			}
+		} catch (RuntimeException ex) {
+			System.err.println("Failed to open route " + route + ": " + ex.getMessage());
+		}
+	}
+
+	private void notifyBackAvailabilityChanged() {
+		MainController mainController = resolveMainController();
+		if (mainController != null) {
+			mainController.updateBackButtonState(canGoBack());
+		}
 	}
 
 	/** Backwards-compatible: no callback. */
@@ -102,15 +414,11 @@ public final class SceneManager {
 		{
 			CasesController c = (CasesController) controller;
 
-			// DB access is enforced inside DbSessionProvider (throws if not logged in)
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-
-			// NOTE: this requires you to update CasesController.init(...) to accept the callback
 			c.init(appState, runtimeBridge, caseDao, onOpenCase);
 			return c;
 		});
 	}
-
 
 	public Parent createOrganizationsView(Consumer<Integer> onOpenOrganization) {
 		return load("/fxml/organizations.fxml", controller ->
@@ -138,6 +446,15 @@ public final class SceneManager {
 			TeamController c = (TeamController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			c.init(appState, userDao, onOpenUser);
+			return c;
+		});
+	}
+
+	public Parent createSettingsView() {
+		return load("/fxml/settings.fxml", controller ->
+		{
+			SettingsController c = (SettingsController) controller;
+			c.init(notificationPreferencesService);
 			return c;
 		});
 	}
@@ -171,11 +488,10 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			UserDetailService userDetailService = new UserDetailService(userDao, caseDao);
-			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId -> {
-				MainController mainController = resolveMainController();
-				if (mainController != null) {
-					mainController.openCase(relatedCaseId);
-				}
+			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
+			{
+				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
+				openCaseProfile(relatedCaseId, "OVERVIEW");
 			});
 			return c;
 		});
@@ -210,7 +526,6 @@ public final class SceneManager {
 		});
 	}
 
-
 	public Parent createMyShaleView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser) {
 		return load("/fxml/my-shale.fxml", controller ->
 		{
@@ -218,34 +533,41 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser);
 			return c;
 		});
 	}
 
-	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {
+	public Parent createCaseView(int caseId, String sectionKey, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {
 		return load("/fxml/case.fxml", controller ->
 		{
 			CaseController c = (CaseController) controller;
-
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(caseId, caseDao, caseDetailService, caseTaskService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
-
+			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
 			c.setOnOpenContact(this::openContactProfile);
-			c.setOnOpenCase(relatedCaseId -> {
-				MainController mainController = resolveMainController();
-				if (mainController != null) {
-					mainController.openCase(relatedCaseId);
+			c.setOnOpenCase(relatedCaseId ->
+			{
+				System.out.println("[Navigation] Rewired case related-case callback via SceneManager.openCaseProfile");
+				openCaseProfile(relatedCaseId, "OVERVIEW");
+			});
+			c.setOnSectionNavigation(selectedSectionKey ->
+			{
+				if (selectedSectionKey == null) {
+					return;
 				}
+				recordCaseSectionNavigation(caseId, selectedSectionKey);
 			});
 			c.setOnOpenTask(this::openTaskProfile);
 			c.setOnOpenOrganization(onOpenOrganization);
@@ -253,8 +575,12 @@ public final class SceneManager {
 		});
 	}
 
+	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {
+		return createCaseView(caseId, "OVERVIEW", onOpenOrganization, onCaseDeleted);
+	}
+
 	public Parent createCaseView(int caseId, Consumer<Integer> onOpenOrganization) {
-		return createCaseView(caseId, onOpenOrganization, null);
+		return createCaseView(caseId, "OVERVIEW", onOpenOrganization, null);
 	}
 
 	public void showNewOrganizationDialog(Consumer<Integer> onOrganizationCreated) {
@@ -312,61 +638,120 @@ public final class SceneManager {
 		}
 	}
 
-	public void openUserProfile(Integer userId) {
-		System.out.println("[TRACE ASSIGNED_CASES][SceneManager.openUserProfile] selectedUserId=" + userId);
-		if (userId == null || userId <= 0) {
-			System.err.println("Ignoring user navigation for invalid userId: " + userId);
-			return;
-		}
-
-		try {
-			Parent userRoot = createUserView(userId);
-			MainController mainController = resolveMainController();
-			if (mainController == null) {
-				System.err.println("Unable to navigate to user profile; main controller is unavailable.");
-				return;
-			}
-			mainController.showUserView(userId, userRoot);
-		} catch (RuntimeException ex) {
-			System.err.println("Failed to open user profile for userId " + userId + ": " + ex.getMessage());
-		}
-	}
-
 	private void openStatusProfile(Integer statusId) {
 		System.out.println("Navigate to Status: " + statusId);
-		// TODO later:
-		// navigate to status manager / filter view / status editor
 	}
-
-	public void openContactProfile(Integer contactId) {
-		if (contactId == null || contactId <= 0) {
-			System.err.println("Ignoring contact navigation for invalid contactId: " + contactId);
-			return;
-		}
-
-		try {
-			MainController mainController = resolveMainController();
-			if (mainController == null) {
-				System.err.println("Unable to navigate to contact profile; main controller is unavailable.");
-				return;
-			}
-			Parent contactRoot = createContactView(contactId, mainController::openCase, mainController::showContactsListView);
-			mainController.showContactView(contactId, contactRoot);
-		} catch (RuntimeException ex) {
-			System.err.println("Failed to open contact profile for contactId " + contactId + ": " + ex.getMessage());
-		}
-	}
-
 
 	public void openTaskProfile(Long taskId) {
 		if (taskId == null || taskId <= 0) {
 			System.err.println("Ignoring task navigation for invalid taskId: " + taskId);
 			return;
 		}
-		System.out.println("navigate to task " + taskId);
-		// TODO: wire real task detail scene in Phase 2+
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			AppDialogs.showError(stage, "Tasks", "You must be signed in to view task details.");
+			return;
+		}
+		CaseTaskService caseTaskService = new CaseTaskService(
+				new TaskDao(dbSessionProvider),
+				new UserDao(dbSessionProvider),
+				runtimeBridge,
+				new NotificationDao(dbSessionProvider));
+		new Thread(() -> loadAndOpenTaskDialog(taskId, shaleClientId, currentUserId, caseTaskService),
+				"scene-manager-open-task-" + taskId).start();
 	}
 
+	private void loadAndOpenTaskDialog(Long taskId, int shaleClientId, int currentUserId, CaseTaskService caseTaskService) {
+		try {
+			TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+			List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+			List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
+			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, priorities, users));
+		} catch (Exception ex) {
+			Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
+		}
+	}
+
+	private void showTaskDetailDialog(
+			long taskId,
+			int shaleClientId,
+			int currentUserId,
+			CaseTaskService caseTaskService,
+			TaskDetailDto detail,
+			List<TaskPriorityOptionDto> priorities,
+			List<CaseTaskService.AssignableUserOption> users) {
+		if (detail == null) {
+			AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted.");
+			return;
+		}
+		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+				detail.id(),
+				detail.caseId(),
+				detail.caseName(),
+				detail.caseResponsibleAttorney(),
+				detail.caseResponsibleAttorneyColor(),
+				detail.title(),
+				detail.description(),
+				detail.dueAt(),
+				detail.priorityId(),
+				detail.assignedUserId(),
+				detail.completedAt() != null);
+		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
+		var result = TaskDetailDialog.showAndWait(
+				owner,
+				model,
+				priorities,
+				users,
+				caseId -> openCaseProfile(caseId, "OVERVIEW"));
+		if (result.isEmpty()) {
+			return;
+		}
+		TaskDetailDialog.TaskDetailResult action = result.get();
+		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+			new Thread(() -> {
+				try {
+					caseTaskService.deleteTask(taskId, shaleClientId);
+				} catch (Exception ex) {
+					Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to delete task. " + rootCauseMessage(ex)));
+				}
+			}, "scene-manager-delete-task-" + taskId).start();
+			return;
+		}
+		TaskDetailDialog.SaveTaskPayload payload = action.payload();
+		if (payload == null) {
+			return;
+		}
+		CaseTaskService.UpdateTaskRequest request = new CaseTaskService.UpdateTaskRequest(
+				taskId,
+				shaleClientId,
+				payload.title(),
+				payload.description(),
+				payload.dueAt(),
+				payload.priorityId(),
+				payload.assigneeUserId(),
+				payload.completed(),
+				currentUserId);
+		new Thread(() -> {
+			try {
+				caseTaskService.updateTask(request);
+			} catch (Exception ex) {
+				Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to save task. " + rootCauseMessage(ex)));
+			}
+		}, "scene-manager-save-task-" + taskId).start();
+	}
+
+	private static String rootCauseMessage(Throwable throwable) {
+		if (throwable == null) {
+			return "";
+		}
+		Throwable current = throwable;
+		while (current.getCause() != null && current.getCause() != current) {
+			current = current.getCause();
+		}
+		String message = current.getMessage();
+		return (message == null || message.isBlank()) ? "" : "Details: " + message;
+	}
 
 	private MainController resolveMainController() {
 		Scene scene = stage.getScene();
@@ -392,7 +777,6 @@ public final class SceneManager {
 			URL url = Objects.requireNonNull(getClass().getResource(fxmlPath), "Missing FXML: " + fxmlPath);
 			FXMLLoader loader = new FXMLLoader(url);
 
-			// Defer controller instantiation so we can inject dependencies
 			loader.setControllerFactory(clz ->
 			{
 				try {

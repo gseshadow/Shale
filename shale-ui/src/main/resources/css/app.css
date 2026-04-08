@@ -61,10 +61,46 @@
 }
 .app-title {
     -fx-font-size: 18px;
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
 }
 .user-email {
     -fx-font-weight: 600;
+}
+
+
+.topbar-back-button {
+    -fx-min-width: 32;
+    -fx-min-height: 32;
+    -fx-pref-width: 32;
+    -fx-pref-height: 32;
+    -fx-max-width: 32;
+    -fx-max-height: 32;
+    -fx-padding: 0 0 1 0;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-background-color: #4b7fce;
+    -fx-border-color: rgba(255, 255, 255, 0.22);
+    -fx-border-width: 1;
+    -fx-text-fill: white;
+    -fx-font-size: 19px;
+    -fx-font-weight: 800;
+    -fx-alignment: center;
+    -fx-content-display: center;
+    -fx-cursor: hand;
+}
+
+.topbar-back-button:hover {
+    -fx-background-color: #5b8fe0;
+}
+
+.topbar-back-button:pressed {
+    -fx-background-color: #3f6fbc;
+}
+
+.topbar-back-button:disabled {
+    -fx-background-color: rgba(105, 130, 170, 0.82);
+    -fx-border-color: rgba(255, 255, 255, 0.18);
+    -fx-text-fill: rgba(255, 255, 255, 0.92);
 }
 
 /* Navigation rail and shell wrappers */
@@ -114,13 +150,13 @@
 
 .sidebar-header,
 .section-title {
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
     -fx-text-fill: #e8f2ff;
 }
 
 .search-section-title {
     -fx-font-size: 15px;
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
     -fx-text-fill: #112542;
 }
 
@@ -186,7 +222,7 @@
     -fx-background-color: rgba(72, 122, 193, 0.95);
     -fx-border-color: rgba(255, 255, 255, 0.38);
     -fx-text-fill: white;
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
 }
 
 .surface-scroll,
@@ -197,7 +233,7 @@
 .transparent-scroll {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
-    -fx-padding: 0;
+    -fx-padding: 0 0 1 0;
 }
 
 .transparent-scroll .viewport {
@@ -223,7 +259,7 @@
 
 .app-dialog-title {
     -fx-font-size: 18px;
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
     -fx-text-fill: #112542;
 }
 
@@ -308,4 +344,109 @@
 .login-version-label {
     -fx-font-size: 11px;
     -fx-text-fill: rgba(233, 241, 255, 0.58);
+}
+
+.session-footer {
+    -fx-background-color: rgba(8, 19, 41, 0.26);
+    -fx-background-radius: 14 14 0 0;
+    -fx-border-color: rgba(235, 245, 255, 0.14);
+    -fx-border-width: 1 0 0 0;
+}
+
+.session-footer .label {
+    -fx-text-fill: #e9f1ff;
+}
+
+.notification-banner-host {
+    -fx-background-color: rgba(241, 247, 255, 0.85);
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-color: rgba(18, 40, 72, 0.24);
+    -fx-border-width: 1;
+    -fx-padding: 6 10 6 10;
+}
+
+.notification-banner-label {
+    -fx-text-fill: #112542;
+    -fx-font-weight: 700;
+}
+
+.notification-bell-button {
+    -fx-background-radius: 999;
+    -fx-padding: 6 12 6 12;
+    -fx-font-weight: 700;
+}
+
+.notification-bell-button-unread {
+    -fx-background-color: #c62828;
+    -fx-text-fill: white;
+}
+
+.notification-list {
+    -fx-background-color: transparent;
+}
+
+.notification-row {
+    -fx-background-color: rgba(235, 244, 253, 0.72);
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: rgba(18, 41, 74, 0.18);
+    -fx-border-width: 1;
+    -fx-padding: 10;
+}
+
+.notification-row-unread {
+    -fx-background-color: rgba(223, 238, 253, 0.92);
+    -fx-border-color: rgba(57, 106, 178, 0.7);
+}
+
+.notification-row-category {
+    -fx-text-fill: #234c84;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+}
+
+.notification-row-time {
+    -fx-text-fill: rgba(17, 37, 66, 0.72);
+    -fx-font-size: 11px;
+}
+
+.notification-row-dismiss {
+    -fx-font-size: 11px;
+    -fx-padding: 2 8 2 8;
+}
+
+.notification-row-title {
+    -fx-text-fill: #102442;
+    -fx-font-weight: 800;
+}
+
+.notification-row-message {
+    -fx-text-fill: rgba(16, 36, 66, 0.86);
+}
+
+.notification-task-preview {
+    -fx-background-color: rgba(222, 236, 252, 0.92);
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: rgba(47, 94, 162, 0.55);
+    -fx-border-width: 1;
+    -fx-padding: 8 10 8 10;
+}
+
+.notification-task-preview:hover {
+    -fx-background-color: rgba(208, 228, 250, 0.96);
+    -fx-border-color: rgba(41, 84, 146, 0.85);
+}
+
+.notification-task-preview-title {
+    -fx-text-fill: #102442;
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+}
+
+.notification-task-preview-meta {
+    -fx-text-fill: rgba(16, 36, 66, 0.76);
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
 }

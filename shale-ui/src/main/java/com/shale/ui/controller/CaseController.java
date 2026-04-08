@@ -457,6 +457,7 @@ public class CaseController {
 	private LocalDate draftSolDate;
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
 	private List<CasePartyDto> caseParties = List.of();
+	private boolean partiesLoadedOnce = false;
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private Long editingCaseUpdateId;
@@ -465,6 +466,8 @@ public class CaseController {
 
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSectionName = "Overview";
+	private String initialSectionName = "Overview";
+	private Consumer<String> onSectionNavigation;
 
 	private final CaseOverviewRenderer overviewRenderer = new CaseOverviewRenderer();
 	private final CaseOverviewEditor overviewEditor = new CaseOverviewEditor();
@@ -500,12 +503,14 @@ public class CaseController {
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
+		this.partiesLoadedOnce = false;
 		refreshHeader();
 		refreshOverviewPlaceholders();
 	}
 
 	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
 		this.caseId = caseId;
+		this.partiesLoadedOnce = false;
 		this.caseDao = caseDao;
 		this.caseDetailService = caseDetailService;
 		this.caseTaskService = caseTaskService;
@@ -537,6 +542,17 @@ public class CaseController {
 	public void setOnOpenCase(Consumer<Integer> onOpenCase) {
 		this.onOpenCase = onOpenCase;
 		this.taskCardFactory = buildTaskCardFactory(this::openTask);
+	}
+
+	public void setOnSectionNavigation(Consumer<String> onSectionNavigation) {
+		this.onSectionNavigation = onSectionNavigation;
+	}
+
+	public void setInitialSection(String sectionKey) {
+		String resolved = fromSectionKey(sectionKey);
+		if (resolved != null) {
+			this.initialSectionName = resolved;
+		}
 	}
 
 	/** Optional - if you don’t set this, card click will Sys.out for now */
@@ -769,12 +785,12 @@ public class CaseController {
 
 		for (String section : SECTIONS) {
 			Button button = createSectionButton(section);
-			button.setOnAction(e -> onSectionSelected(section));
+			button.setOnAction(e -> onSectionSelected(section, true));
 			sectionButtons.put(section, button);
 			sectionButtonsBox.getChildren().add(button);
 		}
 
-		onSectionSelected("Overview");
+		onSectionSelected(initialSectionName, false);
 	}
 
 	private Button createSectionButton(String section) {
@@ -837,7 +853,7 @@ public class CaseController {
 	// Section navigation
 	// ----------------------------
 
-	private void onSectionSelected(String sectionName) {
+	private void onSectionSelected(String sectionName, boolean userInitiated) {
 		if (sectionName == null)
 			return;
 
@@ -851,6 +867,42 @@ public class CaseController {
 		case "Details" -> showDetails();
 		default -> showGeneric(sectionName);
 		}
+
+		if (userInitiated && onSectionNavigation != null) {
+			onSectionNavigation.accept(toSectionKey(sectionName));
+		}
+	}
+
+
+	private static String toSectionKey(String sectionName) {
+		if (sectionName == null) {
+			return null;
+		}
+		return switch (sectionName) {
+		case "Overview" -> "OVERVIEW";
+		case "Tasks" -> "TASKS";
+		case "Timeline" -> "TIMELINE";
+		case "Details" -> "DETAILS";
+		case "Parties" -> "PARTIES";
+		case "Documents" -> "DOCUMENTS";
+		default -> sectionName.toUpperCase(Locale.ROOT);
+		};
+	}
+
+	private static String fromSectionKey(String sectionKey) {
+		if (sectionKey == null || sectionKey.isBlank()) {
+			return null;
+		}
+		String normalized = sectionKey.trim().toUpperCase(Locale.ROOT);
+		return switch (normalized) {
+		case "OVERVIEW" -> "Overview";
+		case "TASKS" -> "Tasks";
+		case "TIMELINE" -> "Timeline";
+		case "DETAILS" -> "Details";
+		case "PARTIES" -> "Parties";
+		case "DOCUMENTS" -> "Documents";
+		default -> null;
+		};
 	}
 
 	private void setActiveSectionButton(String activeSection) {
@@ -970,6 +1022,9 @@ public class CaseController {
 		setVisibleManaged(timelineListBox, true);
 		setVisibleManaged(timelineEmptyLabel, false);
 		renderPartiesSection();
+		if (caseDao != null && caseId != null && (!partiesLoadedOnce || caseParties == null || caseParties.isEmpty())) {
+			refreshPartiesSectionAsync();
+		}
 	}
 
 	private void loadCaseTimelineEventsAsync() {
@@ -1381,6 +1436,7 @@ public class CaseController {
 				List<CasePartyDto> refreshed = caseDao.listCaseParties(activeCaseId);
 				runOnFx(() -> {
 					caseParties = refreshed == null ? List.of() : refreshed;
+					partiesLoadedOnce = true;
 					renderPartiesSection();
 					if (currentOverview != null) {
 						currentOverview = applyCallerFromCaseParties(currentOverview, caseParties);
@@ -2321,10 +2377,7 @@ public class CaseController {
 	}
 
 	private void openTask(Long taskId) {
-		if (taskId == null || onOpenTask == null) {
-			return;
-		}
-		onOpenTask.accept(taskId);
+		showTaskDetailPopup(taskId);
 	}
 
 	private void openOrganization(Integer organizationId) {
@@ -2370,12 +2423,15 @@ public class CaseController {
 			CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
 			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
 			List<CasePartyDto> loadedParties = List.of();
+			boolean partiesLoadSucceeded = false;
 			try {
 				loadedParties = caseDao.listCaseParties(activeCaseId);
+				partiesLoadSucceeded = true;
 			} catch (Exception partiesLoadError) {
 				System.err.println("Case parties load failed for caseId=" + activeCaseId + ": " + partiesLoadError.getMessage());
 			}
 			final List<CasePartyDto> parties = loadedParties;
+			final boolean partiesReady = partiesLoadSucceeded;
 
 			runOnFx(() ->
 			{
@@ -2385,6 +2441,7 @@ public class CaseController {
 				}
 
 				caseParties = parties == null ? List.of() : parties;
+				partiesLoadedOnce = partiesReady;
 				renderPartiesSection();
 				CaseOverviewDto effectiveOverview = applyCallerFromCaseParties(overview, caseParties);
 				applyOverviewEditSafe(effectiveOverview);
@@ -2776,6 +2833,7 @@ public class CaseController {
 		current = null;
 		currentOverview = null;
 		caseParties = List.of();
+		partiesLoadedOnce = false;
 		renderPartiesSection();
 		refreshDeleteAction();
 		navigateAfterDelete();

@@ -11,7 +11,8 @@
 	<top>
 		<HBox spacing="12" styleClass="top-bar app-header">
 			<children>
-				<Label text="Shale" styleClass="app-title" />
+				<Button fx:id="backButton" text="←" onAction="#onBack" disable="true"
+					styleClass="topbar-back-button" />
 				<!-- Global search -->
 				<TextField fx:id="globalSearchField"
 					promptText="Search cases, contacts, tasks..." HBox.hgrow="ALWAYS" />
@@ -20,15 +21,22 @@
 
 				<Button fx:id="newIntakeButton" text="New Intake"
 					onAction="#onNewIntake" />
-				
+
 
 				<Region HBox.hgrow="ALWAYS" />
-				<Label text="Signed in as:" />
-				<Label fx:id="userEmailLabel" text="user@example.com"
-					styleClass="user-email" />
-
-				<Button fx:id="logoutButton" text="Logout"
-					onAction="#onLogout" />
+				<HBox spacing="8" alignment="CENTER_RIGHT">
+					<children>
+						<HBox fx:id="notificationBannerHost" spacing="8" alignment="CENTER_LEFT"
+							styleClass="notification-banner-host" visible="false" managed="false">
+							<children>
+								<Label fx:id="notificationBannerLabel" text="Update available"
+									styleClass="notification-banner-label" />
+							</children>
+						</HBox>
+						<Button fx:id="notificationBellButton" text="🔔"
+							onAction="#onOpenNotificationCenter" styleClass="notification-bell-button" />
+					</children>
+				</HBox>
 			</children>
 			<padding>
 				<Insets top="8" right="12" bottom="8" left="12" />
@@ -91,4 +99,19 @@
 			</padding>
 		</VBox>
 	</center>
+
+	<bottom>
+		<HBox spacing="8" alignment="CENTER_LEFT" styleClass="session-footer">
+			<children>
+				<Label text="Signed in as:" />
+				<Label fx:id="userEmailLabel" text="user@example.com"
+					styleClass="user-email" />
+				<Button fx:id="logoutButton" text="Logout"
+					onAction="#onLogout" />
+			</children>
+			<padding>
+				<Insets top="8" right="12" bottom="8" left="12" />
+			</padding>
+		</HBox>
+	</bottom>
 </BorderPane>
