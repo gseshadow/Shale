@@ -21,6 +21,7 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.Node;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -101,6 +102,9 @@ public final class NotificationCenterDialog {
 					ignored -> {},
 					ignored -> {});
 			setOnMouseClicked(event -> {
+				if (isFromInteractiveChild(event)) {
+					return;
+				}
 				AppNotification selected = getItem();
 				if (selected != null) {
 					notificationService.markRead(selected);
@@ -185,6 +189,7 @@ public final class NotificationCenterDialog {
 					null,
 					null);
 			Region previewCard = taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
+			previewCard.getStyleClass().add("notification-task-preview");
 			previewCard.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> onTaskPreviewPressed(item, taskId, event));
 			previewCard.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
 			return previewCard;
@@ -234,8 +239,6 @@ public final class NotificationCenterDialog {
 		private Button createDismissButton(AppNotification item) {
 			Button button = new Button("Dismiss");
 			button.getStyleClass().add("notification-row-dismiss");
-			button.addEventFilter(MouseEvent.MOUSE_PRESSED, MouseEvent::consume);
-			button.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
 			if (item == null || item.getDurableNotificationId() == null) {
 				button.setText("Dismiss (session)");
 				button.setTooltip(new Tooltip("This notification will be hidden for the current session only."));
@@ -243,10 +246,36 @@ public final class NotificationCenterDialog {
 			button.setOnAction(event -> {
 				event.consume();
 				if (item != null) {
-					notificationService.dismiss(item);
+					try {
+						notificationService.dismiss(item);
+					} catch (RuntimeException ex) {
+						System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
+						ex.printStackTrace(System.err);
+						throw ex;
+					}
 				}
 			});
 			return button;
+		}
+
+
+		private static boolean isFromInteractiveChild(MouseEvent event) {
+			if (event == null || !(event.getTarget() instanceof Node node)) {
+				return false;
+			}
+			return hasStyleClassInAncestorChain(node, "notification-row-dismiss")
+					|| hasStyleClassInAncestorChain(node, "notification-task-preview");
+		}
+
+		private static boolean hasStyleClassInAncestorChain(Node node, String styleClass) {
+			Node current = node;
+			while (current != null) {
+				if (current.getStyleClass().contains(styleClass)) {
+					return true;
+				}
+				current = current.getParent();
+			}
+			return false;
 		}
 
 		private static Long resolveTaskId(AppNotification item) {

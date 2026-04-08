@@ -82,12 +82,21 @@ public final class NotificationDao {
 			return List.of();
 		}
 		String sql = """
-				SELECT n.Id, n.Category, n.Severity, n.Title, n.Message, n.EntityType, n.EntityId, n.ActionType,
+				SELECT n.Id,
+				       n.Category,
+				       n.Severity,
+				       n.Title,
+				       n.Message,
+				       n.EntityType,
+				       n.EntityId,
+				       n.ActionType,
 				       CASE
 				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.Title
 				         ELSE NULL
 				       END AS EntityTitle,
-				       IsRead, CreatedAt, EventKey
+				       n.IsRead AS IsRead,
+				       n.CreatedAt AS CreatedAt,
+				       n.EventKey AS EventKey
 				FROM dbo.Notifications n
 				LEFT JOIN dbo.Tasks t
 				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'

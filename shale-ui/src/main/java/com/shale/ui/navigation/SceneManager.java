@@ -210,6 +210,7 @@ public final class SceneManager {
 				});
 			} catch (RuntimeException ex) {
 				System.err.println("[StartupTiming] notification bootstrap failed: " + ex.getMessage());
+				ex.printStackTrace(System.err);
 			}
 		});
 	}
