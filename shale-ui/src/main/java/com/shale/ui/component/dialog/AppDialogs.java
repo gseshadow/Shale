@@ -6,15 +6,21 @@ import java.util.Optional;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.input.MouseButton;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.stage.Window;
 
 public final class AppDialogs {
@@ -55,6 +61,7 @@ public final class AppDialogs {
 
 	public static Stage createModalStage(Window owner, String title) {
 		Stage stage = new Stage();
+		applySecondaryWindowChrome(stage);
 		if (owner != null) {
 			stage.initOwner(owner);
 		}
@@ -62,6 +69,123 @@ public final class AppDialogs {
 		stage.setTitle(title);
 		stage.setResizable(false);
 		return stage;
+	}
+
+	public static void applySecondaryWindowChrome(Stage stage) {
+		if (stage != null) {
+			stage.initStyle(StageStyle.TRANSPARENT);
+			stage.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (newScene != null) {
+					newScene.setFill(Color.TRANSPARENT);
+				}
+			});
+		}
+	}
+
+	public static void applySecondaryWindowChrome(Dialog<?> dialog) {
+		if (dialog != null) {
+			dialog.initStyle(StageStyle.UNDECORATED);
+		}
+	}
+
+	public static void applySecondaryDialogShell(Dialog<?> dialog, String title) {
+		if (dialog == null) {
+			return;
+		}
+		dialog.initStyle(StageStyle.TRANSPARENT);
+		DialogPane pane = dialog.getDialogPane();
+		if (pane == null) {
+			return;
+		}
+		if (!pane.getStyleClass().contains("secondary-window-shell")) {
+			pane.getStyleClass().add("secondary-window-shell");
+		}
+		String appCss = Objects.requireNonNull(AppDialogs.class.getResource("/css/app.css")).toExternalForm();
+		if (!pane.getStylesheets().contains(appCss)) {
+			pane.getStylesheets().add(appCss);
+		}
+		Node header = createSecondaryDialogHeader(dialog, title);
+		pane.setHeader(null);
+		pane.setGraphic(header);
+		pane.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene != null) {
+				newScene.setFill(Color.TRANSPARENT);
+			}
+		});
+	}
+
+	public static HBox createSecondaryWindowHeader(Stage stage, String title, Runnable onClose) {
+		Objects.requireNonNull(stage, "stage");
+		Label titleLabel = new Label(isBlank(title) ? "" : title);
+		titleLabel.getStyleClass().add("secondary-window-title");
+
+		Button closeButton = new Button("✕");
+		closeButton.setFocusTraversable(false);
+		closeButton.getStyleClass().add("secondary-window-close");
+		closeButton.setOnAction(event -> {
+			if (onClose != null) {
+				onClose.run();
+			} else {
+				stage.close();
+			}
+		});
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+
+		HBox header = new HBox(10, titleLabel, spacer, closeButton);
+		header.getStyleClass().add("secondary-window-header");
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.setPadding(new Insets(8, 10, 8, 12));
+
+		installDragToMove(stage, header);
+		return header;
+	}
+
+	public static void installDragToMove(Stage stage, Node dragHandle) {
+		if (stage == null || dragHandle == null) {
+			return;
+		}
+		final double[] dragOffset = new double[2];
+		dragHandle.setOnMousePressed(event -> {
+			if (event.getButton() != MouseButton.PRIMARY) {
+				return;
+			}
+			dragOffset[0] = event.getScreenX() - stage.getX();
+			dragOffset[1] = event.getScreenY() - stage.getY();
+		});
+		dragHandle.setOnMouseDragged(event -> {
+			if (!event.isPrimaryButtonDown()) {
+				return;
+			}
+			stage.setX(event.getScreenX() - dragOffset[0]);
+			stage.setY(event.getScreenY() - dragOffset[1]);
+		});
+	}
+
+	private static Node createSecondaryDialogHeader(Dialog<?> dialog, String title) {
+		Label titleLabel = new Label(isBlank(title) ? "" : title);
+		titleLabel.getStyleClass().add("secondary-window-title");
+
+		Button closeButton = new Button("✕");
+		closeButton.setFocusTraversable(false);
+		closeButton.getStyleClass().add("secondary-window-close");
+		closeButton.setOnAction(event -> dialog.close());
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+
+		HBox header = new HBox(10, titleLabel, spacer, closeButton);
+		header.getStyleClass().add("secondary-window-header");
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.setPadding(new Insets(8, 10, 8, 12));
+		header.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null || !(newScene.getWindow() instanceof Stage stage)) {
+				return;
+			}
+			installDragToMove(stage, header);
+		});
+		return header;
 	}
 
 	private static void showMessage(
