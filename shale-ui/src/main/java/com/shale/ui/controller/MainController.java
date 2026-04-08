@@ -163,7 +163,8 @@ public final class MainController {
 		highlightNav(navSettingsButton);
 		sectionTitleLabel.setText("Settings");
 		sectionSubtitleLabel.setText("Configure Shale preferences and system settings.");
-		setSectionContentText("Settings tab is not implemented yet.");
+		Node settingsRoot = sceneManager.createSettingsView();
+		sectionContent.getChildren().setAll(settingsRoot);
 	}
 
 	@FXML
@@ -212,7 +213,7 @@ public final class MainController {
 		if (notificationCenterService == null || notificationBellButton == null || notificationBellButton.getScene() == null) {
 			return;
 		}
-		NotificationCenterDialog.show(notificationBellButton.getScene().getWindow(), notificationCenterService);
+		NotificationCenterDialog.show(notificationBellButton.getScene().getWindow(), notificationCenterService, sceneManager::openTaskProfile);
 	}
 
 	public void showMyShaleView() {

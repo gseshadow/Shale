@@ -42,6 +42,18 @@ public final class NotificationPreferencesService {
 		activePreferences.set(updated);
 	}
 
+	public void setForCurrentUser(NotificationPreferences preferences) {
+		if (preferences == null) {
+			return;
+		}
+		Integer userId = appState.getUserId();
+		if (userId == null || userId <= 0) {
+			return;
+		}
+		perUserPreferences.put(userId, preferences);
+		activePreferences.set(preferences);
+	}
+
 	public ObjectProperty<NotificationPreferences> activePreferencesProperty() {
 		return activePreferences;
 	}
