@@ -463,7 +463,7 @@ public final class TaskDao {
         }
 
         String sql = """
-                SELECT DISTINCT
+                SELECT
                   LTRIM(RTRIM(
                     COALESCE(u.name_first, '') +
                     CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -476,8 +476,6 @@ public final class TaskDao {
                  AND u.ShaleClientId = ta.ShaleClientId
                 WHERE ta.TaskId = ?
                   AND ta.ShaleClientId = ?
-                  AND ISNULL(ta.IsDeleted, 0) = 0
-                  AND ISNULL(u.IsDeleted, 0) = 0
                 ORDER BY
                   ta.IsPrimary DESC,
                   u.name_first ASC,
