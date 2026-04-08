@@ -17,6 +17,9 @@ public final class AppNotification {
 	private final boolean showAsBanner;
 	private final Long durableNotificationId;
 	private final String eventKey;
+	private final String entityType;
+	private final Long entityId;
+	private final String entityTitle;
 	private final BooleanProperty unread;
 
 	public AppNotification(
@@ -44,6 +47,24 @@ public final class AppNotification {
 			NotificationTargetScope targetScope,
 			Long durableNotificationId,
 			String eventKey) {
+		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId, eventKey, null, null, null);
+	}
+
+	public AppNotification(
+			String id,
+			NotificationCategory category,
+			NotificationSeverity severity,
+			String title,
+			String message,
+			Instant createdAt,
+			boolean unread,
+			boolean showAsBanner,
+			NotificationTargetScope targetScope,
+			Long durableNotificationId,
+			String eventKey,
+			String entityType,
+			Long entityId,
+			String entityTitle) {
 		this.id = Objects.requireNonNull(id, "id");
 		this.category = Objects.requireNonNull(category, "category");
 		this.severity = Objects.requireNonNull(severity, "severity");
@@ -55,6 +76,9 @@ public final class AppNotification {
 		this.targetScope = Objects.requireNonNull(targetScope, "targetScope");
 		this.durableNotificationId = durableNotificationId;
 		this.eventKey = eventKey;
+		this.entityType = entityType;
+		this.entityId = entityId;
+		this.entityTitle = entityTitle;
 	}
 
 	public String getId() {
@@ -92,6 +116,18 @@ public final class AppNotification {
 
 	public String getEventKey() {
 		return eventKey;
+	}
+
+	public String getEntityType() {
+		return entityType;
+	}
+
+	public Long getEntityId() {
+		return entityId;
+	}
+
+	public String getEntityTitle() {
+		return entityTitle;
 	}
 	public boolean isShowAsBanner() {
 		return showAsBanner;
