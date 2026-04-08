@@ -103,4 +103,15 @@ public final class LiveBusClient implements WebSocket.Listener {
 		});
 	}
 
+	public void closeSilently() {
+		WebSocket ws = socket;
+		socket = null;
+		if (ws != null) {
+			try {
+				ws.sendClose(WebSocket.NORMAL_CLOSURE, "Client shutdown");
+			} catch (Exception ignored) {
+			}
+		}
+	}
+
 }
