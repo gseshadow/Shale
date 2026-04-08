@@ -84,11 +84,11 @@ public final class AppDialogs {
 	public static HBox createSecondaryWindowHeader(Stage stage, String title, Runnable onClose) {
 		Objects.requireNonNull(stage, "stage");
 		Label titleLabel = new Label(isBlank(title) ? "" : title);
-		titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: 700;");
+		titleLabel.getStyleClass().add("secondary-window-title");
 
 		Button closeButton = new Button("✕");
 		closeButton.setFocusTraversable(false);
-		closeButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 12px; -fx-cursor: hand;");
+		closeButton.getStyleClass().add("secondary-window-close");
 		closeButton.setOnAction(event -> {
 			if (onClose != null) {
 				onClose.run();
@@ -101,9 +101,9 @@ public final class AppDialogs {
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 
 		HBox header = new HBox(10, titleLabel, spacer, closeButton);
+		header.getStyleClass().add("secondary-window-header");
 		header.setAlignment(Pos.CENTER_LEFT);
 		header.setPadding(new Insets(8, 10, 8, 12));
-		header.setStyle("-fx-background-color: #112542;");
 
 		installDragToMove(stage, header);
 		return header;
