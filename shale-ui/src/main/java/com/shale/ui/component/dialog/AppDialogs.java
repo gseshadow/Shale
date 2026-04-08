@@ -8,6 +8,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -15,6 +16,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.stage.Window;
 
 public final class AppDialogs {
@@ -55,6 +57,7 @@ public final class AppDialogs {
 
 	public static Stage createModalStage(Window owner, String title) {
 		Stage stage = new Stage();
+		applySecondaryWindowChrome(stage);
 		if (owner != null) {
 			stage.initOwner(owner);
 		}
@@ -62,6 +65,18 @@ public final class AppDialogs {
 		stage.setTitle(title);
 		stage.setResizable(false);
 		return stage;
+	}
+
+	public static void applySecondaryWindowChrome(Stage stage) {
+		if (stage != null) {
+			stage.initStyle(StageStyle.UNDECORATED);
+		}
+	}
+
+	public static void applySecondaryWindowChrome(Dialog<?> dialog) {
+		if (dialog != null) {
+			dialog.initStyle(StageStyle.UNDECORATED);
+		}
 	}
 
 	private static void showMessage(

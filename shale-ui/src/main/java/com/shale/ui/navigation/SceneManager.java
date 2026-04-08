@@ -590,6 +590,7 @@ public final class SceneManager {
 			Parent root = loader.load();
 
 			Stage dialog = new Stage();
+			AppDialogs.applySecondaryWindowChrome(dialog);
 			dialog.initOwner(stage);
 			dialog.initModality(Modality.WINDOW_MODAL);
 			dialog.setTitle("New Organization");
@@ -617,6 +618,7 @@ public final class SceneManager {
 			Parent root = loader.load();
 
 			Stage dialog = new Stage();
+			AppDialogs.applySecondaryWindowChrome(dialog);
 			dialog.initOwner(stage);
 			dialog.initModality(Modality.WINDOW_MODAL);
 			dialog.setTitle("New Intake");

@@ -58,6 +58,7 @@ public final class ClientAssignmentDialog {
 		this.clientCreateHandler = Objects.requireNonNull(clientCreateHandler, "clientCreateHandler");
 
 		stage = new Stage();
+		AppDialogs.applySecondaryWindowChrome(stage);
 		stage.initOwner(owner);
 		stage.initModality(Modality.APPLICATION_MODAL);
 		stage.setTitle("Manage Clients");

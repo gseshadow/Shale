@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import com.shale.data.dao.CaseDao;
+import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
@@ -180,6 +181,7 @@ public final class NewIntakeController {
 
 			String preselect = selectedPracticeArea == null ? labelToRow.keySet().iterator().next() : safeTrim(selectedPracticeArea.name());
 			ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
+			AppDialogs.applySecondaryWindowChrome(dialog);
 			dialog.setTitle("Select Practice Area");
 			dialog.setHeaderText("Select Practice Area");
 			dialog.setContentText("Practice Area:");
@@ -215,6 +217,7 @@ public final class NewIntakeController {
 
 			String preselect = selectedStatus == null ? labelToRow.keySet().iterator().next() : safeTrim(selectedStatus.name());
 			ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
+			AppDialogs.applySecondaryWindowChrome(dialog);
 			dialog.setTitle("Select Status");
 			dialog.setHeaderText("Select Status");
 			dialog.setContentText("Status:");

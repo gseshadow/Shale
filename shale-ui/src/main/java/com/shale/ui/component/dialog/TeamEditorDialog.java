@@ -69,6 +69,7 @@ public final class TeamEditorDialog {
 		this.attorneyUserIds = (attorneyUserIds == null) ? Set.of() : attorneyUserIds;
 
 		this.stage = new Stage();
+		AppDialogs.applySecondaryWindowChrome(stage);
 		stage.initOwner(owner);
 		stage.initModality(Modality.APPLICATION_MODAL);
 		stage.setTitle("Edit Team");
