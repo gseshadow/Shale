@@ -28,6 +28,7 @@ public final class NotificationCenterService {
 	private final ReadOnlyIntegerWrapper unreadCount = new ReadOnlyIntegerWrapper(0);
 	private final ReadOnlyObjectWrapper<AppNotification> activeBanner = new ReadOnlyObjectWrapper<>();
 	private Consumer<List<AppNotification>> readListener = ignored -> {};
+	private Consumer<List<AppNotification>> dismissListener = ignored -> {};
 
 	public NotificationCenterService() {
 		notifications.addListener((ListChangeListener<AppNotification>) change -> {
@@ -172,7 +173,7 @@ public final class NotificationCenterService {
 	}
 
 	public void markAllRead() {
-		markMatchingReadInternal(item -> true);
+		markReadMatching(item -> true);
 	}
 
 	public void markRead(AppNotification notification) {
@@ -185,6 +186,48 @@ public final class NotificationCenterService {
 
 	public void setReadListener(Consumer<List<AppNotification>> listener) {
 		this.readListener = listener == null ? ignored -> {} : listener;
+	}
+
+	public void setDismissListener(Consumer<List<AppNotification>> listener) {
+		this.dismissListener = listener == null ? ignored -> {} : listener;
+	}
+
+	public void dismiss(AppNotification notification) {
+		if (notification == null) {
+			return;
+		}
+		if (Platform.isFxApplicationThread()) {
+			dismissInternal(notification);
+		} else {
+			Platform.runLater(() -> dismissInternal(notification));
+		}
+	}
+
+	public void dismissById(String notificationId) {
+		if (notificationId == null || notificationId.isBlank()) {
+			return;
+		}
+		if (Platform.isFxApplicationThread()) {
+			AppNotification target = notifications.stream()
+					.filter(item -> notificationId.equals(item.getId()))
+					.findFirst()
+					.orElse(null);
+			dismissInternal(target);
+		} else {
+			Platform.runLater(() -> dismissById(notificationId));
+		}
+	}
+
+	private void dismissInternal(AppNotification notification) {
+		if (notification == null) {
+			return;
+		}
+		boolean removed = notifications.remove(notification);
+		if (!removed) {
+			return;
+		}
+		recomputeDerivedState();
+		dismissListener.accept(List.of(notification));
 	}
 
 	private void seed(Clock clock) {
