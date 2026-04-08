@@ -711,11 +711,12 @@ public final class SceneManager {
 				detail.description(),
 				detail.dueAt(),
 				detail.priorityId(),
-				detail.createdByDisplayName(),
-				assignedTeam.stream()
-						.map(member -> new TaskDetailDialog.AssignedTeamMember(
-								member.displayName(),
-								member.color()))
+					detail.createdByDisplayName(),
+					assignedTeam.stream()
+							.map(member -> new TaskDetailDialog.AssignedTeamMember(
+									member.userId(),
+									member.displayName(),
+									member.color()))
 						.toList(),
 				detail.completedAt() != null);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
@@ -724,13 +725,28 @@ public final class SceneManager {
 				model,
 				priorities,
 				id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-				userId -> {
-					caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-					return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-							.map(member -> new TaskDetailDialog.AssignedTeamMember(
-									member.displayName(),
-									member.color()))
-							.toList();
+				new TaskDetailDialog.AssignmentEditor() {
+					@Override
+					public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
+						caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+						return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+								.map(member -> new TaskDetailDialog.AssignedTeamMember(
+										member.userId(),
+										member.displayName(),
+										member.color()))
+								.toList();
+					}
+
+					@Override
+					public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
+						caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId);
+						return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+								.map(member -> new TaskDetailDialog.AssignedTeamMember(
+										member.userId(),
+										member.displayName(),
+										member.color()))
+								.toList();
+					}
 				},
 				caseId -> openCaseProfile(caseId, "OVERVIEW"));
 		if (result.isEmpty()) {

@@ -44,7 +44,7 @@ public final class TaskDetailDialog {
             TaskDetailModel model,
             List<TaskPriorityOptionDto> priorities,
             Function<Long, List<CaseTaskService.AssignableUserOption>> loadAssignableUsersForTask,
-            AssignmentAdder assignmentAdder,
+            AssignmentEditor assignmentEditor,
             Consumer<Integer> onOpenCase) {
         Stage stage = AppDialogs.createModalStage(owner, "Task Details");
 
@@ -52,7 +52,7 @@ public final class TaskDetailDialog {
 
         Label heading = new Label("Task details");
         heading.getStyleClass().add("app-dialog-title");
-        Label message = new Label("Update task fields, assigned team, completion, or delete the task.");
+        Label message = new Label("Update task fields, assigned users, completion, or delete the task.");
         message.getStyleClass().add("app-dialog-message");
         Label createdByLabel = new Label("Created by: " + displayCreatedBy(model.createdByDisplayName()));
         createdByLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.75);");
@@ -106,7 +106,7 @@ public final class TaskDetailDialog {
         }
 
         VBox assignedTeamSection = new VBox(6);
-        Label assignedTeamLabel = new Label("Assigned team");
+        Label assignedTeamLabel = new Label("Assigned");
         assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
         Button addAssignedUserButton = new Button("Add");
         addAssignedUserButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -122,7 +122,19 @@ public final class TaskDetailDialog {
         List<AssignedTeamMember> initialAssignedTeamMembers = model.assignedTeamMembers() == null
                 ? List.of()
                 : model.assignedTeamMembers();
-        renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, initialAssignedTeamMembers);
+        @SuppressWarnings("unchecked")
+        Consumer<Integer>[] removeAssignedUserRef = new Consumer[1];
+        removeAssignedUserRef[0] = userId -> {
+            try {
+                List<AssignedTeamMember> refreshed = assignmentEditor == null
+                        ? List.of()
+                        : assignmentEditor.removeAndReload(userId);
+                renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed, removeAssignedUserRef[0]);
+            } catch (Exception ex) {
+                showError(errorLabel, "Failed to remove assigned user. " + rootCauseMessage(ex));
+            }
+        };
+        renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, initialAssignedTeamMembers, removeAssignedUserRef[0]);
         addAssignedUserButton.setOnAction(e -> {
             List<CaseTaskService.AssignableUserOption> candidates = loadAssignableUsersForTask == null
                     ? List.of()
@@ -133,10 +145,10 @@ public final class TaskDetailDialog {
             }
             CaseTaskService.AssignableUserOption user = selected.get();
             try {
-                List<AssignedTeamMember> refreshed = assignmentAdder == null
+                List<AssignedTeamMember> refreshed = assignmentEditor == null
                         ? List.of()
-                        : assignmentAdder.addAndReload(user.id());
-                renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed);
+                        : assignmentEditor.addAndReload(user.id());
+                renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed, removeAssignedUserRef[0]);
             } catch (Exception ex) {
                 showError(errorLabel, "Failed to add assigned user. " + rootCauseMessage(ex));
             }
@@ -289,7 +301,8 @@ public final class TaskDetailDialog {
     private static void renderAssignedTeam(
             VBox assignedTeamList,
             UserCardFactory cardFactory,
-            List<AssignedTeamMember> members) {
+            List<AssignedTeamMember> members,
+            Consumer<Integer> onRemove) {
         assignedTeamList.getChildren().clear();
         List<AssignedTeamMember> safeMembers = members == null ? List.of() : members;
         if (safeMembers.isEmpty()) {
@@ -303,10 +316,16 @@ public final class TaskDetailDialog {
                 continue;
             }
             var card = cardFactory.create(
-                    new UserCardModel(null, safe(member.displayName()), member.colorCss(), null),
+                    new UserCardModel(member.userId(), safe(member.displayName()), member.colorCss(), null),
                     UserCardFactory.Variant.MINI);
             card.setMouseTransparent(true);
-            assignedTeamList.getChildren().add(card);
+            Button removeButton = new Button("Remove");
+            removeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            removeButton.setFocusTraversable(false);
+            removeButton.setOnAction(e -> onRemove.accept(member.userId()));
+            HBox row = new HBox(8, card, removeButton);
+            row.setAlignment(Pos.CENTER_LEFT);
+            assignedTeamList.getChildren().add(row);
         }
     }
 
@@ -314,7 +333,7 @@ public final class TaskDetailDialog {
             Window owner,
             List<CaseTaskService.AssignableUserOption> candidates) {
         Stage stage = AppDialogs.createModalStage(owner, "Add Assigned User");
-        Label heading = new Label("Add to assigned team");
+        Label heading = new Label("Add to assigned");
         heading.getStyleClass().add("app-dialog-title");
 
         VBox list = new VBox(8);
@@ -377,6 +396,7 @@ public final class TaskDetailDialog {
     }
 
     public record AssignedTeamMember(
+            int userId,
             String displayName,
             String colorCss) {
     }
@@ -409,9 +429,9 @@ public final class TaskDetailDialog {
     private static final class ResultHolderAssignable {
         private CaseTaskService.AssignableUserOption value;
     }
-    @FunctionalInterface
-    public interface AssignmentAdder {
+    public interface AssignmentEditor {
         List<AssignedTeamMember> addAndReload(int userId);
+        List<AssignedTeamMember> removeAndReload(int userId);
     }
 
     private static final class PriorityListCell extends javafx.scene.control.ListCell<TaskPriorityOptionDto> {

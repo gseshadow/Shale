@@ -72,7 +72,7 @@ public final class CaseTaskService {
 
     public List<AssignedTaskUserOption> loadAssignedUsersForTask(long taskId, int shaleClientId) {
         return taskDao.listAssignedUsersForTask(taskId, shaleClientId).stream()
-                .map(row -> new AssignedTaskUserOption(row.displayName(), row.color()))
+                .map(row -> new AssignedTaskUserOption(row.userId(), row.displayName(), row.color()))
                 .toList();
     }
 
@@ -142,6 +142,9 @@ public final class CaseTaskService {
 
     public void addTaskAssignment(long taskId, int shaleClientId, int userId, int assignedByUserId) {
         taskDao.addTaskAssignment(taskId, shaleClientId, userId, assignedByUserId);
+    }
+    public void removeTaskAssignment(long taskId, int shaleClientId, int userId) {
+        taskDao.removeTaskAssignment(taskId, shaleClientId, userId);
     }
 
     public List<AssignableUserOption> loadAssignableUsers(int shaleClientId) {
@@ -241,6 +244,7 @@ public final class CaseTaskService {
     }
 
     public record AssignedTaskUserOption(
+            int userId,
             String displayName,
             String color) {
     }

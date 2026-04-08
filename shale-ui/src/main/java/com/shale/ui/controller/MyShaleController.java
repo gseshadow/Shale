@@ -625,10 +625,11 @@ public final class MyShaleController {
 								detail.dueAt(),
 								detail.priorityId(),
 								detail.createdByDisplayName(),
-								assignedTeam.stream()
-										.map(member -> new TaskDetailDialog.AssignedTeamMember(
-												member.displayName(),
-												member.color()))
+									assignedTeam.stream()
+											.map(member -> new TaskDetailDialog.AssignedTeamMember(
+													member.userId(),
+													member.displayName(),
+													member.color()))
 										.toList(),
 								detail.completedAt() != null);
 						Optional<TaskDetailDialog.TaskDetailResult> result =
@@ -637,13 +638,28 @@ public final class MyShaleController {
 										model,
 										priorities,
 										id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-										userId -> {
-											caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-											return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-													.map(member -> new TaskDetailDialog.AssignedTeamMember(
-															member.displayName(),
-															member.color()))
-													.toList();
+										new TaskDetailDialog.AssignmentEditor() {
+											@Override
+											public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
+												caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+												return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+														.map(member -> new TaskDetailDialog.AssignedTeamMember(
+																member.userId(),
+																member.displayName(),
+																member.color()))
+														.toList();
+											}
+
+											@Override
+											public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
+												caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId);
+												return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+														.map(member -> new TaskDetailDialog.AssignedTeamMember(
+																member.userId(),
+																member.displayName(),
+																member.color()))
+														.toList();
+											}
 										},
 										onOpenCase);
 						if (result.isEmpty()) {
