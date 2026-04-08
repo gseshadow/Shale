@@ -70,9 +70,9 @@ public final class CaseTaskService {
         return taskDao.findTaskDetail(taskId, shaleClientId);
     }
 
-    public List<AssignedTeamMemberOption> loadAssignedTeamForCase(long caseId, int shaleClientId) {
-        return taskDao.listCaseTeamMembers(caseId, shaleClientId).stream()
-                .map(row -> new AssignedTeamMemberOption(row.displayName(), row.color()))
+    public List<AssignedTaskUserOption> loadAssignedUsersForTask(long taskId, int shaleClientId) {
+        return taskDao.listAssignedUsersForTask(taskId, shaleClientId).stream()
+                .map(row -> new AssignedTaskUserOption(row.displayName(), row.color()))
                 .toList();
     }
 
@@ -269,7 +269,7 @@ public final class CaseTaskService {
             String color) {
     }
 
-    public record AssignedTeamMemberOption(
+    public record AssignedTaskUserOption(
             String displayName,
             String color) {
     }

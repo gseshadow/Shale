@@ -603,10 +603,10 @@ public final class MyShaleController {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
 				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
-				List<CaseTaskService.AssignedTeamMemberOption> assignedTeam =
-						detail == null || detail.caseId() <= 0
+				List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
+						detail == null
 								? List.of()
-								: caseTaskService.loadAssignedTeamForCase(detail.caseId(), shaleClientId);
+								: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
 
 				runOnFx(() -> {
 					try {

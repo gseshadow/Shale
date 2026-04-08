@@ -121,37 +121,32 @@ public final class TaskDetailDialog {
         }
 
         VBox assignedTeamSection = new VBox(6);
-        if (model.caseId() > 0) {
-            Label assignedTeamLabel = new Label("Assigned team");
-            assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        Label assignedTeamLabel = new Label("Assigned team");
+        assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
 
-            VBox assignedTeamList = new VBox(6);
-            List<AssignedTeamMember> assignedTeamMembers = model.assignedTeamMembers() == null
-                    ? List.of()
-                    : model.assignedTeamMembers();
-            if (assignedTeamMembers.isEmpty()) {
-                Label emptyLabel = new Label("No team members assigned");
-                emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
-                assignedTeamList.getChildren().add(emptyLabel);
-            } else {
-                UserCardFactory assignedTeamCardFactory = new UserCardFactory(id -> {
-                });
-                for (AssignedTeamMember member : assignedTeamMembers) {
-                    if (member == null) {
-                        continue;
-                    }
-                    var card = assignedTeamCardFactory.create(
-                            new UserCardModel(null, safe(member.displayName()), member.colorCss(), null),
-                            UserCardFactory.Variant.MINI);
-                    card.setMouseTransparent(true);
-                    assignedTeamList.getChildren().add(card);
-                }
-            }
-            assignedTeamSection.getChildren().setAll(assignedTeamLabel, assignedTeamList);
+        VBox assignedTeamList = new VBox(6);
+        List<AssignedTeamMember> assignedTeamMembers = model.assignedTeamMembers() == null
+                ? List.of()
+                : model.assignedTeamMembers();
+        if (assignedTeamMembers.isEmpty()) {
+            Label emptyLabel = new Label("No users assigned");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            assignedTeamList.getChildren().add(emptyLabel);
         } else {
-            assignedTeamSection.setManaged(false);
-            assignedTeamSection.setVisible(false);
+            UserCardFactory assignedTeamCardFactory = new UserCardFactory(id -> {
+            });
+            for (AssignedTeamMember member : assignedTeamMembers) {
+                if (member == null) {
+                    continue;
+                }
+                var card = assignedTeamCardFactory.create(
+                        new UserCardModel(null, safe(member.displayName()), member.colorCss(), null),
+                        UserCardFactory.Variant.MINI);
+                card.setMouseTransparent(true);
+                assignedTeamList.getChildren().add(card);
+            }
         }
+        assignedTeamSection.getChildren().setAll(assignedTeamLabel, assignedTeamList);
 
         VBox content = new VBox(8,
                 createdByLabel,

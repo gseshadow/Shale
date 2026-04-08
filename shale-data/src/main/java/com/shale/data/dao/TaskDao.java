@@ -48,7 +48,7 @@ public final class TaskDao {
 
     private record PriorityLookupRow(int id, String name, Integer sortOrder, String systemKey) {
     }
-    public record CaseTeamMemberRow(String displayName, String color) {
+    public record TaskAssignedUserRow(String displayName, String color) {
     }
 
     private final DbSessionProvider db;
@@ -454,8 +454,8 @@ public final class TaskDao {
         }
     }
 
-    public List<CaseTeamMemberRow> listCaseTeamMembers(long caseId, int shaleClientId) {
-        if (caseId <= 0) {
+    public List<TaskAssignedUserRow> listAssignedUsersForTask(long taskId, int shaleClientId) {
+        if (taskId <= 0) {
             return List.of();
         }
         if (shaleClientId <= 0) {
@@ -470,28 +470,29 @@ public final class TaskDao {
                     COALESCE(u.name_last, '')
                   )) AS DisplayName,
                   u.Color
-                FROM dbo.CaseUsers cu
-                INNER JOIN dbo.Cases c
-                  ON c.Id = cu.CaseId
+                FROM dbo.TaskAssignments ta
                 INNER JOIN dbo.Users u
-                  ON u.Id = cu.UserId
-                 AND u.ShaleClientId = c.ShaleClientId
-                WHERE cu.CaseId = ?
-                  AND c.ShaleClientId = ?
-                  AND ISNULL(c.IsDeleted, 0) = 0
-                  AND ISNULL(cu.IsDeleted, 0) = 0
+                  ON u.Id = ta.UserId
+                 AND u.ShaleClientId = ta.ShaleClientId
+                WHERE ta.TaskId = ?
+                  AND ta.ShaleClientId = ?
+                  AND ISNULL(ta.IsDeleted, 0) = 0
                   AND ISNULL(u.IsDeleted, 0) = 0
-                ORDER BY u.name_last, u.name_first, u.Id;
+                ORDER BY
+                  ta.IsPrimary DESC,
+                  u.name_first ASC,
+                  u.name_last ASC,
+                  u.Id ASC;
                 """;
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setLong(1, caseId);
+            ps.setLong(1, taskId);
             ps.setInt(2, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
-                List<CaseTeamMemberRow> out = new ArrayList<>();
+                List<TaskAssignedUserRow> out = new ArrayList<>();
                 while (rs.next()) {
-                    out.add(new CaseTeamMemberRow(
+                    out.add(new TaskAssignedUserRow(
                             rs.getString("DisplayName"),
                             rs.getString("Color")));
                 }
@@ -499,7 +500,7 @@ public final class TaskDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException(
-                    "Failed to list case team members for caseId=" + caseId + " shaleClientId=" + shaleClientId,
+                    "Failed to list assigned users for taskId=" + taskId + " shaleClientId=" + shaleClientId,
                     e);
         }
     }
