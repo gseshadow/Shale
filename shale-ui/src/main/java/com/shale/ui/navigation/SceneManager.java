@@ -6,6 +6,7 @@ import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.NotificationDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.ContactViewController;
@@ -28,6 +29,7 @@ import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -35,12 +37,26 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.net.URL;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.shale.ui.services.UiUpdateLauncher;
+import com.shale.ui.services.UiUpdateLauncher.UpdateCheckResult;
+import com.shale.ui.notification.NotificationCenterService;
+import com.shale.ui.notification.LiveUpdateNotificationBridge;
+import com.shale.ui.notification.ConnectivityNotificationProducer;
+import com.shale.ui.notification.SystemUpdateNotificationProducer;
+import com.shale.ui.notification.NotificationPreferencesService;
+import com.shale.ui.notification.DurableNotificationService;
+import com.shale.ui.notification.AssignedUserTaskDueNotificationRecipientResolver;
+import com.shale.ui.notification.TaskDueDateNotificationGenerator;
 
 public final class SceneManager {
 
@@ -51,6 +67,16 @@ public final class SceneManager {
 	private final DbSessionProvider dbSessionProvider;
 	private final UiUpdateLauncher updateLauncher;
 	private final NavigationManager navigationManager = new NavigationManager();
+	private final NotificationCenterService notificationCenterService;
+	private final LiveUpdateNotificationBridge liveUpdateNotificationBridge;
+	private final ConnectivityNotificationProducer connectivityNotificationProducer;
+	private final SystemUpdateNotificationProducer systemUpdateNotificationProducer;
+	private final NotificationPreferencesService notificationPreferencesService;
+	private final DurableNotificationService durableNotificationService;
+	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
+	private final ExecutorService notificationStartupExecutor;
+	private final AtomicLong notificationStartupGeneration = new AtomicLong(0);
+	private volatile Future<?> notificationStartupFuture;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -64,9 +90,44 @@ public final class SceneManager {
 		this.runtimeBridge = runtimeBridge;
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
+		this.notificationCenterService = createNotificationCenterService();
+		this.notificationPreferencesService = new NotificationPreferencesService(appState);
+		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState);
+		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
+				new TaskDao(dbSessionProvider),
+				new NotificationDao(dbSessionProvider),
+				appState,
+				new AssignedUserTaskDueNotificationRecipientResolver());
+		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r -> {
+			Thread t = new Thread(r, "notification-startup-worker");
+			t.setDaemon(true);
+			return t;
+		});
+		this.notificationCenterService.setReadListener(durableNotificationService::markRead);
+		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
+		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
+		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
+	}
+
+	private NotificationCenterService createNotificationCenterService() {
+		boolean seedDemoNotifications = Boolean.getBoolean("shale.notifications.seedDemo");
+		if (seedDemoNotifications) {
+			return NotificationCenterService.seeded(Clock.systemUTC());
+		}
+		return NotificationCenterService.empty();
 	}
 
 	public void showLogin() {
+		notificationStartupGeneration.incrementAndGet();
+		Future<?> startupFuture = notificationStartupFuture;
+		if (startupFuture != null) {
+			startupFuture.cancel(true);
+			notificationStartupFuture = null;
+		}
+		liveUpdateNotificationBridge.stop();
+		connectivityNotificationProducer.stop();
+		taskDueDateNotificationGenerator.stop();
+		notificationCenterService.clearAll();
 		var root = load("/fxml/login.fxml", controller ->
 		{
 			LoginController c = (LoginController) controller;
@@ -77,18 +138,87 @@ public final class SceneManager {
 	}
 
 	public void showMain() {
+		long showMainStartNanos = System.nanoTime();
+		System.out.println("[StartupTiming] showMain entry");
 		var root = load("/fxml/main.fxml", controller ->
 		{
 			MainController c = (MainController) controller;
-			c.init(this, appState, runtimeBridge);
+			c.init(this, appState, runtimeBridge, notificationCenterService);
 			c.setUpdateLauncher(updateLauncher);
 			return c;
 		});
 		setScene(root, "Shale");
+		Platform.runLater(() -> System.out.println("[StartupTiming] main shell visible"));
+		notificationPreferencesService.refreshActivePreferences();
+		liveUpdateNotificationBridge.start();
+		connectivityNotificationProducer.start();
+		taskDueDateNotificationGenerator.start();
+		startNotificationBootstrapAsync();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());
 		notifyBackAvailabilityChanged();
+		long showMainEndMs = (System.nanoTime() - showMainStartNanos) / 1_000_000;
+		System.out.println("[StartupTiming] showMain critical path complete in " + showMainEndMs + " ms");
+	}
+
+	private void startNotificationBootstrapAsync() {
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return;
+		}
+		long generation = notificationStartupGeneration.incrementAndGet();
+		notificationStartupFuture = notificationStartupExecutor.submit(() -> {
+			long bootstrapStartNanos = System.nanoTime();
+			System.out.println("[StartupTiming] notification bootstrap start");
+			try {
+				long dueStartNanos = System.nanoTime();
+				taskDueDateNotificationGenerator.runOnce();
+				long dueElapsedMs = (System.nanoTime() - dueStartNanos) / 1_000_000;
+				System.out.println("[StartupTiming] due-date initial pass complete in " + dueElapsedMs + " ms");
+
+				long hydrateStartNanos = System.nanoTime();
+				var unread = durableNotificationService.listUnread(shaleClientId, userId);
+				long hydrateElapsedMs = (System.nanoTime() - hydrateStartNanos) / 1_000_000;
+				System.out.println("[StartupTiming] durable notification load complete in " + hydrateElapsedMs + " ms");
+
+				if (!isActiveSession(generation, shaleClientId, userId)) {
+					System.out.println("[StartupTiming] notification bootstrap discarded (session changed)");
+					return;
+				}
+				Platform.runLater(() -> {
+					if (!isActiveSession(generation, shaleClientId, userId)) {
+						System.out.println("[StartupTiming] notification UI apply skipped (session changed)");
+						return;
+					}
+					durableNotificationService.pushLoaded(notificationCenterService, unread);
+					long bootstrapElapsedMs = (System.nanoTime() - bootstrapStartNanos) / 1_000_000;
+					System.out.println("[StartupTiming] notification bootstrap applied in " + bootstrapElapsedMs + " ms");
+				});
+			} catch (RuntimeException ex) {
+				System.err.println("[StartupTiming] notification bootstrap failed: " + ex.getMessage());
+			}
+		});
+	}
+
+	private boolean isActiveSession(long generation, int expectedShaleClientId, int expectedUserId) {
+		Integer currentShaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		return generation == notificationStartupGeneration.get()
+				&& currentShaleClientId != null
+				&& currentUserId != null
+				&& currentShaleClientId == expectedShaleClientId
+				&& currentUserId == expectedUserId;
+	}
+
+
+	public void onUpdateCheckCompleted(UpdateCheckResult result) {
+		systemUpdateNotificationProducer.onUpdateCheckResult(result);
+	}
+
+	public void onUpdaterLaunchSucceeded() {
+		systemUpdateNotificationProducer.onUpdaterLaunchSucceeded();
 	}
 
 	public boolean canGoBack() {
@@ -358,7 +488,8 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser);
 			return c;
 		});
@@ -374,7 +505,8 @@ public final class SceneManager {
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(caseId, caseDao, caseDetailService, caseTaskService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
 			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);

@@ -345,3 +345,77 @@
     -fx-font-size: 11px;
     -fx-text-fill: rgba(233, 241, 255, 0.58);
 }
+
+.session-footer {
+    -fx-background-color: rgba(8, 19, 41, 0.26);
+    -fx-background-radius: 14 14 0 0;
+    -fx-border-color: rgba(235, 245, 255, 0.14);
+    -fx-border-width: 1 0 0 0;
+}
+
+.session-footer .label {
+    -fx-text-fill: #e9f1ff;
+}
+
+.notification-banner-host {
+    -fx-background-color: rgba(241, 247, 255, 0.85);
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-color: rgba(18, 40, 72, 0.24);
+    -fx-border-width: 1;
+    -fx-padding: 6 10 6 10;
+}
+
+.notification-banner-label {
+    -fx-text-fill: #112542;
+    -fx-font-weight: 700;
+}
+
+.notification-bell-button {
+    -fx-background-radius: 999;
+    -fx-padding: 6 12 6 12;
+    -fx-font-weight: 700;
+}
+
+.notification-bell-button-unread {
+    -fx-background-color: #c62828;
+    -fx-text-fill: white;
+}
+
+.notification-list {
+    -fx-background-color: transparent;
+}
+
+.notification-row {
+    -fx-background-color: rgba(235, 244, 253, 0.72);
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: rgba(18, 41, 74, 0.18);
+    -fx-border-width: 1;
+    -fx-padding: 10;
+}
+
+.notification-row-unread {
+    -fx-background-color: rgba(223, 238, 253, 0.92);
+    -fx-border-color: rgba(57, 106, 178, 0.7);
+}
+
+.notification-row-category {
+    -fx-text-fill: #234c84;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+}
+
+.notification-row-time {
+    -fx-text-fill: rgba(17, 37, 66, 0.72);
+    -fx-font-size: 11px;
+}
+
+.notification-row-title {
+    -fx-text-fill: #102442;
+    -fx-font-weight: 800;
+}
+
+.notification-row-message {
+    -fx-text-fill: rgba(16, 36, 66, 0.86);
+}
