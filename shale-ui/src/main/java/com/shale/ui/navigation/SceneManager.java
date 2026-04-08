@@ -9,6 +9,7 @@ import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.NotificationDao;
+import com.shale.data.dao.UserPreferencesDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.ContactViewController;
@@ -33,6 +34,7 @@ import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -98,7 +100,8 @@ public final class SceneManager {
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
 		this.notificationCenterService = createNotificationCenterService();
-		this.notificationPreferencesService = new NotificationPreferencesService(appState);
+		UserPreferencesService userPreferencesService = new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState);
+		this.notificationPreferencesService = new NotificationPreferencesService(appState, userPreferencesService);
 		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
 		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
 				new TaskDao(dbSessionProvider),
