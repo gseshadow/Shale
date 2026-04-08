@@ -1,6 +1,7 @@
 package com.shale.ui.component.factory;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -24,9 +25,14 @@ public final class TaskCardFactory {
             String priorityColorHex,
             LocalDateTime dueAt,
             LocalDateTime completedAt,
-            Integer assignedUserId,
-            String assignedUserDisplayName,
-            String assignedUserColor
+            List<AssignedUserModel> assignedUsers
+    ) {
+    }
+
+    public record AssignedUserModel(
+            int userId,
+            String displayName,
+            String colorCss
     ) {
     }
 
@@ -65,7 +71,7 @@ public final class TaskCardFactory {
         card.setDescriptionPreview(model.description());
         card.setCompleted(model.completedAt() != null);
         card.setBorderByDueState(model.dueAt(), model.completedAt());
-        card.setAssignee(model.assignedUserId(), model.assignedUserDisplayName(), model.assignedUserColor());
+        card.setAssignees(model.assignedUsers());
         card.setBackgroundCssColor(ColorUtil.toCssBackgroundColorOrNull(model.priorityColorHex()));
 
         switch (variant) {
