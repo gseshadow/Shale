@@ -159,7 +159,8 @@ public final class NewTaskDialog {
         HBox actions = new HBox(10, spacer, cancelButton, createButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        VBox root = new VBox(16, heading, message, content, actions);
+        HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, "New Task", stage::close);
+        VBox root = new VBox(16, windowHeader, heading, message, content, actions);
         root.getStyleClass().add("app-dialog-root");
         root.setPadding(new Insets(22, 24, 22, 24));
         root.setMinWidth(460);

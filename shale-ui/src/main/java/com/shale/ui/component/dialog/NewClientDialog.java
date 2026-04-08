@@ -28,6 +28,7 @@ public final class NewClientDialog {
 
 	public NewClientDialog(Window owner) {
 		stage = new Stage();
+		AppDialogs.applySecondaryWindowChrome(stage);
 		stage.initOwner(owner);
 		stage.initModality(Modality.APPLICATION_MODAL);
 		stage.setTitle("New Client");
@@ -65,7 +66,11 @@ public final class NewClientDialog {
 		HBox actions = new HBox(10, spacer, cancelButton, createButton);
 		actions.setAlignment(Pos.CENTER_RIGHT);
 
-		VBox root = new VBox(12, form, errorLabel, actions);
+		HBox header = AppDialogs.createSecondaryWindowHeader(stage, "New Client", () -> {
+			result = Optional.empty();
+			stage.close();
+		});
+		VBox root = new VBox(12, header, form, errorLabel, actions);
 		root.setPadding(new Insets(12));
 		Scene scene = new Scene(root, 360, 170);
 		stage.setScene(scene);
