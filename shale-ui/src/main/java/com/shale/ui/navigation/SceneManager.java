@@ -489,12 +489,15 @@ public final class SceneManager {
 			UserController c = (UserController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			UserDetailService userDetailService = new UserDetailService(userDao, caseDao);
+			TaskDao taskDao = new TaskDao(dbSessionProvider);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
+			UserDetailService userDetailService = new UserDetailService(userDao, caseDao, taskDao);
 			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
 			{
 				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
 				openCaseProfile(relatedCaseId, "OVERVIEW");
-			});
+			}, caseTaskService);
 			return c;
 		});
 	}

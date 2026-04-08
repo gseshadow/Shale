@@ -116,24 +116,46 @@
                     </VBox>
                 </VBox>
 
-                <VBox prefWidth="460" minWidth="400" maxWidth="560" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
-                    <padding>
-                        <Insets top="12" right="12" bottom="12" left="12" />
-                    </padding>
-                    <HBox spacing="8" alignment="CENTER_LEFT">
-                        <Label text="Assigned Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                        <Region HBox.hgrow="ALWAYS" />
-                    </HBox>
-                    <HBox spacing="8" alignment="CENTER_LEFT">
-                        <TextField fx:id="assignedCasesSearchField" promptText="Search assigned cases…" HBox.hgrow="ALWAYS" />
-                        <ChoiceBox fx:id="assignedCasesSortChoice" prefWidth="180" />
-                    </HBox>
-                    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
-                        <StackPane>
-                            <VBox fx:id="assignedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
-                            <Label fx:id="assignedCasesEmptyLabel" text="No assigned cases" visible="false" managed="false" />
-                        </StackPane>
-                    </ScrollPane>
+                <VBox prefWidth="460" minWidth="400" maxWidth="560" maxHeight="1.7976931348623157E308" spacing="10">
+                    <VBox spacing="10" styleClass="secondary-panel">
+                        <padding>
+                            <Insets top="12" right="12" bottom="12" left="12" />
+                        </padding>
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="Assigned Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                            <Region HBox.hgrow="ALWAYS" />
+                        </HBox>
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <TextField fx:id="assignedCasesSearchField" promptText="Search assigned cases…" HBox.hgrow="ALWAYS" />
+                            <ChoiceBox fx:id="assignedCasesSortChoice" prefWidth="180" />
+                        </HBox>
+                        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
+                            <StackPane>
+                                <VBox fx:id="assignedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
+                                <Label fx:id="assignedCasesEmptyLabel" text="No assigned cases" visible="false" managed="false" />
+                            </StackPane>
+                        </ScrollPane>
+                    </VBox>
+
+                    <VBox spacing="10" styleClass="secondary-panel" VBox.vgrow="ALWAYS">
+                        <padding>
+                            <Insets top="12" right="12" bottom="12" left="12" />
+                        </padding>
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="Assigned Tasks" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                            <Region HBox.hgrow="ALWAYS" />
+                        </HBox>
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <TextField fx:id="assignedTasksSearchField" promptText="Search assigned tasks…" HBox.hgrow="ALWAYS" />
+                            <ChoiceBox fx:id="assignedTasksSortChoice" prefWidth="180" />
+                        </HBox>
+                        <ScrollPane fx:id="assignedTasksScroll" fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
+                            <StackPane>
+                                <VBox fx:id="assignedTasksContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
+                                <Label fx:id="assignedTasksEmptyLabel" text="No assigned tasks" visible="false" managed="false" />
+                            </StackPane>
+                        </ScrollPane>
+                    </VBox>
                 </VBox>
             </HBox>
         </StackPane>

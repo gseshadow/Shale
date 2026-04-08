@@ -5,6 +5,8 @@ import java.util.Objects;
 
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseRow;
+import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.TaskDao.AssignedUserTaskRow;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserDao.UserDetailRow;
 import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
@@ -16,10 +18,12 @@ public final class UserDetailService {
 
 	private final UserDao userDao;
 	private final CaseDao caseDao;
+	private final TaskDao taskDao;
 
-	public UserDetailService(UserDao userDao, CaseDao caseDao) {
+	public UserDetailService(UserDao userDao, CaseDao caseDao, TaskDao taskDao) {
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
+		this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
 	}
 
 	public UserDetailRow loadUser(int userId, int shaleClientId) {
@@ -56,5 +60,9 @@ public final class UserDetailService {
 				+ "selectedUserId=" + userId
 				+ " serviceRowsReceived=" + (rows == null ? 0 : rows.size()));
 		return rows;
+	}
+
+	public List<AssignedUserTaskRow> loadAssignedTasks(int shaleClientId, int userId) {
+		return taskDao.listActiveTasksForAssigneeInTenant(shaleClientId, userId);
 	}
 }

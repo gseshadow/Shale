@@ -24,7 +24,7 @@ import javafx.scene.layout.VBox;
 public final class TaskCard extends VBox {
 
 	public enum Variant {
-		FULL, COMPACT, MINI
+		FULL, COMPACT, COMPACT_FLUID, MINI
 	}
 
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
@@ -236,6 +236,13 @@ public final class TaskCard extends VBox {
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
+	}
+
+	public void applyCompactFluid() {
+		applyCompact();
+		setMinWidth(Region.USE_COMPUTED_SIZE);
+		setPrefWidth(Region.USE_COMPUTED_SIZE);
+		setMaxWidth(Double.MAX_VALUE);
 	}
 
 	public void applyFull() {
