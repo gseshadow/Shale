@@ -82,14 +82,23 @@ public final class NotificationDao {
 			return List.of();
 		}
 		String sql = """
-				SELECT Id, Category, Severity, Title, Message, EntityType, EntityId, ActionType,
+				SELECT n.Id, n.Category, n.Severity, n.Title, n.Message, n.EntityType, n.EntityId, n.ActionType,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.Title
+				         ELSE NULL
+				       END AS EntityTitle,
 				       IsRead, CreatedAt, EventKey
-				FROM dbo.Notifications
-				WHERE ShaleClientId = ?
-				  AND UserId = ?
-				  AND ISNULL(IsDismissed, 0) = 0
-				  AND ISNULL(IsRead, 0) = 0
-				ORDER BY CreatedAt DESC, Id DESC;
+				FROM dbo.Notifications n
+				LEFT JOIN dbo.Tasks t
+				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'
+				 AND t.Id = n.EntityId
+				 AND t.ShaleClientId = n.ShaleClientId
+				 AND ISNULL(t.IsDeleted, 0) = 0
+				WHERE n.ShaleClientId = ?
+				  AND n.UserId = ?
+				  AND ISNULL(n.IsDismissed, 0) = 0
+				  AND ISNULL(n.IsRead, 0) = 0
+				ORDER BY n.CreatedAt DESC, n.Id DESC;
 				""";
 		try (Connection con = db.requireConnection();
 		     PreparedStatement ps = con.prepareStatement(sql)) {
@@ -107,6 +116,7 @@ public final class NotificationDao {
 							rs.getString("EntityType"),
 							rs.getObject("EntityId") == null ? null : rs.getLong("EntityId"),
 							rs.getString("ActionType"),
+							rs.getString("EntityTitle"),
 							rs.getBoolean("IsRead"),
 							toInstant(rs.getTimestamp("CreatedAt")),
 							rs.getString("EventKey")));
@@ -313,6 +323,7 @@ public final class NotificationDao {
 			String entityType,
 			Long entityId,
 			String actionType,
+			String entityTitle,
 			boolean isRead,
 			Instant createdAt,
 			String eventKey) {
