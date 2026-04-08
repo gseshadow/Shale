@@ -11,7 +11,7 @@ import com.shale.ui.util.ColorUtil;
 public final class TaskCardFactory {
 
     public enum Variant {
-        FULL, COMPACT, MINI
+        FULL, COMPACT, COMPACT_FLUID, MINI
     }
 
     public record TaskCardModel(
@@ -77,6 +77,7 @@ public final class TaskCardFactory {
         switch (variant) {
             case FULL -> card.applyFull();
             case COMPACT -> card.applyCompact();
+            case COMPACT_FLUID -> card.applyCompactFluid();
             case MINI -> card.applyMini();
         }
 
