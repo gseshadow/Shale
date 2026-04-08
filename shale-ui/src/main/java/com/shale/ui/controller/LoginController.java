@@ -165,7 +165,10 @@ public final class LoginController {
 					return;
 				}
 
-				Platform.runLater(() -> handlePostLoginFlow(updateCheck));
+				Platform.runLater(() -> {
+					sceneManager.onUpdateCheckCompleted(updateCheck);
+					handlePostLoginFlow(updateCheck);
+				});
 			} catch (Exception ex) {
 				showError("Sign-in failed. " + ex.getMessage());
 			} finally {
@@ -257,6 +260,7 @@ public final class LoginController {
 		try {
 			System.out.println("[Updater] User accepted update; launching updater.");
 			updateLauncher.launchUpdater();
+			sceneManager.onUpdaterLaunchSucceeded();
 		} catch (RuntimeException ex) {
 			progress.close();
 			Alert error = new Alert(Alert.AlertType.ERROR);
