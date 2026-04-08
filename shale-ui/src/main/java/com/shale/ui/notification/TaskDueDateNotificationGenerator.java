@@ -21,6 +21,7 @@ public final class TaskDueDateNotificationGenerator {
 	private final TaskDao taskDao;
 	private final NotificationDao notificationDao;
 	private final AppState appState;
+	private final NotificationPreferencesService notificationPreferencesService;
 	private final TaskDueNotificationRecipientResolver recipientResolver;
 	private final Clock clock;
 	private final ZoneId zoneId;
@@ -30,20 +31,23 @@ public final class TaskDueDateNotificationGenerator {
 			TaskDao taskDao,
 			NotificationDao notificationDao,
 			AppState appState,
+			NotificationPreferencesService notificationPreferencesService,
 			TaskDueNotificationRecipientResolver recipientResolver) {
-		this(taskDao, notificationDao, appState, recipientResolver, Clock.systemDefaultZone(), ZoneId.systemDefault());
+		this(taskDao, notificationDao, appState, notificationPreferencesService, recipientResolver, Clock.systemDefaultZone(), ZoneId.systemDefault());
 	}
 
 	TaskDueDateNotificationGenerator(
 			TaskDao taskDao,
 			NotificationDao notificationDao,
 			AppState appState,
+			NotificationPreferencesService notificationPreferencesService,
 			TaskDueNotificationRecipientResolver recipientResolver,
 			Clock clock,
 			ZoneId zoneId) {
 		this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
 		this.notificationDao = Objects.requireNonNull(notificationDao, "notificationDao");
 		this.appState = Objects.requireNonNull(appState, "appState");
+		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.recipientResolver = Objects.requireNonNull(recipientResolver, "recipientResolver");
 		this.clock = Objects.requireNonNull(clock, "clock");
 		this.zoneId = Objects.requireNonNull(zoneId, "zoneId");
@@ -90,6 +94,9 @@ public final class TaskDueDateNotificationGenerator {
 					if (recipientUserId == null || recipientUserId <= 0) {
 						continue;
 					}
+					if (!isDueStateEnabled(state, recipientUserId)) {
+						continue;
+					}
 						String eventKey = state.eventKey(candidate.taskId(), recipientUserId, today);
 					notificationDao.createTaskDueDateNotification(
 							candidate.shaleClientId(),
@@ -106,6 +113,18 @@ public final class TaskDueDateNotificationGenerator {
 		} catch (Exception ex) {
 			System.err.println("Task due-date generator failed: " + ex.getMessage());
 		}
+	}
+
+	private boolean isDueStateEnabled(DueState state, int recipientUserId) {
+		Integer currentUserId = appState.getUserId();
+		if (currentUserId == null || currentUserId <= 0 || currentUserId != recipientUserId) {
+			return true;
+		}
+		return switch (state) {
+			case OVERDUE -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_OVERDUE);
+			case DUE_TODAY -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_TODAY);
+			case DUE_TOMORROW -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_TOMORROW);
+		};
 	}
 
 	private static DueState classifyDueState(TaskDueNotificationCandidate candidate, LocalDate today) {

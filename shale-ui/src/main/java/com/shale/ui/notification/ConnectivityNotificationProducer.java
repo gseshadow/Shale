@@ -93,6 +93,7 @@ public final class ConnectivityNotificationProducer {
 			offlineNotificationActive = true;
 			return;
 		}
+		boolean showAsBanner = notificationPreferencesService.isEnabled(NotificationPreferenceKey.CONNECTIVITY_BANNER);
 		activeOfflineNotificationId = "offline-" + now.toEpochMilli();
 		notificationCenterService.pushNotification(new AppNotification(
 				activeOfflineNotificationId,
@@ -102,7 +103,7 @@ public final class ConnectivityNotificationProducer {
 				"Connection lost to live services." + suffix(event.detail()),
 				now,
 				true,
-				true,
+				showAsBanner,
 				NotificationTargetScope.SESSION_SYSTEM));
 		offlineNotificationActive = true;
 	}
@@ -126,6 +127,7 @@ public final class ConnectivityNotificationProducer {
 		if (!notificationPreferencesService.isEnabled(NotificationPreferenceKey.CONNECTIVITY_STATUS)) {
 			return;
 		}
+		boolean showAsBanner = notificationPreferencesService.isEnabled(NotificationPreferenceKey.CONNECTIVITY_BANNER);
 		notificationCenterService.pushNotification(new AppNotification(
 				"online-" + now.toEpochMilli(),
 				NotificationCategory.NETWORK,
@@ -134,7 +136,7 @@ public final class ConnectivityNotificationProducer {
 				"Connection restored to live services." + suffix(event.detail()),
 				now,
 				true,
-				false,
+				showAsBanner,
 				NotificationTargetScope.SESSION_SYSTEM));
 	}
 

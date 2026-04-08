@@ -1,12 +1,15 @@
 package com.shale.ui.navigation;
 
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.dto.TaskDetailDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.NotificationDao;
+import com.shale.data.dao.UserPreferencesDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.ContactViewController;
@@ -19,8 +22,11 @@ import com.shale.ui.controller.NewOrganizationController;
 import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.controller.SearchController;
+import com.shale.ui.controller.SettingsController;
 import com.shale.ui.controller.TeamController;
 import com.shale.ui.controller.UserController;
+import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.CaseTaskService;
@@ -28,6 +34,7 @@ import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -40,12 +47,14 @@ import java.io.IOException;
 import java.time.Clock;
 import java.net.URL;
 import java.util.Objects;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javafx.stage.Window;
 
 import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.services.UiUpdateLauncher.UpdateCheckResult;
@@ -91,12 +100,14 @@ public final class SceneManager {
 		this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider);
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
 		this.notificationCenterService = createNotificationCenterService();
-		this.notificationPreferencesService = new NotificationPreferencesService(appState);
-		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState);
+		UserPreferencesService userPreferencesService = new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState);
+		this.notificationPreferencesService = new NotificationPreferencesService(appState, userPreferencesService);
+		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
 		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
 				new TaskDao(dbSessionProvider),
 				new NotificationDao(dbSessionProvider),
 				appState,
+				notificationPreferencesService,
 				new AssignedUserTaskDueNotificationRecipientResolver());
 		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r -> {
 			Thread t = new Thread(r, "notification-startup-worker");
@@ -104,6 +115,7 @@ public final class SceneManager {
 			return t;
 		});
 		this.notificationCenterService.setReadListener(durableNotificationService::markRead);
+		this.notificationCenterService.setDismissListener(durableNotificationService::dismiss);
 		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
@@ -258,6 +270,10 @@ public final class SceneManager {
 		navigateTo(AppRoute.teamList(), true);
 	}
 
+	public void openSettingsView() {
+		navigateTo(AppRoute.settings(), true);
+	}
+
 	public void openSearchView(String query) {
 		navigateTo(AppRoute.search(query), true);
 	}
@@ -327,6 +343,7 @@ public final class SceneManager {
 			case CONTACTS_LIST -> mainController.showContactsListView();
 			case ORGANIZATIONS_LIST -> mainController.showOrganizationsListView();
 			case TEAM_LIST -> mainController.showTeamListView();
+			case SETTINGS -> mainController.showSettingsView();
 			case SEARCH -> mainController.showSearchResultsView(route.searchQuery() == null ? "" : route.searchQuery());
 			case CASE_PROFILE -> mainController.showCaseProfileView(route.entityId(), route.sectionKey());
 			case CONTACT_PROFILE -> {
@@ -415,6 +432,15 @@ public final class SceneManager {
 			TeamController c = (TeamController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			c.init(appState, userDao, onOpenUser);
+			return c;
+		});
+	}
+
+	public Parent createSettingsView() {
+		return load("/fxml/settings.fxml", controller ->
+		{
+			SettingsController c = (SettingsController) controller;
+			c.init(notificationPreferencesService);
 			return c;
 		});
 	}
@@ -607,7 +633,110 @@ public final class SceneManager {
 			System.err.println("Ignoring task navigation for invalid taskId: " + taskId);
 			return;
 		}
-		System.out.println("navigate to task " + taskId);
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			AppDialogs.showError(stage, "Tasks", "You must be signed in to view task details.");
+			return;
+		}
+		CaseTaskService caseTaskService = new CaseTaskService(
+				new TaskDao(dbSessionProvider),
+				new UserDao(dbSessionProvider),
+				runtimeBridge,
+				new NotificationDao(dbSessionProvider));
+		new Thread(() -> loadAndOpenTaskDialog(taskId, shaleClientId, currentUserId, caseTaskService),
+				"scene-manager-open-task-" + taskId).start();
+	}
+
+	private void loadAndOpenTaskDialog(Long taskId, int shaleClientId, int currentUserId, CaseTaskService caseTaskService) {
+		try {
+			TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+			List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+			List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
+			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, priorities, users));
+		} catch (Exception ex) {
+			Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
+		}
+	}
+
+	private void showTaskDetailDialog(
+			long taskId,
+			int shaleClientId,
+			int currentUserId,
+			CaseTaskService caseTaskService,
+			TaskDetailDto detail,
+			List<TaskPriorityOptionDto> priorities,
+			List<CaseTaskService.AssignableUserOption> users) {
+		if (detail == null) {
+			AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted.");
+			return;
+		}
+		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+				detail.id(),
+				detail.caseId(),
+				detail.caseName(),
+				detail.caseResponsibleAttorney(),
+				detail.caseResponsibleAttorneyColor(),
+				detail.title(),
+				detail.description(),
+				detail.dueAt(),
+				detail.priorityId(),
+				detail.assignedUserId(),
+				detail.completedAt() != null);
+		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
+		var result = TaskDetailDialog.showAndWait(
+				owner,
+				model,
+				priorities,
+				users,
+				caseId -> openCaseProfile(caseId, "OVERVIEW"));
+		if (result.isEmpty()) {
+			return;
+		}
+		TaskDetailDialog.TaskDetailResult action = result.get();
+		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+			new Thread(() -> {
+				try {
+					caseTaskService.deleteTask(taskId, shaleClientId);
+				} catch (Exception ex) {
+					Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to delete task. " + rootCauseMessage(ex)));
+				}
+			}, "scene-manager-delete-task-" + taskId).start();
+			return;
+		}
+		TaskDetailDialog.SaveTaskPayload payload = action.payload();
+		if (payload == null) {
+			return;
+		}
+		CaseTaskService.UpdateTaskRequest request = new CaseTaskService.UpdateTaskRequest(
+				taskId,
+				shaleClientId,
+				payload.title(),
+				payload.description(),
+				payload.dueAt(),
+				payload.priorityId(),
+				payload.assigneeUserId(),
+				payload.completed(),
+				currentUserId);
+		new Thread(() -> {
+			try {
+				caseTaskService.updateTask(request);
+			} catch (Exception ex) {
+				Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to save task. " + rootCauseMessage(ex)));
+			}
+		}, "scene-manager-save-task-" + taskId).start();
+	}
+
+	private static String rootCauseMessage(Throwable throwable) {
+		if (throwable == null) {
+			return "";
+		}
+		Throwable current = throwable;
+		while (current.getCause() != null && current.getCause() != current) {
+			current = current.getCause();
+		}
+		String message = current.getMessage();
+		return (message == null || message.isBlank()) ? "" : "Details: " + message;
 	}
 
 	private MainController resolveMainController() {
