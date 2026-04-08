@@ -98,7 +98,8 @@ public final class SceneManager {
 				new NotificationDao(dbSessionProvider),
 				appState,
 				new AssignedUserTaskDueNotificationRecipientResolver());
-		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r -> {
+		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r ->
+		{
 			Thread t = new Thread(r, "notification-startup-worker");
 			t.setDaemon(true);
 			return t;
@@ -169,7 +170,8 @@ public final class SceneManager {
 			return;
 		}
 		long generation = notificationStartupGeneration.incrementAndGet();
-		notificationStartupFuture = notificationStartupExecutor.submit(() -> {
+		notificationStartupFuture = notificationStartupExecutor.submit(() ->
+		{
 			long bootstrapStartNanos = System.nanoTime();
 			System.out.println("[StartupTiming] notification bootstrap start");
 			try {
@@ -187,7 +189,8 @@ public final class SceneManager {
 					System.out.println("[StartupTiming] notification bootstrap discarded (session changed)");
 					return;
 				}
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (!isActiveSession(generation, shaleClientId, userId)) {
 						System.out.println("[StartupTiming] notification UI apply skipped (session changed)");
 						return;
@@ -212,16 +215,6 @@ public final class SceneManager {
 				&& currentUserId == expectedUserId;
 	}
 
-
-	public void onUpdateCheckCompleted(UpdateCheckResult result) {
-		systemUpdateNotificationProducer.onUpdateCheckResult(result);
-	}
-
-	public void onUpdaterLaunchSucceeded() {
-		systemUpdateNotificationProducer.onUpdaterLaunchSucceeded();
-	}
-
-
 	public void onUpdateCheckCompleted(UpdateCheckResult result) {
 		systemUpdateNotificationProducer.onUpdateCheckResult(result);
 	}
@@ -235,11 +228,13 @@ public final class SceneManager {
 	}
 
 	public void goBack() {
-		navigationManager.popBackDestination().ifPresentOrElse(route -> {
+		navigationManager.popBackDestination().ifPresentOrElse(route ->
+		{
 			System.out.println("[Navigation] Back destination -> " + route);
 			showRouteInternal(route);
 			notifyBackAvailabilityChanged();
-		}, () -> {
+		}, () ->
+		{
 			System.out.println("[Navigation] Back ignored; stack is empty.");
 			notifyBackAvailabilityChanged();
 		});
@@ -339,11 +334,13 @@ public final class SceneManager {
 			case CONTACT_PROFILE -> {
 				Parent contactRoot = createContactView(
 						route.entityId(),
-						caseId -> {
+						caseId ->
+						{
 							System.out.println("[Navigation] Rewired contact->case callback via SceneManager.openCaseProfile");
 							openCaseProfile(caseId, "OVERVIEW");
 						},
-						() -> {
+						() ->
+						{
 							System.out.println("[Navigation] Rewired contact delete/list callback via SceneManager.openContactsListView");
 							openContactsListView();
 						});
@@ -453,7 +450,8 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			UserDetailService userDetailService = new UserDetailService(userDao, caseDao);
-			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId -> {
+			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
+			{
 				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
 				openCaseProfile(relatedCaseId, "OVERVIEW");
 			});
@@ -521,11 +519,13 @@ public final class SceneManager {
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
 			c.setOnOpenContact(this::openContactProfile);
-			c.setOnOpenCase(relatedCaseId -> {
+			c.setOnOpenCase(relatedCaseId ->
+			{
 				System.out.println("[Navigation] Rewired case related-case callback via SceneManager.openCaseProfile");
 				openCaseProfile(relatedCaseId, "OVERVIEW");
 			});
-			c.setOnSectionNavigation(selectedSectionKey -> {
+			c.setOnSectionNavigation(selectedSectionKey ->
+			{
 				if (selectedSectionKey == null) {
 					return;
 				}
