@@ -19,6 +19,7 @@ public record TaskDetailDto(
         LocalDateTime completedAt,
         Integer assignedUserId,
         String assignedUserDisplayName,
-        String assignedUserColor
+        String assignedUserColor,
+        String createdByDisplayName
 ) {
 }
