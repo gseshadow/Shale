@@ -50,6 +50,8 @@ public final class TaskDao {
     }
     public record TaskAssignedUserRow(int userId, String displayName, String color) {
     }
+    public record TaskAssignedTaskUserRow(long taskId, int userId, String displayName, String color) {
+    }
     public record TaskAssignableUserRow(int id, String displayName, String color) {
     }
 
@@ -568,7 +570,66 @@ public final class TaskDao {
         }
     }
 
-    public void addTaskAssignment(long taskId, int shaleClientId, int userId, int assignedByUserId) {
+    public List<TaskAssignedTaskUserRow> listAssignedUsersForTasks(List<Long> taskIds, int shaleClientId) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return List.of();
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        List<Long> validTaskIds = taskIds.stream().filter(id -> id != null && id > 0).distinct().toList();
+        if (validTaskIds.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(", ", java.util.Collections.nCopies(validTaskIds.size(), "?"));
+        String sql = """
+                SELECT
+                  ta.TaskId,
+                  u.Id AS UserId,
+                  LTRIM(RTRIM(
+                    COALESCE(u.name_first, '') +
+                    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(u.name_last, '')
+                  )) AS DisplayName,
+                  u.Color
+                FROM dbo.TaskAssignments ta
+                INNER JOIN dbo.Users u
+                  ON u.Id = ta.UserId
+                 AND u.ShaleClientId = ta.ShaleClientId
+                WHERE ta.ShaleClientId = ?
+                  AND ta.TaskId IN (%s)
+                ORDER BY
+                  ta.TaskId ASC,
+                  ta.IsPrimary DESC,
+                  u.name_first ASC,
+                  u.name_last ASC,
+                  u.Id ASC;
+                """.formatted(placeholders);
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            int i = 1;
+            ps.setInt(i++, shaleClientId);
+            for (Long taskId : validTaskIds) {
+                ps.setLong(i++, taskId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                List<TaskAssignedTaskUserRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(new TaskAssignedTaskUserRow(
+                            rs.getLong("TaskId"),
+                            rs.getInt("UserId"),
+                            rs.getString("DisplayName"),
+                            rs.getString("Color")));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to list assigned users for task collection", e);
+        }
+    }
+
+    public boolean addTaskAssignment(long taskId, int shaleClientId, int userId, int assignedByUserId) {
         if (taskId <= 0) {
             throw new IllegalArgumentException("taskId must be > 0");
         }
@@ -587,6 +648,7 @@ public final class TaskDao {
                   BEGIN TRAN;
 
                   DECLARE @now datetime2 = SYSDATETIME();
+                  DECLARE @inserted bit = 0;
 
                   IF NOT EXISTS (
                     SELECT 1
@@ -627,6 +689,7 @@ public final class TaskDao {
                       AssignedAt
                     )
                     VALUES (?, ?, ?, ?, 0, ?, @now);
+                    SET @inserted = 1;
 
                     UPDATE dbo.Tasks
                     SET UpdatedAt = @now
@@ -634,6 +697,7 @@ public final class TaskDao {
                       AND ShaleClientId = ?;
                   END
 
+                  SELECT @inserted AS Inserted;
                   COMMIT;
                 END TRY
                 BEGIN CATCH
@@ -659,7 +723,12 @@ public final class TaskDao {
             ps.setInt(i++, assignedByUserId);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
-            ps.executeUpdate();
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getBoolean("Inserted");
+                }
+                return false;
+            }
         } catch (SQLException e) {
             throw new RuntimeException(
                     "Failed to add assignment for taskId=" + taskId + " userId=" + userId + " shaleClientId=" + shaleClientId,

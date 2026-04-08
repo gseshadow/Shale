@@ -2,10 +2,12 @@ package com.shale.ui.component;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.function.Consumer;
 
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.component.factory.TaskCardFactory.AssignedUserModel;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 
@@ -116,25 +118,39 @@ public final class TaskCard extends VBox {
 		setOpacity(completed ? 0.78 : 1.0);
 	}
 
-	public void setAssignee(Integer userId, String displayName, String colorCss) {
-		String normalized = displayName == null ? "" : displayName.trim();
-		if (userId == null || userId <= 0 || normalized.isBlank()) {
+	public void setAssignees(List<AssignedUserModel> users) {
+		List<AssignedUserModel> safeUsers = users == null ? List.of() : users;
+		if (safeUsers.isEmpty()) {
 			assigneeHost.getChildren().clear();
 			teamSection.setManaged(false);
 			teamSection.setVisible(false);
 			return;
 		}
-
-		var assigneeCard = userCardFactory.create(
-				new UserCardModel(userId, normalized, colorCss, null),
-				UserCardFactory.Variant.MINI);
-		assigneeCard.setOnMouseClicked(e -> {
-			e.consume();
-			if (onOpenAssigneeUser != null) {
-				onOpenAssigneeUser.accept(userId);
+		VBox cards = new VBox(4);
+		int maxVisible = 3;
+		for (int i = 0; i < safeUsers.size() && i < maxVisible; i++) {
+			AssignedUserModel user = safeUsers.get(i);
+			if (user == null || user.userId() <= 0 || user.displayName() == null || user.displayName().isBlank()) {
+				continue;
 			}
-		});
-		assigneeHost.getChildren().setAll(assigneeCard);
+			var assigneeCard = userCardFactory.create(
+					new UserCardModel(user.userId(), user.displayName().trim(), user.colorCss(), null),
+					UserCardFactory.Variant.MINI);
+			int selectedUserId = user.userId();
+			assigneeCard.setOnMouseClicked(e -> {
+				e.consume();
+				if (onOpenAssigneeUser != null) {
+					onOpenAssigneeUser.accept(selectedUserId);
+				}
+			});
+			cards.getChildren().add(assigneeCard);
+		}
+		if (safeUsers.size() > maxVisible) {
+			Label moreLabel = new Label("+" + (safeUsers.size() - maxVisible) + " more");
+			moreLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.62);");
+			cards.getChildren().add(moreLabel);
+		}
+		assigneeHost.getChildren().setAll(cards);
 		teamSection.setManaged(true);
 		teamSection.setVisible(true);
 	}
@@ -271,7 +287,7 @@ public final class TaskCard extends VBox {
 				onOpen.accept(taskId);
 			}
 		});
-		setAssignee(null, null, null);
+		setAssignees(List.of());
 		setRelatedCase(null, null, null, null);
 	}
 

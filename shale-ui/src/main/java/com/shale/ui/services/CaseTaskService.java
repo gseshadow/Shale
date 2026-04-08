@@ -2,6 +2,7 @@ package com.shale.ui.services;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 
@@ -75,6 +76,11 @@ public final class CaseTaskService {
                 .map(row -> new AssignedTaskUserOption(row.userId(), row.displayName(), row.color()))
                 .toList();
     }
+    public List<TaskAssignedUsersByTask> loadAssignedUsersForTasks(List<Long> taskIds, int shaleClientId) {
+        return taskDao.listAssignedUsersForTasks(taskIds, shaleClientId).stream()
+                .map(row -> new TaskAssignedUsersByTask(row.taskId(), row.userId(), row.displayName(), row.color()))
+                .toList();
+    }
 
     public long createTask(CreateTaskRequest request) {
         Objects.requireNonNull(request, "request");
@@ -86,13 +92,19 @@ public final class CaseTaskService {
                 request.dueAt(),
                 request.priorityId(),
                 request.createdByUserId());
-        Integer assigneeUserId = request.assigneeUserId();
-        if (assigneeUserId != null && assigneeUserId > 0) {
-            taskDao.assignPrimaryUserToTask(
+        List<Integer> assignedUserIds = request.assignedUserIds() == null ? List.of() : request.assignedUserIds();
+        for (Integer assignedUserId : new LinkedHashSet<>(assignedUserIds)) {
+            if (assignedUserId == null || assignedUserId <= 0) {
+                continue;
+            }
+            boolean inserted = taskDao.addTaskAssignment(
                     taskId,
                     request.shaleClientId(),
-                    assigneeUserId,
+                    assignedUserId,
                     request.createdByUserId());
+            if (!inserted) {
+                continue;
+            }
             publishTaskAssignmentEvent(
                     taskId,
                     request.shaleClientId(),
@@ -100,7 +112,7 @@ public final class CaseTaskService {
                     request.title(),
                     request.caseId(),
                     null,
-                    assigneeUserId,
+                    assignedUserId,
                     null);
         }
         return taskId;
@@ -141,7 +153,20 @@ public final class CaseTaskService {
     }
 
     public void addTaskAssignment(long taskId, int shaleClientId, int userId, int assignedByUserId) {
-        taskDao.addTaskAssignment(taskId, shaleClientId, userId, assignedByUserId);
+        boolean inserted = taskDao.addTaskAssignment(taskId, shaleClientId, userId, assignedByUserId);
+        if (!inserted) {
+            return;
+        }
+        TaskDetailDto detail = taskDao.findTaskDetail(taskId, shaleClientId);
+        publishTaskAssignmentEvent(
+                taskId,
+                shaleClientId,
+                assignedByUserId,
+                detail == null ? null : detail.title(),
+                detail == null ? null : detail.caseId(),
+                detail == null ? null : detail.caseName(),
+                userId,
+                null);
     }
     public void removeTaskAssignment(long taskId, int shaleClientId, int userId) {
         taskDao.removeTaskAssignment(taskId, shaleClientId, userId);
@@ -233,7 +258,7 @@ public final class CaseTaskService {
             String description,
             java.time.LocalDateTime dueAt,
             Integer priorityId,
-            Integer assigneeUserId,
+            List<Integer> assignedUserIds,
             int createdByUserId) {
     }
 
@@ -244,6 +269,12 @@ public final class CaseTaskService {
     }
 
     public record AssignedTaskUserOption(
+            int userId,
+            String displayName,
+            String color) {
+    }
+    public record TaskAssignedUsersByTask(
+            long taskId,
             int userId,
             String displayName,
             String color) {

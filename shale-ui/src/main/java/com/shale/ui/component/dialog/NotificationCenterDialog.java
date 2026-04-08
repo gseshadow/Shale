@@ -8,6 +8,7 @@ import com.shale.ui.component.factory.TaskCardFactory;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -186,9 +187,7 @@ public final class NotificationCenterDialog {
 					null,
 					null,
 					null,
-					null,
-					null,
-					null);
+					List.of());
 			Region previewCard = taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
 			previewCard.getStyleClass().add("notification-task-preview");
 			previewCard.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> onTaskPreviewPressed(item, taskId, event));

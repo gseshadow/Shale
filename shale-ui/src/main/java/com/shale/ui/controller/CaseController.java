@@ -459,6 +459,7 @@ public class CaseController {
 	private List<CasePartyDto> caseParties = List.of();
 	private boolean partiesLoadedOnce = false;
 	private List<CaseTaskListItemDto> caseTasks = List.of();
+	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private Long editingCaseUpdateId;
 	private String editingCaseUpdateDraftText = "";
@@ -2037,16 +2038,32 @@ public class CaseController {
 						activeCaseId,
 						shaleClientId,
 						selectedCaseTaskSort());
+				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
+						.map(CaseTaskListItemDto::id)
+						.toList();
+				java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
+						.loadAssignedUsersForTasks(taskIds, shaleClientId)
+						.stream()
+						.collect(java.util.stream.Collectors.groupingBy(
+								CaseTaskService.TaskAssignedUsersByTask::taskId,
+								java.util.stream.Collectors.mapping(
+										row -> new TaskCardFactory.AssignedUserModel(
+												row.userId(),
+												row.displayName(),
+												row.color()),
+										java.util.stream.Collectors.toList())));
 				runOnFx(() -> {
 					if (caseId == null || caseId.longValue() != activeCaseId) {
 						return;
 					}
 					caseTasks = tasks == null ? List.of() : tasks;
+					caseTaskAssignedUsers = assignedByTask;
 					renderTasksSection();
 				});
 			} catch (Exception ex) {
 				runOnFx(() -> {
 					caseTasks = List.of();
+					caseTaskAssignedUsers = java.util.Map.of();
 					renderTasksSection();
 				});
 				System.err.println("Case tasks load failed for caseId=" + activeCaseId + ": " + ex.getMessage());
@@ -2095,9 +2112,7 @@ public class CaseController {
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
-					task.assignedUserId(),
-					task.assignedUserDisplayName(),
-					task.assignedUserColor());
+					caseTaskAssignedUsers.getOrDefault(task.id(), List.of()));
 			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT));
 		}
 
@@ -2161,7 +2176,7 @@ public class CaseController {
 				input.get().description(),
 				input.get().dueAt(),
 				input.get().priorityId(),
-				input.get().assigneeUserId(),
+				input.get().assignedUserIds(),
 				currentUserId);
 
 		new Thread(() -> {
