@@ -476,8 +476,6 @@ public final class TaskDao {
                  AND u.ShaleClientId = ta.ShaleClientId
                 WHERE ta.TaskId = ?
                   AND ta.ShaleClientId = ?
-                  AND ISNULL(ta.IsDeleted, 0) = 0
-                  AND ISNULL(u.IsDeleted, 0) = 0
                 ORDER BY
                   ta.IsPrimary DESC,
                   u.name_first ASC,
