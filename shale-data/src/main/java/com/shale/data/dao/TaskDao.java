@@ -52,8 +52,6 @@ public final class TaskDao {
     }
     public record TaskAssignableUserRow(int id, String displayName, String color) {
     }
-    public record TaskAssignableUserRow(int id, String displayName, String color) {
-    }
 
     private final DbSessionProvider db;
 
@@ -274,11 +272,6 @@ public final class TaskDao {
                     cu.CreatedAt DESC,
                     cu.Id DESC
                 ) caseAttorney
-                INNER JOIN dbo.TaskAssignments myAssignment
-                  ON myAssignment.TaskId = t.Id
-                 AND myAssignment.ShaleClientId = t.ShaleClientId
-                 AND myAssignment.IsPrimary = 1
-                 AND myAssignment.UserId = ?
                 OUTER APPLY (
                   SELECT TOP (1)
                     ta.UserId,
@@ -300,6 +293,13 @@ public final class TaskDao {
                     ta.UserId DESC
                 ) assignment
                 WHERE t.ShaleClientId = ?
+                  AND EXISTS (
+                    SELECT 1
+                    FROM dbo.TaskAssignments myAssignment
+                    WHERE myAssignment.TaskId = t.Id
+                      AND myAssignment.ShaleClientId = t.ShaleClientId
+                      AND myAssignment.UserId = ?
+                  )
                   AND ISNULL(t.IsDeleted, 0) = 0
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
@@ -313,8 +313,8 @@ public final class TaskDao {
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
-            ps.setInt(2, assignedUserId);
-            ps.setInt(3, shaleClientId);
+            ps.setInt(2, shaleClientId);
+            ps.setInt(3, assignedUserId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<CaseTaskListItemDto> out = new ArrayList<>();
                 while (rs.next()) {
