@@ -36,10 +36,21 @@ public final class SettingsController {
 	private Label notificationSettingsStatusLabel;
 
 	private NotificationPreferencesService notificationPreferencesService;
+	private boolean fxmlReady;
+
+	@FXML
+	private void initialize() {
+		fxmlReady = true;
+		if (notificationPreferencesService != null) {
+			loadFromPreferences();
+		}
+	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
-		loadFromPreferences();
+		if (fxmlReady) {
+			loadFromPreferences();
+		}
 	}
 
 	@FXML
