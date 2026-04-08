@@ -71,6 +71,7 @@ public final class NewClientDialog {
 			stage.close();
 		});
 		VBox root = new VBox(12, header, form, errorLabel, actions);
+		root.getStyleClass().add("secondary-window-shell");
 		root.setPadding(new Insets(12));
 		Scene scene = new Scene(root, 360, 170);
 		stage.setScene(scene);

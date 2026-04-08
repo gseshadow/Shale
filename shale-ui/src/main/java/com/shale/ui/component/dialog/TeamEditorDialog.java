@@ -296,6 +296,7 @@ public final class TeamEditorDialog {
 			stage.close();
 		});
 		VBox root = new VBox(12, header, lists, primaryRow, bottom);
+		root.getStyleClass().add("secondary-window-shell");
 		root.setPadding(new Insets(12));
 
 		Scene scene = new Scene(root, 780, 540);

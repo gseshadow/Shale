@@ -154,6 +154,7 @@ public final class ClientAssignmentDialog {
 			stage.close();
 		});
 		VBox root = new VBox(12, header, body, actions);
+		root.getStyleClass().add("secondary-window-shell");
 		root.setPadding(new Insets(14));
 		Scene scene = new Scene(root, 760, 420);
 		stage.setScene(scene);

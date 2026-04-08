@@ -253,12 +253,21 @@
     -fx-border-width: 1;
 }
 
+.secondary-window-shell {
+    -fx-background-color: rgba(243, 248, 253, 0.96);
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-border-color: rgba(13, 33, 64, 0.18);
+    -fx-border-width: 1;
+}
+
 .app-dialog-header {
     -fx-padding: 0 0 2 0;
 }
 
 .secondary-window-header {
-    -fx-background-color: #112542;
+    -fx-background-color: linear-gradient(to bottom, #4f7fbf, #3f6ea9);
+    -fx-background-radius: 16 16 0 0;
 }
 
 .secondary-window-title {

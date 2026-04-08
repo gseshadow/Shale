@@ -16,6 +16,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.input.MouseButton;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -71,7 +72,12 @@ public final class AppDialogs {
 
 	public static void applySecondaryWindowChrome(Stage stage) {
 		if (stage != null) {
-			stage.initStyle(StageStyle.UNDECORATED);
+			stage.initStyle(StageStyle.TRANSPARENT);
+			stage.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (newScene != null) {
+					newScene.setFill(Color.TRANSPARENT);
+				}
+			});
 		}
 	}
 

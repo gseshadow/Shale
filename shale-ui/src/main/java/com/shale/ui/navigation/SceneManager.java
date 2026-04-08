@@ -604,6 +604,7 @@ public final class SceneManager {
 			VBox dialogRoot = new VBox(
 					AppDialogs.createSecondaryWindowHeader(dialog, "New Organization", dialog::close),
 					root);
+			dialogRoot.getStyleClass().add("secondary-window-shell");
 			VBox.setVgrow(root, Priority.ALWAYS);
 
 			Scene dialogScene = new Scene(dialogRoot);
@@ -637,6 +638,7 @@ public final class SceneManager {
 			VBox dialogRoot = new VBox(
 					AppDialogs.createSecondaryWindowHeader(dialog, "New Intake", dialog::close),
 					root);
+			dialogRoot.getStyleClass().add("secondary-window-shell");
 			VBox.setVgrow(root, Priority.ALWAYS);
 
 			Scene dialogScene = new Scene(dialogRoot);
