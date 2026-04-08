@@ -53,22 +53,34 @@ public final class DurableNotificationService {
 		if (notifications == null || notifications.isEmpty()) {
 			return;
 		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return;
+		}
 		List<Long> durableIds = notifications.stream()
 				.map(AppNotification::getDurableNotificationId)
 				.filter(Objects::nonNull)
+				.distinct()
 				.toList();
-		notificationDao.markNotificationsRead(durableIds);
+		notificationDao.markNotificationsRead(shaleClientId, userId, durableIds);
 	}
 
 	public void dismiss(List<AppNotification> notifications) {
 		if (notifications == null || notifications.isEmpty()) {
 			return;
 		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return;
+		}
 		List<Long> durableIds = notifications.stream()
 				.map(AppNotification::getDurableNotificationId)
 				.filter(Objects::nonNull)
+				.distinct()
 				.toList();
-		notificationDao.markNotificationsDismissed(durableIds);
+		notificationDao.markNotificationsDismissed(shaleClientId, userId, durableIds);
 	}
 
 	private AppNotification toAppNotification(NotificationRow row) {

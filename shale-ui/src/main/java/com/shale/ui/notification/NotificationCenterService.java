@@ -173,7 +173,7 @@ public final class NotificationCenterService {
 	}
 
 	public void markAllRead() {
-		markMatchingReadInternal(item -> true);
+		markReadMatching(item -> true);
 	}
 
 	public void markRead(AppNotification notification) {
