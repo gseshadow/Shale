@@ -253,8 +253,34 @@
     -fx-border-width: 1;
 }
 
+.secondary-window-shell {
+    -fx-background-color: rgba(243, 248, 253, 0.96);
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-border-color: rgba(13, 33, 64, 0.18);
+    -fx-border-width: 1;
+}
+
 .app-dialog-header {
     -fx-padding: 0 0 2 0;
+}
+
+.secondary-window-header {
+    -fx-background-color: linear-gradient(to bottom, #4f7fbf, #3f6ea9);
+    -fx-background-radius: 16 16 0 0;
+}
+
+.secondary-window-title {
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+}
+
+.secondary-window-close {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
 }
 
 .app-dialog-title {

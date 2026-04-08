@@ -40,6 +40,8 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -590,6 +592,7 @@ public final class SceneManager {
 			Parent root = loader.load();
 
 			Stage dialog = new Stage();
+			AppDialogs.applySecondaryWindowChrome(dialog);
 			dialog.initOwner(stage);
 			dialog.initModality(Modality.WINDOW_MODAL);
 			dialog.setTitle("New Organization");
@@ -598,7 +601,13 @@ public final class SceneManager {
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
 			controller.init(appState, organizationDao, dialog, onOrganizationCreated);
 
-			Scene dialogScene = new Scene(root);
+			VBox dialogRoot = new VBox(
+					AppDialogs.createSecondaryWindowHeader(dialog, "New Organization", dialog::close),
+					root);
+			dialogRoot.getStyleClass().add("secondary-window-shell");
+			VBox.setVgrow(root, Priority.ALWAYS);
+
+			Scene dialogScene = new Scene(dialogRoot);
 			dialogScene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			dialog.setScene(dialogScene);
@@ -617,6 +626,7 @@ public final class SceneManager {
 			Parent root = loader.load();
 
 			Stage dialog = new Stage();
+			AppDialogs.applySecondaryWindowChrome(dialog);
 			dialog.initOwner(stage);
 			dialog.initModality(Modality.WINDOW_MODAL);
 			dialog.setTitle("New Intake");
@@ -625,7 +635,13 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			controller.init(appState, caseDao, dialog, onCaseCreated);
 
-			Scene dialogScene = new Scene(root);
+			VBox dialogRoot = new VBox(
+					AppDialogs.createSecondaryWindowHeader(dialog, "New Intake", dialog::close),
+					root);
+			dialogRoot.getStyleClass().add("secondary-window-shell");
+			VBox.setVgrow(root, Priority.ALWAYS);
+
+			Scene dialogScene = new Scene(dialogRoot);
 			dialogScene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			dialog.setScene(dialogScene);

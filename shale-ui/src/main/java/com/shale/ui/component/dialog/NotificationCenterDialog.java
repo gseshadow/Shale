@@ -77,7 +77,8 @@ public final class NotificationCenterDialog {
 		HBox actions = new HBox(10, markAllReadButton, spacer, closeButton);
 
 		VBox.setVgrow(listView, Priority.ALWAYS);
-		root.getChildren().addAll(heading, subtitle, listView, actions);
+		HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, "Notifications", stage::close);
+		root.getChildren().addAll(windowHeader, heading, subtitle, listView, actions);
 
 		Scene scene = new Scene(root);
 		scene.getStylesheets().add(Objects.requireNonNull(
