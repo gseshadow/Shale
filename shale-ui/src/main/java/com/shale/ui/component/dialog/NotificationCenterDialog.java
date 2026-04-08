@@ -239,7 +239,6 @@ public final class NotificationCenterDialog {
 		private Button createDismissButton(AppNotification item) {
 			Button button = new Button("Dismiss");
 			button.getStyleClass().add("notification-row-dismiss");
-			button.addEventFilter(MouseEvent.MOUSE_PRESSED, MouseEvent::consume);
 			if (item == null || item.getDurableNotificationId() == null) {
 				button.setText("Dismiss (session)");
 				button.setTooltip(new Tooltip("This notification will be hidden for the current session only."));
@@ -247,7 +246,13 @@ public final class NotificationCenterDialog {
 			button.setOnAction(event -> {
 				event.consume();
 				if (item != null) {
-					notificationService.dismiss(item);
+					try {
+						notificationService.dismiss(item);
+					} catch (RuntimeException ex) {
+						System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
+						ex.printStackTrace(System.err);
+						throw ex;
+					}
 				}
 			});
 			return button;
