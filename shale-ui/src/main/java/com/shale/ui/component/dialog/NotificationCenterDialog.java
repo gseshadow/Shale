@@ -38,7 +38,11 @@ public final class NotificationCenterDialog {
 	private NotificationCenterDialog() {
 	}
 
-	public static void show(Window owner, NotificationCenterService notificationService, Consumer<Long> onOpenTask) {
+	public static void show(
+			Window owner,
+			NotificationCenterService notificationService,
+			Consumer<Long> onOpenTask,
+			Consumer<AppNotification> onActivateNotification) {
 		Objects.requireNonNull(notificationService, "notificationService");
 
 		Stage stage = AppDialogs.createModalStage(owner, "Notifications");
@@ -59,7 +63,7 @@ public final class NotificationCenterDialog {
 		ListView<AppNotification> listView = new ListView<>();
 		listView.setItems(notificationService.getNotificationsNewestFirst());
 		listView.getStyleClass().add("notification-list");
-		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask));
+		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification));
 		notificationService.unreadCountProperty().addListener((obs, oldValue, newValue) -> listView.refresh());
 
 		Button markAllReadButton = new Button("Mark all read");
@@ -92,10 +96,14 @@ public final class NotificationCenterDialog {
 		private final NotificationCenterService notificationService;
 		private final Consumer<Long> onOpenTask;
 		private final TaskCardFactory taskCardFactory;
+		private final Consumer<AppNotification> onActivateNotification;
 		private final ChangeListener<Boolean> unreadListener = (obs, oldValue, newValue) -> updateUnreadStyle();
 		private AppNotification observedItem;
 
-		private NotificationCell(NotificationCenterService notificationService, Consumer<Long> onOpenTask) {
+		private NotificationCell(
+				NotificationCenterService notificationService,
+				Consumer<Long> onOpenTask,
+				Consumer<AppNotification> onActivateNotification) {
 			this.notificationService = notificationService;
 			this.onOpenTask = onOpenTask;
 			this.taskCardFactory = new TaskCardFactory(
@@ -103,6 +111,7 @@ public final class NotificationCenterDialog {
 					ignored -> {},
 					ignored -> {},
 					ignored -> {});
+			this.onActivateNotification = onActivateNotification;
 			setOnMouseClicked(event -> {
 				if (isFromInteractiveChild(event)) {
 					return;
@@ -110,6 +119,9 @@ public final class NotificationCenterDialog {
 				AppNotification selected = getItem();
 				if (selected != null) {
 					notificationService.markRead(selected);
+					if (this.onActivateNotification != null) {
+						this.onActivateNotification.accept(selected);
+					}
 				}
 			});
 		}
