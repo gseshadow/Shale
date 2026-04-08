@@ -42,6 +42,8 @@ public final class ContactPickerDialog<T> {
 		this.allItems = FXCollections.observableArrayList(items);
 		this.labelFn = labelFn;
 
+		AppDialogs.applySecondaryWindowChrome(stage);
+
 		if (owner != null) {
 			stage.initOwner(owner);
 		}
@@ -123,7 +125,11 @@ public final class ContactPickerDialog<T> {
 		actions.getStyleClass().add("app-dialog-actions");
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 
-		VBox root = new VBox(16, header, searchField, listView, actions);
+		HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, title, () -> {
+			selected = null;
+			stage.close();
+		});
+		VBox root = new VBox(16, windowHeader, header, searchField, listView, actions);
 		root.getStyleClass().add("app-dialog-root");
 		VBox.setVgrow(listView, Priority.ALWAYS);
 

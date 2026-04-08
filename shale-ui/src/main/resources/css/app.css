@@ -257,6 +257,23 @@
     -fx-padding: 0 0 2 0;
 }
 
+.secondary-window-header {
+    -fx-background-color: #112542;
+}
+
+.secondary-window-title {
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+}
+
+.secondary-window-close {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+}
+
 .app-dialog-title {
     -fx-font-size: 18px;
     -fx-font-weight: 800;

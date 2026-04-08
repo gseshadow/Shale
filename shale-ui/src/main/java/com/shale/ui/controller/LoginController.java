@@ -6,6 +6,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 
 import com.shale.core.platform.AppPaths;
+import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.AppVersionProvider;
 import com.shale.ui.services.UiAuthService;
@@ -196,6 +197,7 @@ public final class LoginController {
 		ButtonType skip = new ButtonType("Skip this time", ButtonBar.ButtonData.CANCEL_CLOSE);
 
 		Alert alert = new Alert(Alert.AlertType.INFORMATION);
+		AppDialogs.applySecondaryWindowChrome(alert);
 		alert.setTitle("Update Available");
 		alert.setHeaderText("A newer version of Shale is available.");
 		alert.setContentText("Would you like to update now?");
@@ -214,6 +216,7 @@ public final class LoginController {
 		ButtonType exit = new ButtonType("Exit application", ButtonBar.ButtonData.CANCEL_CLOSE);
 
 		Alert alert = new Alert(Alert.AlertType.WARNING);
+		AppDialogs.applySecondaryWindowChrome(alert);
 		alert.setTitle("Update Required");
 		alert.setHeaderText("You must update Shale before continuing.");
 		alert.setContentText("An update is required to continue into the app.");
@@ -229,6 +232,7 @@ public final class LoginController {
 
 	private void startUpdateAndBlock() {
 		Alert progress = new Alert(Alert.AlertType.INFORMATION);
+		AppDialogs.applySecondaryWindowChrome(progress);
 		progress.setTitle("Update Started");
 		progress.setHeaderText("Updating…");
 
@@ -264,6 +268,7 @@ public final class LoginController {
 		} catch (RuntimeException ex) {
 			progress.close();
 			Alert error = new Alert(Alert.AlertType.ERROR);
+			AppDialogs.applySecondaryWindowChrome(error);
 			error.setTitle("Update Failed");
 			error.setHeaderText("Unable to launch updater.");
 			error.setContentText(ex.getMessage());
