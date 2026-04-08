@@ -226,11 +226,13 @@ public final class SceneManager {
 	}
 
 	public void goBack() {
-		navigationManager.popBackDestination().ifPresentOrElse(route -> {
+		navigationManager.popBackDestination().ifPresentOrElse(route ->
+		{
 			System.out.println("[Navigation] Back destination -> " + route);
 			showRouteInternal(route);
 			notifyBackAvailabilityChanged();
-		}, () -> {
+		}, () ->
+		{
 			System.out.println("[Navigation] Back ignored; stack is empty.");
 			notifyBackAvailabilityChanged();
 		});
@@ -330,11 +332,13 @@ public final class SceneManager {
 			case CONTACT_PROFILE -> {
 				Parent contactRoot = createContactView(
 						route.entityId(),
-						caseId -> {
+						caseId ->
+						{
 							System.out.println("[Navigation] Rewired contact->case callback via SceneManager.openCaseProfile");
 							openCaseProfile(caseId, "OVERVIEW");
 						},
-						() -> {
+						() ->
+						{
 							System.out.println("[Navigation] Rewired contact delete/list callback via SceneManager.openContactsListView");
 							openContactsListView();
 						});
@@ -444,7 +448,8 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			UserDetailService userDetailService = new UserDetailService(userDao, caseDao);
-			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId -> {
+			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
+			{
 				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
 				openCaseProfile(relatedCaseId, "OVERVIEW");
 			});
@@ -512,11 +517,13 @@ public final class SceneManager {
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
 			c.setOnOpenContact(this::openContactProfile);
-			c.setOnOpenCase(relatedCaseId -> {
+			c.setOnOpenCase(relatedCaseId ->
+			{
 				System.out.println("[Navigation] Rewired case related-case callback via SceneManager.openCaseProfile");
 				openCaseProfile(relatedCaseId, "OVERVIEW");
 			});
-			c.setOnSectionNavigation(selectedSectionKey -> {
+			c.setOnSectionNavigation(selectedSectionKey ->
+			{
 				if (selectedSectionKey == null) {
 					return;
 				}
