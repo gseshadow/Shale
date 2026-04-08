@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Dialog;
@@ -14,6 +15,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.input.MouseButton;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -77,6 +79,55 @@ public final class AppDialogs {
 		if (dialog != null) {
 			dialog.initStyle(StageStyle.UNDECORATED);
 		}
+	}
+
+	public static HBox createSecondaryWindowHeader(Stage stage, String title, Runnable onClose) {
+		Objects.requireNonNull(stage, "stage");
+		Label titleLabel = new Label(isBlank(title) ? "" : title);
+		titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: 700;");
+
+		Button closeButton = new Button("✕");
+		closeButton.setFocusTraversable(false);
+		closeButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 12px; -fx-cursor: hand;");
+		closeButton.setOnAction(event -> {
+			if (onClose != null) {
+				onClose.run();
+			} else {
+				stage.close();
+			}
+		});
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+
+		HBox header = new HBox(10, titleLabel, spacer, closeButton);
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.setPadding(new Insets(8, 10, 8, 12));
+		header.setStyle("-fx-background-color: #112542;");
+
+		installDragToMove(stage, header);
+		return header;
+	}
+
+	public static void installDragToMove(Stage stage, Node dragHandle) {
+		if (stage == null || dragHandle == null) {
+			return;
+		}
+		final double[] dragOffset = new double[2];
+		dragHandle.setOnMousePressed(event -> {
+			if (event.getButton() != MouseButton.PRIMARY) {
+				return;
+			}
+			dragOffset[0] = event.getScreenX() - stage.getX();
+			dragOffset[1] = event.getScreenY() - stage.getY();
+		});
+		dragHandle.setOnMouseDragged(event -> {
+			if (!event.isPrimaryButtonDown()) {
+				return;
+			}
+			stage.setX(event.getScreenX() - dragOffset[0]);
+			stage.setY(event.getScreenY() - dragOffset[1]);
+		});
 	}
 
 	private static void showMessage(
