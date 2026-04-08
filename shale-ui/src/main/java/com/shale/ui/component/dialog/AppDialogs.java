@@ -105,13 +105,17 @@ public final class AppDialogs {
 			pane.getStylesheets().add(appCss);
 		}
 		Node header = createSecondaryDialogHeader(dialog, title);
-		pane.setHeader(null);
-		pane.setGraphic(header);
+		pane.setHeader(header);
+		pane.setGraphic(null);
 		pane.sceneProperty().addListener((obs, oldScene, newScene) -> {
 			if (newScene != null) {
 				newScene.setFill(Color.TRANSPARENT);
 			}
 		});
+		Scene scene = pane.getScene();
+		if (scene != null) {
+			scene.setFill(Color.TRANSPARENT);
+		}
 	}
 
 	public static HBox createSecondaryWindowHeader(Stage stage, String title, Runnable onClose) {
@@ -136,6 +140,7 @@ public final class AppDialogs {
 		HBox header = new HBox(10, titleLabel, spacer, closeButton);
 		header.getStyleClass().add("secondary-window-header");
 		header.setAlignment(Pos.CENTER_LEFT);
+		header.setMaxWidth(Double.MAX_VALUE);
 		header.setPadding(new Insets(8, 10, 8, 12));
 
 		installDragToMove(stage, header);

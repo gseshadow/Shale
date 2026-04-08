@@ -262,6 +262,15 @@
     -fx-border-width: 1;
 }
 
+.secondary-window-shell > .header-panel {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.secondary-window-shell > .content {
+    -fx-background-color: transparent;
+}
+
 .app-dialog-header {
     -fx-padding: 0 0 2 0;
 }
