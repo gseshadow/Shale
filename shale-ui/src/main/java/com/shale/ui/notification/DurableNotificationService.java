@@ -104,7 +104,7 @@ public final class DurableNotificationService {
 				row.eventKey(),
 				row.entityType(),
 				row.entityId(),
-				null);
+				row.entityTitle());
 	}
 
 	private boolean isEnabled(NotificationCategory category, String actionType) {
