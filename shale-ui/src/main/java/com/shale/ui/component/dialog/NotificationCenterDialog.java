@@ -19,6 +19,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -94,15 +95,7 @@ public final class NotificationCenterDialog {
 			this.notificationService = notificationService;
 			this.onOpenTask = onOpenTask;
 			this.taskCardFactory = new TaskCardFactory(
-					taskId -> {
-						AppNotification selected = getItem();
-						if (selected != null) {
-							notificationService.markRead(selected);
-						}
-						if (this.onOpenTask != null) {
-							this.onOpenTask.accept(taskId);
-						}
-					},
+					ignored -> {},
 					ignored -> {},
 					ignored -> {},
 					ignored -> {});
@@ -192,7 +185,20 @@ public final class NotificationCenterDialog {
 					null,
 					null,
 					null);
-			return taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
+			Region previewCard = taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
+			previewCard.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> onTaskPreviewPressed(item, taskId, event));
+			previewCard.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
+			return previewCard;
+		}
+
+		private void onTaskPreviewPressed(AppNotification item, Long taskId, MouseEvent event) {
+			event.consume();
+			if (item != null) {
+				notificationService.markRead(item);
+			}
+			if (onOpenTask != null && taskId != null && taskId > 0) {
+				onOpenTask.accept(taskId);
+			}
 		}
 
 		private static Long resolveTaskId(AppNotification item) {
