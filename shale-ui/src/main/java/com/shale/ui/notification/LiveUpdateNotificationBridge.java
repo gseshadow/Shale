@@ -84,8 +84,13 @@ public final class LiveUpdateNotificationBridge {
 		String message = taskNotificationMessage(event);
 		Integer durableIdInt = intValue(event.patch().get("durableNotificationId"));
 		Long durableNotificationId = durableIdInt == null ? null : Long.valueOf(durableIdInt.longValue());
+		Long entityId = longValue(event.patch().get("taskId"));
+		if (entityId == null || entityId <= 0) {
+			entityId = event.entityId() > 0 ? event.entityId() : null;
+		}
 		Object eventKeyValue = event.patch().get("eventKey");
 		String eventKey = eventKeyValue == null ? null : String.valueOf(eventKeyValue);
+		String taskTitle = stringValue(event.patch().get("title"));
 		notificationCenterService.pushNotification(new AppNotification(
 				event.eventId() == null || event.eventId().isBlank()
 						? "task-" + event.entityId() + "-" + createdAt.toEpochMilli()
@@ -99,7 +104,10 @@ public final class LiveUpdateNotificationBridge {
 					true,
 					NotificationTargetScope.USER_SCOPED,
 					durableNotificationId,
-					eventKey));
+					eventKey,
+					"Task",
+					entityId,
+					taskTitle));
 	}
 
 	private boolean isTaskEventForCurrentUser(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -177,6 +185,28 @@ public final class LiveUpdateNotificationBridge {
 			}
 		}
 		return null;
+	}
+
+	private static Long longValue(Object value) {
+		if (value instanceof Number number) {
+			return number.longValue();
+		}
+		if (value instanceof String text) {
+			try {
+				return Long.parseLong(text.trim());
+			} catch (NumberFormatException ignored) {
+				return null;
+			}
+		}
+		return null;
+	}
+
+	private static String stringValue(Object value) {
+		if (value == null) {
+			return null;
+		}
+		String text = String.valueOf(value).trim();
+		return text.isBlank() ? null : text;
 	}
 
 	private static Instant parseTimestamp(String raw) {

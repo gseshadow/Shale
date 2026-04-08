@@ -52,6 +52,7 @@ public final class SystemUpdateNotificationProducer {
 		lastMandatory = result.mandatory();
 
 		boolean mandatory = result.mandatory();
+		boolean showAsBanner = notificationPreferencesService.isEnabled(NotificationPreferenceKey.APP_UPDATES_BANNER);
 		notificationCenterService.pushNotification(new AppNotification(
 				"update-available-" + (mandatory ? "mandatory" : "optional"),
 				NotificationCategory.APP_UPDATE,
@@ -62,7 +63,7 @@ public final class SystemUpdateNotificationProducer {
 						: "A newer version of Shale is available.",
 				Instant.now(clock),
 				true,
-				true,
+				showAsBanner,
 				NotificationTargetScope.SESSION_SYSTEM));
 	}
 
@@ -74,6 +75,7 @@ public final class SystemUpdateNotificationProducer {
 			return;
 		}
 		restartRequiredNotified = true;
+		boolean showAsBanner = notificationPreferencesService.isEnabled(NotificationPreferenceKey.APP_UPDATES_BANNER);
 		notificationCenterService.pushNotification(new AppNotification(
 				"update-restart-required",
 				NotificationCategory.APP_UPDATE,
@@ -82,7 +84,7 @@ public final class SystemUpdateNotificationProducer {
 				"An update handoff started. Restart Shale after install completes.",
 				Instant.now(clock),
 				true,
-				true,
+				showAsBanner,
 				NotificationTargetScope.SESSION_SYSTEM));
 	}
 }

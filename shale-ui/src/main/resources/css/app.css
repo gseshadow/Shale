@@ -411,6 +411,11 @@
     -fx-font-size: 11px;
 }
 
+.notification-row-dismiss {
+    -fx-font-size: 11px;
+    -fx-padding: 2 8 2 8;
+}
+
 .notification-row-title {
     -fx-text-fill: #102442;
     -fx-font-weight: 800;
