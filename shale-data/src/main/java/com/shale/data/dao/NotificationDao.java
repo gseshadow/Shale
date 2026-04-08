@@ -145,6 +145,33 @@ public final class NotificationDao {
 		}
 	}
 
+	public void markNotificationDismissed(long notificationId) {
+		if (notificationId <= 0) {
+			return;
+		}
+		markNotificationsDismissed(List.of(notificationId));
+	}
+
+	public void markNotificationsDismissed(List<Long> notificationIds) {
+		if (notificationIds == null || notificationIds.isEmpty()) {
+			return;
+		}
+		String sql = "UPDATE dbo.Notifications SET IsDismissed = 1, DismissedAt = SYSUTCDATETIME() WHERE Id = ? AND ISNULL(IsDismissed,0)=0";
+		try (Connection con = db.requireConnection();
+		     PreparedStatement ps = con.prepareStatement(sql)) {
+			for (Long id : notificationIds) {
+				if (id == null || id <= 0) {
+					continue;
+				}
+				ps.setLong(1, id);
+				ps.addBatch();
+			}
+			ps.executeBatch();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to mark notifications dismissed", e);
+		}
+	}
+
 	private static Instant toInstant(Timestamp timestamp) {
 		return timestamp == null ? Instant.now() : timestamp.toInstant();
 	}

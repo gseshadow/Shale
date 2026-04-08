@@ -60,6 +60,17 @@ public final class DurableNotificationService {
 		notificationDao.markNotificationsRead(durableIds);
 	}
 
+	public void dismiss(List<AppNotification> notifications) {
+		if (notifications == null || notifications.isEmpty()) {
+			return;
+		}
+		List<Long> durableIds = notifications.stream()
+				.map(AppNotification::getDurableNotificationId)
+				.filter(Objects::nonNull)
+				.toList();
+		notificationDao.markNotificationsDismissed(durableIds);
+	}
+
 	private AppNotification toAppNotification(NotificationRow row) {
 		NotificationCategory category = parseCategory(row.category());
 		NotificationSeverity severity = parseSeverity(row.severity());

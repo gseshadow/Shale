@@ -128,9 +128,10 @@ public final class NotificationCenterDialog {
 			Label timestamp = new Label(TIME_FORMATTER.format(item.getCreatedAt()));
 			timestamp.getStyleClass().add("notification-row-time");
 
+			Button dismissButton = createDismissButton(item);
 			Region spacer = new Region();
 			HBox.setHgrow(spacer, Priority.ALWAYS);
-			HBox topRow = new HBox(8, category, spacer, timestamp);
+			HBox topRow = new HBox(8, category, spacer, timestamp, dismissButton);
 
 			Label title = new Label(item.getTitle());
 			title.getStyleClass().add("notification-row-title");
@@ -199,6 +200,19 @@ public final class NotificationCenterDialog {
 			if (onOpenTask != null && taskId != null && taskId > 0) {
 				onOpenTask.accept(taskId);
 			}
+		}
+
+		private Button createDismissButton(AppNotification item) {
+			Button button = new Button("Dismiss");
+			button.getStyleClass().add("notification-row-dismiss");
+			button.addEventFilter(MouseEvent.MOUSE_PRESSED, MouseEvent::consume);
+			button.setOnAction(event -> {
+				event.consume();
+				if (item != null) {
+					notificationService.dismiss(item);
+				}
+			});
+			return button;
 		}
 
 		private static Long resolveTaskId(AppNotification item) {

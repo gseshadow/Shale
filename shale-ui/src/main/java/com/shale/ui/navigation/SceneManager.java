@@ -115,6 +115,7 @@ public final class SceneManager {
 			return t;
 		});
 		this.notificationCenterService.setReadListener(durableNotificationService::markRead);
+		this.notificationCenterService.setDismissListener(durableNotificationService::dismiss);
 		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
