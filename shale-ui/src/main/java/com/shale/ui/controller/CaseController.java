@@ -4202,13 +4202,13 @@ public class CaseController {
 		void applyOverviewEditSafe(CaseOverviewDto dto) {
 			if (dto == null)
 				return;
-			currentOverview = dto;
-			renderOverviewCards(dto);
-			renderHeaderTitleFromOverview(dto);
 			if (!editMode) {
 				applyOverview(dto);
 				return;
 			}
+			currentOverview = dto;
+			renderOverviewCards(dto);
+			renderHeaderTitleFromOverview(dto);
 			if (ovCaseNumberValue != null)
 				ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
 			loadTeamSectionAsync();
