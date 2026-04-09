@@ -145,6 +145,8 @@ public class CaseController {
 	@FXML
 	private VBox overviewPane;
 	@FXML
+	private VBox detailsSectionPane;
+	@FXML
 	private ScrollPane detailsScrollPane;
 	@FXML
 	private VBox detailsPane;
@@ -918,7 +920,7 @@ public class CaseController {
 	private void showOverview() {
 		setUpdatesPaneVisible(true);
 		setPaneVisible(overviewPane, true);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, true);
@@ -930,7 +932,7 @@ public class CaseController {
 	private void showTasksTab() {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -941,7 +943,7 @@ public class CaseController {
 	private void showDetails() {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, true);
+		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -953,7 +955,7 @@ public class CaseController {
 	private void showGeneric(String sectionName) {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -978,7 +980,7 @@ public class CaseController {
 	private void showTimeline() {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -1000,7 +1002,7 @@ public class CaseController {
 	private void showParties() {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -3855,7 +3857,7 @@ public class CaseController {
 	}
 
 	private void showError(String message) {
-		boolean detailsVisible = detailsScrollPane != null && detailsScrollPane.isVisible();
+		boolean detailsVisible = detailsSectionPane != null && detailsSectionPane.isVisible();
 		if (detailsVisible) {
 			setErrorLabel(detailsErrorLabel, message);
 			setErrorLabel(errorLabel, "");

@@ -229,29 +229,31 @@
 			</ScrollPane>
 
 			<!-- DETAILS PANE -->
-			<ScrollPane fx:id="detailsScrollPane" fitToWidth="true"
-				hbarPolicy="NEVER" visible="false" managed="false"
-				styleClass="surface-scroll">
-				<VBox fx:id="detailsPane" spacing="10" maxWidth="980"
-					styleClass="case-main-surface">
-					<padding>
-						<Insets top="12" right="12" bottom="12" left="12" />
-					</padding>
-					<HBox alignment="CENTER_LEFT" spacing="8">
-						<Label text="Details"
-							style="-fx-font-size: 16px; -fx-font-weight: bold;" />
-						<Region HBox.hgrow="ALWAYS" />
-						<Button fx:id="detailsEditButton" text="Edit" />
-						<Button fx:id="detailsSaveButton" text="Save"
-							visible="false" managed="false" />
-						<Button fx:id="detailsCancelButton" text="Cancel"
-							visible="false" managed="false" />
-					</HBox>
+			<VBox fx:id="detailsSectionPane" spacing="8" visible="false"
+				managed="false">
+				<HBox alignment="CENTER_LEFT" spacing="8">
+					<Label text="Details"
+						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+					<Region HBox.hgrow="ALWAYS" />
+					<Button fx:id="detailsEditButton" text="Edit" />
+					<Button fx:id="detailsSaveButton" text="Save"
+						visible="false" managed="false" />
+					<Button fx:id="detailsCancelButton" text="Cancel"
+						visible="false" managed="false" />
+				</HBox>
+				<ScrollPane fx:id="detailsScrollPane" fitToWidth="true"
+					hbarPolicy="NEVER" styleClass="surface-scroll"
+					VBox.vgrow="ALWAYS">
+					<VBox fx:id="detailsPane" spacing="10" maxWidth="980"
+						styleClass="case-main-surface">
+						<padding>
+							<Insets top="12" right="12" bottom="12" left="12" />
+						</padding>
 
-					<HBox spacing="8" alignment="CENTER_LEFT">
-						<Label fx:id="detailsErrorLabel" textFill="#b42318"
-							wrapText="true" visible="false" managed="false" />
-					</HBox>
+						<HBox spacing="8" alignment="CENTER_LEFT">
+							<Label fx:id="detailsErrorLabel" textFill="#b42318"
+								wrapText="true" visible="false" managed="false" />
+						</HBox>
 
 					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Core"
@@ -581,8 +583,9 @@
 						</GridPane>
 					</VBox>
 
-				</VBox>
-			</ScrollPane>
+					</VBox>
+				</ScrollPane>
+			</VBox>
 			<!-- TASKS TAB PANE (center) -->
 			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980"
 				styleClass="case-main-surface" visible="false" managed="false">
