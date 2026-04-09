@@ -497,7 +497,7 @@ public final class SceneManager {
 			{
 				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
 				openCaseProfile(relatedCaseId, "OVERVIEW");
-			}, caseTaskService);
+			}, this::openUserProfile, caseTaskService);
 			return c;
 		});
 	}

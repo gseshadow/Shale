@@ -101,6 +101,7 @@ public final class UserController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private Consumer<Integer> onOpenCase;
+	private Consumer<Integer> onOpenUser;
 	private CaseTaskService caseTaskService;
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
@@ -129,12 +130,15 @@ public final class UserController {
 			AppState appState,
 			UiRuntimeBridge runtimeBridge,
 			Consumer<Integer> onOpenCase,
+			Consumer<Integer> onOpenUser,
 			CaseTaskService caseTaskService) {
 		this.userId = userId;
 		this.userDetailService = userDetailService;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.onOpenCase = onOpenCase;
+		this.onOpenUser = onOpenUser == null ? id -> {
+		} : onOpenUser;
 		this.caseTaskService = caseTaskService;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 		this.taskCardFactory = new TaskCardFactory(
@@ -948,7 +952,7 @@ public final class UserController {
 		if (currentUser != null && currentUser.id() == selectedUserId.intValue()) {
 			return;
 		}
-		System.out.println("[Navigation] Task assignee click from User view is currently informational only. userId=" + selectedUserId);
+		onOpenUser.accept(selectedUserId);
 	}
 
 	private void openTask(Long taskId) {
