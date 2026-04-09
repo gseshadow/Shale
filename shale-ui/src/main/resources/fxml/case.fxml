@@ -487,20 +487,6 @@
 							<CheckBox fx:id="detMedicalRecordsReceivedEditor"
 								visible="false" managed="false" GridPane.rowIndex="2"
 								GridPane.columnIndex="1" />
-							<Label text="Fee Agreement Signed:"
-								style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
-							<Label fx:id="detFeeAgreementSignedValue" text="—"
-								GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<CheckBox fx:id="detFeeAgreementSignedEditor"
-								visible="false" managed="false" GridPane.rowIndex="3"
-								GridPane.columnIndex="1" />
-							<Label text="Fee Agreement Date:" style="-fx-opacity: 0.8;"
-								GridPane.rowIndex="4" />
-							<Label fx:id="detDateFeeAgreementSignedValue" text="—"
-								GridPane.rowIndex="4" GridPane.columnIndex="1" />
-							<DatePicker fx:id="detDateFeeAgreementSignedEditor"
-								maxWidth="1.7976931348623157E308" visible="false"
-								managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
@@ -515,42 +501,56 @@
 								<ColumnConstraints hgrow="ALWAYS"
 									fillWidth="true" />
 							</columnConstraints>
-							<Label text="Chronology:" style="-fx-opacity: 0.8;"
-								GridPane.rowIndex="0" />
-							<Label fx:id="detAcceptedChronologyValue" text="—"
+							<Label text="Fee Agreement Signed:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
+							<Label fx:id="detFeeAgreementSignedValue" text="—"
 								GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<CheckBox fx:id="detAcceptedChronologyEditor"
+							<CheckBox fx:id="detFeeAgreementSignedEditor"
 								visible="false" managed="false" GridPane.rowIndex="0"
 								GridPane.columnIndex="1" />
+							<Label text="Fee Agreement Date:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="1" />
+							<Label fx:id="detDateFeeAgreementSignedValue" text="—"
+								GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDateFeeAgreementSignedEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Chronology:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="2" />
+							<Label fx:id="detAcceptedChronologyValue" text="—"
+								GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<CheckBox fx:id="detAcceptedChronologyEditor"
+								visible="false" managed="false" GridPane.rowIndex="2"
+								GridPane.columnIndex="1" />
 							<Label text="Consultant Expert Search:"
-								style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
 							<Label fx:id="detAcceptedConsultantExpertSearchValue"
-								text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+								text="—" GridPane.rowIndex="3" GridPane.columnIndex="1" />
 							<CheckBox
 								fx:id="detAcceptedConsultantExpertSearchEditor" visible="false"
-								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+								managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
 							<Label text="Testifying Expert Search:"
-								style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
 							<Label fx:id="detAcceptedTestifyingExpertSearchValue"
-								text="—" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+								text="—" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 							<CheckBox
 								fx:id="detAcceptedTestifyingExpertSearchEditor" visible="false"
-								managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+								managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 							<Label text="Medical Literature:" style="-fx-opacity: 0.8;"
-								GridPane.rowIndex="3" />
+								GridPane.rowIndex="5" />
 							<Label fx:id="detAcceptedMedicalLiteratureValue" text="—"
-								GridPane.rowIndex="3" GridPane.columnIndex="1" />
+								GridPane.rowIndex="5" GridPane.columnIndex="1" />
 							<CheckBox fx:id="detAcceptedMedicalLiteratureEditor"
-								visible="false" managed="false" GridPane.rowIndex="3"
+								visible="false" managed="false" GridPane.rowIndex="5"
 								GridPane.columnIndex="1" />
 							<Label text="Detail:" style="-fx-opacity: 0.8;"
-								GridPane.rowIndex="4" />
+								GridPane.rowIndex="6" />
 							<Label fx:id="detAcceptedDetailValue" text="—"
-								wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+								wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1" />
 							<TextArea fx:id="detAcceptedDetailEditor"
 								maxWidth="1.7976931348623157E308" prefRowCount="3"
 								wrapText="true" visible="false" managed="false"
-								GridPane.rowIndex="4" GridPane.columnIndex="1" />
+								GridPane.rowIndex="6" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
