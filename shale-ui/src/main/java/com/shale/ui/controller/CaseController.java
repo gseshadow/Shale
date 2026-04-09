@@ -5720,7 +5720,7 @@ public class CaseController {
 			d.clientEstate = detail == null ? "0" : normalizeDetailsCheckboxStorage(detail.getClientEstate());
 			d.officePrinterCode = detail == null ? "" : safeText(detail.getOfficePrinterCode());
 			d.medicalRecordsReceived = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getMedicalRecordsReceived());
-			d.feeAgreementSigned = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getFeeAgreementSigned());
+			d.feeAgreementSigned = detail == null ? null : detail.getFeeAgreementSigned();
 			d.dateFeeAgreementSigned = detail == null ? null : detail.getDateFeeAgreementSigned();
 
 			d.acceptedChronology = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedChronology());
@@ -6220,7 +6220,7 @@ public class CaseController {
 			String summary = normalizeNullableText(source.summary);
 			String receivedUpdates = toNullableBooleanStorage(normalizeDetailsCheckboxBoolean(source.receivedUpdates));
 			Boolean baselineMedicalRecordsReceived = normalizeDetailsCheckboxBoolean(baseline.getMedicalRecordsReceived());
-			Boolean baselineFeeAgreementSigned = normalizeDetailsCheckboxBoolean(baseline.getFeeAgreementSigned());
+			Boolean baselineFeeAgreementSigned = baseline.getFeeAgreementSigned();
 			Boolean baselineAcceptedChronology = normalizeDetailsCheckboxBoolean(baseline.getAcceptedChronology());
 			Boolean baselineAcceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedConsultantExpertSearch());
 			Boolean baselineAcceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedTestifyingExpertSearch());
@@ -6914,6 +6914,27 @@ public class CaseController {
 			return editor != null && editor.isSelected();
 		}
 
+		private void renderTriStateBoolean(CheckBox editor, Boolean value) {
+			if (editor == null)
+				return;
+			editor.setAllowIndeterminate(true);
+			if (value == null) {
+				editor.setSelected(false);
+				editor.setIndeterminate(true);
+				return;
+			}
+			editor.setIndeterminate(false);
+			editor.setSelected(Boolean.TRUE.equals(value));
+		}
+
+		private Boolean captureTriStateBoolean(CheckBox editor) {
+			if (editor == null)
+				return null;
+			if (editor.isIndeterminate())
+				return null;
+			return editor.isSelected();
+		}
+
 		void renderView(CaseDetailsDraft d) {
 			if (d == null)
 				return;
@@ -7020,7 +7041,7 @@ public class CaseController {
 			if (detOfficePrinterCodeEditor != null)
 				detOfficePrinterCodeEditor.setText(d.officePrinterCode);
 			renderNullableBoolean(detMedicalRecordsReceivedEditor, d.medicalRecordsReceived);
-			renderNullableBoolean(detFeeAgreementSignedEditor, d.feeAgreementSigned);
+			renderTriStateBoolean(detFeeAgreementSignedEditor, d.feeAgreementSigned);
 			if (detDateFeeAgreementSignedEditor != null)
 				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
 			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
@@ -7070,7 +7091,7 @@ public class CaseController {
 			if (detOfficePrinterCodeEditor != null)
 				d.officePrinterCode = safeText(detOfficePrinterCodeEditor.getText());
 			d.medicalRecordsReceived = captureNullableBoolean(detMedicalRecordsReceivedEditor);
-			d.feeAgreementSigned = captureNullableBoolean(detFeeAgreementSignedEditor);
+			d.feeAgreementSigned = captureTriStateBoolean(detFeeAgreementSignedEditor);
 			if (detDateFeeAgreementSignedEditor != null)
 				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
 			d.acceptedChronology = captureNullableBoolean(detAcceptedChronologyEditor);
