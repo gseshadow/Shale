@@ -140,6 +140,16 @@
                             </GridPane>
                         </VBox>
 
+                        <VBox spacing="10" styleClass="secondary-panel parties-section-panel" style="-fx-background-color: #f3edff;" maxWidth="1.7976931348623157E308">
+                            <HBox alignment="CENTER_LEFT" spacing="8">
+                                <Label text="Parties" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                                <Region HBox.hgrow="ALWAYS" />
+                                <Button fx:id="addPartyButton" text="Add Party" />
+                            </HBox>
+                            <Label fx:id="partiesEmptyLabel" text="No pending parties yet." style="-fx-opacity: 0.75;" wrapText="true" />
+                            <VBox fx:id="partiesListBox" spacing="8" maxWidth="1.7976931348623157E308" />
+                        </VBox>
+
                         <VBox spacing="10" styleClass="secondary-panel incident-section-panel" style="-fx-background-color: #fde8ec;" maxWidth="1.7976931348623157E308">
                             <Label text="Incident" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                             <GridPane hgap="16" vgap="10" maxWidth="1.7976931348623157E308">

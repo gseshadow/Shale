@@ -1,11 +1,13 @@
 package com.shale.ui.controller;
 
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
+import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -16,8 +18,13 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.geometry.Insets;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -76,12 +83,16 @@ public final class NewIntakeController {
 	@FXML private DatePicker dateOfInjuryPicker;
 	@FXML private DatePicker statuteOfLimitationsPicker;
 	@FXML private DatePicker tortClaimsNoticePicker;
+	@FXML private Button addPartyButton;
+	@FXML private Label partiesEmptyLabel;
+	@FXML private VBox partiesListBox;
 
 	@FXML private Button cancelButton;
 	@FXML private Button createIntakeButton;
 
 	private AppState appState;
 	private CaseDao caseDao;
+	private OrganizationDao organizationDao;
 	private Stage stage;
 	private Consumer<Integer> onCaseCreated;
 	private boolean saving;
@@ -93,13 +104,18 @@ public final class NewIntakeController {
 	private CaseDao.StatusRow selectedStatus;
 	private PracticeAreaCardFactory practiceAreaCardFactory;
 	private StatusCardFactory statusCardFactory;
+	private List<PartyAddWorkflowDialog.AddPartyDraft> pendingParties = new java.util.ArrayList<>();
+	private Map<Long, String> partyRoleLabelsById = Map.of();
+	private Map<String, String> partySideLabelsByKey = Map.of();
 
-	public void init(AppState appState, CaseDao caseDao, Stage stage, Consumer<Integer> onCaseCreated) {
+	public void init(AppState appState, CaseDao caseDao, OrganizationDao organizationDao, Stage stage, Consumer<Integer> onCaseCreated) {
 		this.appState = appState;
 		this.caseDao = caseDao;
+		this.organizationDao = organizationDao;
 		this.stage = stage;
 		this.onCaseCreated = onCaseCreated;
 		Platform.runLater(this::preselectDefaultStatusIfAvailable);
+		Platform.runLater(this::initializePartyMetadata);
 	}
 
 	@FXML
@@ -127,10 +143,156 @@ public final class NewIntakeController {
 
 		selectPracticeAreaButton.setOnAction(e -> onSelectPracticeArea());
 		selectStatusButton.setOnAction(e -> onSelectStatus());
+		if (addPartyButton != null) {
+			addPartyButton.setOnAction(e -> onAddParty());
+		}
 		renderPracticeAreaMini(null, "—", null);
 		renderStatusMini(null, "—", null);
+		renderPendingParties();
 
 		Platform.runLater(this::autoGenerateCaseName);
+	}
+
+	private void initializePartyMetadata() {
+		try {
+			Map<Long, String> roleLabels = new LinkedHashMap<>();
+			for (CaseDao.PartyRoleRow role : caseDao.listPartyRoles()) {
+				roleLabels.put(role.id(), toPartyRoleLabel(role.name(), role.id()));
+			}
+			this.partyRoleLabelsById = Map.copyOf(roleLabels);
+		} catch (RuntimeException ignored) {
+			this.partyRoleLabelsById = Map.of();
+		}
+		try {
+			Map<String, String> sideLabels = new LinkedHashMap<>();
+			for (PartyAddWorkflowDialog.PartySideOption side : loadPartySideOptions()) {
+				if (side.value() == null) continue;
+				sideLabels.put(side.value().toLowerCase(), side.label());
+			}
+			this.partySideLabelsByKey = Map.copyOf(sideLabels);
+		} catch (RuntimeException ignored) {
+			this.partySideLabelsByKey = Map.of();
+		}
+	}
+
+	private void onAddParty() {
+		try {
+			List<CaseDao.PartyRoleRow> partyRoles = caseDao.listPartyRoles();
+			List<CaseDao.SelectableContactRow> contacts = caseDao.findSelectableContactsForTenant();
+			List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findSelectableOrganizationsForTenant();
+			List<OrganizationDao.OrganizationTypeRow> organizationTypes = organizationDao == null ? List.of() : organizationDao.findOrganizationTypes();
+			PartyAddWorkflowDialog.AddPartyDraft draft = PartyAddWorkflowDialog.show(
+					stage,
+					partyRoles,
+					contacts,
+					organizations,
+					organizationTypes,
+					loadPartySideOptions());
+			if (draft == null) {
+				return;
+			}
+			pendingParties.add(draft);
+			renderPendingParties();
+			hideValidation();
+		} catch (RuntimeException ex) {
+			showValidation("Unable to open Add Party flow.");
+		}
+	}
+
+	private List<PartyAddWorkflowDialog.PartySideOption> loadPartySideOptions() {
+		try {
+			List<CaseDao.PartySideRow> sides = caseDao.listPartySides();
+			List<PartyAddWorkflowDialog.PartySideOption> out = new java.util.ArrayList<>();
+			for (CaseDao.PartySideRow side : sides) {
+				if (side == null || side.systemKey() == null || side.systemKey().isBlank()) continue;
+				String key = side.systemKey().trim().toLowerCase();
+				String label = side.name() == null || side.name().isBlank() ? switch (key) {
+					case "represented" -> "Represented";
+					case "opposing" -> "Opposing";
+					case "neutral" -> "Neutral";
+					default -> "Unaffiliated";
+				} : side.name().trim();
+				out.add(new PartyAddWorkflowDialog.PartySideOption(label, key));
+			}
+			if (out.isEmpty()) {
+				out.add(new PartyAddWorkflowDialog.PartySideOption("Represented", "represented"));
+				out.add(new PartyAddWorkflowDialog.PartySideOption("Opposing", "opposing"));
+				out.add(new PartyAddWorkflowDialog.PartySideOption("Neutral", "neutral"));
+			}
+			out.add(new PartyAddWorkflowDialog.PartySideOption("Unaffiliated", null));
+			return out;
+		} catch (RuntimeException ex) {
+			return List.of(
+					new PartyAddWorkflowDialog.PartySideOption("Represented", "represented"),
+					new PartyAddWorkflowDialog.PartySideOption("Opposing", "opposing"),
+					new PartyAddWorkflowDialog.PartySideOption("Neutral", "neutral"),
+					new PartyAddWorkflowDialog.PartySideOption("Unaffiliated", null));
+		}
+	}
+
+	private void renderPendingParties() {
+		if (partiesListBox == null || partiesEmptyLabel == null) return;
+		partiesListBox.getChildren().clear();
+		partiesEmptyLabel.setManaged(pendingParties.isEmpty());
+		partiesEmptyLabel.setVisible(pendingParties.isEmpty());
+		for (int i = 0; i < pendingParties.size(); i++) {
+			final int index = i;
+			PartyAddWorkflowDialog.AddPartyDraft party = pendingParties.get(i);
+			Label title = new Label(resolvePendingDisplayName(party));
+			title.setStyle("-fx-font-weight: bold;");
+			String roleLabel = partyRoleLabelsById.getOrDefault(party.partyRoleId(), "Role " + party.partyRoleId());
+			String sideKey = safeTrim(party.side()).toLowerCase();
+			String sideLabel = partySideLabelsByKey.getOrDefault(sideKey, sideKey.isBlank() ? "Unaffiliated" : sideKey);
+			Label meta = new Label(roleLabel + " · " + sideLabel + (party.primary() ? " · Primary" : ""));
+			meta.setStyle("-fx-opacity: 0.85;");
+			VBox text = new VBox(4, title, meta);
+			if (!safeTrim(party.notes()).isBlank()) {
+				Label notes = new Label(safeTrim(party.notes()));
+				notes.setWrapText(true);
+				text.getChildren().add(notes);
+			}
+			Button removeButton = new Button("Remove");
+			removeButton.getStyleClass().add("button-secondary");
+			removeButton.setOnAction(e -> {
+				pendingParties.remove(index);
+				renderPendingParties();
+			});
+			Region spacer = new Region();
+			HBox.setHgrow(spacer, Priority.ALWAYS);
+			HBox actions = new HBox(8, spacer, removeButton);
+			VBox card = new VBox(6, text, actions);
+			card.setPadding(new Insets(10, 12, 10, 12));
+			card.getStyleClass().add("secondary-panel");
+			partiesListBox.getChildren().add(card);
+		}
+	}
+
+	private String resolvePendingDisplayName(PartyAddWorkflowDialog.AddPartyDraft party) {
+		if (party.createNew()) {
+			if ("organization".equalsIgnoreCase(party.entityType())) {
+				return safeTrim(party.organizationName()).isBlank() ? "New Organization" : safeTrim(party.organizationName());
+			}
+			String first = safeTrim(party.contactFirstName());
+			String last = safeTrim(party.contactLastName());
+			String value = (first + " " + last).trim();
+			return value.isBlank() ? "New Contact" : value;
+		}
+		String labelPrefix = "organization".equalsIgnoreCase(party.entityType()) ? "Organization #" : "Contact #";
+		return labelPrefix + (party.entityId() == null ? "—" : party.entityId());
+	}
+
+	private String toPartyRoleLabel(String roleName, long roleId) {
+		String normalized = safeTrim(roleName).replace('_', ' ');
+		if (normalized.isBlank()) {
+			return "Role " + roleId;
+		}
+		String[] tokens = normalized.split("\\s+");
+		for (int i = 0; i < tokens.length; i++) {
+			String token = tokens[i];
+			if (token.isBlank()) continue;
+			tokens[i] = token.substring(0, 1).toUpperCase() + token.substring(1).toLowerCase();
+		}
+		return String.join(" ", tokens);
 	}
 
 	private void autoGenerateCaseName() {
@@ -361,6 +523,18 @@ public final class NewIntakeController {
 				safeTrim(callerPhoneField.getText()),
 				safeTrim(callerAddressField.getText()),
 				safeTrim(callerEmailField.getText()),
+				pendingParties.stream().map(party -> new CaseDao.NewIntakePendingParty(
+						party.entityType(),
+						party.entityId(),
+						party.partyRoleId(),
+						party.side(),
+						party.primary(),
+						party.notes(),
+						party.createNew(),
+						party.contactFirstName(),
+						party.contactLastName(),
+						party.organizationName(),
+						party.organizationTypeId())).toList(),
 				appState == null ? null : appState.getUserId()
 			);
 
@@ -394,6 +568,8 @@ public final class NewIntakeController {
 			selectPracticeAreaButton.setDisable(saving);
 		if (selectStatusButton != null)
 			selectStatusButton.setDisable(saving);
+		if (addPartyButton != null)
+			addPartyButton.setDisable(saving);
 	}
 
 	private String firstMeaningfulMessage(Throwable throwable) {
