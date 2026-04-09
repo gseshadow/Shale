@@ -19,6 +19,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListUiSupport;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -87,6 +88,7 @@ public final class CasesController {
 			CaseDao caseDao,
 			Consumer<Integer> onOpenCase) {
 		System.out.println("CasesController.init()");
+		PerfLog.log("CTRL", "start", "controller=CasesController page=cases_list");
 		this.caseDao = caseDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
@@ -313,6 +315,7 @@ public final class CasesController {
 	}
 
 	private void loadFirstPage() {
+		PerfLog.log("PAGE", "start", "page=cases_list");
 		loadGeneration++;
 		currentPage = 0;
 		loading = false;
@@ -339,7 +342,10 @@ public final class CasesController {
 		dbExec.submit(() ->
 		{
 			try {
+				long daoStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=findPage page=cases_list pageIndex=" + pageToLoad);
 				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort(), includeClosedDeniedInQuery());
+				PerfLog.logDone("DAO", "method=findPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
 
 				// map DAO rows into UI VM
 				List<CaseCardVm> newItems = page.items().stream()
@@ -390,6 +396,8 @@ public final class CasesController {
 	private void rerender() {
 		if (casesFlow == null)
 			return;
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=cases_list page=cases_list");
 
 		String q = normalizedSearchQuery();
 		String sort = casesSortChoice == null ? "Intake date (newest first)" : casesSortChoice.getValue();
@@ -410,6 +418,7 @@ public final class CasesController {
 		List<CaseCardVm> view = q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList();
 
 		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
+		PerfLog.logDone("RENDER", "panel=cases_list page=cases_list childCount=" + casesFlow.getChildren().size(), renderStartNanos);
 	}
 
 	private void refreshResultsCountAsync(String normalizedQuery, Set<Integer> selectedStatuses) {
@@ -425,7 +434,10 @@ public final class CasesController {
 		dbExec.submit(() ->
 		{
 			try {
+				long daoStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=countForCasesView page=cases_list");
 				long total = caseDao.countForCasesView(query, statusesSnapshot);
+				PerfLog.logDone("DAO", "method=countForCasesView page=cases_list rows=1", daoStartNanos);
 				Platform.runLater(() ->
 				{
 					if (generationAtSubmit != resultsCountGeneration) {
@@ -473,7 +485,10 @@ public final class CasesController {
 		}
 
 		dbExec.submit(() -> {
+			long daoStartNanos = PerfLog.start();
+			PerfLog.log("DAO", "start", "method=listStatusesForTenant page=cases_list organizationId=" + tenantId);
 			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+			PerfLog.logDone("DAO", "method=listStatusesForTenant page=cases_list organizationId=" + tenantId + " rows=" + (statuses == null ? 0 : statuses.size()), daoStartNanos);
 			List<CaseListUiSupport.StatusFilterOption> options = statuses == null
 					? List.of()
 					: statuses.stream()
@@ -681,7 +696,10 @@ public final class CasesController {
 			try {
 				// simplest: fetch a 1-item "page" by filtering current page is awkward,
 				// so add a DAO method later. For now: just reload the *current page* row via DAO helper.
+				long daoStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=getCaseRow page=cases_list caseId=" + caseId);
 				CaseDao.CaseRow row = caseDao.getCaseRow(caseId);
+				PerfLog.logDone("DAO", "method=getCaseRow page=cases_list caseId=" + caseId + " rows=" + (row == null ? 0 : 1), daoStartNanos);
 
 				Platform.runLater(() ->
 				{
