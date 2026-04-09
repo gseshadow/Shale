@@ -5720,7 +5720,8 @@ public class CaseController {
 			d.clientEstate = detail == null ? "0" : normalizeDetailsCheckboxStorage(detail.getClientEstate());
 			d.officePrinterCode = detail == null ? "" : safeText(detail.getOfficePrinterCode());
 			d.medicalRecordsReceived = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getMedicalRecordsReceived());
-			d.feeAgreementSigned = detail == null ? null : detail.getFeeAgreementSigned();
+			System.out.println("Case details load: feeAgreementSigned rawLoaded=" + (detail == null ? null : detail.getFeeAgreementSigned()));
+			d.feeAgreementSigned = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getFeeAgreementSigned());
 			d.dateFeeAgreementSigned = detail == null ? null : detail.getDateFeeAgreementSigned();
 
 			d.acceptedChronology = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedChronology());
@@ -5813,6 +5814,8 @@ public class CaseController {
 
 		private void runSaveWorker(DetailsSaveRequest request) {
 			try {
+				System.out.println("Case details save: sentToDao feeAgreementSigned=" + request.feeAgreementSigned()
+						+ ", finalDate=" + request.dateFeeAgreementSigned());
 				CaseDetailDto updated = caseDao.updateCaseDetails(
 						request.caseId(),
 						request.name(),
@@ -6207,9 +6210,14 @@ public class CaseController {
 			String officePrinterCode = normalizeNullableText(source.officePrinterCode);
 			Boolean medicalRecordsReceived = normalizeDetailsCheckboxBoolean(source.medicalRecordsReceived);
 			Boolean feeAgreementSigned = normalizeDetailsCheckboxBoolean(source.feeAgreementSigned);
-			LocalDate dateFeeAgreementSigned = source.dateFeeAgreementSigned;
+			LocalDate rawDateFeeAgreementSigned = source.dateFeeAgreementSigned;
+			LocalDate dateFeeAgreementSigned = rawDateFeeAgreementSigned;
 			if (Boolean.TRUE.equals(feeAgreementSigned) && dateFeeAgreementSigned == null)
 				dateFeeAgreementSigned = LocalDate.now();
+			System.out.println("Case details save: feeAgreementSigned rawLoaded=" + baseline.getFeeAgreementSigned()
+					+ ", selected=" + feeAgreementSigned
+					+ ", rawDate=" + rawDateFeeAgreementSigned
+					+ ", finalDate=" + dateFeeAgreementSigned);
 			Boolean acceptedChronology = normalizeDetailsCheckboxBoolean(source.acceptedChronology);
 			Boolean acceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedConsultantExpertSearch);
 			Boolean acceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedTestifyingExpertSearch);
@@ -7041,7 +7049,11 @@ public class CaseController {
 			if (detOfficePrinterCodeEditor != null)
 				detOfficePrinterCodeEditor.setText(d.officePrinterCode);
 			renderNullableBoolean(detMedicalRecordsReceivedEditor, d.medicalRecordsReceived);
-			renderTriStateBoolean(detFeeAgreementSignedEditor, d.feeAgreementSigned);
+			if (detFeeAgreementSignedEditor != null) {
+				detFeeAgreementSignedEditor.setAllowIndeterminate(false);
+				detFeeAgreementSignedEditor.setIndeterminate(false);
+				detFeeAgreementSignedEditor.setSelected(Boolean.TRUE.equals(d.feeAgreementSigned));
+			}
 			if (detDateFeeAgreementSignedEditor != null)
 				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
 			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
@@ -7091,7 +7103,7 @@ public class CaseController {
 			if (detOfficePrinterCodeEditor != null)
 				d.officePrinterCode = safeText(detOfficePrinterCodeEditor.getText());
 			d.medicalRecordsReceived = captureNullableBoolean(detMedicalRecordsReceivedEditor);
-			d.feeAgreementSigned = captureTriStateBoolean(detFeeAgreementSignedEditor);
+			d.feeAgreementSigned = detFeeAgreementSignedEditor != null && detFeeAgreementSignedEditor.isSelected();
 			if (detDateFeeAgreementSignedEditor != null)
 				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
 			d.acceptedChronology = captureNullableBoolean(detAcceptedChronologyEditor);
