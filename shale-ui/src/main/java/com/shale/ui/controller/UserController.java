@@ -18,6 +18,7 @@ import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.state.AppState;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserDetailService;
+import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ColorUtil;
 
 import javafx.application.Platform;
@@ -117,6 +118,7 @@ public final class UserController {
 	private long assignedTasksRefreshSequence;
 	private boolean editMode;
 	private boolean colorEditedInSession;
+	private long pageLoadStartNanos;
 	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
@@ -146,6 +148,9 @@ public final class UserController {
 				this::onToggleAssignedTaskComplete,
 				onOpenCase,
 				this::onOpenUserFromTask);
+		this.pageLoadStartNanos = PerfLog.start();
+		PerfLog.log("NAV", "start", "page=user_view userId=" + userId);
+		PerfLog.log("CTRL", "start", "controller=UserController page=user_view userId=" + userId);
 		System.out.println("[TRACE ASSIGNED_CASES][UserController.init] selectedUserId=" + userId);
 	}
 
@@ -232,7 +237,10 @@ public final class UserController {
 		setBusy(true);
 		dbExec.submit(() -> {
 			try {
+				long daoStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=loadUser page=user_view userId=" + userId + " organizationId=" + shaleClientId);
 				UserDetailRow loaded = userDetailService.loadUser(userId, shaleClientId);
+				PerfLog.logDone("DAO", "method=loadUser page=user_view userId=" + userId + " organizationId=" + shaleClientId + " rows=" + (loaded == null ? 0 : 1), daoStartNanos);
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (loaded == null) {
@@ -248,6 +256,7 @@ public final class UserController {
 					refreshRolesAsync();
 					refreshAssignedCasesAsync();
 					refreshAssignedTasksAsync();
+					PerfLog.logDone("NAV", "ready page=user_view userId=" + userId, pageLoadStartNanos);
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
@@ -270,10 +279,15 @@ public final class UserController {
 		final int shaleClientId = currentUser.shaleClientId();
 		dbExec.submit(() -> {
 			try {
+				long assignedRolesStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=loadAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId);
 				List<UserRoleRow> loadedAssigned = userDetailService.loadAssignedRoles(targetUserId, shaleClientId);
+				PerfLog.logDone("DAO", "method=loadAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (loadedAssigned == null ? 0 : loadedAssigned.size()), assignedRolesStartNanos);
+				long assignableRolesStartNanos = PerfLog.start();
 				List<UserRoleRow> loadedAssignable = canManageRoles()
 						? userDetailService.loadAssignableRoles(targetUserId, shaleClientId)
 						: List.of();
+				PerfLog.logDone("DAO", "method=loadAssignableRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (loadedAssignable == null ? 0 : loadedAssignable.size()), assignableRolesStartNanos);
 				Platform.runLater(() -> {
 					assignedRoles = loadedAssigned == null ? List.of() : List.copyOf(loadedAssigned);
 					assignableRoles = loadedAssignable == null ? List.of() : List.copyOf(loadedAssignable);
@@ -309,7 +323,10 @@ public final class UserController {
 				+ " selectedUserEmail=\"" + targetUserEmail + "\"");
 		dbExec.submit(() -> {
 			try {
+				long assignedCasesStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=loadAssignedCases page=user_view userId=" + targetUserId);
 				List<CaseRow> loaded = userDetailService.loadAssignedCases(targetUserId);
+				PerfLog.logDone("DAO", "method=loadAssignedCases page=user_view userId=" + targetUserId + " rows=" + (loaded == null ? 0 : loaded.size()), assignedCasesStartNanos);
 				Platform.runLater(() -> {
 					if (requestId != assignedCasesRefreshSequence) {
 						System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
@@ -361,10 +378,15 @@ public final class UserController {
 		final long requestId = ++assignedTasksRefreshSequence;
 		dbExec.submit(() -> {
 			try {
+				long assignedTasksStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=loadAssignedTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId);
 				List<AssignedUserTaskRow> loaded = userDetailService.loadAssignedTasks(tenantId, targetUserId);
+				PerfLog.logDone("DAO", "method=loadAssignedTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId + " rows=" + (loaded == null ? 0 : loaded.size()), assignedTasksStartNanos);
 				List<Long> taskIds = (loaded == null ? List.<AssignedUserTaskRow>of() : loaded).stream()
 						.map(AssignedUserTaskRow::taskId)
 						.toList();
+				long assignedTaskUsersStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId);
 				java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> usersByTask = caseTaskService == null
 						? java.util.Map.of()
 						: caseTaskService.loadAssignedUsersForTasks(taskIds, tenantId).stream()
@@ -374,8 +396,9 @@ public final class UserController {
 												row -> new TaskCardFactory.AssignedUserModel(
 														row.userId(),
 														row.displayName(),
-														row.color()),
+												row.color()),
 												java.util.stream.Collectors.toList())));
+				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId + " rows=" + usersByTask.size(), assignedTaskUsersStartNanos);
 				Platform.runLater(() -> {
 					if (requestId != assignedTasksRefreshSequence) {
 						return;
@@ -639,6 +662,8 @@ public final class UserController {
 		if (assignedCasesContainer == null) {
 			return;
 		}
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=assigned_cases page=user_view userId=" + (currentUser == null ? null : currentUser.id()));
 		if (caseCardFactory == null) {
 			caseCardFactory = new CaseCardFactory(onOpenCase);
 		}
@@ -683,6 +708,7 @@ public final class UserController {
 				assignedCasesEmptyLabel.setText("No assigned cases");
 			}
 		}
+		PerfLog.logDone("RENDER", "panel=assigned_cases page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " childCount=" + assignedCasesContainer.getChildren().size(), renderStartNanos);
 	}
 
 	private void initializeAssignedTaskControls() {
@@ -709,6 +735,8 @@ public final class UserController {
 		if (assignedTasksContainer == null) {
 			return;
 		}
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=assigned_tasks page=user_view userId=" + (currentUser == null ? null : currentUser.id()));
 		if (taskCardFactory == null) {
 			taskCardFactory = new TaskCardFactory(this::openTask, this::onToggleAssignedTaskComplete, onOpenCase, this::onOpenUserFromTask);
 		}
@@ -732,6 +760,7 @@ public final class UserController {
 				assignedTasksEmptyLabel.setText("No assigned tasks");
 			}
 		}
+		PerfLog.logDone("RENDER", "panel=assigned_tasks page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " childCount=" + assignedTasksContainer.getChildren().size(), renderStartNanos);
 	}
 
 	private Node createAssignedTaskCard(AssignedUserTaskRow row) {
