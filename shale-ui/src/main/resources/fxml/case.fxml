@@ -320,6 +320,65 @@
 								GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
+					
+					
+					<VBox spacing="10" styleClass="secondary-panel">
+						<Label text="Incident &amp; Deadlines"
+							style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+						<GridPane hgap="14" vgap="10"
+							style="-fx-alignment: TOP_LEFT;">
+							<columnConstraints>
+								<ColumnConstraints minWidth="210"
+									prefWidth="230" />
+								<ColumnConstraints hgrow="ALWAYS"
+									fillWidth="true" />
+							</columnConstraints>
+							<Label text="Date of Medical Negligence:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
+							<Label fx:id="detDateOfMedicalNegligenceValue" text="—"
+								GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDateOfMedicalNegligenceEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+							<Label text="Date Medical Negligence Was Discovered:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
+							<Label fx:id="detDateMedicalNegligenceWasDiscoveredValue"
+								text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<DatePicker
+								fx:id="detDateMedicalNegligenceWasDiscoveredEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<Label text="Date of Injury:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="2" />
+							<Label fx:id="detDateOfInjuryValue" text="—"
+								GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDateOfInjuryEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<Label text="Statute of Limitations:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
+							<Label fx:id="detStatuteOfLimitationsValue" text="—"
+								GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detStatuteOfLimitationsEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+							<Label text="Tort Notice Deadline:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
+							<Label fx:id="detTortNoticeDeadlineValue" text="—"
+								GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detTortNoticeDeadlineEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+							<Label text="Discovery Deadline:" style="-fx-opacity: 0.8;"
+								GridPane.rowIndex="5" />
+							<Label fx:id="detDiscoveryDeadlineValue" text="—"
+								GridPane.rowIndex="5" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDiscoveryDeadlineEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+						</GridPane>
+					</VBox>
+					
 
 					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Notes"
@@ -399,62 +458,6 @@
 						</GridPane>
 					</VBox>
 
-					<VBox spacing="10" styleClass="secondary-panel">
-						<Label text="Incident &amp; Deadlines"
-							style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-						<GridPane hgap="14" vgap="10"
-							style="-fx-alignment: TOP_LEFT;">
-							<columnConstraints>
-								<ColumnConstraints minWidth="210"
-									prefWidth="230" />
-								<ColumnConstraints hgrow="ALWAYS"
-									fillWidth="true" />
-							</columnConstraints>
-							<Label text="Date of Medical Negligence:"
-								style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
-							<Label fx:id="detDateOfMedicalNegligenceValue" text="—"
-								GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<DatePicker fx:id="detDateOfMedicalNegligenceEditor"
-								maxWidth="1.7976931348623157E308" visible="false"
-								managed="false" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-							<Label text="Date Medical Negligence Was Discovered:"
-								style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
-							<Label fx:id="detDateMedicalNegligenceWasDiscoveredValue"
-								text="—" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<DatePicker
-								fx:id="detDateMedicalNegligenceWasDiscoveredEditor"
-								maxWidth="1.7976931348623157E308" visible="false"
-								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="Date of Injury:" style="-fx-opacity: 0.8;"
-								GridPane.rowIndex="2" />
-							<Label fx:id="detDateOfInjuryValue" text="—"
-								GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<DatePicker fx:id="detDateOfInjuryEditor"
-								maxWidth="1.7976931348623157E308" visible="false"
-								managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<Label text="Statute of Limitations:"
-								style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
-							<Label fx:id="detStatuteOfLimitationsValue" text="—"
-								GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<DatePicker fx:id="detStatuteOfLimitationsEditor"
-								maxWidth="1.7976931348623157E308" visible="false"
-								managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-							<Label text="Tort Notice Deadline:"
-								style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
-							<Label fx:id="detTortNoticeDeadlineValue" text="—"
-								GridPane.rowIndex="4" GridPane.columnIndex="1" />
-							<DatePicker fx:id="detTortNoticeDeadlineEditor"
-								maxWidth="1.7976931348623157E308" visible="false"
-								managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-							<Label text="Discovery Deadline:" style="-fx-opacity: 0.8;"
-								GridPane.rowIndex="5" />
-							<Label fx:id="detDiscoveryDeadlineValue" text="—"
-								GridPane.rowIndex="5" GridPane.columnIndex="1" />
-							<DatePicker fx:id="detDiscoveryDeadlineEditor"
-								maxWidth="1.7976931348623157E308" visible="false"
-								managed="false" GridPane.rowIndex="5" GridPane.columnIndex="1" />
-						</GridPane>
-					</VBox>
 
 					<VBox spacing="10" styleClass="secondary-panel">
 						<Label text="Administrative"
