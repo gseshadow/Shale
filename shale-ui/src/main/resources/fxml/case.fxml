@@ -155,7 +155,7 @@
 
 						<Label text="Parties" style="-fx-opacity: 0.8;"
 							GridPane.rowIndex="4" GridPane.columnIndex="0" />
-						<VBox fx:id="ovPartiesBox" spacing="8"
+						<VBox fx:id="ovPartiesBox" spacing="4"
 							GridPane.rowIndex="4" GridPane.columnIndex="1"
 							GridPane.columnSpan="2" />
 

@@ -499,7 +499,7 @@ public class CaseController {
 	private record OpposingCounselPartySelection(Integer contactId, String displayName) {}
 	private enum PartyRenderMode {
 		MANAGE,
-		READ_ONLY
+		READ_ONLY_MINI
 	}
 
 	public void init(Integer caseId) {
@@ -1149,7 +1149,7 @@ public class CaseController {
 			ovPartiesBox.getChildren().add(empty);
 			return;
 		}
-		renderPartyGroups(ovPartiesBox, safeParties, PartyRenderMode.READ_ONLY, 240, true);
+		renderPartyGroups(ovPartiesBox, safeParties, PartyRenderMode.READ_ONLY_MINI, 190, true);
 	}
 
 	private void renderPartyGroups(VBox target, List<CasePartyDto> parties, PartyRenderMode mode, double entityCardWidth, boolean compactHeadings) {
@@ -1191,21 +1191,28 @@ public class CaseController {
 		String roleLabel = toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId());
 		String sideLabel = toPartySideLabel(sideLabelsByKey, normalizedPartySideKey(party.getSide()));
 		String notes = safeText(party.getNotes()).trim();
-		Node summaryCard = createPartyEntityCard(party, entityCardWidth);
+		Node summaryCard = createPartyEntityCard(party, entityCardWidth, mode);
 
-		Label metaLabel = new Label(formatPartyRelationshipMeta(roleLabel, sideLabel, party.isPrimary()));
-		metaLabel.setStyle("-fx-opacity: 0.86;");
+		String metadata = (mode == PartyRenderMode.READ_ONLY_MINI)
+				? formatOverviewPartyRelationshipMeta(roleLabel, party.isPrimary())
+				: formatPartyRelationshipMeta(roleLabel, sideLabel, party.isPrimary());
+		Label metaLabel = new Label(metadata);
+		metaLabel.setStyle(mode == PartyRenderMode.READ_ONLY_MINI
+				? "-fx-opacity: 0.72; -fx-font-size: 11px;"
+				: "-fx-opacity: 0.86;");
 		metaLabel.setWrapText(true);
 
-		VBox content = new VBox(6, summaryCard, metaLabel);
+		VBox content = new VBox(mode == PartyRenderMode.READ_ONLY_MINI ? 2 : 6, summaryCard, metaLabel);
 		if (!notes.isBlank()) {
 			Label notesLabel = new Label(notes);
 			notesLabel.setWrapText(true);
-			notesLabel.setStyle("-fx-opacity: 0.9;");
+			notesLabel.setStyle(mode == PartyRenderMode.READ_ONLY_MINI
+					? "-fx-opacity: 0.68; -fx-font-size: 11px;"
+					: "-fx-opacity: 0.9;");
 			content.getChildren().add(notesLabel);
 		}
 
-		VBox card = new VBox(6, content);
+		VBox card = new VBox(mode == PartyRenderMode.READ_ONLY_MINI ? 3 : 6, content);
 		if (mode == PartyRenderMode.MANAGE) {
 			Button editButton = new Button("Edit");
 			editButton.getStyleClass().add("button-secondary");
@@ -1219,13 +1226,15 @@ public class CaseController {
 			HBox.setHgrow(spacer, Priority.ALWAYS);
 			HBox actions = new HBox(8, spacer, editButton, removeButton);
 			card.getChildren().add(actions);
+			card.setPadding(new Insets(10, 12, 10, 12));
+			card.getStyleClass().add("secondary-panel");
+		} else {
+			card.setPadding(new Insets(2, 0, 2, 0));
 		}
-		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().add("secondary-panel");
 		return card;
 	}
 
-	private Node createPartyEntityCard(CasePartyDto party, double partiesCardWidth) {
+	private Node createPartyEntityCard(CasePartyDto party, double partiesCardWidth, PartyRenderMode mode) {
 		String entityType = safeText(party.getEntityType()).trim().toLowerCase(Locale.ROOT);
 		if ("organization".equals(entityType) && party.getOrganizationId() != null) {
 			OrganizationCardFactory factory = organizationCardFactory != null
@@ -1248,9 +1257,11 @@ public class CaseController {
 					null,
 					null
 			);
-			OrganizationCard card = factory.create(model, OrganizationCardFactory.Variant.COMPACT);
+			OrganizationCardFactory.Variant variant = (mode == PartyRenderMode.READ_ONLY_MINI)
+					? OrganizationCardFactory.Variant.MINI
+					: OrganizationCardFactory.Variant.COMPACT;
+			OrganizationCard card = factory.create(model, variant);
 			card.setSuppressPlaceholderLines(true);
-			card.applyCompact();
 			card.setMinWidth(partiesCardWidth);
 			card.setPrefWidth(partiesCardWidth);
 			card.setMaxWidth(partiesCardWidth);
@@ -1269,9 +1280,11 @@ public class CaseController {
 					null,
 					null
 			);
-			ContactCard card = factory.create(model, ContactCardFactory.Variant.COMPACT);
+			ContactCardFactory.Variant variant = (mode == PartyRenderMode.READ_ONLY_MINI)
+					? ContactCardFactory.Variant.MINI
+					: ContactCardFactory.Variant.COMPACT;
+			ContactCard card = factory.create(model, variant);
 			card.setSuppressPlaceholderLines(true);
-			card.applyCompact();
 			card.setMinWidth(partiesCardWidth);
 			card.setPrefWidth(partiesCardWidth);
 			card.setMaxWidth(partiesCardWidth);
@@ -1282,6 +1295,10 @@ public class CaseController {
 		fallback.setStyle("-fx-font-weight: bold;");
 		fallback.setWrapText(true);
 		return fallback;
+	}
+
+	private String formatOverviewPartyRelationshipMeta(String roleLabel, boolean primary) {
+		return primary ? roleLabel + " · Primary" : roleLabel;
 	}
 
 	private String formatPartyRelationshipMeta(String roleLabel, String sideLabel, boolean primary) {
