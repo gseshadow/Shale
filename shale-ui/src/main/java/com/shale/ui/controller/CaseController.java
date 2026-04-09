@@ -462,6 +462,8 @@ public class CaseController {
 	private boolean partiesLoadedOnce = false;
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
+	private boolean caseTasksLoadedOnce;
+	private boolean caseTasksStale = true;
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private Long editingCaseUpdateId;
 	private String editingCaseUpdateDraftText = "";
@@ -508,6 +510,8 @@ public class CaseController {
 	public void init(Integer caseId) {
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
+		this.caseTasksLoadedOnce = false;
+		this.caseTasksStale = true;
 		refreshHeader();
 		refreshOverviewPlaceholders();
 	}
@@ -515,6 +519,8 @@ public class CaseController {
 	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
+		this.caseTasksLoadedOnce = false;
+		this.caseTasksStale = true;
 		this.caseDao = caseDao;
 		this.caseDetailService = caseDetailService;
 		this.caseTaskService = caseTaskService;
@@ -941,8 +947,14 @@ public class CaseController {
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
-		loadCaseTasksAsync();
+		if (shouldReloadTasksForTabOpen()) {
+			loadCaseTasksAsync();
+		}
 		renderTasksSection();
+	}
+
+	private boolean shouldReloadTasksForTabOpen() {
+		return !caseTasksLoadedOnce || caseTasksStale;
 	}
 
 	private void showDetails() {
@@ -2068,12 +2080,16 @@ public class CaseController {
 					}
 					caseTasks = tasks == null ? List.of() : tasks;
 					caseTaskAssignedUsers = assignedByTask;
+					caseTasksLoadedOnce = true;
+					caseTasksStale = false;
 					renderTasksSection();
 				});
 			} catch (Exception ex) {
 				runOnFx(() -> {
 					caseTasks = List.of();
 					caseTaskAssignedUsers = java.util.Map.of();
+					caseTasksLoadedOnce = true;
+					caseTasksStale = false;
 					renderTasksSection();
 				});
 				System.err.println("Case tasks load failed for caseId=" + activeCaseId + ": " + ex.getMessage());
@@ -2383,6 +2399,7 @@ public class CaseController {
 	}
 
 	private void refreshCaseTasks() {
+		caseTasksStale = true;
 		loadCaseTasksAsync();
 	}
 
