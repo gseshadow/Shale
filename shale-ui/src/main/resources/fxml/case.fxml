@@ -153,68 +153,50 @@
 							visible="false" managed="false" GridPane.rowIndex="3"
 							GridPane.columnIndex="2" />
 
-						<Label text="Caller:" style="-fx-opacity: 0.8;"
+						<Label text="Parties" style="-fx-opacity: 0.8;"
 							GridPane.rowIndex="4" GridPane.columnIndex="0" />
-						<StackPane fx:id="ovCallerHost" GridPane.rowIndex="4"
-							GridPane.columnIndex="1" />
-						<Button fx:id="changeCallerButton" text="Change"
-							visible="false" managed="false" GridPane.rowIndex="4"
-							GridPane.columnIndex="2" />
+						<VBox fx:id="ovPartiesBox" spacing="8"
+							GridPane.rowIndex="4" GridPane.columnIndex="1"
+							GridPane.columnSpan="2" />
 
-						<Label text="Clients:" style="-fx-opacity: 0.8;"
+						<Label text="Practice area:" style="-fx-opacity: 0.8;"
 							GridPane.rowIndex="5" GridPane.columnIndex="0" />
-						<StackPane fx:id="ovClientHost" GridPane.rowIndex="5"
-							GridPane.columnIndex="1" />
-						<Button fx:id="changeClientButton" text="Manage"
+
+						<StackPane fx:id="ovPracticeAreaHost"
+							GridPane.rowIndex="5" GridPane.columnIndex="1" />
+						<Button fx:id="changePracticeAreaButton" text="Change"
 							visible="false" managed="false" GridPane.rowIndex="5"
 							GridPane.columnIndex="2" />
 
-						<Label text="Practice area:" style="-fx-opacity: 0.8;"
-							GridPane.rowIndex="6" GridPane.columnIndex="0" />
-
-						<StackPane fx:id="ovPracticeAreaHost"
-							GridPane.rowIndex="6" GridPane.columnIndex="1" />
-						<Button fx:id="changePracticeAreaButton" text="Change"
-							visible="false" managed="false" GridPane.rowIndex="6"
-							GridPane.columnIndex="2" />
-
-						<Label text="Opposing Counsel" style="-fx-opacity: 0.8;"
-							GridPane.rowIndex="7" GridPane.columnIndex="0" />
-						<StackPane fx:id="ovOpposingCounselHost"
-							GridPane.rowIndex="7" GridPane.columnIndex="1" />
-						<Button fx:id="changeOpposingCounselButton" text="Change"
-							visible="false" managed="false" GridPane.rowIndex="7"
-							GridPane.columnIndex="2" />
-
 						<Label text="Team:" style="-fx-opacity: 0.8;"
-							GridPane.rowIndex="8" GridPane.columnIndex="0" />
+							GridPane.rowIndex="6" GridPane.columnIndex="0" />
 						<FlowPane fx:id="teamFlow" hgap="10" vgap="10"
 							prefWrapLength="520" maxWidth="1.7976931348623157E308"
-							GridPane.rowIndex="8" GridPane.columnIndex="1" />
+							GridPane.rowIndex="6" GridPane.columnIndex="1" />
 						<Button fx:id="btnEditTeam" text="Edit Team"
 							visible="false" managed="false" onAction="#onEditTeam"
-							GridPane.rowIndex="8" GridPane.columnIndex="2" />
+							GridPane.rowIndex="6" GridPane.columnIndex="2" />
 
 						<Label text="Intake date:" style="-fx-opacity: 0.8;"
-							GridPane.rowIndex="9" GridPane.columnIndex="0" />
+							GridPane.rowIndex="7" GridPane.columnIndex="0" />
 						<Label fx:id="ovIntakeDateValue" text="—"
-							GridPane.rowIndex="9" GridPane.columnIndex="1" />
+							GridPane.rowIndex="7" GridPane.columnIndex="1" />
 
 						<Label text="Incident date:" style="-fx-opacity: 0.8;"
-							GridPane.rowIndex="10" GridPane.columnIndex="0" />
+							GridPane.rowIndex="8" GridPane.columnIndex="0" />
 						<Label fx:id="ovIncidentDateValue" text="—"
-							GridPane.rowIndex="10" GridPane.columnIndex="1" />
+							GridPane.rowIndex="8" GridPane.columnIndex="1" />
 						<DatePicker fx:id="ovIncidentDateEditor"
 							visible="false" managed="false" maxWidth="1.7976931348623157E308"
-							GridPane.rowIndex="10" GridPane.columnIndex="1" />
+							GridPane.rowIndex="8" GridPane.columnIndex="1" />
 
 						<Label text="SOL date:" style="-fx-opacity: 0.8;"
-							GridPane.rowIndex="11" GridPane.columnIndex="0" />
+							GridPane.rowIndex="9" GridPane.columnIndex="0" />
 						<Label fx:id="ovSolDateValue" text="—"
-							GridPane.rowIndex="11" GridPane.columnIndex="1" />
+							GridPane.rowIndex="9" GridPane.columnIndex="1" />
 						<DatePicker fx:id="ovSolDateEditor" visible="false"
 							managed="false" maxWidth="1.7976931348623157E308"
-							GridPane.rowIndex="11" GridPane.columnIndex="1" />
+							GridPane.rowIndex="9" GridPane.columnIndex="1" />
 					</GridPane>
 
 					<Separator />
