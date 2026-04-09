@@ -377,8 +377,7 @@ public class CaseController {
 			"Parties",
 			"Tasks",
 			"Timeline",
-			"Details",
-			"Documents"
+			"Details"
 	);
 
 	// ----------------------------
@@ -885,7 +884,6 @@ public class CaseController {
 		case "Timeline" -> "TIMELINE";
 		case "Details" -> "DETAILS";
 		case "Parties" -> "PARTIES";
-		case "Documents" -> "DOCUMENTS";
 		default -> sectionName.toUpperCase(Locale.ROOT);
 		};
 	}
@@ -901,7 +899,6 @@ public class CaseController {
 		case "TIMELINE" -> "Timeline";
 		case "DETAILS" -> "Details";
 		case "PARTIES" -> "Parties";
-		case "DOCUMENTS" -> "Documents";
 		default -> null;
 		};
 	}
