@@ -173,12 +173,10 @@ public class CaseCard extends VBox {
 	private void wireEvents() {
 		setOnMouseEntered(e -> {
 			hovered = true;
-			setTranslateY(-1.5);
 			refreshSurfaceStyle();
 		});
 		setOnMouseExited(e -> {
 			hovered = false;
-			setTranslateY(0);
 			refreshSurfaceStyle();
 		});
 		setOnMouseClicked(e ->
