@@ -6206,7 +6206,10 @@ public class CaseController {
 			String clientEstate = normalizeDetailsCheckboxStorage(source.clientEstate);
 			String officePrinterCode = normalizeNullableText(source.officePrinterCode);
 			Boolean medicalRecordsReceived = normalizeDetailsCheckboxBoolean(source.medicalRecordsReceived);
-			Boolean feeAgreementSigned = source.feeAgreementSigned;
+			Boolean feeAgreementSigned = normalizeDetailsCheckboxBoolean(source.feeAgreementSigned);
+			LocalDate dateFeeAgreementSigned = source.dateFeeAgreementSigned;
+			if (Boolean.TRUE.equals(feeAgreementSigned) && dateFeeAgreementSigned == null)
+				dateFeeAgreementSigned = LocalDate.now();
 			Boolean acceptedChronology = normalizeDetailsCheckboxBoolean(source.acceptedChronology);
 			Boolean acceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedConsultantExpertSearch);
 			Boolean acceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedTestifyingExpertSearch);
@@ -6252,7 +6255,7 @@ public class CaseController {
 				!Objects.equals(officePrinterCode, normalizeNullableText(baseline.getOfficePrinterCode())) ||
 				!Objects.equals(medicalRecordsReceived, baselineMedicalRecordsReceived) ||
 				!Objects.equals(feeAgreementSigned, baselineFeeAgreementSigned) ||
-				!Objects.equals(source.dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
+				!Objects.equals(dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
 				!Objects.equals(acceptedChronology, baselineAcceptedChronology) ||
 				!Objects.equals(acceptedConsultantExpertSearch, baselineAcceptedConsultantExpertSearch) ||
 				!Objects.equals(acceptedTestifyingExpertSearch, baselineAcceptedTestifyingExpertSearch) ||
@@ -6288,7 +6291,7 @@ public class CaseController {
 				officePrinterCode,
 				medicalRecordsReceived,
 				feeAgreementSigned,
-				source.dateFeeAgreementSigned,
+				dateFeeAgreementSigned,
 				acceptedChronology,
 				acceptedConsultantExpertSearch,
 				acceptedTestifyingExpertSearch,
@@ -6977,7 +6980,7 @@ public class CaseController {
 			if (detMedicalRecordsReceivedValue != null)
 				detMedicalRecordsReceivedValue.setText(boolLabel(d.medicalRecordsReceived));
 			if (detFeeAgreementSignedValue != null)
-				detFeeAgreementSignedValue.setText(boolLabel(d.feeAgreementSigned));
+				detFeeAgreementSignedValue.setText(boolLabel(Boolean.TRUE.equals(d.feeAgreementSigned)));
 			if (detDateFeeAgreementSignedValue != null)
 				detDateFeeAgreementSignedValue.setText(formatDate(d.dateFeeAgreementSigned));
 			if (detAcceptedChronologyValue != null)
