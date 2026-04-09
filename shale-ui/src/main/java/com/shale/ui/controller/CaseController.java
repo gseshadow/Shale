@@ -6848,6 +6848,8 @@ public class CaseController {
 	}
 
 	private final class CaseDetailsEditor {
+		private javafx.beans.value.ChangeListener<Boolean> feeAgreementSignedAutoDateListener;
+
 		void beginEdit() {
 			CaseDetailsDraft base = resolveDetailsViewModel();
 			detailsBaseline = base.copy();
@@ -7056,6 +7058,7 @@ public class CaseController {
 			}
 			if (detDateFeeAgreementSignedEditor != null)
 				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
+			wireFeeAgreementSignedAutoDateListener();
 			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
 			renderNullableBoolean(detAcceptedConsultantExpertSearchEditor, d.acceptedConsultantExpertSearch);
 			renderNullableBoolean(detAcceptedTestifyingExpertSearchEditor, d.acceptedTestifyingExpertSearch);
@@ -7068,6 +7071,20 @@ public class CaseController {
 			if (detSummaryEditor != null)
 				detSummaryEditor.setText(d.summary);
 			renderNullableBoolean(detReceivedUpdatesEditor, d.receivedUpdates);
+		}
+
+		private void wireFeeAgreementSignedAutoDateListener() {
+			if (detFeeAgreementSignedEditor == null)
+				return;
+			if (feeAgreementSignedAutoDateListener != null)
+				detFeeAgreementSignedEditor.selectedProperty().removeListener(feeAgreementSignedAutoDateListener);
+			feeAgreementSignedAutoDateListener = (obs, wasSelected, isSelected) -> {
+				if (!Boolean.TRUE.equals(isSelected) || detDateFeeAgreementSignedEditor == null)
+					return;
+				if (detDateFeeAgreementSignedEditor.getValue() == null)
+					detDateFeeAgreementSignedEditor.setValue(LocalDate.now());
+			};
+			detFeeAgreementSignedEditor.selectedProperty().addListener(feeAgreementSignedAutoDateListener);
 		}
 
 		void captureEditors(CaseDetailsDraft d) {
