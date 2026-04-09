@@ -317,22 +317,7 @@ public final class CaseDao {
 					request.shaleClientId(),
 					now);
 
-			int callerContactId = clientContactId;
-			if (!request.callerIsClient()) {
-				callerContactId = insertContact(con,
-						buildFullName(request.callerFirstName(), request.callerLastName()),
-						request.callerFirstName(),
-						request.callerLastName(),
-						request.callerAddress(),
-						request.callerPhone(),
-						request.callerEmail(),
-						null,
-						null,
-						false,
-						false,
-						request.shaleClientId(),
-						now);
-			}
+			int callerContactId = resolveCallerContactId(con, request, clientContactId, now);
 
 			long caseId = insertCase(con, request, now);
 			insertCaseParty(con, caseId, clientContactId, PARTY_ROLE_NAME_PARTY, PARTY_SIDE_KEY_REPRESENTED, true, now, request.shaleClientId());
@@ -412,6 +397,25 @@ public final class CaseDao {
 				}
 			}
 		}
+	}
+
+	private int resolveCallerContactId(Connection con, NewIntakeCreateRequest request, int clientContactId, Timestamp now) throws SQLException {
+		if (request.callerIsClient()) {
+			return clientContactId;
+		}
+		return insertContact(con,
+				buildFullName(request.callerFirstName(), request.callerLastName()),
+				request.callerFirstName(),
+				request.callerLastName(),
+				request.callerAddress(),
+				request.callerPhone(),
+				request.callerEmail(),
+				null,
+				null,
+				false,
+				false,
+				request.shaleClientId(),
+				now);
 	}
 
 	private int insertOrganization(Connection con, int shaleClientId, Integer organizationTypeId, String organizationName, Timestamp now) throws SQLException {
