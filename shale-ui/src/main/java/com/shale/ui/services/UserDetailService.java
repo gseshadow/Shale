@@ -11,6 +11,7 @@ import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserDao.UserDetailRow;
 import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
 import com.shale.data.dao.UserDao.UserRoleRow;
+import com.shale.ui.util.PerfLog;
 
 public final class UserDetailService {
 
@@ -27,15 +28,27 @@ public final class UserDetailService {
 	}
 
 	public UserDetailRow loadUser(int userId, int shaleClientId) {
-		return userDao.findById(userId, shaleClientId);
+		long startNanos = PerfLog.start();
+		PerfLog.log("DAO", "start", "method=findById page=user_view userId=" + userId + " organizationId=" + shaleClientId);
+		UserDetailRow row = userDao.findById(userId, shaleClientId);
+		PerfLog.logDone("DAO", "method=findById page=user_view userId=" + userId + " organizationId=" + shaleClientId + " rows=" + (row == null ? 0 : 1), startNanos);
+		return row;
 	}
 
 	public List<UserRoleRow> loadAssignedRoles(int targetUserId, int shaleClientId) {
-		return userDao.listAssignedRoles(targetUserId, shaleClientId);
+		long startNanos = PerfLog.start();
+		PerfLog.log("DAO", "start", "method=listAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId);
+		List<UserRoleRow> rows = userDao.listAssignedRoles(targetUserId, shaleClientId);
+		PerfLog.logDone("DAO", "method=listAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), startNanos);
+		return rows;
 	}
 
 	public List<UserRoleRow> loadAssignableRoles(int targetUserId, int shaleClientId) {
-		return userDao.listAssignableRoles(targetUserId, shaleClientId);
+		long startNanos = PerfLog.start();
+		PerfLog.log("DAO", "start", "method=listAssignableRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId);
+		List<UserRoleRow> rows = userDao.listAssignableRoles(targetUserId, shaleClientId);
+		PerfLog.logDone("DAO", "method=listAssignableRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), startNanos);
+		return rows;
 	}
 
 	public boolean updateBasicProfile(UserProfileUpdateRequest request) {
@@ -63,6 +76,10 @@ public final class UserDetailService {
 	}
 
 	public List<AssignedUserTaskRow> loadAssignedTasks(int shaleClientId, int userId) {
-		return taskDao.listActiveTasksForAssigneeInTenant(shaleClientId, userId);
+		long startNanos = PerfLog.start();
+		PerfLog.log("DAO", "start", "method=listActiveTasksForAssigneeInTenant page=user_view userId=" + userId + " organizationId=" + shaleClientId);
+		List<AssignedUserTaskRow> rows = taskDao.listActiveTasksForAssigneeInTenant(shaleClientId, userId);
+		PerfLog.logDone("DAO", "method=listActiveTasksForAssigneeInTenant page=user_view userId=" + userId + " organizationId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), startNanos);
+		return rows;
 	}
 }

@@ -12,6 +12,7 @@ import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.NotificationDao;
+import com.shale.ui.util.PerfLog;
 
 /**
  * Thin case-task service facade for UI.
@@ -55,7 +56,11 @@ public final class CaseTaskService {
             case PRIORITY_DESC -> TaskDao.CaseTaskSort.PRIORITY_DESC;
             case DEFAULT -> TaskDao.CaseTaskSort.DEFAULT;
         };
-        return taskDao.listActiveTasksForCase(caseId, shaleClientId, daoSort);
+        long startNanos = PerfLog.start();
+        PerfLog.log("DAO", "start", "method=listActiveTasksForCase page=case_view caseId=" + caseId + " organizationId=" + shaleClientId);
+        List<CaseTaskListItemDto> rows = taskDao.listActiveTasksForCase(caseId, shaleClientId, daoSort);
+        PerfLog.logDone("DAO", "method=listActiveTasksForCase page=case_view caseId=" + caseId + " organizationId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), startNanos);
+        return rows;
     }
 
     public List<CaseTaskListItemDto> loadMyTasks(int shaleClientId, int currentUserId, MyTasksSortOption sortOption) {
@@ -64,7 +69,11 @@ public final class CaseTaskService {
             case DUE_DATE_DESC -> TaskDao.MyTaskSort.DUE_DATE_DESC;
             case DEFAULT -> TaskDao.MyTaskSort.DEFAULT;
         };
-        return taskDao.listActiveTasksAssignedToUser(shaleClientId, currentUserId, daoSort);
+        long startNanos = PerfLog.start();
+        PerfLog.log("DAO", "start", "method=listActiveTasksAssignedToUser page=my_shale userId=" + currentUserId + " organizationId=" + shaleClientId);
+        List<CaseTaskListItemDto> rows = taskDao.listActiveTasksAssignedToUser(shaleClientId, currentUserId, daoSort);
+        PerfLog.logDone("DAO", "method=listActiveTasksAssignedToUser page=my_shale userId=" + currentUserId + " organizationId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), startNanos);
+        return rows;
     }
 
     public TaskDetailDto loadTaskDetail(long taskId, int shaleClientId) {
@@ -77,9 +86,13 @@ public final class CaseTaskService {
                 .toList();
     }
     public List<TaskAssignedUsersByTask> loadAssignedUsersForTasks(List<Long> taskIds, int shaleClientId) {
-        return taskDao.listAssignedUsersForTasks(taskIds, shaleClientId).stream()
+        long startNanos = PerfLog.start();
+        PerfLog.log("DAO", "start", "method=listAssignedUsersForTasks organizationId=" + shaleClientId);
+        List<TaskAssignedUsersByTask> rows = taskDao.listAssignedUsersForTasks(taskIds, shaleClientId).stream()
                 .map(row -> new TaskAssignedUsersByTask(row.taskId(), row.userId(), row.displayName(), row.color()))
                 .toList();
+        PerfLog.logDone("DAO", "method=listAssignedUsersForTasks organizationId=" + shaleClientId + " rows=" + rows.size(), startNanos);
+        return rows;
     }
 
     public long createTask(CreateTaskRequest request) {
