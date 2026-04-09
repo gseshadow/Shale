@@ -3332,7 +3332,6 @@ public class CaseController {
 
 	private void loadCaseUpdatesAsync() {
 		updatesPanelController.loadCaseUpdatesAsync();
-		loadCaseTasksAsync();
 	}
 
 	private void loadCaseUpdatesAsyncInternal() {
@@ -5506,8 +5505,9 @@ public class CaseController {
 				return false;
 			runOnFx(() ->
 			{
+				// Keep ownership explicit: case updates and tasks refresh are separate.
 				loadCaseUpdatesAsync();
-		loadCaseTasksAsync();
+				loadCaseTasksAsync();
 				refreshLastUpdatedLabelAsync();
 			});
 			return true;
