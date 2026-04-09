@@ -180,17 +180,11 @@ public final class NewIntakeController {
 			}
 
 			String preselect = selectedPracticeArea == null ? labelToRow.keySet().iterator().next() : safeTrim(selectedPracticeArea.name());
-			ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
-			AppDialogs.applySecondaryWindowChrome(dialog);
-			dialog.setTitle("Select Practice Area");
-			dialog.setHeaderText("Select Practice Area");
-			dialog.setContentText("Practice Area:");
-			Window owner = stage == null ? null : stage;
-			if (owner != null) {
-				dialog.initOwner(owner);
-			}
-
-			Optional<String> picked = dialog.showAndWait();
+			Optional<String> picked = showSecondaryChoiceDialog(
+					"Change Practice Area",
+					"Practice Area:",
+					preselect,
+					labelToRow.keySet());
 			if (picked.isPresent()) {
 				selectedPracticeArea = labelToRow.get(picked.get());
 				renderPracticeAreaMini(selectedPracticeArea.id(), selectedPracticeArea.name(), selectedPracticeArea.color());
@@ -216,17 +210,11 @@ public final class NewIntakeController {
 			}
 
 			String preselect = selectedStatus == null ? labelToRow.keySet().iterator().next() : safeTrim(selectedStatus.name());
-			ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, labelToRow.keySet());
-			AppDialogs.applySecondaryWindowChrome(dialog);
-			dialog.setTitle("Select Status");
-			dialog.setHeaderText("Select Status");
-			dialog.setContentText("Status:");
-			Window owner = stage == null ? null : stage;
-			if (owner != null) {
-				dialog.initOwner(owner);
-			}
-
-			Optional<String> picked = dialog.showAndWait();
+			Optional<String> picked = showSecondaryChoiceDialog(
+					"Change Status",
+					"Status:",
+					preselect,
+					labelToRow.keySet());
 			if (picked.isPresent()) {
 				selectedStatus = labelToRow.get(picked.get());
 				renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
@@ -235,6 +223,23 @@ public final class NewIntakeController {
 		} catch (RuntimeException ex) {
 			showValidation("Unable to load statuses.");
 		}
+	}
+
+	private Optional<String> showSecondaryChoiceDialog(
+			String title,
+			String content,
+			String preselect,
+			java.util.Collection<String> options) {
+		ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, options);
+		dialog.setTitle(title);
+		dialog.setHeaderText(null);
+		dialog.setContentText(content);
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		Window owner = stage == null ? null : stage;
+		if (owner != null) {
+			dialog.initOwner(owner);
+		}
+		return dialog.showAndWait();
 	}
 
 	private void preselectDefaultStatusIfAvailable() {
