@@ -29,6 +29,7 @@ public final class PartyAddWorkflowDialog {
 	public record AddPartyDraft(
 			String entityType,
 			Long entityId,
+			String entityLabel,
 			long partyRoleId,
 			String side,
 			boolean primary,
@@ -380,6 +381,7 @@ public final class PartyAddWorkflowDialog {
 				return new AddPartyDraft(
 						state.entityType,
 						null,
+						null,
 						state.partyRoleId,
 						state.affiliation,
 						false,
@@ -396,6 +398,7 @@ public final class PartyAddWorkflowDialog {
 			return new AddPartyDraft(
 					state.selectedEntity.entityType(),
 					state.selectedEntity.id(),
+					state.selectedEntity.label(),
 					state.partyRoleId,
 					state.affiliation,
 					state.primary,

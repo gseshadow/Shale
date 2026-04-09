@@ -277,6 +277,10 @@ public final class NewIntakeController {
 			String value = (first + " " + last).trim();
 			return value.isBlank() ? "New Contact" : value;
 		}
+		String explicitLabel = safeTrim(party.entityLabel());
+		if (!explicitLabel.isBlank()) {
+			return explicitLabel;
+		}
 		String labelPrefix = "organization".equalsIgnoreCase(party.entityType()) ? "Organization #" : "Contact #";
 		return labelPrefix + (party.entityId() == null ? "—" : party.entityId());
 	}
