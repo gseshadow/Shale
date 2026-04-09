@@ -198,9 +198,10 @@ public class CaseController {
 	private Button changeCallerButton;
 	@FXML
 	private StackPane ovCallerHost;
-
 	@FXML
 	private StackPane ovClientHost;
+	@FXML
+	private VBox ovPartiesBox;
 
 	// Legacy label; no longer used for rendering (Practice Area is a card in
 	// ovPracticeAreaHost)
@@ -275,12 +276,10 @@ public class CaseController {
 	private Button changeStatusButton;
 	@FXML
 	private Button changeClientButton;
-
 	@FXML
 	private StackPane ovPracticeAreaHost;
 	@FXML
 	private Button changePracticeAreaButton;
-
 	@FXML
 	private Button changeOpposingCounselButton;
 	@FXML
@@ -496,8 +495,12 @@ public class CaseController {
 	private record PartyEntityOption(String entityType, Long id, String label) {}
 	private record PartySideOption(String label, String value) {}
 	private record PartyEditorResult(String entityType, Long entityId, long partyRoleId, String side, boolean primary, String notes) {}
-		private record CallerPartySelection(Integer contactId, String displayName) {}
+	private record CallerPartySelection(Integer contactId, String displayName) {}
 	private record OpposingCounselPartySelection(Integer contactId, String displayName) {}
+	private enum PartyRenderMode {
+		MANAGE,
+		READ_ONLY_MINI
+	}
 
 	public void init(Integer caseId) {
 		this.caseId = caseId;
@@ -613,18 +616,12 @@ public class CaseController {
 			changeResponsibleAttorneyButton.setOnAction(e -> onChangeResponsibleAttorney());
 		if (changeStatusButton != null)
 			changeStatusButton.setOnAction(e -> onChangeStatus());
-		if (changeCallerButton != null)
-			changeCallerButton.setOnAction(e -> onChangeCaller());
-		if (changeClientButton != null)
-			changeClientButton.setOnAction(e -> onManageClients());
 		if (changePracticeAreaButton != null)
 			changePracticeAreaButton.setOnAction(e -> onChangePracticeArea());
 		if (detChangeStatusButton != null)
 			detChangeStatusButton.setOnAction(e -> onDetailsChangeStatus());
 		if (detChangePracticeAreaButton != null)
 			detChangePracticeAreaButton.setOnAction(e -> onDetailsChangePracticeArea());
-		if (changeOpposingCounselButton != null)
-			changeOpposingCounselButton.setOnAction(e -> onChangeOpposingCounsel());
 		if (btnEditTeam != null)
 			btnEditTeam.setOnAction(e -> onEditTeam());
 		if (submitCaseUpdateButton != null)
@@ -837,8 +834,7 @@ public class CaseController {
 		if (ovCaseStatusValue != null)
 			ovCaseStatusValue.setText("—");
 
-		renderCallerMini(null, "—");
-		renderClientsMini(List.of());
+		renderOverviewPartiesSection();
 		renderPracticeAreaMini(null, "—", null);
 
 		if (ovTeamValue != null)
@@ -1139,24 +1135,42 @@ public class CaseController {
 			setVisibleManaged(timelineEmptyLabel, false);
 		}
 
-		Map<String, List<CasePartyDto>> grouped = safeParties.stream()
+		renderPartyGroups(timelineListBox, safeParties, PartyRenderMode.MANAGE, 300, false);
+	}
+
+	private void renderOverviewPartiesSection() {
+		if (ovPartiesBox == null)
+			return;
+		ovPartiesBox.getChildren().clear();
+		List<CasePartyDto> safeParties = caseParties == null ? List.of() : caseParties;
+		if (safeParties.isEmpty()) {
+			Label empty = new Label("No parties added.");
+			empty.setStyle("-fx-opacity: 0.75;");
+			ovPartiesBox.getChildren().add(empty);
+			return;
+		}
+		renderPartyGroups(ovPartiesBox, safeParties, PartyRenderMode.READ_ONLY_MINI, 190, true);
+	}
+
+	private void renderPartyGroups(VBox target, List<CasePartyDto> parties, PartyRenderMode mode, double entityCardWidth, boolean compactHeadings) {
+		Map<String, List<CasePartyDto>> grouped = parties.stream()
 				.filter(Objects::nonNull)
 				.collect(Collectors.groupingBy(
 						p -> normalizedPartySideKey(p.getSide()),
 						LinkedHashMap::new,
 						Collectors.toList()));
 		Map<String, String> sideLabelsByKey = loadPartySideLabelMap();
-
 		List<String> sideOrder = List.of("represented", "opposing", "neutral", "unclassified");
 		for (String sideKey : sideOrder) {
 			List<CasePartyDto> group = grouped.get(sideKey);
 			if (group == null || group.isEmpty()) {
 				continue;
 			}
-
 			Label heading = new Label(toPartySideLabel(sideLabelsByKey, sideKey));
-			heading.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-opacity: 0.92;");
-			timelineListBox.getChildren().add(heading);
+			heading.setStyle(compactHeadings
+					? "-fx-font-size: 13px; -fx-font-weight: bold; -fx-opacity: 0.9;"
+					: "-fx-font-size: 14px; -fx-font-weight: bold; -fx-opacity: 0.92;");
+			target.getChildren().add(heading);
 
 			List<CasePartyDto> sorted = group.stream()
 					.sorted((a, b) -> {
@@ -1168,49 +1182,59 @@ public class CaseController {
 					.toList();
 
 			for (CasePartyDto party : sorted) {
-				timelineListBox.getChildren().add(createPartyCard(party, sideLabelsByKey));
+				target.getChildren().add(createPartyCard(party, sideLabelsByKey, mode, entityCardWidth));
 			}
 		}
 	}
 
-	private Node createPartyCard(CasePartyDto party, Map<String, String> sideLabelsByKey) {
+	private Node createPartyCard(CasePartyDto party, Map<String, String> sideLabelsByKey, PartyRenderMode mode, double entityCardWidth) {
 		String roleLabel = toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId());
 		String sideLabel = toPartySideLabel(sideLabelsByKey, normalizedPartySideKey(party.getSide()));
 		String notes = safeText(party.getNotes()).trim();
-		Node summaryCard = createPartyEntityCard(party);
+		Node summaryCard = createPartyEntityCard(party, entityCardWidth, mode);
 
-		Label metaLabel = new Label(formatPartyRelationshipMeta(roleLabel, sideLabel, party.isPrimary()));
-		metaLabel.setStyle("-fx-opacity: 0.86;");
+		String metadata = (mode == PartyRenderMode.READ_ONLY_MINI)
+				? formatOverviewPartyRelationshipMeta(roleLabel, party.isPrimary())
+				: formatPartyRelationshipMeta(roleLabel, sideLabel, party.isPrimary());
+		Label metaLabel = new Label(metadata);
+		metaLabel.setStyle(mode == PartyRenderMode.READ_ONLY_MINI
+				? "-fx-opacity: 0.72; -fx-font-size: 11px;"
+				: "-fx-opacity: 0.86;");
 		metaLabel.setWrapText(true);
 
-		VBox content = new VBox(6, summaryCard, metaLabel);
+		VBox content = new VBox(mode == PartyRenderMode.READ_ONLY_MINI ? 2 : 6, summaryCard, metaLabel);
 		if (!notes.isBlank()) {
 			Label notesLabel = new Label(notes);
 			notesLabel.setWrapText(true);
-			notesLabel.setStyle("-fx-opacity: 0.9;");
+			notesLabel.setStyle(mode == PartyRenderMode.READ_ONLY_MINI
+					? "-fx-opacity: 0.68; -fx-font-size: 11px;"
+					: "-fx-opacity: 0.9;");
 			content.getChildren().add(notesLabel);
 		}
 
-		Button editButton = new Button("Edit");
-		editButton.getStyleClass().add("button-secondary");
-		editButton.setOnAction(e -> onEditParty(party));
+		VBox card = new VBox(mode == PartyRenderMode.READ_ONLY_MINI ? 3 : 6, content);
+		if (mode == PartyRenderMode.MANAGE) {
+			Button editButton = new Button("Edit");
+			editButton.getStyleClass().add("button-secondary");
+			editButton.setOnAction(e -> onEditParty(party));
 
-		Button removeButton = new Button("Remove");
-		removeButton.getStyleClass().add("button-secondary");
-		removeButton.setOnAction(e -> onRemoveParty(party));
+			Button removeButton = new Button("Remove");
+			removeButton.getStyleClass().add("button-secondary");
+			removeButton.setOnAction(e -> onRemoveParty(party));
 
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox actions = new HBox(8, spacer, editButton, removeButton);
-
-		VBox card = new VBox(6, content, actions);
-		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().add("secondary-panel");
+			Region spacer = new Region();
+			HBox.setHgrow(spacer, Priority.ALWAYS);
+			HBox actions = new HBox(8, spacer, editButton, removeButton);
+			card.getChildren().add(actions);
+			card.setPadding(new Insets(10, 12, 10, 12));
+			card.getStyleClass().add("secondary-panel");
+		} else {
+			card.setPadding(new Insets(2, 0, 2, 0));
+		}
 		return card;
 	}
 
-	private Node createPartyEntityCard(CasePartyDto party) {
-		final double partiesCardWidth = 300;
+	private Node createPartyEntityCard(CasePartyDto party, double partiesCardWidth, PartyRenderMode mode) {
 		String entityType = safeText(party.getEntityType()).trim().toLowerCase(Locale.ROOT);
 		if ("organization".equals(entityType) && party.getOrganizationId() != null) {
 			OrganizationCardFactory factory = organizationCardFactory != null
@@ -1233,9 +1257,11 @@ public class CaseController {
 					null,
 					null
 			);
-			OrganizationCard card = factory.create(model, OrganizationCardFactory.Variant.COMPACT);
+			OrganizationCardFactory.Variant variant = (mode == PartyRenderMode.READ_ONLY_MINI)
+					? OrganizationCardFactory.Variant.MINI
+					: OrganizationCardFactory.Variant.COMPACT;
+			OrganizationCard card = factory.create(model, variant);
 			card.setSuppressPlaceholderLines(true);
-			card.applyCompact();
 			card.setMinWidth(partiesCardWidth);
 			card.setPrefWidth(partiesCardWidth);
 			card.setMaxWidth(partiesCardWidth);
@@ -1254,9 +1280,11 @@ public class CaseController {
 					null,
 					null
 			);
-			ContactCard card = factory.create(model, ContactCardFactory.Variant.COMPACT);
+			ContactCardFactory.Variant variant = (mode == PartyRenderMode.READ_ONLY_MINI)
+					? ContactCardFactory.Variant.MINI
+					: ContactCardFactory.Variant.COMPACT;
+			ContactCard card = factory.create(model, variant);
 			card.setSuppressPlaceholderLines(true);
-			card.applyCompact();
 			card.setMinWidth(partiesCardWidth);
 			card.setPrefWidth(partiesCardWidth);
 			card.setMaxWidth(partiesCardWidth);
@@ -1267,6 +1295,10 @@ public class CaseController {
 		fallback.setStyle("-fx-font-weight: bold;");
 		fallback.setWrapText(true);
 		return fallback;
+	}
+
+	private String formatOverviewPartyRelationshipMeta(String roleLabel, boolean primary) {
+		return primary ? roleLabel + " · Primary" : roleLabel;
 	}
 
 	private String formatPartyRelationshipMeta(String roleLabel, String sideLabel, boolean primary) {
@@ -3896,7 +3928,7 @@ public class CaseController {
 		private void renderOverviewCards(CaseOverviewDto dto) {
 			renderResponsibleAttorney(dto);
 			renderStatus(dto);
-			renderContacts(dto);
+			renderOverviewPartiesSection();
 			renderPracticeArea(dto);
 		}
 
