@@ -108,6 +108,9 @@ public final class NewIntakeController {
 		timeOfIntakeField.setText(LocalTime.now().format(TIME_FORMAT));
 
 		callerIsClientCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+			if (Boolean.TRUE.equals(newVal)) {
+				copyCallerFieldsToClientIfEmpty();
+			}
 			applyCallerMode(Boolean.TRUE.equals(newVal));
 			hideValidation();
 		});
@@ -163,6 +166,22 @@ public final class NewIntakeController {
 		setRequiredIndicator(callerFirstNameRequiredIndicator, callerFieldsRequired);
 		setRequiredIndicator(callerLastNameRequiredIndicator, callerFieldsRequired);
 		setRequiredIndicator(callerPhoneRequiredIndicator, callerFieldsRequired);
+	}
+
+	private void copyCallerFieldsToClientIfEmpty() {
+		copyFieldIfSourcePresentAndTargetEmpty(callerFirstNameField, clientFirstNameField);
+		copyFieldIfSourcePresentAndTargetEmpty(callerLastNameField, clientLastNameField);
+		copyFieldIfSourcePresentAndTargetEmpty(callerPhoneField, clientPhoneField);
+		copyFieldIfSourcePresentAndTargetEmpty(callerAddressField, clientAddressField);
+		copyFieldIfSourcePresentAndTargetEmpty(callerEmailField, clientEmailField);
+	}
+
+	private void copyFieldIfSourcePresentAndTargetEmpty(TextField source, TextField target) {
+		String sourceValue = safeTrim(source == null ? null : source.getText());
+		String targetValue = safeTrim(target == null ? null : target.getText());
+		if (!sourceValue.isEmpty() && targetValue.isEmpty() && target != null) {
+			target.setText(sourceValue);
+		}
 	}
 
 	private void onSelectPracticeArea() {
