@@ -6207,6 +6207,9 @@ public class CaseController {
 			String officePrinterCode = normalizeNullableText(source.officePrinterCode);
 			Boolean medicalRecordsReceived = normalizeDetailsCheckboxBoolean(source.medicalRecordsReceived);
 			Boolean feeAgreementSigned = normalizeDetailsCheckboxBoolean(source.feeAgreementSigned);
+			LocalDate dateFeeAgreementSigned = source.dateFeeAgreementSigned;
+			if (Boolean.TRUE.equals(feeAgreementSigned) && dateFeeAgreementSigned == null)
+				dateFeeAgreementSigned = LocalDate.now();
 			Boolean acceptedChronology = normalizeDetailsCheckboxBoolean(source.acceptedChronology);
 			Boolean acceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedConsultantExpertSearch);
 			Boolean acceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedTestifyingExpertSearch);
@@ -6252,7 +6255,7 @@ public class CaseController {
 				!Objects.equals(officePrinterCode, normalizeNullableText(baseline.getOfficePrinterCode())) ||
 				!Objects.equals(medicalRecordsReceived, baselineMedicalRecordsReceived) ||
 				!Objects.equals(feeAgreementSigned, baselineFeeAgreementSigned) ||
-				!Objects.equals(source.dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
+				!Objects.equals(dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
 				!Objects.equals(acceptedChronology, baselineAcceptedChronology) ||
 				!Objects.equals(acceptedConsultantExpertSearch, baselineAcceptedConsultantExpertSearch) ||
 				!Objects.equals(acceptedTestifyingExpertSearch, baselineAcceptedTestifyingExpertSearch) ||
@@ -6288,7 +6291,7 @@ public class CaseController {
 				officePrinterCode,
 				medicalRecordsReceived,
 				feeAgreementSigned,
-				source.dateFeeAgreementSigned,
+				dateFeeAgreementSigned,
 				acceptedChronology,
 				acceptedConsultantExpertSearch,
 				acceptedTestifyingExpertSearch,
@@ -6956,7 +6959,7 @@ public class CaseController {
 			if (detMedicalRecordsReceivedValue != null)
 				detMedicalRecordsReceivedValue.setText(boolLabel(d.medicalRecordsReceived));
 			if (detFeeAgreementSignedValue != null)
-				detFeeAgreementSignedValue.setText(boolLabel(d.feeAgreementSigned));
+				detFeeAgreementSignedValue.setText(boolLabel(Boolean.TRUE.equals(d.feeAgreementSigned)));
 			if (detDateFeeAgreementSignedValue != null)
 				detDateFeeAgreementSignedValue.setText(formatDate(d.dateFeeAgreementSigned));
 			if (detAcceptedChronologyValue != null)
@@ -6977,16 +6980,6 @@ public class CaseController {
 				detSummaryValue.setText(safe(d.summary));
 			if (detReceivedUpdatesValue != null)
 				detReceivedUpdatesValue.setText(boolLabel(d.receivedUpdates));
-		}
-
-
-		private void refreshFeeAgreementDateState() {
-			if (detFeeAgreementSignedEditor == null || detDateFeeAgreementSignedEditor == null)
-				return;
-			boolean disable = !detFeeAgreementSignedEditor.isSelected();
-			detDateFeeAgreementSignedEditor.setDisable(disable);
-			if (disable)
-				detDateFeeAgreementSignedEditor.setValue(null);
 		}
 
 		private void renderEditors(CaseDetailsDraft d) {
@@ -7030,9 +7023,6 @@ public class CaseController {
 			renderNullableBoolean(detFeeAgreementSignedEditor, d.feeAgreementSigned);
 			if (detDateFeeAgreementSignedEditor != null)
 				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
-			if (detFeeAgreementSignedEditor != null)
-				detFeeAgreementSignedEditor.setOnAction(e -> refreshFeeAgreementDateState());
-			refreshFeeAgreementDateState();
 			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
 			renderNullableBoolean(detAcceptedConsultantExpertSearchEditor, d.acceptedConsultantExpertSearch);
 			renderNullableBoolean(detAcceptedTestifyingExpertSearchEditor, d.acceptedTestifyingExpertSearch);
@@ -7083,8 +7073,6 @@ public class CaseController {
 			d.feeAgreementSigned = captureNullableBoolean(detFeeAgreementSignedEditor);
 			if (detDateFeeAgreementSignedEditor != null)
 				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
-			if (Boolean.FALSE.equals(d.feeAgreementSigned))
-				d.dateFeeAgreementSigned = null;
 			d.acceptedChronology = captureNullableBoolean(detAcceptedChronologyEditor);
 			d.acceptedConsultantExpertSearch = captureNullableBoolean(detAcceptedConsultantExpertSearchEditor);
 			d.acceptedTestifyingExpertSearch = captureNullableBoolean(detAcceptedTestifyingExpertSearchEditor);
