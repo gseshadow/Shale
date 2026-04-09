@@ -5562,8 +5562,6 @@ public class CaseController {
 			runOnFx(() ->
 			{
 				reloadCurrentCaseForViewMode();
-				if (patch.teamChanged())
-					loadTeamSectionAsync();
 				hideRemoteUpdateBanner();
 			});
 		}
