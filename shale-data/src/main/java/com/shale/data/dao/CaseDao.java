@@ -269,7 +269,23 @@ public final class CaseDao {
 			String callerPhone,
 			String callerAddress,
 			String callerEmail,
+			List<NewIntakePendingParty> pendingParties,
 			Integer createdByUserId
+	) {
+	}
+
+	public record NewIntakePendingParty(
+			String entityType,
+			Long entityId,
+			Long partyRoleId,
+			String side,
+			boolean primary,
+			String notes,
+			boolean createNew,
+			String contactFirstName,
+			String contactLastName,
+			String organizationName,
+			Integer organizationTypeId
 	) {
 	}
 
@@ -301,26 +317,61 @@ public final class CaseDao {
 					request.shaleClientId(),
 					now);
 
-			int callerContactId = clientContactId;
-			if (!request.callerIsClient()) {
-				callerContactId = insertContact(con,
-						buildFullName(request.callerFirstName(), request.callerLastName()),
-						request.callerFirstName(),
-						request.callerLastName(),
-						request.callerAddress(),
-						request.callerPhone(),
-						request.callerEmail(),
-						null,
-						null,
-						false,
-						false,
-						request.shaleClientId(),
-						now);
-			}
+			int callerContactId = resolveCallerContactId(con, request, clientContactId, now);
 
 			long caseId = insertCase(con, request, now);
 			insertCaseParty(con, caseId, clientContactId, PARTY_ROLE_NAME_PARTY, PARTY_SIDE_KEY_REPRESENTED, true, now, request.shaleClientId());
 			insertCaseParty(con, caseId, callerContactId, PARTY_ROLE_NAME_CALLER, PARTY_SIDE_KEY_REPRESENTED, true, now, request.shaleClientId());
+			List<NewIntakePendingParty> pendingParties = request.pendingParties() == null ? List.of() : request.pendingParties();
+			for (NewIntakePendingParty pending : pendingParties) {
+				if (pending == null || pending.partyRoleId() == null || pending.partyRoleId().longValue() <= 0) {
+					continue;
+				}
+				String entityType = pending.entityType() == null ? "" : pending.entityType().trim().toLowerCase(Locale.ROOT);
+				Long entityId = pending.entityId();
+				if (pending.createNew()) {
+					if ("contact".equals(entityType)) {
+						entityId = Long.valueOf(insertContact(con,
+								buildFullName(pending.contactFirstName(), pending.contactLastName()),
+								pending.contactFirstName(),
+								pending.contactLastName(),
+								null,
+								null,
+								null,
+								null,
+								null,
+								false,
+								false,
+								request.shaleClientId(),
+								now));
+					} else if ("organization".equals(entityType)) {
+						entityId = Long.valueOf(insertOrganization(con,
+								request.shaleClientId(),
+								pending.organizationTypeId(),
+								pending.organizationName(),
+								now));
+					}
+				}
+				if (entityId == null || entityId.longValue() <= 0) {
+					continue;
+				}
+				Long contactId = "contact".equals(entityType) ? entityId : null;
+				Long organizationId = "organization".equals(entityType) ? entityId : null;
+				if (contactId == null && organizationId == null) {
+					continue;
+				}
+				insertCasePartyWithValidation(
+						con,
+						caseId,
+						contactId,
+						organizationId,
+						pending.partyRoleId().longValue(),
+						pending.side(),
+						pending.primary(),
+						pending.notes(),
+						request.shaleClientId(),
+						now);
+			}
 			normalizeCasePartyRelationshipPrimaries(con, caseId, request.shaleClientId());
 			insertCaseStatus(con, caseId, request.statusId(), now);
 
@@ -344,6 +395,57 @@ public final class CaseDao {
 					con.close();
 				} catch (SQLException ignored) {
 				}
+			}
+		}
+	}
+
+	private int resolveCallerContactId(Connection con, NewIntakeCreateRequest request, int clientContactId, Timestamp now) throws SQLException {
+		if (request.callerIsClient()) {
+			return clientContactId;
+		}
+		return insertContact(con,
+				buildFullName(request.callerFirstName(), request.callerLastName()),
+				request.callerFirstName(),
+				request.callerLastName(),
+				request.callerAddress(),
+				request.callerPhone(),
+				request.callerEmail(),
+				null,
+				null,
+				false,
+				false,
+				request.shaleClientId(),
+				now);
+	}
+
+	private int insertOrganization(Connection con, int shaleClientId, Integer organizationTypeId, String organizationName, Timestamp now) throws SQLException {
+		if (organizationTypeId == null || organizationTypeId.intValue() <= 0) {
+			throw new RuntimeException("Organization Type is required.");
+		}
+		String sql = """
+				INSERT INTO dbo.Organizations (
+				  OrganizationTypeId,
+				  Name,
+				  IsDeleted,
+				  CreatedAt,
+				  UpdatedAt,
+				  ShaleClientId
+				)
+				OUTPUT INSERTED.Id
+				VALUES (?, ?, 0, ?, ?, ?);
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			ps.setInt(i++, organizationTypeId.intValue());
+			setNullableString(ps, i++, organizationName);
+			ps.setTimestamp(i++, now);
+			ps.setTimestamp(i++, now);
+			ps.setInt(i++, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) {
+					throw new RuntimeException("Failed to create organization.");
+				}
+				return rs.getInt(1);
 			}
 		}
 	}
@@ -2484,6 +2586,49 @@ public final class CaseDao {
 		}
 	}
 
+	public List<SelectableContactRow> findSelectableContactsForTenant() {
+		String sql = """
+				SELECT
+				  ct.Id,
+				  LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )) AS DisplayName,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				FROM dbo.Contacts ct
+				WHERE ct.ShaleClientId = ?
+				  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				ORDER BY DisplayName ASC, ct.Id ASC;
+				""";
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			ps.setInt(1, shaleClientId);
+			List<SelectableContactRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new SelectableContactRow(
+							rs.getInt("Id"),
+							rs.getString("DisplayName"),
+							rs.getString("Email"),
+							rs.getString("Phone")));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load contacts for tenant party picker.", e);
+		}
+	}
+
 	public List<PartyRoleRow> listPartyRoles() {
 		try (Connection con = db.requireConnection()) {
 			int shaleClientId = requireCurrentShaleClientId(con);
@@ -2703,6 +2848,40 @@ public final class CaseDao {
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load linkable organizations for case (id=" + caseId + ")", e);
+		}
+	}
+
+	public List<SelectableOrganizationRow> findSelectableOrganizationsForTenant() {
+		String sql = """
+				SELECT
+				  o.Id,
+				  o.Name,
+				  ot.Name AS OrganizationTypeName
+				FROM Organizations o
+				LEFT JOIN OrganizationTypes ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				ORDER BY o.Name ASC, o.Id ASC;
+				""";
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			ps.setInt(1, shaleClientId);
+			List<SelectableOrganizationRow> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new SelectableOrganizationRow(
+							rs.getInt("Id"),
+							rs.getString("Name"),
+							rs.getString("OrganizationTypeName")
+					));
+				}
+			}
+			return out;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load organizations for tenant party picker.", e);
 		}
 	}
 
@@ -2999,6 +3178,100 @@ public final class CaseDao {
 				}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to add case party (caseId=" + caseId + ")", e);
+		}
+	}
+
+	private void insertCasePartyWithValidation(
+			Connection con,
+			long caseId,
+			Long contactId,
+			Long organizationId,
+			long partyRoleId,
+			String side,
+			boolean primary,
+			String notes,
+			int shaleClientId,
+			Timestamp now) throws SQLException {
+		validateSinglePartyEntity(contactId, organizationId);
+		String normalizedSide = normalizeCasePartySide(con, shaleClientId, side);
+		String sql = """
+				INSERT INTO dbo.CaseParties (
+				  CaseId,
+				  ContactId,
+				  OrganizationId,
+				  PartyRoleId,
+				  Side,
+				  IsPrimary,
+				  Notes,
+				  CreatedAt,
+				  UpdatedAt
+				)
+				SELECT
+				  ?,
+				  ?,
+				  ?,
+				  ?,
+				  ?,
+				  ?,
+				  ?,
+				  ?,
+				  ?
+				WHERE EXISTS (
+				    SELECT 1
+				    FROM dbo.Cases c
+				    WHERE c.Id = ?
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				)
+				  AND EXISTS (
+				    SELECT 1
+				    FROM dbo.PartyRoles pr
+				    WHERE pr.Id = ?
+				      AND (pr.ShaleClientId = ? OR pr.ShaleClientId IS NULL)
+				  )
+				  AND (
+				    (? IS NOT NULL AND EXISTS (
+				      SELECT 1
+				      FROM dbo.Contacts ct
+				      WHERE ct.Id = ?
+				        AND ct.ShaleClientId = ?
+				        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+				    ))
+				    OR
+				    (? IS NOT NULL AND EXISTS (
+				      SELECT 1
+				      FROM dbo.Organizations o
+				      WHERE o.Id = ?
+				        AND o.ShaleClientId = ?
+				        AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				    ))
+				  );
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			setNullableLong(ps, idx++, contactId);
+			setNullableLong(ps, idx++, organizationId);
+			ps.setLong(idx++, partyRoleId);
+			setNullableString(ps, idx++, normalizedSide);
+			ps.setBoolean(idx++, primary);
+			setNullableString(ps, idx++, notes);
+			ps.setTimestamp(idx++, now);
+			ps.setTimestamp(idx++, now);
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setLong(idx++, partyRoleId);
+			ps.setInt(idx++, shaleClientId);
+			setNullableLong(ps, idx++, contactId);
+			setNullableLong(ps, idx++, contactId);
+			ps.setInt(idx++, shaleClientId);
+			setNullableLong(ps, idx++, organizationId);
+			setNullableLong(ps, idx++, organizationId);
+			ps.setInt(idx++, shaleClientId);
+			int rows = ps.executeUpdate();
+			if (rows != 1) {
+				throw new RuntimeException("Failed to add case party (caseId=" + caseId + ").");
+			}
 		}
 	}
 
