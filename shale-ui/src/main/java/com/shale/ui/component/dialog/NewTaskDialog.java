@@ -7,6 +7,7 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.ui.component.factory.UserCardFactory;
@@ -18,7 +19,6 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -79,23 +79,40 @@ public final class NewTaskDialog {
         priorityComboBox.setButtonCell(new PriorityListCell());
         selectDefaultPriority(priorityComboBox, safePriorities);
 
-        Label assigneeLabel = new Label("Assignee");
-        ComboBox<AssigneeChoice> assigneeComboBox = new ComboBox<>();
-        assigneeComboBox.setMaxWidth(Double.MAX_VALUE);
-        assigneeComboBox.setPromptText("Unassigned");
-        UserCardFactory userCardFactory = new UserCardFactory(id -> {
-        });
-        assigneeComboBox.setCellFactory(cb -> new AssigneeChoiceListCell(userCardFactory));
-        assigneeComboBox.setButtonCell(new AssigneeChoiceButtonCell());
         List<CaseTaskService.AssignableUserOption> safeAssignees = availableAssignees == null ? List.of() : availableAssignees;
-        assigneeComboBox.getItems().add(AssigneeChoice.unassigned());
-        for (CaseTaskService.AssignableUserOption assignee : safeAssignees) {
-            if (assignee == null || assignee.id() <= 0) {
-                continue;
+        VBox assignedSection = new VBox(6);
+        Label assignedLabel = new Label("Assigned");
+        assignedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        Button addAssignedButton = new Button("Add");
+        addAssignedButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        Region assignedSpacer = new Region();
+        HBox.setHgrow(assignedSpacer, Priority.ALWAYS);
+        HBox assignedHeader = new HBox(8, assignedLabel, assignedSpacer, addAssignedButton);
+        assignedHeader.setAlignment(Pos.CENTER_LEFT);
+        VBox assignedList = new VBox(6);
+        java.util.LinkedHashMap<Integer, CaseTaskService.AssignableUserOption> selectedAssignedUsers = new java.util.LinkedHashMap<>();
+        UserCardFactory assignedUserFactory = new UserCardFactory(id -> {
+        });
+        @SuppressWarnings("unchecked")
+        Consumer<Integer>[] removeAssignedRef = new Consumer[1];
+        removeAssignedRef[0] = userId -> {
+            selectedAssignedUsers.remove(userId);
+            renderAssignedUsers(assignedList, assignedUserFactory, selectedAssignedUsers.values().stream().toList(), removeAssignedRef[0]);
+        };
+        renderAssignedUsers(assignedList, assignedUserFactory, List.of(), removeAssignedRef[0]);
+        addAssignedButton.setOnAction(e -> {
+            List<CaseTaskService.AssignableUserOption> candidates = safeAssignees.stream()
+                    .filter(user -> user != null && user.id() > 0 && !selectedAssignedUsers.containsKey(user.id()))
+                    .toList();
+            Optional<CaseTaskService.AssignableUserOption> selected = showAssignUserPicker(stage, candidates);
+            if (selected.isEmpty()) {
+                return;
             }
-            assigneeComboBox.getItems().add(new AssigneeChoice(assignee.id(), assignee.displayName(), assignee.color()));
-        }
-        assigneeComboBox.setValue(AssigneeChoice.unassigned());
+            CaseTaskService.AssignableUserOption user = selected.get();
+            selectedAssignedUsers.put(user.id(), user);
+            renderAssignedUsers(assignedList, assignedUserFactory, selectedAssignedUsers.values().stream().toList(), removeAssignedRef[0]);
+        });
+        assignedSection.getChildren().setAll(assignedHeader, assignedList);
 
         Label errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: #b42318;");
@@ -109,8 +126,7 @@ public final class NewTaskDialog {
                 descriptionArea,
                 priorityLabel,
                 priorityComboBox,
-                assigneeLabel,
-                assigneeComboBox,
+                assignedSection,
                 dueLabel,
                 dueRow,
                 errorLabel);
@@ -142,15 +158,12 @@ public final class NewTaskDialog {
             Integer selectedPriorityId = Optional.ofNullable(priorityComboBox.getValue())
                     .map(TaskPriorityOptionDto::id)
                     .orElse(null);
-            Integer selectedAssigneeId = Optional.ofNullable(assigneeComboBox.getValue())
-                    .map(AssigneeChoice::userId)
-                    .orElse(null);
             result.value = new CreateTaskInput(
                     title,
                     descriptionArea.getText(),
                     dueAt,
                     selectedPriorityId,
-                    selectedAssigneeId);
+                    selectedAssignedUsers.values().stream().map(CaseTaskService.AssignableUserOption::id).toList());
             stage.close();
         });
 
@@ -159,7 +172,8 @@ public final class NewTaskDialog {
         HBox actions = new HBox(10, spacer, cancelButton, createButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        VBox root = new VBox(16, heading, message, content, actions);
+        HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, "New Task", stage::close);
+        VBox root = new VBox(16, windowHeader, heading, message, content, actions);
         root.getStyleClass().add("app-dialog-root");
         root.setPadding(new Insets(22, 24, 22, 24));
         root.setMinWidth(460);
@@ -206,7 +220,7 @@ public final class NewTaskDialog {
             String description,
             LocalDateTime dueAt,
             Integer priorityId,
-            Integer assigneeUserId) {
+            List<Integer> assignedUserIds) {
     }
 
     private static final class ResultHolder {
@@ -221,66 +235,85 @@ public final class NewTaskDialog {
         }
     }
 
-    private record AssigneeChoice(Integer userId, String displayName, String colorCss) {
-        static AssigneeChoice unassigned() {
-            return new AssigneeChoice(null, "Unassigned", null);
+    private static void renderAssignedUsers(
+            VBox assignedList,
+            UserCardFactory cardFactory,
+            List<CaseTaskService.AssignableUserOption> users,
+            Consumer<Integer> onRemove) {
+        assignedList.getChildren().clear();
+        if (users == null || users.isEmpty()) {
+            Label emptyLabel = new Label("No users assigned");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            assignedList.getChildren().add(emptyLabel);
+            return;
         }
-    }
-
-    private static final class AssigneeChoiceListCell extends javafx.scene.control.ListCell<AssigneeChoice> {
-        private final UserCardFactory userCardFactory;
-
-        private AssigneeChoiceListCell(UserCardFactory userCardFactory) {
-            this.userCardFactory = userCardFactory;
-        }
-
-        @Override
-        protected void updateItem(AssigneeChoice item, boolean empty) {
-            super.updateItem(item, empty);
-            if (empty || item == null) {
-                setText(null);
-                setGraphic(null);
-                return;
+        for (CaseTaskService.AssignableUserOption user : users) {
+            if (user == null || user.id() <= 0) {
+                continue;
             }
-            if (item.userId() == null) {
-                setText("Unassigned");
-                setGraphic(null);
-                return;
-            }
-            String text = item.displayName();
-            if (text == null || text.isBlank()) {
-                text = "User #" + item.userId();
-            }
-            var card = userCardFactory.create(
-                    new UserCardModel(item.userId(), text, item.colorCss(), null),
+            var card = cardFactory.create(
+                    new UserCardModel(user.id(), user.displayName(), user.color(), null),
                     UserCardFactory.Variant.MINI);
             card.setMouseTransparent(true);
-            setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-            setText(null);
-            setGraphic(card);
+            Button removeButton = new Button("Remove");
+            removeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            int userId = user.id();
+            removeButton.setOnAction(e -> onRemove.accept(userId));
+            HBox row = new HBox(8, card, removeButton);
+            row.setAlignment(Pos.CENTER_LEFT);
+            assignedList.getChildren().add(row);
         }
     }
 
-    private static final class AssigneeChoiceButtonCell extends javafx.scene.control.ListCell<AssigneeChoice> {
-        @Override
-        protected void updateItem(AssigneeChoice item, boolean empty) {
-            super.updateItem(item, empty);
-            if (empty || item == null) {
-                setText(null);
-                setGraphic(null);
-                return;
+    private static Optional<CaseTaskService.AssignableUserOption> showAssignUserPicker(
+            Window owner,
+            List<CaseTaskService.AssignableUserOption> candidates) {
+        Stage stage = AppDialogs.createModalStage(owner, "Add Assigned User");
+        Label heading = new Label("Add to assigned");
+        heading.getStyleClass().add("app-dialog-title");
+        VBox list = new VBox(8);
+        UserCardFactory cardFactory = new UserCardFactory(id -> {
+        });
+        ResultHolderAssignable holder = new ResultHolderAssignable();
+        if (candidates == null || candidates.isEmpty()) {
+            Label emptyLabel = new Label("No additional users available");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            list.getChildren().add(emptyLabel);
+        } else {
+            for (CaseTaskService.AssignableUserOption user : candidates) {
+                if (user == null || user.id() <= 0) {
+                    continue;
+                }
+                var card = cardFactory.create(
+                        new UserCardModel(user.id(), user.displayName(), user.color(), null),
+                        UserCardFactory.Variant.MINI);
+                Button selectButton = new Button();
+                selectButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+                selectButton.setMaxWidth(Double.MAX_VALUE);
+                selectButton.setGraphic(card);
+                selectButton.setOnAction(e -> {
+                    holder.value = user;
+                    stage.close();
+                });
+                list.getChildren().add(selectButton);
             }
-            if (item.userId() == null) {
-                setText("Unassigned");
-                setGraphic(null);
-                return;
-            }
-            String text = item.displayName();
-            if (text == null || text.isBlank()) {
-                text = "User #" + item.userId();
-            }
-            setText(text);
-            setGraphic(null);
         }
+        Button closeButton = new Button("Close");
+        closeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        closeButton.setOnAction(e -> stage.close());
+        VBox root = new VBox(12, heading, list, closeButton);
+        root.getStyleClass().add("app-dialog-root");
+        root.setPadding(new Insets(18));
+        root.setMinWidth(380);
+        Scene scene = new Scene(root);
+        scene.getStylesheets().add(Objects.requireNonNull(
+                NewTaskDialog.class.getResource("/css/app.css")).toExternalForm());
+        stage.setScene(scene);
+        stage.showAndWait();
+        return Optional.ofNullable(holder.value);
+    }
+
+    private static final class ResultHolderAssignable {
+        private CaseTaskService.AssignableUserOption value;
     }
 }

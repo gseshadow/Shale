@@ -145,6 +145,8 @@ public class CaseController {
 	@FXML
 	private VBox overviewPane;
 	@FXML
+	private VBox detailsSectionPane;
+	@FXML
 	private ScrollPane detailsScrollPane;
 	@FXML
 	private VBox detailsPane;
@@ -377,8 +379,7 @@ public class CaseController {
 			"Parties",
 			"Tasks",
 			"Timeline",
-			"Details",
-			"Documents"
+			"Details"
 	);
 
 	// ----------------------------
@@ -459,6 +460,7 @@ public class CaseController {
 	private List<CasePartyDto> caseParties = List.of();
 	private boolean partiesLoadedOnce = false;
 	private List<CaseTaskListItemDto> caseTasks = List.of();
+	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private Long editingCaseUpdateId;
 	private String editingCaseUpdateDraftText = "";
@@ -884,7 +886,6 @@ public class CaseController {
 		case "Timeline" -> "TIMELINE";
 		case "Details" -> "DETAILS";
 		case "Parties" -> "PARTIES";
-		case "Documents" -> "DOCUMENTS";
 		default -> sectionName.toUpperCase(Locale.ROOT);
 		};
 	}
@@ -900,7 +901,6 @@ public class CaseController {
 		case "TIMELINE" -> "Timeline";
 		case "DETAILS" -> "Details";
 		case "PARTIES" -> "Parties";
-		case "DOCUMENTS" -> "Documents";
 		default -> null;
 		};
 	}
@@ -920,7 +920,7 @@ public class CaseController {
 	private void showOverview() {
 		setUpdatesPaneVisible(true);
 		setPaneVisible(overviewPane, true);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, true);
@@ -932,7 +932,7 @@ public class CaseController {
 	private void showTasksTab() {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -943,7 +943,7 @@ public class CaseController {
 	private void showDetails() {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, true);
+		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -955,7 +955,7 @@ public class CaseController {
 	private void showGeneric(String sectionName) {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -980,7 +980,7 @@ public class CaseController {
 	private void showTimeline() {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -1002,7 +1002,7 @@ public class CaseController {
 	private void showParties() {
 		setUpdatesPaneVisible(false);
 		setPaneVisible(overviewPane, false);
-		setVisibleManaged(detailsScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -1467,6 +1467,7 @@ public class CaseController {
 		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
 
 		Dialog<PartyEditorResult> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, "Edit Party");
 		dialog.setTitle("Edit Party");
 		dialog.initOwner(organizationDialogOwner());
 		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
@@ -1636,6 +1637,7 @@ public class CaseController {
 		WizardState state = new WizardState();
 
 		Dialog<AddPartyDraft> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, "Add Party");
 		dialog.setTitle("Add Party");
 		dialog.initOwner(organizationDialogOwner());
 		ButtonType backType = new ButtonType("Back", ButtonData.LEFT);
@@ -2035,16 +2037,32 @@ public class CaseController {
 						activeCaseId,
 						shaleClientId,
 						selectedCaseTaskSort());
+				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
+						.map(CaseTaskListItemDto::id)
+						.toList();
+				java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
+						.loadAssignedUsersForTasks(taskIds, shaleClientId)
+						.stream()
+						.collect(java.util.stream.Collectors.groupingBy(
+								CaseTaskService.TaskAssignedUsersByTask::taskId,
+								java.util.stream.Collectors.mapping(
+										row -> new TaskCardFactory.AssignedUserModel(
+												row.userId(),
+												row.displayName(),
+												row.color()),
+										java.util.stream.Collectors.toList())));
 				runOnFx(() -> {
 					if (caseId == null || caseId.longValue() != activeCaseId) {
 						return;
 					}
 					caseTasks = tasks == null ? List.of() : tasks;
+					caseTaskAssignedUsers = assignedByTask;
 					renderTasksSection();
 				});
 			} catch (Exception ex) {
 				runOnFx(() -> {
 					caseTasks = List.of();
+					caseTaskAssignedUsers = java.util.Map.of();
 					renderTasksSection();
 				});
 				System.err.println("Case tasks load failed for caseId=" + activeCaseId + ": " + ex.getMessage());
@@ -2093,9 +2111,7 @@ public class CaseController {
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
-					task.assignedUserId(),
-					task.assignedUserDisplayName(),
-					task.assignedUserColor());
+					caseTaskAssignedUsers.getOrDefault(task.id(), List.of()));
 			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT));
 		}
 
@@ -2159,7 +2175,7 @@ public class CaseController {
 				input.get().description(),
 				input.get().dueAt(),
 				input.get().priorityId(),
-				input.get().assigneeUserId(),
+				input.get().assignedUserIds(),
 				currentUserId);
 
 		new Thread(() -> {
@@ -2219,7 +2235,10 @@ public class CaseController {
 	        try {
 	            TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 	            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-	            List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
+                List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
+                        detail == null
+                                ? List.of()
+                                : caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
 
 	            runOnFx(() -> {
 	                try {
@@ -2239,12 +2258,46 @@ public class CaseController {
 	                            detail.description(),
 	                            detail.dueAt(),
 	                            detail.priorityId(),
-	                            detail.assignedUserId(),
+                                detail.createdByDisplayName(),
+                                assignedTeam.stream()
+                                        .map(member -> new TaskDetailDialog.AssignedTeamMember(
+                                                member.userId(),
+                                                member.displayName(),
+                                                member.color()))
+                                        .toList(),
 	                            detail.completedAt() != null
 	                    );
 
 	                    Optional<TaskDetailDialog.TaskDetailResult> result =
-	                            TaskDetailDialog.showAndWait(taskDialogOwner(), model, priorities, users, onOpenCase);
+	                            TaskDetailDialog.showAndWait(
+	                                    taskDialogOwner(),
+	                                    model,
+	                                    priorities,
+	                                    id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+	                                    new TaskDetailDialog.AssignmentEditor() {
+	                                        @Override
+	                                        public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
+	                                            caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+	                                            return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+	                                                    .map(member -> new TaskDetailDialog.AssignedTeamMember(
+	                                                            member.userId(),
+	                                                            member.displayName(),
+	                                                            member.color()))
+	                                                    .toList();
+	                                        }
+
+	                                        @Override
+	                                        public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
+	                                            caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId);
+	                                            return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+	                                                    .map(member -> new TaskDetailDialog.AssignedTeamMember(
+	                                                            member.userId(),
+	                                                            member.displayName(),
+	                                                            member.color()))
+	                                                    .toList();
+	                                        }
+	                                    },
+	                                    onOpenCase);
 
 	                    if (result.isEmpty()) {
 	                        return;
@@ -2288,7 +2341,6 @@ public class CaseController {
 				payload.description(),
 				payload.dueAt(),
 				payload.priorityId(),
-				payload.assigneeUserId(),
 				payload.completed(),
 				currentUserId);
 
@@ -3805,7 +3857,7 @@ public class CaseController {
 	}
 
 	private void showError(String message) {
-		boolean detailsVisible = detailsScrollPane != null && detailsScrollPane.isVisible();
+		boolean detailsVisible = detailsSectionPane != null && detailsSectionPane.isVisible();
 		if (detailsVisible) {
 			setErrorLabel(detailsErrorLabel, message);
 			setErrorLabel(errorLabel, "");
@@ -5279,6 +5331,7 @@ public class CaseController {
 				String preselect,
 				java.util.Collection<String> options) {
 			ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, options);
+			AppDialogs.applySecondaryWindowChrome(dialog);
 			dialog.setTitle(title);
 			dialog.setHeaderText(header);
 			dialog.setContentText(content);
@@ -5667,6 +5720,7 @@ public class CaseController {
 			d.clientEstate = detail == null ? "0" : normalizeDetailsCheckboxStorage(detail.getClientEstate());
 			d.officePrinterCode = detail == null ? "" : safeText(detail.getOfficePrinterCode());
 			d.medicalRecordsReceived = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getMedicalRecordsReceived());
+			System.out.println("Case details load: feeAgreementSigned rawLoaded=" + (detail == null ? null : detail.getFeeAgreementSigned()));
 			d.feeAgreementSigned = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getFeeAgreementSigned());
 			d.dateFeeAgreementSigned = detail == null ? null : detail.getDateFeeAgreementSigned();
 
@@ -5760,6 +5814,8 @@ public class CaseController {
 
 		private void runSaveWorker(DetailsSaveRequest request) {
 			try {
+				System.out.println("Case details save: sentToDao feeAgreementSigned=" + request.feeAgreementSigned()
+						+ ", finalDate=" + request.dateFeeAgreementSigned());
 				CaseDetailDto updated = caseDao.updateCaseDetails(
 						request.caseId(),
 						request.name(),
@@ -6154,6 +6210,14 @@ public class CaseController {
 			String officePrinterCode = normalizeNullableText(source.officePrinterCode);
 			Boolean medicalRecordsReceived = normalizeDetailsCheckboxBoolean(source.medicalRecordsReceived);
 			Boolean feeAgreementSigned = normalizeDetailsCheckboxBoolean(source.feeAgreementSigned);
+			LocalDate rawDateFeeAgreementSigned = source.dateFeeAgreementSigned;
+			LocalDate dateFeeAgreementSigned = rawDateFeeAgreementSigned;
+			if (Boolean.TRUE.equals(feeAgreementSigned) && dateFeeAgreementSigned == null)
+				dateFeeAgreementSigned = LocalDate.now();
+			System.out.println("Case details save: feeAgreementSigned rawLoaded=" + baseline.getFeeAgreementSigned()
+					+ ", selected=" + feeAgreementSigned
+					+ ", rawDate=" + rawDateFeeAgreementSigned
+					+ ", finalDate=" + dateFeeAgreementSigned);
 			Boolean acceptedChronology = normalizeDetailsCheckboxBoolean(source.acceptedChronology);
 			Boolean acceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedConsultantExpertSearch);
 			Boolean acceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedTestifyingExpertSearch);
@@ -6164,7 +6228,7 @@ public class CaseController {
 			String summary = normalizeNullableText(source.summary);
 			String receivedUpdates = toNullableBooleanStorage(normalizeDetailsCheckboxBoolean(source.receivedUpdates));
 			Boolean baselineMedicalRecordsReceived = normalizeDetailsCheckboxBoolean(baseline.getMedicalRecordsReceived());
-			Boolean baselineFeeAgreementSigned = normalizeDetailsCheckboxBoolean(baseline.getFeeAgreementSigned());
+			Boolean baselineFeeAgreementSigned = baseline.getFeeAgreementSigned();
 			Boolean baselineAcceptedChronology = normalizeDetailsCheckboxBoolean(baseline.getAcceptedChronology());
 			Boolean baselineAcceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedConsultantExpertSearch());
 			Boolean baselineAcceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedTestifyingExpertSearch());
@@ -6199,7 +6263,7 @@ public class CaseController {
 				!Objects.equals(officePrinterCode, normalizeNullableText(baseline.getOfficePrinterCode())) ||
 				!Objects.equals(medicalRecordsReceived, baselineMedicalRecordsReceived) ||
 				!Objects.equals(feeAgreementSigned, baselineFeeAgreementSigned) ||
-				!Objects.equals(source.dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
+				!Objects.equals(dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
 				!Objects.equals(acceptedChronology, baselineAcceptedChronology) ||
 				!Objects.equals(acceptedConsultantExpertSearch, baselineAcceptedConsultantExpertSearch) ||
 				!Objects.equals(acceptedTestifyingExpertSearch, baselineAcceptedTestifyingExpertSearch) ||
@@ -6235,7 +6299,7 @@ public class CaseController {
 				officePrinterCode,
 				medicalRecordsReceived,
 				feeAgreementSigned,
-				source.dateFeeAgreementSigned,
+				dateFeeAgreementSigned,
 				acceptedChronology,
 				acceptedConsultantExpertSearch,
 				acceptedTestifyingExpertSearch,
@@ -6784,6 +6848,8 @@ public class CaseController {
 	}
 
 	private final class CaseDetailsEditor {
+		private javafx.beans.value.ChangeListener<Boolean> feeAgreementSignedAutoDateListener;
+
 		void beginEdit() {
 			CaseDetailsDraft base = resolveDetailsViewModel();
 			detailsBaseline = base.copy();
@@ -6858,6 +6924,27 @@ public class CaseController {
 			return editor != null && editor.isSelected();
 		}
 
+		private void renderTriStateBoolean(CheckBox editor, Boolean value) {
+			if (editor == null)
+				return;
+			editor.setAllowIndeterminate(true);
+			if (value == null) {
+				editor.setSelected(false);
+				editor.setIndeterminate(true);
+				return;
+			}
+			editor.setIndeterminate(false);
+			editor.setSelected(Boolean.TRUE.equals(value));
+		}
+
+		private Boolean captureTriStateBoolean(CheckBox editor) {
+			if (editor == null)
+				return null;
+			if (editor.isIndeterminate())
+				return null;
+			return editor.isSelected();
+		}
+
 		void renderView(CaseDetailsDraft d) {
 			if (d == null)
 				return;
@@ -6903,7 +6990,7 @@ public class CaseController {
 			if (detMedicalRecordsReceivedValue != null)
 				detMedicalRecordsReceivedValue.setText(boolLabel(d.medicalRecordsReceived));
 			if (detFeeAgreementSignedValue != null)
-				detFeeAgreementSignedValue.setText(boolLabel(d.feeAgreementSigned));
+				detFeeAgreementSignedValue.setText(boolLabel(Boolean.TRUE.equals(d.feeAgreementSigned)));
 			if (detDateFeeAgreementSignedValue != null)
 				detDateFeeAgreementSignedValue.setText(formatDate(d.dateFeeAgreementSigned));
 			if (detAcceptedChronologyValue != null)
@@ -6924,16 +7011,6 @@ public class CaseController {
 				detSummaryValue.setText(safe(d.summary));
 			if (detReceivedUpdatesValue != null)
 				detReceivedUpdatesValue.setText(boolLabel(d.receivedUpdates));
-		}
-
-
-		private void refreshFeeAgreementDateState() {
-			if (detFeeAgreementSignedEditor == null || detDateFeeAgreementSignedEditor == null)
-				return;
-			boolean disable = !detFeeAgreementSignedEditor.isSelected();
-			detDateFeeAgreementSignedEditor.setDisable(disable);
-			if (disable)
-				detDateFeeAgreementSignedEditor.setValue(null);
 		}
 
 		private void renderEditors(CaseDetailsDraft d) {
@@ -6974,12 +7051,14 @@ public class CaseController {
 			if (detOfficePrinterCodeEditor != null)
 				detOfficePrinterCodeEditor.setText(d.officePrinterCode);
 			renderNullableBoolean(detMedicalRecordsReceivedEditor, d.medicalRecordsReceived);
-			renderNullableBoolean(detFeeAgreementSignedEditor, d.feeAgreementSigned);
+			if (detFeeAgreementSignedEditor != null) {
+				detFeeAgreementSignedEditor.setAllowIndeterminate(false);
+				detFeeAgreementSignedEditor.setIndeterminate(false);
+				detFeeAgreementSignedEditor.setSelected(Boolean.TRUE.equals(d.feeAgreementSigned));
+			}
 			if (detDateFeeAgreementSignedEditor != null)
 				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
-			if (detFeeAgreementSignedEditor != null)
-				detFeeAgreementSignedEditor.setOnAction(e -> refreshFeeAgreementDateState());
-			refreshFeeAgreementDateState();
+			wireFeeAgreementSignedAutoDateListener();
 			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
 			renderNullableBoolean(detAcceptedConsultantExpertSearchEditor, d.acceptedConsultantExpertSearch);
 			renderNullableBoolean(detAcceptedTestifyingExpertSearchEditor, d.acceptedTestifyingExpertSearch);
@@ -6992,6 +7071,20 @@ public class CaseController {
 			if (detSummaryEditor != null)
 				detSummaryEditor.setText(d.summary);
 			renderNullableBoolean(detReceivedUpdatesEditor, d.receivedUpdates);
+		}
+
+		private void wireFeeAgreementSignedAutoDateListener() {
+			if (detFeeAgreementSignedEditor == null)
+				return;
+			if (feeAgreementSignedAutoDateListener != null)
+				detFeeAgreementSignedEditor.selectedProperty().removeListener(feeAgreementSignedAutoDateListener);
+			feeAgreementSignedAutoDateListener = (obs, wasSelected, isSelected) -> {
+				if (!Boolean.TRUE.equals(isSelected) || detDateFeeAgreementSignedEditor == null)
+					return;
+				if (detDateFeeAgreementSignedEditor.getValue() == null)
+					detDateFeeAgreementSignedEditor.setValue(LocalDate.now());
+			};
+			detFeeAgreementSignedEditor.selectedProperty().addListener(feeAgreementSignedAutoDateListener);
 		}
 
 		void captureEditors(CaseDetailsDraft d) {
@@ -7027,11 +7120,9 @@ public class CaseController {
 			if (detOfficePrinterCodeEditor != null)
 				d.officePrinterCode = safeText(detOfficePrinterCodeEditor.getText());
 			d.medicalRecordsReceived = captureNullableBoolean(detMedicalRecordsReceivedEditor);
-			d.feeAgreementSigned = captureNullableBoolean(detFeeAgreementSignedEditor);
+			d.feeAgreementSigned = detFeeAgreementSignedEditor != null && detFeeAgreementSignedEditor.isSelected();
 			if (detDateFeeAgreementSignedEditor != null)
 				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
-			if (Boolean.FALSE.equals(d.feeAgreementSigned))
-				d.dateFeeAgreementSigned = null;
 			d.acceptedChronology = captureNullableBoolean(detAcceptedChronologyEditor);
 			d.acceptedConsultantExpertSearch = captureNullableBoolean(detAcceptedConsultantExpertSearchEditor);
 			d.acceptedTestifyingExpertSearch = captureNullableBoolean(detAcceptedTestifyingExpertSearchEditor);

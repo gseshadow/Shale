@@ -1,13 +1,19 @@
 package com.shale.ui.controller;
 
 import com.shale.data.dao.CaseDao.CaseRow;
+import com.shale.data.dao.TaskDao.AssignedUserTaskRow;
 import com.shale.data.dao.UserDao.UserDetailRow;
 import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
 import com.shale.data.dao.UserDao.UserRoleRow;
+import com.shale.core.dto.TaskDetailDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
+import com.shale.ui.component.dialog.TaskDetailDialog;
+import com.shale.ui.component.factory.TaskCardFactory;
+import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.state.AppState;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -21,6 +27,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -32,6 +39,9 @@ import javafx.stage.Window;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -39,6 +49,10 @@ import java.util.function.Consumer;
 public final class UserController {
 
 	private static final Color DEFAULT_USER_COLOR = Color.WHITE;
+	private static final String TASK_SORT_RECENT = "Recent";
+	private static final String TASK_SORT_DUE_DATE = "Due Date";
+	private static final String TASK_SORT_NAME = "Name";
+	private static final String TASK_SORT_PRIORITY = "Priority";
 	private static final String COLOR_SWATCH_BASE_STYLE = "-fx-min-width: 22px; -fx-pref-width: 22px; -fx-max-width: 22px; "
 			+ "-fx-min-height: 22px; -fx-pref-height: 22px; -fx-max-height: 22px; "
 			+ "-fx-background-radius: 11px; -fx-border-radius: 11px; "
@@ -58,6 +72,11 @@ public final class UserController {
 	@FXML private Label assignedCasesEmptyLabel;
 	@FXML private TextField assignedCasesSearchField;
 	@FXML private ChoiceBox<String> assignedCasesSortChoice;
+	@FXML private VBox assignedTasksContainer;
+	@FXML private Label assignedTasksEmptyLabel;
+	@FXML private TextField assignedTasksSearchField;
+	@FXML private ChoiceBox<String> assignedTasksSortChoice;
+	@FXML private ScrollPane assignedTasksScroll;
 
 	@FXML private Label displayNameValue;
 	@FXML private Label firstNameValue;
@@ -82,16 +101,23 @@ public final class UserController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private Consumer<Integer> onOpenCase;
+	private Consumer<Integer> onOpenUser;
+	private CaseTaskService caseTaskService;
 	private CaseCardFactory caseCardFactory;
+	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
 	private UserDetailRow currentUser;
 	private List<UserRoleRow> assignedRoles = List.of();
 	private List<UserRoleRow> assignableRoles = List.of();
 	private List<CaseRow> assignedCases = List.of();
+	private List<AssignedUserTaskRow> assignedTasks = List.of();
+	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedTaskUsers = java.util.Map.of();
 	private long assignedCasesRefreshSequence;
+	private long assignedTasksRefreshSequence;
 	private boolean editMode;
 	private boolean colorEditedInSession;
+	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "user-detail-loader");
@@ -103,13 +129,23 @@ public final class UserController {
 			UserDetailService userDetailService,
 			AppState appState,
 			UiRuntimeBridge runtimeBridge,
-			Consumer<Integer> onOpenCase) {
+			Consumer<Integer> onOpenCase,
+			Consumer<Integer> onOpenUser,
+			CaseTaskService caseTaskService) {
 		this.userId = userId;
 		this.userDetailService = userDetailService;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.onOpenCase = onOpenCase;
+		this.onOpenUser = onOpenUser == null ? id -> {
+		} : onOpenUser;
+		this.caseTaskService = caseTaskService;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
+		this.taskCardFactory = new TaskCardFactory(
+				this::openTask,
+				this::onToggleAssignedTaskComplete,
+				onOpenCase,
+				this::onOpenUserFromTask);
 		System.out.println("[TRACE ASSIGNED_CASES][UserController.init] selectedUserId=" + userId);
 	}
 
@@ -128,6 +164,7 @@ public final class UserController {
 			addRoleButton.setOnAction(e -> onAddRole());
 		}
 		CaseListFilterSortSupport.initializeControls(assignedCasesSearchField, assignedCasesSortChoice, this::renderAssignedCases);
+		initializeAssignedTaskControls();
 		configureColorEditor();
 
 		setEditMode(false);
@@ -204,11 +241,13 @@ public final class UserController {
 					}
 						currentUser = loaded;
 						resetAssignedCaseControls();
+						resetAssignedTaskControls();
 						renderFromCurrent();
 					setEditMode(false);
 					clearError();
 					refreshRolesAsync();
 					refreshAssignedCasesAsync();
+					refreshAssignedTasksAsync();
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
@@ -298,6 +337,59 @@ public final class UserController {
 					assignedCases = List.of();
 					renderAssignedCases();
 					setError("Failed to load assigned cases for this user.");
+				});
+			}
+		});
+	}
+
+	private void refreshAssignedTasksAsync() {
+		if (userDetailService == null || currentUser == null || appState == null) {
+			assignedTasks = List.of();
+			assignedTaskUsers = java.util.Map.of();
+			renderAssignedTasks();
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			assignedTasks = List.of();
+			assignedTaskUsers = java.util.Map.of();
+			renderAssignedTasks();
+			return;
+		}
+		final int targetUserId = currentUser.id();
+		final int tenantId = shaleClientId;
+		final long requestId = ++assignedTasksRefreshSequence;
+		dbExec.submit(() -> {
+			try {
+				List<AssignedUserTaskRow> loaded = userDetailService.loadAssignedTasks(tenantId, targetUserId);
+				List<Long> taskIds = (loaded == null ? List.<AssignedUserTaskRow>of() : loaded).stream()
+						.map(AssignedUserTaskRow::taskId)
+						.toList();
+				java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> usersByTask = caseTaskService == null
+						? java.util.Map.of()
+						: caseTaskService.loadAssignedUsersForTasks(taskIds, tenantId).stream()
+								.collect(java.util.stream.Collectors.groupingBy(
+										CaseTaskService.TaskAssignedUsersByTask::taskId,
+										java.util.stream.Collectors.mapping(
+												row -> new TaskCardFactory.AssignedUserModel(
+														row.userId(),
+														row.displayName(),
+														row.color()),
+												java.util.stream.Collectors.toList())));
+				Platform.runLater(() -> {
+					if (requestId != assignedTasksRefreshSequence) {
+						return;
+					}
+					assignedTasks = loaded == null ? List.of() : List.copyOf(loaded);
+					assignedTaskUsers = usersByTask;
+					renderAssignedTasks();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> {
+					assignedTasks = List.of();
+					assignedTaskUsers = java.util.Map.of();
+					renderAssignedTasks();
+					setError("Failed to load assigned tasks for this user.");
 				});
 			}
 		});
@@ -502,6 +594,7 @@ public final class UserController {
 		refreshActionVisibility();
 		renderRoles();
 		renderAssignedCases();
+		renderAssignedTasks();
 	}
 
 	private void renderRoles() {
@@ -590,6 +683,119 @@ public final class UserController {
 				assignedCasesEmptyLabel.setText("No assigned cases");
 			}
 		}
+	}
+
+	private void initializeAssignedTaskControls() {
+		if (assignedTasksSortChoice != null) {
+			assignedTasksSortChoice.getItems().setAll(TASK_SORT_RECENT, TASK_SORT_DUE_DATE, TASK_SORT_PRIORITY, TASK_SORT_NAME);
+			assignedTasksSortChoice.getSelectionModel().select(TASK_SORT_RECENT);
+			assignedTasksSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderAssignedTasks());
+		}
+		if (assignedTasksSearchField != null) {
+			assignedTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderAssignedTasks());
+		}
+	}
+
+	private void resetAssignedTaskControls() {
+		if (assignedTasksSearchField != null) {
+			assignedTasksSearchField.clear();
+		}
+		if (assignedTasksSortChoice != null) {
+			assignedTasksSortChoice.getSelectionModel().select(TASK_SORT_RECENT);
+		}
+	}
+
+	private void renderAssignedTasks() {
+		if (assignedTasksContainer == null) {
+			return;
+		}
+		if (taskCardFactory == null) {
+			taskCardFactory = new TaskCardFactory(this::openTask, this::onToggleAssignedTaskComplete, onOpenCase, this::onOpenUserFromTask);
+		}
+		String query = normalizedAssignedTaskQuery();
+		Comparator<AssignedUserTaskRow> comparator = assignedTasksComparator();
+		List<Node> taskCards = assignedTasks.stream()
+				.filter(task -> matchesAssignedTaskQuery(task, query))
+				.sorted(comparator)
+				.map(this::createAssignedTaskCard)
+				.toList();
+		assignedTasksContainer.getChildren().setAll(taskCards);
+		boolean empty = taskCards.isEmpty();
+		if (assignedTasksEmptyLabel != null) {
+			assignedTasksEmptyLabel.setVisible(empty);
+			assignedTasksEmptyLabel.setManaged(empty);
+			if (!empty) {
+				assignedTasksEmptyLabel.toBack();
+			} else if (!query.isEmpty()) {
+				assignedTasksEmptyLabel.setText("No assigned tasks match your search");
+			} else {
+				assignedTasksEmptyLabel.setText("No assigned tasks");
+			}
+		}
+	}
+
+	private Node createAssignedTaskCard(AssignedUserTaskRow row) {
+		TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+				row.taskId(),
+				row.caseId(),
+				row.caseName(),
+				row.caseResponsibleAttorney(),
+				row.caseResponsibleAttorneyColor(),
+				row.title(),
+				row.description(),
+				row.priorityColorHex(),
+				row.dueAt(),
+				row.completedAt(),
+				assignedTaskUsers.getOrDefault(row.taskId(), List.of()));
+		Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT_FLUID);
+		if (card instanceof Region region) {
+			region.setMaxWidth(Double.MAX_VALUE);
+		}
+		return card;
+	}
+
+	private String normalizedAssignedTaskQuery() {
+		return assignedTasksSearchField == null || assignedTasksSearchField.getText() == null
+				? ""
+				: assignedTasksSearchField.getText().trim().toLowerCase(Locale.ROOT);
+	}
+
+	private Comparator<AssignedUserTaskRow> assignedTasksComparator() {
+		String selected = assignedTasksSortChoice == null ? TASK_SORT_RECENT : assignedTasksSortChoice.getValue();
+		if (TASK_SORT_NAME.equals(selected)) {
+			return Comparator.comparing((AssignedUserTaskRow task) -> safeText(task.title()), String.CASE_INSENSITIVE_ORDER)
+					.thenComparingLong(AssignedUserTaskRow::taskId);
+		}
+		if (TASK_SORT_DUE_DATE.equals(selected)) {
+			return Comparator.comparing(
+					AssignedUserTaskRow::dueAt,
+					Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(AssignedUserTaskRow::updatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+					.thenComparingLong(AssignedUserTaskRow::taskId);
+		}
+		if (TASK_SORT_PRIORITY.equals(selected)) {
+			return Comparator.comparing(
+					AssignedUserTaskRow::prioritySortOrder,
+					Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(AssignedUserTaskRow::dueAt, Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparingLong(AssignedUserTaskRow::taskId);
+		}
+		return Comparator.comparing(AssignedUserTaskRow::updatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+				.thenComparing(AssignedUserTaskRow::createdAt, Comparator.nullsLast(Comparator.reverseOrder()))
+				.thenComparingLong(AssignedUserTaskRow::taskId);
+	}
+
+	private boolean matchesAssignedTaskQuery(AssignedUserTaskRow task, String query) {
+		if (task == null) {
+			return false;
+		}
+		if (query == null || query.isBlank()) {
+			return true;
+		}
+		return safeText(task.title()).toLowerCase(Locale.ROOT).contains(query)
+				|| safeText(task.description()).toLowerCase(Locale.ROOT).contains(query)
+				|| safeText(task.caseName()).toLowerCase(Locale.ROOT).contains(query)
+				|| safeText(task.priorityName()).toLowerCase(Locale.ROOT).contains(query);
 	}
 
 	private String normalizedAssignedCaseQuery() {
@@ -737,6 +943,201 @@ public final class UserController {
 			return button.getScene().getWindow();
 		}
 		return null;
+	}
+
+	private void onOpenUserFromTask(Integer selectedUserId) {
+		if (selectedUserId == null || selectedUserId <= 0) {
+			return;
+		}
+		if (currentUser != null && currentUser.id() == selectedUserId.intValue()) {
+			return;
+		}
+		onOpenUser.accept(selectedUserId);
+	}
+
+	private void openTask(Long taskId) {
+		showTaskDetailPopup(taskId);
+	}
+
+	private void onToggleAssignedTaskComplete(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			showTaskActionError("Unable to update task right now.");
+			return;
+		}
+		boolean currentlyCompleted = findAssignedTaskById(taskId)
+				.map(task -> task.completedAt() != null)
+				.orElse(false);
+		new Thread(() -> {
+			try {
+				if (currentlyCompleted) {
+					caseTaskService.uncompleteTask(taskId, shaleClientId);
+				} else {
+					caseTaskService.completeTask(taskId, shaleClientId);
+				}
+				Platform.runLater(this::refreshAssignedTasksAsync);
+			} catch (Exception ex) {
+				Platform.runLater(() -> showTaskActionError("Failed to update task completion."));
+			}
+		}, "user-view-toggle-task-" + taskId).start();
+	}
+
+	private Optional<AssignedUserTaskRow> findAssignedTaskById(Long taskId) {
+		if (taskId == null || assignedTasks == null) {
+			return Optional.empty();
+		}
+		for (AssignedUserTaskRow task : assignedTasks) {
+			if (task.taskId() == taskId.longValue()) {
+				return Optional.of(task);
+			}
+		}
+		return Optional.empty();
+	}
+
+	private void showTaskDetailPopup(Long taskId) {
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showTaskActionError("You must be signed in to edit tasks.");
+			return;
+		}
+		if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
+			return;
+		}
+
+		new Thread(() -> {
+			try {
+				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+				List<CaseTaskService.AssignedTaskUserOption> assignedTeam = detail == null
+						? List.of()
+						: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+				Platform.runLater(() -> {
+					try {
+						if (detail == null) {
+							showTaskActionError("Task was not found or may have been deleted.");
+							refreshAssignedTasksAsync();
+							return;
+						}
+						TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+								detail.id(),
+								detail.caseId(),
+								detail.caseName(),
+								detail.caseResponsibleAttorney(),
+								detail.caseResponsibleAttorneyColor(),
+								detail.title(),
+								detail.description(),
+								detail.dueAt(),
+								detail.priorityId(),
+								detail.createdByDisplayName(),
+								assignedTeam.stream()
+										.map(member -> new TaskDetailDialog.AssignedTeamMember(
+												member.userId(),
+												member.displayName(),
+												member.color()))
+										.toList(),
+								detail.completedAt() != null);
+						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+								taskDialogOwner(),
+								model,
+								priorities,
+								id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+								new TaskDetailDialog.AssignmentEditor() {
+									@Override
+									public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
+										caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+										return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+												.map(member -> new TaskDetailDialog.AssignedTeamMember(
+														member.userId(),
+														member.displayName(),
+														member.color()))
+												.toList();
+									}
+
+									@Override
+									public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
+										caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId);
+										return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+												.map(member -> new TaskDetailDialog.AssignedTeamMember(
+														member.userId(),
+														member.displayName(),
+														member.color()))
+												.toList();
+									}
+								},
+								onOpenCase);
+						if (result.isEmpty()) {
+							return;
+						}
+						TaskDetailDialog.TaskDetailResult action = result.get();
+						if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+							deleteTaskFromDetail(taskId, shaleClientId);
+							return;
+						}
+						TaskDetailDialog.SaveTaskPayload payload = action.payload();
+						if (payload == null) {
+							return;
+						}
+						saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+					} finally {
+						taskDetailDialogInFlight.set(false);
+					}
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> {
+					taskDetailDialogInFlight.set(false);
+					showTaskActionError("Failed to load task details.");
+				});
+			}
+		}, "user-view-task-detail-" + taskId).start();
+	}
+
+	private void saveTaskFromDetail(long taskId, int shaleClientId, int currentUserId, TaskDetailDialog.SaveTaskPayload payload) {
+		CaseTaskService.UpdateTaskRequest request = new CaseTaskService.UpdateTaskRequest(
+				taskId,
+				shaleClientId,
+				payload.title(),
+				payload.description(),
+				payload.dueAt(),
+				payload.priorityId(),
+				payload.completed(),
+				currentUserId);
+		new Thread(() -> {
+			try {
+				caseTaskService.updateTask(request);
+				Platform.runLater(this::refreshAssignedTasksAsync);
+			} catch (Exception ex) {
+				Platform.runLater(() -> showTaskActionError("Failed to save task."));
+			}
+		}, "user-view-task-save-" + taskId).start();
+	}
+
+	private void deleteTaskFromDetail(long taskId, int shaleClientId) {
+		new Thread(() -> {
+			try {
+				caseTaskService.deleteTask(taskId, shaleClientId);
+				Platform.runLater(this::refreshAssignedTasksAsync);
+			} catch (Exception ex) {
+				Platform.runLater(() -> showTaskActionError("Failed to delete task."));
+			}
+		}, "user-view-task-delete-" + taskId).start();
+	}
+
+	private Window taskDialogOwner() {
+		if (assignedTasksContainer != null && assignedTasksContainer.getScene() != null) {
+			return assignedTasksContainer.getScene().getWindow();
+		}
+		return dialogOwner(addRoleButton);
+	}
+
+	private void showTaskActionError(String message) {
+		AppDialogs.showError(taskDialogOwner(), "Tasks", message);
 	}
 
 	private void configureColorEditor() {

@@ -40,6 +40,8 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -487,12 +489,15 @@ public final class SceneManager {
 			UserController c = (UserController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			UserDetailService userDetailService = new UserDetailService(userDao, caseDao);
+			TaskDao taskDao = new TaskDao(dbSessionProvider);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
+			UserDetailService userDetailService = new UserDetailService(userDao, caseDao, taskDao);
 			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
 			{
 				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
 				openCaseProfile(relatedCaseId, "OVERVIEW");
-			});
+			}, this::openUserProfile, caseTaskService);
 			return c;
 		});
 	}
@@ -590,6 +595,7 @@ public final class SceneManager {
 			Parent root = loader.load();
 
 			Stage dialog = new Stage();
+			AppDialogs.applySecondaryWindowChrome(dialog);
 			dialog.initOwner(stage);
 			dialog.initModality(Modality.WINDOW_MODAL);
 			dialog.setTitle("New Organization");
@@ -598,7 +604,13 @@ public final class SceneManager {
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
 			controller.init(appState, organizationDao, dialog, onOrganizationCreated);
 
-			Scene dialogScene = new Scene(root);
+			VBox dialogRoot = new VBox(
+					AppDialogs.createSecondaryWindowHeader(dialog, "New Organization", dialog::close),
+					root);
+			dialogRoot.getStyleClass().add("secondary-window-shell");
+			VBox.setVgrow(root, Priority.ALWAYS);
+
+			Scene dialogScene = new Scene(dialogRoot);
 			dialogScene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			dialog.setScene(dialogScene);
@@ -617,6 +629,7 @@ public final class SceneManager {
 			Parent root = loader.load();
 
 			Stage dialog = new Stage();
+			AppDialogs.applySecondaryWindowChrome(dialog);
 			dialog.initOwner(stage);
 			dialog.initModality(Modality.WINDOW_MODAL);
 			dialog.setTitle("New Intake");
@@ -625,7 +638,13 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			controller.init(appState, caseDao, dialog, onCaseCreated);
 
-			Scene dialogScene = new Scene(root);
+			VBox dialogRoot = new VBox(
+					AppDialogs.createSecondaryWindowHeader(dialog, "New Intake", dialog::close),
+					root);
+			dialogRoot.getStyleClass().add("secondary-window-shell");
+			VBox.setVgrow(root, Priority.ALWAYS);
+
+			Scene dialogScene = new Scene(dialogRoot);
 			dialogScene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			dialog.setScene(dialogScene);
@@ -666,8 +685,7 @@ public final class SceneManager {
 		try {
 			TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 			List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-			List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
-			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, priorities, users));
+			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, priorities));
 		} catch (Exception ex) {
 			Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
 		}
@@ -679,12 +697,13 @@ public final class SceneManager {
 			int currentUserId,
 			CaseTaskService caseTaskService,
 			TaskDetailDto detail,
-			List<TaskPriorityOptionDto> priorities,
-			List<CaseTaskService.AssignableUserOption> users) {
+			List<TaskPriorityOptionDto> priorities) {
 		if (detail == null) {
 			AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted.");
 			return;
 		}
+		List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
+				caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 				detail.id(),
 				detail.caseId(),
@@ -695,14 +714,43 @@ public final class SceneManager {
 				detail.description(),
 				detail.dueAt(),
 				detail.priorityId(),
-				detail.assignedUserId(),
+					detail.createdByDisplayName(),
+					assignedTeam.stream()
+							.map(member -> new TaskDetailDialog.AssignedTeamMember(
+									member.userId(),
+									member.displayName(),
+									member.color()))
+						.toList(),
 				detail.completedAt() != null);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
 		var result = TaskDetailDialog.showAndWait(
 				owner,
 				model,
 				priorities,
-				users,
+				id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+				new TaskDetailDialog.AssignmentEditor() {
+					@Override
+					public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
+						caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+						return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+								.map(member -> new TaskDetailDialog.AssignedTeamMember(
+										member.userId(),
+										member.displayName(),
+										member.color()))
+								.toList();
+					}
+
+					@Override
+					public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
+						caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId);
+						return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+								.map(member -> new TaskDetailDialog.AssignedTeamMember(
+										member.userId(),
+										member.displayName(),
+										member.color()))
+								.toList();
+					}
+				},
 				caseId -> openCaseProfile(caseId, "OVERVIEW"));
 		if (result.isEmpty()) {
 			return;
@@ -729,7 +777,6 @@ public final class SceneManager {
 				payload.description(),
 				payload.dueAt(),
 				payload.priorityId(),
-				payload.assigneeUserId(),
 				payload.completed(),
 				currentUserId);
 		new Thread(() -> {
