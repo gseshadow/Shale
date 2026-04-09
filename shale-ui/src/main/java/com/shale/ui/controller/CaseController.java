@@ -61,6 +61,7 @@ import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
+import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
 import javafx.application.Platform;
@@ -461,6 +462,8 @@ public class CaseController {
 	private boolean partiesLoadedOnce = false;
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
+	private boolean caseTasksLoadedOnce;
+	private boolean caseTasksStale = true;
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private Long editingCaseUpdateId;
 	private String editingCaseUpdateDraftText = "";
@@ -483,6 +486,7 @@ public class CaseController {
 	private CaseDetailsDraft detailsDraft;
 	private CaseDetailsDraft detailsBaseline;
 	private CaseDetailsDraft detailsLocalViewOverride;
+	private long pageLoadStartNanos;
 
 	private record PartyRoleOption(long id, String label) {}
 	private record PartyEntityOption(String entityType, Long id, String label) {}
@@ -506,6 +510,8 @@ public class CaseController {
 	public void init(Integer caseId) {
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
+		this.caseTasksLoadedOnce = false;
+		this.caseTasksStale = true;
 		refreshHeader();
 		refreshOverviewPlaceholders();
 	}
@@ -513,6 +519,8 @@ public class CaseController {
 	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
+		this.caseTasksLoadedOnce = false;
+		this.caseTasksStale = true;
 		this.caseDao = caseDao;
 		this.caseDetailService = caseDetailService;
 		this.caseTaskService = caseTaskService;
@@ -523,6 +531,9 @@ public class CaseController {
 		this.caseDocumentService = (caseDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, contactDao);
 		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
 		this.onCaseDeleted = onCaseDeleted;
+		this.pageLoadStartNanos = PerfLog.start();
+		PerfLog.log("NAV", "start", "page=case_view caseId=" + caseId);
+		PerfLog.log("CTRL", "start", "controller=CaseController page=case_view caseId=" + caseId);
 		refreshHeader();
 	}
 
@@ -936,8 +947,14 @@ public class CaseController {
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
-		loadCaseTasksAsync();
+		if (shouldReloadTasksForTabOpen()) {
+			loadCaseTasksAsync();
+		}
 		renderTasksSection();
+	}
+
+	private boolean shouldReloadTasksForTabOpen() {
+		return !caseTasksLoadedOnce || caseTasksStale;
 	}
 
 	private void showDetails() {
@@ -2033,13 +2050,18 @@ public class CaseController {
 
 		new Thread(() -> {
 			try {
+				long taskLoadStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=loadTasksForCase page=case_view caseId=" + activeCaseId);
 				List<CaseTaskListItemDto> tasks = caseTaskService.loadTasksForCase(
 						activeCaseId,
 						shaleClientId,
 						selectedCaseTaskSort());
+				PerfLog.logDone("DAO", "method=loadTasksForCase page=case_view caseId=" + activeCaseId + " rows=" + (tasks == null ? 0 : tasks.size()), taskLoadStartNanos);
 				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
 						.map(CaseTaskListItemDto::id)
 						.toList();
+				long assignedUsersLoadStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=case_view caseId=" + activeCaseId);
 				java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
 						.loadAssignedUsersForTasks(taskIds, shaleClientId)
 						.stream()
@@ -2051,18 +2073,23 @@ public class CaseController {
 												row.displayName(),
 												row.color()),
 										java.util.stream.Collectors.toList())));
+				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=case_view caseId=" + activeCaseId + " rows=" + assignedByTask.size(), assignedUsersLoadStartNanos);
 				runOnFx(() -> {
 					if (caseId == null || caseId.longValue() != activeCaseId) {
 						return;
 					}
 					caseTasks = tasks == null ? List.of() : tasks;
 					caseTaskAssignedUsers = assignedByTask;
+					caseTasksLoadedOnce = true;
+					caseTasksStale = false;
 					renderTasksSection();
 				});
 			} catch (Exception ex) {
 				runOnFx(() -> {
 					caseTasks = List.of();
 					caseTaskAssignedUsers = java.util.Map.of();
+					caseTasksLoadedOnce = true;
+					caseTasksStale = false;
 					renderTasksSection();
 				});
 				System.err.println("Case tasks load failed for caseId=" + activeCaseId + ": " + ex.getMessage());
@@ -2087,11 +2114,14 @@ public class CaseController {
 		if (tasksTabFlow == null || tasksTabEmptyLabel == null) {
 			return;
 		}
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=tasks page=case_view caseId=" + caseId);
 
 		tasksTabFlow.getChildren().clear();
 		if (caseTasks == null || caseTasks.isEmpty()) {
 			setVisibleManaged(tasksTabEmptyLabel, true);
 			tasksTabEmptyLabel.setText("No tasks for this case yet.");
+			PerfLog.logDone("RENDER", "panel=tasks page=case_view caseId=" + caseId + " childCount=0", renderStartNanos);
 			return;
 		}
 
@@ -2116,6 +2146,7 @@ public class CaseController {
 		}
 
 		setVisibleManaged(tasksTabEmptyLabel, false);
+		PerfLog.logDone("RENDER", "panel=tasks page=case_view caseId=" + caseId + " childCount=" + tasksTabFlow.getChildren().size(), renderStartNanos);
 	}
 
 
@@ -2368,6 +2399,7 @@ public class CaseController {
 	}
 
 	private void refreshCaseTasks() {
+		caseTasksStale = true;
 		loadCaseTasksAsync();
 	}
 
@@ -2472,12 +2504,21 @@ public class CaseController {
 
 		new Thread(() ->
 		{
+			long overviewStartNanos = PerfLog.start();
+			PerfLog.log("DAO", "start", "method=getOverview page=case_view caseId=" + activeCaseId);
 			CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
+			PerfLog.logDone("DAO", "method=getOverview page=case_view caseId=" + activeCaseId + " rows=" + (overview == null ? 0 : 1), overviewStartNanos);
+			long detailStartNanos = PerfLog.start();
+			PerfLog.log("DAO", "start", "method=getDetail page=case_view caseId=" + activeCaseId);
 			CaseDetailDto detail = caseDao.getDetail(activeCaseId);
+			PerfLog.logDone("DAO", "method=getDetail page=case_view caseId=" + activeCaseId + " rows=" + (detail == null ? 0 : 1), detailStartNanos);
 			List<CasePartyDto> loadedParties = List.of();
 			boolean partiesLoadSucceeded = false;
 			try {
+				long partiesStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=listCaseParties page=case_view caseId=" + activeCaseId);
 				loadedParties = caseDao.listCaseParties(activeCaseId);
+				PerfLog.logDone("DAO", "method=listCaseParties page=case_view caseId=" + activeCaseId + " rows=" + (loadedParties == null ? 0 : loadedParties.size()), partiesStartNanos);
 				partiesLoadSucceeded = true;
 			} catch (Exception partiesLoadError) {
 				System.err.println("Case parties load failed for caseId=" + activeCaseId + ": " + partiesLoadError.getMessage());
@@ -2509,6 +2550,7 @@ public class CaseController {
 				hideRemoteUpdateBanner();
 				clearError();
 				refreshDeleteAction();
+				PerfLog.logDone("NAV", "ready page=case_view caseId=" + activeCaseId, pageLoadStartNanos);
 			});
 		}, "case-view-sync-" + activeCaseId).start();
 	}
@@ -3096,7 +3138,10 @@ public class CaseController {
 		new Thread(() ->
 		{
 			try {
+				long teamLoadStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=listCaseTeamRows page=case_view caseId=" + activeCaseId);
 				List<CaseDao.CaseUserTeamRow> teamRows = caseDao.listCaseTeamRows(activeCaseId);
+				PerfLog.logDone("DAO", "method=listCaseTeamRows page=case_view caseId=" + activeCaseId + " rows=" + (teamRows == null ? 0 : teamRows.size()), teamLoadStartNanos);
 
 				runOnFx(() ->
 				{
@@ -3121,6 +3166,8 @@ public class CaseController {
 	private void renderTeamCardsFromTeamRowsInternal(List<CaseDao.CaseUserTeamRow> rows) {
 		if (teamFlow == null)
 			return;
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=team page=case_view caseId=" + caseId);
 
 		teamFlow.getChildren().clear();
 
@@ -3137,6 +3184,7 @@ public class CaseController {
 
 		if (filtered.isEmpty()) {
 			teamFlow.getChildren().add(new Label("—"));
+			PerfLog.logDone("RENDER", "panel=team page=case_view caseId=" + caseId + " childCount=1", renderStartNanos);
 			return;
 		}
 
@@ -3161,6 +3209,7 @@ public class CaseController {
 			VBox wrap = new VBox(4, card, role);
 			teamFlow.getChildren().add(wrap);
 		}
+		PerfLog.logDone("RENDER", "panel=team page=case_view caseId=" + caseId + " childCount=" + teamFlow.getChildren().size(), renderStartNanos);
 	}
 
 	private String roleLabel(int roleId) {
@@ -3300,7 +3349,6 @@ public class CaseController {
 
 	private void loadCaseUpdatesAsync() {
 		updatesPanelController.loadCaseUpdatesAsync();
-		loadCaseTasksAsync();
 	}
 
 	private void loadCaseUpdatesAsyncInternal() {
@@ -3311,7 +3359,10 @@ public class CaseController {
 		new Thread(() ->
 		{
 			try {
+				long updatesLoadStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=listCaseUpdates page=case_view caseId=" + activeCaseId);
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
+				PerfLog.logDone("DAO", "method=listCaseUpdates page=case_view caseId=" + activeCaseId + " rows=" + (updates == null ? 0 : updates.size()), updatesLoadStartNanos);
 				runOnFx(() ->
 				{
 					if (caseId == null || caseId.longValue() != activeCaseId)
@@ -3331,6 +3382,8 @@ public class CaseController {
 	private void renderCaseUpdatesInternal(List<CaseUpdateDto> updates) {
 		if (caseUpdatesFeedBox == null)
 			return;
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=case_updates page=case_view caseId=" + caseId);
 
 		caseUpdatesFeedBox.getChildren().clear();
 		List<CaseUpdateDto> safeUpdates = updates == null ? List.of() : List.copyOf(updates);
@@ -3349,6 +3402,7 @@ public class CaseController {
 			caseUpdatesFeedBox.getChildren().add(empty);
 			if (caseUpdatesScrollPane != null)
 				caseUpdatesScrollPane.setVvalue(0.0);
+			PerfLog.logDone("RENDER", "panel=case_updates page=case_view caseId=" + caseId + " childCount=" + caseUpdatesFeedBox.getChildren().size(), renderStartNanos);
 			return;
 		}
 
@@ -3360,6 +3414,7 @@ public class CaseController {
 
 		if (caseUpdatesScrollPane != null)
 			caseUpdatesScrollPane.setVvalue(0.0);
+		PerfLog.logDone("RENDER", "panel=case_updates page=case_view caseId=" + caseId + " childCount=" + caseUpdatesFeedBox.getChildren().size(), renderStartNanos);
 	}
 
 	private void onSubmitCaseUpdate() {
@@ -4147,13 +4202,13 @@ public class CaseController {
 		void applyOverviewEditSafe(CaseOverviewDto dto) {
 			if (dto == null)
 				return;
-			currentOverview = dto;
-			renderOverviewCards(dto);
-			renderHeaderTitleFromOverview(dto);
 			if (!editMode) {
 				applyOverview(dto);
 				return;
 			}
+			currentOverview = dto;
+			renderOverviewCards(dto);
+			renderHeaderTitleFromOverview(dto);
 			if (ovCaseNumberValue != null)
 				ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
 			loadTeamSectionAsync();
@@ -5467,8 +5522,9 @@ public class CaseController {
 				return false;
 			runOnFx(() ->
 			{
+				// Keep ownership explicit: case updates and tasks refresh are separate.
 				loadCaseUpdatesAsync();
-		loadCaseTasksAsync();
+				loadCaseTasksAsync();
 				refreshLastUpdatedLabelAsync();
 			});
 			return true;

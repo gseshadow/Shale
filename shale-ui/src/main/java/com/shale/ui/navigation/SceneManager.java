@@ -36,6 +36,7 @@ import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -329,6 +330,9 @@ public final class SceneManager {
 
 	private void navigateTo(AppRoute route, boolean addToHistory) {
 		Objects.requireNonNull(route, "route");
+		String navContext = routePerfContext(route);
+		PerfLog.log("NAV", "start", "page=" + route.type().name().toLowerCase() + navContext);
+		long navStartNanos = PerfLog.start();
 		if (addToHistory) {
 			boolean recorded = navigationManager.recordNavigation(route);
 			if (!recorded) {
@@ -343,10 +347,12 @@ public final class SceneManager {
 
 		showRouteInternal(route);
 		notifyBackAvailabilityChanged();
+		PerfLog.logDone("NAV", "ready page=" + route.type().name().toLowerCase() + navContext, navStartNanos);
 	}
 
 	private void showRouteInternal(AppRoute route) {
 		MainController mainController = resolveMainController();
+		PerfLog.log("CTRL", "start", "route=" + route.type().name().toLowerCase() + routePerfContext(route));
 		if (mainController == null) {
 			System.err.println("Unable to navigate; main controller is unavailable for route " + route);
 			return;
@@ -479,6 +485,20 @@ public final class SceneManager {
 			c.init(appState, searchService, caseDetailService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
 			return c;
 		});
+	}
+
+	private String routePerfContext(AppRoute route) {
+		if (route == null) {
+			return "";
+		}
+		Integer entityId = route.entityId();
+		return switch (route.type()) {
+			case CASE_PROFILE -> entityId == null ? "" : " caseId=" + entityId;
+			case USER_PROFILE -> entityId == null ? "" : " userId=" + entityId;
+			case ORGANIZATION_PROFILE -> entityId == null ? "" : " organizationId=" + entityId;
+			case CONTACT_PROFILE -> entityId == null ? "" : " contactId=" + entityId;
+			default -> "";
+		};
 	}
 
 	private static final String ROOT_CONTROLLER_KEY = "sceneManager.controller";
