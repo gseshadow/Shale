@@ -6228,7 +6228,7 @@ public class CaseController {
 			String summary = normalizeNullableText(source.summary);
 			String receivedUpdates = toNullableBooleanStorage(normalizeDetailsCheckboxBoolean(source.receivedUpdates));
 			Boolean baselineMedicalRecordsReceived = normalizeDetailsCheckboxBoolean(baseline.getMedicalRecordsReceived());
-			Boolean baselineFeeAgreementSigned = normalizeDetailsCheckboxBoolean(baseline.getFeeAgreementSigned());
+			Boolean baselineFeeAgreementSigned = baseline.getFeeAgreementSigned();
 			Boolean baselineAcceptedChronology = normalizeDetailsCheckboxBoolean(baseline.getAcceptedChronology());
 			Boolean baselineAcceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedConsultantExpertSearch());
 			Boolean baselineAcceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedTestifyingExpertSearch());
@@ -6920,6 +6920,27 @@ public class CaseController {
 
 		private Boolean captureNullableBoolean(CheckBox editor) {
 			return editor != null && editor.isSelected();
+		}
+
+		private void renderTriStateBoolean(CheckBox editor, Boolean value) {
+			if (editor == null)
+				return;
+			editor.setAllowIndeterminate(true);
+			if (value == null) {
+				editor.setSelected(false);
+				editor.setIndeterminate(true);
+				return;
+			}
+			editor.setIndeterminate(false);
+			editor.setSelected(Boolean.TRUE.equals(value));
+		}
+
+		private Boolean captureTriStateBoolean(CheckBox editor) {
+			if (editor == null)
+				return null;
+			if (editor.isIndeterminate())
+				return null;
+			return editor.isSelected();
 		}
 
 		void renderView(CaseDetailsDraft d) {
