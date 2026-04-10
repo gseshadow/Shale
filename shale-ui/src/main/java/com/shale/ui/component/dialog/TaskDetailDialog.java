@@ -126,6 +126,14 @@ public final class TaskDetailDialog {
         UserCardFactory assignedTeamCardFactory = new UserCardFactory(id -> {
         });
         VBox assignedTeamList = new VBox(6);
+        ScrollPane assignedTeamScrollPane = new ScrollPane(assignedTeamList);
+        assignedTeamScrollPane.setFitToWidth(true);
+        assignedTeamScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        assignedTeamScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        assignedTeamScrollPane.setMinHeight(96);
+        assignedTeamScrollPane.setPrefHeight(168);
+        assignedTeamScrollPane.setMaxHeight(220);
+        assignedTeamScrollPane.getStyleClass().add("transparent-scroll");
         List<AssignedTeamMember> initialAssignedTeamMembers = model.assignedTeamMembers() == null
                 ? List.of()
                 : model.assignedTeamMembers();
@@ -160,7 +168,7 @@ public final class TaskDetailDialog {
                 showError(errorLabel, "Failed to add assigned user. " + rootCauseMessage(ex));
             }
         });
-        assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedTeamList);
+        assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedTeamScrollPane);
 
         VBox formContent = new VBox(8,
                 createdByLabel,
