@@ -379,6 +379,7 @@ public final class TaskDao {
                       AND myAssignment.UserId = ?
                   )
                   AND ISNULL(t.IsDeleted, 0) = 0
+                  AND t.CompletedAt IS NULL
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
                   CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
