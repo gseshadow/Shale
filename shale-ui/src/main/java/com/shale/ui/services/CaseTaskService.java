@@ -265,13 +265,23 @@ public final class CaseTaskService {
         taskDao.markTaskCompleted(taskId, shaleClientId);
         TaskDetailDto after = taskDao.findTaskDetail(taskId, shaleClientId);
         if (before != null && before.completedAt() == null && after != null && after.completedAt() != null) {
-            taskDao.addTaskTimelineEvent(
+            long timelineEventId = taskDao.addTaskTimelineEvent(
                     taskId,
                     Math.toIntExact(after.caseId()),
                     shaleClientId,
                     TaskDao.TaskTimelineEventTypes.TASK_COMPLETED,
                     normalizeActorUserId(actorUserId),
                     "Task marked complete",
+                    "Task marked complete");
+            publishTimelineEventNotifications(
+                    TaskDao.TaskTimelineEventTypes.TASK_COMPLETED,
+                    timelineEventId,
+                    taskId,
+                    shaleClientId,
+                    normalizeActorUserId(actorUserId),
+                    after.title(),
+                    after.caseId(),
+                    after.caseName(),
                     "Task marked complete");
         }
     }
@@ -281,13 +291,23 @@ public final class CaseTaskService {
         taskDao.clearTaskCompleted(taskId, shaleClientId);
         TaskDetailDto after = taskDao.findTaskDetail(taskId, shaleClientId);
         if (before != null && before.completedAt() != null && after != null && after.completedAt() == null) {
-            taskDao.addTaskTimelineEvent(
+            long timelineEventId = taskDao.addTaskTimelineEvent(
                     taskId,
                     Math.toIntExact(after.caseId()),
                     shaleClientId,
                     TaskDao.TaskTimelineEventTypes.TASK_REOPENED,
                     normalizeActorUserId(actorUserId),
                     "Task reopened",
+                    "Task reopened");
+            publishTimelineEventNotifications(
+                    TaskDao.TaskTimelineEventTypes.TASK_REOPENED,
+                    timelineEventId,
+                    taskId,
+                    shaleClientId,
+                    normalizeActorUserId(actorUserId),
+                    after.title(),
+                    after.caseId(),
+                    after.caseName(),
                     "Task reopened");
         }
     }
@@ -325,7 +345,7 @@ public final class CaseTaskService {
         Integer actorUserId = normalizeActorUserId(request.changedByUserId());
         int caseId = Math.toIntExact(after.caseId());
         if (!Objects.equals(normalizeTitle(before.title()), normalizeTitle(after.title()))) {
-            taskDao.addTaskTimelineEvent(
+            long timelineEventId = taskDao.addTaskTimelineEvent(
                     request.taskId(),
                     caseId,
                     request.shaleClientId(),
@@ -333,9 +353,19 @@ public final class CaseTaskService {
                     actorUserId,
                     "Title changed",
                     "Title changed from " + quoteForBody(before.title()) + " to " + quoteForBody(after.title()));
+            publishTimelineEventNotifications(
+                    TaskDao.TaskTimelineEventTypes.TASK_TITLE_CHANGED,
+                    timelineEventId,
+                    request.taskId(),
+                    request.shaleClientId(),
+                    actorUserId,
+                    after.title(),
+                    after.caseId(),
+                    after.caseName(),
+                    "Title changed");
         }
         if (!Objects.equals(normalizeText(before.description()), normalizeText(after.description()))) {
-            taskDao.addTaskTimelineEvent(
+            long timelineEventId = taskDao.addTaskTimelineEvent(
                     request.taskId(),
                     caseId,
                     request.shaleClientId(),
@@ -343,9 +373,19 @@ public final class CaseTaskService {
                     actorUserId,
                     "Description changed",
                     "Description changed");
+            publishTimelineEventNotifications(
+                    TaskDao.TaskTimelineEventTypes.TASK_DESCRIPTION_CHANGED,
+                    timelineEventId,
+                    request.taskId(),
+                    request.shaleClientId(),
+                    actorUserId,
+                    after.title(),
+                    after.caseId(),
+                    after.caseName(),
+                    "Description changed");
         }
         if (!Objects.equals(before.dueAt(), after.dueAt())) {
-            taskDao.addTaskTimelineEvent(
+            long timelineEventId = taskDao.addTaskTimelineEvent(
                     request.taskId(),
                     caseId,
                     request.shaleClientId(),
@@ -353,10 +393,20 @@ public final class CaseTaskService {
                     actorUserId,
                     "Due date changed",
                     "Due date changed from " + formatDueDate(before.dueAt()) + " to " + formatDueDate(after.dueAt()));
+            publishTimelineEventNotifications(
+                    TaskDao.TaskTimelineEventTypes.TASK_DUE_DATE_CHANGED,
+                    timelineEventId,
+                    request.taskId(),
+                    request.shaleClientId(),
+                    actorUserId,
+                    after.title(),
+                    after.caseId(),
+                    after.caseName(),
+                    "Due date changed");
         }
         if (!Objects.equals(before.priorityId(), after.priorityId())) {
             Map<Integer, String> priorityLabels = loadPriorityLabels(request.shaleClientId());
-            taskDao.addTaskTimelineEvent(
+            long timelineEventId = taskDao.addTaskTimelineEvent(
                     request.taskId(),
                     caseId,
                     request.shaleClientId(),
@@ -365,9 +415,19 @@ public final class CaseTaskService {
                     "Priority changed",
                     "Priority changed from " + formatPriority(before.priorityId(), priorityLabels)
                             + " to " + formatPriority(after.priorityId(), priorityLabels));
+            publishTimelineEventNotifications(
+                    TaskDao.TaskTimelineEventTypes.TASK_PRIORITY_CHANGED,
+                    timelineEventId,
+                    request.taskId(),
+                    request.shaleClientId(),
+                    actorUserId,
+                    after.title(),
+                    after.caseId(),
+                    after.caseName(),
+                    "Priority changed");
         }
         if (before.completedAt() == null && after.completedAt() != null) {
-            taskDao.addTaskTimelineEvent(
+            long timelineEventId = taskDao.addTaskTimelineEvent(
                     request.taskId(),
                     caseId,
                     request.shaleClientId(),
@@ -375,14 +435,34 @@ public final class CaseTaskService {
                     actorUserId,
                     "Task marked complete",
                     "Task marked complete");
+            publishTimelineEventNotifications(
+                    TaskDao.TaskTimelineEventTypes.TASK_COMPLETED,
+                    timelineEventId,
+                    request.taskId(),
+                    request.shaleClientId(),
+                    actorUserId,
+                    after.title(),
+                    after.caseId(),
+                    after.caseName(),
+                    "Task marked complete");
         } else if (before.completedAt() != null && after.completedAt() == null) {
-            taskDao.addTaskTimelineEvent(
+            long timelineEventId = taskDao.addTaskTimelineEvent(
                     request.taskId(),
                     caseId,
                     request.shaleClientId(),
                     TaskDao.TaskTimelineEventTypes.TASK_REOPENED,
                     actorUserId,
                     "Task reopened",
+                    "Task reopened");
+            publishTimelineEventNotifications(
+                    TaskDao.TaskTimelineEventTypes.TASK_REOPENED,
+                    timelineEventId,
+                    request.taskId(),
+                    request.shaleClientId(),
+                    actorUserId,
+                    after.title(),
+                    after.caseId(),
+                    after.caseName(),
                     "Task reopened");
         }
     }
@@ -427,7 +507,7 @@ public final class CaseTaskService {
         taskDao.removeTaskAssignment(taskId, shaleClientId, userId);
         TaskDetailDto detail = taskDao.findTaskDetail(taskId, shaleClientId);
         if (detail != null && removedDisplayName != null) {
-            taskDao.addTaskTimelineEvent(
+            long timelineEventId = taskDao.addTaskTimelineEvent(
                     taskId,
                     Math.toIntExact(detail.caseId()),
                     shaleClientId,
@@ -435,6 +515,16 @@ public final class CaseTaskService {
                     normalizeActorUserId(actorUserId),
                     "Assignee removed",
                     "Unassigned " + removedDisplayName);
+            publishTimelineEventNotifications(
+                    TaskDao.TaskTimelineEventTypes.TASK_ASSIGNMENT_REMOVED,
+                    timelineEventId,
+                    taskId,
+                    shaleClientId,
+                    normalizeActorUserId(actorUserId),
+                    detail.title(),
+                    detail.caseId(),
+                    detail.caseName(),
+                    "Assignee removed");
         }
     }
 
@@ -554,6 +644,99 @@ public final class CaseTaskService {
         }
     }
 
+    private void publishTimelineEventNotifications(
+            String eventType,
+            long timelineEventId,
+            long taskId,
+            int shaleClientId,
+            Integer actorUserId,
+            String taskTitle,
+            Long caseId,
+            String caseName,
+            String eventLabel) {
+        List<Integer> recipients = taskDao.listAssignedUsersForTask(taskId, shaleClientId).stream()
+                .map(TaskDao.TaskAssignedUserRow::userId)
+                .toList();
+        publishTimelineEventNotificationsToUsers(
+                eventType,
+                timelineEventId,
+                taskId,
+                shaleClientId,
+                actorUserId,
+                taskTitle,
+                caseId,
+                caseName,
+                recipients,
+                eventLabel);
+    }
+
+    private void publishTimelineEventNotificationsToUsers(
+            String eventType,
+            long timelineEventId,
+            long taskId,
+            int shaleClientId,
+            Integer actorUserId,
+            String taskTitle,
+            Long caseId,
+            String caseName,
+            List<Integer> recipientCandidates,
+            String eventLabel) {
+        LinkedHashSet<Integer> recipients = new LinkedHashSet<>();
+        if (recipientCandidates != null) {
+            for (Integer candidate : recipientCandidates) {
+                if (candidate != null && candidate > 0) {
+                    recipients.add(candidate);
+                }
+            }
+        }
+        if (actorUserId != null && actorUserId > 0) {
+            recipients.remove(actorUserId);
+        }
+        if (recipients.isEmpty()) {
+            return;
+        }
+        String notificationTitle = timelineNotificationTitle(eventType, eventLabel);
+        String notificationMessage = timelineNotificationMessage(actorUserId, shaleClientId, eventType, taskTitle, caseId, caseName, taskId);
+        for (Integer recipientUserId : recipients) {
+            String eventKey = "task-action:" + taskId + ":" + eventType + ":" + timelineEventId + ":" + recipientUserId;
+            Long durableId = notificationDao.createTaskActionNotification(
+                    shaleClientId,
+                    recipientUserId,
+                    notificationTitle,
+                    notificationMessage,
+                    taskId,
+                    actorUserId == null ? 0 : actorUserId,
+                    eventType,
+                    eventKey);
+            StringBuilder patch = new StringBuilder("{");
+            patch.append("\"notificationType\":\"TASK_TIMELINE_EVENT\"");
+            patch.append(",\"recipientUserId\":").append(recipientUserId);
+            patch.append(",\"eventType\":\"").append(escapeJson(eventType)).append('"');
+            patch.append(",\"eventKey\":\"").append(escapeJson(eventKey)).append('"');
+            patch.append(",\"notificationTitle\":\"").append(escapeJson(notificationTitle)).append('"');
+            patch.append(",\"notificationMessage\":\"").append(escapeJson(notificationMessage)).append('"');
+            patch.append(",\"actionType\":\"").append(escapeJson(eventType)).append('"');
+            patch.append(",\"timelineEventId\":").append(timelineEventId);
+            if (durableId != null) {
+                patch.append(",\"durableNotificationId\":").append(durableId);
+            }
+            if (taskTitle != null && !taskTitle.isBlank()) {
+                patch.append(",\"title\":\"").append(escapeJson(taskTitle)).append('"');
+            }
+            if (caseId != null && caseId > 0) {
+                patch.append(",\"caseId\":").append(caseId);
+            }
+            if (caseName != null && !caseName.isBlank()) {
+                patch.append(",\"caseName\":\"").append(escapeJson(caseName)).append('"');
+            }
+            patch.append(",\"updatedAtUtc\":\"")
+                    .append(LocalDateTime.now().atOffset(ZoneOffset.UTC))
+                    .append('"');
+            patch.append('}');
+            runtimeBridge.publishEntityUpdated("Task", taskId, shaleClientId, actorUserId == null ? 0 : actorUserId, patch.toString());
+        }
+    }
+
     private static String buildTaskAssignedMessage(String title, Long caseId, String caseName, long taskId) {
         String trimmedTitle = title == null ? "" : title.trim();
         if (trimmedTitle.isBlank()) {
@@ -566,6 +749,41 @@ public final class CaseTaskService {
             return "Task: " + trimmedTitle + " • Case #" + caseId;
         }
         return "Task: " + trimmedTitle;
+    }
+
+    private static String timelineNotificationTitle(String eventType, String eventLabel) {
+        if (TaskDao.TaskTimelineEventTypes.TASK_ASSIGNMENT_ADDED.equals(eventType)) {
+            return "Task assigned to you";
+        }
+        if (eventLabel != null && !eventLabel.isBlank()) {
+            return eventLabel.trim();
+        }
+        return "Task updated";
+    }
+
+    private String timelineNotificationMessage(Integer actorUserId, int shaleClientId, String eventType, String taskTitle, Long caseId, String caseName, long taskId) {
+        String actor = resolveActorDisplayName(actorUserId, shaleClientId);
+        String safeTitle = taskTitle == null || taskTitle.isBlank() ? "Task #" + taskId : "'" + taskTitle.trim() + "'";
+        if (TaskDao.TaskTimelineEventTypes.TASK_ASSIGNMENT_ADDED.equals(eventType)) {
+            return actor + " assigned you to " + safeTitle;
+        }
+        String action = switch (eventType) {
+            case TaskDao.TaskTimelineEventTypes.TASK_COMPLETED -> "marked " + safeTitle + " complete";
+            case TaskDao.TaskTimelineEventTypes.TASK_REOPENED -> "reopened " + safeTitle;
+            case TaskDao.TaskTimelineEventTypes.TASK_DUE_DATE_CHANGED -> "changed the due date on " + safeTitle;
+            case TaskDao.TaskTimelineEventTypes.TASK_PRIORITY_CHANGED -> "changed the priority on " + safeTitle;
+            case TaskDao.TaskTimelineEventTypes.TASK_ASSIGNMENT_REMOVED -> "updated assignees on " + safeTitle;
+            case TaskDao.TaskTimelineEventTypes.TASK_TITLE_CHANGED -> "changed the title of " + safeTitle;
+            case TaskDao.TaskTimelineEventTypes.TASK_DESCRIPTION_CHANGED -> "updated the description for " + safeTitle;
+            default -> "updated " + safeTitle;
+        };
+        StringBuilder out = new StringBuilder(actor).append(' ').append(action);
+        if (caseName != null && !caseName.isBlank()) {
+            out.append(" • Case: ").append(caseName.trim());
+        } else if (caseId != null && caseId > 0) {
+            out.append(" • Case #").append(caseId);
+        }
+        return out.toString();
     }
 
     private static String buildTaskNoteAddedMessage(String title, Long caseId, String caseName, long taskId, String noteBody) {
@@ -605,6 +823,19 @@ public final class CaseTaskService {
             return resolved;
         }
         return fallbackWhenMissing ? "User #" + userId : null;
+    }
+
+    private String resolveActorDisplayName(Integer actorUserId, int shaleClientId) {
+        if (actorUserId == null || actorUserId <= 0) {
+            return "Someone";
+        }
+        return userDao.listUsersForTenant(shaleClientId).stream()
+                .filter(user -> user.id() == actorUserId)
+                .map(user -> user.displayName() == null || user.displayName().isBlank()
+                        ? "User #" + actorUserId
+                        : user.displayName().trim())
+                .findFirst()
+                .orElse("User #" + actorUserId);
     }
 
     private Map<Integer, String> loadPriorityLabels(int shaleClientId) {

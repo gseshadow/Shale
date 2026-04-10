@@ -1232,7 +1232,7 @@ public final class TaskDao {
         }
     }
 
-    public void addTaskTimelineEvent(
+    public long addTaskTimelineEvent(
             long taskId,
             int caseId,
             int shaleClientId,
@@ -1270,6 +1270,7 @@ public final class TaskDao {
                   Title,
                   Body
                 )
+                OUTPUT INSERTED.Id
                 VALUES (?, ?, ?, ?, ?, ?, ?);
                 """;
         try (Connection con = db.requireConnection();
@@ -1286,9 +1287,11 @@ public final class TaskDao {
             }
             ps.setString(i++, normalizedTitle);
             setNullableString(ps, i, normalizedBody);
-            int rows = ps.executeUpdate();
-            if (rows != 1) {
-                throw new RuntimeException("Unexpected task timeline insert row count for taskId=" + taskId + ": " + rows);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new RuntimeException("Task timeline insert did not return inserted id");
+                }
+                return rs.getLong(1);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to add task timeline event (taskId=" + taskId + ")", e);
