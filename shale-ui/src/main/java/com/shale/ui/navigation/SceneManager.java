@@ -844,6 +844,7 @@ public final class SceneManager {
 								.toList();
 					}
 				},
+				this::openUserProfile,
 				caseId -> openCaseProfile(caseId, "OVERVIEW"));
 		if (result.isEmpty()) {
 			return;

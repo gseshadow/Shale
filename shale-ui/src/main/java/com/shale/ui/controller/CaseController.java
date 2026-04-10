@@ -273,6 +273,8 @@ public class CaseController {
 	private Label tasksTabEmptyLabel;
 	@FXML
 	private ChoiceBox<String> caseTasksSortChoice;
+	@FXML
+	private Button caseTasksShowCompletedButton;
 
 	@FXML
 	private StackPane ovCaseStatusHost;
@@ -397,6 +399,14 @@ public class CaseController {
 	private Label detDateFeeAgreementSignedValue;
 	@FXML
 	private DatePicker detDateFeeAgreementSignedEditor;
+	@FXML
+	private Label detNonEngagementLetterSentValue;
+	@FXML
+	private CheckBox detNonEngagementLetterSentEditor;
+	@FXML
+	private Label detDateNonEngagementLetterSentValue;
+	@FXML
+	private DatePicker detDateNonEngagementLetterSentEditor;
 	@FXML
 	private Label detAcceptedChronologyValue;
 	@FXML
@@ -532,6 +542,7 @@ public class CaseController {
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
 	private boolean caseTasksLoadedOnce;
 	private boolean caseTasksStale = true;
+	private boolean showCompletedCaseTasks;
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private boolean caseUpdatesLoadedOnce;
 	private boolean caseUpdatesStale = true;
@@ -742,6 +753,14 @@ public class CaseController {
 			caseTasksSortChoice.getSelectionModel().select(CASE_TASKS_SORT_DUE_ASC);
 			caseTasksSortChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> refreshCaseTasks());
+		}
+		if (caseTasksShowCompletedButton != null) {
+			caseTasksShowCompletedButton.setOnAction(e -> {
+				showCompletedCaseTasks = !showCompletedCaseTasks;
+				updateCaseTaskCompletionToggleLabel();
+				renderTasksSection();
+			});
+			updateCaseTaskCompletionToggleLabel();
 		}
 		if (addOrganizationButton != null)
 			addOrganizationButton.setOnAction(e -> onAddRelatedEntity());
@@ -1941,9 +1960,12 @@ public class CaseController {
 		PerfLog.log("RENDER", "start", "panel=tasks page=case_view caseId=" + caseId);
 
 		tasksTabFlow.getChildren().clear();
-		if (caseTasks == null || caseTasks.isEmpty()) {
+		List<CaseTaskListItemDto> visibleTasks = visibleCaseTasks();
+		if (visibleTasks.isEmpty()) {
 			setVisibleManaged(tasksTabEmptyLabel, true);
-			tasksTabEmptyLabel.setText("No tasks for this case yet.");
+			tasksTabEmptyLabel.setText(showCompletedCaseTasks
+					? "No tasks for this case yet."
+					: "No incomplete tasks for this case.");
 			PerfLog.logDone("RENDER", "panel=tasks page=case_view caseId=" + caseId + " childCount=0", renderStartNanos);
 			return;
 		}
@@ -1952,7 +1974,7 @@ public class CaseController {
 				? taskCardFactory
 				: buildTaskCardFactory(this::openTask);
 
-		for (CaseTaskListItemDto task : caseTasks) {
+		for (CaseTaskListItemDto task : visibleTasks) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
 					task.id(),
 					task.caseId(),
@@ -1970,6 +1992,25 @@ public class CaseController {
 
 		setVisibleManaged(tasksTabEmptyLabel, false);
 		PerfLog.logDone("RENDER", "panel=tasks page=case_view caseId=" + caseId + " childCount=" + tasksTabFlow.getChildren().size(), renderStartNanos);
+	}
+
+	private List<CaseTaskListItemDto> visibleCaseTasks() {
+		if (caseTasks == null || caseTasks.isEmpty()) {
+			return List.of();
+		}
+		if (showCompletedCaseTasks) {
+			return caseTasks;
+		}
+		return caseTasks.stream()
+				.filter(task -> task.completedAt() == null)
+				.toList();
+	}
+
+	private void updateCaseTaskCompletionToggleLabel() {
+		if (caseTasksShowCompletedButton == null) {
+			return;
+		}
+		caseTasksShowCompletedButton.setText(showCompletedCaseTasks ? "Hide Completed" : "Show Completed");
 	}
 
 	private boolean isSectionActive(String sectionName) {
@@ -2204,6 +2245,7 @@ public class CaseController {
                                                             .toList();
                                                 }
                                             },
+                                            onOpenUser,
 		                                    onOpenCase);
 
 	                    if (result.isEmpty()) {
@@ -5502,7 +5544,8 @@ public class CaseController {
 					"dateOfMedicalNegligence", "dateMedicalNegligenceWasDiscovered", "dateOfInjury",
 					"statuteOfLimitations", "tortNoticeDeadline", "discoveryDeadline",
 					"clientEstate", "officePrinterCode", "medicalRecordsReceived", "feeAgreementSigned",
-					"dateFeeAgreementSigned", "acceptedChronology", "acceptedConsultantExpertSearch",
+					"dateFeeAgreementSigned", "nonEngagementLetterSent", "dateNonEngagementLetterSent",
+					"acceptedChronology", "acceptedConsultantExpertSearch",
 					"acceptedTestifyingExpertSearch", "acceptedMedicalLiterature", "acceptedDetail",
 					"deniedChronology", "deniedDetail", "summary", "receivedUpdates"
 			};
@@ -5727,6 +5770,8 @@ public class CaseController {
 		Boolean medicalRecordsReceived;
 		Boolean feeAgreementSigned;
 		LocalDate dateFeeAgreementSigned;
+		Boolean nonEngagementLetterSent;
+		LocalDate dateNonEngagementLetterSent;
 
 		Boolean acceptedChronology;
 		Boolean acceptedConsultantExpertSearch;
@@ -5775,6 +5820,8 @@ public class CaseController {
 			System.out.println("Case details load: feeAgreementSigned rawLoaded=" + (detail == null ? null : detail.getFeeAgreementSigned()));
 			d.feeAgreementSigned = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getFeeAgreementSigned());
 			d.dateFeeAgreementSigned = detail == null ? null : detail.getDateFeeAgreementSigned();
+			d.nonEngagementLetterSent = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getNonEngagementLetterSent());
+			d.dateNonEngagementLetterSent = detail == null ? null : detail.getDateNonEngagementLetterSent();
 
 			d.acceptedChronology = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedChronology());
 			d.acceptedConsultantExpertSearch = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedConsultantExpertSearch());
@@ -5817,6 +5864,8 @@ public class CaseController {
 			c.medicalRecordsReceived = medicalRecordsReceived;
 			c.feeAgreementSigned = feeAgreementSigned;
 			c.dateFeeAgreementSigned = dateFeeAgreementSigned;
+			c.nonEngagementLetterSent = nonEngagementLetterSent;
+			c.dateNonEngagementLetterSent = dateNonEngagementLetterSent;
 			c.acceptedChronology = acceptedChronology;
 			c.acceptedConsultantExpertSearch = acceptedConsultantExpertSearch;
 			c.acceptedTestifyingExpertSearch = acceptedTestifyingExpertSearch;
@@ -5867,7 +5916,9 @@ public class CaseController {
 		private void runSaveWorker(DetailsSaveRequest request) {
 			try {
 				System.out.println("Case details save: sentToDao feeAgreementSigned=" + request.feeAgreementSigned()
-						+ ", finalDate=" + request.dateFeeAgreementSigned());
+						+ ", finalDate=" + request.dateFeeAgreementSigned()
+						+ ", nonEngagementLetterSent=" + request.nonEngagementLetterSent()
+						+ ", nonEngagementDate=" + request.dateNonEngagementLetterSent());
 				CaseDetailDto updated = caseDao.updateCaseDetails(
 						request.caseId(),
 						request.name(),
@@ -5890,6 +5941,8 @@ public class CaseController {
 						request.medicalRecordsReceived(),
 						request.feeAgreementSigned(),
 						request.dateFeeAgreementSigned(),
+						request.nonEngagementLetterSent(),
+						request.dateNonEngagementLetterSent(),
 						request.acceptedChronology(),
 						request.acceptedConsultantExpertSearch(),
 						request.acceptedTestifyingExpertSearch(),
@@ -6231,6 +6284,12 @@ public class CaseController {
 			publishIfChanged(request.caseId(), "medicalRecordsReceived", baseline.getMedicalRecordsReceived(), request.medicalRecordsReceived());
 			publishIfChanged(request.caseId(), "feeAgreementSigned", baseline.getFeeAgreementSigned(), request.feeAgreementSigned());
 			publishIfChanged(request.caseId(), "dateFeeAgreementSigned", baseline.getDateFeeAgreementSigned(), request.dateFeeAgreementSigned());
+			publishIfChanged(request.caseId(), "nonEngagementLetterSent", baseline.getNonEngagementLetterSent(), request.nonEngagementLetterSent());
+			publishIfChanged(
+					request.caseId(),
+					"dateNonEngagementLetterSent",
+					baseline.getDateNonEngagementLetterSent(),
+					request.dateNonEngagementLetterSent());
 			publishIfChanged(request.caseId(), "acceptedChronology", baseline.getAcceptedChronology(), request.acceptedChronology());
 			publishIfChanged(request.caseId(), "acceptedConsultantExpertSearch", baseline.getAcceptedConsultantExpertSearch(), request.acceptedConsultantExpertSearch());
 			publishIfChanged(request.caseId(), "acceptedTestifyingExpertSearch", baseline.getAcceptedTestifyingExpertSearch(), request.acceptedTestifyingExpertSearch());
@@ -6268,10 +6327,18 @@ public class CaseController {
 			LocalDate dateFeeAgreementSigned = rawDateFeeAgreementSigned;
 			if (Boolean.TRUE.equals(feeAgreementSigned) && dateFeeAgreementSigned == null)
 				dateFeeAgreementSigned = LocalDate.now();
+			Boolean nonEngagementLetterSent = normalizeDetailsCheckboxBoolean(source.nonEngagementLetterSent);
+			LocalDate rawDateNonEngagementLetterSent = source.dateNonEngagementLetterSent;
+			LocalDate dateNonEngagementLetterSent = rawDateNonEngagementLetterSent;
+			if (Boolean.TRUE.equals(nonEngagementLetterSent) && dateNonEngagementLetterSent == null)
+				dateNonEngagementLetterSent = LocalDate.now();
 			System.out.println("Case details save: feeAgreementSigned rawLoaded=" + baseline.getFeeAgreementSigned()
 					+ ", selected=" + feeAgreementSigned
 					+ ", rawDate=" + rawDateFeeAgreementSigned
-					+ ", finalDate=" + dateFeeAgreementSigned);
+					+ ", finalDate=" + dateFeeAgreementSigned
+					+ ", nonEngagementLetterSent selected=" + nonEngagementLetterSent
+					+ ", nonEngagementRawDate=" + rawDateNonEngagementLetterSent
+					+ ", nonEngagementFinalDate=" + dateNonEngagementLetterSent);
 			Boolean acceptedChronology = normalizeDetailsCheckboxBoolean(source.acceptedChronology);
 			Boolean acceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedConsultantExpertSearch);
 			Boolean acceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedTestifyingExpertSearch);
@@ -6283,6 +6350,7 @@ public class CaseController {
 			String receivedUpdates = toNullableBooleanStorage(normalizeDetailsCheckboxBoolean(source.receivedUpdates));
 			Boolean baselineMedicalRecordsReceived = normalizeDetailsCheckboxBoolean(baseline.getMedicalRecordsReceived());
 			Boolean baselineFeeAgreementSigned = baseline.getFeeAgreementSigned();
+			Boolean baselineNonEngagementLetterSent = baseline.getNonEngagementLetterSent();
 			Boolean baselineAcceptedChronology = normalizeDetailsCheckboxBoolean(baseline.getAcceptedChronology());
 			Boolean baselineAcceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedConsultantExpertSearch());
 			Boolean baselineAcceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(baseline.getAcceptedTestifyingExpertSearch());
@@ -6317,6 +6385,8 @@ public class CaseController {
 					!Objects.equals(medicalRecordsReceived, baselineMedicalRecordsReceived) ||
 					!Objects.equals(feeAgreementSigned, baselineFeeAgreementSigned) ||
 					!Objects.equals(dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
+					!Objects.equals(nonEngagementLetterSent, baselineNonEngagementLetterSent) ||
+					!Objects.equals(dateNonEngagementLetterSent, baseline.getDateNonEngagementLetterSent()) ||
 					!Objects.equals(acceptedChronology, baselineAcceptedChronology) ||
 					!Objects.equals(acceptedConsultantExpertSearch, baselineAcceptedConsultantExpertSearch) ||
 					!Objects.equals(acceptedTestifyingExpertSearch, baselineAcceptedTestifyingExpertSearch) ||
@@ -6353,6 +6423,8 @@ public class CaseController {
 					medicalRecordsReceived,
 					feeAgreementSigned,
 					dateFeeAgreementSigned,
+					nonEngagementLetterSent,
+					dateNonEngagementLetterSent,
 					acceptedChronology,
 					acceptedConsultantExpertSearch,
 					acceptedTestifyingExpertSearch,
@@ -6884,6 +6956,8 @@ public class CaseController {
 			Boolean medicalRecordsReceived,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
+			Boolean nonEngagementLetterSent,
+			LocalDate dateNonEngagementLetterSent,
 			Boolean acceptedChronology,
 			Boolean acceptedConsultantExpertSearch,
 			Boolean acceptedTestifyingExpertSearch,
@@ -6902,6 +6976,7 @@ public class CaseController {
 
 	private final class CaseDetailsEditor {
 		private javafx.beans.value.ChangeListener<Boolean> feeAgreementSignedAutoDateListener;
+		private javafx.beans.value.ChangeListener<Boolean> nonEngagementLetterSentAutoDateListener;
 
 		void beginEdit() {
 			CaseDetailsDraft base = resolveDetailsViewModel();
@@ -6948,6 +7023,8 @@ public class CaseController {
 			toggleDetailField(detMedicalRecordsReceivedValue, detMedicalRecordsReceivedEditor, enabled);
 			toggleDetailField(detFeeAgreementSignedValue, detFeeAgreementSignedEditor, enabled);
 			toggleDetailField(detDateFeeAgreementSignedValue, detDateFeeAgreementSignedEditor, enabled);
+			toggleDetailField(detNonEngagementLetterSentValue, detNonEngagementLetterSentEditor, enabled);
+			toggleDetailField(detDateNonEngagementLetterSentValue, detDateNonEngagementLetterSentEditor, enabled);
 			toggleDetailField(detAcceptedChronologyValue, detAcceptedChronologyEditor, enabled);
 			toggleDetailField(detAcceptedConsultantExpertSearchValue, detAcceptedConsultantExpertSearchEditor, enabled);
 			toggleDetailField(detAcceptedTestifyingExpertSearchValue, detAcceptedTestifyingExpertSearchEditor, enabled);
@@ -7045,6 +7122,10 @@ public class CaseController {
 				detFeeAgreementSignedValue.setText(boolLabel(Boolean.TRUE.equals(d.feeAgreementSigned)));
 			if (detDateFeeAgreementSignedValue != null)
 				detDateFeeAgreementSignedValue.setText(formatDate(d.dateFeeAgreementSigned));
+			if (detNonEngagementLetterSentValue != null)
+				detNonEngagementLetterSentValue.setText(boolLabel(Boolean.TRUE.equals(d.nonEngagementLetterSent)));
+			if (detDateNonEngagementLetterSentValue != null)
+				detDateNonEngagementLetterSentValue.setText(formatDate(d.dateNonEngagementLetterSent));
 			if (detAcceptedChronologyValue != null)
 				detAcceptedChronologyValue.setText(boolLabel(d.acceptedChronology));
 			if (detAcceptedConsultantExpertSearchValue != null)
@@ -7110,7 +7191,15 @@ public class CaseController {
 			}
 			if (detDateFeeAgreementSignedEditor != null)
 				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
+			if (detNonEngagementLetterSentEditor != null) {
+				detNonEngagementLetterSentEditor.setAllowIndeterminate(false);
+				detNonEngagementLetterSentEditor.setIndeterminate(false);
+				detNonEngagementLetterSentEditor.setSelected(Boolean.TRUE.equals(d.nonEngagementLetterSent));
+			}
+			if (detDateNonEngagementLetterSentEditor != null)
+				detDateNonEngagementLetterSentEditor.setValue(d.dateNonEngagementLetterSent);
 			wireFeeAgreementSignedAutoDateListener();
+			wireNonEngagementLetterSentAutoDateListener();
 			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
 			renderNullableBoolean(detAcceptedConsultantExpertSearchEditor, d.acceptedConsultantExpertSearch);
 			renderNullableBoolean(detAcceptedTestifyingExpertSearchEditor, d.acceptedTestifyingExpertSearch);
@@ -7138,6 +7227,21 @@ public class CaseController {
 					detDateFeeAgreementSignedEditor.setValue(LocalDate.now());
 			};
 			detFeeAgreementSignedEditor.selectedProperty().addListener(feeAgreementSignedAutoDateListener);
+		}
+
+		private void wireNonEngagementLetterSentAutoDateListener() {
+			if (detNonEngagementLetterSentEditor == null)
+				return;
+			if (nonEngagementLetterSentAutoDateListener != null)
+				detNonEngagementLetterSentEditor.selectedProperty().removeListener(nonEngagementLetterSentAutoDateListener);
+			nonEngagementLetterSentAutoDateListener = (obs, wasSelected, isSelected) ->
+			{
+				if (!Boolean.TRUE.equals(isSelected) || detDateNonEngagementLetterSentEditor == null)
+					return;
+				if (detDateNonEngagementLetterSentEditor.getValue() == null)
+					detDateNonEngagementLetterSentEditor.setValue(LocalDate.now());
+			};
+			detNonEngagementLetterSentEditor.selectedProperty().addListener(nonEngagementLetterSentAutoDateListener);
 		}
 
 		void captureEditors(CaseDetailsDraft d) {
@@ -7176,6 +7280,9 @@ public class CaseController {
 			d.feeAgreementSigned = detFeeAgreementSignedEditor != null && detFeeAgreementSignedEditor.isSelected();
 			if (detDateFeeAgreementSignedEditor != null)
 				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
+			d.nonEngagementLetterSent = detNonEngagementLetterSentEditor != null && detNonEngagementLetterSentEditor.isSelected();
+			if (detDateNonEngagementLetterSentEditor != null)
+				d.dateNonEngagementLetterSent = detDateNonEngagementLetterSentEditor.getValue();
 			d.acceptedChronology = captureNullableBoolean(detAcceptedChronologyEditor);
 			d.acceptedConsultantExpertSearch = captureNullableBoolean(detAcceptedConsultantExpertSearchEditor);
 			d.acceptedTestifyingExpertSearch = captureNullableBoolean(detAcceptedTestifyingExpertSearchEditor);
