@@ -39,6 +39,7 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
+import javafx.fxml.LoadException;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.layout.Priority;
@@ -397,7 +398,28 @@ public final class SceneManager {
 			default -> System.err.println("Unhandled route: " + route);
 			}
 		} catch (RuntimeException ex) {
-			System.err.println("Failed to open route " + route + ": " + ex.getMessage());
+			logRouteFailure(route, ex);
+		}
+	}
+
+	private void logRouteFailure(AppRoute route, RuntimeException ex) {
+		System.err.println("Failed to open route " + route + ": " + ex.getMessage());
+		if (ex != null) {
+			ex.printStackTrace(System.err);
+		}
+
+		Throwable current = ex == null ? null : ex.getCause();
+		int depth = 1;
+		while (current != null && depth <= 16) {
+			System.err.println("  Cause[" + depth + "]: " + current.getClass().getName() + ": " + current.getMessage());
+			if (current instanceof LoadException) {
+				String loadMessage = current.getMessage();
+				if (loadMessage != null && !loadMessage.isBlank()) {
+					System.err.println("  FXML LoadException detail: " + loadMessage);
+				}
+			}
+			current = current.getCause();
+			depth++;
 		}
 	}
 
