@@ -81,6 +81,7 @@ import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
@@ -468,6 +469,9 @@ public class CaseController {
 	private boolean caseUpdatesLoadedOnce;
 	private boolean caseUpdatesStale = true;
 	private boolean caseUpdatesLoading;
+	private List<CaseTaskService.TaskActivityItem> caseTaskActivityEvents = List.of();
+	private VBox overviewTaskActivitySection;
+	private VBox overviewTaskActivityFeedBox;
 	private Long editingCaseUpdateId;
 	private String editingCaseUpdateDraftText = "";
 	private boolean savingCaseUpdateEdit = false;
@@ -510,6 +514,8 @@ public class CaseController {
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
 		this.caseUpdatesLoading = false;
+		this.caseTaskActivityEvents = List.of();
+		renderOverviewTaskActivity(List.of());
 		refreshHeader();
 		refreshOverviewPlaceholders();
 	}
@@ -522,6 +528,8 @@ public class CaseController {
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
 		this.caseUpdatesLoading = false;
+		this.caseTaskActivityEvents = List.of();
+		renderOverviewTaskActivity(List.of());
 		this.caseDao = caseDao;
 		this.caseDetailService = caseDetailService;
 		this.caseTaskService = caseTaskService;
@@ -604,6 +612,7 @@ public class CaseController {
 		refreshHeader();
 		refreshOverviewPlaceholders();
 		setupSections();
+		setupOverviewTaskActivitySection();
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
@@ -1952,11 +1961,20 @@ public class CaseController {
 	    new Thread(() -> {
 	        try {
 	            TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
-	            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+		            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
                 List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
                         detail == null
                                 ? List.of()
                                 : caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+                List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
+                        ? List.of()
+                        : caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+                                .map(item -> new TaskDetailDialog.TaskActivityEntry(
+                                        item.title(),
+                                        item.body(),
+                                        item.actorDisplayName(),
+                                        item.occurredAt()))
+                                .toList();
 
 	            runOnFx(() -> {
 	                try {
@@ -1983,8 +2001,9 @@ public class CaseController {
                                                 member.displayName(),
                                                 member.color()))
                                         .toList(),
-	                            detail.completedAt() != null
-	                    );
+                                activityEntries,
+		                            detail.completedAt() != null
+		                    );
 
 	                    Optional<TaskDetailDialog.TaskDetailResult> result =
 	                            TaskDetailDialog.showAndWait(
@@ -2088,6 +2107,7 @@ public class CaseController {
 	private void refreshCaseTasks() {
 		caseTasksStale = true;
 		loadCaseTasksAsync();
+		loadCaseTaskActivityAsync();
 	}
 
 	private CaseTaskService.CaseTasksSortOption selectedCaseTaskSort() {
@@ -2189,6 +2209,7 @@ public class CaseController {
 		caseUpdatesStale = true;
 		loadCaseUpdatesAsync();
 		loadCaseTasksAsync();
+		loadCaseTaskActivityAsync();
 
 		new Thread(() ->
 		{
@@ -2241,6 +2262,99 @@ public class CaseController {
 				PerfLog.logDone("NAV", "ready page=case_view caseId=" + activeCaseId, pageLoadStartNanos);
 			});
 		}, "case-view-sync-" + activeCaseId).start();
+	}
+
+	private void setupOverviewTaskActivitySection() {
+		if (overviewPane == null || overviewTaskActivitySection != null) {
+			return;
+		}
+		Label heading = new Label("Task Activity");
+		heading.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+		overviewTaskActivityFeedBox = new VBox(8);
+		overviewTaskActivitySection = new VBox(6, heading, overviewTaskActivityFeedBox);
+		overviewPane.getChildren().add(overviewTaskActivitySection);
+		renderOverviewTaskActivity(List.of());
+	}
+
+	private void loadCaseTaskActivityAsync() {
+		if (caseTaskService == null || appState == null || caseId == null || caseId <= 0) {
+			renderOverviewTaskActivity(List.of());
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			renderOverviewTaskActivity(List.of());
+			return;
+		}
+		final int activeCaseId = caseId;
+		new Thread(() -> {
+			try {
+				List<CaseTaskService.TaskActivityItem> events = caseTaskService.loadCaseTaskActivity(activeCaseId, shaleClientId);
+				runOnFx(() -> {
+					if (caseId == null || caseId != activeCaseId) {
+						return;
+					}
+					renderOverviewTaskActivity(events);
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to load task activity. " + ex.getMessage()));
+			}
+		}, "case-task-activity-load-" + activeCaseId).start();
+	}
+
+	private void renderOverviewTaskActivity(List<CaseTaskService.TaskActivityItem> events) {
+		if (overviewTaskActivityFeedBox == null) {
+			return;
+		}
+		overviewTaskActivityFeedBox.getChildren().clear();
+		caseTaskActivityEvents = events == null ? List.of() : List.copyOf(events);
+		if (caseTaskActivityEvents.isEmpty()) {
+			Label empty = new Label("No task activity yet.");
+			empty.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+			overviewTaskActivityFeedBox.getChildren().add(empty);
+			return;
+		}
+		for (CaseTaskService.TaskActivityItem event : caseTaskActivityEvents) {
+			if (event == null) {
+				continue;
+			}
+			overviewTaskActivityFeedBox.getChildren().add(createCaseTaskActivityCard(event));
+		}
+	}
+
+	private Node createCaseTaskActivityCard(CaseTaskService.TaskActivityItem event) {
+		String taskTitle = safeText(event.taskTitle()).trim();
+		if (taskTitle.isBlank()) {
+			taskTitle = "Task #" + event.taskId();
+		}
+		Hyperlink taskLink = new Hyperlink(taskTitle);
+		taskLink.setOnAction(e -> openTask(event.taskId()));
+		taskLink.setWrapText(true);
+
+		Label eventTitle = new Label(safeText(event.title()).trim().isBlank() ? "Activity event" : safeText(event.title()).trim());
+		eventTitle.setStyle("-fx-font-weight: bold;");
+		eventTitle.setWrapText(true);
+
+		VBox content = new VBox(6, taskLink, eventTitle);
+		String body = safeText(event.body()).trim();
+		if (!body.isBlank()) {
+			Label bodyLabel = new Label(body);
+			bodyLabel.setWrapText(true);
+			content.getChildren().add(bodyLabel);
+		}
+
+		String actor = safeText(event.actorDisplayName()).trim();
+		if (actor.isBlank()) {
+			actor = "System";
+		}
+		Label metaLabel = new Label(actor + " · " + formatDateTime(event.occurredAt()));
+		metaLabel.setStyle("-fx-opacity: 0.75;");
+		content.getChildren().add(metaLabel);
+
+		VBox card = new VBox(content);
+		card.setPadding(new Insets(10, 12, 10, 12));
+		card.getStyleClass().add("secondary-panel");
+		return card;
 	}
 
 	private void refreshLastUpdatedLabelAsync() {

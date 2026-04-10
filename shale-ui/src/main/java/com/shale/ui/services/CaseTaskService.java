@@ -98,6 +98,48 @@ public final class CaseTaskService {
         return rows;
     }
 
+    public List<TaskActivityItem> loadTaskActivity(long taskId, int shaleClientId) {
+        if (taskId <= 0 || shaleClientId <= 0) {
+            return List.of();
+        }
+        return taskDao.listTaskTimelineEvents(taskId).stream()
+                .filter(row -> row.shaleClientId() == shaleClientId)
+                .map(row -> new TaskActivityItem(
+                        row.id(),
+                        row.taskId(),
+                        row.caseId(),
+                        row.shaleClientId(),
+                        row.taskTitle(),
+                        row.eventType(),
+                        row.actorUserId(),
+                        normalizeActorDisplayName(row.actorDisplayName()),
+                        row.title(),
+                        row.body(),
+                        row.occurredAt()))
+                .toList();
+    }
+
+    public List<TaskActivityItem> loadCaseTaskActivity(int caseId, int shaleClientId) {
+        if (caseId <= 0 || shaleClientId <= 0) {
+            return List.of();
+        }
+        return taskDao.listCaseTaskTimelineEvents(caseId).stream()
+                .filter(row -> row.shaleClientId() == shaleClientId)
+                .map(row -> new TaskActivityItem(
+                        row.id(),
+                        row.taskId(),
+                        row.caseId(),
+                        row.shaleClientId(),
+                        row.taskTitle(),
+                        row.eventType(),
+                        row.actorUserId(),
+                        normalizeActorDisplayName(row.actorDisplayName()),
+                        row.title(),
+                        row.body(),
+                        row.occurredAt()))
+                .toList();
+    }
+
     public long createTask(CreateTaskRequest request) {
         Objects.requireNonNull(request, "request");
         long taskId = taskDao.createTask(
@@ -487,6 +529,11 @@ public final class CaseTaskService {
         return dueAt.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE);
     }
 
+    private static String normalizeActorDisplayName(String actorDisplayName) {
+        String normalized = actorDisplayName == null ? "" : actorDisplayName.trim();
+        return normalized.isBlank() ? null : normalized;
+    }
+
     public record CreateTaskRequest(
             int shaleClientId,
             long caseId,
@@ -525,5 +572,19 @@ public final class CaseTaskService {
             Integer priorityId,
             boolean completed,
             int changedByUserId) {
+    }
+
+    public record TaskActivityItem(
+            long id,
+            long taskId,
+            int caseId,
+            int shaleClientId,
+            String taskTitle,
+            String eventType,
+            Integer actorUserId,
+            String actorDisplayName,
+            String title,
+            String body,
+            LocalDateTime occurredAt) {
     }
 }

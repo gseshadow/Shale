@@ -1047,6 +1047,15 @@ public final class UserController {
 				List<CaseTaskService.AssignedTaskUserOption> assignedTeam = detail == null
 						? List.of()
 						: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+				List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
+						? List.of()
+						: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+								.map(item -> new TaskDetailDialog.TaskActivityEntry(
+										item.title(),
+										item.body(),
+										item.actorDisplayName(),
+										item.occurredAt()))
+								.toList();
 				Platform.runLater(() -> {
 					try {
 						if (detail == null) {
@@ -1071,6 +1080,7 @@ public final class UserController {
 												member.displayName(),
 												member.color()))
 										.toList(),
+								activityEntries,
 								detail.completedAt() != null);
 						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
 								taskDialogOwner(),

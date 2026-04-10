@@ -3,6 +3,7 @@ package com.shale.ui.component.dialog;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
@@ -16,6 +17,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -155,6 +157,13 @@ public final class TaskDetailDialog {
         });
         assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedTeamList);
 
+        VBox activitySection = new VBox(6);
+        Label activityLabel = new Label("Activity");
+        activityLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        VBox activityList = new VBox(8);
+        renderActivityItems(activityList, model.activityEntries());
+        activitySection.getChildren().setAll(activityLabel, activityList);
+
         VBox content = new VBox(8,
                 createdByLabel,
                 new Label("Title"), titleField,
@@ -163,6 +172,7 @@ public final class TaskDetailDialog {
                 new Label("Priority"), priorityCombo,
                 new Label("Due date/time"), dueRow,
                 assignedTeamSection,
+                activitySection,
                 completedCheck,
                 errorLabel);
         content.setPadding(new Insets(8, 2, 4, 2));
@@ -329,6 +339,53 @@ public final class TaskDetailDialog {
         }
     }
 
+    private static void renderActivityItems(VBox activityList, List<TaskActivityEntry> entries) {
+        activityList.getChildren().clear();
+        List<TaskActivityEntry> safeEntries = entries == null ? List.of() : entries;
+        if (safeEntries.isEmpty()) {
+            Label emptyLabel = new Label("No activity yet.");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            activityList.getChildren().add(emptyLabel);
+            return;
+        }
+
+        for (TaskActivityEntry entry : safeEntries) {
+            if (entry == null) {
+                continue;
+            }
+            Label titleLabel = new Label(safe(entry.title()).trim().isBlank() ? "Activity event" : safe(entry.title()).trim());
+            titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700;");
+            titleLabel.setWrapText(true);
+
+            VBox cardContent = new VBox(4, titleLabel);
+            String body = safe(entry.body()).trim();
+            if (!body.isBlank()) {
+                Label bodyLabel = new Label(body);
+                bodyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.88);");
+                bodyLabel.setWrapText(true);
+                cardContent.getChildren().add(bodyLabel);
+            }
+
+            String actor = safe(entry.actorDisplayName()).trim();
+            if (actor.isBlank()) {
+                actor = "System";
+            }
+            String metaText = actor + " · " + formatDateTime(entry.occurredAt());
+            Label metaLabel = new Label(metaText);
+            metaLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
+            cardContent.getChildren().add(metaLabel);
+
+            VBox card = new VBox(cardContent);
+            card.setPadding(new Insets(10, 12, 10, 12));
+            card.getStyleClass().add("secondary-panel");
+            activityList.getChildren().add(card);
+        }
+    }
+
+    private static String formatDateTime(LocalDateTime value) {
+        return UtcDateTimeDisplayFormatter.formatUtcToLocal(value, TASK_ACTIVITY_TIMESTAMP_FORMAT);
+    }
+
     private static Optional<CaseTaskService.AssignableUserOption> showAssignUserPicker(
             Window owner,
             List<CaseTaskService.AssignableUserOption> candidates) {
@@ -392,7 +449,15 @@ public final class TaskDetailDialog {
             Integer priorityId,
             String createdByDisplayName,
             List<AssignedTeamMember> assignedTeamMembers,
+            List<TaskActivityEntry> activityEntries,
             boolean completed) {
+    }
+
+    public record TaskActivityEntry(
+            String title,
+            String body,
+            String actorDisplayName,
+            LocalDateTime occurredAt) {
     }
 
     public record AssignedTeamMember(
@@ -441,5 +506,7 @@ public final class TaskDetailDialog {
             setText(empty || item == null ? null : item.name());
         }
     }
+
+    private static final DateTimeFormatter TASK_ACTIVITY_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
 
 }

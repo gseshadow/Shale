@@ -725,6 +725,13 @@ public final class SceneManager {
 		}
 		List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
 				caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+		List<TaskDetailDialog.TaskActivityEntry> activityEntries = caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+				.map(item -> new TaskDetailDialog.TaskActivityEntry(
+						item.title(),
+						item.body(),
+						item.actorDisplayName(),
+						item.occurredAt()))
+				.toList();
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 				detail.id(),
 				detail.caseId(),
@@ -742,6 +749,7 @@ public final class SceneManager {
 									member.displayName(),
 									member.color()))
 						.toList(),
+				activityEntries,
 				detail.completedAt() != null);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
 		var result = TaskDetailDialog.showAndWait(

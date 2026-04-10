@@ -108,8 +108,10 @@ public final class TaskDao {
             long taskId,
             int caseId,
             int shaleClientId,
+            String taskTitle,
             String eventType,
             Integer actorUserId,
+            String actorDisplayName,
             String title,
             String body,
             LocalDateTime occurredAt,
@@ -1290,8 +1292,14 @@ public final class TaskDao {
                   tte.TaskId,
                   tte.CaseId,
                   tte.ShaleClientId,
+                  t.Title AS TaskTitle,
                   tte.EventType,
                   tte.ActorUserId,
+                  LTRIM(RTRIM(
+                    COALESCE(u.name_first, '') +
+                    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(u.name_last, '')
+                  )) AS ActorDisplayName,
                   tte.Title,
                   tte.Body,
                   tte.OccurredAt,
@@ -1300,6 +1308,9 @@ public final class TaskDao {
                 INNER JOIN dbo.Tasks t
                   ON t.Id = tte.TaskId
                  AND t.ShaleClientId = tte.ShaleClientId
+                LEFT JOIN dbo.Users u
+                  ON u.Id = tte.ActorUserId
+                 AND u.ShaleClientId = tte.ShaleClientId
                 WHERE tte.TaskId = ?
                   AND ISNULL(tte.IsDeleted, 0) = 0
                 ORDER BY tte.OccurredAt DESC, tte.Id DESC;
@@ -1329,8 +1340,14 @@ public final class TaskDao {
                   tte.TaskId,
                   tte.CaseId,
                   tte.ShaleClientId,
+                  t.Title AS TaskTitle,
                   tte.EventType,
                   tte.ActorUserId,
+                  LTRIM(RTRIM(
+                    COALESCE(u.name_first, '') +
+                    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(u.name_last, '')
+                  )) AS ActorDisplayName,
                   tte.Title,
                   tte.Body,
                   tte.OccurredAt,
@@ -1339,6 +1356,9 @@ public final class TaskDao {
                 INNER JOIN dbo.Tasks t
                   ON t.Id = tte.TaskId
                  AND t.ShaleClientId = tte.ShaleClientId
+                LEFT JOIN dbo.Users u
+                  ON u.Id = tte.ActorUserId
+                 AND u.ShaleClientId = tte.ShaleClientId
                 WHERE tte.CaseId = ?
                   AND ISNULL(tte.IsDeleted, 0) = 0
                 ORDER BY tte.OccurredAt DESC, tte.Id DESC;
@@ -1557,8 +1577,10 @@ public final class TaskDao {
                 rs.getLong("TaskId"),
                 rs.getInt("CaseId"),
                 rs.getInt("ShaleClientId"),
+                rs.getString("TaskTitle"),
                 rs.getString("EventType"),
                 (Integer) rs.getObject("ActorUserId"),
+                rs.getString("ActorDisplayName"),
                 rs.getString("Title"),
                 rs.getString("Body"),
                 toLocalDateTime(rs.getTimestamp("OccurredAt")),
