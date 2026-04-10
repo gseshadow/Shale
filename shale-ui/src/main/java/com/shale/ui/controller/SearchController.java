@@ -228,7 +228,8 @@ public final class SearchController {
 					row.intakeDate(),
 					row.statuteOfLimitationsDate(),
 					row.responsibleAttorneyName(),
-					row.responsibleAttorneyColor()));
+					row.responsibleAttorneyColor(),
+					row.nonEngagementLetterSent()));
 			if (card instanceof Region region) {
 				region.setPrefWidth(CASE_CARD_WIDTH);
 				region.setMaxWidth(CASE_CARD_WIDTH);
@@ -260,7 +261,8 @@ public final class SearchController {
 					row.intakeDate(),
 					row.statuteOfLimitationsDate(),
 					row.responsibleAttorneyName(),
-					row.responsibleAttorneyColor()));
+					row.responsibleAttorneyColor(),
+					row.nonEngagementLetterSent()));
 			if (card instanceof Region region) {
 				region.setPrefWidth(CASE_CARD_WIDTH);
 				region.setMaxWidth(CASE_CARD_WIDTH);

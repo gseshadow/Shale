@@ -12,6 +12,7 @@ public record TaskDetailDto(
         String caseName,
         String caseResponsibleAttorney,
         String caseResponsibleAttorneyColor,
+        Boolean caseNonEngagementLetterSent,
         String title,
         String description,
         LocalDateTime dueAt,

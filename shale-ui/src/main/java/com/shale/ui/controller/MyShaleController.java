@@ -322,7 +322,8 @@ public final class MyShaleController {
 			r.statuteOfLimitationsDate(),
 			r.primaryStatusId(),
 			safe(r.responsibleAttorneyName()),
-			safe(r.responsibleAttorneyColor())
+			safe(r.responsibleAttorneyColor()),
+			r.nonEngagementLetterSent()
 		);
 	}
 
@@ -492,7 +493,8 @@ public final class MyShaleController {
 				vm.intakeDate,
 				vm.solDate,
 				vm.responsibleAttorney,
-				vm.responsibleAttorneyColor));
+				vm.responsibleAttorneyColor,
+				vm.nonEngagementLetterSent));
 	}
 
 	private void refreshMyTasks() {
@@ -573,6 +575,7 @@ public final class MyShaleController {
 					task.caseName(),
 					task.caseResponsibleAttorney(),
 					task.caseResponsibleAttorneyColor(),
+					task.caseNonEngagementLetterSent(),
 					task.title(),
 					task.description(),
 					task.priorityColorHex(),
@@ -701,6 +704,7 @@ public final class MyShaleController {
 								detail.caseName(),
 								detail.caseResponsibleAttorney(),
 								detail.caseResponsibleAttorneyColor(),
+				detail.caseNonEngagementLetterSent(),
 								detail.title(),
 								detail.description(),
 								detail.dueAt(),
@@ -889,9 +893,10 @@ public final class MyShaleController {
 		final Integer primaryStatusId;
 		final String responsibleAttorney;
 		final String responsibleAttorneyColor;
+		final Boolean nonEngagementLetterSent;
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId,
-				String responsibleAttorney, String responsibleAttorneyColor) {
+				String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
@@ -899,6 +904,7 @@ public final class MyShaleController {
 			this.primaryStatusId = primaryStatusId;
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
+			this.nonEngagementLetterSent = nonEngagementLetterSent;
 		}
 
 		boolean sameContent(CaseCardVm other) {
@@ -911,7 +917,8 @@ public final class MyShaleController {
 					&& Objects.equals(solDate, other.solDate)
 					&& Objects.equals(primaryStatusId, other.primaryStatusId)
 					&& Objects.equals(responsibleAttorney, other.responsibleAttorney)
-					&& Objects.equals(responsibleAttorneyColor, other.responsibleAttorneyColor);
+					&& Objects.equals(responsibleAttorneyColor, other.responsibleAttorneyColor)
+					&& Objects.equals(nonEngagementLetterSent, other.nonEngagementLetterSent);
 		}
 	}
 }

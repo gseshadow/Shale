@@ -20,6 +20,7 @@ public final class TaskCardFactory {
             String caseName,
             String caseResponsibleAttorney,
             String caseResponsibleAttorneyColor,
+            Boolean caseNonEngagementLetterSent,
             String title,
             String description,
             String priorityColorHex,
@@ -65,7 +66,8 @@ public final class TaskCardFactory {
                 model.caseId(),
                 model.caseName(),
                 model.caseResponsibleAttorney(),
-                model.caseResponsibleAttorneyColor());
+                model.caseResponsibleAttorneyColor(),
+                model.caseNonEngagementLetterSent());
         card.setTitle(model.title());
         card.setDueAt(model.dueAt());
         card.setDescriptionPreview(model.description());

@@ -10,6 +10,7 @@ import com.shale.ui.util.ColorUtil;
 import javafx.scene.Node;
 
 public final class CaseCardFactory {
+	private static final String NON_ENGAGEMENT_OVERRIDE_BACKGROUND_CSS = "#D4D4DFF";
 
 	public enum Variant {
 		FULL, COMPACT, MINI
@@ -34,7 +35,10 @@ public final class CaseCardFactory {
 		card.setIntakeDate(vm.intakeDate());
 		card.setSolDate(vm.solDate());
 
-		card.setBackgroundCssColor(ColorUtil.toCssBackgroundColorOrNull(vm.responsibleAttorneyColor()));
+		String backgroundCss = Boolean.TRUE.equals(vm.nonEngagementLetterSent())
+				? NON_ENGAGEMENT_OVERRIDE_BACKGROUND_CSS
+				: ColorUtil.toCssBackgroundColorOrNull(vm.responsibleAttorneyColor());
+		card.setBackgroundCssColor(backgroundCss);
 
 		card.setOnOpen(id ->
 		{
@@ -58,12 +62,14 @@ public final class CaseCardFactory {
 			LocalDate intakeDate,
 			LocalDate solDate,
 			String responsibleAttorney,
-			String responsibleAttorneyColor
+			String responsibleAttorneyColor,
+			Boolean nonEngagementLetterSent
 	) {
 		public CaseCardModel {
 			name = Objects.requireNonNullElse(name, "");
 			responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
+			nonEngagementLetterSent = Boolean.TRUE.equals(nonEngagementLetterSent);
 		}
 	}
 }

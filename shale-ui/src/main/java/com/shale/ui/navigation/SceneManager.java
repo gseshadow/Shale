@@ -770,6 +770,7 @@ public final class SceneManager {
 				detail.caseName(),
 				detail.caseResponsibleAttorney(),
 				detail.caseResponsibleAttorneyColor(),
+				detail.caseNonEngagementLetterSent(),
 				detail.title(),
 				detail.description(),
 				detail.dueAt(),
