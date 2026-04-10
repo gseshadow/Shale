@@ -725,6 +725,13 @@ public final class SceneManager {
 		}
 		List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
 				caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+		List<TaskDetailDialog.TaskActivityEntry> activityEntries = caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+				.map(item -> new TaskDetailDialog.TaskActivityEntry(
+						item.title(),
+						item.body(),
+						item.actorDisplayName(),
+						item.occurredAt()))
+				.toList();
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 				detail.id(),
 				detail.caseId(),
@@ -742,6 +749,7 @@ public final class SceneManager {
 									member.displayName(),
 									member.color()))
 						.toList(),
+				activityEntries,
 				detail.completedAt() != null);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
 		var result = TaskDetailDialog.showAndWait(
@@ -763,7 +771,7 @@ public final class SceneManager {
 
 					@Override
 					public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
-						caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId);
+						caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
 						return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
 								.map(member -> new TaskDetailDialog.AssignedTeamMember(
 										member.userId(),
@@ -780,7 +788,7 @@ public final class SceneManager {
 		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
 			new Thread(() -> {
 				try {
-					caseTaskService.deleteTask(taskId, shaleClientId);
+					caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 				} catch (Exception ex) {
 					Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to delete task. " + rootCauseMessage(ex)));
 				}
