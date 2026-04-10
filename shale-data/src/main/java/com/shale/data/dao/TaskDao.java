@@ -293,6 +293,14 @@ public final class TaskDao {
     }
 
     public List<CaseTaskListItemDto> listActiveTasksAssignedToUser(int shaleClientId, int assignedUserId, MyTaskSort sort) {
+        return listActiveTasksAssignedToUser(shaleClientId, assignedUserId, sort, false);
+    }
+
+    public List<CaseTaskListItemDto> listActiveTasksAssignedToUser(
+            int shaleClientId,
+            int assignedUserId,
+            MyTaskSort sort,
+            boolean includeCompleted) {
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
@@ -379,7 +387,7 @@ public final class TaskDao {
                       AND myAssignment.UserId = ?
                   )
                   AND ISNULL(t.IsDeleted, 0) = 0
-                  AND t.CompletedAt IS NULL
+                  %s
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
                   CASE WHEN t.DueAt IS NULL THEN 1 ELSE 0 END ASC,
@@ -387,7 +395,7 @@ public final class TaskDao {
                   t.UpdatedAt DESC,
                   t.CreatedAt DESC,
                   t.Id DESC;
-                """.formatted(dueOrderSql);
+                """.formatted(includeCompleted ? "" : "AND t.CompletedAt IS NULL", dueOrderSql);
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
