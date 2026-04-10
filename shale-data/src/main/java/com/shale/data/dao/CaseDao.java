@@ -1533,6 +1533,8 @@ public final class CaseDao {
 				  c.MedicalRecordsReceived,
 				  c.FeeAgreementSigned,
 				  c.DateFeeAgreementSigned,
+				  c.NonEngagementLetterSent,
+				  c.DateNonEngagementLetterSent,
 				  c.AcceptedChronology,
 				  c.AcceptedConsultantExpertSearch,
 				  c.AcceptedTestifyingExpertSearch,
@@ -1596,6 +1598,8 @@ public final class CaseDao {
 				getNullableBoolean(rs, "MedicalRecordsReceived"),
 				getNullableBoolean(rs, "FeeAgreementSigned"),
 				toLocalDate(rs.getDate("DateFeeAgreementSigned")),
+				getNullableBoolean(rs, "NonEngagementLetterSent"),
+				toLocalDate(rs.getDate("DateNonEngagementLetterSent")),
 				getNullableBoolean(rs, "AcceptedChronology"),
 				getNullableBoolean(rs, "AcceptedConsultantExpertSearch"),
 				getNullableBoolean(rs, "AcceptedTestifyingExpertSearch"),
@@ -1694,6 +1698,8 @@ public final class CaseDao {
 			Boolean medicalRecordsReceived,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
+			Boolean nonEngagementLetterSent,
+			LocalDate dateNonEngagementLetterSent,
 			Boolean acceptedChronology,
 			Boolean acceptedConsultantExpertSearch,
 			Boolean acceptedTestifyingExpertSearch,
@@ -1731,6 +1737,8 @@ public final class CaseDao {
 					    MedicalRecordsReceived = ?,
 					    FeeAgreementSigned = ?,
 					    DateFeeAgreementSigned = ?,
+					    NonEngagementLetterSent = ?,
+					    DateNonEngagementLetterSent = ?,
 					    AcceptedChronology = ?,
 					    AcceptedConsultantExpertSearch = ?,
 					    AcceptedTestifyingExpertSearch = ?,
@@ -1771,6 +1779,8 @@ public final class CaseDao {
 				setNullableBoolean(ps, idx++, medicalRecordsReceived);
 				setNullableBoolean(ps, idx++, feeAgreementSigned);
 				setNullableDate(ps, idx++, dateFeeAgreementSigned);
+				setNullableBoolean(ps, idx++, nonEngagementLetterSent);
+				setNullableDate(ps, idx++, dateNonEngagementLetterSent);
 				setNullableBoolean(ps, idx++, acceptedChronology);
 				setNullableBoolean(ps, idx++, acceptedConsultantExpertSearch);
 				setNullableBoolean(ps, idx++, acceptedTestifyingExpertSearch);
