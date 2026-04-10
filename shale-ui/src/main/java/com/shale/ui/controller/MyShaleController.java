@@ -649,6 +649,18 @@ public final class MyShaleController {
 											item.actorDisplayName(),
 											item.occurredAt()))
 									.toList();
+					List<TaskDetailDialog.TaskNoteEntry> noteEntries = detail == null
+							? List.of()
+							: caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
+									.map(note -> new TaskDetailDialog.TaskNoteEntry(
+											note.id(),
+											note.userId(),
+											note.userDisplayName(),
+											note.body(),
+											note.createdAt(),
+											note.updatedAt(),
+											note.userId() == currentUserId))
+									.toList();
 
 				runOnFx(() -> {
 					try {
@@ -668,21 +680,22 @@ public final class MyShaleController {
 								detail.dueAt(),
 								detail.priorityId(),
 								detail.createdByDisplayName(),
-									assignedTeam.stream()
-											.map(member -> new TaskDetailDialog.AssignedTeamMember(
-													member.userId(),
-													member.displayName(),
-													member.color()))
-										.toList(),
-									activityEntries,
-									detail.completedAt() != null);
+										assignedTeam.stream()
+												.map(member -> new TaskDetailDialog.AssignedTeamMember(
+														member.userId(),
+														member.displayName(),
+														member.color()))
+											.toList(),
+										activityEntries,
+										noteEntries,
+										detail.completedAt() != null);
 						Optional<TaskDetailDialog.TaskDetailResult> result =
 								TaskDetailDialog.showAndWait(
 										taskDialogOwner(),
 										model,
 										priorities,
 										id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-										new TaskDetailDialog.AssignmentEditor() {
+											new TaskDetailDialog.AssignmentEditor() {
 											@Override
 											public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
 												caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
@@ -704,8 +717,39 @@ public final class MyShaleController {
 																member.color()))
 														.toList();
 											}
-										},
-										onOpenCase);
+											},
+											new TaskDetailDialog.NotesEditor() {
+												@Override
+												public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
+													caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
+													return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+															.map(note -> new TaskDetailDialog.TaskNoteEntry(
+																	note.id(),
+																	note.userId(),
+																	note.userDisplayName(),
+																	note.body(),
+																	note.createdAt(),
+																	note.updatedAt(),
+																	note.userId() == currentUserId))
+															.toList();
+												}
+
+												@Override
+												public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
+													caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
+													return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+															.map(note -> new TaskDetailDialog.TaskNoteEntry(
+																	note.id(),
+																	note.userId(),
+																	note.userDisplayName(),
+																	note.body(),
+																	note.createdAt(),
+																	note.updatedAt(),
+																	note.userId() == currentUserId))
+															.toList();
+												}
+											},
+											onOpenCase);
 						if (result.isEmpty()) {
 							return;
 						}

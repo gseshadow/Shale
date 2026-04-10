@@ -1047,15 +1047,27 @@ public final class UserController {
 				List<CaseTaskService.AssignedTaskUserOption> assignedTeam = detail == null
 						? List.of()
 						: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
-				List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
-						? List.of()
-						: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
-								.map(item -> new TaskDetailDialog.TaskActivityEntry(
-										item.title(),
-										item.body(),
-										item.actorDisplayName(),
-										item.occurredAt()))
-								.toList();
+					List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
+							? List.of()
+							: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+									.map(item -> new TaskDetailDialog.TaskActivityEntry(
+											item.title(),
+											item.body(),
+											item.actorDisplayName(),
+											item.occurredAt()))
+									.toList();
+					List<TaskDetailDialog.TaskNoteEntry> noteEntries = detail == null
+							? List.of()
+							: caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
+									.map(note -> new TaskDetailDialog.TaskNoteEntry(
+											note.id(),
+											note.userId(),
+											note.userDisplayName(),
+											note.body(),
+											note.createdAt(),
+											note.updatedAt(),
+											note.userId() == currentUserId))
+									.toList();
 				Platform.runLater(() -> {
 					try {
 						if (detail == null) {
@@ -1074,20 +1086,21 @@ public final class UserController {
 								detail.dueAt(),
 								detail.priorityId(),
 								detail.createdByDisplayName(),
-								assignedTeam.stream()
-										.map(member -> new TaskDetailDialog.AssignedTeamMember(
-												member.userId(),
-												member.displayName(),
-												member.color()))
-										.toList(),
-								activityEntries,
-								detail.completedAt() != null);
+									assignedTeam.stream()
+											.map(member -> new TaskDetailDialog.AssignedTeamMember(
+													member.userId(),
+													member.displayName(),
+													member.color()))
+											.toList(),
+									activityEntries,
+									noteEntries,
+									detail.completedAt() != null);
 						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
 								taskDialogOwner(),
 								model,
 								priorities,
 								id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-								new TaskDetailDialog.AssignmentEditor() {
+									new TaskDetailDialog.AssignmentEditor() {
 									@Override
 									public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
 										caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
@@ -1109,8 +1122,39 @@ public final class UserController {
 														member.color()))
 												.toList();
 									}
-								},
-								onOpenCase);
+									},
+									new TaskDetailDialog.NotesEditor() {
+										@Override
+										public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
+											caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
+											return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+													.map(note -> new TaskDetailDialog.TaskNoteEntry(
+															note.id(),
+															note.userId(),
+															note.userDisplayName(),
+															note.body(),
+															note.createdAt(),
+															note.updatedAt(),
+															note.userId() == currentUserId))
+													.toList();
+										}
+
+										@Override
+										public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
+											caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
+											return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+													.map(note -> new TaskDetailDialog.TaskNoteEntry(
+															note.id(),
+															note.userId(),
+															note.userDisplayName(),
+															note.body(),
+															note.createdAt(),
+															note.updatedAt(),
+															note.userId() == currentUserId))
+													.toList();
+										}
+									},
+									onOpenCase);
 						if (result.isEmpty()) {
 							return;
 						}

@@ -140,6 +140,48 @@ public final class CaseTaskService {
                 .toList();
     }
 
+    public List<TaskNoteItem> loadTaskNotes(long taskId, int shaleClientId) {
+        if (taskId <= 0 || shaleClientId <= 0) {
+            return List.of();
+        }
+        return taskDao.listTaskUpdates(taskId).stream()
+                .filter(row -> row.shaleClientId() == shaleClientId)
+                .map(row -> new TaskNoteItem(
+                        row.id(),
+                        row.taskId(),
+                        row.caseId(),
+                        row.shaleClientId(),
+                        row.userId(),
+                        row.userDisplayName(),
+                        row.userColor(),
+                        row.body(),
+                        row.createdAt(),
+                        row.updatedAt(),
+                        row.isDeleted()))
+                .toList();
+    }
+
+    public void addTaskNote(long taskId, int shaleClientId, int userId, String body) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (userId <= 0) {
+            throw new IllegalArgumentException("userId must be > 0");
+        }
+        TaskDetailDto detail = taskDao.findTaskDetail(taskId, shaleClientId);
+        if (detail == null) {
+            throw new IllegalArgumentException("Task not found for note insert");
+        }
+        taskDao.addTaskUpdate(taskId, Math.toIntExact(detail.caseId()), shaleClientId, userId, body);
+    }
+
+    public boolean updateTaskNote(long taskUpdateId, int shaleClientId, int userId, String body) {
+        return taskDao.updateTaskUpdate(taskUpdateId, shaleClientId, userId, body);
+    }
+
     public long createTask(CreateTaskRequest request) {
         Objects.requireNonNull(request, "request");
         long taskId = taskDao.createTask(
@@ -586,5 +628,19 @@ public final class CaseTaskService {
             String title,
             String body,
             LocalDateTime occurredAt) {
+    }
+
+    public record TaskNoteItem(
+            long id,
+            long taskId,
+            int caseId,
+            int shaleClientId,
+            int userId,
+            String userDisplayName,
+            String userColor,
+            String body,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt,
+            boolean isDeleted) {
     }
 }

@@ -754,6 +754,16 @@ public final class SceneManager {
 						item.actorDisplayName(),
 						item.occurredAt()))
 				.toList();
+		List<TaskDetailDialog.TaskNoteEntry> noteEntries = caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
+				.map(note -> new TaskDetailDialog.TaskNoteEntry(
+						note.id(),
+						note.userId(),
+						note.userDisplayName(),
+						note.body(),
+						note.createdAt(),
+						note.updatedAt(),
+						note.userId() == currentUserId))
+				.toList();
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 				detail.id(),
 				detail.caseId(),
@@ -765,13 +775,14 @@ public final class SceneManager {
 				detail.dueAt(),
 				detail.priorityId(),
 					detail.createdByDisplayName(),
-					assignedTeam.stream()
-							.map(member -> new TaskDetailDialog.AssignedTeamMember(
-									member.userId(),
-									member.displayName(),
-									member.color()))
-						.toList(),
-				activityEntries,
+						assignedTeam.stream()
+								.map(member -> new TaskDetailDialog.AssignedTeamMember(
+										member.userId(),
+										member.displayName(),
+										member.color()))
+							.toList(),
+					activityEntries,
+					noteEntries,
 				detail.completedAt() != null);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
 		var result = TaskDetailDialog.showAndWait(
@@ -799,6 +810,37 @@ public final class SceneManager {
 										member.userId(),
 										member.displayName(),
 										member.color()))
+								.toList();
+					}
+				},
+				new TaskDetailDialog.NotesEditor() {
+					@Override
+					public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
+						caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
+						return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+								.map(note -> new TaskDetailDialog.TaskNoteEntry(
+										note.id(),
+										note.userId(),
+										note.userDisplayName(),
+										note.body(),
+										note.createdAt(),
+										note.updatedAt(),
+										note.userId() == currentUserId))
+								.toList();
+					}
+
+					@Override
+					public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
+						caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
+						return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+								.map(note -> new TaskDetailDialog.TaskNoteEntry(
+										note.id(),
+										note.userId(),
+										note.userDisplayName(),
+										note.body(),
+										note.createdAt(),
+										note.updatedAt(),
+										note.userId() == currentUserId))
 								.toList();
 					}
 				},
