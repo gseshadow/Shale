@@ -47,6 +47,34 @@ public final class NotificationDao {
 		}
 	}
 
+	public Long createTaskNoteAddedNotification(
+			int shaleClientId,
+			int userId,
+			String title,
+			String message,
+			long entityId,
+			int createdByUserId,
+			String eventKey) {
+		if (eventKey == null || eventKey.isBlank()) {
+			return null;
+		}
+		try (Connection con = db.requireConnection()) {
+			return createIfAbsent(
+					con,
+					shaleClientId,
+					userId,
+					title,
+					message,
+					entityId,
+					createdByUserId,
+					"NOTE_ADDED",
+					"INFO",
+					eventKey);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create task-note notification", e);
+		}
+	}
+
 	public Long createTaskDueDateNotification(
 			int shaleClientId,
 			int userId,
@@ -74,6 +102,35 @@ public final class NotificationDao {
 					eventKey);
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to create due-date notification", e);
+		}
+	}
+
+	public Long createTaskActionNotification(
+			int shaleClientId,
+			int userId,
+			String title,
+			String message,
+			long entityId,
+			int createdByUserId,
+			String actionType,
+			String eventKey) {
+		if (eventKey == null || eventKey.isBlank()) {
+			return null;
+		}
+		try (Connection con = db.requireConnection()) {
+			return createIfAbsent(
+					con,
+					shaleClientId,
+					userId,
+					title,
+					message,
+					entityId,
+					createdByUserId,
+					actionType,
+					"INFO",
+					eventKey);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create task-action notification", e);
 		}
 	}
 
