@@ -1154,6 +1154,7 @@ public final class UserController {
 													.toList();
 										}
 									},
+									this::onOpenUserFromTask,
 									onOpenCase);
 						if (result.isEmpty()) {
 							return;
