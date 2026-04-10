@@ -573,12 +573,14 @@
 			</VBox>
 			<!-- TASKS TAB PANE (center) -->
 			<VBox fx:id="tasksTabPane" spacing="8" maxWidth="1.7976931348623157E308"
+				maxHeight="1.7976931348623157E308"
 				visible="false" managed="false">
 				<padding>
 					<Insets top="8" right="8" bottom="8" left="8" />
 				</padding>
-				<HBox spacing="10" alignment="TOP_LEFT" VBox.vgrow="ALWAYS">
-					<VBox spacing="8" HBox.hgrow="ALWAYS" styleClass="case-main-surface">
+				<HBox spacing="10" alignment="TOP_LEFT" fillHeight="true" VBox.vgrow="ALWAYS">
+					<VBox spacing="8" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS"
+						maxHeight="1.7976931348623157E308" styleClass="case-main-surface">
 						<padding>
 							<Insets top="10" right="10" bottom="10" left="10" />
 						</padding>
@@ -593,7 +595,8 @@
 						<Label fx:id="tasksTabEmptyLabel"
 							text="No tasks for this case yet." visible="false" managed="false"
 							style="-fx-opacity: 0.7;" />
-						<ScrollPane fitToWidth="true" hbarPolicy="NEVER"
+						<ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER"
+							vbarPolicy="AS_NEEDED"
 							VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
 							<content>
 								<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12"
@@ -606,7 +609,8 @@
 						</ScrollPane>
 					</VBox>
 					<VBox fx:id="caseTaskActivityPane" spacing="8" prefWidth="420"
-						minWidth="360" maxWidth="480" styleClass="secondary-panel">
+						minWidth="360" maxWidth="480" maxHeight="1.7976931348623157E308"
+						VBox.vgrow="ALWAYS" styleClass="secondary-panel">
 						<padding>
 							<Insets top="10" right="10" bottom="10" left="10" />
 						</padding>
@@ -615,6 +619,7 @@
 						<Label fx:id="caseTaskActivityEmptyLabel" text="No task activity yet."
 							style="-fx-opacity: 0.7;" visible="false" managed="false" />
 						<ScrollPane fx:id="caseTaskActivityScrollPane" fitToWidth="true"
+							fitToHeight="true"
 							hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS"
 							styleClass="transparent-scroll">
 							<content>
