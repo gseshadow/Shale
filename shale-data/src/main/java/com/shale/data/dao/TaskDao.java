@@ -117,6 +117,19 @@ public final class TaskDao {
             LocalDateTime occurredAt,
             boolean isDeleted) {
     }
+    public record TaskUpdateRow(
+            long id,
+            long taskId,
+            int caseId,
+            int shaleClientId,
+            int userId,
+            String userDisplayName,
+            String userColor,
+            String body,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt,
+            boolean isDeleted) {
+    }
 
     private final DbSessionProvider db;
 
@@ -1378,6 +1391,191 @@ public final class TaskDao {
         }
     }
 
+    public void addTaskUpdate(long taskId, int caseId, int shaleClientId, int userId, String body) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        if (caseId <= 0) {
+            throw new IllegalArgumentException("caseId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (userId <= 0) {
+            throw new IllegalArgumentException("userId must be > 0");
+        }
+        String trimmedBody = body == null ? "" : body.trim();
+        if (trimmedBody.isBlank()) {
+            throw new IllegalArgumentException("Task update body is required");
+        }
+
+        String sql = """
+                INSERT INTO dbo.TaskUpdates (
+                  TaskId,
+                  CaseId,
+                  ShaleClientId,
+                  UserId,
+                  Body,
+                  CreatedAt,
+                  UpdatedAt,
+                  IsDeleted
+                )
+                SELECT ?, ?, ?, ?, ?, SYSUTCDATETIME(), NULL, 0
+                WHERE EXISTS (
+                  SELECT 1
+                  FROM dbo.Tasks t
+                  WHERE t.Id = ?
+                    AND t.CaseId = ?
+                    AND t.ShaleClientId = ?
+                    AND ISNULL(t.IsDeleted, 0) = 0
+                );
+                """;
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            int i = 1;
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, caseId);
+            ps.setInt(i++, shaleClientId);
+            ps.setInt(i++, userId);
+            ps.setString(i++, trimmedBody);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, caseId);
+            ps.setInt(i++, shaleClientId);
+            int rows = ps.executeUpdate();
+            if (rows != 1) {
+                throw new RuntimeException("Task update insert affected unexpected row count: " + rows);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to add task update (taskId=" + taskId + ", caseId=" + caseId + ")", e);
+        }
+    }
+
+    public boolean updateTaskUpdate(long taskUpdateId, int shaleClientId, int userId, String body) {
+        if (taskUpdateId <= 0) {
+            throw new IllegalArgumentException("taskUpdateId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (userId <= 0) {
+            throw new IllegalArgumentException("userId must be > 0");
+        }
+        String trimmedBody = body == null ? "" : body.trim();
+        if (trimmedBody.isBlank()) {
+            throw new IllegalArgumentException("Task update body is required");
+        }
+
+        String sql = """
+                UPDATE dbo.TaskUpdates
+                SET Body = ?,
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = ?
+                  AND ShaleClientId = ?
+                  AND UserId = ?
+                  AND ISNULL(IsDeleted, 0) = 0;
+                """;
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, trimmedBody);
+            ps.setLong(2, taskUpdateId);
+            ps.setInt(3, shaleClientId);
+            ps.setInt(4, userId);
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update task update (id=" + taskUpdateId + ")", e);
+        }
+    }
+
+    public boolean softDeleteTaskUpdate(long taskUpdateId, int shaleClientId, int userId) {
+        if (taskUpdateId <= 0) {
+            throw new IllegalArgumentException("taskUpdateId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (userId <= 0) {
+            throw new IllegalArgumentException("userId must be > 0");
+        }
+        String sql = """
+                UPDATE dbo.TaskUpdates
+                SET IsDeleted = 1,
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = ?
+                  AND ShaleClientId = ?
+                  AND UserId = ?
+                  AND ISNULL(IsDeleted, 0) = 0;
+                """;
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setLong(1, taskUpdateId);
+            ps.setInt(2, shaleClientId);
+            ps.setInt(3, userId);
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to soft delete task update (id=" + taskUpdateId + ")", e);
+        }
+    }
+
+    public List<TaskUpdateRow> listTaskUpdates(long taskId) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        String sql = """
+                SELECT
+                  tu.Id,
+                  tu.TaskId,
+                  tu.CaseId,
+                  tu.ShaleClientId,
+                  tu.UserId,
+                  LTRIM(RTRIM(
+                    COALESCE(u.name_first, '') +
+                    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(u.name_last, '')
+                  )) AS UserDisplayName,
+                  u.Color AS UserColor,
+                  tu.Body,
+                  tu.CreatedAt,
+                  tu.UpdatedAt,
+                  ISNULL(tu.IsDeleted, 0) AS IsDeleted
+                FROM dbo.TaskUpdates tu
+                INNER JOIN dbo.Tasks t
+                  ON t.Id = tu.TaskId
+                 AND t.ShaleClientId = tu.ShaleClientId
+                LEFT JOIN dbo.Users u
+                  ON u.Id = tu.UserId
+                 AND u.ShaleClientId = tu.ShaleClientId
+                WHERE tu.TaskId = ?
+                  AND ISNULL(tu.IsDeleted, 0) = 0
+                ORDER BY tu.CreatedAt DESC, tu.Id DESC;
+                """;
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setLong(1, taskId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<TaskUpdateRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    int userId = rs.getInt("UserId");
+                    out.add(new TaskUpdateRow(
+                            rs.getLong("Id"),
+                            rs.getLong("TaskId"),
+                            rs.getInt("CaseId"),
+                            rs.getInt("ShaleClientId"),
+                            userId,
+                            safeTaskUpdateUserDisplayName(rs.getString("UserDisplayName"), userId),
+                            rs.getString("UserColor"),
+                            rs.getString("Body"),
+                            toLocalDateTime(rs.getTimestamp("CreatedAt")),
+                            toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+                            rs.getBoolean("IsDeleted")
+                    ));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to list task updates for taskId=" + taskId, e);
+        }
+    }
+
     public void assignPrimaryUserToTask(long taskId, int shaleClientId, int userId, int assignedByUserId) {
         if (taskId <= 0) {
             throw new IllegalArgumentException("taskId must be > 0");
@@ -1569,6 +1767,14 @@ public final class TaskDao {
             return;
         }
         ps.setString(index, value.trim());
+    }
+
+    private static String safeTaskUpdateUserDisplayName(String displayName, int userId) {
+        String normalized = displayName == null ? "" : displayName.trim();
+        if (!normalized.isBlank()) {
+            return normalized;
+        }
+        return userId > 0 ? "User #" + userId : "Unknown user";
     }
 
     private static TaskTimelineEventRow mapTaskTimelineEventRow(ResultSet rs) throws SQLException {
