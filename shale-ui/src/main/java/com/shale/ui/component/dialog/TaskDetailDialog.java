@@ -27,6 +27,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
@@ -157,14 +158,7 @@ public final class TaskDetailDialog {
         });
         assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedTeamList);
 
-        VBox activitySection = new VBox(6);
-        Label activityLabel = new Label("Activity");
-        activityLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
-        VBox activityList = new VBox(8);
-        renderActivityItems(activityList, model.activityEntries());
-        activitySection.getChildren().setAll(activityLabel, activityList);
-
-        VBox content = new VBox(8,
+        VBox formContent = new VBox(8,
                 createdByLabel,
                 new Label("Title"), titleField,
                 new Label("Description"), descriptionArea,
@@ -175,7 +169,30 @@ public final class TaskDetailDialog {
                 activitySection,
                 completedCheck,
                 errorLabel);
-        content.setPadding(new Insets(8, 2, 4, 2));
+        formContent.setPadding(new Insets(8, 2, 4, 2));
+        HBox.setHgrow(formContent, Priority.ALWAYS);
+
+        Label activityLabel = new Label("Activity");
+        activityLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        VBox activityList = new VBox(8);
+        renderActivityItems(activityList, model.activityEntries());
+        ScrollPane activityScrollPane = new ScrollPane(activityList);
+        activityScrollPane.setFitToWidth(true);
+        activityScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        activityScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        activityScrollPane.setPrefViewportHeight(420);
+        VBox.setVgrow(activityScrollPane, Priority.ALWAYS);
+
+        VBox activityPanel = new VBox(6, activityLabel, activityScrollPane);
+        activityPanel.setPrefWidth(320);
+        activityPanel.setMinWidth(280);
+        activityPanel.setMaxWidth(360);
+        activityPanel.setPadding(new Insets(8, 2, 4, 8));
+        VBox.setVgrow(activityPanel, Priority.ALWAYS);
+
+        HBox contentColumns = new HBox(12, formContent, activityPanel);
+        HBox.setHgrow(formContent, Priority.ALWAYS);
+        contentColumns.setAlignment(Pos.TOP_LEFT);
 
         Button deleteButton = new Button("Delete");
         deleteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -235,10 +252,12 @@ public final class TaskDetailDialog {
         actions.setAlignment(Pos.CENTER_RIGHT);
 
         HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, "Task Details", stage::close);
-        VBox root = new VBox(16, windowHeader, heading, message, content, actions);
+        VBox root = new VBox(16, windowHeader, heading, message, contentColumns, actions);
         root.getStyleClass().add("app-dialog-root");
         root.setPadding(new Insets(22, 24, 22, 24));
-        root.setMinWidth(500);
+        root.setMinWidth(860);
+        root.setPrefWidth(980);
+        root.setMinHeight(620);
 
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(

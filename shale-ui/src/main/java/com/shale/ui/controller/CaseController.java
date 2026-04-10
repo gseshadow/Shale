@@ -470,8 +470,14 @@ public class CaseController {
 	private boolean caseUpdatesStale = true;
 	private boolean caseUpdatesLoading;
 	private List<CaseTaskService.TaskActivityItem> caseTaskActivityEvents = List.of();
-	private VBox overviewTaskActivitySection;
-	private VBox overviewTaskActivityFeedBox;
+	@FXML
+	private VBox caseTaskActivityPane;
+	@FXML
+	private ScrollPane caseTaskActivityScrollPane;
+	@FXML
+	private VBox caseTaskActivityFeedBox;
+	@FXML
+	private Label caseTaskActivityEmptyLabel;
 	private Long editingCaseUpdateId;
 	private String editingCaseUpdateDraftText = "";
 	private boolean savingCaseUpdateEdit = false;
@@ -515,7 +521,7 @@ public class CaseController {
 		this.caseUpdatesStale = true;
 		this.caseUpdatesLoading = false;
 		this.caseTaskActivityEvents = List.of();
-		renderOverviewTaskActivity(List.of());
+		renderCaseTaskActivity(List.of());
 		refreshHeader();
 		refreshOverviewPlaceholders();
 	}
@@ -529,7 +535,7 @@ public class CaseController {
 		this.caseUpdatesStale = true;
 		this.caseUpdatesLoading = false;
 		this.caseTaskActivityEvents = List.of();
-		renderOverviewTaskActivity(List.of());
+		renderCaseTaskActivity(List.of());
 		this.caseDao = caseDao;
 		this.caseDetailService = caseDetailService;
 		this.caseTaskService = caseTaskService;
@@ -2264,26 +2270,14 @@ public class CaseController {
 		}, "case-view-sync-" + activeCaseId).start();
 	}
 
-	private void setupOverviewTaskActivitySection() {
-		if (overviewPane == null || overviewTaskActivitySection != null) {
-			return;
-		}
-		Label heading = new Label("Task Activity");
-		heading.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
-		overviewTaskActivityFeedBox = new VBox(8);
-		overviewTaskActivitySection = new VBox(6, heading, overviewTaskActivityFeedBox);
-		overviewPane.getChildren().add(overviewTaskActivitySection);
-		renderOverviewTaskActivity(List.of());
-	}
-
 	private void loadCaseTaskActivityAsync() {
 		if (caseTaskService == null || appState == null || caseId == null || caseId <= 0) {
-			renderOverviewTaskActivity(List.of());
+			renderCaseTaskActivity(List.of());
 			return;
 		}
 		Integer shaleClientId = appState.getShaleClientId();
 		if (shaleClientId == null || shaleClientId <= 0) {
-			renderOverviewTaskActivity(List.of());
+			renderCaseTaskActivity(List.of());
 			return;
 		}
 		final int activeCaseId = caseId;
@@ -2294,7 +2288,7 @@ public class CaseController {
 					if (caseId == null || caseId != activeCaseId) {
 						return;
 					}
-					renderOverviewTaskActivity(events);
+					renderCaseTaskActivity(events);
 				});
 			} catch (Exception ex) {
 				runOnFx(() -> showError("Failed to load task activity. " + ex.getMessage()));
@@ -2302,23 +2296,28 @@ public class CaseController {
 		}, "case-task-activity-load-" + activeCaseId).start();
 	}
 
-	private void renderOverviewTaskActivity(List<CaseTaskService.TaskActivityItem> events) {
-		if (overviewTaskActivityFeedBox == null) {
+	private void renderCaseTaskActivity(List<CaseTaskService.TaskActivityItem> events) {
+		if (caseTaskActivityFeedBox == null) {
 			return;
 		}
-		overviewTaskActivityFeedBox.getChildren().clear();
+		caseTaskActivityFeedBox.getChildren().clear();
 		caseTaskActivityEvents = events == null ? List.of() : List.copyOf(events);
 		if (caseTaskActivityEvents.isEmpty()) {
-			Label empty = new Label("No task activity yet.");
-			empty.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
-			overviewTaskActivityFeedBox.getChildren().add(empty);
+			setVisibleManaged(caseTaskActivityEmptyLabel, true);
+			if (caseTaskActivityScrollPane != null) {
+				caseTaskActivityScrollPane.setVvalue(0.0);
+			}
 			return;
 		}
+		setVisibleManaged(caseTaskActivityEmptyLabel, false);
 		for (CaseTaskService.TaskActivityItem event : caseTaskActivityEvents) {
 			if (event == null) {
 				continue;
 			}
-			overviewTaskActivityFeedBox.getChildren().add(createCaseTaskActivityCard(event));
+			caseTaskActivityFeedBox.getChildren().add(createCaseTaskActivityCard(event));
+		}
+		if (caseTaskActivityScrollPane != null) {
+			caseTaskActivityScrollPane.setVvalue(0.0);
 		}
 	}
 
