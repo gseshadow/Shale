@@ -243,12 +243,12 @@ public final class TaskDetailDialog {
         activityToggle.setToggleGroup(rightRailToggle);
         ToggleButton notesToggle = new ToggleButton("Notes");
         notesToggle.setToggleGroup(rightRailToggle);
-        activityToggle.setSelected(true);
+        notesToggle.setSelected(true);
         HBox rightRailTabs = new HBox(6, activityToggle, notesToggle);
 
         StackPane rightRailBody = new StackPane(activityPanel, notesPanel);
-        notesPanel.setVisible(false);
-        notesPanel.setManaged(false);
+        activityPanel.setVisible(false);
+        activityPanel.setManaged(false);
         rightRailToggle.selectedToggleProperty().addListener((obs, oldToggle, selectedToggle) -> {
             boolean showNotes = selectedToggle == notesToggle;
             notesPanel.setVisible(showNotes);
