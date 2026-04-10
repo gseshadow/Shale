@@ -273,6 +273,8 @@ public class CaseController {
 	private Label tasksTabEmptyLabel;
 	@FXML
 	private ChoiceBox<String> caseTasksSortChoice;
+	@FXML
+	private Button caseTasksShowCompletedButton;
 
 	@FXML
 	private StackPane ovCaseStatusHost;
@@ -532,6 +534,7 @@ public class CaseController {
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
 	private boolean caseTasksLoadedOnce;
 	private boolean caseTasksStale = true;
+	private boolean showCompletedCaseTasks;
 	private List<CaseUpdateDto> caseUpdates = List.of();
 	private boolean caseUpdatesLoadedOnce;
 	private boolean caseUpdatesStale = true;
@@ -742,6 +745,14 @@ public class CaseController {
 			caseTasksSortChoice.getSelectionModel().select(CASE_TASKS_SORT_DUE_ASC);
 			caseTasksSortChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> refreshCaseTasks());
+		}
+		if (caseTasksShowCompletedButton != null) {
+			caseTasksShowCompletedButton.setOnAction(e -> {
+				showCompletedCaseTasks = !showCompletedCaseTasks;
+				updateCaseTaskCompletionToggleLabel();
+				renderTasksSection();
+			});
+			updateCaseTaskCompletionToggleLabel();
 		}
 		if (addOrganizationButton != null)
 			addOrganizationButton.setOnAction(e -> onAddRelatedEntity());
@@ -1941,9 +1952,12 @@ public class CaseController {
 		PerfLog.log("RENDER", "start", "panel=tasks page=case_view caseId=" + caseId);
 
 		tasksTabFlow.getChildren().clear();
-		if (caseTasks == null || caseTasks.isEmpty()) {
+		List<CaseTaskListItemDto> visibleTasks = visibleCaseTasks();
+		if (visibleTasks.isEmpty()) {
 			setVisibleManaged(tasksTabEmptyLabel, true);
-			tasksTabEmptyLabel.setText("No tasks for this case yet.");
+			tasksTabEmptyLabel.setText(showCompletedCaseTasks
+					? "No tasks for this case yet."
+					: "No incomplete tasks for this case.");
 			PerfLog.logDone("RENDER", "panel=tasks page=case_view caseId=" + caseId + " childCount=0", renderStartNanos);
 			return;
 		}
@@ -1952,7 +1966,7 @@ public class CaseController {
 				? taskCardFactory
 				: buildTaskCardFactory(this::openTask);
 
-		for (CaseTaskListItemDto task : caseTasks) {
+		for (CaseTaskListItemDto task : visibleTasks) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
 					task.id(),
 					task.caseId(),
@@ -1970,6 +1984,25 @@ public class CaseController {
 
 		setVisibleManaged(tasksTabEmptyLabel, false);
 		PerfLog.logDone("RENDER", "panel=tasks page=case_view caseId=" + caseId + " childCount=" + tasksTabFlow.getChildren().size(), renderStartNanos);
+	}
+
+	private List<CaseTaskListItemDto> visibleCaseTasks() {
+		if (caseTasks == null || caseTasks.isEmpty()) {
+			return List.of();
+		}
+		if (showCompletedCaseTasks) {
+			return caseTasks;
+		}
+		return caseTasks.stream()
+				.filter(task -> task.completedAt() == null)
+				.toList();
+	}
+
+	private void updateCaseTaskCompletionToggleLabel() {
+		if (caseTasksShowCompletedButton == null) {
+			return;
+		}
+		caseTasksShowCompletedButton.setText(showCompletedCaseTasks ? "Hide Completed" : "Show Completed");
 	}
 
 	private boolean isSectionActive(String sectionName) {
