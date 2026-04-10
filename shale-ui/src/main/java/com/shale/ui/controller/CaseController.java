@@ -147,6 +147,8 @@ public class CaseController {
 	@FXML
 	private BorderPane caseRootPane;
 	@FXML
+	private ScrollPane overviewScrollPane;
+	@FXML
 	private VBox overviewPane;
 	@FXML
 	private VBox detailsSectionPane;
@@ -1017,7 +1019,7 @@ public class CaseController {
 
 	private void showOverview() {
 		setUpdatesPaneVisible(true);
-		setPaneVisible(overviewPane, true);
+		setPaneVisible(overviewScrollPane, true);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, false);
@@ -1030,7 +1032,7 @@ public class CaseController {
 
 	private void showTasksTab() {
 		setUpdatesPaneVisible(false);
-		setPaneVisible(overviewPane, false);
+		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(genericPane, false);
@@ -1047,7 +1049,7 @@ public class CaseController {
 
 	private void showDetails() {
 		setUpdatesPaneVisible(false);
-		setPaneVisible(overviewPane, false);
+		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, false);
@@ -1059,7 +1061,7 @@ public class CaseController {
 
 	private void showGeneric(String sectionName) {
 		setUpdatesPaneVisible(false);
-		setPaneVisible(overviewPane, false);
+		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
@@ -1084,7 +1086,7 @@ public class CaseController {
 
 	private void showTimeline() {
 		setUpdatesPaneVisible(false);
-		setPaneVisible(overviewPane, false);
+		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
@@ -1106,7 +1108,7 @@ public class CaseController {
 
 	private void showParties() {
 		setUpdatesPaneVisible(false);
-		setPaneVisible(overviewPane, false);
+		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(genericPane, true);
@@ -3927,7 +3929,7 @@ public class CaseController {
 			Platform.runLater(runnable);
 	}
 
-	private static void setPaneVisible(VBox pane, boolean visible) {
+	private static void setPaneVisible(Node pane, boolean visible) {
 		if (pane == null)
 			return;
 		pane.setVisible(visible);
