@@ -33,6 +33,7 @@ import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
@@ -63,6 +64,8 @@ public final class MyShaleController {
 	@FXML
 	private ChoiceBox<String> myTasksSortChoice;
 	@FXML
+	private Button myTasksShowCompletedButton;
+	@FXML
 	private ScrollPane myTasksScroll;
 	@FXML
 	private VBox myTasksList;
@@ -90,6 +93,7 @@ public final class MyShaleController {
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
+	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 
@@ -138,6 +142,14 @@ public final class MyShaleController {
 			myTasksSortChoice.getSelectionModel().select(MY_TASKS_SORT_DUE_ASC);
 			myTasksSortChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> refreshMyTasks());
+		}
+		if (myTasksShowCompletedButton != null) {
+			myTasksShowCompletedButton.setOnAction(e -> {
+				showCompletedMyTasks = !showCompletedMyTasks;
+				updateMyTasksCompletionToggleLabel();
+				refreshMyTasks();
+			});
+			updateMyTasksCompletionToggleLabel();
 		}
 
 		reloadStatusFilterOptionsAndThen(this::rerender);
@@ -497,11 +509,16 @@ public final class MyShaleController {
 		}
 
 		CaseTaskService.MyTasksSortOption sortOption = selectedMyTaskSort();
+		final boolean includeCompleted = showCompletedMyTasks;
 		dbExec.submit(() -> {
 			try {
 				long loadStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadMyTasks page=my_shale userId=" + userId);
-				List<CaseTaskListItemDto> tasks = caseTaskService.loadMyTasks(shaleClientId, userId, sortOption);
+				List<CaseTaskListItemDto> tasks = caseTaskService.loadMyTasks(
+						shaleClientId,
+						userId,
+						sortOption,
+						includeCompleted);
 				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
 						.map(CaseTaskListItemDto::id)
 						.toList();
@@ -543,7 +560,9 @@ public final class MyShaleController {
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
-			myTasksEmptyLabel.setText("No tasks assigned to you.");
+			myTasksEmptyLabel.setText(showCompletedMyTasks
+					? "No tasks assigned to you."
+					: "No incomplete tasks assigned to you.");
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
@@ -572,6 +591,13 @@ public final class MyShaleController {
 			return CaseTaskService.MyTasksSortOption.DUE_DATE_DESC;
 		}
 		return CaseTaskService.MyTasksSortOption.DUE_DATE_ASC;
+	}
+
+	private void updateMyTasksCompletionToggleLabel() {
+		if (myTasksShowCompletedButton == null) {
+			return;
+		}
+		myTasksShowCompletedButton.setText(showCompletedMyTasks ? "Hide Completed" : "Show Completed");
 	}
 
 	private void openTask(Long taskId) {

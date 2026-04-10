@@ -67,6 +67,14 @@ public final class CaseTaskService {
     }
 
     public List<CaseTaskListItemDto> loadMyTasks(int shaleClientId, int currentUserId, MyTasksSortOption sortOption) {
+        return loadMyTasks(shaleClientId, currentUserId, sortOption, false);
+    }
+
+    public List<CaseTaskListItemDto> loadMyTasks(
+            int shaleClientId,
+            int currentUserId,
+            MyTasksSortOption sortOption,
+            boolean includeCompleted) {
         TaskDao.MyTaskSort daoSort = switch (sortOption == null ? MyTasksSortOption.DEFAULT : sortOption) {
             case DUE_DATE_ASC -> TaskDao.MyTaskSort.DUE_DATE_ASC;
             case DUE_DATE_DESC -> TaskDao.MyTaskSort.DUE_DATE_DESC;
@@ -74,7 +82,7 @@ public final class CaseTaskService {
         };
         long startNanos = PerfLog.start();
         PerfLog.log("DAO", "start", "method=listActiveTasksAssignedToUser page=my_shale userId=" + currentUserId + " organizationId=" + shaleClientId);
-        List<CaseTaskListItemDto> rows = taskDao.listActiveTasksAssignedToUser(shaleClientId, currentUserId, daoSort);
+        List<CaseTaskListItemDto> rows = taskDao.listActiveTasksAssignedToUser(shaleClientId, currentUserId, daoSort, includeCompleted);
         PerfLog.logDone("DAO", "method=listActiveTasksAssignedToUser page=my_shale userId=" + currentUserId + " organizationId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), startNanos);
         return rows;
     }
