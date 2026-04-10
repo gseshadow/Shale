@@ -194,6 +194,7 @@ public final class NotificationCenterDialog {
 					null,
 					null,
 					null,
+					null,
 					previewTitle,
 					null,
 					null,

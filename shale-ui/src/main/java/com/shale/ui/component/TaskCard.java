@@ -155,7 +155,8 @@ public final class TaskCard extends VBox {
 		teamSection.setVisible(true);
 	}
 
-	public void setRelatedCase(Long caseId, String caseName, String responsibleAttorney, String responsibleAttorneyColor) {
+	public void setRelatedCase(Long caseId, String caseName, String responsibleAttorney, String responsibleAttorneyColor,
+			Boolean nonEngagementLetterSent) {
 		String normalizedName = caseName == null ? "" : caseName.trim();
 		if (caseId == null || caseId <= 0 || normalizedName.isBlank()) {
 			relatedCaseHost.getChildren().clear();
@@ -164,7 +165,7 @@ public final class TaskCard extends VBox {
 			return;
 		}
 		var caseCard = caseCardFactory.create(
-				new CaseCardModel(caseId, normalizedName, null, null, responsibleAttorney, responsibleAttorneyColor),
+				new CaseCardModel(caseId, normalizedName, null, null, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent),
 				CaseCardFactory.Variant.MINI);
 		caseCard.setOnMouseClicked(e -> {
 			e.consume();
@@ -295,7 +296,7 @@ public final class TaskCard extends VBox {
 			}
 		});
 		setAssignees(List.of());
-		setRelatedCase(null, null, null, null);
+		setRelatedCase(null, null, null, null, null);
 	}
 
 	private void configureRelatedSections() {

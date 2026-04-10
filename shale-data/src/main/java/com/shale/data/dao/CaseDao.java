@@ -162,7 +162,8 @@ public final class CaseDao {
 			Integer primaryStatusId,
 			Integer responsibleAttorneyId,
 			String responsibleAttorneyName,
-			String responsibleAttorneyColor
+			String responsibleAttorneyColor,
+			Boolean nonEngagementLetterSent
 	) {
 	}
 
@@ -713,6 +714,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
+				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
 					  LTRIM(RTRIM(
 					    COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -781,7 +783,8 @@ public final class CaseDao {
 								getNullableInt(rs, "PrimaryStatusId"),
 								getNullableInt(rs, "ResponsibleAttorneyId"),
 								rs.getString("ResponsibleAttorneyName"),
-								rs.getString("ResponsibleAttorneyColor")));
+								rs.getString("ResponsibleAttorneyColor"),
+								getNullableBoolean(rs, "NonEngagementLetterSent")));
 					}
 				}
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
@@ -822,6 +825,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
+				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
 					  LTRIM(RTRIM(
 					    COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -875,7 +879,8 @@ public final class CaseDao {
 								getNullableInt(rs, "PrimaryStatusId"),
 								getNullableInt(rs, "ResponsibleAttorneyId"),
 								rs.getString("ResponsibleAttorneyName"),
-								rs.getString("ResponsibleAttorneyColor")
+								rs.getString("ResponsibleAttorneyColor"),
+								getNullableBoolean(rs, "NonEngagementLetterSent")
 						));
 					}
 				}
@@ -907,6 +912,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
+				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
 					  LTRIM(RTRIM(
 					    COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -960,7 +966,8 @@ public final class CaseDao {
 								getNullableInt(rs, "PrimaryStatusId"),
 								getNullableInt(rs, "ResponsibleAttorneyId"),
 								rs.getString("ResponsibleAttorneyName"),
-								rs.getString("ResponsibleAttorneyColor")
+								rs.getString("ResponsibleAttorneyColor"),
+								getNullableBoolean(rs, "NonEngagementLetterSent")
 						));
 					}
 				}
@@ -1004,6 +1011,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
+				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
 					  LTRIM(RTRIM(
 					    COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -1075,7 +1083,8 @@ public final class CaseDao {
 								getNullableInt(rs, "PrimaryStatusId"),
 								getNullableInt(rs, "ResponsibleAttorneyId"),
 								rs.getString("ResponsibleAttorneyName"),
-								rs.getString("ResponsibleAttorneyColor")
+								rs.getString("ResponsibleAttorneyColor"),
+								getNullableBoolean(rs, "NonEngagementLetterSent")
 						));
 					}
 				}
@@ -1295,6 +1304,7 @@ public final class CaseDao {
 
 					  ra.UserId AS ResponsibleAttorneyUserId,
 					  u.color AS ResponsibleAttorneyColor,
+				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
 					  LTRIM(RTRIM(
 					    COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -4867,6 +4877,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
+				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
 					  LTRIM(RTRIM(
 					    COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -4915,7 +4926,8 @@ public final class CaseDao {
 							getNullableInt(rs, "PrimaryStatusId"),
 							getNullableInt(rs, "ResponsibleAttorneyId"),
 							rs.getString("ResponsibleAttorneyName"),
-							rs.getString("ResponsibleAttorneyColor")
+							rs.getString("ResponsibleAttorneyColor"),
+							getNullableBoolean(rs, "NonEngagementLetterSent")
 					);
 				}
 			}
@@ -4939,6 +4951,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
+				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
 					  LTRIM(RTRIM(
 					    COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -4994,7 +5007,8 @@ public final class CaseDao {
 							getNullableInt(rs, "PrimaryStatusId"),
 							getNullableInt(rs, "ResponsibleAttorneyId"),
 							rs.getString("ResponsibleAttorneyName"),
-							rs.getString("ResponsibleAttorneyColor")
+							rs.getString("ResponsibleAttorneyColor"),
+							getNullableBoolean(rs, "NonEngagementLetterSent")
 					);
 				}
 			}
