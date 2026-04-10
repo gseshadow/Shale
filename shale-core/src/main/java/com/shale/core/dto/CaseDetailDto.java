@@ -35,6 +35,8 @@ public final class CaseDetailDto {
 	private final Boolean medicalRecordsReceived;
 	private final Boolean feeAgreementSigned;
 	private final LocalDate dateFeeAgreementSigned;
+	private final Boolean nonEngagementLetterSent;
+	private final LocalDate dateNonEngagementLetterSent;
 
 	private final Boolean acceptedChronology;
 	private final Boolean acceptedConsultantExpertSearch;
@@ -73,6 +75,8 @@ public final class CaseDetailDto {
 			Boolean medicalRecordsReceived,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
+			Boolean nonEngagementLetterSent,
+			LocalDate dateNonEngagementLetterSent,
 			Boolean acceptedChronology,
 			Boolean acceptedConsultantExpertSearch,
 			Boolean acceptedTestifyingExpertSearch,
@@ -106,6 +110,8 @@ public final class CaseDetailDto {
 		this.medicalRecordsReceived = medicalRecordsReceived;
 		this.feeAgreementSigned = feeAgreementSigned;
 		this.dateFeeAgreementSigned = dateFeeAgreementSigned;
+		this.nonEngagementLetterSent = nonEngagementLetterSent;
+		this.dateNonEngagementLetterSent = dateNonEngagementLetterSent;
 		this.acceptedChronology = acceptedChronology;
 		this.acceptedConsultantExpertSearch = acceptedConsultantExpertSearch;
 		this.acceptedTestifyingExpertSearch = acceptedTestifyingExpertSearch;
@@ -141,6 +147,8 @@ public final class CaseDetailDto {
 	public Boolean getMedicalRecordsReceived() { return medicalRecordsReceived; }
 	public Boolean getFeeAgreementSigned() { return feeAgreementSigned; }
 	public LocalDate getDateFeeAgreementSigned() { return dateFeeAgreementSigned; }
+	public Boolean getNonEngagementLetterSent() { return nonEngagementLetterSent; }
+	public LocalDate getDateNonEngagementLetterSent() { return dateNonEngagementLetterSent; }
 	public Boolean getAcceptedChronology() { return acceptedChronology; }
 	public Boolean getAcceptedConsultantExpertSearch() { return acceptedConsultantExpertSearch; }
 	public Boolean getAcceptedTestifyingExpertSearch() { return acceptedTestifyingExpertSearch; }

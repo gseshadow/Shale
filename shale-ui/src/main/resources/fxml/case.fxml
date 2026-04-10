@@ -557,14 +557,28 @@
 							<CheckBox fx:id="detDeniedChronologyEditor"
 								visible="false" managed="false" GridPane.rowIndex="0"
 								GridPane.columnIndex="1" />
+							<Label text="Non-Engagement Letter Sent:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
+							<Label fx:id="detNonEngagementLetterSentValue" text="—"
+								GridPane.rowIndex="1" GridPane.columnIndex="1" />
+							<CheckBox fx:id="detNonEngagementLetterSentEditor"
+								visible="false" managed="false" GridPane.rowIndex="1"
+								GridPane.columnIndex="1" />
+							<Label text="Date Non-Engagement Letter Sent:"
+								style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
+							<Label fx:id="detDateNonEngagementLetterSentValue" text="—"
+								GridPane.rowIndex="2" GridPane.columnIndex="1" />
+							<DatePicker fx:id="detDateNonEngagementLetterSentEditor"
+								maxWidth="1.7976931348623157E308" visible="false"
+								managed="false" GridPane.rowIndex="2" GridPane.columnIndex="1" />
 							<Label text="Detail:" style="-fx-opacity: 0.8;"
-								GridPane.rowIndex="1" />
+								GridPane.rowIndex="3" />
 							<Label fx:id="detDeniedDetailValue" text="—"
-								wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+								wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" />
 							<TextArea fx:id="detDeniedDetailEditor"
 								maxWidth="1.7976931348623157E308" prefRowCount="3"
 								wrapText="true" visible="false" managed="false"
-								GridPane.rowIndex="1" GridPane.columnIndex="1" />
+								GridPane.rowIndex="3" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
 
