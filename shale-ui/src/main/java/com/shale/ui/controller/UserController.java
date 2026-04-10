@@ -1003,9 +1003,9 @@ public final class UserController {
 		new Thread(() -> {
 			try {
 				if (currentlyCompleted) {
-					caseTaskService.uncompleteTask(taskId, shaleClientId);
+					caseTaskService.uncompleteTask(taskId, shaleClientId, appState.getUserId());
 				} else {
-					caseTaskService.completeTask(taskId, shaleClientId);
+					caseTaskService.completeTask(taskId, shaleClientId, appState.getUserId());
 				}
 				Platform.runLater(this::refreshAssignedTasksAsync);
 			} catch (Exception ex) {
@@ -1091,7 +1091,7 @@ public final class UserController {
 
 									@Override
 									public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
-										caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId);
+										caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
 										return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
 												.map(member -> new TaskDetailDialog.AssignedTeamMember(
 														member.userId(),
@@ -1106,7 +1106,7 @@ public final class UserController {
 						}
 						TaskDetailDialog.TaskDetailResult action = result.get();
 						if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
-							deleteTaskFromDetail(taskId, shaleClientId);
+							deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
 							return;
 						}
 						TaskDetailDialog.SaveTaskPayload payload = action.payload();
@@ -1147,10 +1147,10 @@ public final class UserController {
 		}, "user-view-task-save-" + taskId).start();
 	}
 
-	private void deleteTaskFromDetail(long taskId, int shaleClientId) {
+	private void deleteTaskFromDetail(long taskId, int shaleClientId, int currentUserId) {
 		new Thread(() -> {
 			try {
-				caseTaskService.deleteTask(taskId, shaleClientId);
+				caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 				Platform.runLater(this::refreshAssignedTasksAsync);
 			} catch (Exception ex) {
 				Platform.runLater(() -> showTaskActionError("Failed to delete task."));
