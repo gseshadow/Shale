@@ -107,13 +107,14 @@ import javafx.stage.Window;
  * <p>
  * Responsibility boundaries:
  * <ul>
- *   <li>{@code CaseOverviewRenderer}: overview/detail render orchestration</li>
- *   <li>{@code CaseOverviewEditor}: edit-mode lifecycle and draft-state transitions</li>
- *   <li>{@code CaseOverviewSaveCoordinator}: save validation/persist/publish pipeline</li>
- *   <li>{@code CaseOverviewLiveUpdateHandler}: remote case-update subscription/branching</li>
- *   <li>{@code CaseOverviewPickerCoordinator}: selectable overview relation pickers</li>
- *   <li>{@code CaseTeamCoordinator}: team loading/edit/render</li>
- *   <li>{@code CaseUpdatesPanelController}: case updates feed/compose/render</li>
+ * <li>{@code CaseOverviewRenderer}: overview/detail render orchestration</li>
+ * <li>{@code CaseOverviewEditor}: edit-mode lifecycle and draft-state transitions</li>
+ * <li>{@code CaseOverviewSaveCoordinator}: save validation/persist/publish pipeline</li>
+ * <li>{@code CaseOverviewLiveUpdateHandler}: remote case-update
+ * subscription/branching</li>
+ * <li>{@code CaseOverviewPickerCoordinator}: selectable overview relation pickers</li>
+ * <li>{@code CaseTeamCoordinator}: team loading/edit/render</li>
+ * <li>{@code CaseUpdatesPanelController}: case updates feed/compose/render</li>
  * </ul>
  */
 public class CaseController {
@@ -302,70 +303,134 @@ public class CaseController {
 	@FXML
 	private VBox caseUpdatesFeedBox;
 
-	@FXML private Label detNameValue;
-	@FXML private TextField detNameEditor;
-	@FXML private Label detCaseNumberValue;
-	@FXML private TextField detCaseNumberEditor;
-	@FXML private Label detCaseStatusValue;
-	@FXML private StackPane detCaseStatusHost;
-	@FXML private HBox detCaseStatusEditorRow;
-	@FXML private Button detChangeStatusButton;
-	@FXML private Label detPracticeAreaIdValue;
-	@FXML private StackPane detPracticeAreaHost;
-	@FXML private HBox detPracticeAreaEditorRow;
-	@FXML private Button detChangePracticeAreaButton;
-	@FXML private Label detDescriptionValue;
-	@FXML private TextArea detDescriptionEditor;
-	@FXML private Label detCallerDateValue;
-	@FXML private DatePicker detCallerDateEditor;
-	@FXML private Label detCallerTimeValue;
-	@FXML private TextField detCallerTimeEditor;
-	@FXML private Label detAcceptedDateValue;
-	@FXML private DatePicker detAcceptedDateEditor;
-	@FXML private Label detClosedDateValue;
-	@FXML private DatePicker detClosedDateEditor;
-	@FXML private Label detDeniedDateValue;
-	@FXML private DatePicker detDeniedDateEditor;
-	@FXML private Label detDateOfMedicalNegligenceValue;
-	@FXML private DatePicker detDateOfMedicalNegligenceEditor;
-	@FXML private Label detDateMedicalNegligenceWasDiscoveredValue;
-	@FXML private DatePicker detDateMedicalNegligenceWasDiscoveredEditor;
-	@FXML private Label detDateOfInjuryValue;
-	@FXML private DatePicker detDateOfInjuryEditor;
-	@FXML private Label detStatuteOfLimitationsValue;
-	@FXML private DatePicker detStatuteOfLimitationsEditor;
-	@FXML private Label detTortNoticeDeadlineValue;
-	@FXML private DatePicker detTortNoticeDeadlineEditor;
-	@FXML private Label detDiscoveryDeadlineValue;
-	@FXML private DatePicker detDiscoveryDeadlineEditor;
-	@FXML private Label detClientEstateValue;
-	@FXML private CheckBox detClientEstateEditor;
-	@FXML private Label detOfficePrinterCodeValue;
-	@FXML private TextField detOfficePrinterCodeEditor;
-	@FXML private Label detMedicalRecordsReceivedValue;
-	@FXML private CheckBox detMedicalRecordsReceivedEditor;
-	@FXML private Label detFeeAgreementSignedValue;
-	@FXML private CheckBox detFeeAgreementSignedEditor;
-	@FXML private Label detDateFeeAgreementSignedValue;
-	@FXML private DatePicker detDateFeeAgreementSignedEditor;
-	@FXML private Label detAcceptedChronologyValue;
-	@FXML private CheckBox detAcceptedChronologyEditor;
-	@FXML private Label detAcceptedConsultantExpertSearchValue;
-	@FXML private CheckBox detAcceptedConsultantExpertSearchEditor;
-	@FXML private Label detAcceptedTestifyingExpertSearchValue;
-	@FXML private CheckBox detAcceptedTestifyingExpertSearchEditor;
-	@FXML private Label detAcceptedMedicalLiteratureValue;
-	@FXML private CheckBox detAcceptedMedicalLiteratureEditor;
-	@FXML private Label detAcceptedDetailValue;
-	@FXML private TextArea detAcceptedDetailEditor;
-	@FXML private Label detDeniedChronologyValue;
-	@FXML private CheckBox detDeniedChronologyEditor;
-	@FXML private Label detDeniedDetailValue;
-	@FXML private TextArea detDeniedDetailEditor;
-	@FXML private Label detSummaryValue;
-	@FXML private TextArea detSummaryEditor;
-	@FXML private Label detReceivedUpdatesValue;
-	@FXML private CheckBox detReceivedUpdatesEditor;
+	@FXML
+	private Label detNameValue;
+	@FXML
+	private TextField detNameEditor;
+	@FXML
+	private Label detCaseNumberValue;
+	@FXML
+	private TextField detCaseNumberEditor;
+	@FXML
+	private Label detCaseStatusValue;
+	@FXML
+	private StackPane detCaseStatusHost;
+	@FXML
+	private HBox detCaseStatusEditorRow;
+	@FXML
+	private Button detChangeStatusButton;
+	@FXML
+	private Label detPracticeAreaIdValue;
+	@FXML
+	private StackPane detPracticeAreaHost;
+	@FXML
+	private HBox detPracticeAreaEditorRow;
+	@FXML
+	private Button detChangePracticeAreaButton;
+	@FXML
+	private Label detDescriptionValue;
+	@FXML
+	private TextArea detDescriptionEditor;
+	@FXML
+	private Label detCallerDateValue;
+	@FXML
+	private DatePicker detCallerDateEditor;
+	@FXML
+	private Label detCallerTimeValue;
+	@FXML
+	private TextField detCallerTimeEditor;
+	@FXML
+	private Label detAcceptedDateValue;
+	@FXML
+	private DatePicker detAcceptedDateEditor;
+	@FXML
+	private Label detClosedDateValue;
+	@FXML
+	private DatePicker detClosedDateEditor;
+	@FXML
+	private Label detDeniedDateValue;
+	@FXML
+	private DatePicker detDeniedDateEditor;
+	@FXML
+	private Label detDateOfMedicalNegligenceValue;
+	@FXML
+	private DatePicker detDateOfMedicalNegligenceEditor;
+	@FXML
+	private Label detDateMedicalNegligenceWasDiscoveredValue;
+	@FXML
+	private DatePicker detDateMedicalNegligenceWasDiscoveredEditor;
+	@FXML
+	private Label detDateOfInjuryValue;
+	@FXML
+	private DatePicker detDateOfInjuryEditor;
+	@FXML
+	private Label detStatuteOfLimitationsValue;
+	@FXML
+	private DatePicker detStatuteOfLimitationsEditor;
+	@FXML
+	private Label detTortNoticeDeadlineValue;
+	@FXML
+	private DatePicker detTortNoticeDeadlineEditor;
+	@FXML
+	private Label detDiscoveryDeadlineValue;
+	@FXML
+	private DatePicker detDiscoveryDeadlineEditor;
+	@FXML
+	private Label detClientEstateValue;
+	@FXML
+	private CheckBox detClientEstateEditor;
+	@FXML
+	private Label detOfficePrinterCodeValue;
+	@FXML
+	private TextField detOfficePrinterCodeEditor;
+	@FXML
+	private Label detMedicalRecordsReceivedValue;
+	@FXML
+	private CheckBox detMedicalRecordsReceivedEditor;
+	@FXML
+	private Label detFeeAgreementSignedValue;
+	@FXML
+	private CheckBox detFeeAgreementSignedEditor;
+	@FXML
+	private Label detDateFeeAgreementSignedValue;
+	@FXML
+	private DatePicker detDateFeeAgreementSignedEditor;
+	@FXML
+	private Label detAcceptedChronologyValue;
+	@FXML
+	private CheckBox detAcceptedChronologyEditor;
+	@FXML
+	private Label detAcceptedConsultantExpertSearchValue;
+	@FXML
+	private CheckBox detAcceptedConsultantExpertSearchEditor;
+	@FXML
+	private Label detAcceptedTestifyingExpertSearchValue;
+	@FXML
+	private CheckBox detAcceptedTestifyingExpertSearchEditor;
+	@FXML
+	private Label detAcceptedMedicalLiteratureValue;
+	@FXML
+	private CheckBox detAcceptedMedicalLiteratureEditor;
+	@FXML
+	private Label detAcceptedDetailValue;
+	@FXML
+	private TextArea detAcceptedDetailEditor;
+	@FXML
+	private Label detDeniedChronologyValue;
+	@FXML
+	private CheckBox detDeniedChronologyEditor;
+	@FXML
+	private Label detDeniedDetailValue;
+	@FXML
+	private TextArea detDeniedDetailEditor;
+	@FXML
+	private Label detSummaryValue;
+	@FXML
+	private TextArea detSummaryEditor;
+	@FXML
+	private Label detReceivedUpdatesValue;
+	@FXML
+	private CheckBox detReceivedUpdatesEditor;
 
 	// ----------------------------
 	// Constants
@@ -501,12 +566,24 @@ public class CaseController {
 	private CaseDetailsDraft detailsLocalViewOverride;
 	private long pageLoadStartNanos;
 
-	private record PartyRoleOption(long id, String label) {}
-	private record PartyEntityOption(String entityType, Long id, String label) {}
-	private record PartySideOption(String label, String value) {}
-	private record PartyEditorResult(String entityType, Long entityId, long partyRoleId, String side, boolean primary, String notes) {}
-	private record CallerPartySelection(Integer contactId, String displayName) {}
-	private record OpposingCounselPartySelection(Integer contactId, String displayName) {}
+	private record PartyRoleOption(long id, String label) {
+	}
+
+	private record PartyEntityOption(String entityType, Long id, String label) {
+	}
+
+	private record PartySideOption(String label, String value) {
+	}
+
+	private record PartyEditorResult(String entityType, Long entityId, long partyRoleId, String side, boolean primary, String notes) {
+	}
+
+	private record CallerPartySelection(Integer contactId, String displayName) {
+	}
+
+	private record OpposingCounselPartySelection(Integer contactId, String displayName) {
+	}
+
 	private enum PartyRenderMode {
 		MANAGE,
 		READ_ONLY_MINI
@@ -526,7 +603,8 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 	}
 
-	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, OrganizationDao organizationDao, ContactDao contactDao, AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
+	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, OrganizationDao organizationDao, ContactDao contactDao,
+			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
 		this.caseTasksLoadedOnce = false;
@@ -589,7 +667,6 @@ public class CaseController {
 		this.practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea);
 	}
 
-
 	public void setOnOpenTask(Consumer<Long> onOpenTask) {
 		this.onOpenTask = onOpenTask;
 		this.taskCardFactory = buildTaskCardFactory(this::openTask);
@@ -601,7 +678,9 @@ public class CaseController {
 	}
 
 	private TaskCardFactory buildTaskCardFactory(Consumer<Long> openTaskHandler) {
-		Consumer<Long> resolvedOpenHandler = openTaskHandler == null ? taskId -> {} : openTaskHandler;
+		Consumer<Long> resolvedOpenHandler = openTaskHandler == null ? taskId ->
+		{
+		} : openTaskHandler;
 		return new TaskCardFactory(
 				resolvedOpenHandler,
 				this::onToggleTaskComplete,
@@ -618,7 +697,6 @@ public class CaseController {
 		refreshHeader();
 		refreshOverviewPlaceholders();
 		setupSections();
-		setupOverviewTaskActivitySection();
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
@@ -676,7 +754,6 @@ public class CaseController {
 		}
 	}
 
-
 	private void onGenerateSummaryPdf() {
 		generateAndOpenSummary(CaseDocumentFormat.PDF);
 	}
@@ -712,7 +789,8 @@ public class CaseController {
 			}
 		};
 
-		task.setOnSucceeded(event -> {
+		task.setOnSucceeded(event ->
+		{
 			setSummaryGenerationBusy(false, null);
 			GeneratedDocument generated = task.getValue();
 			try {
@@ -727,7 +805,8 @@ public class CaseController {
 			}
 		});
 
-		task.setOnFailed(event -> {
+		task.setOnFailed(event ->
+		{
 			setSummaryGenerationBusy(false, null);
 			Throwable ex = task.getException();
 			System.err.println("[Document] Failed to generate case summary " + format + ": " + (ex == null ? "<unknown>" : ex.getMessage()));
@@ -762,7 +841,8 @@ public class CaseController {
 			return;
 		}
 
-		Runnable refreshWrapLength = () -> {
+		Runnable refreshWrapLength = () ->
+		{
 			double viewportWidth = organizationsScrollPane.getViewportBounds().getWidth();
 			double contentWidth = viewportWidth > 0 ? viewportWidth : organizationsScrollPane.getWidth();
 			double wrapWidth = Math.max(0, contentWidth - 8);
@@ -823,7 +903,6 @@ public class CaseController {
 		NavButtonStyler.applyBaseStyle(button);
 		return button;
 	}
-
 
 	private void refreshHeader() {
 		if (caseTitleLabel == null || caseId == null)
@@ -894,7 +973,6 @@ public class CaseController {
 			onSectionNavigation.accept(toSectionKey(sectionName));
 		}
 	}
-
 
 	private static String toSectionKey(String sectionName) {
 		if (sectionName == null) {
@@ -1061,10 +1139,12 @@ public class CaseController {
 		}
 
 		final int activeCaseId = caseId;
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				List<CaseTimelineEventDto> events = caseDao.listCaseTimelineEvents(activeCaseId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId == null || caseId != activeCaseId)
 						return;
 					renderTimelineEvents(events);
@@ -1188,7 +1268,8 @@ public class CaseController {
 			target.getChildren().add(heading);
 
 			List<CasePartyDto> sorted = group.stream()
-					.sorted((a, b) -> {
+					.sorted((a, b) ->
+					{
 						int primaryCompare = Boolean.compare(b.isPrimary(), a.isPrimary());
 						if (primaryCompare != 0)
 							return primaryCompare;
@@ -1286,7 +1367,8 @@ public class CaseController {
 		if ("contact".equals(entityType) && party.getContactId() != null) {
 			ContactCardFactory factory = contactCardFactory != null
 					? contactCardFactory
-					: new ContactCardFactory(onOpenContact == null ? id -> {
+					: new ContactCardFactory(onOpenContact == null ? id ->
+					{
 					} : onOpenContact);
 			ContactCardFactory.ContactCardModel model = new ContactCardFactory.ContactCardModel(
 					party.getContactId().intValue(),
@@ -1361,10 +1443,10 @@ public class CaseController {
 	private String normalizedPartySideKey(String side) {
 		String normalized = safeText(side).trim().toLowerCase(Locale.ROOT);
 		return switch (normalized) {
-			case "represented" -> "represented";
-			case "opposing" -> "opposing";
-			case "neutral" -> "neutral";
-			default -> "unclassified";
+		case "represented" -> "represented";
+		case "opposing" -> "opposing";
+		case "neutral" -> "neutral";
+		default -> "unclassified";
 		};
 	}
 
@@ -1385,10 +1467,10 @@ public class CaseController {
 			return mapped;
 		}
 		return switch (normalized) {
-			case "represented" -> "Represented";
-			case "opposing" -> "Opposing";
-			case "neutral" -> "Neutral";
-			default -> "Unaffiliated";
+		case "represented" -> "Represented";
+		case "opposing" -> "Opposing";
+		case "neutral" -> "Neutral";
+		default -> "Unaffiliated";
 		};
 	}
 
@@ -1416,7 +1498,8 @@ public class CaseController {
 			return;
 
 		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				Long entityId = draft.entityId();
 				if (draft.createNew()) {
@@ -1426,18 +1509,18 @@ public class CaseController {
 					throw new IllegalStateException("A party entity must be selected or created.");
 				}
 				caseDao.addCaseParty(
-							activeCaseId,
-							draft.entityType().equals("contact") ? entityId : null,
-							draft.entityType().equals("organization") ? entityId : null,
-							draft.partyRoleId(),
-							draft.side(),
-							draft.primary(),
-							draft.notes());
-					runOnFx(this::refreshPartiesSectionAsync);
-				} catch (Exception ex) {
-					runOnFx(() -> showError("Failed to add party. " + ex.getMessage()));
-				}
-			}, "case-add-party-" + activeCaseId).start();
+						activeCaseId,
+						draft.entityType().equals("contact") ? entityId : null,
+						draft.entityType().equals("organization") ? entityId : null,
+						draft.partyRoleId(),
+						draft.side(),
+						draft.primary(),
+						draft.notes());
+				runOnFx(this::refreshPartiesSectionAsync);
+			} catch (Exception ex) {
+				runOnFx(() -> showError("Failed to add party. " + ex.getMessage()));
+			}
+		}, "case-add-party-" + activeCaseId).start();
 	}
 
 	private void onEditParty(CasePartyDto party) {
@@ -1448,7 +1531,8 @@ public class CaseController {
 			return;
 
 		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseDao.updateCaseParty(
 						party.getId(),
@@ -1480,7 +1564,8 @@ public class CaseController {
 			return;
 
 		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseDao.removeCaseParty(party.getId());
 				runOnFx(this::refreshPartiesSectionAsync);
@@ -1494,10 +1579,12 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				List<CasePartyDto> refreshed = caseDao.listCaseParties(activeCaseId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					caseParties = refreshed == null ? List.of() : refreshed;
 					partiesLoadedOnce = true;
 					renderPartiesSection();
@@ -1544,8 +1631,15 @@ public class CaseController {
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
 		sideChoice.getItems().addAll(loadPartySideOptions());
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
-			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
-			@Override public PartySideOption fromString(String string) { return null; }
+			@Override
+			public String toString(PartySideOption object) {
+				return object == null ? "" : object.label;
+			}
+
+			@Override
+			public PartySideOption fromString(String string) {
+				return null;
+			}
 		});
 
 		CheckBox primaryCheck = new CheckBox("Primary");
@@ -1557,15 +1651,30 @@ public class CaseController {
 				.map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id())))
 				.forEach(roleChoice.getItems()::add);
 		roleChoice.setConverter(new javafx.util.StringConverter<>() {
-			@Override public String toString(PartyRoleOption object) { return object == null ? "" : object.label; }
-			@Override public PartyRoleOption fromString(String string) { return null; }
+			@Override
+			public String toString(PartyRoleOption object) {
+				return object == null ? "" : object.label;
+			}
+
+			@Override
+			public PartyRoleOption fromString(String string) {
+				return null;
+			}
 		});
 		entityChoice.setConverter(new javafx.util.StringConverter<>() {
-			@Override public String toString(PartyEntityOption object) { return object == null ? "" : object.label; }
-			@Override public PartyEntityOption fromString(String string) { return null; }
+			@Override
+			public String toString(PartyEntityOption object) {
+				return object == null ? "" : object.label;
+			}
+
+			@Override
+			public PartyEntityOption fromString(String string) {
+				return null;
+			}
 		});
 
-		Runnable loadEntities = () -> {
+		Runnable loadEntities = () ->
+		{
 			String selectedType = entityTypeChoice.getValue();
 			entityChoice.getItems().clear();
 			if ("Organization".equalsIgnoreCase(selectedType)) {
@@ -1602,7 +1711,8 @@ public class CaseController {
 				.filter(o -> Objects.equals(o.entityType, safeText(existing.getEntityType()).toLowerCase(Locale.ROOT))
 						&& Objects.equals(o.id, "organization".equalsIgnoreCase(existing.getEntityType()) ? existing.getOrganizationId() : existing.getContactId()))
 				.findFirst()
-				.ifPresentOrElse(entityChoice::setValue, () -> {
+				.ifPresentOrElse(entityChoice::setValue, () ->
+				{
 					Long existingId = "organization".equalsIgnoreCase(existing.getEntityType()) ? existing.getOrganizationId() : existing.getContactId();
 					String fallbackLabel = safeText(existing.getDisplayName()).isBlank() ? "Party #" + existingId : safeText(existing.getDisplayName());
 					PartyEntityOption fallback = new PartyEntityOption(
@@ -1650,11 +1760,19 @@ public class CaseController {
 						.or(sideChoice.valueProperty().isNull())
 		);
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
-			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
-			@Override public PartySideOption fromString(String string) { return null; }
+			@Override
+			public String toString(PartySideOption object) {
+				return object == null ? "" : object.label;
+			}
+
+			@Override
+			public PartySideOption fromString(String string) {
+				return null;
+			}
 		});
 
-		dialog.setResultConverter(button -> {
+		dialog.setResultConverter(button ->
+		{
 			if (button != saveType)
 				return null;
 			PartyEntityOption entity = entityChoice.getValue();
@@ -1732,12 +1850,10 @@ public class CaseController {
 	private static String normalizeSideForStorage(String side) {
 		String normalized = side == null ? "" : side.trim().toLowerCase(Locale.ROOT);
 		return switch (normalized) {
-			case "represented", "opposing", "neutral" -> normalized;
-			default -> null;
+		case "represented", "opposing", "neutral" -> normalized;
+		default -> null;
 		};
 	}
-
-
 
 	private void loadCaseTasksAsync() {
 		if (caseTaskService == null || appState == null || caseId == null) {
@@ -1750,7 +1866,8 @@ public class CaseController {
 			return;
 		}
 
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				long taskLoadStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadTasksForCase page=case_view caseId=" + activeCaseId);
@@ -1776,7 +1893,8 @@ public class CaseController {
 												row.color()),
 										java.util.stream.Collectors.toList())));
 				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=case_view caseId=" + activeCaseId + " rows=" + assignedByTask.size(), assignedUsersLoadStartNanos);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId == null || caseId.longValue() != activeCaseId) {
 						return;
 					}
@@ -1787,7 +1905,8 @@ public class CaseController {
 					renderTasksSection();
 				});
 			} catch (Exception ex) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					caseTasks = List.of();
 					caseTaskAssignedUsers = java.util.Map.of();
 					caseTasksLoadedOnce = true;
@@ -1851,18 +1970,15 @@ public class CaseController {
 		PerfLog.logDone("RENDER", "panel=tasks page=case_view caseId=" + caseId + " childCount=" + tasksTabFlow.getChildren().size(), renderStartNanos);
 	}
 
-
 	private boolean isSectionActive(String sectionName) {
 		return Objects.equals(activeSectionName, sectionName);
 	}
-
 
 	private void onAddRelatedEntity() {
 		if (isSectionActive("Parties")) {
 			onAddParty();
 		}
 	}
-
 
 	private void onAddTask() {
 		if (caseTaskService == null || caseId == null || appState == null) {
@@ -1911,7 +2027,8 @@ public class CaseController {
 				input.get().assignedUserIds(),
 				currentUserId);
 
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseTaskService.createTask(request);
 				runOnFx(this::refreshCaseTasks);
@@ -1934,7 +2051,8 @@ public class CaseController {
 		boolean currentlyCompleted = findCaseTaskById(taskId)
 				.map(task -> task.completedAt() != null)
 				.orElse(false);
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				if (currentlyCompleted) {
 					caseTaskService.uncompleteTask(taskId, shaleClientId, appState.getUserId());
@@ -1950,126 +2068,127 @@ public class CaseController {
 	}
 
 	private void showTaskDetailPopup(Long taskId) {
-	    if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
-	        return;
-	    }
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
 
-	    Integer shaleClientId = appState.getShaleClientId();
-	    Integer currentUserId = appState.getUserId();
-	    if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
-	        showTaskActionError("You must be signed in to edit tasks.");
-	        return;
-	    }
-	    if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
-	        return;
-	    }
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showTaskActionError("You must be signed in to edit tasks.");
+			return;
+		}
+		if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
+			return;
+		}
 
-	    new Thread(() -> {
-	        try {
-	            TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
-		            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-                List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
-                        detail == null
-                                ? List.of()
-                                : caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
-                List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
-                        ? List.of()
-                        : caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
-                                .map(item -> new TaskDetailDialog.TaskActivityEntry(
-                                        item.title(),
-                                        item.body(),
-                                        item.actorDisplayName(),
-                                        item.occurredAt()))
-                                .toList();
+		new Thread(() ->
+		{
+			try {
+				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+				List<CaseTaskService.AssignedTaskUserOption> assignedTeam = detail == null
+						? List.of()
+						: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+				List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
+						? List.of()
+						: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+								.map(item -> new TaskDetailDialog.TaskActivityEntry(
+										item.title(),
+										item.body(),
+										item.actorDisplayName(),
+										item.occurredAt()))
+								.toList();
 
-	            runOnFx(() -> {
-	                try {
-	                    if (detail == null) {
-	                        showTaskActionError("Task was not found or may have been deleted.");
-	                        refreshCaseTasks();
-	                        return;
-	                    }
+				runOnFx(() ->
+				{
+					try {
+						if (detail == null) {
+							showTaskActionError("Task was not found or may have been deleted.");
+							refreshCaseTasks();
+							return;
+						}
 
-	                    TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
-	                            detail.id(),
-	                            detail.caseId(),
-	                            detail.caseName(),
-	                            detail.caseResponsibleAttorney(),
-	                            detail.caseResponsibleAttorneyColor(),
-	                            detail.title(),
-	                            detail.description(),
-	                            detail.dueAt(),
-	                            detail.priorityId(),
-                                detail.createdByDisplayName(),
-                                assignedTeam.stream()
-                                        .map(member -> new TaskDetailDialog.AssignedTeamMember(
-                                                member.userId(),
-                                                member.displayName(),
-                                                member.color()))
-                                        .toList(),
-                                activityEntries,
-		                            detail.completedAt() != null
-		                    );
+						TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+								detail.id(),
+								detail.caseId(),
+								detail.caseName(),
+								detail.caseResponsibleAttorney(),
+								detail.caseResponsibleAttorneyColor(),
+								detail.title(),
+								detail.description(),
+								detail.dueAt(),
+								detail.priorityId(),
+								detail.createdByDisplayName(),
+								assignedTeam.stream()
+										.map(member -> new TaskDetailDialog.AssignedTeamMember(
+												member.userId(),
+												member.displayName(),
+												member.color()))
+										.toList(),
+								activityEntries,
+								detail.completedAt() != null
+						);
 
-	                    Optional<TaskDetailDialog.TaskDetailResult> result =
-	                            TaskDetailDialog.showAndWait(
-	                                    taskDialogOwner(),
-	                                    model,
-	                                    priorities,
-	                                    id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-	                                    new TaskDetailDialog.AssignmentEditor() {
-	                                        @Override
-	                                        public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
-	                                            caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-	                                            return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-	                                                    .map(member -> new TaskDetailDialog.AssignedTeamMember(
-	                                                            member.userId(),
-	                                                            member.displayName(),
-	                                                            member.color()))
-	                                                    .toList();
-	                                        }
+						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+								taskDialogOwner(),
+								model,
+								priorities,
+								id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+								new TaskDetailDialog.AssignmentEditor() {
+									@Override
+									public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
+										caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+										return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+												.map(member -> new TaskDetailDialog.AssignedTeamMember(
+														member.userId(),
+														member.displayName(),
+														member.color()))
+												.toList();
+									}
 
-	                                        @Override
-	                                        public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
-	                                            caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-	                                            return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-	                                                    .map(member -> new TaskDetailDialog.AssignedTeamMember(
-	                                                            member.userId(),
-	                                                            member.displayName(),
-	                                                            member.color()))
-	                                                    .toList();
-	                                        }
-	                                    },
-	                                    onOpenCase);
+									@Override
+									public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
+										caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+										return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+												.map(member -> new TaskDetailDialog.AssignedTeamMember(
+														member.userId(),
+														member.displayName(),
+														member.color()))
+												.toList();
+									}
+								},
+								onOpenCase);
 
-	                    if (result.isEmpty()) {
-	                        return;
-	                    }
+						if (result.isEmpty()) {
+							return;
+						}
 
-	                    TaskDetailDialog.TaskDetailResult action = result.get();
-	                    if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
-	                        deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
-	                        return;
-	                    }
+						TaskDetailDialog.TaskDetailResult action = result.get();
+						if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+							deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
+							return;
+						}
 
-	                    TaskDetailDialog.SaveTaskPayload payload = action.payload();
-	                    if (payload == null) {
-	                        return;
-	                    }
+						TaskDetailDialog.SaveTaskPayload payload = action.payload();
+						if (payload == null) {
+							return;
+						}
 
-	                    saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
-	                } finally {
-	                    taskDetailDialogInFlight.set(false);
-	                }
-	            });
-	        } catch (Exception ex) {
-	            logTaskActionException("load-detail", ex);
-	            runOnFx(() -> {
-	                taskDetailDialogInFlight.set(false);
-	                showTaskActionError("Failed to load task details. " + rootCauseMessage(ex));
-	            });
-	        }
-	    }, "case-task-detail-" + taskId).start();
+						saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+					} finally {
+						taskDetailDialogInFlight.set(false);
+					}
+				});
+			} catch (Exception ex) {
+				logTaskActionException("load-detail", ex);
+				runOnFx(() ->
+				{
+					taskDetailDialogInFlight.set(false);
+					showTaskActionError("Failed to load task details. " + rootCauseMessage(ex));
+				});
+			}
+		}, "case-task-detail-" + taskId).start();
 	}
 
 	private void saveTaskFromDetail(
@@ -2087,7 +2206,8 @@ public class CaseController {
 				payload.completed(),
 				currentUserId);
 
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseTaskService.updateTask(request);
 				runOnFx(this::refreshCaseTasks);
@@ -2099,7 +2219,8 @@ public class CaseController {
 	}
 
 	private void deleteTaskFromDetail(long taskId, int shaleClientId, int currentUserId) {
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 				runOnFx(this::refreshCaseTasks);
@@ -2184,14 +2305,12 @@ public class CaseController {
 		onOpenOrganization.accept(organizationId);
 	}
 
-
 	private Window organizationDialogOwner() {
 		if (addOrganizationButton != null && addOrganizationButton.getScene() != null) {
 			return addOrganizationButton.getScene().getWindow();
 		}
 		return null;
 	}
-
 
 	// ----------------------------
 	// Overview loading
@@ -2233,7 +2352,8 @@ public class CaseController {
 				long partiesStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=listCaseParties page=case_view caseId=" + activeCaseId);
 				loadedParties = caseDao.listCaseParties(activeCaseId);
-				PerfLog.logDone("DAO", "method=listCaseParties page=case_view caseId=" + activeCaseId + " rows=" + (loadedParties == null ? 0 : loadedParties.size()), partiesStartNanos);
+				PerfLog.logDone("DAO", "method=listCaseParties page=case_view caseId=" + activeCaseId + " rows=" + (loadedParties == null ? 0 : loadedParties.size()),
+						partiesStartNanos);
 				partiesLoadSucceeded = true;
 			} catch (Exception partiesLoadError) {
 				System.err.println("Case parties load failed for caseId=" + activeCaseId + ": " + partiesLoadError.getMessage());
@@ -2281,10 +2401,12 @@ public class CaseController {
 			return;
 		}
 		final int activeCaseId = caseId;
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				List<CaseTaskService.TaskActivityItem> events = caseTaskService.loadCaseTaskActivity(activeCaseId, shaleClientId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId == null || caseId != activeCaseId) {
 						return;
 					}
@@ -2424,15 +2546,15 @@ public class CaseController {
 				overview.getIntakeDate(),
 				overview.getIncidentDate(),
 				overview.getSolDate(),
-					effectiveCallerId,
-					overview.getPrimaryClientContactId(),
-					effectiveOpposingCounselId,
-					effectiveCallerName,
-					overview.getClient(),
-					representedClients,
-					effectiveOpposingCounselName,
-					overview.getTeam(),
-					overview.getDescription());
+				effectiveCallerId,
+				overview.getPrimaryClientContactId(),
+				effectiveOpposingCounselId,
+				effectiveCallerName,
+				overview.getClient(),
+				representedClients,
+				effectiveOpposingCounselName,
+				overview.getTeam(),
+				overview.getDescription());
 	}
 
 	private boolean hasCallerRows(List<CasePartyDto> parties) {
@@ -2553,23 +2675,21 @@ public class CaseController {
 	// 3) Save path: include field in SaveCoordinator desired-value capture/publish.
 	// 4) Live update path: map remote patch handling in CaseOverviewLiveUpdateHandler.
 
-	// Thin wrapper keeps controller as FXML entrypoint while render ownership stays in renderer.
+	// Thin wrapper keeps controller as FXML entrypoint while render ownership stays in
+	// renderer.
 	private void applyOverview(CaseOverviewDto dto) {
 		overviewRenderer.applyOverview(dto);
 	}
-
 
 	// Thin wrapper keeps controller wiring stable for callers outside renderer internals.
 	private void applyDetail(CaseDetailDto detail) {
 		overviewRenderer.applyDetail(detail);
 	}
 
-
 	// Thin wrapper keeps edit-safe refresh callsites unchanged after refactor.
 	private void applyOverviewEditSafe(CaseOverviewDto dto) {
 		overviewRenderer.applyOverviewEditSafe(dto);
 	}
-
 
 	// ----------------------------
 	// Edit lifecycle
@@ -2663,10 +2783,12 @@ public class CaseController {
 
 		setBusy(true);
 		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				boolean deleted = caseDetailService.softDeleteCase(activeCaseId, tenantId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					setBusy(false);
 					if (!deleted) {
 						showDeleteFailure("Case could not be deleted.");
@@ -2677,7 +2799,8 @@ public class CaseController {
 					navigateAfterDelete();
 				});
 			} catch (RuntimeException ex) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					setBusy(false);
 					showDeleteFailure("Failed to delete case.");
 				});
@@ -2828,7 +2951,6 @@ public class CaseController {
 	private void subscribeLiveCaseUpdates() {
 		liveUpdateHandler.subscribe();
 	}
-
 
 	private void refreshCurrentAfterRemoteUpdateAsync() {
 		if (caseDao == null || caseId == null)
@@ -3170,28 +3292,29 @@ public class CaseController {
 
 		new Thread(() ->
 		{
-				try {
-					long updatesLoadStartNanos = PerfLog.start();
-					PerfLog.log("DAO", "start", "method=listCaseUpdates page=case_view caseId=" + activeCaseId);
-					List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
-					PerfLog.logDone("DAO", "method=listCaseUpdates page=case_view caseId=" + activeCaseId + " rows=" + (updates == null ? 0 : updates.size()), updatesLoadStartNanos);
-					runOnFx(() ->
-					{
-						caseUpdatesLoading = false;
-						if (caseId == null || caseId.longValue() != activeCaseId)
-							return;
-						caseUpdatesLoadedOnce = true;
-						caseUpdatesStale = false;
-						renderCaseUpdates(updates);
-					});
-				} catch (Exception ex) {
-					runOnFx(() -> {
-						caseUpdatesLoading = false;
-						caseUpdatesStale = true;
-						showError("Failed to load case updates. " + ex.getMessage());
-					});
-				}
-			}, "case-updates-load-" + activeCaseId).start();
+			try {
+				long updatesLoadStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=listCaseUpdates page=case_view caseId=" + activeCaseId);
+				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
+				PerfLog.logDone("DAO", "method=listCaseUpdates page=case_view caseId=" + activeCaseId + " rows=" + (updates == null ? 0 : updates.size()), updatesLoadStartNanos);
+				runOnFx(() ->
+				{
+					caseUpdatesLoading = false;
+					if (caseId == null || caseId.longValue() != activeCaseId)
+						return;
+					caseUpdatesLoadedOnce = true;
+					caseUpdatesStale = false;
+					renderCaseUpdates(updates);
+				});
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					caseUpdatesLoading = false;
+					caseUpdatesStale = true;
+					showError("Failed to load case updates. " + ex.getMessage());
+				});
+			}
+		}, "case-updates-load-" + activeCaseId).start();
 	}
 
 	private void renderCaseUpdates(List<CaseUpdateDto> updates) {
@@ -3281,14 +3404,14 @@ public class CaseController {
 				{
 					if (caseId == null || caseId.longValue() != activeCaseId)
 						return;
-						if (caseUpdatesComposerArea != null) {
-							caseUpdatesComposerArea.clear();
-							caseUpdatesComposerArea.setDisable(false);
-						}
-						caseUpdatesLoadedOnce = true;
-						caseUpdatesStale = false;
-						renderCaseUpdates(updates);
-						refreshLastUpdatedLabelAsync();
+					if (caseUpdatesComposerArea != null) {
+						caseUpdatesComposerArea.clear();
+						caseUpdatesComposerArea.setDisable(false);
+					}
+					caseUpdatesLoadedOnce = true;
+					caseUpdatesStale = false;
+					renderCaseUpdates(updates);
+					refreshLastUpdatedLabelAsync();
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
 				});
@@ -3454,13 +3577,13 @@ public class CaseController {
 				{
 					if (caseId == null || caseId.longValue() != activeCaseId)
 						return;
-						editingCaseUpdateId = null;
-						editingCaseUpdateDraftText = "";
-						savingCaseUpdateEdit = false;
-						caseUpdatesLoadedOnce = true;
-						caseUpdatesStale = false;
-						renderCaseUpdates(updates);
-						refreshLastUpdatedLabelAsync();
+					editingCaseUpdateId = null;
+					editingCaseUpdateDraftText = "";
+					savingCaseUpdateEdit = false;
+					caseUpdatesLoadedOnce = true;
+					caseUpdatesStale = false;
+					renderCaseUpdates(updates);
+					refreshLastUpdatedLabelAsync();
 				});
 			} catch (Exception ex) {
 				runOnFx(() ->
@@ -3560,12 +3683,13 @@ public class CaseController {
 		);
 	}
 
-
 	private void renderDetailsStatusMini(Integer statusId, String statusName, String statusColorCss) {
 		if (detCaseStatusHost == null)
 			return;
 		if (statusCardFactory == null) {
-			statusCardFactory = new StatusCardFactory(onOpenStatus == null ? id -> { } : onOpenStatus);
+			statusCardFactory = new StatusCardFactory(onOpenStatus == null ? id ->
+			{
+			} : onOpenStatus);
 		}
 		StatusCardModel model = new StatusCardModel(statusId,
 				(statusName == null || statusName.isBlank()) ? "—" : statusName,
@@ -3578,7 +3702,9 @@ public class CaseController {
 		if (detPracticeAreaHost == null)
 			return;
 		if (practiceAreaCardFactory == null) {
-			practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea == null ? id -> { } : onOpenPracticeArea);
+			practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea == null ? id ->
+			{
+			} : onOpenPracticeArea);
 		}
 		PracticeAreaCardModel model = new PracticeAreaCardModel(practiceAreaId,
 				(name == null || name.isBlank()) ? "—" : name,
@@ -3664,9 +3790,10 @@ public class CaseController {
 			} : onOpenContact);
 		}
 
-		List<CaseOverviewDto.ContactSummary> safeClients = clients == null ? List.of() : clients.stream()
-				.filter(Objects::nonNull)
-				.toList();
+		List<CaseOverviewDto.ContactSummary> safeClients = clients == null ? List.of()
+				: clients.stream()
+						.filter(Objects::nonNull)
+						.toList();
 		if (safeClients.isEmpty()) {
 			ovClientHost.getChildren().setAll(contactCardFactory.createMini(null, "—"));
 			return;
@@ -3709,7 +3836,6 @@ public class CaseController {
 			return "—";
 		return value ? "Yes" : "No";
 	}
-
 
 	// ----------------------------
 	// Utilities
@@ -4582,10 +4708,10 @@ public class CaseController {
 				requireTenant(request.tenantId());
 				List<Integer> desiredClientIds = request.desired().desiredClientContacts() == null ? List.of()
 						: request.desired().desiredClientContacts().stream()
-						.map(CaseOverviewDto.ContactSummary::contactId)
-						.filter(Objects::nonNull)
-						.distinct()
-						.toList();
+								.map(CaseOverviewDto.ContactSummary::contactId)
+								.filter(Objects::nonNull)
+								.distinct()
+								.toList();
 				caseDao.syncRepresentedPartyContacts(
 						request.saveCaseId(), request.tenantId(), desiredClientIds, null
 				);
@@ -4682,7 +4808,6 @@ public class CaseController {
 				publishCaseFieldUpdated(request.saveCaseId(), "teamChanged", 1);
 		}
 
-
 		private static java.util.Set<String> normalizeTeamRoleRows(List<CaseDao.CaseUserRoleRow> rows) {
 			java.util.Set<String> out = new java.util.HashSet<>();
 			if (rows == null)
@@ -4728,7 +4853,8 @@ public class CaseController {
 			SaveBaseline baseline,
 			SaveDesiredValues desired,
 			Integer tenantId,
-			Integer userId) {
+			Integer userId
+	) {
 	}
 
 	private record SaveBaseline(
@@ -4736,7 +4862,8 @@ public class CaseController {
 			String oldDescription,
 			String oldNumber,
 			CaseOverviewDto baseOverview,
-			byte[] expectedRowVer) {
+			byte[] expectedRowVer
+	) {
 	}
 
 	private record SaveDesiredValues(
@@ -4750,7 +4877,8 @@ public class CaseController {
 			String desiredOpposingCounselContactName,
 			LocalDate desiredIncidentDate,
 			LocalDate desiredSolDate,
-			List<CaseDao.TeamAssignmentRow> desiredTeamAssignments) {
+			List<CaseDao.TeamAssignmentRow> desiredTeamAssignments
+	) {
 	}
 
 	private record SaveComputation(
@@ -4761,9 +4889,9 @@ public class CaseController {
 			boolean clientChanged,
 			boolean practiceAreaChanged,
 			boolean attyChanged,
-			boolean opposingCounselChanged) {
+			boolean opposingCounselChanged
+	) {
 	}
-
 
 	private final class CaseOverviewPickerCoordinator {
 		void changeResponsibleAttorney() {
@@ -4839,7 +4967,8 @@ public class CaseController {
 					() -> (editMode && draftPrimaryCallerContactId != null)
 							? draftPrimaryCallerContactId
 							: (currentOverview == null ? null : currentOverview.getPrimaryCallerContactId()),
-					picked -> {
+					picked ->
+					{
 						draftPrimaryCallerContactId = picked.id();
 						draftPrimaryCallerName = picked.displayName();
 						renderCallerMini(draftPrimaryCallerContactId, draftPrimaryCallerName);
@@ -4911,7 +5040,8 @@ public class CaseController {
 					() -> (editMode && draftPrimaryOpposingCounselContactId != null)
 							? draftPrimaryOpposingCounselContactId
 							: (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId()),
-					picked -> {
+					picked ->
+					{
 						draftPrimaryOpposingCounselContactId = picked.id();
 						draftPrimaryOpposingCounselName = picked.displayName();
 						renderOpposingCounselMini(draftPrimaryOpposingCounselContactId, draftPrimaryOpposingCounselName);
@@ -5180,7 +5310,8 @@ public class CaseController {
 					owner,
 					cleaned,
 					contactOnlyInitial,
-					(firstName, lastName) -> {
+					(firstName, lastName) ->
+					{
 						if (contactDao == null || appState == null || appState.getShaleClientId() == null || appState.getShaleClientId() <= 0)
 							throw new IllegalStateException("Cannot create contact without an active tenant.");
 						int createdId = contactDao.createContact(new ContactDao.CreateContactRequest(
@@ -5300,24 +5431,24 @@ public class CaseController {
 			boolean detailsTouched = hasDetailsFieldPatch(rawPatch);
 
 			return new LivePatchData(
-				rawPatch,
-				patchedName,
-				patchedNumber,
-				patchedDescription,
-				incidentDatePatched,
-				solDatePatched,
-				patchedIncident,
-				patchedSol,
-				patchedPrimaryStatusId,
-				patchedPrimaryCallerContactId,
-				clientAssignmentsPatched,
-				patchedPracticeAreaId,
-				patchedResponsibleAttorneyUserId,
-				patchedPrimaryOpposingCounselContactId,
-				teamChanged,
-				caseUpdateAdded,
-				deleted,
-				detailsTouched
+					rawPatch,
+					patchedName,
+					patchedNumber,
+					patchedDescription,
+					incidentDatePatched,
+					solDatePatched,
+					patchedIncident,
+					patchedSol,
+					patchedPrimaryStatusId,
+					patchedPrimaryCallerContactId,
+					clientAssignmentsPatched,
+					patchedPracticeAreaId,
+					patchedResponsibleAttorneyUserId,
+					patchedPrimaryOpposingCounselContactId,
+					teamChanged,
+					caseUpdateAdded,
+					deleted,
+					detailsTouched
 			);
 		}
 
@@ -5325,13 +5456,13 @@ public class CaseController {
 			if (rawPatch == null || rawPatch.isBlank())
 				return false;
 			String[] keys = {
-				"callerDate", "callerTime", "acceptedDate", "closedDate", "deniedDate",
-				"dateOfMedicalNegligence", "dateMedicalNegligenceWasDiscovered", "dateOfInjury",
-				"statuteOfLimitations", "tortNoticeDeadline", "discoveryDeadline",
-				"clientEstate", "officePrinterCode", "medicalRecordsReceived", "feeAgreementSigned",
-				"dateFeeAgreementSigned", "acceptedChronology", "acceptedConsultantExpertSearch",
-				"acceptedTestifyingExpertSearch", "acceptedMedicalLiterature", "acceptedDetail",
-				"deniedChronology", "deniedDetail", "summary", "receivedUpdates"
+					"callerDate", "callerTime", "acceptedDate", "closedDate", "deniedDate",
+					"dateOfMedicalNegligence", "dateMedicalNegligenceWasDiscovered", "dateOfInjury",
+					"statuteOfLimitations", "tortNoticeDeadline", "discoveryDeadline",
+					"clientEstate", "officePrinterCode", "medicalRecordsReceived", "feeAgreementSigned",
+					"dateFeeAgreementSigned", "acceptedChronology", "acceptedConsultantExpertSearch",
+					"acceptedTestifyingExpertSearch", "acceptedMedicalLiterature", "acceptedDetail",
+					"deniedChronology", "deniedDetail", "summary", "receivedUpdates"
 			};
 			for (String key : keys) {
 				if (hasPatchKey(rawPatch, key))
@@ -5340,16 +5471,16 @@ public class CaseController {
 			return false;
 		}
 
-			private boolean handleCaseUpdateAdded(LivePatchData patch) {
-				if (!patch.caseUpdateAdded())
-					return false;
-				runOnFx(() ->
-				{
-					// Keep ownership explicit: case updates and tasks refresh are separate.
-					caseUpdatesStale = true;
-					loadCaseUpdatesAsync();
-					loadCaseTasksAsync();
-					refreshLastUpdatedLabelAsync();
+		private boolean handleCaseUpdateAdded(LivePatchData patch) {
+			if (!patch.caseUpdateAdded())
+				return false;
+			runOnFx(() ->
+			{
+				// Keep ownership explicit: case updates and tasks refresh are separate.
+				caseUpdatesStale = true;
+				loadCaseUpdatesAsync();
+				loadCaseTasksAsync();
+				refreshLastUpdatedLabelAsync();
 			});
 			return true;
 		}
@@ -5485,7 +5616,8 @@ public class CaseController {
 			boolean teamChanged,
 			boolean caseUpdateAdded,
 			boolean deleted,
-			boolean detailsTouched) {
+			boolean detailsTouched
+	) {
 	}
 
 	private final class CaseTeamCoordinator {
@@ -6006,7 +6138,8 @@ public class CaseController {
 
 				runOnFx(() -> handleSaveResult(request, updated));
 			} catch (Exception ex) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					showError("Failed to save case details. " + ex.getMessage());
 					setBusy(false);
 				});
@@ -6045,7 +6178,8 @@ public class CaseController {
 			publishIfChanged(request.caseId(), "closedDate", baseline.getClosedDate(), request.closedDate());
 			publishIfChanged(request.caseId(), "deniedDate", baseline.getDeniedDate(), request.deniedDate());
 			publishIfChanged(request.caseId(), "dateOfMedicalNegligence", baseline.getDateOfMedicalNegligence(), request.dateOfMedicalNegligence());
-			publishIfChanged(request.caseId(), "dateMedicalNegligenceWasDiscovered", baseline.getDateMedicalNegligenceWasDiscovered(), request.dateMedicalNegligenceWasDiscovered());
+			publishIfChanged(request.caseId(), "dateMedicalNegligenceWasDiscovered", baseline.getDateMedicalNegligenceWasDiscovered(), request
+					.dateMedicalNegligenceWasDiscovered());
 			publishIfChanged(request.caseId(), "dateOfInjury", baseline.getDateOfInjury(), request.dateOfInjury());
 			publishIfChanged(request.caseId(), "statuteOfLimitations", baseline.getStatuteOfLimitations(), request.statuteOfLimitations());
 			publishIfChanged(request.caseId(), "tortNoticeDeadline", baseline.getTortNoticeDeadline(), request.tortNoticeDeadline());
@@ -6120,79 +6254,77 @@ public class CaseController {
 					source.deniedDate);
 
 			boolean statusChanged = !Objects.equals(source.primaryStatusId, currentOverview == null ? null : currentOverview.getPrimaryStatusId());
-			boolean changed =
-				statusChanged ||
-				!Objects.equals(name, normalizeRequired(baseline.getCaseName())) ||
-				!Objects.equals(caseNumber, normalizeNullableText(baseline.getCaseNumber())) ||
-				!Objects.equals(practiceAreaId, baseline.getPracticeAreaId()) ||
-				!Objects.equals(description, normalizeNullableText(baseline.getDescription())) ||
-				!Objects.equals(source.callerDate, baseline.getCallerDate()) ||
-				!Objects.equals(callerTime, normalizeCallerTimeInput(normalizeCallerTimeDisplay(baseline.getCallerTime()))) ||
-				!Objects.equals(lifecycleDates.acceptedDate(), baseline.getAcceptedDate()) ||
-				!Objects.equals(lifecycleDates.closedDate(), baseline.getClosedDate()) ||
-				!Objects.equals(lifecycleDates.deniedDate(), baseline.getDeniedDate()) ||
-				!Objects.equals(source.dateOfMedicalNegligence, baseline.getDateOfMedicalNegligence()) ||
-				!Objects.equals(source.dateMedicalNegligenceWasDiscovered, baseline.getDateMedicalNegligenceWasDiscovered()) ||
-				!Objects.equals(source.dateOfInjury, baseline.getDateOfInjury()) ||
-				!Objects.equals(source.statuteOfLimitations, baseline.getStatuteOfLimitations()) ||
-				!Objects.equals(source.tortNoticeDeadline, baseline.getTortNoticeDeadline()) ||
-				!Objects.equals(source.discoveryDeadline, baseline.getDiscoveryDeadline()) ||
-				!Objects.equals(clientEstate, normalizeDetailsCheckboxStorage(baseline.getClientEstate())) ||
-				!Objects.equals(officePrinterCode, normalizeNullableText(baseline.getOfficePrinterCode())) ||
-				!Objects.equals(medicalRecordsReceived, baselineMedicalRecordsReceived) ||
-				!Objects.equals(feeAgreementSigned, baselineFeeAgreementSigned) ||
-				!Objects.equals(dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
-				!Objects.equals(acceptedChronology, baselineAcceptedChronology) ||
-				!Objects.equals(acceptedConsultantExpertSearch, baselineAcceptedConsultantExpertSearch) ||
-				!Objects.equals(acceptedTestifyingExpertSearch, baselineAcceptedTestifyingExpertSearch) ||
-				!Objects.equals(acceptedMedicalLiterature, baselineAcceptedMedicalLiterature) ||
-				!Objects.equals(acceptedDetail, normalizeNullableText(baseline.getAcceptedDetail())) ||
-				!Objects.equals(deniedChronology, baselineDeniedChronology) ||
-				!Objects.equals(deniedDetail, normalizeNullableText(baseline.getDeniedDetail())) ||
-				!Objects.equals(summary, normalizeNullableText(baseline.getSummary())) ||
-				!Objects.equals(receivedUpdates, normalizeDetailsCheckboxStorage(baseline.getReceivedUpdates()));
+			boolean changed = statusChanged ||
+					!Objects.equals(name, normalizeRequired(baseline.getCaseName())) ||
+					!Objects.equals(caseNumber, normalizeNullableText(baseline.getCaseNumber())) ||
+					!Objects.equals(practiceAreaId, baseline.getPracticeAreaId()) ||
+					!Objects.equals(description, normalizeNullableText(baseline.getDescription())) ||
+					!Objects.equals(source.callerDate, baseline.getCallerDate()) ||
+					!Objects.equals(callerTime, normalizeCallerTimeInput(normalizeCallerTimeDisplay(baseline.getCallerTime()))) ||
+					!Objects.equals(lifecycleDates.acceptedDate(), baseline.getAcceptedDate()) ||
+					!Objects.equals(lifecycleDates.closedDate(), baseline.getClosedDate()) ||
+					!Objects.equals(lifecycleDates.deniedDate(), baseline.getDeniedDate()) ||
+					!Objects.equals(source.dateOfMedicalNegligence, baseline.getDateOfMedicalNegligence()) ||
+					!Objects.equals(source.dateMedicalNegligenceWasDiscovered, baseline.getDateMedicalNegligenceWasDiscovered()) ||
+					!Objects.equals(source.dateOfInjury, baseline.getDateOfInjury()) ||
+					!Objects.equals(source.statuteOfLimitations, baseline.getStatuteOfLimitations()) ||
+					!Objects.equals(source.tortNoticeDeadline, baseline.getTortNoticeDeadline()) ||
+					!Objects.equals(source.discoveryDeadline, baseline.getDiscoveryDeadline()) ||
+					!Objects.equals(clientEstate, normalizeDetailsCheckboxStorage(baseline.getClientEstate())) ||
+					!Objects.equals(officePrinterCode, normalizeNullableText(baseline.getOfficePrinterCode())) ||
+					!Objects.equals(medicalRecordsReceived, baselineMedicalRecordsReceived) ||
+					!Objects.equals(feeAgreementSigned, baselineFeeAgreementSigned) ||
+					!Objects.equals(dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
+					!Objects.equals(acceptedChronology, baselineAcceptedChronology) ||
+					!Objects.equals(acceptedConsultantExpertSearch, baselineAcceptedConsultantExpertSearch) ||
+					!Objects.equals(acceptedTestifyingExpertSearch, baselineAcceptedTestifyingExpertSearch) ||
+					!Objects.equals(acceptedMedicalLiterature, baselineAcceptedMedicalLiterature) ||
+					!Objects.equals(acceptedDetail, normalizeNullableText(baseline.getAcceptedDetail())) ||
+					!Objects.equals(deniedChronology, baselineDeniedChronology) ||
+					!Objects.equals(deniedDetail, normalizeNullableText(baseline.getDeniedDetail())) ||
+					!Objects.equals(summary, normalizeNullableText(baseline.getSummary())) ||
+					!Objects.equals(receivedUpdates, normalizeDetailsCheckboxStorage(baseline.getReceivedUpdates()));
 
 			return new DetailsSaveRequest(
-				caseId.longValue(),
-				currentOverview == null ? null : currentOverview.getPrimaryStatusId(),
-				currentOverview == null ? null : currentOverview.getCaseStatus(),
-				source.primaryStatusId,
-				source.primaryStatusName,
-				name,
-				caseNumber,
-				practiceAreaId,
-				description,
-				source.callerDate,
-				callerTime,
-				lifecycleDates.acceptedDate(),
-				lifecycleDates.closedDate(),
-				lifecycleDates.deniedDate(),
-				source.dateOfMedicalNegligence,
-				source.dateMedicalNegligenceWasDiscovered,
-				source.dateOfInjury,
-				source.statuteOfLimitations,
-				source.tortNoticeDeadline,
-				source.discoveryDeadline,
-				clientEstate,
-				officePrinterCode,
-				medicalRecordsReceived,
-				feeAgreementSigned,
-				dateFeeAgreementSigned,
-				acceptedChronology,
-				acceptedConsultantExpertSearch,
-				acceptedTestifyingExpertSearch,
-				acceptedMedicalLiterature,
-				acceptedDetail,
-				deniedChronology,
-				deniedDetail,
-				summary,
-				receivedUpdates,
-				baseline.getRowVer(),
-				baseline,
-				statusChanged,
-				changed);
+					caseId.longValue(),
+					currentOverview == null ? null : currentOverview.getPrimaryStatusId(),
+					currentOverview == null ? null : currentOverview.getCaseStatus(),
+					source.primaryStatusId,
+					source.primaryStatusName,
+					name,
+					caseNumber,
+					practiceAreaId,
+					description,
+					source.callerDate,
+					callerTime,
+					lifecycleDates.acceptedDate(),
+					lifecycleDates.closedDate(),
+					lifecycleDates.deniedDate(),
+					source.dateOfMedicalNegligence,
+					source.dateMedicalNegligenceWasDiscovered,
+					source.dateOfInjury,
+					source.statuteOfLimitations,
+					source.tortNoticeDeadline,
+					source.discoveryDeadline,
+					clientEstate,
+					officePrinterCode,
+					medicalRecordsReceived,
+					feeAgreementSigned,
+					dateFeeAgreementSigned,
+					acceptedChronology,
+					acceptedConsultantExpertSearch,
+					acceptedTestifyingExpertSearch,
+					acceptedMedicalLiterature,
+					acceptedDetail,
+					deniedChronology,
+					deniedDetail,
+					summary,
+					receivedUpdates,
+					baseline.getRowVer(),
+					baseline,
+					statusChanged,
+					changed);
 		}
-
 
 		private String normalizeNullableText(String value) {
 			String trimmed = safeText(value).trim();
@@ -6722,7 +6854,8 @@ public class CaseController {
 			byte[] expectedRowVer,
 			CaseDetailDto baseline,
 			boolean statusChanged,
-			boolean hasChanges) {
+			boolean hasChanges
+	) {
 	}
 
 	private final class CaseDetailsEditor {
@@ -6735,7 +6868,6 @@ public class CaseController {
 			renderEditors(detailsDraft);
 			setEditMode(true);
 		}
-
 
 		void cancelEdit() {
 			CaseDetailsDraft restore = detailsBaseline != null ? detailsBaseline : resolveDetailsViewModel();
@@ -6956,7 +7088,8 @@ public class CaseController {
 				return;
 			if (feeAgreementSignedAutoDateListener != null)
 				detFeeAgreementSignedEditor.selectedProperty().removeListener(feeAgreementSignedAutoDateListener);
-			feeAgreementSignedAutoDateListener = (obs, wasSelected, isSelected) -> {
+			feeAgreementSignedAutoDateListener = (obs, wasSelected, isSelected) ->
+			{
 				if (!Boolean.TRUE.equals(isSelected) || detDateFeeAgreementSignedEditor == null)
 					return;
 				if (detDateFeeAgreementSignedEditor.getValue() == null)
