@@ -573,7 +573,7 @@
 			</VBox>
 			<!-- TASKS TAB PANE (center) -->
 			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980"
-				styleClass="case-main-surface" visible="false" managed="false">
+				visible="false" managed="false">
 				<padding>
 					<Insets top="12" right="12" bottom="12" left="12" />
 				</padding>
@@ -589,17 +589,22 @@
 					text="No tasks for this case yet." visible="false" managed="false"
 					style="-fx-opacity: 0.7;" />
 				<HBox spacing="12" alignment="TOP_LEFT" VBox.vgrow="ALWAYS">
-					<ScrollPane fitToWidth="true" hbarPolicy="NEVER"
-						HBox.hgrow="ALWAYS" styleClass="transparent-scroll">
-						<content>
-							<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12"
-								prefWrapLength="680" maxWidth="1.7976931348623157E308">
-								<padding>
-									<Insets top="2" right="2" bottom="2" left="2" />
-								</padding>
-							</FlowPane>
-						</content>
-					</ScrollPane>
+					<VBox spacing="8" HBox.hgrow="ALWAYS" styleClass="case-main-surface">
+						<padding>
+							<Insets top="8" right="8" bottom="8" left="8" />
+						</padding>
+						<ScrollPane fitToWidth="true" hbarPolicy="NEVER"
+							VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
+							<content>
+								<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12"
+									prefWrapLength="680" maxWidth="1.7976931348623157E308">
+									<padding>
+										<Insets top="2" right="2" bottom="2" left="2" />
+									</padding>
+								</FlowPane>
+							</content>
+						</ScrollPane>
+					</VBox>
 					<VBox fx:id="caseTaskActivityPane" spacing="8" prefWidth="320"
 						minWidth="280" maxWidth="360" styleClass="secondary-panel">
 						<padding>

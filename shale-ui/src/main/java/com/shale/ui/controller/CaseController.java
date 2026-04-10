@@ -2068,127 +2068,126 @@ public class CaseController {
 	}
 
 	private void showTaskDetailPopup(Long taskId) {
-		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
-			return;
-		}
+	    if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+	        return;
+	    }
 
-		Integer shaleClientId = appState.getShaleClientId();
-		Integer currentUserId = appState.getUserId();
-		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
-			showTaskActionError("You must be signed in to edit tasks.");
-			return;
-		}
-		if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
-			return;
-		}
+	    Integer shaleClientId = appState.getShaleClientId();
+	    Integer currentUserId = appState.getUserId();
+	    if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+	        showTaskActionError("You must be signed in to edit tasks.");
+	        return;
+	    }
+	    if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
+	        return;
+	    }
 
-		new Thread(() ->
-		{
-			try {
-				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
-				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-				List<CaseTaskService.AssignedTaskUserOption> assignedTeam = detail == null
-						? List.of()
-						: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
-				List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
-						? List.of()
-						: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
-								.map(item -> new TaskDetailDialog.TaskActivityEntry(
-										item.title(),
-										item.body(),
-										item.actorDisplayName(),
-										item.occurredAt()))
-								.toList();
+	    new Thread(() -> {
+	        try {
+	            TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+		            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+                List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
+                        detail == null
+                                ? List.of()
+                                : caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+                List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
+                        ? List.of()
+                        : caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+                                .map(item -> new TaskDetailDialog.TaskActivityEntry(
+                                        item.title(),
+                                        item.body(),
+                                        item.actorDisplayName(),
+                                        item.occurredAt()))
+                                .toList();
 
-				runOnFx(() ->
-				{
-					try {
-						if (detail == null) {
-							showTaskActionError("Task was not found or may have been deleted.");
-							refreshCaseTasks();
-							return;
-						}
+	            runOnFx(() -> {
+	                try {
+	                    if (detail == null) {
+	                        showTaskActionError("Task was not found or may have been deleted.");
+	                        refreshCaseTasks();
+	                        return;
+	                    }
 
-						TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
-								detail.id(),
-								detail.caseId(),
-								detail.caseName(),
-								detail.caseResponsibleAttorney(),
-								detail.caseResponsibleAttorneyColor(),
-								detail.title(),
-								detail.description(),
-								detail.dueAt(),
-								detail.priorityId(),
-								detail.createdByDisplayName(),
-								assignedTeam.stream()
-										.map(member -> new TaskDetailDialog.AssignedTeamMember(
-												member.userId(),
-												member.displayName(),
-												member.color()))
-										.toList(),
-								activityEntries,
-								detail.completedAt() != null
-						);
+	                    TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+	                            detail.id(),
+	                            detail.caseId(),
+	                            detail.caseName(),
+	                            detail.caseResponsibleAttorney(),
+	                            detail.caseResponsibleAttorneyColor(),
+	                            detail.title(),
+	                            detail.description(),
+	                            detail.dueAt(),
+	                            detail.priorityId(),
+                                detail.createdByDisplayName(),
+                                assignedTeam.stream()
+                                        .map(member -> new TaskDetailDialog.AssignedTeamMember(
+                                                member.userId(),
+                                                member.displayName(),
+                                                member.color()))
+                                        .toList(),
+                                activityEntries,
+		                            detail.completedAt() != null
+		                    );
 
-						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
-								taskDialogOwner(),
-								model,
-								priorities,
-								id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-								new TaskDetailDialog.AssignmentEditor() {
-									@Override
-									public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
-										caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-										return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-												.map(member -> new TaskDetailDialog.AssignedTeamMember(
-														member.userId(),
-														member.displayName(),
-														member.color()))
-												.toList();
-									}
+	                    Optional<TaskDetailDialog.TaskDetailResult> result =
+	                            TaskDetailDialog.showAndWait(
+	                                    taskDialogOwner(),
+	                                    model,
+	                                    priorities,
+	                                    id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+	                                    new TaskDetailDialog.AssignmentEditor() {
+	                                        @Override
+	                                        public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
+	                                            caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+	                                            return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+	                                                    .map(member -> new TaskDetailDialog.AssignedTeamMember(
+	                                                            member.userId(),
+	                                                            member.displayName(),
+	                                                            member.color()))
+	                                                    .toList();
+	                                        }
 
-									@Override
-									public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
-										caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-										return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-												.map(member -> new TaskDetailDialog.AssignedTeamMember(
-														member.userId(),
-														member.displayName(),
-														member.color()))
-												.toList();
-									}
-								},
-								onOpenCase);
+	                                        @Override
+	                                        public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
+	                                            caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+	                                            return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+	                                                    .map(member -> new TaskDetailDialog.AssignedTeamMember(
+	                                                            member.userId(),
+	                                                            member.displayName(),
+	                                                            member.color()))
+	                                                    .toList();
+	                                        }
+	                                    },
+	                                    onOpenCase);
 
-						if (result.isEmpty()) {
-							return;
-						}
+	                    if (result.isEmpty()) {
+	                        return;
+	                    }
 
-						TaskDetailDialog.TaskDetailResult action = result.get();
-						if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
-							deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
-							return;
-						}
+	                    TaskDetailDialog.TaskDetailResult action = result.get();
+	                    if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+	                        deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
+	                        return;
+	                    }
 
-						TaskDetailDialog.SaveTaskPayload payload = action.payload();
-						if (payload == null) {
-							return;
-						}
+	                    TaskDetailDialog.SaveTaskPayload payload = action.payload();
+	                    if (payload == null) {
+	                        return;
+	                    }
 
-						saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
-					} finally {
-						taskDetailDialogInFlight.set(false);
-					}
-				});
-			} catch (Exception ex) {
-				logTaskActionException("load-detail", ex);
-				runOnFx(() ->
-				{
-					taskDetailDialogInFlight.set(false);
-					showTaskActionError("Failed to load task details. " + rootCauseMessage(ex));
-				});
-			}
-		}, "case-task-detail-" + taskId).start();
+	                    saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+	                } finally {
+	                    taskDetailDialogInFlight.set(false);
+	                }
+	            });
+	        } catch (Exception ex) {
+	            logTaskActionException("load-detail", ex);
+	            runOnFx(() -> {
+	                taskDetailDialogInFlight.set(false);
+	                showTaskActionError("Failed to load task details. " + rootCauseMessage(ex));
+	            });
+	        }
+	    }, "case-task-detail-" + taskId).start();
 	}
 
 	private void saveTaskFromDetail(
@@ -2219,8 +2218,7 @@ public class CaseController {
 	}
 
 	private void deleteTaskFromDetail(long taskId, int shaleClientId, int currentUserId) {
-		new Thread(() ->
-		{
+		new Thread(() -> {
 			try {
 				caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 				runOnFx(this::refreshCaseTasks);
@@ -2401,12 +2399,10 @@ public class CaseController {
 			return;
 		}
 		final int activeCaseId = caseId;
-		new Thread(() ->
-		{
+		new Thread(() -> {
 			try {
 				List<CaseTaskService.TaskActivityItem> events = caseTaskService.loadCaseTaskActivity(activeCaseId, shaleClientId);
-				runOnFx(() ->
-				{
+				runOnFx(() -> {
 					if (caseId == null || caseId != activeCaseId) {
 						return;
 					}
