@@ -175,7 +175,16 @@ public final class CaseTaskService {
         if (detail == null) {
             throw new IllegalArgumentException("Task not found for note insert");
         }
-        taskDao.addTaskUpdate(taskId, Math.toIntExact(detail.caseId()), shaleClientId, userId, body);
+        long taskUpdateId = taskDao.addTaskUpdate(taskId, Math.toIntExact(detail.caseId()), shaleClientId, userId, body);
+        publishTaskNoteAddedEvents(
+                taskId,
+                taskUpdateId,
+                shaleClientId,
+                userId,
+                detail.title(),
+                detail.caseId(),
+                detail.caseName(),
+                body);
     }
 
     public boolean updateTaskNote(long taskUpdateId, int shaleClientId, int userId, String body) {
@@ -487,6 +496,64 @@ public final class CaseTaskService {
         runtimeBridge.publishEntityUpdated("Task", taskId, shaleClientId, updatedByUserId, patch.toString());
     }
 
+    private void publishTaskNoteAddedEvents(
+            long taskId,
+            long taskUpdateId,
+            int shaleClientId,
+            int actorUserId,
+            String taskTitle,
+            Long caseId,
+            String caseName,
+            String noteBody) {
+        LinkedHashSet<Integer> recipientUserIds = taskDao.listAssignedUsersForTask(taskId, shaleClientId).stream()
+                .map(TaskDao.TaskAssignedUserRow::userId)
+                .filter(Objects::nonNull)
+                .filter(id -> id > 0)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        recipientUserIds.remove(actorUserId);
+        if (recipientUserIds.isEmpty()) {
+            return;
+        }
+        String message = buildTaskNoteAddedMessage(taskTitle, caseId, caseName, taskId, noteBody);
+        for (Integer recipientUserId : recipientUserIds) {
+            String eventKey = "task-note-added:" + taskId + ":" + taskUpdateId + ":" + recipientUserId;
+            Long durableId = notificationDao.createTaskNoteAddedNotification(
+                    shaleClientId,
+                    recipientUserId,
+                    "New note added to task",
+                    message,
+                    taskId,
+                    actorUserId,
+                    eventKey);
+            StringBuilder patch = new StringBuilder("{");
+            patch.append("\"notificationType\":\"TASK_NOTE_ADDED\"");
+            patch.append(",\"recipientUserId\":").append(recipientUserId);
+            patch.append(",\"eventKey\":\"").append(escapeJson(eventKey)).append('"');
+            patch.append(",\"taskUpdateId\":").append(taskUpdateId);
+            if (durableId != null) {
+                patch.append(",\"durableNotificationId\":").append(durableId);
+            }
+            if (taskTitle != null && !taskTitle.isBlank()) {
+                patch.append(",\"title\":\"").append(escapeJson(taskTitle)).append('"');
+            }
+            if (caseId != null && caseId > 0) {
+                patch.append(",\"caseId\":").append(caseId);
+            }
+            if (caseName != null && !caseName.isBlank()) {
+                patch.append(",\"caseName\":\"").append(escapeJson(caseName)).append('"');
+            }
+            String noteSnippet = buildNoteSnippet(noteBody);
+            if (!noteSnippet.isBlank()) {
+                patch.append(",\"noteSnippet\":\"").append(escapeJson(noteSnippet)).append('"');
+            }
+            patch.append(",\"updatedAtUtc\":\"")
+                    .append(LocalDateTime.now().atOffset(ZoneOffset.UTC))
+                    .append('"');
+            patch.append('}');
+            runtimeBridge.publishEntityUpdated("Task", taskId, shaleClientId, actorUserId, patch.toString());
+        }
+    }
+
     private static String buildTaskAssignedMessage(String title, Long caseId, String caseName, long taskId) {
         String trimmedTitle = title == null ? "" : title.trim();
         if (trimmedTitle.isBlank()) {
@@ -499,6 +566,26 @@ public final class CaseTaskService {
             return "Task: " + trimmedTitle + " • Case #" + caseId;
         }
         return "Task: " + trimmedTitle;
+    }
+
+    private static String buildTaskNoteAddedMessage(String title, Long caseId, String caseName, long taskId, String noteBody) {
+        String base = buildTaskAssignedMessage(title, caseId, caseName, taskId);
+        String snippet = buildNoteSnippet(noteBody);
+        if (snippet.isBlank()) {
+            return base + " • New note added";
+        }
+        return base + " • Note: " + snippet;
+    }
+
+    private static String buildNoteSnippet(String noteBody) {
+        if (noteBody == null) {
+            return "";
+        }
+        String normalized = noteBody.trim().replaceAll("\\s+", " ");
+        if (normalized.isBlank()) {
+            return "";
+        }
+        return normalized.length() <= 120 ? normalized : normalized.substring(0, 117) + "...";
     }
 
     private static String escapeJson(String text) {

@@ -66,10 +66,10 @@ public final class LiveUpdateNotificationBridge {
 	}
 
 	private void handleEntityUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
-		if (!isTaskEventForCurrentUser(event)) {
+		if (!isTaskNotificationEventForCurrentUser(event)) {
 			return;
 		}
-		if (isSelfAssignment(event)) {
+		if (isSelfNotificationEvent(event)) {
 			return;
 		}
 		if (isDuplicate(event)) {
@@ -80,8 +80,9 @@ public final class LiveUpdateNotificationBridge {
 		}
 
 		Instant createdAt = parseTimestamp(event.timestamp());
-		String title = "Task assigned to you";
-		String message = taskNotificationMessage(event);
+		boolean noteAdded = isTaskNoteAddedEvent(event);
+		String title = noteAdded ? "New note added to task" : "Task assigned to you";
+		String message = noteAdded ? taskNoteNotificationMessage(event) : taskNotificationMessage(event);
 		Integer durableIdInt = intValue(event.patch().get("durableNotificationId"));
 		Long durableNotificationId = durableIdInt == null ? null : Long.valueOf(durableIdInt.longValue());
 		Long entityId = longValue(event.patch().get("taskId"));
@@ -110,7 +111,7 @@ public final class LiveUpdateNotificationBridge {
 					taskTitle));
 	}
 
-	private boolean isTaskEventForCurrentUser(UiRuntimeBridge.EntityUpdatedEvent event) {
+	private boolean isTaskNotificationEventForCurrentUser(UiRuntimeBridge.EntityUpdatedEvent event) {
 		if (event == null || event.entityType() == null || event.patch() == null) {
 			return false;
 		}
@@ -122,6 +123,10 @@ public final class LiveUpdateNotificationBridge {
 			return false;
 		}
 
+		if (isTaskNoteAddedEvent(event)) {
+			Integer recipientUserId = recipientUserId(event.patch());
+			return recipientUserId != null && recipientUserId.equals(currentUserId);
+		}
 		Integer newAssigneeUserId = assigneeUserId(event.patch());
 		if (newAssigneeUserId == null || !newAssigneeUserId.equals(currentUserId)) {
 			return false;
@@ -130,8 +135,14 @@ public final class LiveUpdateNotificationBridge {
 		return previousAssigneeUserId == null || !previousAssigneeUserId.equals(currentUserId);
 	}
 
-	private boolean isSelfAssignment(UiRuntimeBridge.EntityUpdatedEvent event) {
+	private boolean isSelfNotificationEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
 		Integer currentUserId = appState.getUserId();
+		if (currentUserId == null || currentUserId <= 0) {
+			return false;
+		}
+		if (isTaskNoteAddedEvent(event)) {
+			return currentUserId.equals(event.updatedByUserId());
+		}
 		return currentUserId != null
 				&& currentUserId > 0
 				&& currentUserId.equals(event.updatedByUserId());
@@ -234,6 +245,17 @@ public final class LiveUpdateNotificationBridge {
 		return assigneeId;
 	}
 
+	private static Integer recipientUserId(Map<String, Object> patch) {
+		if (patch == null) {
+			return null;
+		}
+		Integer recipient = intValue(patch.get("recipientUserId"));
+		if (recipient == null) {
+			recipient = intValue(patch.get("userId"));
+		}
+		return recipient;
+	}
+
 	private static Integer previousAssigneeUserId(Map<String, Object> patch) {
 		if (patch == null) {
 			return null;
@@ -263,5 +285,30 @@ public final class LiveUpdateNotificationBridge {
 			return "Task: " + title;
 		}
 		return "Task #" + event.entityId() + " was assigned to your queue.";
+	}
+
+	private static boolean isTaskNoteAddedEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (event == null || event.patch() == null) {
+			return false;
+		}
+		Object notificationType = event.patch().get("notificationType");
+		if (notificationType != null && "TASK_NOTE_ADDED".equalsIgnoreCase(String.valueOf(notificationType))) {
+			return true;
+		}
+		Object actionType = event.patch().get("actionType");
+		return actionType != null && "NOTE_ADDED".equalsIgnoreCase(String.valueOf(actionType));
+	}
+
+	private static String taskNoteNotificationMessage(UiRuntimeBridge.EntityUpdatedEvent event) {
+		String base = taskNotificationMessage(event);
+		Object snippet = event.patch().get("noteSnippet");
+		if (snippet == null) {
+			return base + " • New note added";
+		}
+		String normalized = String.valueOf(snippet).trim();
+		if (normalized.isBlank()) {
+			return base + " • New note added";
+		}
+		return base + " • Note: " + normalized;
 	}
 }
