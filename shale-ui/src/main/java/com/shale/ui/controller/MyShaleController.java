@@ -594,9 +594,9 @@ public final class MyShaleController {
 		new Thread(() -> {
 			try {
 				if (currentlyCompleted) {
-					caseTaskService.uncompleteTask(taskId, shaleClientId);
+					caseTaskService.uncompleteTask(taskId, shaleClientId, appState.getUserId());
 				} else {
-					caseTaskService.completeTask(taskId, shaleClientId);
+					caseTaskService.completeTask(taskId, shaleClientId, appState.getUserId());
 				}
 				runOnFx(this::refreshMyTasks);
 			} catch (Exception ex) {
@@ -635,11 +635,32 @@ public final class MyShaleController {
 		new Thread(() -> {
 			try {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
-				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-				List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
-						detail == null
-								? List.of()
-								: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+					List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+					List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
+							detail == null
+									? List.of()
+									: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+					List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
+							? List.of()
+							: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+									.map(item -> new TaskDetailDialog.TaskActivityEntry(
+											item.title(),
+											item.body(),
+											item.actorDisplayName(),
+											item.occurredAt()))
+									.toList();
+					List<TaskDetailDialog.TaskNoteEntry> noteEntries = detail == null
+							? List.of()
+							: caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
+									.map(note -> new TaskDetailDialog.TaskNoteEntry(
+											note.id(),
+											note.userId(),
+											note.userDisplayName(),
+											note.body(),
+											note.createdAt(),
+											note.updatedAt(),
+											note.userId() == currentUserId))
+									.toList();
 
 				runOnFx(() -> {
 					try {
@@ -659,20 +680,22 @@ public final class MyShaleController {
 								detail.dueAt(),
 								detail.priorityId(),
 								detail.createdByDisplayName(),
-									assignedTeam.stream()
-											.map(member -> new TaskDetailDialog.AssignedTeamMember(
-													member.userId(),
-													member.displayName(),
-													member.color()))
-										.toList(),
-								detail.completedAt() != null);
+										assignedTeam.stream()
+												.map(member -> new TaskDetailDialog.AssignedTeamMember(
+														member.userId(),
+														member.displayName(),
+														member.color()))
+											.toList(),
+										activityEntries,
+										noteEntries,
+										detail.completedAt() != null);
 						Optional<TaskDetailDialog.TaskDetailResult> result =
 								TaskDetailDialog.showAndWait(
 										taskDialogOwner(),
 										model,
 										priorities,
 										id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-										new TaskDetailDialog.AssignmentEditor() {
+											new TaskDetailDialog.AssignmentEditor() {
 											@Override
 											public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
 												caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
@@ -686,7 +709,7 @@ public final class MyShaleController {
 
 											@Override
 											public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
-												caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId);
+												caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
 												return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
 														.map(member -> new TaskDetailDialog.AssignedTeamMember(
 																member.userId(),
@@ -694,14 +717,45 @@ public final class MyShaleController {
 																member.color()))
 														.toList();
 											}
-										},
-										onOpenCase);
+											},
+											new TaskDetailDialog.NotesEditor() {
+												@Override
+												public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
+													caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
+													return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+															.map(note -> new TaskDetailDialog.TaskNoteEntry(
+																	note.id(),
+																	note.userId(),
+																	note.userDisplayName(),
+																	note.body(),
+																	note.createdAt(),
+																	note.updatedAt(),
+																	note.userId() == currentUserId))
+															.toList();
+												}
+
+												@Override
+												public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
+													caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
+													return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+															.map(note -> new TaskDetailDialog.TaskNoteEntry(
+																	note.id(),
+																	note.userId(),
+																	note.userDisplayName(),
+																	note.body(),
+																	note.createdAt(),
+																	note.updatedAt(),
+																	note.userId() == currentUserId))
+															.toList();
+												}
+											},
+											onOpenCase);
 						if (result.isEmpty()) {
 							return;
 						}
 						TaskDetailDialog.TaskDetailResult action = result.get();
 						if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
-							deleteTaskFromDetail(taskId, shaleClientId);
+							deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
 							return;
 						}
 						TaskDetailDialog.SaveTaskPayload payload = action.payload();
@@ -746,10 +800,10 @@ public final class MyShaleController {
 		}, "my-shale-task-save-" + taskId).start();
 	}
 
-	private void deleteTaskFromDetail(long taskId, int shaleClientId) {
+	private void deleteTaskFromDetail(long taskId, int shaleClientId, int currentUserId) {
 		new Thread(() -> {
 			try {
-				caseTaskService.deleteTask(taskId, shaleClientId);
+				caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 				runOnFx(this::refreshMyTasks);
 			} catch (Exception ex) {
 				runOnFx(() -> showTaskActionError("Failed to delete task. " + rootCauseMessage(ex)));

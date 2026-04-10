@@ -3,6 +3,7 @@ package com.shale.ui.component.dialog;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
@@ -16,6 +17,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -25,11 +27,15 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -45,6 +51,7 @@ public final class TaskDetailDialog {
             List<TaskPriorityOptionDto> priorities,
             Function<Long, List<CaseTaskService.AssignableUserOption>> loadAssignableUsersForTask,
             AssignmentEditor assignmentEditor,
+            NotesEditor notesEditor,
             Consumer<Integer> onOpenCase) {
         Stage stage = AppDialogs.createModalStage(owner, "Task Details");
 
@@ -155,7 +162,7 @@ public final class TaskDetailDialog {
         });
         assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedTeamList);
 
-        VBox content = new VBox(8,
+        VBox formContent = new VBox(8,
                 createdByLabel,
                 new Label("Title"), titleField,
                 new Label("Description"), descriptionArea,
@@ -165,7 +172,100 @@ public final class TaskDetailDialog {
                 assignedTeamSection,
                 completedCheck,
                 errorLabel);
-        content.setPadding(new Insets(8, 2, 4, 2));
+        formContent.setPadding(new Insets(8, 2, 4, 2));
+        HBox.setHgrow(formContent, Priority.ALWAYS);
+
+        Label activityLabel = new Label("Activity");
+        activityLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        VBox activityList = new VBox(8);
+        renderActivityItems(activityList, model.activityEntries());
+        ScrollPane activityScrollPane = new ScrollPane(activityList);
+        activityScrollPane.setFitToWidth(true);
+        activityScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        activityScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        activityScrollPane.setPrefViewportHeight(420);
+        VBox.setVgrow(activityScrollPane, Priority.ALWAYS);
+
+        VBox activityPanel = new VBox(6, activityLabel, activityScrollPane);
+        activityPanel.setPrefWidth(320);
+        activityPanel.setMinWidth(280);
+        activityPanel.setMaxWidth(360);
+        activityPanel.setPadding(new Insets(8, 2, 4, 8));
+        VBox.setVgrow(activityPanel, Priority.ALWAYS);
+
+        VBox notesPanel = new VBox(8);
+        Label notesLabel = new Label("Notes");
+        notesLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        TextArea noteComposer = new TextArea();
+        noteComposer.setPromptText("Add note...");
+        noteComposer.setPrefRowCount(3);
+        noteComposer.setWrapText(true);
+        Button addNoteButton = new Button("Add Note");
+        addNoteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        Label notesErrorLabel = new Label();
+        notesErrorLabel.setStyle("-fx-text-fill: #b42318;");
+        notesErrorLabel.setVisible(false);
+        notesErrorLabel.setManaged(false);
+        VBox notesList = new VBox(8);
+        List<TaskNoteEntry> noteEntries = model.noteEntries() == null ? List.of() : model.noteEntries();
+        renderNoteEntries(notesList, noteEntries, notesEditor, notesErrorLabel);
+        ScrollPane notesScrollPane = new ScrollPane(notesList);
+        notesScrollPane.setFitToWidth(true);
+        notesScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        notesScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        notesScrollPane.setPrefViewportHeight(420);
+        VBox.setVgrow(notesScrollPane, Priority.ALWAYS);
+        addNoteButton.setOnAction(e -> {
+            String body = safe(noteComposer.getText()).trim();
+            if (body.isBlank()) {
+                showError(notesErrorLabel, "Note text is required.");
+                return;
+            }
+            try {
+                List<TaskNoteEntry> refreshed = notesEditor == null ? noteEntries : notesEditor.addAndReload(body);
+                renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel);
+                noteComposer.clear();
+                notesErrorLabel.setManaged(false);
+                notesErrorLabel.setVisible(false);
+            } catch (Exception ex) {
+                showError(notesErrorLabel, "Failed to add note. " + rootCauseMessage(ex));
+            }
+        });
+        notesPanel.getChildren().setAll(notesLabel, noteComposer, addNoteButton, notesErrorLabel, notesScrollPane);
+        notesPanel.setPrefWidth(320);
+        notesPanel.setMinWidth(280);
+        notesPanel.setMaxWidth(360);
+        notesPanel.setPadding(new Insets(8, 2, 4, 8));
+        VBox.setVgrow(notesPanel, Priority.ALWAYS);
+
+        ToggleGroup rightRailToggle = new ToggleGroup();
+        ToggleButton activityToggle = new ToggleButton("Activity");
+        activityToggle.setToggleGroup(rightRailToggle);
+        ToggleButton notesToggle = new ToggleButton("Notes");
+        notesToggle.setToggleGroup(rightRailToggle);
+        activityToggle.setSelected(true);
+        HBox rightRailTabs = new HBox(6, activityToggle, notesToggle);
+
+        StackPane rightRailBody = new StackPane(activityPanel, notesPanel);
+        notesPanel.setVisible(false);
+        notesPanel.setManaged(false);
+        rightRailToggle.selectedToggleProperty().addListener((obs, oldToggle, selectedToggle) -> {
+            boolean showNotes = selectedToggle == notesToggle;
+            notesPanel.setVisible(showNotes);
+            notesPanel.setManaged(showNotes);
+            activityPanel.setVisible(!showNotes);
+            activityPanel.setManaged(!showNotes);
+        });
+
+        VBox rightRail = new VBox(8, rightRailTabs, rightRailBody);
+        rightRail.setPrefWidth(340);
+        rightRail.setMinWidth(300);
+        rightRail.setMaxWidth(380);
+        VBox.setVgrow(rightRailBody, Priority.ALWAYS);
+
+        HBox contentColumns = new HBox(12, formContent, rightRail);
+        HBox.setHgrow(formContent, Priority.ALWAYS);
+        contentColumns.setAlignment(Pos.TOP_LEFT);
 
         Button deleteButton = new Button("Delete");
         deleteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -225,10 +325,12 @@ public final class TaskDetailDialog {
         actions.setAlignment(Pos.CENTER_RIGHT);
 
         HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, "Task Details", stage::close);
-        VBox root = new VBox(16, windowHeader, heading, message, content, actions);
+        VBox root = new VBox(16, windowHeader, heading, message, contentColumns, actions);
         root.getStyleClass().add("app-dialog-root");
         root.setPadding(new Insets(22, 24, 22, 24));
-        root.setMinWidth(500);
+        root.setMinWidth(860);
+        root.setPrefWidth(980);
+        root.setMinHeight(620);
 
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(
@@ -329,6 +431,132 @@ public final class TaskDetailDialog {
         }
     }
 
+    private static void renderActivityItems(VBox activityList, List<TaskActivityEntry> entries) {
+        activityList.getChildren().clear();
+        List<TaskActivityEntry> safeEntries = entries == null ? List.of() : entries;
+        if (safeEntries.isEmpty()) {
+            Label emptyLabel = new Label("No activity yet.");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            activityList.getChildren().add(emptyLabel);
+            return;
+        }
+
+        for (TaskActivityEntry entry : safeEntries) {
+            if (entry == null) {
+                continue;
+            }
+            Label titleLabel = new Label(safe(entry.title()).trim().isBlank() ? "Activity event" : safe(entry.title()).trim());
+            titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700;");
+            titleLabel.setWrapText(true);
+
+            VBox cardContent = new VBox(4, titleLabel);
+            String body = safe(entry.body()).trim();
+            if (!body.isBlank()) {
+                Label bodyLabel = new Label(body);
+                bodyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.88);");
+                bodyLabel.setWrapText(true);
+                cardContent.getChildren().add(bodyLabel);
+            }
+
+            String actor = safe(entry.actorDisplayName()).trim();
+            if (actor.isBlank()) {
+                actor = "System";
+            }
+            String metaText = actor + " · " + formatDateTime(entry.occurredAt());
+            Label metaLabel = new Label(metaText);
+            metaLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
+            cardContent.getChildren().add(metaLabel);
+
+            VBox card = new VBox(cardContent);
+            card.setPadding(new Insets(10, 12, 10, 12));
+            card.getStyleClass().add("secondary-panel");
+            activityList.getChildren().add(card);
+        }
+    }
+
+    private static void renderNoteEntries(
+            VBox notesList,
+            List<TaskNoteEntry> entries,
+            NotesEditor notesEditor,
+            Label notesErrorLabel) {
+        notesList.getChildren().clear();
+        List<TaskNoteEntry> safeEntries = entries == null ? List.of() : entries;
+        if (safeEntries.isEmpty()) {
+            Label empty = new Label("No notes yet.");
+            empty.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            notesList.getChildren().add(empty);
+            return;
+        }
+
+        for (TaskNoteEntry entry : safeEntries) {
+            if (entry == null) {
+                continue;
+            }
+            Label authorLabel = new Label((safe(entry.userDisplayName()).trim().isBlank() ? "Unknown user" : entry.userDisplayName())
+                    + " · " + formatDateTime(entry.createdAt()));
+            authorLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
+
+            String updated = "";
+            if (entry.updatedAt() != null && !entry.updatedAt().equals(entry.createdAt())) {
+                updated = " (edited " + formatDateTime(entry.updatedAt()) + ")";
+            }
+            if (!updated.isBlank()) {
+                authorLabel.setText(authorLabel.getText() + updated);
+            }
+
+            Label bodyLabel = new Label(safe(entry.body()));
+            bodyLabel.setWrapText(true);
+
+            VBox cardContent = new VBox(6, authorLabel, bodyLabel);
+            if (entry.editable()) {
+                Button editButton = new Button("Edit");
+                editButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+                editButton.setOnAction(e -> {
+                    TextArea editArea = new TextArea(safe(entry.body()));
+                    editArea.setWrapText(true);
+                    editArea.setPrefRowCount(3);
+                    Button saveButton = new Button("Save");
+                    saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+                    Button cancelButton = new Button("Cancel");
+                    cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+                    HBox actions = new HBox(6, saveButton, cancelButton);
+                    VBox editContent = new VBox(6, authorLabel, editArea, actions);
+                    VBox card = (VBox) ((Button) e.getSource()).getParent().getParent();
+                    card.getChildren().setAll(editContent);
+                    saveButton.setOnAction(saveEvent -> {
+                        String updatedText = safe(editArea.getText()).trim();
+                        if (updatedText.isBlank()) {
+                            showError(notesErrorLabel, "Note text is required.");
+                            return;
+                        }
+                        try {
+                            List<TaskNoteEntry> refreshed = notesEditor == null
+                                    ? safeEntries
+                                    : notesEditor.editAndReload(entry.id(), updatedText);
+                            renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel);
+                            notesErrorLabel.setManaged(false);
+                            notesErrorLabel.setVisible(false);
+                        } catch (Exception ex) {
+                            showError(notesErrorLabel, "Failed to update note. " + rootCauseMessage(ex));
+                        }
+                    });
+                    cancelButton.setOnAction(cancelEvent -> renderNoteEntries(notesList, safeEntries, notesEditor, notesErrorLabel));
+                });
+                HBox actionRow = new HBox(6, editButton);
+                cardContent.getChildren().add(actionRow);
+            }
+
+            VBox card = new VBox(cardContent);
+            card.setPadding(new Insets(10, 12, 10, 12));
+            card.getStyleClass().add("secondary-panel");
+            notesList.getChildren().add(card);
+        }
+    }
+
+    private static String formatDateTime(LocalDateTime value) {
+        return UtcDateTimeDisplayFormatter.formatUtcToLocal(value, TASK_ACTIVITY_TIMESTAMP_FORMAT);
+    }
+
     private static Optional<CaseTaskService.AssignableUserOption> showAssignUserPicker(
             Window owner,
             List<CaseTaskService.AssignableUserOption> candidates) {
@@ -392,7 +620,25 @@ public final class TaskDetailDialog {
             Integer priorityId,
             String createdByDisplayName,
             List<AssignedTeamMember> assignedTeamMembers,
+            List<TaskActivityEntry> activityEntries,
+            List<TaskNoteEntry> noteEntries,
             boolean completed) {
+    }
+
+    public record TaskActivityEntry(
+            String title,
+            String body,
+            String actorDisplayName,
+            LocalDateTime occurredAt) {
+    }
+    public record TaskNoteEntry(
+            long id,
+            int userId,
+            String userDisplayName,
+            String body,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt,
+            boolean editable) {
     }
 
     public record AssignedTeamMember(
@@ -433,6 +679,10 @@ public final class TaskDetailDialog {
         List<AssignedTeamMember> addAndReload(int userId);
         List<AssignedTeamMember> removeAndReload(int userId);
     }
+    public interface NotesEditor {
+        List<TaskNoteEntry> addAndReload(String body);
+        List<TaskNoteEntry> editAndReload(long noteId, String body);
+    }
 
     private static final class PriorityListCell extends javafx.scene.control.ListCell<TaskPriorityOptionDto> {
         @Override
@@ -441,5 +691,7 @@ public final class TaskDetailDialog {
             setText(empty || item == null ? null : item.name());
         }
     }
+
+    private static final DateTimeFormatter TASK_ACTIVITY_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
 
 }
