@@ -749,6 +749,7 @@ public final class MyShaleController {
 															.toList();
 												}
 											},
+											onOpenUser,
 											onOpenCase);
 						if (result.isEmpty()) {
 							return;

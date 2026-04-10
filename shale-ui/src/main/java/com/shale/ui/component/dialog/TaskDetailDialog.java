@@ -52,8 +52,21 @@ public final class TaskDetailDialog {
             Function<Long, List<CaseTaskService.AssignableUserOption>> loadAssignableUsersForTask,
             AssignmentEditor assignmentEditor,
             NotesEditor notesEditor,
+            Consumer<Integer> onOpenUser,
             Consumer<Integer> onOpenCase) {
         Stage stage = AppDialogs.createModalStage(owner, "Task Details");
+        Consumer<Integer> closeAndOpenUser = userId -> {
+            stage.close();
+            if (onOpenUser != null) {
+                onOpenUser.accept(userId);
+            }
+        };
+        Consumer<Integer> closeAndOpenCase = caseId -> {
+            stage.close();
+            if (onOpenCase != null) {
+                onOpenCase.accept(caseId);
+            }
+        };
 
         ResultHolder result = new ResultHolder();
 
@@ -96,7 +109,7 @@ public final class TaskDetailDialog {
         if (model.caseId() > 0 && !relatedCaseName.isBlank()) {
             Label relatedCaseLabel = new Label("Case:");
             relatedCaseLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
-            CaseCardFactory caseCardFactory = new CaseCardFactory(onOpenCase);
+            CaseCardFactory caseCardFactory = new CaseCardFactory(closeAndOpenCase);
             var caseCard = caseCardFactory.create(
                     new CaseCardModel(
                             model.caseId(),
@@ -123,8 +136,7 @@ public final class TaskDetailDialog {
         HBox assignedTeamHeader = new HBox(8, assignedTeamLabel, assignedHeaderSpacer, addAssignedUserButton);
         assignedTeamHeader.setAlignment(Pos.CENTER_LEFT);
 
-        UserCardFactory assignedTeamCardFactory = new UserCardFactory(id -> {
-        });
+        UserCardFactory assignedTeamCardFactory = new UserCardFactory(closeAndOpenUser);
         VBox assignedTeamList = new VBox(6);
         ScrollPane assignedTeamScrollPane = new ScrollPane(assignedTeamList);
         assignedTeamScrollPane.setFitToWidth(true);
@@ -428,7 +440,6 @@ public final class TaskDetailDialog {
             var card = cardFactory.create(
                     new UserCardModel(member.userId(), safe(member.displayName()), member.colorCss(), null),
                     UserCardFactory.Variant.MINI);
-            card.setMouseTransparent(true);
             Button removeButton = new Button("Remove");
             removeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
             removeButton.setFocusTraversable(false);

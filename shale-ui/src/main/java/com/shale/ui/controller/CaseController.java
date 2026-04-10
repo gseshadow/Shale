@@ -2204,6 +2204,7 @@ public class CaseController {
                                                             .toList();
                                                 }
                                             },
+                                            onOpenUser,
 		                                    onOpenCase);
 
 	                    if (result.isEmpty()) {
