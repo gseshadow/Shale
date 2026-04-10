@@ -572,33 +572,61 @@
 				</ScrollPane>
 			</VBox>
 			<!-- TASKS TAB PANE (center) -->
-			<VBox fx:id="tasksTabPane" spacing="10" maxWidth="980"
-				styleClass="case-main-surface" visible="false" managed="false">
+			<VBox fx:id="tasksTabPane" spacing="8" maxWidth="1.7976931348623157E308"
+				visible="false" managed="false">
 				<padding>
-					<Insets top="12" right="12" bottom="12" left="12" />
+					<Insets top="8" right="8" bottom="8" left="8" />
 				</padding>
-				<HBox spacing="8" alignment="CENTER_LEFT">
-					<Label text="Tasks"
-						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
-					<Region HBox.hgrow="ALWAYS" />
-					<Label text="Sort By" style="-fx-opacity: 0.8;" />
-					<ChoiceBox fx:id="caseTasksSortChoice" prefWidth="190" />
-					<Button fx:id="addTaskButton" text="New Task" />
+				<HBox spacing="10" alignment="TOP_LEFT" VBox.vgrow="ALWAYS">
+					<VBox spacing="8" HBox.hgrow="ALWAYS" styleClass="case-main-surface">
+						<padding>
+							<Insets top="10" right="10" bottom="10" left="10" />
+						</padding>
+						<HBox spacing="8" alignment="CENTER_LEFT">
+							<Label text="Tasks"
+								style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+							<Region HBox.hgrow="ALWAYS" />
+							<Label text="Sort By" style="-fx-opacity: 0.8;" />
+							<ChoiceBox fx:id="caseTasksSortChoice" prefWidth="190" />
+							<Button fx:id="addTaskButton" text="New Task" />
+						</HBox>
+						<Label fx:id="tasksTabEmptyLabel"
+							text="No tasks for this case yet." visible="false" managed="false"
+							style="-fx-opacity: 0.7;" />
+						<ScrollPane fitToWidth="true" hbarPolicy="NEVER"
+							VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
+							<content>
+								<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12"
+									prefWrapLength="680" maxWidth="1.7976931348623157E308">
+									<padding>
+										<Insets top="2" right="2" bottom="2" left="2" />
+									</padding>
+								</FlowPane>
+							</content>
+						</ScrollPane>
+					</VBox>
+					<VBox fx:id="caseTaskActivityPane" spacing="8" prefWidth="420"
+						minWidth="360" maxWidth="480" styleClass="secondary-panel">
+						<padding>
+							<Insets top="10" right="10" bottom="10" left="10" />
+						</padding>
+						<Label text="Task Activity"
+							style="-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);" />
+						<Label fx:id="caseTaskActivityEmptyLabel" text="No task activity yet."
+							style="-fx-opacity: 0.7;" visible="false" managed="false" />
+						<ScrollPane fx:id="caseTaskActivityScrollPane" fitToWidth="true"
+							hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS"
+							styleClass="transparent-scroll">
+							<content>
+								<VBox fx:id="caseTaskActivityFeedBox" spacing="8">
+									<padding>
+										<Insets top="2" right="10" bottom="2" left="2" />
+									</padding>
+								</VBox>
+							</content>
+						</ScrollPane>
+					</VBox>
 				</HBox>
-				<Label fx:id="tasksTabEmptyLabel"
-					text="No tasks for this case yet." visible="false" managed="false"
-					style="-fx-opacity: 0.7;" />
-				<ScrollPane fitToWidth="true" hbarPolicy="NEVER"
-					VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
-					<content>
-						<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12"
-							prefWrapLength="880" maxWidth="1.7976931348623157E308">
-							<padding>
-								<Insets top="2" right="2" bottom="2" left="2" />
-							</padding>
-						</FlowPane>
-					</content>
-				</ScrollPane>
 			</VBox>
 
 			<!-- GENERIC PLACEHOLDER PANE -->
