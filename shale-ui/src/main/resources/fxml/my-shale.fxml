@@ -49,7 +49,7 @@
 			</BorderPane>
 		</VBox>
 
-		<VBox spacing="8" styleClass="strong-panel" prefWidth="380" minWidth="340">
+		<VBox spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390">
 			<padding>
 				<Insets top="10" right="10" bottom="10" left="10" />
 			</padding>
