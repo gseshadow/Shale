@@ -39,6 +39,7 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
+import javafx.fxml.LoadException;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.layout.Priority;
@@ -397,7 +398,28 @@ public final class SceneManager {
 			default -> System.err.println("Unhandled route: " + route);
 			}
 		} catch (RuntimeException ex) {
-			System.err.println("Failed to open route " + route + ": " + ex.getMessage());
+			logRouteFailure(route, ex);
+		}
+	}
+
+	private void logRouteFailure(AppRoute route, RuntimeException ex) {
+		System.err.println("Failed to open route " + route + ": " + ex.getMessage());
+		if (ex != null) {
+			ex.printStackTrace(System.err);
+		}
+
+		Throwable current = ex == null ? null : ex.getCause();
+		int depth = 1;
+		while (current != null && depth <= 16) {
+			System.err.println("  Cause[" + depth + "]: " + current.getClass().getName() + ": " + current.getMessage());
+			if (current instanceof LoadException) {
+				String loadMessage = current.getMessage();
+				if (loadMessage != null && !loadMessage.isBlank()) {
+					System.err.println("  FXML LoadException detail: " + loadMessage);
+				}
+			}
+			current = current.getCause();
+			depth++;
 		}
 	}
 
@@ -725,6 +747,13 @@ public final class SceneManager {
 		}
 		List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
 				caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+		List<TaskDetailDialog.TaskActivityEntry> activityEntries = caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+				.map(item -> new TaskDetailDialog.TaskActivityEntry(
+						item.title(),
+						item.body(),
+						item.actorDisplayName(),
+						item.occurredAt()))
+				.toList();
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 				detail.id(),
 				detail.caseId(),
@@ -742,6 +771,7 @@ public final class SceneManager {
 									member.displayName(),
 									member.color()))
 						.toList(),
+				activityEntries,
 				detail.completedAt() != null);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
 		var result = TaskDetailDialog.showAndWait(
@@ -763,7 +793,7 @@ public final class SceneManager {
 
 					@Override
 					public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
-						caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId);
+						caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
 						return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
 								.map(member -> new TaskDetailDialog.AssignedTeamMember(
 										member.userId(),
@@ -780,7 +810,7 @@ public final class SceneManager {
 		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
 			new Thread(() -> {
 				try {
-					caseTaskService.deleteTask(taskId, shaleClientId);
+					caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 				} catch (Exception ex) {
 					Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to delete task. " + rootCauseMessage(ex)));
 				}
