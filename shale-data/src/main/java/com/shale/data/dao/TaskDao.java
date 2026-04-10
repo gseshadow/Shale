@@ -1232,7 +1232,7 @@ public final class TaskDao {
         }
     }
 
-    public void addTaskTimelineEvent(
+    public long addTaskTimelineEvent(
             long taskId,
             int caseId,
             int shaleClientId,
@@ -1270,6 +1270,7 @@ public final class TaskDao {
                   Title,
                   Body
                 )
+                OUTPUT INSERTED.Id
                 VALUES (?, ?, ?, ?, ?, ?, ?);
                 """;
         try (Connection con = db.requireConnection();
@@ -1286,9 +1287,11 @@ public final class TaskDao {
             }
             ps.setString(i++, normalizedTitle);
             setNullableString(ps, i, normalizedBody);
-            int rows = ps.executeUpdate();
-            if (rows != 1) {
-                throw new RuntimeException("Unexpected task timeline insert row count for taskId=" + taskId + ": " + rows);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new RuntimeException("Task timeline insert did not return inserted id");
+                }
+                return rs.getLong(1);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to add task timeline event (taskId=" + taskId + ")", e);
@@ -1391,7 +1394,7 @@ public final class TaskDao {
         }
     }
 
-    public void addTaskUpdate(long taskId, int caseId, int shaleClientId, int userId, String body) {
+    public long addTaskUpdate(long taskId, int caseId, int shaleClientId, int userId, String body) {
         if (taskId <= 0) {
             throw new IllegalArgumentException("taskId must be > 0");
         }
@@ -1420,6 +1423,7 @@ public final class TaskDao {
                   UpdatedAt,
                   IsDeleted
                 )
+                OUTPUT INSERTED.Id
                 SELECT ?, ?, ?, ?, ?, SYSUTCDATETIME(), NULL, 0
                 WHERE EXISTS (
                   SELECT 1
@@ -1441,9 +1445,11 @@ public final class TaskDao {
             ps.setLong(i++, taskId);
             ps.setInt(i++, caseId);
             ps.setInt(i++, shaleClientId);
-            int rows = ps.executeUpdate();
-            if (rows != 1) {
-                throw new RuntimeException("Task update insert affected unexpected row count: " + rows);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new RuntimeException("Task update insert did not return inserted id");
+                }
+                return rs.getLong(1);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to add task update (taskId=" + taskId + ", caseId=" + caseId + ")", e);
