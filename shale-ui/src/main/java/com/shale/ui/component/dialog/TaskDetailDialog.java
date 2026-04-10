@@ -166,6 +166,7 @@ public final class TaskDetailDialog {
                 new Label("Priority"), priorityCombo,
                 new Label("Due date/time"), dueRow,
                 assignedTeamSection,
+                activitySection,
                 completedCheck,
                 errorLabel);
         formContent.setPadding(new Insets(8, 2, 4, 2));
