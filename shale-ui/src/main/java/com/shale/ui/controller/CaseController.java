@@ -618,6 +618,7 @@ public class CaseController {
 		refreshHeader();
 		refreshOverviewPlaceholders();
 		setupSections();
+		setupOverviewTaskActivitySection();
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
