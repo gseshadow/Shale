@@ -588,17 +588,34 @@
 				<Label fx:id="tasksTabEmptyLabel"
 					text="No tasks for this case yet." visible="false" managed="false"
 					style="-fx-opacity: 0.7;" />
-				<ScrollPane fitToWidth="true" hbarPolicy="NEVER"
-					VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
-					<content>
-						<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12"
-							prefWrapLength="880" maxWidth="1.7976931348623157E308">
-							<padding>
-								<Insets top="2" right="2" bottom="2" left="2" />
-							</padding>
-						</FlowPane>
-					</content>
-				</ScrollPane>
+				<HBox spacing="12" alignment="TOP_LEFT" VBox.vgrow="ALWAYS">
+					<ScrollPane fitToWidth="true" hbarPolicy="NEVER"
+						HBox.hgrow="ALWAYS" styleClass="transparent-scroll">
+						<content>
+							<FlowPane fx:id="tasksTabFlow" hgap="12" vgap="12"
+								prefWrapLength="680" maxWidth="1.7976931348623157E308">
+								<padding>
+									<Insets top="2" right="2" bottom="2" left="2" />
+								</padding>
+							</FlowPane>
+						</content>
+					</ScrollPane>
+					<VBox fx:id="caseTaskActivityPane" spacing="8" prefWidth="320"
+						minWidth="280" maxWidth="360" styleClass="secondary-panel">
+						<padding>
+							<Insets top="8" right="8" bottom="8" left="8" />
+						</padding>
+						<Label text="Task Activity"
+							style="-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);" />
+						<Label fx:id="caseTaskActivityEmptyLabel" text="No task activity yet."
+							style="-fx-opacity: 0.7;" visible="false" managed="false" />
+						<ScrollPane fx:id="caseTaskActivityScrollPane" fitToWidth="true"
+							hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS"
+							styleClass="transparent-scroll">
+							<VBox fx:id="caseTaskActivityFeedBox" spacing="8" />
+						</ScrollPane>
+					</VBox>
+				</HBox>
 			</VBox>
 
 			<!-- GENERIC PLACEHOLDER PANE -->
