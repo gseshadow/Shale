@@ -592,6 +592,7 @@
 							<Label text="Sort By" style="-fx-opacity: 0.8;" />
 							<ChoiceBox fx:id="caseTasksSortChoice" prefWidth="190" />
 							<Button fx:id="addTaskButton" text="New Task" />
+							<Button fx:id="caseTasksShowCompletedButton" text="Show Completed" />
 						</HBox>
 						<Label fx:id="tasksTabEmptyLabel"
 							text="No tasks for this case yet." visible="false" managed="false"

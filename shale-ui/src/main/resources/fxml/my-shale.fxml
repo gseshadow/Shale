@@ -58,8 +58,11 @@
 				</left>
 				<right>
 					<HBox spacing="8" alignment="CENTER_RIGHT">
-						<Button fx:id="myTasksShowCompletedButton" text="Show Completed" />
+						<padding>
+							<Insets left="12" />
+						</padding>
 						<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170" />
+						<Button fx:id="myTasksShowCompletedButton" text="Show Completed" />
 					</HBox>
 				</right>
 			</BorderPane>
