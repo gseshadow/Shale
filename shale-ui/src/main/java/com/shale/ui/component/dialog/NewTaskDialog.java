@@ -21,6 +21,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
@@ -90,6 +91,14 @@ public final class NewTaskDialog {
         HBox assignedHeader = new HBox(8, assignedLabel, assignedSpacer, addAssignedButton);
         assignedHeader.setAlignment(Pos.CENTER_LEFT);
         VBox assignedList = new VBox(6);
+        ScrollPane assignedScrollPane = new ScrollPane(assignedList);
+        assignedScrollPane.setFitToWidth(true);
+        assignedScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        assignedScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        assignedScrollPane.setMinHeight(96);
+        assignedScrollPane.setPrefHeight(168);
+        assignedScrollPane.setMaxHeight(220);
+        assignedScrollPane.getStyleClass().add("transparent-scroll");
         java.util.LinkedHashMap<Integer, CaseTaskService.AssignableUserOption> selectedAssignedUsers = new java.util.LinkedHashMap<>();
         UserCardFactory assignedUserFactory = new UserCardFactory(id -> {
         });
@@ -112,7 +121,7 @@ public final class NewTaskDialog {
             selectedAssignedUsers.put(user.id(), user);
             renderAssignedUsers(assignedList, assignedUserFactory, selectedAssignedUsers.values().stream().toList(), removeAssignedRef[0]);
         });
-        assignedSection.getChildren().setAll(assignedHeader, assignedList);
+        assignedSection.getChildren().setAll(assignedHeader, assignedScrollPane);
 
         Label errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: #b42318;");
