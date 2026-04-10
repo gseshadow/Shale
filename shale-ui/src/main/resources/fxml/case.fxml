@@ -612,7 +612,9 @@
 						<ScrollPane fx:id="caseTaskActivityScrollPane" fitToWidth="true"
 							hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS"
 							styleClass="transparent-scroll">
-							<VBox fx:id="caseTaskActivityFeedBox" spacing="8" />
+							<content>
+								<VBox fx:id="caseTaskActivityFeedBox" spacing="8" />
+							</content>
 						</ScrollPane>
 					</VBox>
 				</HBox>
