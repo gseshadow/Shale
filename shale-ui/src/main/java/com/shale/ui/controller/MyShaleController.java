@@ -659,7 +659,12 @@ public final class MyShaleController {
 
 		List<CaseFilterOption> options = new ArrayList<>();
 		options.add(ALL_CASES_OPTION);
-		caseById.forEach((caseId, caseName) -> options.add(new CaseFilterOption(caseId, caseName)));
+		caseById.entrySet().stream()
+				.map(entry -> new CaseFilterOption(entry.getKey(), entry.getValue()))
+				.sorted(Comparator.comparing(
+						(CaseFilterOption option) -> normalizeCaseFilterSortKey(option.displayName()),
+						Comparator.nullsLast(String::compareToIgnoreCase)))
+				.forEach(options::add);
 
 		myTasksCaseFilterChoice.getItems().setAll(options);
 		if (selectedId != null && caseById.containsKey(selectedId)) {
@@ -679,6 +684,14 @@ public final class MyShaleController {
 		}
 		CaseFilterOption option = myTasksCaseFilterChoice.getSelectionModel().getSelectedItem();
 		return option == null ? null : option.caseId();
+	}
+
+	private String normalizeCaseFilterSortKey(String caseName) {
+		String trimmed = safe(caseName).trim();
+		if (trimmed.isEmpty()) {
+			return null;
+		}
+		return trimmed.toLowerCase(Locale.ROOT);
 	}
 
 	private int myTaskSearchScore(CaseTaskListItemDto task, String normalizedQuery) {
