@@ -23,6 +23,7 @@ public final class TaskCardFactory {
             Boolean caseNonEngagementLetterSent,
             String title,
             String description,
+            String createdByDisplayName,
             String priorityColorHex,
             LocalDateTime dueAt,
             LocalDateTime completedAt,
@@ -70,6 +71,7 @@ public final class TaskCardFactory {
                 model.caseNonEngagementLetterSent());
         card.setTitle(model.title());
         card.setDueAt(model.dueAt());
+        card.setCreatedByDisplayName(model.createdByDisplayName());
         card.setDescriptionPreview(model.description());
         card.setCompleted(model.completedAt() != null);
         card.setBorderByDueState(model.dueAt(), model.completedAt());

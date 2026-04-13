@@ -2095,6 +2095,7 @@ public class CaseController {
 					task.caseNonEngagementLetterSent(),
 					task.title(),
 					task.description(),
+					task.createdByDisplayName(),
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),

@@ -773,6 +773,7 @@ public final class UserController {
 				row.caseNonEngagementLetterSent(),
 				row.title(),
 				row.description(),
+				null,
 				row.priorityColorHex(),
 				row.dueAt(),
 				row.completedAt(),

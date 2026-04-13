@@ -593,6 +593,7 @@ public final class MyShaleController {
 					task.caseNonEngagementLetterSent(),
 					task.title(),
 					task.description(),
+					task.createdByDisplayName(),
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
