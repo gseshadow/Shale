@@ -10,8 +10,7 @@ import com.shale.ui.util.ColorUtil;
 import javafx.scene.Node;
 
 public final class CaseCardFactory {
-	private static final String NON_ENGAGEMENT_OVERRIDE_BACKGROUND_CSS =
-			ColorUtil.toCssBackgroundColorOrNull("D4D4DF");
+	private static final String NON_ENGAGEMENT_OVERRIDE_BACKGROUND_CSS = ColorUtil.toCssBackgroundColorOrNull("62627A");
 
 	public enum Variant {
 		FULL, COMPACT, MINI
