@@ -36,6 +36,7 @@ public final class TaskDao {
         public static final String TASK_DESCRIPTION_CHANGED = "TASK_DESCRIPTION_CHANGED";
         public static final String TASK_DUE_DATE_CHANGED = "TASK_DUE_DATE_CHANGED";
         public static final String TASK_PRIORITY_CHANGED = "TASK_PRIORITY_CHANGED";
+        public static final String TASK_STATUS_CHANGED = "TASK_STATUS_CHANGED";
         public static final String TASK_ASSIGNMENT_ADDED = "TASK_ASSIGNMENT_ADDED";
         public static final String TASK_ASSIGNMENT_REMOVED = "TASK_ASSIGNMENT_REMOVED";
         public static final String TASK_DELETED = "TASK_DELETED";
@@ -48,6 +49,7 @@ public final class TaskDao {
                 TASK_DESCRIPTION_CHANGED,
                 TASK_DUE_DATE_CHANGED,
                 TASK_PRIORITY_CHANGED,
+                TASK_STATUS_CHANGED,
                 TASK_ASSIGNMENT_ADDED,
                 TASK_ASSIGNMENT_REMOVED,
                 TASK_DELETED

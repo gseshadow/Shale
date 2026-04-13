@@ -440,6 +440,18 @@ public final class CaseTaskService {
                     after.caseName(),
                     "Priority changed");
         }
+        if (!Objects.equals(before.statusId(), after.statusId())) {
+            Map<Integer, String> statusLabels = loadTaskStatusLabels(request.shaleClientId());
+            taskDao.addTaskTimelineEvent(
+                    request.taskId(),
+                    caseId,
+                    request.shaleClientId(),
+                    TaskDao.TaskTimelineEventTypes.TASK_STATUS_CHANGED,
+                    actorUserId,
+                    "Status changed",
+                    "Changed from " + formatStatus(before.statusId(), statusLabels)
+                            + " to " + formatStatus(after.statusId(), statusLabels));
+        }
         if (before.completedAt() == null && after.completedAt() != null) {
             long timelineEventId = taskDao.addTaskTimelineEvent(
                     request.taskId(),
@@ -863,6 +875,17 @@ public final class CaseTaskService {
         return labels;
     }
 
+    private Map<Integer, String> loadTaskStatusLabels(int shaleClientId) {
+        Map<Integer, String> labels = new HashMap<>();
+        for (TaskStatusOptionDto option : taskDao.listActiveTaskStatuses(shaleClientId)) {
+            if (option == null) {
+                continue;
+            }
+            labels.put(option.id(), option.name());
+        }
+        return labels;
+    }
+
     private static String formatPriority(Integer priorityId, Map<Integer, String> labels) {
         if (priorityId == null) {
             return "None";
@@ -870,6 +893,17 @@ public final class CaseTaskService {
         String name = labels.get(priorityId);
         if (name == null || name.isBlank()) {
             return "Priority #" + priorityId;
+        }
+        return name.trim();
+    }
+
+    private static String formatStatus(Integer statusId, Map<Integer, String> labels) {
+        if (statusId == null) {
+            return "None";
+        }
+        String name = labels.get(statusId);
+        if (name == null || name.isBlank()) {
+            return "Status #" + statusId;
         }
         return name.trim();
     }
