@@ -716,7 +716,7 @@ public class CaseController {
 		setEditMode(false);
 		detailsEditor.setEditMode(false);
 		clearError();
-		subscribeLiveCaseUpdates();
+		wireLiveRefreshLifecycle();
 
 		if (changeResponsibleAttorneyButton != null)
 			changeResponsibleAttorneyButton.setOnAction(e -> onChangeResponsibleAttorney());
@@ -773,6 +773,20 @@ public class CaseController {
 				}
 			});
 		}
+	}
+
+	private void wireLiveRefreshLifecycle() {
+		if (caseRootPane == null) {
+			return;
+		}
+		caseRootPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null) {
+				unsubscribeLiveCaseUpdates();
+			} else {
+				subscribeLiveCaseUpdates();
+			}
+		});
+		subscribeLiveCaseUpdates();
 	}
 
 	private void onGenerateSummaryPdf() {
@@ -2035,52 +2049,57 @@ public class CaseController {
 			return;
 		}
 
-		List<TaskPriorityOptionDto> priorities;
-		try {
-			priorities = caseTaskService.loadActivePriorities(shaleClientId);
-		} catch (Exception ex) {
-			logTaskActionException("load-priorities", ex);
-			showTaskActionError("Unable to load priorities right now.");
-			return;
-		}
-
-		List<CaseTaskService.AssignableUserOption> assignableUsers;
-		try {
-			assignableUsers = caseTaskService.loadAssignableUsers(shaleClientId);
-		} catch (Exception ex) {
-			logTaskActionException("load-assignees", ex);
-			showTaskActionError("Unable to load users right now.");
-			return;
-		}
-
-		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
-				taskDialogOwner(),
-				priorities,
-				assignableUsers);
-		if (input.isEmpty()) {
-			return;
-		}
-
-		CaseTaskService.CreateTaskRequest request = new CaseTaskService.CreateTaskRequest(
-				shaleClientId,
-				caseId.longValue(),
-				input.get().title(),
-				input.get().description(),
-				input.get().dueAt(),
-				input.get().priorityId(),
-				input.get().assignedUserIds(),
-				currentUserId);
-
-		new Thread(() ->
-		{
+		final int activeCaseId = caseId;
+		new Thread(() -> {
+			List<TaskPriorityOptionDto> priorities;
 			try {
-				caseTaskService.createTask(request);
-				runOnFx(this::refreshCaseTasks);
+				priorities = caseTaskService.loadActivePriorities(shaleClientId);
 			} catch (Exception ex) {
-				logTaskActionException("create", ex);
-				runOnFx(() -> showTaskActionError("Failed to create task for this case. " + rootCauseMessage(ex)));
+				logTaskActionException("load-priorities", ex);
+				runOnFx(() -> showTaskActionError("Unable to load priorities right now."));
+				return;
 			}
-		}, "case-create-task-" + caseId).start();
+
+			List<CaseTaskService.AssignableUserOption> assignableUsers;
+			try {
+				assignableUsers = caseTaskService.loadAssignableUsers(shaleClientId);
+			} catch (Exception ex) {
+				logTaskActionException("load-assignees", ex);
+				runOnFx(() -> showTaskActionError("Unable to load users right now."));
+				return;
+			}
+
+			runOnFx(() -> {
+				Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
+						taskDialogOwner(),
+						priorities,
+						assignableUsers);
+				if (input.isEmpty()) {
+					return;
+				}
+
+				CaseTaskService.CreateTaskRequest request = new CaseTaskService.CreateTaskRequest(
+						shaleClientId,
+						(long) activeCaseId,
+						input.get().title(),
+						input.get().description(),
+						input.get().dueAt(),
+						input.get().priorityId(),
+						input.get().assignedUserIds(),
+						currentUserId);
+
+				new Thread(() ->
+				{
+					try {
+						caseTaskService.createTask(request);
+						runOnFx(this::refreshCaseTasks);
+					} catch (Exception ex) {
+						logTaskActionException("create", ex);
+						runOnFx(() -> showTaskActionError("Failed to create task for this case. " + rootCauseMessage(ex)));
+					}
+				}, "case-create-task-" + activeCaseId).start();
+			});
+		}, "case-add-task-prereq-" + activeCaseId).start();
 	}
 
 	private void onToggleTaskComplete(Long taskId) {
@@ -3036,6 +3055,10 @@ public class CaseController {
 
 	private void subscribeLiveCaseUpdates() {
 		liveUpdateHandler.subscribe();
+	}
+
+	private void unsubscribeLiveCaseUpdates() {
+		liveUpdateHandler.unsubscribe();
 	}
 
 	private void refreshCurrentAfterRemoteUpdateAsync() {
@@ -5435,11 +5458,23 @@ public class CaseController {
 	}
 
 	private final class CaseOverviewLiveUpdateHandler {
+		private final Consumer<UiRuntimeBridge.CaseUpdatedEvent> eventHandler = this::handleEvent;
+		private boolean subscribed;
+
 		void subscribe() {
-			if (runtimeBridge == null)
+			if (runtimeBridge == null || subscribed)
 				return;
 
-			runtimeBridge.subscribeCaseUpdated(this::handleEvent);
+			runtimeBridge.subscribeCaseUpdated(eventHandler);
+			subscribed = true;
+		}
+
+		void unsubscribe() {
+			if (runtimeBridge == null || !subscribed) {
+				return;
+			}
+			runtimeBridge.unsubscribeCaseUpdated(eventHandler);
+			subscribed = false;
 		}
 
 		private void handleEvent(UiRuntimeBridge.CaseUpdatedEvent event) {

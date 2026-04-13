@@ -19,8 +19,10 @@ import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
@@ -152,18 +154,26 @@ public final class TaskDetailDialog {
                 : model.assignedTeamMembers();
         @SuppressWarnings("unchecked")
         Consumer<Integer>[] removeAssignedUserRef = new Consumer[1];
+        BusyMutationState busyMutationState = new BusyMutationState();
+        BusyMutationUi busyMutationUi = new BusyMutationUi(busyMutationState);
+        busyMutationUi.register(addAssignedUserButton);
+        busyMutationUi.register(assignedTeamScrollPane);
         removeAssignedUserRef[0] = userId -> {
-            try {
-                List<AssignedTeamMember> refreshed = assignmentEditor == null
-                        ? List.of()
-                        : assignmentEditor.removeAndReload(userId);
-                renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed, removeAssignedUserRef[0]);
-            } catch (Exception ex) {
-                showError(errorLabel, "Failed to remove assigned user. " + rootCauseMessage(ex));
+            if (busyMutationState.isBusy()) {
+                return;
             }
+            runMutationAsync(
+                    busyMutationState,
+                    busyMutationUi::refresh,
+                    () -> assignmentEditor == null ? List.<AssignedTeamMember>of() : assignmentEditor.removeAndReload(userId),
+                    refreshed -> renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed, removeAssignedUserRef[0]),
+                    ex -> showError(errorLabel, "Failed to remove assigned user. " + rootCauseMessage(ex)));
         };
         renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, initialAssignedTeamMembers, removeAssignedUserRef[0]);
         addAssignedUserButton.setOnAction(e -> {
+            if (busyMutationState.isBusy()) {
+                return;
+            }
             List<CaseTaskService.AssignableUserOption> candidates = loadAssignableUsersForTask == null
                     ? List.of()
                     : loadAssignableUsersForTask.apply(model.taskId());
@@ -172,14 +182,12 @@ public final class TaskDetailDialog {
                 return;
             }
             CaseTaskService.AssignableUserOption user = selected.get();
-            try {
-                List<AssignedTeamMember> refreshed = assignmentEditor == null
-                        ? List.of()
-                        : assignmentEditor.addAndReload(user.id());
-                renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed, removeAssignedUserRef[0]);
-            } catch (Exception ex) {
-                showError(errorLabel, "Failed to add assigned user. " + rootCauseMessage(ex));
-            }
+            runMutationAsync(
+                    busyMutationState,
+                    busyMutationUi::refresh,
+                    () -> assignmentEditor == null ? List.<AssignedTeamMember>of() : assignmentEditor.addAndReload(user.id()),
+                    refreshed -> renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed, removeAssignedUserRef[0]),
+                    ex -> showError(errorLabel, "Failed to add assigned user. " + rootCauseMessage(ex)));
         });
         assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedTeamScrollPane);
 
@@ -229,28 +237,36 @@ public final class TaskDetailDialog {
         notesErrorLabel.setManaged(false);
         VBox notesList = new VBox(8);
         List<TaskNoteEntry> noteEntries = model.noteEntries() == null ? List.of() : model.noteEntries();
-        renderNoteEntries(notesList, noteEntries, notesEditor, notesErrorLabel);
+        renderNoteEntries(notesList, noteEntries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
         ScrollPane notesScrollPane = new ScrollPane(notesList);
         notesScrollPane.setFitToWidth(true);
         notesScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         notesScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         notesScrollPane.setPrefViewportHeight(420);
         VBox.setVgrow(notesScrollPane, Priority.ALWAYS);
+        busyMutationUi.register(addNoteButton);
+        busyMutationUi.register(noteComposer);
+        busyMutationUi.register(notesScrollPane);
         addNoteButton.setOnAction(e -> {
+            if (busyMutationState.isBusy()) {
+                return;
+            }
             String body = safe(noteComposer.getText()).trim();
             if (body.isBlank()) {
                 showError(notesErrorLabel, "Note text is required.");
                 return;
             }
-            try {
-                List<TaskNoteEntry> refreshed = notesEditor == null ? noteEntries : notesEditor.addAndReload(body);
-                renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel);
-                noteComposer.clear();
-                notesErrorLabel.setManaged(false);
-                notesErrorLabel.setVisible(false);
-            } catch (Exception ex) {
-                showError(notesErrorLabel, "Failed to add note. " + rootCauseMessage(ex));
-            }
+            runMutationAsync(
+                    busyMutationState,
+                    busyMutationUi::refresh,
+                    () -> notesEditor == null ? noteEntries : notesEditor.addAndReload(body),
+                    refreshed -> {
+                        renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
+                        noteComposer.clear();
+                        notesErrorLabel.setManaged(false);
+                        notesErrorLabel.setVisible(false);
+                    },
+                    ex -> showError(notesErrorLabel, "Failed to add note. " + rootCauseMessage(ex)));
         });
         notesPanel.getChildren().setAll(notesLabel, noteComposer, addNoteButton, notesErrorLabel, notesScrollPane);
         notesPanel.setPrefWidth(320);
@@ -359,6 +375,88 @@ public final class TaskDetailDialog {
         stage.setScene(scene);
         stage.showAndWait();
         return Optional.ofNullable(result.value);
+    }
+
+    private static <T> void runMutationAsync(
+            BusyMutationState busyState,
+            Runnable onBusyChanged,
+            java.util.concurrent.Callable<T> worker,
+            Consumer<T> onSuccess,
+            Consumer<Throwable> onError) {
+        busyState.increment();
+        if (onBusyChanged != null) {
+            onBusyChanged.run();
+        }
+        new Thread(() -> {
+            try {
+                T value = worker == null ? null : worker.call();
+                Platform.runLater(() -> {
+                    try {
+                        if (onSuccess != null) {
+                            onSuccess.accept(value);
+                        }
+                    } finally {
+                        busyState.decrement();
+                        if (onBusyChanged != null) {
+                            onBusyChanged.run();
+                        }
+                    }
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    try {
+                        if (onError != null) {
+                            onError.accept(ex);
+                        }
+                    } finally {
+                        busyState.decrement();
+                        if (onBusyChanged != null) {
+                            onBusyChanged.run();
+                        }
+                    }
+                });
+            }
+        }, "task-detail-dialog-mutation").start();
+    }
+
+    private static final class BusyMutationState {
+        private int inFlight;
+
+        void increment() {
+            inFlight++;
+        }
+
+        void decrement() {
+            if (inFlight > 0) {
+                inFlight--;
+            }
+        }
+
+        boolean isBusy() {
+            return inFlight > 0;
+        }
+    }
+
+    private static final class BusyMutationUi {
+        private final BusyMutationState busyState;
+        private final java.util.List<Node> nodes = new java.util.ArrayList<>();
+
+        BusyMutationUi(BusyMutationState busyState) {
+            this.busyState = busyState;
+        }
+
+        void register(Node node) {
+            if (node != null) {
+                nodes.add(node);
+            }
+        }
+
+        void refresh() {
+            boolean busy = busyState.isBusy();
+            for (Node node : nodes) {
+                node.setDisable(busy);
+            }
+        }
     }
 
     private static void selectPriority(
@@ -498,7 +596,9 @@ public final class TaskDetailDialog {
             VBox notesList,
             List<TaskNoteEntry> entries,
             NotesEditor notesEditor,
-            Label notesErrorLabel) {
+            Label notesErrorLabel,
+            BusyMutationState busyMutationState,
+            BusyMutationUi busyMutationUi) {
         notesList.getChildren().clear();
         List<TaskNoteEntry> safeEntries = entries == null ? List.of() : entries;
         if (safeEntries.isEmpty()) {
@@ -544,23 +644,26 @@ public final class TaskDetailDialog {
                     VBox card = (VBox) ((Button) e.getSource()).getParent().getParent();
                     card.getChildren().setAll(editContent);
                     saveButton.setOnAction(saveEvent -> {
+                        if (busyMutationState != null && busyMutationState.isBusy()) {
+                            return;
+                        }
                         String updatedText = safe(editArea.getText()).trim();
                         if (updatedText.isBlank()) {
                             showError(notesErrorLabel, "Note text is required.");
                             return;
                         }
-                        try {
-                            List<TaskNoteEntry> refreshed = notesEditor == null
-                                    ? safeEntries
-                                    : notesEditor.editAndReload(entry.id(), updatedText);
-                            renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel);
-                            notesErrorLabel.setManaged(false);
-                            notesErrorLabel.setVisible(false);
-                        } catch (Exception ex) {
-                            showError(notesErrorLabel, "Failed to update note. " + rootCauseMessage(ex));
-                        }
+                        runMutationAsync(
+                                busyMutationState,
+                                busyMutationUi == null ? null : busyMutationUi::refresh,
+                                () -> notesEditor == null ? safeEntries : notesEditor.editAndReload(entry.id(), updatedText),
+                                refreshed -> {
+                                    renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
+                                    notesErrorLabel.setManaged(false);
+                                    notesErrorLabel.setVisible(false);
+                                },
+                                ex -> showError(notesErrorLabel, "Failed to update note. " + rootCauseMessage(ex)));
                     });
-                    cancelButton.setOnAction(cancelEvent -> renderNoteEntries(notesList, safeEntries, notesEditor, notesErrorLabel));
+                    cancelButton.setOnAction(cancelEvent -> renderNoteEntries(notesList, safeEntries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi));
                 });
                 HBox actionRow = new HBox(6, editButton);
                 cardContent.getChildren().add(actionRow);
