@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -578,6 +579,9 @@ public class CaseController {
 	private CaseDetailsDraft detailsBaseline;
 	private CaseDetailsDraft detailsLocalViewOverride;
 	private long pageLoadStartNanos;
+	private static volatile List<PartySideOption> cachedPartySideOptions;
+	private static final Map<Integer, List<CaseDao.StatusRow>> statusesByTenantCache = new ConcurrentHashMap<>();
+	private static final Map<Integer, List<CaseDao.PracticeAreaRow>> practiceAreasByTenantCache = new ConcurrentHashMap<>();
 
 	private record PartyRoleOption(long id, String label) {
 	}
@@ -589,6 +593,14 @@ public class CaseController {
 	}
 
 	private record PartyEditorResult(String entityType, Long entityId, long partyRoleId, String side, boolean primary, String notes) {
+	}
+
+	private record PartyDialogData(
+			List<CaseDao.PartyRoleRow> partyRoles,
+			List<CaseDao.SelectableContactRow> contacts,
+			List<CaseDao.SelectableOrganizationRow> organizations,
+			List<PartySideOption> sideOptions,
+			List<OrganizationDao.OrganizationTypeRow> organizationTypes) {
 	}
 
 	private record CallerPartySelection(Integer contactId, String displayName) {
@@ -716,7 +728,7 @@ public class CaseController {
 		setEditMode(false);
 		detailsEditor.setEditMode(false);
 		clearError();
-		subscribeLiveCaseUpdates();
+		wireLiveRefreshLifecycle();
 
 		if (changeResponsibleAttorneyButton != null)
 			changeResponsibleAttorneyButton.setOnAction(e -> onChangeResponsibleAttorney());
@@ -773,6 +785,20 @@ public class CaseController {
 				}
 			});
 		}
+	}
+
+	private void wireLiveRefreshLifecycle() {
+		if (caseRootPane == null) {
+			return;
+		}
+		caseRootPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null) {
+				unsubscribeLiveCaseUpdates();
+			} else {
+				subscribeLiveCaseUpdates();
+			}
+		});
+		subscribeLiveCaseUpdates();
 	}
 
 	private void onGenerateSummaryPdf() {
@@ -1434,8 +1460,14 @@ public class CaseController {
 	}
 
 	private List<PartySideOption> loadPartySideOptions() {
+		List<PartySideOption> cached = cachedPartySideOptions;
+		if (cached != null && !cached.isEmpty()) {
+			return cached;
+		}
 		if (caseDao == null) {
-			return defaultPartySideOptions();
+			List<PartySideOption> defaults = defaultPartySideOptions();
+			cachedPartySideOptions = defaults;
+			return defaults;
 		}
 		try {
 			List<CaseDao.PartySideRow> sides = caseDao.listPartySides();
@@ -1451,13 +1483,19 @@ public class CaseController {
 					label = toPartySideLabel(Map.of(), key);
 				out.add(new PartySideOption(label, key));
 			}
-			if (out.isEmpty()) {
-				return defaultPartySideOptions();
-			}
-			out.add(new PartySideOption("Unaffiliated", null));
-			return List.copyOf(out);
+				if (out.isEmpty()) {
+					List<PartySideOption> defaults = defaultPartySideOptions();
+					cachedPartySideOptions = defaults;
+					return defaults;
+				}
+				out.add(new PartySideOption("Unaffiliated", null));
+				List<PartySideOption> loaded = List.copyOf(out);
+				cachedPartySideOptions = loaded;
+				return loaded;
 		} catch (Exception ignored) {
-			return defaultPartySideOptions();
+			List<PartySideOption> defaults = defaultPartySideOptions();
+			cachedPartySideOptions = defaults;
+			return defaults;
 		}
 	}
 
@@ -1469,6 +1507,26 @@ public class CaseController {
 		case "neutral" -> "neutral";
 		default -> "unclassified";
 		};
+	}
+
+	private List<CaseDao.StatusRow> statusesForTenantCached(int tenantId) {
+		if (tenantId <= 0 || caseDao == null) {
+			return List.of();
+		}
+		return statusesByTenantCache.computeIfAbsent(tenantId, key -> {
+			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(key);
+			return statuses == null ? List.of() : List.copyOf(statuses);
+		});
+	}
+
+	private List<CaseDao.PracticeAreaRow> practiceAreasForTenantCached(int tenantId) {
+		if (tenantId <= 0 || caseDao == null) {
+			return List.of();
+		}
+		return practiceAreasByTenantCache.computeIfAbsent(tenantId, key -> {
+			List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(key);
+			return areas == null ? List.of() : List.copyOf(areas);
+		});
 	}
 
 	private Map<String, String> loadPartySideLabelMap() {
@@ -1514,61 +1572,114 @@ public class CaseController {
 	private void onAddParty() {
 		if (caseDao == null || caseId == null || appState == null || appState.getShaleClientId() <= 0)
 			return;
-		PartyAddWorkflowDialog.AddPartyDraft draft = showAddPartyWizardDialog();
-		if (draft == null)
-			return;
-
 		final long activeCaseId = caseId.longValue();
-		new Thread(() ->
-		{
-			try {
-				Long entityId = draft.entityId();
-				if (draft.createNew()) {
-					entityId = createEntityForNewPartyDraft(draft);
+		setPartyDialogLoading(true);
+		loadPartyDialogDataAsync(activeCaseId, data -> {
+			setPartyDialogLoading(false);
+			PartyAddWorkflowDialog.AddPartyDraft draft = showAddPartyWizardDialog(data);
+			if (draft == null)
+				return;
+			new Thread(() ->
+			{
+				try {
+					Long entityId = draft.entityId();
+					if (draft.createNew()) {
+						entityId = createEntityForNewPartyDraft(draft);
+					}
+					if (entityId == null || entityId <= 0) {
+						throw new IllegalStateException("A party entity must be selected or created.");
+					}
+					caseDao.addCaseParty(
+							activeCaseId,
+							draft.entityType().equals("contact") ? entityId : null,
+							draft.entityType().equals("organization") ? entityId : null,
+							draft.partyRoleId(),
+							draft.side(),
+							draft.primary(),
+							draft.notes());
+					runOnFx(this::refreshPartiesSectionAsync);
+				} catch (Exception ex) {
+					runOnFx(() -> showError("Failed to add party. " + ex.getMessage()));
 				}
-				if (entityId == null || entityId <= 0) {
-					throw new IllegalStateException("A party entity must be selected or created.");
-				}
-				caseDao.addCaseParty(
-						activeCaseId,
-						draft.entityType().equals("contact") ? entityId : null,
-						draft.entityType().equals("organization") ? entityId : null,
-						draft.partyRoleId(),
-						draft.side(),
-						draft.primary(),
-						draft.notes());
-				runOnFx(this::refreshPartiesSectionAsync);
-			} catch (Exception ex) {
-				runOnFx(() -> showError("Failed to add party. " + ex.getMessage()));
-			}
-		}, "case-add-party-" + activeCaseId).start();
+			}, "case-add-party-" + activeCaseId).start();
+		});
 	}
 
 	private void onEditParty(CasePartyDto party) {
 		if (party == null || caseDao == null || caseId == null)
 			return;
-		PartyEditorResult result = showPartyEditorDialog(party);
-		if (result == null)
-			return;
-
 		final long activeCaseId = caseId.longValue();
-		new Thread(() ->
-		{
+		setPartyDialogLoading(true);
+		loadPartyDialogDataAsync(activeCaseId, data -> {
+			setPartyDialogLoading(false);
+			PartyEditorResult result = showPartyEditorDialog(party, data);
+			if (result == null)
+				return;
+			new Thread(() ->
+			{
+				try {
+					caseDao.updateCaseParty(
+							party.getId(),
+							activeCaseId,
+							result.entityType.equals("contact") ? result.entityId : null,
+							result.entityType.equals("organization") ? result.entityId : null,
+							result.partyRoleId,
+							result.side,
+							result.primary,
+							result.notes);
+					runOnFx(this::refreshPartiesSectionAsync);
+				} catch (Exception ex) {
+					runOnFx(() -> showError("Failed to update party. " + ex.getMessage()));
+				}
+			}, "case-edit-party-" + activeCaseId + "-" + party.getId()).start();
+		});
+	}
+
+	private void setPartyDialogLoading(boolean loading) {
+		if (addOrganizationButton == null) {
+			return;
+		}
+		addOrganizationButton.setDisable(loading);
+		if (loading && isSectionActive("Parties")) {
+			addOrganizationButton.setText("Loading…");
+		} else if (isSectionActive("Parties")) {
+			addOrganizationButton.setText("Add Party");
+		}
+	}
+
+	private void loadPartyDialogDataAsync(long activeCaseId, Consumer<PartyDialogData> onLoaded) {
+		new Thread(() -> {
 			try {
-				caseDao.updateCaseParty(
-						party.getId(),
-						activeCaseId,
-						result.entityType.equals("contact") ? result.entityId : null,
-						result.entityType.equals("organization") ? result.entityId : null,
-						result.partyRoleId,
-						result.side,
-						result.primary,
-						result.notes);
-				runOnFx(this::refreshPartiesSectionAsync);
+				PartyDialogData data = loadPartyDialogData(activeCaseId);
+				runOnFx(() -> {
+					if (caseId == null || caseId.longValue() != activeCaseId) {
+						return;
+					}
+					if (onLoaded != null) {
+						onLoaded.accept(data);
+					}
+				});
 			} catch (Exception ex) {
-				runOnFx(() -> showError("Failed to update party. " + ex.getMessage()));
+				runOnFx(() -> {
+					setPartyDialogLoading(false);
+					showError("Failed to load party options. " + ex.getMessage());
+				});
 			}
-		}, "case-edit-party-" + activeCaseId + "-" + party.getId()).start();
+		}, "case-party-dialog-load-" + activeCaseId).start();
+	}
+
+	private PartyDialogData loadPartyDialogData(long activeCaseId) {
+		List<CaseDao.PartyRoleRow> partyRoles = caseDao.listPartyRoles();
+		List<CaseDao.SelectableContactRow> contacts = caseDao.findLinkableContacts(activeCaseId);
+		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(activeCaseId);
+		List<PartySideOption> sideOptions = loadPartySideOptions();
+		List<OrganizationDao.OrganizationTypeRow> organizationTypes = organizationDao == null ? List.of() : organizationDao.findOrganizationTypes();
+		return new PartyDialogData(
+				partyRoles == null ? List.of() : partyRoles,
+				contacts == null ? List.of() : contacts,
+				organizations == null ? List.of() : organizations,
+				sideOptions == null ? List.of() : sideOptions,
+				organizationTypes == null ? List.of() : organizationTypes);
 	}
 
 	private void onRemoveParty(CasePartyDto party) {
@@ -1620,9 +1731,9 @@ public class CaseController {
 		}, "case-refresh-parties-" + activeCaseId).start();
 	}
 
-	private PartyEditorResult showPartyEditorDialog(CasePartyDto existing) {
+	private PartyEditorResult showPartyEditorDialog(CasePartyDto existing, PartyDialogData data) {
 		if (existing == null) {
-			PartyAddWorkflowDialog.AddPartyDraft draft = showAddPartyWizardDialog();
+			PartyAddWorkflowDialog.AddPartyDraft draft = showAddPartyWizardDialog(data);
 			if (draft == null || draft.entityId() == null) {
 				return null;
 			}
@@ -1633,9 +1744,9 @@ public class CaseController {
 			showError("Unable to edit parties without an active client/case context.");
 			return null;
 		}
-		List<CaseDao.PartyRoleRow> partyRoles = caseDao.listPartyRoles();
-		List<CaseDao.SelectableContactRow> contacts = caseDao.findLinkableContacts(caseId.longValue());
-		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
+		List<CaseDao.PartyRoleRow> partyRoles = data == null ? List.of() : data.partyRoles();
+		List<CaseDao.SelectableContactRow> contacts = data == null ? List.of() : data.contacts();
+		List<CaseDao.SelectableOrganizationRow> organizations = data == null ? List.of() : data.organizations();
 
 		Dialog<PartyEditorResult> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, "Edit Party");
@@ -1650,7 +1761,7 @@ public class CaseController {
 		ChoiceBox<PartyEntityOption> entityChoice = new ChoiceBox<>();
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
-		sideChoice.getItems().addAll(loadPartySideOptions());
+			sideChoice.getItems().addAll(data == null ? List.of() : data.sideOptions());
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override
 			public String toString(PartySideOption object) {
@@ -1807,16 +1918,16 @@ public class CaseController {
 		return dialog.showAndWait().orElse(null);
 	}
 
-	private PartyAddWorkflowDialog.AddPartyDraft showAddPartyWizardDialog() {
+	private PartyAddWorkflowDialog.AddPartyDraft showAddPartyWizardDialog(PartyDialogData data) {
 		if (appState == null || appState.getShaleClientId() <= 0 || caseId == null || caseId <= 0) {
 			showError("Unable to add parties without an active client/case context.");
 			return null;
 		}
-		List<CaseDao.PartyRoleRow> partyRoles = caseDao.listPartyRoles();
-		List<CaseDao.SelectableContactRow> contacts = caseDao.findLinkableContacts(caseId.longValue());
-		List<CaseDao.SelectableOrganizationRow> organizations = caseDao.findLinkableOrganizations(caseId.longValue());
-		List<OrganizationDao.OrganizationTypeRow> organizationTypes = organizationDao == null ? List.of() : organizationDao.findOrganizationTypes();
-		List<PartyAddWorkflowDialog.PartySideOption> sideOptions = loadPartySideOptions().stream()
+		List<CaseDao.PartyRoleRow> partyRoles = data == null ? List.of() : data.partyRoles();
+		List<CaseDao.SelectableContactRow> contacts = data == null ? List.of() : data.contacts();
+		List<CaseDao.SelectableOrganizationRow> organizations = data == null ? List.of() : data.organizations();
+		List<OrganizationDao.OrganizationTypeRow> organizationTypes = data == null ? List.of() : data.organizationTypes();
+		List<PartyAddWorkflowDialog.PartySideOption> sideOptions = (data == null ? List.<PartySideOption>of() : data.sideOptions()).stream()
 				.map(o -> new PartyAddWorkflowDialog.PartySideOption(o.label(), o.value()))
 				.toList();
 		return PartyAddWorkflowDialog.show(organizationDialogOwner(), partyRoles, contacts, organizations, organizationTypes, sideOptions);
@@ -1981,6 +2092,7 @@ public class CaseController {
 					task.caseName(),
 					task.caseResponsibleAttorney(),
 					task.caseResponsibleAttorneyColor(),
+					task.caseNonEngagementLetterSent(),
 					task.title(),
 					task.description(),
 					task.priorityColorHex(),
@@ -2034,52 +2146,57 @@ public class CaseController {
 			return;
 		}
 
-		List<TaskPriorityOptionDto> priorities;
-		try {
-			priorities = caseTaskService.loadActivePriorities(shaleClientId);
-		} catch (Exception ex) {
-			logTaskActionException("load-priorities", ex);
-			showTaskActionError("Unable to load priorities right now.");
-			return;
-		}
-
-		List<CaseTaskService.AssignableUserOption> assignableUsers;
-		try {
-			assignableUsers = caseTaskService.loadAssignableUsers(shaleClientId);
-		} catch (Exception ex) {
-			logTaskActionException("load-assignees", ex);
-			showTaskActionError("Unable to load users right now.");
-			return;
-		}
-
-		Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
-				taskDialogOwner(),
-				priorities,
-				assignableUsers);
-		if (input.isEmpty()) {
-			return;
-		}
-
-		CaseTaskService.CreateTaskRequest request = new CaseTaskService.CreateTaskRequest(
-				shaleClientId,
-				caseId.longValue(),
-				input.get().title(),
-				input.get().description(),
-				input.get().dueAt(),
-				input.get().priorityId(),
-				input.get().assignedUserIds(),
-				currentUserId);
-
-		new Thread(() ->
-		{
+		final int activeCaseId = caseId;
+		new Thread(() -> {
+			List<TaskPriorityOptionDto> priorities;
 			try {
-				caseTaskService.createTask(request);
-				runOnFx(this::refreshCaseTasks);
+				priorities = caseTaskService.loadActivePriorities(shaleClientId);
 			} catch (Exception ex) {
-				logTaskActionException("create", ex);
-				runOnFx(() -> showTaskActionError("Failed to create task for this case. " + rootCauseMessage(ex)));
+				logTaskActionException("load-priorities", ex);
+				runOnFx(() -> showTaskActionError("Unable to load priorities right now."));
+				return;
 			}
-		}, "case-create-task-" + caseId).start();
+
+			List<CaseTaskService.AssignableUserOption> assignableUsers;
+			try {
+				assignableUsers = caseTaskService.loadAssignableUsers(shaleClientId);
+			} catch (Exception ex) {
+				logTaskActionException("load-assignees", ex);
+				runOnFx(() -> showTaskActionError("Unable to load users right now."));
+				return;
+			}
+
+			runOnFx(() -> {
+				Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
+						taskDialogOwner(),
+						priorities,
+						assignableUsers);
+				if (input.isEmpty()) {
+					return;
+				}
+
+				CaseTaskService.CreateTaskRequest request = new CaseTaskService.CreateTaskRequest(
+						shaleClientId,
+						(long) activeCaseId,
+						input.get().title(),
+						input.get().description(),
+						input.get().dueAt(),
+						input.get().priorityId(),
+						input.get().assignedUserIds(),
+						currentUserId);
+
+				new Thread(() ->
+				{
+					try {
+						caseTaskService.createTask(request);
+						runOnFx(this::refreshCaseTasks);
+					} catch (Exception ex) {
+						logTaskActionException("create", ex);
+						runOnFx(() -> showTaskActionError("Failed to create task for this case. " + rootCauseMessage(ex)));
+					}
+				}, "case-create-task-" + activeCaseId).start();
+			});
+		}, "case-add-task-prereq-" + activeCaseId).start();
 	}
 
 	private void onToggleTaskComplete(Long taskId) {
@@ -2169,6 +2286,7 @@ public class CaseController {
 	                            detail.caseName(),
 	                            detail.caseResponsibleAttorney(),
 	                            detail.caseResponsibleAttorneyColor(),
+				detail.caseNonEngagementLetterSent(),
 	                            detail.title(),
 	                            detail.description(),
 	                            detail.dueAt(),
@@ -2474,6 +2592,42 @@ public class CaseController {
 				PerfLog.logDone("NAV", "ready page=case_view caseId=" + activeCaseId, pageLoadStartNanos);
 			});
 		}, "case-view-sync-" + activeCaseId).start();
+	}
+
+	private void refreshOverviewAndDetailsAfterStructuralPatchAsync() {
+		if (caseDao == null || caseId == null) {
+			return;
+		}
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
+				CaseDetailDto detail = caseDao.getDetail(activeCaseId);
+				runOnFx(() -> {
+					if (caseId == null || caseId.longValue() != activeCaseId) {
+						return;
+					}
+					if (overview != null) {
+						currentOverview = applyCallerFromCaseParties(overview, caseParties);
+						applyOverviewEditSafe(currentOverview);
+					}
+					if (detail != null) {
+						current = detail;
+						detailsLocalViewOverride = null;
+						renderDetailsFromCurrent();
+						if (!editMode) {
+							applyDetail(detail);
+						} else {
+							applyLastUpdatedLabel(detail.getUpdatedAt());
+						}
+						refreshDeleteAction();
+					}
+					refreshLastUpdatedLabelAsync();
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> reloadCurrentCaseForViewMode());
+			}
+		}, "case-structural-refresh-" + activeCaseId).start();
 	}
 
 	private void loadCaseTaskActivityAsync() {
@@ -3034,6 +3188,10 @@ public class CaseController {
 
 	private void subscribeLiveCaseUpdates() {
 		liveUpdateHandler.subscribe();
+	}
+
+	private void unsubscribeLiveCaseUpdates() {
+		liveUpdateHandler.unsubscribe();
 	}
 
 	private void refreshCurrentAfterRemoteUpdateAsync() {
@@ -5030,7 +5188,7 @@ public class CaseController {
 			new Thread(() ->
 			{
 				try {
-					List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+					List<CaseDao.StatusRow> statuses = statusesForTenantCached(tenantId);
 					runOnFx(() -> handleStatusLoaded(statuses, detailsMode));
 				} catch (Exception ex) {
 					runOnFx(() ->
@@ -5103,7 +5261,7 @@ public class CaseController {
 			new Thread(() ->
 			{
 				try {
-					List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(tenantId);
+					List<CaseDao.PracticeAreaRow> areas = practiceAreasForTenantCached(tenantId);
 					runOnFx(() -> handlePracticeAreaLoaded(areas, detailsMode));
 				} catch (Exception ex) {
 					runOnFx(() ->
@@ -5433,11 +5591,23 @@ public class CaseController {
 	}
 
 	private final class CaseOverviewLiveUpdateHandler {
+		private final Consumer<UiRuntimeBridge.CaseUpdatedEvent> eventHandler = this::handleEvent;
+		private boolean subscribed;
+
 		void subscribe() {
-			if (runtimeBridge == null)
+			if (runtimeBridge == null || subscribed)
 				return;
 
-			runtimeBridge.subscribeCaseUpdated(this::handleEvent);
+			runtimeBridge.subscribeCaseUpdated(eventHandler);
+			subscribed = true;
+		}
+
+		void unsubscribe() {
+			if (runtimeBridge == null || !subscribed) {
+				return;
+			}
+			runtimeBridge.unsubscribeCaseUpdated(eventHandler);
+			subscribed = false;
 		}
 
 		private void handleEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
@@ -5598,13 +5768,40 @@ public class CaseController {
 					|| patch.detailsTouched();
 		}
 
-		private void handleStructuralReload(LivePatchData patch) {
-			runOnFx(() ->
-			{
-				reloadCurrentCaseForViewMode();
-				hideRemoteUpdateBanner();
-			});
-		}
+			private void handleStructuralReload(LivePatchData patch) {
+				runOnFx(() ->
+				{
+					if (patch == null || patch.deleted()) {
+						reloadCurrentCaseForViewMode();
+						hideRemoteUpdateBanner();
+						return;
+					}
+
+					boolean partyRelated = patch.patchedPrimaryCallerContactId() != null
+							|| patch.clientAssignmentsPatched()
+							|| patch.patchedPrimaryOpposingCounselContactId() != null;
+					boolean teamRelated = patch.teamChanged();
+					boolean overviewOrDetailsRelated = patch.patchedPrimaryStatusId() != null
+							|| patch.patchedPracticeAreaId() != null
+							|| patch.patchedResponsibleAttorneyUserId() != null
+							|| patch.detailsTouched()
+							|| partyRelated;
+
+					if (partyRelated) {
+						refreshPartiesSectionAsync();
+					}
+					if (teamRelated) {
+						loadTeamSectionAsync();
+					}
+					if (overviewOrDetailsRelated) {
+						refreshOverviewAndDetailsAfterStructuralPatchAsync();
+					}
+					if (!partyRelated && !teamRelated && !overviewOrDetailsRelated) {
+						reloadCurrentCaseForViewMode();
+					}
+					hideRemoteUpdateBanner();
+				});
+			}
 
 		private boolean hasInlineSimplePatch(LivePatchData patch) {
 			return patch.patchedName() != null || patch.patchedNumber() != null || patch.patchedDescription() != null
@@ -6535,7 +6732,7 @@ public class CaseController {
 		if (statusId == null)
 			return "none";
 		if (caseDao != null && tenantId != null && tenantId > 0) {
-			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+			List<CaseDao.StatusRow> statuses = statusesForTenantCached(tenantId);
 			if (statuses != null) {
 				for (CaseDao.StatusRow status : statuses) {
 					if (status == null || status.id() != statusId)
@@ -6820,7 +7017,7 @@ public class CaseController {
 		if (practiceAreaId == null)
 			return "none";
 		if (caseDao != null && tenantId != null && tenantId > 0) {
-			List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(tenantId);
+			List<CaseDao.PracticeAreaRow> areas = practiceAreasForTenantCached(tenantId);
 			if (areas != null) {
 				for (CaseDao.PracticeAreaRow area : areas) {
 					if (area == null || area.id() != practiceAreaId)

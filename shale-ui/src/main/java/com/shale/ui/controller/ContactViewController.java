@@ -428,7 +428,8 @@ public final class ContactViewController {
                 row.intakeDate(),
                 row.statuteOfLimitationsDate(),
                 row.responsibleAttorneyName(),
-                row.responsibleAttorneyColor()));
+                row.responsibleAttorneyColor(),
+                row.nonEngagementLetterSent()));
         if (card instanceof Region region) {
             region.setMaxWidth(Double.MAX_VALUE);
             region.setPrefWidth(300);

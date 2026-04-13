@@ -60,6 +60,8 @@ public final class CasesController {
 	private boolean hasMore = true;
 	private int loadGeneration = 0;
 	private int resultsCountGeneration = 0;
+	private String lastCountQuery;
+	private Set<Integer> lastCountStatuses;
 
 	// Loaded items (we keep these so search/sort can re-render)
 	private final List<CaseCardVm> loaded = new ArrayList<>();
@@ -248,7 +250,7 @@ public final class CasesController {
 					if (safeVal.equals(vm.name)) {
 						return false; // no change
 					}
-					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor));
+					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent));
 					return true;
 				}
 
@@ -294,7 +296,7 @@ public final class CasesController {
 		for (int i = 0; i < loaded.size(); i++) {
 			CaseCardVm vm = loaded.get(i);
 			if (vm.id == caseId) {
-				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor));
+				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent));
 				rerender();
 				return;
 			}
@@ -356,7 +358,8 @@ public final class CasesController {
 								r.statuteOfLimitationsDate(),
 								r.primaryStatusId(),
 								safe(r.responsibleAttorneyName()),
-								safe(r.responsibleAttorneyColor())
+								safe(r.responsibleAttorneyColor()),
+								r.nonEngagementLetterSent()
 						))
 						.toList();
 
@@ -408,7 +411,9 @@ public final class CasesController {
 				.filter(vm -> matchesQuery(vm, q) && matchesSelectedStatus(vm))
 				.sorted(comp)
 				.toList();
-		refreshResultsCountAsync(q, selectedStatusIds);
+		if (shouldRefreshResultsCount(q, selectedStatusIds)) {
+			refreshResultsCountAsync(q, selectedStatusIds);
+		}
 
 		boolean statusFilterActive = selectedStatusIds.size() < statusFilterOptions.size();
 		if (( !q.isEmpty() || statusFilterActive ) && filtered.size() < pageSize && hasMore && !loading) {
@@ -449,6 +454,17 @@ public final class CasesController {
 				Platform.runLater(ex::printStackTrace);
 			}
 		});
+	}
+
+	private boolean shouldRefreshResultsCount(String normalizedQuery, Set<Integer> selectedStatuses) {
+		String nextQuery = normalizedQuery == null ? "" : normalizedQuery;
+		Set<Integer> nextStatuses = new LinkedHashSet<>(selectedStatuses == null ? Set.of() : selectedStatuses);
+		if (Objects.equals(lastCountQuery, nextQuery) && Objects.equals(lastCountStatuses, nextStatuses)) {
+			return false;
+		}
+		lastCountQuery = nextQuery;
+		lastCountStatuses = nextStatuses;
+		return true;
 	}
 
 	private void updateResultsCountLabel(long total) {
@@ -612,7 +628,8 @@ public final class CasesController {
 				vm.intakeDate,
 				vm.solDate,
 				vm.responsibleAttorney,
-				vm.responsibleAttorneyColor
+				vm.responsibleAttorneyColor,
+				vm.nonEngagementLetterSent
 		));
 	}
 
@@ -637,9 +654,10 @@ public final class CasesController {
 		final Integer primaryStatusId;
 		final String responsibleAttorney;
 		final String responsibleAttorneyColor;
+		final Boolean nonEngagementLetterSent;
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId, String responsibleAttorney,
-				String responsibleAttorneyColor) {
+				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
@@ -647,6 +665,7 @@ public final class CasesController {
 			this.primaryStatusId = primaryStatusId;
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
+			this.nonEngagementLetterSent = nonEngagementLetterSent;
 		}
 	}
 
@@ -736,7 +755,8 @@ public final class CasesController {
 
 				boolean same = newName.equals(vm.name)
 						&& newAtty.equals(vm.responsibleAttorney)
-						&& newColor.equals(vm.responsibleAttorneyColor);
+						&& newColor.equals(vm.responsibleAttorneyColor)
+						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent);
 
 				if (same)
 					return false;
@@ -748,7 +768,8 @@ public final class CasesController {
 						r.statuteOfLimitationsDate(),
 						r.primaryStatusId(),
 						newAtty,
-						newColor
+						newColor,
+						r.nonEngagementLetterSent()
 				));
 				return true;
 			}
