@@ -1,7 +1,9 @@
 package com.shale.ui.controller;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -406,6 +408,9 @@ public final class ContactViewController {
         }
 
         List<Node> cards = relatedCases.stream()
+                .sorted(Comparator.comparing(
+                        (RelatedCaseRow row) -> caseNameSortKey(row == null ? null : row.name()),
+                        Comparator.nullsLast(String::compareToIgnoreCase)))
                 .map(this::createRelatedCaseCard)
                 .toList();
 
@@ -440,6 +445,15 @@ public final class ContactViewController {
         VBox container = new VBox(4, card, relationshipMeta);
         VBox.setVgrow(container, javafx.scene.layout.Priority.NEVER);
         return container;
+    }
+
+
+    private static String caseNameSortKey(String name) {
+        String trimmed = safe(name).trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.toLowerCase(Locale.ROOT);
     }
 
     private static String formatRelationshipMeta(String roleName, String side, boolean primary) {

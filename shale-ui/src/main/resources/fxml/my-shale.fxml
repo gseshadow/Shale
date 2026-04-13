@@ -60,7 +60,10 @@
 					<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170" />
 					<Button fx:id="myTasksShowCompletedButton" text="Show Completed" />
 				</HBox>
-				<TextField fx:id="myTasksSearchField" promptText="Search my tasks…" />
+				<HBox spacing="8" alignment="CENTER_LEFT">
+					<TextField fx:id="myTasksSearchField" promptText="Search my tasks…" HBox.hgrow="ALWAYS" />
+					<ChoiceBox fx:id="myTasksCaseFilterChoice" prefWidth="180" />
+				</HBox>
 			</VBox>
 			<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" />
 			<ScrollPane fx:id="myTasksScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"

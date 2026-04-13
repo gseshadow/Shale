@@ -50,6 +50,7 @@ public final class MyShaleController {
 	private static final String SORT_SOL = "Statute of Limitations Date";
 	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
+	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -63,6 +64,8 @@ public final class MyShaleController {
 	private FlowPane myCasesFlow;
 	@FXML
 	private ChoiceBox<String> myTasksSortChoice;
+	@FXML
+	private ChoiceBox<CaseFilterOption> myTasksCaseFilterChoice;
 	@FXML
 	private TextField myTasksSearchField;
 	@FXML
@@ -144,6 +147,12 @@ public final class MyShaleController {
 			myTasksSortChoice.getSelectionModel().select(MY_TASKS_SORT_DUE_ASC);
 			myTasksSortChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> refreshMyTasks());
+		}
+		if (myTasksCaseFilterChoice != null) {
+			myTasksCaseFilterChoice.getItems().setAll(ALL_CASES_OPTION);
+			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
+			myTasksCaseFilterChoice.getSelectionModel().selectedItemProperty()
+					.addListener((obs, oldV, newV) -> renderMyTasks());
 		}
 		if (myTasksSearchField != null) {
 			myTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyTasks());
@@ -547,6 +556,7 @@ public final class MyShaleController {
 				runOnFx(() -> {
 					myTasks = tasks == null ? List.of() : tasks;
 					myTaskAssignedUsers = assignedByTask;
+					syncMyTaskCaseFilterOptions();
 					renderMyTasks();
 				});
 			} catch (Exception ex) {
@@ -566,7 +576,7 @@ public final class MyShaleController {
 		myTasksList.getChildren().clear();
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
-		List<CaseTaskListItemDto> filteredTasks = filterAndRankMyTasks(myTasks, searchQuery);
+		List<CaseTaskListItemDto> filteredTasks = filterAndRankMyTasks(myTasks, selectedCaseFilterId(), searchQuery);
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
@@ -605,18 +615,21 @@ public final class MyShaleController {
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
 	}
 
-	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, String normalizedQuery) {
+	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, Long selectedCaseId, String normalizedQuery) {
 		if (tasks == null || tasks.isEmpty()) {
 			return List.of();
 		}
+		List<CaseTaskListItemDto> caseFiltered = tasks.stream()
+				.filter(task -> selectedCaseId == null || task.caseId() == selectedCaseId.longValue())
+				.toList();
 		if (normalizedQuery.isEmpty()) {
-			return tasks;
+			return caseFiltered;
 		}
 		record RankedTask(CaseTaskListItemDto task, int score, int originalIndex) {
 		}
 		List<RankedTask> ranked = new ArrayList<>();
-		for (int i = 0; i < tasks.size(); i++) {
-			CaseTaskListItemDto task = tasks.get(i);
+		for (int i = 0; i < caseFiltered.size(); i++) {
+			CaseTaskListItemDto task = caseFiltered.get(i);
 			int score = myTaskSearchScore(task, normalizedQuery);
 			if (score > 0) {
 				ranked.add(new RankedTask(task, score, i));
@@ -626,6 +639,59 @@ public final class MyShaleController {
 				.comparingInt(RankedTask::score).reversed()
 				.thenComparingInt(RankedTask::originalIndex));
 		return ranked.stream().map(RankedTask::task).toList();
+	}
+
+
+	private void syncMyTaskCaseFilterOptions() {
+		if (myTasksCaseFilterChoice == null) {
+			return;
+		}
+		CaseFilterOption selectedOption = myTasksCaseFilterChoice.getSelectionModel().getSelectedItem();
+		Long selectedId = selectedOption == null ? null : selectedOption.caseId();
+
+		java.util.Map<Long, String> caseById = new java.util.LinkedHashMap<>();
+		for (CaseTaskListItemDto task : myTasks) {
+			if (task == null || task.caseId() <= 0) {
+				continue;
+			}
+			caseById.putIfAbsent(task.caseId(), safe(task.caseName()));
+		}
+
+		List<CaseFilterOption> options = new ArrayList<>();
+		options.add(ALL_CASES_OPTION);
+		caseById.entrySet().stream()
+				.map(entry -> new CaseFilterOption(entry.getKey(), entry.getValue()))
+				.sorted(Comparator.comparing(
+						(CaseFilterOption option) -> normalizeCaseFilterSortKey(option.displayName()),
+						Comparator.nullsLast(String::compareToIgnoreCase)))
+				.forEach(options::add);
+
+		myTasksCaseFilterChoice.getItems().setAll(options);
+		if (selectedId != null && caseById.containsKey(selectedId)) {
+			myTasksCaseFilterChoice.getSelectionModel().select(
+					options.stream()
+							.filter(option -> selectedId.equals(option.caseId()))
+							.findFirst()
+							.orElse(ALL_CASES_OPTION));
+		} else {
+			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
+		}
+	}
+
+	private Long selectedCaseFilterId() {
+		if (myTasksCaseFilterChoice == null) {
+			return null;
+		}
+		CaseFilterOption option = myTasksCaseFilterChoice.getSelectionModel().getSelectedItem();
+		return option == null ? null : option.caseId();
+	}
+
+	private String normalizeCaseFilterSortKey(String caseName) {
+		String trimmed = safe(caseName).trim();
+		if (trimmed.isEmpty()) {
+			return null;
+		}
+		return trimmed.toLowerCase(Locale.ROOT);
 	}
 
 	private int myTaskSearchScore(CaseTaskListItemDto task, String normalizedQuery) {
@@ -952,6 +1018,13 @@ public final class MyShaleController {
 
 	private static String safe(String s) {
 		return s == null ? "" : s;
+	}
+
+	private record CaseFilterOption(Long caseId, String displayName) {
+		@Override
+		public String toString() {
+			return safe(displayName);
+		}
 	}
 
 	private static final class CaseCardVm {
