@@ -226,6 +226,7 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyCompact() {
+		compactTitleRow.getChildren().setAll(titleLabel, titleDueSpacer, dueLabel);
 		getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel, actionsRow);
 		setSpacing(5);
 		setPadding(new Insets(8, 10, 8, 10));
