@@ -20,6 +20,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -30,6 +31,7 @@ import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -1281,6 +1283,12 @@ public final class UserController {
 	}
 
 	private static void toggleEditableField(Node valueNode, Node editorNode, boolean editMode) {
+		if (editorNode instanceof TextInputControl textInput) {
+			setVisibleManaged(valueNode, false);
+			setVisibleManaged(editorNode, true);
+			ReadOnlyTextDisplaySupport.apply(textInput, editMode);
+			return;
+		}
 		setVisibleManaged(valueNode, !editMode);
 		setVisibleManaged(editorNode, editMode);
 	}
