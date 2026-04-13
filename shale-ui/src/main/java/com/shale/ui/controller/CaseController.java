@@ -64,6 +64,7 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
 import javafx.application.Platform;
@@ -89,6 +90,7 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.Node;
 import javafx.scene.layout.BorderPane;
@@ -4461,10 +4463,16 @@ public class CaseController {
 		private void renderOverviewTextFields(CaseOverviewDto dto) {
 			if (ovCaseNameValue != null)
 				ovCaseNameValue.setText(safe(dto.getCaseName()));
+			if (ovCaseNameEditor != null && !editMode)
+				ovCaseNameEditor.setText(safe(dto.getCaseName()));
 			if (ovCaseNumberValue != null)
 				ovCaseNumberValue.setText(safe(dto.getCaseNumber()));
+			if (ovCaseNumberEditor != null && !editMode)
+				ovCaseNumberEditor.setText(safe(dto.getCaseNumber()));
 			if (ovDescriptionValue != null)
 				ovDescriptionValue.setText(safeText(dto.getDescription()));
+			if (ovDescriptionEditor != null && !editMode)
+				ovDescriptionEditor.setText(safeText(dto.getDescription()));
 		}
 
 		private void renderOverviewDates(CaseOverviewDto dto, boolean editSafeOnly) {
@@ -4542,13 +4550,16 @@ public class CaseController {
 		void setEditMode(boolean enabled) {
 			editMode = enabled;
 
-			setVisibleManaged(ovCaseNameValue, !enabled);
-			setVisibleManaged(ovCaseNameEditor, enabled);
-			setVisibleManaged(ovCaseNumberValue, !enabled);
-			setVisibleManaged(ovCaseNumberEditor, enabled);
+			setVisibleManaged(ovCaseNameValue, false);
+			setVisibleManaged(ovCaseNameEditor, true);
+			ReadOnlyTextDisplaySupport.apply(ovCaseNameEditor, enabled);
+			setVisibleManaged(ovCaseNumberValue, false);
+			setVisibleManaged(ovCaseNumberEditor, true);
+			ReadOnlyTextDisplaySupport.apply(ovCaseNumberEditor, enabled);
 
-			setVisibleManaged(ovDescriptionValue, !enabled);
-			setVisibleManaged(ovDescriptionEditor, enabled);
+			setVisibleManaged(ovDescriptionValue, false);
+			setVisibleManaged(ovDescriptionEditor, true);
+			ReadOnlyTextDisplaySupport.apply(ovDescriptionEditor, enabled);
 
 			setVisibleManaged(ovIncidentDateValue, !enabled);
 			setVisibleManaged(ovIncidentDateEditor, enabled);
@@ -7235,6 +7246,12 @@ public class CaseController {
 		}
 
 		private void toggleDetailField(Label valueNode, javafx.scene.control.Control editorNode, boolean editEnabled) {
+			if (editorNode instanceof TextInputControl textInput) {
+				setVisibleManaged(valueNode, false);
+				setVisibleManaged(editorNode, true);
+				ReadOnlyTextDisplaySupport.apply(textInput, editEnabled);
+				return;
+			}
 			setVisibleManaged(valueNode, !editEnabled);
 			setVisibleManaged(editorNode, editEnabled);
 		}
@@ -7342,6 +7359,8 @@ public class CaseController {
 				detSummaryValue.setText(safe(d.summary));
 			if (detReceivedUpdatesValue != null)
 				detReceivedUpdatesValue.setText(boolLabel(d.receivedUpdates));
+			if (!detailsEditMode)
+				renderEditors(d);
 		}
 
 		private void renderEditors(CaseDetailsDraft d) {

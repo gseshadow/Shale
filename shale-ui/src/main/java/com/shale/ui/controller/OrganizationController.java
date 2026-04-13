@@ -16,6 +16,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -27,6 +28,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -661,6 +663,12 @@ public final class OrganizationController {
 	}
 
 	private static void toggleField(Label valueNode, javafx.scene.Node editorNode, boolean editMode) {
+		if (editorNode instanceof TextInputControl textInput) {
+			setVisibleManaged(valueNode, false);
+			setVisibleManaged(editorNode, true);
+			ReadOnlyTextDisplaySupport.apply(textInput, editMode);
+			return;
+		}
 		setVisibleManaged(valueNode, !editMode);
 		setVisibleManaged(editorNode, editMode);
 	}
