@@ -53,12 +53,15 @@
 			<padding>
 				<Insets top="10" right="10" bottom="10" left="10" />
 			</padding>
-			<HBox spacing="8" alignment="CENTER_LEFT">
-				<Label text="My Tasks" styleClass="page-heading" />
-				<Region HBox.hgrow="ALWAYS" />
-				<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170" />
-				<Button fx:id="myTasksShowCompletedButton" text="Show Completed" />
-			</HBox>
+			<VBox spacing="8">
+				<HBox spacing="8" alignment="CENTER_LEFT">
+					<Label text="My Tasks" styleClass="page-heading" />
+					<Region HBox.hgrow="ALWAYS" />
+					<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170" />
+					<Button fx:id="myTasksShowCompletedButton" text="Show Completed" />
+				</HBox>
+				<TextField fx:id="myTasksSearchField" promptText="Search my tasks…" />
+			</VBox>
 			<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" />
 			<ScrollPane fx:id="myTasksScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
 				vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
