@@ -235,6 +235,7 @@ public final class TaskCard extends VBox {
 		setMaxWidth(320);
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		titleLabel.setMinWidth(Region.USE_PREF_SIZE);
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
 		dueLabel.setWrapText(false);
 		compactTitleRow.setAlignment(Pos.CENTER_LEFT);
@@ -271,6 +272,7 @@ public final class TaskCard extends VBox {
 	}
 
 	private void wireEvents() {
+		HBox.setHgrow(titleLabel, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(titleDueSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(compactMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);

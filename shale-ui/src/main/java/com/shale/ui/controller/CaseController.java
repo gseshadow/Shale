@@ -2099,7 +2099,7 @@ public class CaseController {
 					task.dueAt(),
 					task.completedAt(),
 					caseTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT));
+			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.FULL));
 		}
 
 		setVisibleManaged(tasksTabEmptyLabel, false);
