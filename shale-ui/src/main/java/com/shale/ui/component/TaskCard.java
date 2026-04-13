@@ -29,6 +29,7 @@ public final class TaskCard extends VBox {
 	}
 
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
+	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
@@ -55,6 +56,8 @@ public final class TaskCard extends VBox {
 	});
 
 	private Long taskId;
+	private LocalDateTime dueAtValue;
+	private Variant currentVariant = Variant.MINI;
 	private Consumer<Long> onOpen;
 	private Consumer<Long> onToggleComplete;
 	private Consumer<Integer> onOpenAssigneeUser;
@@ -94,6 +97,7 @@ public final class TaskCard extends VBox {
 	}
 
 	public void setDueAt(LocalDateTime dueAt) {
+		dueAtValue = dueAt;
 		if (dueAt == null) {
 			dueLabel.setText("");
 			dueLabel.setManaged(false);
@@ -101,7 +105,11 @@ public final class TaskCard extends VBox {
 			return;
 		}
 
-		dueLabel.setText("Due " + DUE_DATE_FORMAT.format(dueAt));
+		String formattedDueAt = switch (currentVariant) {
+			case COMPACT -> DUE_DATE_COMPACT_FORMAT.format(dueAt);
+			default -> DUE_DATE_FORMAT.format(dueAt);
+		};
+		dueLabel.setText("Due " + formattedDueAt);
 		dueLabel.setManaged(true);
 		dueLabel.setVisible(true);
 	}
@@ -225,6 +233,8 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyMini() {
+		currentVariant = Variant.MINI;
+		setDueAt(dueAtValue);
 		getChildren().setAll(titleLabel, completedLabel);
 		setSpacing(2);
 		setPadding(new Insets(4, 10, 4, 10));
@@ -236,6 +246,8 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyCompact() {
+		currentVariant = Variant.COMPACT;
+		setDueAt(dueAtValue);
 		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel);
 		compactTitleRow.getChildren().setAll(compactTitleBlock, compactDueHost);
 		getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel, actionsRow);
@@ -267,12 +279,16 @@ public final class TaskCard extends VBox {
 
 	public void applyCompactFluid() {
 		applyCompact();
+		currentVariant = Variant.COMPACT_FLUID;
+		setDueAt(dueAtValue);
 		setMinWidth(Region.USE_COMPUTED_SIZE);
 		setPrefWidth(Region.USE_COMPUTED_SIZE);
 		setMaxWidth(Double.MAX_VALUE);
 	}
 
 	public void applyFull() {
+		currentVariant = Variant.FULL;
+		setDueAt(dueAtValue);
 		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, caseSection, teamSection, completedLabel, actionsRow);
 		setSpacing(8);
 		setPadding(new Insets(14, 16, 14, 16));
@@ -340,4 +356,5 @@ public final class TaskCard extends VBox {
 	private void refreshSurfaceStyle() {
 		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, borderCss, hovered));
 	}
+
 }
