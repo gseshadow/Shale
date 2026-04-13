@@ -16,6 +16,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -28,6 +29,7 @@ public final class TaskCard extends VBox {
 	}
 
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
+	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
@@ -36,9 +38,9 @@ public final class TaskCard extends VBox {
 	private final Label completedLabel = new Label();
 	private final StackPane relatedCaseHost = new StackPane();
 	private final StackPane assigneeHost = new StackPane();
-	private final Region titleDueSpacer = new Region();
 	private final VBox compactTitleBlock = new VBox(2, titleLabel, createdByLabel);
-	private final HBox compactTitleRow = new HBox(8, compactTitleBlock, titleDueSpacer, dueLabel);
+	private final StackPane compactDueHost = new StackPane(dueLabel);
+	private final HBox compactTitleRow = new HBox(8, compactTitleBlock, compactDueHost);
 	private final Label caseSectionLabel = new Label("Case:");
 	private final VBox caseSection = new VBox(3, caseSectionLabel, relatedCaseHost);
 	private final Label teamSectionLabel = new Label("Team:");
@@ -54,6 +56,8 @@ public final class TaskCard extends VBox {
 	});
 
 	private Long taskId;
+	private LocalDateTime dueAtValue;
+	private Variant currentVariant = Variant.MINI;
 	private Consumer<Long> onOpen;
 	private Consumer<Long> onToggleComplete;
 	private Consumer<Integer> onOpenAssigneeUser;
@@ -93,6 +97,7 @@ public final class TaskCard extends VBox {
 	}
 
 	public void setDueAt(LocalDateTime dueAt) {
+		dueAtValue = dueAt;
 		if (dueAt == null) {
 			dueLabel.setText("");
 			dueLabel.setManaged(false);
@@ -100,7 +105,11 @@ public final class TaskCard extends VBox {
 			return;
 		}
 
-		dueLabel.setText("Due " + DUE_DATE_FORMAT.format(dueAt));
+		String formattedDueAt = switch (currentVariant) {
+			case COMPACT -> DUE_DATE_COMPACT_FORMAT.format(dueAt);
+			default -> DUE_DATE_FORMAT.format(dueAt);
+		};
+		dueLabel.setText("Due " + formattedDueAt);
 		dueLabel.setManaged(true);
 		dueLabel.setVisible(true);
 	}
@@ -224,6 +233,8 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyMini() {
+		currentVariant = Variant.MINI;
+		setDueAt(dueAtValue);
 		getChildren().setAll(titleLabel, completedLabel);
 		setSpacing(2);
 		setPadding(new Insets(4, 10, 4, 10));
@@ -235,8 +246,10 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyCompact() {
+		currentVariant = Variant.COMPACT;
+		setDueAt(dueAtValue);
 		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel);
-		compactTitleRow.getChildren().setAll(compactTitleBlock, titleDueSpacer, dueLabel);
+		compactTitleRow.getChildren().setAll(compactTitleBlock, compactDueHost);
 		getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel, actionsRow);
 		setSpacing(5);
 		setPadding(new Insets(8, 10, 8, 10));
@@ -247,9 +260,15 @@ public final class TaskCard extends VBox {
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
-		titleLabel.setMinWidth(Region.USE_PREF_SIZE);
+		titleLabel.setWrapText(false);
+		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		titleLabel.setMinWidth(0);
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
+		compactTitleBlock.setMinWidth(0);
 		dueLabel.setWrapText(false);
+		compactDueHost.setAlignment(Pos.CENTER_RIGHT);
+		compactDueHost.setMinWidth(Region.USE_PREF_SIZE);
+		compactDueHost.setMaxWidth(Region.USE_PREF_SIZE);
 		compactTitleRow.setAlignment(Pos.CENTER_LEFT);
 		configureRelatedSections();
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
@@ -260,12 +279,16 @@ public final class TaskCard extends VBox {
 
 	public void applyCompactFluid() {
 		applyCompact();
+		currentVariant = Variant.COMPACT_FLUID;
+		setDueAt(dueAtValue);
 		setMinWidth(Region.USE_COMPUTED_SIZE);
 		setPrefWidth(Region.USE_COMPUTED_SIZE);
 		setMaxWidth(Double.MAX_VALUE);
 	}
 
 	public void applyFull() {
+		currentVariant = Variant.FULL;
+		setDueAt(dueAtValue);
 		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, caseSection, teamSection, completedLabel, actionsRow);
 		setSpacing(8);
 		setPadding(new Insets(14, 16, 14, 16));
@@ -285,7 +308,7 @@ public final class TaskCard extends VBox {
 
 	private void wireEvents() {
 		HBox.setHgrow(compactTitleBlock, javafx.scene.layout.Priority.ALWAYS);
-		HBox.setHgrow(titleDueSpacer, javafx.scene.layout.Priority.ALWAYS);
+		HBox.setHgrow(compactDueHost, javafx.scene.layout.Priority.NEVER);
 		HBox.setHgrow(compactMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
 		toggleCompleteButton.getStyleClass().add("button-secondary");
@@ -333,4 +356,5 @@ public final class TaskCard extends VBox {
 	private void refreshSurfaceStyle() {
 		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, borderCss, hovered));
 	}
+
 }
