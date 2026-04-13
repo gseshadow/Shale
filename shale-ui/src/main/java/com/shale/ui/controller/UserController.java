@@ -7,6 +7,7 @@ import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
 import com.shale.data.dao.UserDao.UserRoleRow;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
@@ -1048,6 +1049,7 @@ public final class UserController {
 		new Thread(() -> {
 			try {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+				List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
 				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
 				List<CaseTaskService.AssignedTaskUserOption> assignedTeam = detail == null
 						? List.of()
@@ -1087,10 +1089,11 @@ public final class UserController {
 								detail.caseResponsibleAttorney(),
 								detail.caseResponsibleAttorneyColor(),
 				detail.caseNonEngagementLetterSent(),
-								detail.title(),
-								detail.description(),
-								detail.dueAt(),
-								detail.priorityId(),
+						detail.title(),
+						detail.description(),
+						detail.dueAt(),
+						detail.statusId(),
+						detail.priorityId(),
 								detail.createdByDisplayName(),
 									assignedTeam.stream()
 											.map(member -> new TaskDetailDialog.AssignedTeamMember(
@@ -1104,6 +1107,7 @@ public final class UserController {
 						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
 								taskDialogOwner(),
 								model,
+								statuses,
 								priorities,
 								id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
 									new TaskDetailDialog.AssignmentEditor() {
@@ -1195,6 +1199,7 @@ public final class UserController {
 				payload.title(),
 				payload.description(),
 				payload.dueAt(),
+				payload.statusId(),
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);

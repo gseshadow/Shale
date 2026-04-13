@@ -16,6 +16,7 @@ public record TaskDetailDto(
         String title,
         String description,
         LocalDateTime dueAt,
+        Integer statusId,
         Integer priorityId,
         LocalDateTime completedAt,
         Integer assignedUserId,

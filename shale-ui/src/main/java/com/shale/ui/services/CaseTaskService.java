@@ -12,6 +12,7 @@ import java.util.Objects;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.NotificationDao;
@@ -256,6 +257,10 @@ public final class CaseTaskService {
         return taskDao.listActivePriorities(shaleClientId);
     }
 
+    public List<TaskStatusOptionDto> loadActiveTaskStatuses(int shaleClientId) {
+        return taskDao.listActiveTaskStatuses(shaleClientId);
+    }
+
     public void completeTask(long taskId, int shaleClientId) {
         completeTask(taskId, shaleClientId, null);
     }
@@ -344,6 +349,7 @@ public final class CaseTaskService {
                 request.title(),
                 request.description(),
                 request.dueAt(),
+                request.statusId(),
                 request.priorityId(),
                 request.completed());
         TaskDetailDto after = taskDao.findTaskDetail(request.taskId(), request.shaleClientId());
@@ -433,6 +439,18 @@ public final class CaseTaskService {
                     after.caseId(),
                     after.caseName(),
                     "Priority changed");
+        }
+        if (!Objects.equals(before.statusId(), after.statusId())) {
+            Map<Integer, String> statusLabels = loadTaskStatusLabels(request.shaleClientId());
+            taskDao.addTaskTimelineEvent(
+                    request.taskId(),
+                    caseId,
+                    request.shaleClientId(),
+                    TaskDao.TaskTimelineEventTypes.TASK_STATUS_CHANGED,
+                    actorUserId,
+                    "Status changed",
+                    "Changed from " + formatStatus(before.statusId(), statusLabels)
+                            + " to " + formatStatus(after.statusId(), statusLabels));
         }
         if (before.completedAt() == null && after.completedAt() != null) {
             long timelineEventId = taskDao.addTaskTimelineEvent(
@@ -857,6 +875,17 @@ public final class CaseTaskService {
         return labels;
     }
 
+    private Map<Integer, String> loadTaskStatusLabels(int shaleClientId) {
+        Map<Integer, String> labels = new HashMap<>();
+        for (TaskStatusOptionDto option : taskDao.listActiveTaskStatuses(shaleClientId)) {
+            if (option == null) {
+                continue;
+            }
+            labels.put(option.id(), option.name());
+        }
+        return labels;
+    }
+
     private static String formatPriority(Integer priorityId, Map<Integer, String> labels) {
         if (priorityId == null) {
             return "None";
@@ -864,6 +893,17 @@ public final class CaseTaskService {
         String name = labels.get(priorityId);
         if (name == null || name.isBlank()) {
             return "Priority #" + priorityId;
+        }
+        return name.trim();
+    }
+
+    private static String formatStatus(Integer statusId, Map<Integer, String> labels) {
+        if (statusId == null) {
+            return "None";
+        }
+        String name = labels.get(statusId);
+        if (name == null || name.isBlank()) {
+            return "Status #" + statusId;
         }
         return name.trim();
     }
@@ -937,6 +977,7 @@ public final class CaseTaskService {
             String title,
             String description,
             java.time.LocalDateTime dueAt,
+            Integer statusId,
             Integer priorityId,
             boolean completed,
             int changedByUserId) {

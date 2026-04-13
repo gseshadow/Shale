@@ -17,6 +17,7 @@ import java.util.function.Consumer;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.ui.component.dialog.AppDialogs;
@@ -799,32 +800,33 @@ public final class MyShaleController {
 		new Thread(() -> {
 			try {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
-					List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-					List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
-							detail == null
-									? List.of()
-									: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
-					List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
-							? List.of()
-							: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
-									.map(item -> new TaskDetailDialog.TaskActivityEntry(
-											item.title(),
-											item.body(),
-											item.actorDisplayName(),
-											item.occurredAt()))
-									.toList();
-					List<TaskDetailDialog.TaskNoteEntry> noteEntries = detail == null
-							? List.of()
-							: caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
-									.map(note -> new TaskDetailDialog.TaskNoteEntry(
-											note.id(),
-											note.userId(),
-											note.userDisplayName(),
-											note.body(),
-											note.createdAt(),
-											note.updatedAt(),
-											note.userId() == currentUserId))
-									.toList();
+				List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
+				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+				List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
+						detail == null
+								? List.of()
+								: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
+				List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
+						? List.of()
+						: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+								.map(item -> new TaskDetailDialog.TaskActivityEntry(
+										item.title(),
+										item.body(),
+										item.actorDisplayName(),
+										item.occurredAt()))
+								.toList();
+				List<TaskDetailDialog.TaskNoteEntry> noteEntries = detail == null
+						? List.of()
+						: caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
+								.map(note -> new TaskDetailDialog.TaskNoteEntry(
+										note.id(),
+										note.userId(),
+										note.userDisplayName(),
+										note.body(),
+										note.createdAt(),
+										note.updatedAt(),
+										note.userId() == currentUserId))
+								.toList();
 
 				runOnFx(() -> {
 					try {
@@ -843,6 +845,7 @@ public final class MyShaleController {
 								detail.title(),
 								detail.description(),
 								detail.dueAt(),
+								detail.statusId(),
 								detail.priorityId(),
 								detail.createdByDisplayName(),
 										assignedTeam.stream()
@@ -858,6 +861,7 @@ public final class MyShaleController {
 								TaskDetailDialog.showAndWait(
 										taskDialogOwner(),
 										model,
+										statuses,
 										priorities,
 										id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
 											new TaskDetailDialog.AssignmentEditor() {
@@ -953,6 +957,7 @@ public final class MyShaleController {
 				payload.title(),
 				payload.description(),
 				payload.dueAt(),
+				payload.statusId(),
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);

@@ -15,6 +15,7 @@ import java.util.Set;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
 
@@ -24,7 +25,9 @@ import com.shale.core.semantics.RoleSemantics;
 public final class TaskDao {
     private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
     private static final String PRIORITIES_TABLE = "dbo.Priorities";
+    private static final String TASK_STATUSES_TABLE = "dbo.TaskStatuses";
     private static final String PRIORITY_SYSTEM_KEY_NORMAL = "normal";
+    private static final String TASK_STATUS_SYSTEM_KEY_OPEN = "open";
     public static final class TaskTimelineEventTypes {
         public static final String TASK_CREATED = "TASK_CREATED";
         public static final String TASK_COMPLETED = "TASK_COMPLETED";
@@ -33,6 +36,7 @@ public final class TaskDao {
         public static final String TASK_DESCRIPTION_CHANGED = "TASK_DESCRIPTION_CHANGED";
         public static final String TASK_DUE_DATE_CHANGED = "TASK_DUE_DATE_CHANGED";
         public static final String TASK_PRIORITY_CHANGED = "TASK_PRIORITY_CHANGED";
+        public static final String TASK_STATUS_CHANGED = "TASK_STATUS_CHANGED";
         public static final String TASK_ASSIGNMENT_ADDED = "TASK_ASSIGNMENT_ADDED";
         public static final String TASK_ASSIGNMENT_REMOVED = "TASK_ASSIGNMENT_REMOVED";
         public static final String TASK_DELETED = "TASK_DELETED";
@@ -45,6 +49,7 @@ public final class TaskDao {
                 TASK_DESCRIPTION_CHANGED,
                 TASK_DUE_DATE_CHANGED,
                 TASK_PRIORITY_CHANGED,
+                TASK_STATUS_CHANGED,
                 TASK_ASSIGNMENT_ADDED,
                 TASK_ASSIGNMENT_REMOVED,
                 TASK_DELETED
@@ -76,6 +81,8 @@ public final class TaskDao {
     public static final byte DEFAULT_PRIMARY_ASSIGNMENT_ROLE = 1;
 
     private record PriorityLookupRow(int id, String name, Integer sortOrder, String systemKey) {
+    }
+    private record TaskStatusLookupRow(int id, String name, Integer sortOrder, String systemKey) {
     }
     public record TaskAssignedUserRow(int userId, String displayName, String color) {
     }
@@ -430,6 +437,7 @@ public final class TaskDao {
                       AND myAssignment.UserId = ?
                   )
                   AND ISNULL(t.IsDeleted, 0) = 0
+                  AND ISNULL(t.StatusId, 0) <> 3
                   %s
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
@@ -632,6 +640,7 @@ public final class TaskDao {
                   t.Title,
                   t.Description,
                   t.DueAt,
+                  t.StatusId,
                   t.PriorityId,
                   t.CompletedAt,
                   assignment.UserId AS AssignedUserId,
@@ -712,6 +721,7 @@ public final class TaskDao {
                         rs.getString("Title"),
                         rs.getString("Description"),
                         toLocalDateTime(rs.getTimestamp("DueAt")),
+                        (Integer) rs.getObject("StatusId"),
                         (Integer) rs.getObject("PriorityId"),
                         toLocalDateTime(rs.getTimestamp("CompletedAt")),
                         (Integer) rs.getObject("AssignedUserId"),
@@ -1207,12 +1217,39 @@ public final class TaskDao {
         }
     }
 
+    public List<TaskStatusOptionDto> listActiveTaskStatuses(int shaleClientId) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        try (Connection con = db.requireConnection()) {
+            if (!tableExists(con, TASK_STATUSES_TABLE)) {
+                return List.of();
+            }
+            List<TaskStatusLookupRow> effective = listEffectiveTaskStatusesForTenant(con, shaleClientId, true);
+            List<TaskStatusOptionDto> out = new ArrayList<>(effective.size());
+            for (TaskStatusLookupRow row : effective) {
+                if (row == null) {
+                    continue;
+                }
+                String displayName = row.name() == null || row.name().isBlank()
+                        ? "Status " + row.id()
+                        : row.name().trim();
+                out.add(new TaskStatusOptionDto(row.id(), displayName, row.sortOrder()));
+            }
+            return out;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to list task statuses for shaleClientId=" + shaleClientId, e);
+        }
+    }
+
     public void updateTask(
             long taskId,
             int shaleClientId,
             String title,
             String description,
             LocalDateTime dueAt,
+            Integer statusId,
             Integer priorityId,
             boolean completed) {
         if (taskId <= 0) {
@@ -1231,6 +1268,7 @@ public final class TaskDao {
                 SET Title = ?,
                     Description = ?,
                     DueAt = ?,
+                    StatusId = ?,
                     PriorityId = ?,
                     CompletedAt = %s,
                     UpdatedAt = SYSDATETIME()
@@ -1241,11 +1279,13 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
+            int resolvedStatusId = resolveStatusIdForUpdate(con, shaleClientId, statusId);
             int resolvedPriorityId = resolvePriorityIdForCreate(con, shaleClientId, priorityId);
             int i = 1;
             ps.setString(i++, normalizedTitle);
             setNullableString(ps, i++, description);
             setNullableTimestamp(ps, i++, dueAt);
+            ps.setInt(i++, resolvedStatusId);
             ps.setInt(i++, resolvedPriorityId);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
@@ -2010,34 +2050,142 @@ public final class TaskDao {
         }
     }
 
-    private static int resolveDefaultTaskStatusId(Connection con, int shaleClientId) throws SQLException {
-        boolean hasLifecycleKey = hasColumn(con, "dbo.Statuses", "LifecycleKey");
-        boolean hasSystemKey = hasColumn(con, "dbo.Statuses", "SystemKey");
-        String lifecycleExpr = hasLifecycleKey
-                ? "LOWER(LTRIM(RTRIM(ISNULL(s.LifecycleKey, ''))))"
-                : "''";
-        String systemExpr = hasSystemKey
-                ? "LOWER(LTRIM(RTRIM(ISNULL(s.SystemKey, ''))))"
-                : "''";
-        String sql = """
-                SELECT TOP (1) s.Id
-                FROM dbo.Statuses s
-                WHERE s.ShaleClientId = ?
-                  AND NOT (%s IN ('closed', 'denied') OR %s IN ('closed', 'denied'))
-                ORDER BY
-                  CASE WHEN LOWER(LTRIM(RTRIM(ISNULL(s.Name, '')))) IN ('open', 'todo', 'to do', 'active') THEN 0 ELSE 1 END,
-                  ISNULL(s.SortOrder, 2147483647),
-                  s.Id;
-                """.formatted(lifecycleExpr, systemExpr);
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, shaleClientId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
+    private static TaskStatusLookupRow mapTaskStatusLookupRow(ResultSet rs, boolean hasName, boolean hasSortOrder) throws SQLException {
+        return new TaskStatusLookupRow(
+                rs.getInt("Id"),
+                hasName ? rs.getString("Name") : null,
+                hasSortOrder ? (Integer) rs.getObject("SortOrder") : null,
+                normalizeSystemKey(rs.getString("SystemKey"))
+        );
+    }
+
+    private static List<TaskStatusLookupRow> resolveEffectiveTaskStatuses(List<TaskStatusLookupRow> globalStatuses, List<TaskStatusLookupRow> tenantStatuses) {
+        List<TaskStatusLookupRow> globalUnkeyed = new ArrayList<>();
+        List<TaskStatusLookupRow> tenantUnkeyed = new ArrayList<>();
+        java.util.Map<String, TaskStatusLookupRow> bySystemKey = new java.util.LinkedHashMap<>();
+
+        if (globalStatuses != null) {
+            for (TaskStatusLookupRow status : globalStatuses) {
+                if (status == null) {
+                    continue;
+                }
+                String systemKey = normalizeSystemKey(status.systemKey());
+                if (systemKey == null) {
+                    globalUnkeyed.add(status);
+                    continue;
+                }
+                bySystemKey.putIfAbsent(systemKey, status);
+            }
+        }
+
+        if (tenantStatuses != null) {
+            for (TaskStatusLookupRow status : tenantStatuses) {
+                if (status == null) {
+                    continue;
+                }
+                String systemKey = normalizeSystemKey(status.systemKey());
+                if (systemKey == null) {
+                    tenantUnkeyed.add(status);
+                    continue;
+                }
+                bySystemKey.put(systemKey, status);
+            }
+        }
+
+        List<TaskStatusLookupRow> merged = new ArrayList<>(globalUnkeyed.size() + bySystemKey.size() + tenantUnkeyed.size());
+        merged.addAll(globalUnkeyed);
+        merged.addAll(bySystemKey.values());
+        merged.addAll(tenantUnkeyed);
+        merged.sort((a, b) -> {
+            if (a == b) {
+                return 0;
+            }
+            if (a == null) {
+                return 1;
+            }
+            if (b == null) {
+                return -1;
+            }
+            int aSort = a.sortOrder() == null ? Integer.MAX_VALUE : a.sortOrder();
+            int bSort = b.sortOrder() == null ? Integer.MAX_VALUE : b.sortOrder();
+            int bySort = Integer.compare(aSort, bSort);
+            if (bySort != 0) {
+                return bySort;
+            }
+            return Integer.compare(a.id(), b.id());
+        });
+        return merged;
+    }
+
+    private static List<TaskStatusLookupRow> listEffectiveTaskStatusesForTenant(Connection con, int shaleClientId, boolean activeOnly) throws SQLException {
+        if (!tableExists(con, TASK_STATUSES_TABLE)) {
+            return List.of();
+        }
+        boolean hasName = hasColumn(con, TASK_STATUSES_TABLE, "Name");
+        boolean hasSortOrder = hasColumn(con, TASK_STATUSES_TABLE, "SortOrder");
+        boolean hasIsActive = hasColumn(con, TASK_STATUSES_TABLE, "IsActive");
+        boolean hasSystemKey = hasColumn(con, TASK_STATUSES_TABLE, "SystemKey");
+
+        String nameSelect = hasName ? "s.Name" : "NULL AS Name";
+        String sortOrderSelect = hasSortOrder ? "s.SortOrder" : "NULL AS SortOrder";
+        String systemKeySelect = hasSystemKey ? "s.SystemKey" : "NULL AS SystemKey";
+        String activeFilter = (activeOnly && hasIsActive) ? "\n  AND ISNULL(s.IsActive, 1) = 1" : "";
+        String orderExpr = hasSortOrder ? "ISNULL(s.SortOrder, 2147483647)" : "s.Id";
+
+        String tenantSql = """
+                SELECT s.Id, %s, %s, %s
+                FROM dbo.TaskStatuses s
+                WHERE s.ShaleClientId = ?%s
+                ORDER BY %s, s.Id;
+                """.formatted(nameSelect, sortOrderSelect, systemKeySelect, activeFilter, orderExpr);
+        try (PreparedStatement tenantPs = con.prepareStatement(tenantSql)) {
+            tenantPs.setInt(1, shaleClientId);
+            try (ResultSet tenantRs = tenantPs.executeQuery()) {
+                List<TaskStatusLookupRow> tenantStatuses = new ArrayList<>();
+                while (tenantRs.next()) {
+                    tenantStatuses.add(mapTaskStatusLookupRow(tenantRs, hasName, hasSortOrder));
+                }
+
+                String globalSql = """
+                        SELECT s.Id, %s, %s, %s
+                        FROM dbo.TaskStatuses s
+                        WHERE s.ShaleClientId IS NULL%s
+                        ORDER BY %s, s.Id;
+                        """.formatted(nameSelect, sortOrderSelect, systemKeySelect, activeFilter, orderExpr);
+                try (PreparedStatement globalPs = con.prepareStatement(globalSql);
+                     ResultSet globalRs = globalPs.executeQuery()) {
+                    List<TaskStatusLookupRow> globalStatuses = new ArrayList<>();
+                    while (globalRs.next()) {
+                        globalStatuses.add(mapTaskStatusLookupRow(globalRs, hasName, hasSortOrder));
+                    }
+                    return resolveEffectiveTaskStatuses(globalStatuses, tenantStatuses);
                 }
             }
         }
+    }
+
+    private static int resolveDefaultTaskStatusId(Connection con, int shaleClientId) throws SQLException {
+        List<TaskStatusLookupRow> effective = listEffectiveTaskStatusesForTenant(con, shaleClientId, true);
+        for (TaskStatusLookupRow row : effective) {
+            if (row == null) {
+                continue;
+            }
+            if (TASK_STATUS_SYSTEM_KEY_OPEN.equals(normalizeSystemKey(row.systemKey()))) {
+                return row.id();
+            }
+        }
+        if (!effective.isEmpty()) {
+            return effective.get(0).id();
+        }
         throw new IllegalStateException("No default open task status found for shaleClientId=" + shaleClientId);
+    }
+
+    private static int resolveStatusIdForUpdate(Connection con, int shaleClientId, Integer requestedStatusId) throws SQLException {
+        if (requestedStatusId != null && requestedStatusId > 0
+                && isTaskStatusSelectable(con, shaleClientId, requestedStatusId)) {
+            return requestedStatusId;
+        }
+        return resolveDefaultTaskStatusId(con, shaleClientId);
     }
 
     private static int resolveDefaultTaskPriorityId(Connection con, int shaleClientId) throws SQLException {
@@ -2083,6 +2231,32 @@ public final class TaskDao {
 
         try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
             ps.setInt(1, priorityId);
+            ps.setInt(2, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) == 1;
+            }
+        }
+    }
+
+    private static boolean isTaskStatusSelectable(Connection con, int shaleClientId, int statusId) throws SQLException {
+        if (!tableExists(con, TASK_STATUSES_TABLE)) {
+            return false;
+        }
+        boolean hasIsActive = hasColumn(con, TASK_STATUSES_TABLE, "IsActive");
+        StringBuilder sql = new StringBuilder("""
+                SELECT CASE WHEN EXISTS (
+                    SELECT 1
+                    FROM dbo.TaskStatuses s
+                    WHERE s.Id = ?
+                      AND (s.ShaleClientId = ? OR s.ShaleClientId IS NULL)
+                """);
+        if (hasIsActive) {
+            sql.append("\n  AND ISNULL(s.IsActive, 1) = 1");
+        }
+        sql.append("\n) THEN 1 ELSE 0 END;");
+
+        try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+            ps.setInt(1, statusId);
             ps.setInt(2, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() && rs.getInt(1) == 1;
