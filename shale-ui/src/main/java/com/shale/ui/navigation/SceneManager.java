@@ -806,6 +806,7 @@ public final class SceneManager {
 				model,
 				statuses,
 				priorities,
+				null,
 				id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
 				id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
 						.map(member -> new TaskDetailDialog.AssignedTeamMember(

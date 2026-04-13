@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -57,6 +58,7 @@ public final class TaskDetailDialog {
             TaskDetailModel model,
             List<TaskStatusOptionDto> statuses,
             List<TaskPriorityOptionDto> priorities,
+            Function<Long, CoreTaskHydration> loadCoreTaskData,
             Function<Long, List<CaseTaskService.AssignableUserOption>> loadAssignableUsersForTask,
             Function<Long, List<AssignedTeamMember>> loadAssignedTeamMembers,
             Function<Long, List<TaskActivityEntry>> loadActivityEntries,
@@ -115,6 +117,9 @@ public final class TaskDetailDialog {
         priorityCombo.setCellFactory(cb -> new PriorityListCell());
         priorityCombo.setButtonCell(new PriorityListCell());
         selectPriority(priorityCombo, safePriorities, model.priorityId());
+        Label coreLoadingLabel = loadingLabel("Loading task details…");
+        boolean needsCoreHydration = safeStatuses.isEmpty() || safePriorities.isEmpty() || loadCoreTaskData != null;
+        setVisibleManaged(coreLoadingLabel, needsCoreHydration);
 
         CheckBox completedCheck = new CheckBox("Completed");
         completedCheck.setSelected(model.completed());
@@ -213,6 +218,7 @@ public final class TaskDetailDialog {
 
         VBox formContent = new VBox(8,
                 createdByLabel,
+                coreLoadingLabel,
                 new Label("Title"), titleField,
                 new Label("Description"), descriptionArea,
                 relatedCaseSection,
@@ -354,6 +360,7 @@ public final class TaskDetailDialog {
         Button saveButton = new Button("Save");
         saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
         saveButton.setDefaultButton(true);
+        saveButton.setDisable(safeStatuses.isEmpty() || safePriorities.isEmpty());
         saveButton.setOnAction(e -> {
             String title = safe(titleField.getText()).trim();
             if (title.isBlank()) {
@@ -408,6 +415,10 @@ public final class TaskDetailDialog {
                 + " taskId=" + model.taskId());
         System.out.println("[TASK_DETAIL_TIMING][" + context + "] fxml_load_ms=0 taskId=" + model.taskId() + " reason=programmatic-dialog");
         stage.setOnShown(e -> {
+            AtomicLong coreLoadVersion = new AtomicLong();
+            AtomicLong assignedLoadVersion = new AtomicLong();
+            AtomicLong activityLoadVersion = new AtomicLong();
+            AtomicLong notesLoadVersion = new AtomicLong();
             System.out.println("[TASK_DETAIL_TIMING][" + context + "] initial_show_ms=" + elapsedMillis(dialogCreateStartedAt)
                     + " taskId=" + model.taskId());
             if (clickReceivedAtNanos > 0L) {
@@ -415,9 +426,47 @@ public final class TaskDetailDialog {
                         + elapsedMillis(clickReceivedAtNanos) + " taskId=" + model.taskId());
             }
             System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_start_all taskId=" + model.taskId());
+            if (loadCoreTaskData != null) {
+                loadSectionAsync(
+                        context,
+                        "core",
+                        stage,
+                        coreLoadVersion,
+                        model.taskId(),
+                        () -> List.of(loadCoreTaskData.apply(model.taskId())),
+                        entries -> {
+                            CoreTaskHydration core = entries.isEmpty() ? null : entries.get(0);
+                            if (core == null || core.detail() == null) {
+                                return;
+                            }
+                            var detail = core.detail();
+                            titleField.setText(safe(detail.title()));
+                            descriptionArea.setText(safe(detail.description()));
+                            dueDatePicker.setValue(detail.dueAt() == null ? null : detail.dueAt().toLocalDate());
+                            dueTimeField.setText(detail.dueAt() == null ? "" : detail.dueAt().toLocalTime().toString());
+                            completedCheck.setSelected(detail.completedAt() != null);
+                            createdByLabel.setText("Created by: " + displayCreatedBy(detail.createdByDisplayName()));
+                            List<TaskStatusOptionDto> hydratedStatuses = core.statuses() == null ? List.of() : core.statuses();
+                            statusCombo.getItems().setAll(hydratedStatuses);
+                            selectStatus(statusCombo, hydratedStatuses, detail.statusId());
+                            List<TaskPriorityOptionDto> hydratedPriorities = core.priorities() == null ? List.of() : core.priorities();
+                            priorityCombo.getItems().setAll(hydratedPriorities);
+                            selectPriority(priorityCombo, hydratedPriorities, detail.priorityId());
+                            saveButton.setDisable(hydratedStatuses.isEmpty() || hydratedPriorities.isEmpty());
+                            setVisibleManaged(coreLoadingLabel, false);
+                        },
+                        ex -> {
+                            showError(errorLabel, "Failed to load task details. " + rootCauseMessage(ex));
+                            setVisibleManaged(coreLoadingLabel, false);
+                        });
+            } else {
+                setVisibleManaged(coreLoadingLabel, false);
+            }
             loadSectionAsync(
                     context,
                     "assigned",
+                    stage,
+                    assignedLoadVersion,
                     model.taskId(),
                     () -> loadAssignedTeamMembers == null ? List.of() : loadAssignedTeamMembers.apply(model.taskId()),
                     members -> {
@@ -433,6 +482,8 @@ public final class TaskDetailDialog {
             loadSectionAsync(
                     context,
                     "activity",
+                    stage,
+                    activityLoadVersion,
                     model.taskId(),
                     () -> loadActivityEntries == null ? List.of() : loadActivityEntries.apply(model.taskId()),
                     entries -> {
@@ -446,6 +497,8 @@ public final class TaskDetailDialog {
             loadSectionAsync(
                     context,
                     "notes",
+                    stage,
+                    notesLoadVersion,
                     model.taskId(),
                     () -> loadNoteEntries == null ? List.of() : loadNoteEntries.apply(model.taskId()),
                     entries -> {
@@ -482,16 +535,25 @@ public final class TaskDetailDialog {
     private static <T> void loadSectionAsync(
             String context,
             String sectionName,
+            Stage stage,
+            AtomicLong sectionVersion,
             long taskId,
             Callable<List<T>> loader,
             Consumer<List<T>> onSuccess,
             Consumer<Throwable> onError) {
         System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_start section=" + sectionName + " taskId=" + taskId);
+        long requestVersion = sectionVersion == null ? 0L : sectionVersion.incrementAndGet();
         long startedAt = System.nanoTime();
         new Thread(() -> {
             try {
                 List<T> value = loader == null ? List.of() : loader.call();
                 Platform.runLater(() -> {
+                    if (stage != null && !stage.isShowing()) {
+                        return;
+                    }
+                    if (sectionVersion != null && sectionVersion.get() != requestVersion) {
+                        return;
+                    }
                     if (onSuccess != null) {
                         onSuccess.accept(value == null ? List.of() : value);
                     }
@@ -500,6 +562,12 @@ public final class TaskDetailDialog {
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
+                    if (stage != null && !stage.isShowing()) {
+                        return;
+                    }
+                    if (sectionVersion != null && sectionVersion.get() != requestVersion) {
+                        return;
+                    }
                     if (onError != null) {
                         onError.accept(ex);
                     }
@@ -955,6 +1023,12 @@ public final class TaskDetailDialog {
             Integer statusId,
             Integer priorityId,
             boolean completed) {
+    }
+
+    public record CoreTaskHydration(
+            com.shale.core.dto.TaskDetailDto detail,
+            List<TaskStatusOptionDto> statuses,
+            List<TaskPriorityOptionDto> priorities) {
     }
 
     public record TaskDetailResult(TaskDetailAction action, SaveTaskPayload payload) {
