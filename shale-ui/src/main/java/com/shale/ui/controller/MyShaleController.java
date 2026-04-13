@@ -50,7 +50,6 @@ public final class MyShaleController {
 	private static final String SORT_SOL = "Statute of Limitations Date";
 	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
-	private static final TaskCardFactory.Variant MY_TASKS_CARD_VARIANT = TaskCardFactory.Variant.COMPACT;
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -579,11 +578,12 @@ public final class MyShaleController {
 					task.caseNonEngagementLetterSent(),
 					task.title(),
 					task.description(),
+					task.createdByDisplayName(),
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
 					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			myTasksList.getChildren().add(taskCardFactory.create(model, MY_TASKS_CARD_VARIANT));
+			myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);

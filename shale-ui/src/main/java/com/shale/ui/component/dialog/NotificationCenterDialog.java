@@ -200,6 +200,7 @@ public final class NotificationCenterDialog {
 					null,
 					null,
 					null,
+					null,
 					List.of());
 			Region previewCard = taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
 			previewCard.getStyleClass().add("notification-task-preview");

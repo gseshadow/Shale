@@ -200,6 +200,11 @@ public final class TaskDao {
                   assignment.DisplayName AS AssignedUserDisplayName,
                   assignment.Color AS AssignedUserColor,
                   t.CreatedByUserId,
+                  LTRIM(RTRIM(
+                    COALESCE(createdByUser.name_first, '') +
+                    CASE WHEN COALESCE(createdByUser.name_first, '') = '' OR COALESCE(createdByUser.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(createdByUser.name_last, '')
+                  )) AS CreatedByDisplayName,
                   t.CreatedAt,
                   t.UpdatedAt,
                   t.IsDeleted
@@ -207,6 +212,9 @@ public final class TaskDao {
                 INNER JOIN dbo.Cases c
                   ON c.Id = t.CaseId
                  AND c.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.Users createdByUser
+                  ON createdByUser.Id = t.CreatedByUserId
+                 AND createdByUser.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Priorities p
                   ON p.Id = t.PriorityId
                  AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
@@ -283,6 +291,7 @@ public final class TaskDao {
                             rs.getString("AssignedUserDisplayName"),
                             rs.getString("AssignedUserColor"),
                             (Integer) rs.getObject("CreatedByUserId"),
+                            rs.getString("CreatedByDisplayName"),
                             toLocalDateTime(rs.getTimestamp("CreatedAt")),
                             toLocalDateTime(rs.getTimestamp("UpdatedAt")),
                             rs.getBoolean("IsDeleted")
@@ -332,6 +341,11 @@ public final class TaskDao {
                   assignment.DisplayName AS AssignedUserDisplayName,
                   assignment.Color AS AssignedUserColor,
                   t.CreatedByUserId,
+                  LTRIM(RTRIM(
+                    COALESCE(createdByUser.name_first, '') +
+                    CASE WHEN COALESCE(createdByUser.name_first, '') = '' OR COALESCE(createdByUser.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(createdByUser.name_last, '')
+                  )) AS CreatedByDisplayName,
                   t.CreatedAt,
                   t.UpdatedAt,
                   t.IsDeleted
@@ -339,6 +353,9 @@ public final class TaskDao {
                 INNER JOIN dbo.Cases c
                   ON c.Id = t.CaseId
                  AND c.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.Users createdByUser
+                  ON createdByUser.Id = t.CreatedByUserId
+                 AND createdByUser.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Priorities p
                   ON p.Id = t.PriorityId
                  AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
@@ -426,6 +443,7 @@ public final class TaskDao {
                             rs.getString("AssignedUserDisplayName"),
                             rs.getString("AssignedUserColor"),
                             (Integer) rs.getObject("CreatedByUserId"),
+                            rs.getString("CreatedByDisplayName"),
                             toLocalDateTime(rs.getTimestamp("CreatedAt")),
                             toLocalDateTime(rs.getTimestamp("UpdatedAt")),
                             rs.getBoolean("IsDeleted")

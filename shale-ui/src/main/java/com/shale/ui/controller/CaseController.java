@@ -2095,11 +2095,12 @@ public class CaseController {
 					task.caseNonEngagementLetterSent(),
 					task.title(),
 					task.description(),
+					task.createdByDisplayName(),
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
 					caseTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT));
+			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.FULL));
 		}
 
 		setVisibleManaged(tasksTabEmptyLabel, false);
