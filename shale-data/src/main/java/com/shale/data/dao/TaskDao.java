@@ -200,6 +200,7 @@ public final class TaskDao {
                   assignment.DisplayName AS AssignedUserDisplayName,
                   assignment.Color AS AssignedUserColor,
                   t.CreatedByUserId,
+                  createdBy.DisplayName AS CreatedByDisplayName,
                   t.CreatedAt,
                   t.UpdatedAt,
                   t.IsDeleted
@@ -250,6 +251,17 @@ public final class TaskDao {
                     ta.AssignedAt DESC,
                     ta.UserId DESC
                 ) assignment
+                OUTER APPLY (
+                  SELECT
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName
+                  FROM dbo.Users u
+                  WHERE u.Id = t.CreatedByUserId
+                    AND u.ShaleClientId = t.ShaleClientId
+                ) createdBy
                 WHERE t.CaseId = ?
                   AND t.ShaleClientId = ?
                   AND ISNULL(t.IsDeleted, 0) = 0
@@ -283,6 +295,7 @@ public final class TaskDao {
                             rs.getString("AssignedUserDisplayName"),
                             rs.getString("AssignedUserColor"),
                             (Integer) rs.getObject("CreatedByUserId"),
+                            rs.getString("CreatedByDisplayName"),
                             toLocalDateTime(rs.getTimestamp("CreatedAt")),
                             toLocalDateTime(rs.getTimestamp("UpdatedAt")),
                             rs.getBoolean("IsDeleted")
@@ -332,6 +345,7 @@ public final class TaskDao {
                   assignment.DisplayName AS AssignedUserDisplayName,
                   assignment.Color AS AssignedUserColor,
                   t.CreatedByUserId,
+                  createdBy.DisplayName AS CreatedByDisplayName,
                   t.CreatedAt,
                   t.UpdatedAt,
                   t.IsDeleted
@@ -382,6 +396,17 @@ public final class TaskDao {
                     ta.AssignedAt DESC,
                     ta.UserId DESC
                 ) assignment
+                OUTER APPLY (
+                  SELECT
+                    LTRIM(RTRIM(
+                      COALESCE(u.name_first, '') +
+                      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+                      COALESCE(u.name_last, '')
+                    )) AS DisplayName
+                  FROM dbo.Users u
+                  WHERE u.Id = t.CreatedByUserId
+                    AND u.ShaleClientId = t.ShaleClientId
+                ) createdBy
                 WHERE t.ShaleClientId = ?
                   AND EXISTS (
                     SELECT 1
@@ -426,6 +451,7 @@ public final class TaskDao {
                             rs.getString("AssignedUserDisplayName"),
                             rs.getString("AssignedUserColor"),
                             (Integer) rs.getObject("CreatedByUserId"),
+                            rs.getString("CreatedByDisplayName"),
                             toLocalDateTime(rs.getTimestamp("CreatedAt")),
                             toLocalDateTime(rs.getTimestamp("UpdatedAt")),
                             rs.getBoolean("IsDeleted")

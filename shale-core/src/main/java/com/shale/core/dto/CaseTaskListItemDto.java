@@ -22,6 +22,7 @@ public record CaseTaskListItemDto(
         String assignedUserDisplayName,
         String assignedUserColor,
         Integer createdByUserId,
+        String createdByDisplayName,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         boolean deleted

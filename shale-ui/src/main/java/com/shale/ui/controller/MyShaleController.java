@@ -64,6 +64,8 @@ public final class MyShaleController {
 	@FXML
 	private ChoiceBox<String> myTasksSortChoice;
 	@FXML
+	private TextField myTasksSearchField;
+	@FXML
 	private Button myTasksShowCompletedButton;
 	@FXML
 	private ScrollPane myTasksScroll;
@@ -142,6 +144,9 @@ public final class MyShaleController {
 			myTasksSortChoice.getSelectionModel().select(MY_TASKS_SORT_DUE_ASC);
 			myTasksSortChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> refreshMyTasks());
+		}
+		if (myTasksSearchField != null) {
+			myTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyTasks());
 		}
 		if (myTasksShowCompletedButton != null) {
 			myTasksShowCompletedButton.setOnAction(e -> {
@@ -559,6 +564,9 @@ public final class MyShaleController {
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
+
+		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
+		List<CaseTaskListItemDto> filteredTasks = filterAndRankMyTasks(myTasks, searchQuery);
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
@@ -568,7 +576,14 @@ public final class MyShaleController {
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
-		for (CaseTaskListItemDto task : myTasks) {
+		if (filteredTasks.isEmpty()) {
+			setVisibleManaged(myTasksEmptyLabel, true);
+			setVisibleManaged(myTasksScroll, false);
+			myTasksEmptyLabel.setText("No tasks found.");
+			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
+			return;
+		}
+		for (CaseTaskListItemDto task : filteredTasks) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
 					task.id(),
 					task.caseId(),
@@ -587,6 +602,59 @@ public final class MyShaleController {
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
+	}
+
+	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, String normalizedQuery) {
+		if (tasks == null || tasks.isEmpty()) {
+			return List.of();
+		}
+		if (normalizedQuery.isEmpty()) {
+			return tasks;
+		}
+		record RankedTask(CaseTaskListItemDto task, int score, int originalIndex) {
+		}
+		List<RankedTask> ranked = new ArrayList<>();
+		for (int i = 0; i < tasks.size(); i++) {
+			CaseTaskListItemDto task = tasks.get(i);
+			int score = myTaskSearchScore(task, normalizedQuery);
+			if (score > 0) {
+				ranked.add(new RankedTask(task, score, i));
+			}
+		}
+		ranked.sort(Comparator
+				.comparingInt(RankedTask::score).reversed()
+				.thenComparingInt(RankedTask::originalIndex));
+		return ranked.stream().map(RankedTask::task).toList();
+	}
+
+	private int myTaskSearchScore(CaseTaskListItemDto task, String normalizedQuery) {
+		if (task == null || normalizedQuery == null || normalizedQuery.isEmpty()) {
+			return 0;
+		}
+		if (containsIgnoreCase(task.title(), normalizedQuery)) {
+			return 4;
+		}
+		if (containsIgnoreCase(task.description(), normalizedQuery)) {
+			return 3;
+		}
+		if (containsIgnoreCase(task.caseName(), normalizedQuery)) {
+			return 2;
+		}
+		if (containsIgnoreCase(task.createdByDisplayName(), normalizedQuery)) {
+			return 1;
+		}
+		return 0;
+	}
+
+	private String normalizeSearchQuery(String rawQuery) {
+		if (rawQuery == null) {
+			return "";
+		}
+		return rawQuery.trim().toLowerCase(Locale.ROOT);
+	}
+
+	private boolean containsIgnoreCase(String value, String normalizedQuery) {
+		return safe(value).toLowerCase(Locale.ROOT).contains(normalizedQuery);
 	}
 
 	private CaseTaskService.MyTasksSortOption selectedMyTaskSort() {
