@@ -3008,10 +3008,6 @@ public class CaseController {
 			showError("Case details are unavailable.");
 			return;
 		}
-		if (!canDeleteCurrentCase()) {
-			showError("Only admin and attorney users can delete cases.");
-			return;
-		}
 		if (!confirmDeleteCase()) {
 			return;
 		}
@@ -3099,12 +3095,8 @@ public class CaseController {
 	}
 
 	private void refreshDeleteAction() {
-		boolean showDelete = canDeleteCurrentCase() && !editMode && !detailsEditMode;
+		boolean showDelete = current != null && caseDetailService != null && !editMode && !detailsEditMode;
 		setVisibleManaged(deleteCaseButton, showDelete);
-	}
-
-	private boolean canDeleteCurrentCase() {
-		return current != null && caseDetailService != null && caseDetailService.canDeleteCase();
 	}
 
 	// ----------------------------
