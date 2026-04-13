@@ -66,13 +66,13 @@ public final class NewClientDialog {
 		HBox actions = new HBox(10, spacer, cancelButton, createButton);
 		actions.setAlignment(Pos.CENTER_RIGHT);
 
-		HBox header = AppDialogs.createSecondaryWindowHeader(stage, "New Client", () -> {
+		VBox body = new VBox(12, form, errorLabel, actions);
+		body.setPadding(new Insets(12));
+		VBox root = AppDialogs.createSecondaryWindowShell(stage, "New Client", () -> {
 			result = Optional.empty();
 			stage.close();
-		});
-		VBox root = new VBox(12, header, form, errorLabel, actions);
+		}, body);
 		root.getStyleClass().add("secondary-window-shell");
-		root.setPadding(new Insets(12));
 		Scene scene = new Scene(root, 360, 170);
 		stage.setScene(scene);
 	}

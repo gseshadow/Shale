@@ -50,10 +50,6 @@ public final class NotificationCenterDialog {
 		stage.setMinWidth(680);
 		stage.setMinHeight(440);
 
-		VBox root = new VBox(12);
-		root.setPadding(new Insets(16));
-		root.getStyleClass().add("app-dialog-root");
-
 		Label heading = new Label("Notifications");
 		heading.getStyleClass().add("app-dialog-title");
 
@@ -82,8 +78,9 @@ public final class NotificationCenterDialog {
 		HBox actions = new HBox(10, markAllReadButton, spacer, closeButton);
 
 		VBox.setVgrow(listView, Priority.ALWAYS);
-		HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, "Notifications", stage::close);
-		root.getChildren().addAll(windowHeader, heading, subtitle, listView, actions);
+		VBox body = new VBox(12, heading, subtitle, listView, actions);
+		body.setPadding(new Insets(16));
+		VBox root = AppDialogs.createSecondaryWindowShell(stage, "Notifications", stage::close, body);
 
 		Scene scene = new Scene(root);
 		scene.getStylesheets().add(Objects.requireNonNull(

@@ -361,10 +361,9 @@ public final class TaskDetailDialog {
         HBox actions = new HBox(10, deleteButton, spacer, cancelButton, saveButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, "Task Details", stage::close);
-        VBox root = new VBox(16, windowHeader, heading, message, contentColumns, actions);
-        root.getStyleClass().add("app-dialog-root");
-        root.setPadding(new Insets(22, 24, 22, 24));
+        VBox body = new VBox(16, heading, message, contentColumns, actions);
+        body.setPadding(new Insets(22, 24, 22, 24));
+        VBox root = AppDialogs.createSecondaryWindowShell(stage, "Task Details", stage::close, body);
         root.setMinWidth(860);
         root.setPrefWidth(980);
         root.setMinHeight(620);
