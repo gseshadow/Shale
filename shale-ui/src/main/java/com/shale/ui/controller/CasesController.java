@@ -60,6 +60,8 @@ public final class CasesController {
 	private boolean hasMore = true;
 	private int loadGeneration = 0;
 	private int resultsCountGeneration = 0;
+	private String lastCountQuery;
+	private Set<Integer> lastCountStatuses;
 
 	// Loaded items (we keep these so search/sort can re-render)
 	private final List<CaseCardVm> loaded = new ArrayList<>();
@@ -409,7 +411,9 @@ public final class CasesController {
 				.filter(vm -> matchesQuery(vm, q) && matchesSelectedStatus(vm))
 				.sorted(comp)
 				.toList();
-		refreshResultsCountAsync(q, selectedStatusIds);
+		if (shouldRefreshResultsCount(q, selectedStatusIds)) {
+			refreshResultsCountAsync(q, selectedStatusIds);
+		}
 
 		boolean statusFilterActive = selectedStatusIds.size() < statusFilterOptions.size();
 		if (( !q.isEmpty() || statusFilterActive ) && filtered.size() < pageSize && hasMore && !loading) {
@@ -450,6 +454,17 @@ public final class CasesController {
 				Platform.runLater(ex::printStackTrace);
 			}
 		});
+	}
+
+	private boolean shouldRefreshResultsCount(String normalizedQuery, Set<Integer> selectedStatuses) {
+		String nextQuery = normalizedQuery == null ? "" : normalizedQuery;
+		Set<Integer> nextStatuses = new LinkedHashSet<>(selectedStatuses == null ? Set.of() : selectedStatuses);
+		if (Objects.equals(lastCountQuery, nextQuery) && Objects.equals(lastCountStatuses, nextStatuses)) {
+			return false;
+		}
+		lastCountQuery = nextQuery;
+		lastCountStatuses = nextStatuses;
+		return true;
 	}
 
 	private void updateResultsCountLabel(long total) {
