@@ -12,6 +12,7 @@ import java.util.Objects;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.NotificationDao;
@@ -256,6 +257,10 @@ public final class CaseTaskService {
         return taskDao.listActivePriorities(shaleClientId);
     }
 
+    public List<TaskStatusOptionDto> loadActiveTaskStatuses(int shaleClientId) {
+        return taskDao.listActiveTaskStatuses(shaleClientId);
+    }
+
     public void completeTask(long taskId, int shaleClientId) {
         completeTask(taskId, shaleClientId, null);
     }
@@ -344,6 +349,7 @@ public final class CaseTaskService {
                 request.title(),
                 request.description(),
                 request.dueAt(),
+                request.statusId(),
                 request.priorityId(),
                 request.completed());
         TaskDetailDto after = taskDao.findTaskDetail(request.taskId(), request.shaleClientId());
@@ -937,6 +943,7 @@ public final class CaseTaskService {
             String title,
             String description,
             java.time.LocalDateTime dueAt,
+            Integer statusId,
             Integer priorityId,
             boolean completed,
             int changedByUserId) {

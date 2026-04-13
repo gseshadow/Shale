@@ -12,6 +12,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.UserCardFactory;
@@ -50,6 +51,7 @@ public final class TaskDetailDialog {
     public static Optional<TaskDetailResult> showAndWait(
             Window owner,
             TaskDetailModel model,
+            List<TaskStatusOptionDto> statuses,
             List<TaskPriorityOptionDto> priorities,
             Function<Long, List<CaseTaskService.AssignableUserOption>> loadAssignableUsersForTask,
             AssignmentEditor assignmentEditor,
@@ -89,6 +91,14 @@ public final class TaskDetailDialog {
         dueTimeField.setPromptText("HH:mm (optional)");
         dueTimeField.setPrefColumnCount(8);
         HBox dueRow = new HBox(8, dueDatePicker, dueTimeField);
+
+        ComboBox<TaskStatusOptionDto> statusCombo = new ComboBox<>();
+        statusCombo.setMaxWidth(Double.MAX_VALUE);
+        List<TaskStatusOptionDto> safeStatuses = statuses == null ? List.of() : statuses;
+        statusCombo.getItems().setAll(safeStatuses);
+        statusCombo.setCellFactory(cb -> new StatusListCell());
+        statusCombo.setButtonCell(new StatusListCell());
+        selectStatus(statusCombo, safeStatuses, model.statusId());
 
         ComboBox<TaskPriorityOptionDto> priorityCombo = new ComboBox<>();
         priorityCombo.setMaxWidth(Double.MAX_VALUE);
@@ -196,6 +206,7 @@ public final class TaskDetailDialog {
                 new Label("Title"), titleField,
                 new Label("Description"), descriptionArea,
                 relatedCaseSection,
+                new Label("Status"), statusCombo,
                 new Label("Priority"), priorityCombo,
                 new Label("Due date/time"), dueRow,
                 assignedTeamSection,
@@ -347,10 +358,16 @@ public final class TaskDetailDialog {
                 showError(errorLabel, "Priority is required.");
                 return;
             }
+            Integer statusId = Optional.ofNullable(statusCombo.getValue()).map(TaskStatusOptionDto::id).orElse(null);
+            if (statusId == null) {
+                showError(errorLabel, "Status is required.");
+                return;
+            }
             result.value = TaskDetailResult.save(new SaveTaskPayload(
                     title,
                     descriptionArea.getText(),
                     dueAt,
+                    statusId,
                     priorityId,
                     completedCheck.isSelected()));
             stage.close();
@@ -478,6 +495,28 @@ public final class TaskDetailDialog {
             selected = priorities.get(0);
         }
         priorityCombo.setValue(selected);
+    }
+
+    private static void selectStatus(
+            ComboBox<TaskStatusOptionDto> statusCombo,
+            List<TaskStatusOptionDto> statuses,
+            Integer currentStatusId) {
+        if (statuses == null || statuses.isEmpty()) {
+            return;
+        }
+        TaskStatusOptionDto selected = null;
+        if (currentStatusId != null) {
+            for (TaskStatusOptionDto status : statuses) {
+                if (status != null && status.id() == currentStatusId) {
+                    selected = status;
+                    break;
+                }
+            }
+        }
+        if (selected == null) {
+            selected = statuses.get(0);
+        }
+        statusCombo.setValue(selected);
     }
 
     private static LocalDateTime parseDueAt(LocalDate dueDate, String dueTimeRaw) {
@@ -740,6 +779,7 @@ public final class TaskDetailDialog {
             String title,
             String description,
             LocalDateTime dueAt,
+            Integer statusId,
             Integer priorityId,
             String createdByDisplayName,
             List<AssignedTeamMember> assignedTeamMembers,
@@ -774,6 +814,7 @@ public final class TaskDetailDialog {
             String title,
             String description,
             LocalDateTime dueAt,
+            Integer statusId,
             Integer priorityId,
             boolean completed) {
     }
@@ -810,6 +851,14 @@ public final class TaskDetailDialog {
     private static final class PriorityListCell extends javafx.scene.control.ListCell<TaskPriorityOptionDto> {
         @Override
         protected void updateItem(TaskPriorityOptionDto item, boolean empty) {
+            super.updateItem(item, empty);
+            setText(empty || item == null ? null : item.name());
+        }
+    }
+
+    private static final class StatusListCell extends javafx.scene.control.ListCell<TaskStatusOptionDto> {
+        @Override
+        protected void updateItem(TaskStatusOptionDto item, boolean empty) {
             super.updateItem(item, empty);
             setText(empty || item == null ? null : item.name());
         }
