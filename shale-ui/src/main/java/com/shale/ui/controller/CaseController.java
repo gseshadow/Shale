@@ -2232,6 +2232,8 @@ public class CaseController {
 	}
 
 	private void showTaskDetailPopup(Long taskId) {
+	    long clickReceivedAt = System.nanoTime();
+	    System.out.println("[TASK_DETAIL_TIMING][CASE_TASKS] click_received taskId=" + taskId);
 	    if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
 	        return;
 	    }
@@ -2243,6 +2245,7 @@ public class CaseController {
 	        return;
 	    }
 	    if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
+	        System.out.println("[TASK_DETAIL_TIMING][CASE_TASKS] open_skipped_in_flight taskId=" + taskId);
 	        return;
 	    }
 
@@ -2251,31 +2254,8 @@ public class CaseController {
 	            TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 			List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
 	            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-                List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
-                        detail == null
-                                ? List.of()
-                                : caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
-                List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
-                        ? List.of()
-                        : caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
-                                .map(item -> new TaskDetailDialog.TaskActivityEntry(
-                                        item.title(),
-                                        item.body(),
-                                        item.actorDisplayName(),
-                                        item.occurredAt()))
-                                .toList();
-                List<TaskDetailDialog.TaskNoteEntry> noteEntries = detail == null
-                        ? List.of()
-                        : caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
-                                .map(note -> new TaskDetailDialog.TaskNoteEntry(
-                                        note.id(),
-                                        note.userId(),
-                                        note.userDisplayName(),
-                                        note.body(),
-                                        note.createdAt(),
-                                        note.updatedAt(),
-                                        note.userId() == currentUserId))
-                                .toList();
+                System.out.println("[TASK_DETAIL_TIMING][CASE_TASKS] dialog_prereq_loaded_ms="
+                        + ((System.nanoTime() - clickReceivedAt) / 1_000_000L) + " taskId=" + taskId);
 
 	            runOnFx(() -> {
 	                try {
@@ -2296,26 +2276,46 @@ public class CaseController {
 	                            detail.description(),
 	                            detail.dueAt(),
 	                            detail.statusId(),
-	                            detail.priorityId(),
+                                detail.priorityId(),
                                 detail.createdByDisplayName(),
-                                assignedTeam.stream()
-                                        .map(member -> new TaskDetailDialog.AssignedTeamMember(
-                                                member.userId(),
-                                                member.displayName(),
-                                                member.color()))
-                                        .toList(),
-                                activityEntries,
-                                noteEntries,
+	                            List.of(),
+                                List.of(),
+                                List.of(),
 		                            detail.completedAt() != null
 		                    );
 
 	                    Optional<TaskDetailDialog.TaskDetailResult> result =
 	                            TaskDetailDialog.showAndWait(
+	                                    "CASE_TASKS",
+	                                    clickReceivedAt,
 	                                    taskDialogOwner(),
 	                                    model,
 	                                    statuses,
 	                                    priorities,
 	                                    id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+	                                    id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
+	                                            .map(member -> new TaskDetailDialog.AssignedTeamMember(
+	                                                    member.userId(),
+	                                                    member.displayName(),
+	                                                    member.color()))
+	                                            .toList(),
+	                                    id -> caseTaskService.loadTaskActivity(id, shaleClientId).stream()
+	                                            .map(item -> new TaskDetailDialog.TaskActivityEntry(
+	                                                    item.title(),
+	                                                    item.body(),
+	                                                    item.actorDisplayName(),
+	                                                    item.occurredAt()))
+	                                            .toList(),
+	                                    id -> caseTaskService.loadTaskNotes(id, shaleClientId).stream()
+	                                            .map(note -> new TaskDetailDialog.TaskNoteEntry(
+	                                                    note.id(),
+	                                                    note.userId(),
+	                                                    note.userDisplayName(),
+	                                                    note.body(),
+	                                                    note.createdAt(),
+	                                                    note.updatedAt(),
+	                                                    note.userId() == currentUserId))
+	                                            .toList(),
 		                                    new TaskDetailDialog.AssignmentEditor() {
 	                                        @Override
 	                                        public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
@@ -2372,6 +2372,8 @@ public class CaseController {
                                             },
                                             onOpenUser,
 		                                    onOpenCase);
+	                    System.out.println("[TASK_DETAIL_TIMING][CASE_TASKS] dialog_open_invoked_ms="
+	                            + ((System.nanoTime() - clickReceivedAt) / 1_000_000L) + " taskId=" + taskId);
 
 	                    if (result.isEmpty()) {
 	                        return;
