@@ -1105,11 +1105,36 @@ public final class UserController {
 									noteEntries,
 									detail.completedAt() != null);
 						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+								"USER_CONTROLLER",
+								0L,
 								taskDialogOwner(),
 								model,
 								statuses,
 								priorities,
 								id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+								id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
+										.map(member -> new TaskDetailDialog.AssignedTeamMember(
+												member.userId(),
+												member.displayName(),
+												member.color()))
+										.toList(),
+								id -> caseTaskService.loadTaskActivity(id, shaleClientId).stream()
+										.map(item -> new TaskDetailDialog.TaskActivityEntry(
+												item.title(),
+												item.body(),
+												item.actorDisplayName(),
+												item.occurredAt()))
+										.toList(),
+								id -> caseTaskService.loadTaskNotes(id, shaleClientId).stream()
+										.map(note -> new TaskDetailDialog.TaskNoteEntry(
+												note.id(),
+												note.userId(),
+												note.userDisplayName(),
+												note.body(),
+												note.createdAt(),
+												note.updatedAt(),
+												note.userId() == currentUserId))
+										.toList(),
 									new TaskDetailDialog.AssignmentEditor() {
 									@Override
 									public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
