@@ -770,6 +770,7 @@ public final class UserController {
 				row.caseName(),
 				row.caseResponsibleAttorney(),
 				row.caseResponsibleAttorneyColor(),
+				row.caseNonEngagementLetterSent(),
 				row.title(),
 				row.description(),
 				row.priorityColorHex(),
@@ -850,7 +851,8 @@ public final class UserController {
 				row.intakeDate(),
 				row.statuteOfLimitationsDate(),
 				row.responsibleAttorneyName(),
-				row.responsibleAttorneyColor()));
+				row.responsibleAttorneyColor(),
+				row.nonEngagementLetterSent()));
 		if (card instanceof Region region) {
 			region.setMaxWidth(Double.MAX_VALUE);
 			region.setPrefWidth(340);
@@ -1081,6 +1083,7 @@ public final class UserController {
 								detail.caseName(),
 								detail.caseResponsibleAttorney(),
 								detail.caseResponsibleAttorneyColor(),
+				detail.caseNonEngagementLetterSent(),
 								detail.title(),
 								detail.description(),
 								detail.dueAt(),

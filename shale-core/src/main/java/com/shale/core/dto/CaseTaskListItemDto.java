@@ -12,6 +12,7 @@ public record CaseTaskListItemDto(
         String caseName,
         String caseResponsibleAttorney,
         String caseResponsibleAttorneyColor,
+        Boolean caseNonEngagementLetterSent,
         String title,
         String description,
         String priorityColorHex,

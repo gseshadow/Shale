@@ -117,7 +117,8 @@ public final class TaskDetailDialog {
                             null,
                             null,
                             model.caseResponsibleAttorney(),
-                            model.caseResponsibleAttorneyColor()),
+                            model.caseResponsibleAttorneyColor(),
+                            model.caseNonEngagementLetterSent()),
                     CaseCardFactory.Variant.MINI);
             relatedCaseSection.getChildren().setAll(relatedCaseLabel, caseCard);
         } else {
@@ -633,6 +634,7 @@ public final class TaskDetailDialog {
             String caseName,
             String caseResponsibleAttorney,
             String caseResponsibleAttorneyColor,
+            Boolean caseNonEngagementLetterSent,
             String title,
             String description,
             LocalDateTime dueAt,

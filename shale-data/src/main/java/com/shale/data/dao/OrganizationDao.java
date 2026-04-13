@@ -35,6 +35,7 @@ public final class OrganizationDao {
 			java.time.LocalDate statuteOfLimitationsDate,
 			String responsibleAttorneyName,
 			String responsibleAttorneyColor,
+			Boolean nonEngagementLetterSent,
 			String partyRoleName,
 			String side,
 			boolean primary,
@@ -623,6 +624,7 @@ public final class OrganizationDao {
 				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
 				  cp.Notes,
 				  u.color AS ResponsibleAttorneyColor,
+				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
 				  LTRIM(RTRIM(
 				    COALESCE(u.name_first, '') +
 				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
@@ -678,6 +680,7 @@ public final class OrganizationDao {
 						toLocalDate(rs.getDate("StatuteOfLimitations")),
 						rs.getString("ResponsibleAttorneyName"),
 						rs.getString("ResponsibleAttorneyColor"),
+						(Boolean) rs.getObject("NonEngagementLetterSent"),
 						rs.getString("PartyRoleName"),
 						rs.getString("Side"),
 						rs.getBoolean("IsPrimary"),
