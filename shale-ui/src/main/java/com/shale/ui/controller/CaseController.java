@@ -29,6 +29,7 @@ import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.core.semantics.RoleSemantics;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
@@ -2248,7 +2249,8 @@ public class CaseController {
 	    new Thread(() -> {
 	        try {
 	            TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
-		            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+			List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
+	            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
                 List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
                         detail == null
                                 ? List.of()
@@ -2293,6 +2295,7 @@ public class CaseController {
 	                            detail.title(),
 	                            detail.description(),
 	                            detail.dueAt(),
+	                            detail.statusId(),
 	                            detail.priorityId(),
                                 detail.createdByDisplayName(),
                                 assignedTeam.stream()
@@ -2310,6 +2313,7 @@ public class CaseController {
 	                            TaskDetailDialog.showAndWait(
 	                                    taskDialogOwner(),
 	                                    model,
+	                                    statuses,
 	                                    priorities,
 	                                    id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
 		                                    new TaskDetailDialog.AssignmentEditor() {
@@ -2410,6 +2414,7 @@ public class CaseController {
 				payload.title(),
 				payload.description(),
 				payload.dueAt(),
+				payload.statusId(),
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);

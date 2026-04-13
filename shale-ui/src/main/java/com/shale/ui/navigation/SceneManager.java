@@ -3,6 +3,7 @@ package com.shale.ui.navigation;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
@@ -736,8 +737,9 @@ public final class SceneManager {
 	private void loadAndOpenTaskDialog(Long taskId, int shaleClientId, int currentUserId, CaseTaskService caseTaskService) {
 		try {
 			TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+			List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
 			List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, priorities));
+			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, statuses, priorities));
 		} catch (Exception ex) {
 			Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
 		}
@@ -749,6 +751,7 @@ public final class SceneManager {
 			int currentUserId,
 			CaseTaskService caseTaskService,
 			TaskDetailDto detail,
+			List<TaskStatusOptionDto> statuses,
 			List<TaskPriorityOptionDto> priorities) {
 		if (detail == null) {
 			AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted.");
@@ -783,6 +786,7 @@ public final class SceneManager {
 				detail.title(),
 				detail.description(),
 				detail.dueAt(),
+				detail.statusId(),
 				detail.priorityId(),
 					detail.createdByDisplayName(),
 						assignedTeam.stream()
@@ -798,6 +802,7 @@ public final class SceneManager {
 		var result = TaskDetailDialog.showAndWait(
 				owner,
 				model,
+				statuses,
 				priorities,
 				id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
 				new TaskDetailDialog.AssignmentEditor() {
@@ -880,6 +885,7 @@ public final class SceneManager {
 				payload.title(),
 				payload.description(),
 				payload.dueAt(),
+				payload.statusId(),
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);
