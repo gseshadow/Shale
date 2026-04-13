@@ -249,14 +249,26 @@
     -fx-background-insets: 0;
     -fx-border-color: transparent;
     -fx-padding: 0;
+    -fx-control-inner-background: transparent;
     -fx-highlight-fill: rgba(75, 127, 206, 0.35);
     -fx-highlight-text-fill: inherit;
+}
+
+.read-only-display-field.text-area {
+    -fx-padding: 2 0 2 0;
 }
 
 .read-only-display-field .content {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-padding: 0;
+}
+
+.read-only-display-field .scroll-pane,
+.read-only-display-field .scroll-pane .viewport,
+.read-only-display-field .scroll-pane .content {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
 }
 
 
