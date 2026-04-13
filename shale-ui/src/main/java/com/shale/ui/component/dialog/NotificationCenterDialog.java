@@ -4,6 +4,7 @@ import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCenterService;
 import com.shale.ui.notification.NotificationCategory;
 import com.shale.ui.component.factory.TaskCardFactory;
+import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -20,6 +21,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.Node;
@@ -152,8 +154,12 @@ public final class NotificationCenterDialog {
 			Label title = new Label(item.getTitle());
 			title.getStyleClass().add("notification-row-title");
 
-			Label message = new Label(item.getMessage());
+			TextArea message = new TextArea(item.getMessage());
 			message.setWrapText(true);
+			message.setEditable(false);
+			message.setPrefRowCount(2);
+			message.setMaxWidth(Double.MAX_VALUE);
+			ReadOnlyTextDisplaySupport.apply(message, false);
 			message.getStyleClass().add("notification-row-message");
 
 			VBox wrapper = new VBox(6, topRow, title, message);

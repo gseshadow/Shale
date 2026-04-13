@@ -244,6 +244,40 @@
     -fx-background-color: transparent;
 }
 
+.read-only-display-field {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-control-inner-background: transparent;
+    -fx-text-fill: #112542;
+    -fx-text-inner-color: #112542;
+    -fx-highlight-fill: rgba(75, 127, 206, 0.35);
+    -fx-highlight-text-fill: inherit;
+}
+
+.read-only-display-field.text-area {
+    -fx-padding: 2 0 2 0;
+}
+
+.read-only-display-field .content {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-text-fill: #112542;
+}
+
+.read-only-display-field .scroll-pane,
+.read-only-display-field .scroll-pane .viewport,
+.read-only-display-field .scroll-pane .content {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.read-only-display-field .text {
+    -fx-fill: #112542;
+}
+
 
 .app-dialog-root {
     -fx-background-color: rgba(243, 248, 253, 0.96);
