@@ -35,10 +35,14 @@ public final class TaskCard extends VBox {
 	private final Label completedLabel = new Label();
 	private final StackPane relatedCaseHost = new StackPane();
 	private final StackPane assigneeHost = new StackPane();
+	private final Region titleDueSpacer = new Region();
+	private final HBox compactTitleRow = new HBox(8, titleLabel, titleDueSpacer, dueLabel);
 	private final Label caseSectionLabel = new Label("Case:");
 	private final VBox caseSection = new VBox(3, caseSectionLabel, relatedCaseHost);
 	private final Label teamSectionLabel = new Label("Team:");
 	private final VBox teamSection = new VBox(3, teamSectionLabel, assigneeHost);
+	private final Region compactMetadataSpacer = new Region();
+	private final HBox compactMetadataRow = new HBox(12, teamSection, compactMetadataSpacer, caseSection);
 	private final Button toggleCompleteButton = new Button();
 	private final Region actionsSpacer = new Region();
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
@@ -222,19 +226,21 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyCompact() {
-		getChildren().setAll(titleLabel, dueLabel, descriptionLabel, caseSection, teamSection, completedLabel, actionsRow);
-		setSpacing(6);
-		setPadding(new Insets(10, 12, 10, 12));
+		getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel, actionsRow);
+		setSpacing(5);
+		setPadding(new Insets(8, 10, 8, 10));
 		setAlignment(Pos.TOP_LEFT);
 		setMinWidth(320);
 		setPrefWidth(320);
 		setMaxWidth(320);
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
-		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
-		descriptionLabel.setWrapText(true);
+		titleLabel.setMaxWidth(Double.MAX_VALUE);
+		dueLabel.setWrapText(false);
+		compactTitleRow.setAlignment(Pos.CENTER_LEFT);
 		configureRelatedSections();
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+		compactMetadataRow.setAlignment(Pos.TOP_LEFT);
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 		refreshSurfaceStyle();
 	}
@@ -265,6 +271,8 @@ public final class TaskCard extends VBox {
 	}
 
 	private void wireEvents() {
+		HBox.setHgrow(titleDueSpacer, javafx.scene.layout.Priority.ALWAYS);
+		HBox.setHgrow(compactMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
 		toggleCompleteButton.getStyleClass().add("button-secondary");
 		toggleCompleteButton.setOnAction(e ->
