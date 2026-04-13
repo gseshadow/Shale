@@ -91,13 +91,12 @@ public final class CreateContactDialog {
         VBox header = new VBox(8, titleLabel, subtitleLabel);
         header.getStyleClass().add("app-dialog-header");
 
-        HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, "New Contact", () -> {
+        VBox body = new VBox(16, header, form, errorLabel, actions);
+        body.setPadding(new Insets(18));
+        VBox root = AppDialogs.createSecondaryWindowShell(stage, "New Contact", () -> {
             result = null;
             stage.close();
-        });
-        VBox root = new VBox(16, windowHeader, header, form, errorLabel, actions);
-        root.getStyleClass().add("app-dialog-root");
-        root.setPadding(new Insets(18));
+        }, body);
         root.setMinWidth(440);
 
         Scene scene = new Scene(root);

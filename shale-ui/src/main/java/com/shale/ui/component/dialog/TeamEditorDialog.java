@@ -291,13 +291,13 @@ public final class TeamEditorDialog {
 
 		HBox bottom = new HBox(10, spacer, btnCancel, btnSave);
 
-		HBox header = AppDialogs.createSecondaryWindowHeader(stage, "Edit Team", () -> {
+		VBox body = new VBox(12, lists, primaryRow, bottom);
+		body.setPadding(new Insets(12));
+		VBox root = AppDialogs.createSecondaryWindowShell(stage, "Edit Team", () -> {
 			result = Optional.empty();
 			stage.close();
-		});
-		VBox root = new VBox(12, header, lists, primaryRow, bottom);
+		}, body);
 		root.getStyleClass().add("secondary-window-shell");
-		root.setPadding(new Insets(12));
 
 		Scene scene = new Scene(root, 780, 540);
 		scene.getStylesheets().add(Objects.requireNonNull(

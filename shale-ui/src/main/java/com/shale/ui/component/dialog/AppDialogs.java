@@ -147,6 +147,16 @@ public final class AppDialogs {
 		return header;
 	}
 
+	public static VBox createSecondaryWindowShell(Stage stage, String title, Runnable onClose, Node body) {
+		Objects.requireNonNull(stage, "stage");
+		Objects.requireNonNull(body, "body");
+		HBox header = createSecondaryWindowHeader(stage, title, onClose);
+		VBox root = new VBox(header, body);
+		root.getStyleClass().add("app-dialog-root");
+		root.setSpacing(0);
+		return root;
+	}
+
 	public static void installDragToMove(Stage stage, Node dragHandle) {
 		if (stage == null || dragHandle == null) {
 			return;
