@@ -244,6 +244,21 @@
     -fx-background-color: transparent;
 }
 
+.read-only-display-field {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-highlight-fill: rgba(75, 127, 206, 0.35);
+    -fx-highlight-text-fill: inherit;
+}
+
+.read-only-display-field .content {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
 
 .app-dialog-root {
     -fx-background-color: rgba(243, 248, 253, 0.96);
