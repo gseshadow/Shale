@@ -35,6 +35,7 @@ import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserPreferencesService;
+import com.shale.ui.services.UpdatePollingService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
@@ -87,6 +88,7 @@ public final class SceneManager {
 	private final NotificationPreferencesService notificationPreferencesService;
 	private final DurableNotificationService durableNotificationService;
 	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
+	private final UpdatePollingService updatePollingService;
 	private final ExecutorService notificationStartupExecutor;
 	private final AtomicLong notificationStartupGeneration = new AtomicLong(0);
 	private volatile Future<?> notificationStartupFuture;
@@ -123,6 +125,7 @@ public final class SceneManager {
 		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
+		this.updatePollingService = new UpdatePollingService(updateLauncher, this::onUpdateCheckCompleted);
 	}
 
 	private NotificationCenterService createNotificationCenterService() {
@@ -143,6 +146,7 @@ public final class SceneManager {
 		liveUpdateNotificationBridge.stop();
 		connectivityNotificationProducer.stop();
 		taskDueDateNotificationGenerator.stop();
+		updatePollingService.stop();
 		notificationCenterService.clearAll();
 		var root = load("/fxml/login.fxml", controller ->
 		{
@@ -169,6 +173,7 @@ public final class SceneManager {
 		liveUpdateNotificationBridge.start();
 		connectivityNotificationProducer.start();
 		taskDueDateNotificationGenerator.start();
+		updatePollingService.start();
 		startNotificationBootstrapAsync();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
@@ -231,7 +236,11 @@ public final class SceneManager {
 
 
 	public void onUpdateCheckCompleted(UpdateCheckResult result) {
-		systemUpdateNotificationProducer.onUpdateCheckResult(result);
+		if (Platform.isFxApplicationThread()) {
+			systemUpdateNotificationProducer.onUpdateCheckResult(result);
+			return;
+		}
+		Platform.runLater(() -> systemUpdateNotificationProducer.onUpdateCheckResult(result));
 	}
 
 	public void onUpdaterLaunchSucceeded() {
