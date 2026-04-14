@@ -278,17 +278,6 @@
     -fx-fill: #112542;
 }
 
-.read-only-display-field.detail-large-text .scroll-bar:vertical,
-.read-only-display-field.detail-large-text .scroll-bar:horizontal {
-    -fx-opacity: 0;
-    -fx-pref-width: 0;
-    -fx-max-width: 0;
-    -fx-pref-height: 0;
-    -fx-max-height: 0;
-    -fx-padding: 0;
-}
-
-
 .app-dialog-root {
     -fx-background-color: rgba(243, 248, 253, 0.96);
     -fx-background-radius: 16;
