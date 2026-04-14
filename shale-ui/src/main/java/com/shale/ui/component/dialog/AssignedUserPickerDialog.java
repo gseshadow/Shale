@@ -14,6 +14,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -50,29 +51,7 @@ final class AssignedUserPickerDialog {
         });
         List<CaseTaskService.AssignableUserOption> safeCandidates = candidates == null ? List.of() : candidates;
         ResultHolderAssignable holder = new ResultHolderAssignable();
-        if (safeCandidates.isEmpty()) {
-            Label emptyLabel = new Label("No additional users available");
-            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
-            list.getChildren().add(emptyLabel);
-        } else {
-            for (CaseTaskService.AssignableUserOption user : safeCandidates) {
-                if (user == null || user.id() <= 0) {
-                    continue;
-                }
-                var card = cardFactory.create(
-                        new UserCardModel(user.id(), safe(user.displayName()), user.color(), null),
-                        UserCardFactory.Variant.MINI);
-                Button cardButton = new Button();
-                cardButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-                cardButton.setMaxWidth(Double.MAX_VALUE);
-                cardButton.setGraphic(card);
-                cardButton.setOnAction(e -> {
-                    holder.value = user;
-                    stage.close();
-                });
-                list.getChildren().add(cardButton);
-            }
-        }
+        renderUsers(list, safeCandidates, "", cardFactory, holder, stage);
 
         ScrollPane listScrollPane = new ScrollPane(list);
         listScrollPane.setFitToWidth(true);
@@ -91,7 +70,12 @@ final class AssignedUserPickerDialog {
         closeRow.setAlignment(Pos.CENTER_RIGHT);
         closeRow.setPadding(new Insets(8, 0, 0, 0));
 
-        VBox topContent = new VBox(heading);
+        TextField searchField = new TextField();
+        searchField.setPromptText("Search users...");
+        searchField.textProperty().addListener((obs, oldValue, newValue) ->
+                renderUsers(list, safeCandidates, newValue, cardFactory, holder, stage));
+
+        VBox topContent = new VBox(8, heading, searchField);
         topContent.setFillWidth(true);
         topContent.setPadding(new Insets(0, 0, 6, 0));
 
@@ -140,6 +124,72 @@ final class AssignedUserPickerDialog {
 
     private static String safe(String text) {
         return text == null ? "" : text;
+    }
+
+    private static void renderUsers(
+            VBox list,
+            List<CaseTaskService.AssignableUserOption> candidates,
+            String searchText,
+            UserCardFactory cardFactory,
+            ResultHolderAssignable holder,
+            Stage stage) {
+        list.getChildren().clear();
+        String normalizedSearch = normalizeSearch(searchText);
+        List<CaseTaskService.AssignableUserOption> filtered = candidates.stream()
+                .filter(user -> user != null && user.id() > 0)
+                .filter(user -> matchesSearch(user, normalizedSearch))
+                .toList();
+
+        if (filtered.isEmpty()) {
+            Label emptyLabel = new Label("No additional users available");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            list.getChildren().add(emptyLabel);
+            return;
+        }
+
+        for (CaseTaskService.AssignableUserOption user : filtered) {
+            var card = cardFactory.create(
+                    new UserCardModel(user.id(), safe(user.displayName()), user.color(), null),
+                    UserCardFactory.Variant.MINI);
+            Button cardButton = new Button();
+            cardButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            cardButton.setMaxWidth(Double.MAX_VALUE);
+            cardButton.setGraphic(card);
+            cardButton.setOnAction(e -> {
+                holder.value = user;
+                stage.close();
+            });
+            list.getChildren().add(cardButton);
+        }
+    }
+
+    private static boolean matchesSearch(CaseTaskService.AssignableUserOption user, String normalizedSearch) {
+        if (normalizedSearch.isBlank()) {
+            return true;
+        }
+        String displayName = safe(user.displayName()).trim().toLowerCase();
+        if (displayName.contains(normalizedSearch)) {
+            return true;
+        }
+        String initials = deriveInitials(displayName);
+        return !initials.isBlank() && initials.contains(normalizedSearch);
+    }
+
+    private static String normalizeSearch(String searchText) {
+        return safe(searchText).trim().toLowerCase();
+    }
+
+    private static String deriveInitials(String displayName) {
+        if (displayName == null || displayName.isBlank()) {
+            return "";
+        }
+        StringBuilder initials = new StringBuilder();
+        for (String part : displayName.split("\\s+")) {
+            if (!part.isBlank()) {
+                initials.append(part.charAt(0));
+            }
+        }
+        return initials.toString();
     }
 
     private static final class ResultHolderAssignable {
