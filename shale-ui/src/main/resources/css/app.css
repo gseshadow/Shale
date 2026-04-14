@@ -225,6 +225,45 @@
     -fx-font-weight: 800;
 }
 
+
+.app-pill-button {
+    -fx-padding: 10 16 10 16;
+    -fx-min-height: 40;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-background-color: linear-gradient(to bottom, rgba(116, 154, 212, 0.92), rgba(66, 109, 182, 0.94));
+    -fx-border-color: rgba(237, 245, 255, 0.36);
+    -fx-border-width: 1;
+    -fx-text-fill: #f9fbff;
+    -fx-font-weight: 600;
+    -fx-cursor: hand;
+}
+
+.app-pill-button:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(132, 171, 227, 0.95), rgba(79, 123, 196, 0.96));
+    -fx-border-color: rgba(245, 250, 255, 0.52);
+}
+
+.app-pill-button:pressed {
+    -fx-background-color: linear-gradient(to bottom, rgba(72, 112, 176, 0.96), rgba(56, 92, 155, 0.98));
+    -fx-border-color: rgba(218, 232, 252, 0.44);
+}
+
+.app-pill-button-danger {
+    -fx-background-color: linear-gradient(to bottom, rgba(220, 94, 94, 0.94), rgba(178, 55, 55, 0.96));
+    -fx-border-color: rgba(255, 231, 231, 0.42);
+}
+
+.app-pill-button-danger:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(234, 110, 110, 0.96), rgba(194, 70, 70, 0.98));
+    -fx-border-color: rgba(255, 240, 240, 0.56);
+}
+
+.app-pill-button-danger:pressed {
+    -fx-background-color: linear-gradient(to bottom, rgba(191, 64, 64, 0.98), rgba(153, 44, 44, 1.0));
+    -fx-border-color: rgba(255, 220, 220, 0.40);
+}
+
 .surface-scroll,
 .surface-scroll > .viewport {
     -fx-background-color: transparent;
