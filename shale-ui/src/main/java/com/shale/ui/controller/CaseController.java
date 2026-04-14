@@ -728,6 +728,8 @@ public class CaseController {
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
+		ensureStyleClass(detDescriptionEditor, "detail-large-text");
+		ensureStyleClass(detSummaryEditor, "detail-large-text");
 		setEditMode(false);
 		detailsEditor.setEditMode(false);
 		clearError();
@@ -787,6 +789,15 @@ public class CaseController {
 					e.consume();
 				}
 			});
+		}
+	}
+
+	private void ensureStyleClass(javafx.scene.Node node, String styleClass) {
+		if (node == null || styleClass == null || styleClass.isBlank()) {
+			return;
+		}
+		if (!node.getStyleClass().contains(styleClass)) {
+			node.getStyleClass().add(styleClass);
 		}
 	}
 
