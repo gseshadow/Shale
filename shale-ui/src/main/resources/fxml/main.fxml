@@ -17,10 +17,12 @@
 				<TextField fx:id="globalSearchField"
 					promptText="Search cases, contacts, tasks..." HBox.hgrow="ALWAYS" />
 				<Button fx:id="globalSearchButton" text="Search"
-					onAction="#onGlobalSearch" />
+					onAction="#onGlobalSearch"
+					styleClass="app-toolbar-button app-toolbar-button-neutral" />
 
 				<Button fx:id="newIntakeButton" text="New Intake"
-					onAction="#onNewIntake" />
+					onAction="#onNewIntake"
+					styleClass="app-toolbar-button app-toolbar-button-primary" />
 
 
 				<Region HBox.hgrow="ALWAYS" />
@@ -107,7 +109,8 @@
 				<Label fx:id="userEmailLabel" text="user@example.com"
 					styleClass="user-email" />
 				<Button fx:id="logoutButton" text="Logout"
-					onAction="#onLogout" />
+					onAction="#onLogout"
+					styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
 			</children>
 			<padding>
 				<Insets top="8" right="12" bottom="8" left="12" />
