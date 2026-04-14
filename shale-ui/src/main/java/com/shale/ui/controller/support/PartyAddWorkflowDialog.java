@@ -93,6 +93,7 @@ public final class PartyAddWorkflowDialog {
 
 		Node backButton = dialog.getDialogPane().lookupButton(backType);
 		Node addButton = dialog.getDialogPane().lookupButton(addType);
+		Node cancelButton = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
 
 		Label titleLabel = new Label();
 		titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
@@ -108,12 +109,20 @@ public final class PartyAddWorkflowDialog {
 		Button organizationButton = new Button("Organization");
 		contactButton.setMinWidth(200);
 		organizationButton.setMinWidth(200);
+		applyToolbarButtonClasses(createNewButton, "app-toolbar-button-primary");
+		applyToolbarButtonClasses(selectExistingButton, "app-toolbar-button-primary");
+		applyToolbarButtonClasses(contactButton, "app-toolbar-button-primary");
+		applyToolbarButtonClasses(organizationButton, "app-toolbar-button-primary");
+		applyToolbarButtonClasses(asButton(addButton), "app-toolbar-button-primary");
+		applyToolbarButtonClasses(asButton(backButton), "app-toolbar-button-neutral");
+		applyToolbarButtonClasses(asButton(cancelButton), "app-toolbar-button-neutral");
 
 		TextField createFirstNameField = new TextField();
 		TextField createLastNameField = new TextField();
 		TextField createOrganizationNameField = new TextField();
 		ChoiceBox<OrganizationDao.OrganizationTypeRow> createOrganizationTypeChoice = new ChoiceBox<>();
 		createOrganizationTypeChoice.getItems().setAll(organizationTypes);
+		applyToolbarSelectClasses(createOrganizationTypeChoice);
 		createOrganizationTypeChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(OrganizationDao.OrganizationTypeRow object) { return object == null ? "" : safeText(object.name()); }
 			@Override public OrganizationDao.OrganizationTypeRow fromString(String string) { return null; }
@@ -124,6 +133,7 @@ public final class PartyAddWorkflowDialog {
 
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
 		partyRoles.stream().map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id()))).forEach(roleChoice.getItems()::add);
+		applyToolbarSelectClasses(roleChoice);
 		roleChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartyRoleOption object) { return object == null ? "" : object.label; }
 			@Override public PartyRoleOption fromString(String string) { return null; }
@@ -138,6 +148,7 @@ public final class PartyAddWorkflowDialog {
 
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
 		sideChoice.getItems().addAll(sideOptions);
+		applyToolbarSelectClasses(sideChoice);
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
 			@Override public PartySideOption fromString(String string) { return null; }
@@ -427,6 +438,31 @@ public final class PartyAddWorkflowDialog {
 			tokens[i] = token.substring(0, 1).toUpperCase(Locale.ROOT) + token.substring(1).toLowerCase(Locale.ROOT);
 		}
 		return String.join(" ", tokens);
+	}
+
+	private static Button asButton(Node node) {
+		return node instanceof Button button ? button : null;
+	}
+
+	private static void applyToolbarButtonClasses(Button button, String variantClass) {
+		if (button == null) {
+			return;
+		}
+		if (!button.getStyleClass().contains("app-toolbar-button")) {
+			button.getStyleClass().add("app-toolbar-button");
+		}
+		if (!button.getStyleClass().contains(variantClass)) {
+			button.getStyleClass().add(variantClass);
+		}
+	}
+
+	private static void applyToolbarSelectClasses(ChoiceBox<?> choiceBox) {
+		if (choiceBox == null) {
+			return;
+		}
+		if (!choiceBox.getStyleClass().contains("app-toolbar-select")) {
+			choiceBox.getStyleClass().add("app-toolbar-select");
+		}
 	}
 
 	private static void setVisibleManaged(Node node, boolean visible) {

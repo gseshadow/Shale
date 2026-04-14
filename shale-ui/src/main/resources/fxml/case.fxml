@@ -81,26 +81,53 @@
 						<Button fx:id="deleteCaseButton" id="caseOverviewDeleteCaseButton"
 							text="Delete Case" visible="false" managed="false">
 							<styleClass>
-								<String fx:value="app-pill-button" />
-								<String fx:value="app-pill-button-danger" />
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-danger" />
 							</styleClass>
 						</Button>
-						<Button fx:id="editButton" text="Edit" />
+						<Button fx:id="editButton" text="Edit">
+							<styleClass>
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-neutral" />
+							</styleClass>
+						</Button>
 						<MenuButton fx:id="generateSummaryMenuButton"
 							text="Generate Summary">
+							<styleClass>
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-primary" />
+							</styleClass>
 							<items>
 								<MenuItem fx:id="generateSummaryHtmlMenuItem"
-									text="Preview HTML" />
+									text="Preview HTML">
+									<styleClass>
+										<String fx:value="app-toolbar-menu-item" />
+									</styleClass>
+								</MenuItem>
 								<MenuItem fx:id="generateSummaryPdfMenuItem"
-									text="Export PDF" />
+									text="Export PDF">
+									<styleClass>
+										<String fx:value="app-toolbar-menu-item" />
+									</styleClass>
+								</MenuItem>
 							</items>
 						</MenuButton>
 						<Label fx:id="summaryGenerationStatusLabel" text=""
 							visible="false" managed="false" style="-fx-opacity: 0.75;" />
 						<Button fx:id="saveButton" text="Save" visible="false"
-							managed="false" />
+							managed="false">
+							<styleClass>
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-primary" />
+							</styleClass>
+						</Button>
 						<Button fx:id="cancelButton" text="Cancel" visible="false"
-							managed="false" />
+							managed="false">
+							<styleClass>
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-neutral" />
+							</styleClass>
+						</Button>
 					</HBox>
 
 					<HBox spacing="8" alignment="CENTER_LEFT">
@@ -223,11 +250,29 @@
 					<Label text="Details"
 						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 					<Region HBox.hgrow="ALWAYS" />
-					<Button fx:id="detailsEditButton" text="Edit" />
+					<Button fx:id="detailsEditButton" text="Edit">
+						<styleClass>
+							<String fx:value="button" />
+							<String fx:value="app-toolbar-button" />
+							<String fx:value="app-toolbar-button-neutral" />
+						</styleClass>
+					</Button>
 					<Button fx:id="detailsSaveButton" text="Save"
-						visible="false" managed="false" />
+						visible="false" managed="false">
+						<styleClass>
+							<String fx:value="button" />
+							<String fx:value="app-toolbar-button" />
+							<String fx:value="app-toolbar-button-primary" />
+						</styleClass>
+					</Button>
 					<Button fx:id="detailsCancelButton" text="Cancel"
-						visible="false" managed="false" />
+						visible="false" managed="false">
+						<styleClass>
+							<String fx:value="button" />
+							<String fx:value="app-toolbar-button" />
+							<String fx:value="app-toolbar-button-neutral" />
+						</styleClass>
+					</Button>
 				</HBox>
 				<ScrollPane fx:id="detailsScrollPane" fitToWidth="true"
 					hbarPolicy="NEVER" styleClass="surface-scroll"
@@ -610,11 +655,24 @@
 							<Label text="Tasks"
 								style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 							<Region HBox.hgrow="ALWAYS" />
-							<Button fx:id="caseTasksShowCompletedButton" text="Show Completed" />
 							<Label text="Sort By" style="-fx-opacity: 0.8;" />
-							<ChoiceBox fx:id="caseTasksSortChoice" prefWidth="190" />
-							<Button fx:id="addTaskButton" text="New Task" />
-							<Button fx:id="caseTasksShowCompletedButton" text="Show Completed" />
+							<ChoiceBox fx:id="caseTasksSortChoice" prefWidth="190">
+								<styleClass>
+									<String fx:value="app-toolbar-select" />
+								</styleClass>
+							</ChoiceBox>
+							<Button fx:id="addTaskButton" text="New Task">
+								<styleClass>
+									<String fx:value="app-toolbar-button" />
+									<String fx:value="app-toolbar-button-primary" />
+								</styleClass>
+							</Button>
+							<Button fx:id="caseTasksShowCompletedButton" text="Show Completed">
+								<styleClass>
+									<String fx:value="app-toolbar-button" />
+									<String fx:value="app-toolbar-button-neutral" />
+								</styleClass>
+							</Button>
 						</HBox>
 						<Label fx:id="tasksTabEmptyLabel"
 							text="No tasks for this case yet." visible="false" managed="false"
@@ -669,7 +727,12 @@
 						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 					<Region HBox.hgrow="ALWAYS" />
 					<Button fx:id="addOrganizationButton"
-						text="Add Organization" visible="false" managed="false" />
+						text="Add Organization" visible="false" managed="false">
+						<styleClass>
+							<String fx:value="app-toolbar-button" />
+							<String fx:value="app-toolbar-button-primary" />
+						</styleClass>
+					</Button>
 				</HBox>
 				<Label fx:id="organizationsEmptyLabel" text="No organizations"
 					visible="false" managed="false" style="-fx-opacity: 0.75;" />
@@ -720,11 +783,17 @@
 				promptText="Add a case update..." wrapText="true" prefRowCount="4" />
 
 			<Button fx:id="submitCaseUpdateButton" text="Submit"
-				maxWidth="Infinity" />
+				maxWidth="Infinity">
+				<styleClass>
+					<String fx:value="app-toolbar-button" />
+					<String fx:value="app-toolbar-button-primary" />
+				</styleClass>
+			</Button>
 
 			<ScrollPane fx:id="caseUpdatesScrollPane"
-				fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
-				<VBox fx:id="caseUpdatesFeedBox" spacing="8.0">
+				fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS"
+				styleClass="transparent-scroll">
+				<VBox fx:id="caseUpdatesFeedBox" spacing="8.0" styleClass="secondary-panel">
 					<padding>
 						<Insets top="2" right="2" bottom="2" left="2" />
 					</padding>

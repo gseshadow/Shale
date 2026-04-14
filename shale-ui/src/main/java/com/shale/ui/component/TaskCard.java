@@ -311,7 +311,10 @@ public final class TaskCard extends VBox {
 		HBox.setHgrow(compactDueHost, javafx.scene.layout.Priority.NEVER);
 		HBox.setHgrow(compactMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
-		toggleCompleteButton.getStyleClass().add("button-secondary");
+		toggleCompleteButton.getStyleClass().addAll(
+				"app-toolbar-button",
+				"app-toolbar-button-success",
+				"app-taskcard-action-button");
 		toggleCompleteButton.setOnAction(e ->
 		{
 			e.consume();
