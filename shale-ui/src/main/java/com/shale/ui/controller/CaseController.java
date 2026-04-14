@@ -729,8 +729,7 @@ public class CaseController {
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
-		configureAutoGrowingDetailArea(detDescriptionEditor, 170);
-		configureAutoGrowingDetailArea(detSummaryEditor, 150);
+		wireDetailsReadOnlyAutoSizing();
 		setEditMode(false);
 		detailsEditor.setEditMode(false);
 		clearError();
@@ -841,6 +840,52 @@ public class CaseController {
 			}
 		});
 		subscribeLiveCaseUpdates();
+	}
+
+	private void wireDetailsReadOnlyAutoSizing() {
+		if (detDescriptionEditor != null) {
+			detDescriptionEditor.textProperty().addListener((obs, oldV, newV) -> autoSizeReadOnlyDetailTextAreas());
+			detDescriptionEditor.widthProperty().addListener((obs, oldV, newV) -> autoSizeReadOnlyDetailTextAreas());
+		}
+		if (detSummaryEditor != null) {
+			detSummaryEditor.textProperty().addListener((obs, oldV, newV) -> autoSizeReadOnlyDetailTextAreas());
+			detSummaryEditor.widthProperty().addListener((obs, oldV, newV) -> autoSizeReadOnlyDetailTextAreas());
+		}
+		Platform.runLater(this::autoSizeReadOnlyDetailTextAreas);
+	}
+
+	private void autoSizeReadOnlyDetailTextAreas() {
+		autoSizeReadOnlyDetailTextArea(detDescriptionEditor, 2);
+		autoSizeReadOnlyDetailTextArea(detSummaryEditor, 2);
+	}
+
+	private void autoSizeReadOnlyDetailTextArea(TextArea area, int minimumLines) {
+		if (area == null || detailsEditMode) {
+			return;
+		}
+		Text measurer = new Text();
+		measurer.setFont(area.getFont());
+		measurer.setText((area.getText() == null || area.getText().isEmpty()) ? " " : area.getText());
+		Insets insets = area.getInsets();
+		double width = area.getWidth() > 0 ? area.getWidth() : area.prefWidth(-1);
+		double contentWidth = Math.max(0, width - insets.getLeft() - insets.getRight() - 18);
+		measurer.setWrappingWidth(contentWidth);
+		double lineHeight = Math.max(16, area.getFont().getSize() + 4);
+		double minimumHeight = (lineHeight * minimumLines) + insets.getTop() + insets.getBottom() + 10;
+		double computedHeight = Math.ceil(measurer.getLayoutBounds().getHeight() + insets.getTop() + insets.getBottom() + 10);
+		double targetHeight = Math.max(minimumHeight, computedHeight);
+		area.setMinHeight(targetHeight);
+		area.setPrefHeight(targetHeight);
+		area.setMaxHeight(targetHeight);
+	}
+
+	private void resetAutoSizedDetailTextArea(TextArea area) {
+		if (area == null) {
+			return;
+		}
+		area.setMinHeight(Region.USE_COMPUTED_SIZE);
+		area.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		area.setMaxHeight(Region.USE_COMPUTED_SIZE);
 	}
 
 	private void onGenerateSummaryPdf() {
@@ -7263,6 +7308,11 @@ public class CaseController {
 			toggleDetailField(detDeniedDetailValue, detDeniedDetailEditor, enabled);
 			toggleLargeTextDetailField(detSummaryValue, detSummaryEditor, enabled);
 			toggleDetailField(detReceivedUpdatesValue, detReceivedUpdatesEditor, enabled);
+			if (enabled) {
+				resetAutoSizedDetailTextArea(detDescriptionEditor);
+				resetAutoSizedDetailTextArea(detSummaryEditor);
+			} else
+				Platform.runLater(CaseController.this::autoSizeReadOnlyDetailTextAreas);
 		}
 
 		private void toggleLargeTextDetailField(Label valueNode, TextArea editorNode, boolean editEnabled) {
