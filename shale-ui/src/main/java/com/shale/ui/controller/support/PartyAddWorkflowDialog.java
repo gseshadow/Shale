@@ -122,6 +122,7 @@ public final class PartyAddWorkflowDialog {
 		TextField createOrganizationNameField = new TextField();
 		ChoiceBox<OrganizationDao.OrganizationTypeRow> createOrganizationTypeChoice = new ChoiceBox<>();
 		createOrganizationTypeChoice.getItems().setAll(organizationTypes);
+		applyToolbarSelectClasses(createOrganizationTypeChoice);
 		createOrganizationTypeChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(OrganizationDao.OrganizationTypeRow object) { return object == null ? "" : safeText(object.name()); }
 			@Override public OrganizationDao.OrganizationTypeRow fromString(String string) { return null; }
@@ -132,6 +133,7 @@ public final class PartyAddWorkflowDialog {
 
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
 		partyRoles.stream().map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id()))).forEach(roleChoice.getItems()::add);
+		applyToolbarSelectClasses(roleChoice);
 		roleChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartyRoleOption object) { return object == null ? "" : object.label; }
 			@Override public PartyRoleOption fromString(String string) { return null; }
@@ -146,6 +148,7 @@ public final class PartyAddWorkflowDialog {
 
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
 		sideChoice.getItems().addAll(sideOptions);
+		applyToolbarSelectClasses(sideChoice);
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override public String toString(PartySideOption object) { return object == null ? "" : object.label; }
 			@Override public PartySideOption fromString(String string) { return null; }
@@ -450,6 +453,15 @@ public final class PartyAddWorkflowDialog {
 		}
 		if (!button.getStyleClass().contains(variantClass)) {
 			button.getStyleClass().add(variantClass);
+		}
+	}
+
+	private static void applyToolbarSelectClasses(ChoiceBox<?> choiceBox) {
+		if (choiceBox == null) {
+			return;
+		}
+		if (!choiceBox.getStyleClass().contains("app-toolbar-select")) {
+			choiceBox.getStyleClass().add("app-toolbar-select");
 		}
 	}
 
