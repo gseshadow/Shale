@@ -102,6 +102,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -728,6 +729,7 @@ public class CaseController {
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
+		wireDetailsReadOnlyAutoSizing();
 		setEditMode(false);
 		detailsEditor.setEditMode(false);
 		clearError();
@@ -790,6 +792,42 @@ public class CaseController {
 		}
 	}
 
+	private void ensureStyleClass(javafx.scene.Node node, String styleClass) {
+		if (node == null || styleClass == null || styleClass.isBlank()) {
+			return;
+		}
+		if (!node.getStyleClass().contains(styleClass)) {
+			node.getStyleClass().add(styleClass);
+		}
+	}
+
+	private void configureAutoGrowingDetailArea(TextArea area, double minHeight) {
+		if (area == null) {
+			return;
+		}
+		ensureStyleClass(area, "detail-large-text");
+		Text measurer = new Text();
+		measurer.fontProperty().bind(area.fontProperty());
+		Runnable recomputeHeight = () -> {
+			String text = area.getText();
+			measurer.setText((text == null || text.isEmpty()) ? " " : text);
+			Insets insets = area.getInsets();
+			double width = area.getWidth() > 0 ? area.getWidth() : area.prefWidth(-1);
+			double contentWidth = Math.max(0, width - insets.getLeft() - insets.getRight() - 18);
+			measurer.setWrappingWidth(contentWidth);
+			double targetHeight = Math.max(
+					minHeight,
+					Math.ceil(measurer.getLayoutBounds().getHeight() + insets.getTop() + insets.getBottom() + 22));
+			area.setMinHeight(targetHeight);
+			area.setPrefHeight(targetHeight);
+			area.setMaxHeight(targetHeight);
+		};
+		area.textProperty().addListener((obs, oldV, newV) -> recomputeHeight.run());
+		area.widthProperty().addListener((obs, oldV, newV) -> recomputeHeight.run());
+		area.fontProperty().addListener((obs, oldV, newV) -> recomputeHeight.run());
+		Platform.runLater(recomputeHeight);
+	}
+
 	private void wireLiveRefreshLifecycle() {
 		if (caseRootPane == null) {
 			return;
@@ -802,6 +840,52 @@ public class CaseController {
 			}
 		});
 		subscribeLiveCaseUpdates();
+	}
+
+	private void wireDetailsReadOnlyAutoSizing() {
+		if (detDescriptionEditor != null) {
+			detDescriptionEditor.textProperty().addListener((obs, oldV, newV) -> autoSizeReadOnlyDetailTextAreas());
+			detDescriptionEditor.widthProperty().addListener((obs, oldV, newV) -> autoSizeReadOnlyDetailTextAreas());
+		}
+		if (detSummaryEditor != null) {
+			detSummaryEditor.textProperty().addListener((obs, oldV, newV) -> autoSizeReadOnlyDetailTextAreas());
+			detSummaryEditor.widthProperty().addListener((obs, oldV, newV) -> autoSizeReadOnlyDetailTextAreas());
+		}
+		Platform.runLater(this::autoSizeReadOnlyDetailTextAreas);
+	}
+
+	private void autoSizeReadOnlyDetailTextAreas() {
+		autoSizeReadOnlyDetailTextArea(detDescriptionEditor, 2);
+		autoSizeReadOnlyDetailTextArea(detSummaryEditor, 2);
+	}
+
+	private void autoSizeReadOnlyDetailTextArea(TextArea area, int minimumLines) {
+		if (area == null || detailsEditMode) {
+			return;
+		}
+		Text measurer = new Text();
+		measurer.setFont(area.getFont());
+		measurer.setText((area.getText() == null || area.getText().isEmpty()) ? " " : area.getText());
+		Insets insets = area.getInsets();
+		double width = area.getWidth() > 0 ? area.getWidth() : area.prefWidth(-1);
+		double contentWidth = Math.max(0, width - insets.getLeft() - insets.getRight() - 18);
+		measurer.setWrappingWidth(contentWidth);
+		double lineHeight = Math.max(16, area.getFont().getSize() + 4);
+		double minimumHeight = (lineHeight * minimumLines) + insets.getTop() + insets.getBottom() + 10;
+		double computedHeight = Math.ceil(measurer.getLayoutBounds().getHeight() + insets.getTop() + insets.getBottom() + 10);
+		double targetHeight = Math.max(minimumHeight, computedHeight);
+		area.setMinHeight(targetHeight);
+		area.setPrefHeight(targetHeight);
+		area.setMaxHeight(targetHeight);
+	}
+
+	private void resetAutoSizedDetailTextArea(TextArea area) {
+		if (area == null) {
+			return;
+		}
+		area.setMinHeight(Region.USE_COMPUTED_SIZE);
+		area.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		area.setMaxHeight(Region.USE_COMPUTED_SIZE);
 	}
 
 	private void onGenerateSummaryPdf() {
