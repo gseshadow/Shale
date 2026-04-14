@@ -250,11 +250,29 @@
 					<Label text="Details"
 						style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 					<Region HBox.hgrow="ALWAYS" />
-					<Button fx:id="detailsEditButton" text="Edit" />
+					<Button fx:id="detailsEditButton" text="Edit">
+						<styleClass>
+							<String fx:value="button" />
+							<String fx:value="app-toolbar-button" />
+							<String fx:value="app-toolbar-button-neutral" />
+						</styleClass>
+					</Button>
 					<Button fx:id="detailsSaveButton" text="Save"
-						visible="false" managed="false" />
+						visible="false" managed="false">
+						<styleClass>
+							<String fx:value="button" />
+							<String fx:value="app-toolbar-button" />
+							<String fx:value="app-toolbar-button-primary" />
+						</styleClass>
+					</Button>
 					<Button fx:id="detailsCancelButton" text="Cancel"
-						visible="false" managed="false" />
+						visible="false" managed="false">
+						<styleClass>
+							<String fx:value="button" />
+							<String fx:value="app-toolbar-button" />
+							<String fx:value="app-toolbar-button-neutral" />
+						</styleClass>
+					</Button>
 				</HBox>
 				<ScrollPane fx:id="detailsScrollPane" fitToWidth="true"
 					hbarPolicy="NEVER" styleClass="surface-scroll"
