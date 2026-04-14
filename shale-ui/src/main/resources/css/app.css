@@ -264,25 +264,273 @@
     -fx-border-color: rgba(255, 220, 220, 0.40);
 }
 
-.case-main-surface #caseOverviewDeleteCaseButton.button {
+/* App-wide toolbar/action button system (phase rollout by opting in via style class). */
+.app-toolbar-button {
+    -fx-min-height: 40;
+    -fx-pref-height: 40;
+    -fx-padding: 10 16 10 16;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
     -fx-background-insets: 0;
     -fx-border-insets: 0;
-    -fx-background-color: linear-gradient(to bottom, rgba(220, 94, 94, 0.94), rgba(178, 55, 55, 0.96));
-    -fx-border-color: rgba(255, 231, 231, 0.42);
     -fx-border-width: 1;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+
+.button.app-toolbar-button,
+.menu-button.app-toolbar-button,
+.split-menu-button.app-toolbar-button {
+    -fx-background-color: linear-gradient(to bottom, rgba(116, 154, 212, 0.92), rgba(66, 109, 182, 0.94));
+    -fx-border-color: rgba(237, 245, 255, 0.36);
+}
+
+.button.app-toolbar-button .text,
+.menu-button.app-toolbar-button .text,
+.split-menu-button.app-toolbar-button .text {
+    -fx-fill: #f9fbff;
+}
+
+.button.app-toolbar-button .label,
+.menu-button.app-toolbar-button .label,
+.split-menu-button.app-toolbar-button .label {
     -fx-text-fill: #f9fbff;
 }
 
-.case-main-surface #caseOverviewDeleteCaseButton.button:hover {
+.button.app-toolbar-button:hover,
+.menu-button.app-toolbar-button:hover,
+.split-menu-button.app-toolbar-button:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(132, 171, 227, 0.95), rgba(79, 123, 196, 0.96));
+    -fx-border-color: rgba(245, 250, 255, 0.52);
+}
+
+.button.app-toolbar-button:pressed,
+.menu-button.app-toolbar-button:pressed,
+.split-menu-button.app-toolbar-button:pressed {
+    -fx-background-color: linear-gradient(to bottom, rgba(72, 112, 176, 0.96), rgba(56, 92, 155, 0.98));
+    -fx-border-color: rgba(218, 232, 252, 0.44);
+}
+
+.button.app-toolbar-button:focused,
+.menu-button.app-toolbar-button:focused,
+.split-menu-button.app-toolbar-button:focused {
+    -fx-effect: dropshadow(gaussian, rgba(123, 178, 255, 0.45), 10, 0.2, 0, 0);
+    -fx-border-color: rgba(236, 245, 255, 0.72);
+}
+
+.button.app-toolbar-button:disabled,
+.menu-button.app-toolbar-button:disabled,
+.split-menu-button.app-toolbar-button:disabled {
+    -fx-opacity: 0.65;
+    -fx-cursor: default;
+}
+
+.menu-button.app-toolbar-button > .arrow-button,
+.split-menu-button.app-toolbar-button > .arrow-button,
+.split-menu-button.app-toolbar-button > .split-menu-button-arrow {
+    -fx-background-color: transparent;
+}
+
+.menu-button.app-toolbar-button {
+    -fx-padding: 0;
+}
+
+.menu-button.app-toolbar-button > .label {
+    -fx-padding: 0 8 0 16;
+    -fx-alignment: center-left;
+}
+
+.menu-button.app-toolbar-button > .arrow-button {
+    -fx-padding: 0 14 0 8;
+    -fx-min-width: 24;
+    -fx-pref-width: 24;
+}
+
+.menu-button.app-toolbar-button > .arrow-button > .arrow,
+.split-menu-button.app-toolbar-button > .arrow-button > .arrow,
+.split-menu-button.app-toolbar-button > .split-menu-button-arrow > .arrow {
+    -fx-background-color: #f9fbff;
+}
+
+.button.app-toolbar-button-primary,
+.menu-button.app-toolbar-button-primary,
+.split-menu-button.app-toolbar-button-primary {
+    -fx-background-color: linear-gradient(to bottom, rgba(116, 154, 212, 0.92), rgba(66, 109, 182, 0.94));
+    -fx-border-color: rgba(237, 245, 255, 0.36);
+}
+
+.button.app-toolbar-button-neutral,
+.menu-button.app-toolbar-button-neutral,
+.split-menu-button.app-toolbar-button-neutral {
+    -fx-background-color: linear-gradient(to bottom, rgba(63, 90, 132, 0.78), rgba(36, 57, 90, 0.84));
+    -fx-border-color: rgba(232, 242, 255, 0.26);
+}
+
+.button.app-toolbar-button-neutral:hover,
+.menu-button.app-toolbar-button-neutral:hover,
+.split-menu-button.app-toolbar-button-neutral:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(77, 107, 151, 0.82), rgba(45, 69, 106, 0.88));
+    -fx-border-color: rgba(238, 246, 255, 0.38);
+}
+
+.button.app-toolbar-button-neutral:pressed,
+.menu-button.app-toolbar-button-neutral:pressed,
+.split-menu-button.app-toolbar-button-neutral:pressed {
+    -fx-background-color: linear-gradient(to bottom, rgba(50, 74, 112, 0.86), rgba(31, 50, 80, 0.92));
+    -fx-border-color: rgba(214, 229, 249, 0.42);
+}
+
+.button.app-toolbar-button-danger,
+.menu-button.app-toolbar-button-danger,
+.split-menu-button.app-toolbar-button-danger {
+    -fx-background-color: linear-gradient(to bottom, rgba(220, 94, 94, 0.94), rgba(178, 55, 55, 0.96));
+    -fx-border-color: rgba(255, 231, 231, 0.42);
+}
+
+.button.app-toolbar-button-danger:hover,
+.menu-button.app-toolbar-button-danger:hover,
+.split-menu-button.app-toolbar-button-danger:hover {
     -fx-background-color: linear-gradient(to bottom, rgba(234, 110, 110, 0.96), rgba(194, 70, 70, 0.98));
     -fx-border-color: rgba(255, 240, 240, 0.56);
 }
 
-.case-main-surface #caseOverviewDeleteCaseButton.button:pressed {
+.button.app-toolbar-button-danger:pressed,
+.menu-button.app-toolbar-button-danger:pressed,
+.split-menu-button.app-toolbar-button-danger:pressed {
     -fx-background-color: linear-gradient(to bottom, rgba(191, 64, 64, 0.98), rgba(153, 44, 44, 1.0));
     -fx-border-color: rgba(255, 220, 220, 0.40);
+}
+
+.button.app-toolbar-button-success,
+.menu-button.app-toolbar-button-success,
+.split-menu-button.app-toolbar-button-success {
+    -fx-background-color: linear-gradient(to bottom, rgba(71, 176, 118, 0.95), rgba(34, 139, 86, 0.97));
+    -fx-border-color: rgba(220, 249, 234, 0.48);
+}
+
+.button.app-toolbar-button-success:hover,
+.menu-button.app-toolbar-button-success:hover,
+.split-menu-button.app-toolbar-button-success:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(84, 191, 131, 0.97), rgba(43, 152, 98, 0.99));
+    -fx-border-color: rgba(229, 252, 241, 0.62);
+}
+
+.button.app-toolbar-button-success:pressed,
+.menu-button.app-toolbar-button-success:pressed,
+.split-menu-button.app-toolbar-button-success:pressed {
+    -fx-background-color: linear-gradient(to bottom, rgba(40, 151, 97, 0.98), rgba(25, 120, 74, 1.0));
+    -fx-border-color: rgba(205, 245, 224, 0.50);
+}
+
+.button.app-taskcard-action-button {
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-padding: 6 12 6 12;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+.button.app-toolbar-button-compact,
+.menu-button.app-toolbar-button-compact,
+.split-menu-button.app-toolbar-button-compact {
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-padding: 6 12 6 12;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+.choice-box.app-toolbar-select {
+    -fx-min-height: 40;
+    -fx-pref-height: 40;
+    -fx-padding: 0;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-border-width: 1;
+    -fx-background-color: linear-gradient(to bottom, rgba(63, 90, 132, 0.78), rgba(36, 57, 90, 0.84));
+    -fx-border-color: rgba(232, 242, 255, 0.26);
+    -fx-cursor: hand;
+}
+
+.choice-box.app-toolbar-select > .label {
+    -fx-padding: 0 8 0 14;
+    -fx-text-fill: #f9fbff;
+    -fx-font-weight: 700;
+}
+
+.choice-box.app-toolbar-select > .open-button {
+    -fx-padding: 0 14 0 8;
+    -fx-background-color: transparent;
+}
+
+.choice-box.app-toolbar-select > .open-button > .arrow {
+    -fx-background-color: #f9fbff;
+}
+
+.choice-box.app-toolbar-select:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(77, 107, 151, 0.82), rgba(45, 69, 106, 0.88));
+    -fx-border-color: rgba(238, 246, 255, 0.38);
+}
+
+.choice-box.app-toolbar-select:showing,
+.choice-box.app-toolbar-select:focused {
+    -fx-background-color: linear-gradient(to bottom, rgba(50, 74, 112, 0.86), rgba(31, 50, 80, 0.92));
+    -fx-border-color: rgba(214, 229, 249, 0.42);
+    -fx-effect: dropshadow(gaussian, rgba(123, 178, 255, 0.45), 10, 0.2, 0, 0);
+}
+
+.choice-box.app-toolbar-select:disabled {
+    -fx-opacity: 0.65;
+}
+
+.context-menu .menu-item .label,
+.context-menu .custom-menu-item .label {
+    -fx-text-fill: #112542;
+}
+
+.context-menu .menu-item .label .text,
+.context-menu .custom-menu-item .label .text,
+.context-menu .menu-item .text,
+.context-menu .custom-menu-item .text {
+    -fx-fill: #112542;
+}
+
+.context-menu .menu-item:armed .label,
+.context-menu .menu-item:hover .label,
+.context-menu .menu-item:focused .label,
+.context-menu .custom-menu-item:armed .label,
+.context-menu .custom-menu-item:hover .label,
+.context-menu .custom-menu-item:focused .label {
+    -fx-text-fill: #f9fbff;
+}
+
+.context-menu .menu-item:armed .label .text,
+.context-menu .menu-item:hover .label .text,
+.context-menu .menu-item:focused .label .text,
+.context-menu .custom-menu-item:armed .label .text,
+.context-menu .custom-menu-item:hover .label .text,
+.context-menu .custom-menu-item:focused .label .text,
+.context-menu .menu-item:armed .text,
+.context-menu .menu-item:hover .text,
+.context-menu .menu-item:focused .text,
+.context-menu .custom-menu-item:armed .text,
+.context-menu .custom-menu-item:hover .text,
+.context-menu .custom-menu-item:focused .text {
+    -fx-fill: #f9fbff;
+}
+
+.context-menu .menu-item:disabled .label,
+.context-menu .custom-menu-item:disabled .label {
+    -fx-text-fill: rgba(17, 37, 66, 0.45);
+}
+
+.context-menu .menu-item:disabled .label .text,
+.context-menu .custom-menu-item:disabled .label .text,
+.context-menu .menu-item:disabled .text,
+.context-menu .custom-menu-item:disabled .text {
+    -fx-fill: rgba(17, 37, 66, 0.45);
 }
 
 .surface-scroll,
