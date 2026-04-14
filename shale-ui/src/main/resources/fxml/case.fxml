@@ -81,13 +81,22 @@
 						<Button fx:id="deleteCaseButton" id="caseOverviewDeleteCaseButton"
 							text="Delete Case" visible="false" managed="false">
 							<styleClass>
-								<String fx:value="app-pill-button" />
-								<String fx:value="app-pill-button-danger" />
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-danger" />
 							</styleClass>
 						</Button>
-						<Button fx:id="editButton" text="Edit" />
+						<Button fx:id="editButton" text="Edit">
+							<styleClass>
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-neutral" />
+							</styleClass>
+						</Button>
 						<MenuButton fx:id="generateSummaryMenuButton"
 							text="Generate Summary">
+							<styleClass>
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-primary" />
+							</styleClass>
 							<items>
 								<MenuItem fx:id="generateSummaryHtmlMenuItem"
 									text="Preview HTML" />
@@ -98,9 +107,19 @@
 						<Label fx:id="summaryGenerationStatusLabel" text=""
 							visible="false" managed="false" style="-fx-opacity: 0.75;" />
 						<Button fx:id="saveButton" text="Save" visible="false"
-							managed="false" />
+							managed="false">
+							<styleClass>
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-primary" />
+							</styleClass>
+						</Button>
 						<Button fx:id="cancelButton" text="Cancel" visible="false"
-							managed="false" />
+							managed="false">
+							<styleClass>
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-neutral" />
+							</styleClass>
+						</Button>
 					</HBox>
 
 					<HBox spacing="8" alignment="CENTER_LEFT">
