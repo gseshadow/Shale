@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.Insets?>
@@ -15,7 +16,13 @@
 			</padding>
 			<TextField fx:id="organizationsSearchField"
 				promptText="Search organizations…" HBox.hgrow="ALWAYS" />
-			<Button fx:id="addOrganizationButton" text="Add Organization" />
+			<Button fx:id="addOrganizationButton" text="Add Organization">
+				<styleClass>
+					<String fx:value="button" />
+					<String fx:value="app-toolbar-button" />
+					<String fx:value="app-toolbar-button-primary" />
+				</styleClass>
+			</Button>
 		</HBox>
 	</top>
 

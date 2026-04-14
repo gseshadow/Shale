@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ChoiceBox?>
@@ -30,9 +31,27 @@
                 <Label fx:id="userTitleLabel" text="User"
                     style="-fx-font-size: 18px; -fx-font-weight: bold;" />
                 <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="editButton" text="Edit" visible="false" managed="false" />
-                <Button fx:id="saveButton" text="Save" visible="false" managed="false" />
-                <Button fx:id="cancelButton" text="Cancel" visible="false" managed="false" />
+                <Button fx:id="editButton" text="Edit" visible="false" managed="false">
+                    <styleClass>
+                        <String fx:value="button" />
+                        <String fx:value="app-toolbar-button" />
+                        <String fx:value="app-toolbar-button-neutral" />
+                    </styleClass>
+                </Button>
+                <Button fx:id="saveButton" text="Save" visible="false" managed="false">
+                    <styleClass>
+                        <String fx:value="button" />
+                        <String fx:value="app-toolbar-button" />
+                        <String fx:value="app-toolbar-button-primary" />
+                    </styleClass>
+                </Button>
+                <Button fx:id="cancelButton" text="Cancel" visible="false" managed="false">
+                    <styleClass>
+                        <String fx:value="button" />
+                        <String fx:value="app-toolbar-button" />
+                        <String fx:value="app-toolbar-button-neutral" />
+                    </styleClass>
+                </Button>
             </HBox>
 
             <HBox spacing="10.0" alignment="CENTER_LEFT">
@@ -109,7 +128,13 @@
                         <HBox spacing="8" alignment="CENTER_LEFT">
                             <Label text="Roles" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                             <Region HBox.hgrow="ALWAYS" />
-                            <Button fx:id="addRoleButton" text="Add Role" visible="false" managed="false" />
+                            <Button fx:id="addRoleButton" text="Add Role" visible="false" managed="false">
+                                <styleClass>
+                                    <String fx:value="button" />
+                                    <String fx:value="app-toolbar-button" />
+                                    <String fx:value="app-toolbar-button-primary" />
+                                </styleClass>
+                            </Button>
                         </HBox>
                         <FlowPane fx:id="rolesFlow" hgap="8" vgap="8" prefWrapLength="720" />
                         <Label fx:id="rolesEmptyLabel" text="No roles assigned" visible="false" managed="false" style="-fx-opacity: 0.75;" />
@@ -126,7 +151,12 @@
                     </HBox>
                     <HBox spacing="8" alignment="CENTER_LEFT">
                         <TextField fx:id="assignedTasksSearchField" promptText="Search assigned tasks…" HBox.hgrow="ALWAYS" />
-                        <ChoiceBox fx:id="assignedTasksSortChoice" prefWidth="180" />
+                        <ChoiceBox fx:id="assignedTasksSortChoice" prefWidth="180">
+                            <styleClass>
+                                <String fx:value="choice-box" />
+                                <String fx:value="app-toolbar-select" />
+                            </styleClass>
+                        </ChoiceBox>
                     </HBox>
                     <ScrollPane fx:id="assignedTasksScroll" fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
                         <StackPane>
@@ -146,7 +176,12 @@
                     </HBox>
                     <HBox spacing="8" alignment="CENTER_LEFT">
                         <TextField fx:id="assignedCasesSearchField" promptText="Search assigned cases…" HBox.hgrow="ALWAYS" />
-                        <ChoiceBox fx:id="assignedCasesSortChoice" prefWidth="180" />
+                        <ChoiceBox fx:id="assignedCasesSortChoice" prefWidth="180">
+                            <styleClass>
+                                <String fx:value="choice-box" />
+                                <String fx:value="app-toolbar-select" />
+                            </styleClass>
+                        </ChoiceBox>
                     </HBox>
                     <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
                         <StackPane>

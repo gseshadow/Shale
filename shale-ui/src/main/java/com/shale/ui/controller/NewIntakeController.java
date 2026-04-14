@@ -11,6 +11,7 @@ import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
@@ -424,7 +425,21 @@ public final class NewIntakeController {
 		if (owner != null) {
 			dialog.initOwner(owner);
 		}
+		applyToolbarClassesToDialogButton(dialog.getDialogPane().lookupButton(javafx.scene.control.ButtonType.OK), "app-toolbar-button-primary");
+		applyToolbarClassesToDialogButton(dialog.getDialogPane().lookupButton(javafx.scene.control.ButtonType.CANCEL), "app-toolbar-button-neutral");
 		return dialog.showAndWait();
+	}
+
+	private void applyToolbarClassesToDialogButton(Node node, String variantClass) {
+		if (!(node instanceof Button button)) {
+			return;
+		}
+		if (!button.getStyleClass().contains("app-toolbar-button")) {
+			button.getStyleClass().add("app-toolbar-button");
+		}
+		if (!button.getStyleClass().contains(variantClass)) {
+			button.getStyleClass().add(variantClass);
+		}
 	}
 
 	private void preselectDefaultStatusIfAvailable() {
