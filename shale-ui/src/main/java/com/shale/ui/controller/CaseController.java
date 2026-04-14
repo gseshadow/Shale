@@ -7196,7 +7196,7 @@ public class CaseController {
 			setVisibleManaged(detCaseStatusEditorRow, enabled);
 			setVisibleManaged(detPracticeAreaIdValue, !enabled);
 			setVisibleManaged(detPracticeAreaEditorRow, enabled);
-			toggleDetailField(detDescriptionValue, detDescriptionEditor, enabled);
+			toggleLargeTextDetailField(detDescriptionValue, detDescriptionEditor, enabled);
 			toggleDetailField(detCallerDateValue, detCallerDateEditor, enabled);
 			toggleDetailField(detCallerTimeValue, detCallerTimeEditor, enabled);
 			toggleDetailField(detAcceptedDateValue, detAcceptedDateEditor, enabled);
@@ -7222,8 +7222,14 @@ public class CaseController {
 			toggleDetailField(detAcceptedDetailValue, detAcceptedDetailEditor, enabled);
 			toggleDetailField(detDeniedChronologyValue, detDeniedChronologyEditor, enabled);
 			toggleDetailField(detDeniedDetailValue, detDeniedDetailEditor, enabled);
-			toggleDetailField(detSummaryValue, detSummaryEditor, enabled);
+			toggleLargeTextDetailField(detSummaryValue, detSummaryEditor, enabled);
 			toggleDetailField(detReceivedUpdatesValue, detReceivedUpdatesEditor, enabled);
+		}
+
+		private void toggleLargeTextDetailField(Label valueNode, TextArea editorNode, boolean editEnabled) {
+			setVisibleManaged(valueNode, false);
+			setVisibleManaged(editorNode, true);
+			ReadOnlyTextDisplaySupport.apply(editorNode, editEnabled);
 		}
 
 		private void toggleDetailField(Label valueNode, javafx.scene.control.Control editorNode, boolean editEnabled) {
