@@ -40,6 +40,10 @@ public final class CaseDao {
 	private static final String PARTY_ROLE_NAME_CALLER = "caller";
 	private static final String PARTY_ROLE_NAME_PARTY = "party";
 	private static final String PARTY_ROLE_NAME_COUNSEL = "counsel";
+	private static final Map<String, String> BUILTIN_PARTY_ROLE_DISPLAY_NAMES = Map.of(
+			PARTY_ROLE_NAME_CALLER, "Caller",
+			PARTY_ROLE_NAME_PARTY, "Party",
+			PARTY_ROLE_NAME_COUNSEL, "Counsel");
 	private static final String PARTY_ROLES_TABLE = "PartyRoles";
 	private static final String PARTY_SIDE_KEY_REPRESENTED = "represented";
 	private static final String PARTY_SIDE_KEY_OPPOSING = "opposing";
@@ -303,6 +307,10 @@ public final class CaseDao {
 		try {
 			con = db.requireConnection();
 			con.setAutoCommit(false);
+			System.out.println("[IntakeCreate] start shaleClientId=" + request.shaleClientId()
+					+ " caseName='" + safeLogValue(request.caseName()) + "'");
+			ensureRequiredPartyRolesForTenant(con, request.shaleClientId());
+			System.out.println("[IntakeCreate] required party roles verified for shaleClientId=" + request.shaleClientId());
 
 			int clientContactId = insertContact(con,
 					buildFullName(request.clientFirstName(), request.clientLastName()),
@@ -319,10 +327,13 @@ public final class CaseDao {
 					now);
 
 			int callerContactId = resolveCallerContactId(con, request, clientContactId, now);
+			System.out.println("[IntakeCreate] contacts created clientContactId=" + clientContactId + " callerContactId=" + callerContactId);
 
 			long caseId = insertCase(con, request, now);
+			System.out.println("[IntakeCreate] case row created caseId=" + caseId);
 			insertCaseParty(con, caseId, clientContactId, PARTY_ROLE_NAME_PARTY, PARTY_SIDE_KEY_REPRESENTED, true, now, request.shaleClientId());
 			insertCaseParty(con, caseId, callerContactId, PARTY_ROLE_NAME_CALLER, PARTY_SIDE_KEY_REPRESENTED, true, now, request.shaleClientId());
+			System.out.println("[IntakeCreate] default case parties linked for caseId=" + caseId);
 			List<NewIntakePendingParty> pendingParties = request.pendingParties() == null ? List.of() : request.pendingParties();
 			for (NewIntakePendingParty pending : pendingParties) {
 				if (pending == null || pending.partyRoleId() == null || pending.partyRoleId().longValue() <= 0) {
@@ -374,11 +385,16 @@ public final class CaseDao {
 						now);
 			}
 			normalizeCasePartyRelationshipPrimaries(con, caseId, request.shaleClientId());
+			System.out.println("[IntakeCreate] party primary normalization completed caseId=" + caseId);
 			insertCaseStatus(con, caseId, request.statusId(), now);
+			System.out.println("[IntakeCreate] primary status linked caseId=" + caseId + " statusId=" + request.statusId());
 
 			con.commit();
+			System.out.println("[IntakeCreate] committed caseId=" + caseId + " shaleClientId=" + request.shaleClientId());
 			return new NewIntakeCreateResult(caseId, clientContactId, callerContactId);
 		} catch (SQLException e) {
+			System.err.println("[IntakeCreate] failed shaleClientId=" + request.shaleClientId() + " error=" + e.getMessage());
+			e.printStackTrace(System.err);
 			if (con != null) {
 				try {
 					con.rollback();
@@ -398,6 +414,51 @@ public final class CaseDao {
 				}
 			}
 		}
+	}
+
+	private void ensureRequiredPartyRolesForTenant(Connection con, int shaleClientId) throws SQLException {
+		ensurePartyRoleExistsForTenant(con, shaleClientId, PARTY_ROLE_NAME_PARTY);
+		ensurePartyRoleExistsForTenant(con, shaleClientId, PARTY_ROLE_NAME_CALLER);
+	}
+
+	private void ensurePartyRoleExistsForTenant(Connection con, int shaleClientId, String roleSystemKey) throws SQLException {
+		Long existingId = findPartyRoleIdForTenantBySystemKey(con, shaleClientId, roleSystemKey);
+		if (existingId != null && existingId.longValue() > 0) {
+			return;
+		}
+		boolean hasSystemKey = tableHasColumn(con, PARTY_ROLES_TABLE, "SystemKey");
+		String displayName = BUILTIN_PARTY_ROLE_DISPLAY_NAMES.getOrDefault(roleSystemKey, roleSystemKey);
+		String insertSql = hasSystemKey
+				? "INSERT INTO dbo.PartyRoles (ShaleClientId, Name, SystemKey) VALUES (?, ?, ?);"
+				: "INSERT INTO dbo.PartyRoles (ShaleClientId, Name) VALUES (?, ?);";
+		try (PreparedStatement ps = con.prepareStatement(insertSql)) {
+			int i = 1;
+			ps.setInt(i++, shaleClientId);
+			ps.setString(i++, displayName);
+			if (hasSystemKey) {
+				ps.setString(i++, roleSystemKey);
+			}
+			int rows = ps.executeUpdate();
+			if (rows != 1) {
+				throw new RuntimeException("Failed to seed missing party role: " + roleSystemKey);
+			}
+			System.out.println("[IntakeCreate] seeded missing party role roleSystemKey=" + roleSystemKey + " shaleClientId=" + shaleClientId);
+		}
+		Long seededId = findPartyRoleIdForTenantBySystemKey(con, shaleClientId, roleSystemKey);
+		if (seededId == null || seededId.longValue() <= 0) {
+			throw new IllegalStateException("Party role missing for tenant after seed attempt (role=" + roleSystemKey + ", shaleClientId=" + shaleClientId + ")");
+		}
+	}
+
+	private static String safeLogValue(String value) {
+		if (value == null) {
+			return "";
+		}
+		String trimmed = value.trim();
+		if (trimmed.length() <= 80) {
+			return trimmed;
+		}
+		return trimmed.substring(0, 80) + "…";
 	}
 
 	private int resolveCallerContactId(Connection con, NewIntakeCreateRequest request, int clientContactId, Timestamp now) throws SQLException {

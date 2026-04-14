@@ -497,6 +497,8 @@ public final class NewIntakeController {
 		}
 
 		setSaving(true);
+		int tenantId = requireClientId();
+		System.out.println("[NewIntakeController] submit started tenant=" + tenantId + " userId=" + (appState == null ? null : appState.getUserId()));
 		try {
 			CaseDao.NewIntakeCreateRequest request = new CaseDao.NewIntakeCreateRequest(
 				requireClientId(),
@@ -543,12 +545,15 @@ public final class NewIntakeController {
 			);
 
 			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
+			System.out.println("[NewIntakeController] submit succeeded tenant=" + tenantId + " caseId=" + result.caseId());
 			showSuccess("Intake created successfully.");
 			if (stage != null)
 				stage.close();
 			if (onCaseCreated != null)
 				onCaseCreated.accept(Math.toIntExact(result.caseId()));
 		} catch (RuntimeException ex) {
+			System.err.println("[NewIntakeController] submit failed tenant=" + tenantId + " error=" + ex.getMessage());
+			ex.printStackTrace(System.err);
 			showValidation("Create intake failed: " + firstMeaningfulMessage(ex));
 		} finally {
 			setSaving(false);
