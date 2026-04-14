@@ -295,10 +295,11 @@
 							<Label text="Description:" style="-fx-opacity: 0.8;"
 								GridPane.rowIndex="4" />
 							<Label fx:id="detDescriptionValue" text="—" wrapText="true"
-								GridPane.rowIndex="4" GridPane.columnIndex="1" />
+								visible="false" managed="false" GridPane.rowIndex="4"
+								GridPane.columnIndex="1" />
 							<TextArea fx:id="detDescriptionEditor"
-								maxWidth="1.7976931348623157E308" prefRowCount="4"
-								wrapText="true" visible="false" managed="false"
+								maxWidth="1.7976931348623157E308" prefRowCount="8"
+								minHeight="170" wrapText="true"
 								GridPane.rowIndex="4" GridPane.columnIndex="1" />
 						</GridPane>
 					</VBox>
@@ -376,10 +377,11 @@
 							<Label text="Summary:" style="-fx-opacity: 0.8;"
 								GridPane.rowIndex="0" />
 							<Label fx:id="detSummaryValue" text="—" wrapText="true"
-								GridPane.rowIndex="0" GridPane.columnIndex="1" />
+								visible="false" managed="false" GridPane.rowIndex="0"
+								GridPane.columnIndex="1" />
 							<TextArea fx:id="detSummaryEditor"
-								maxWidth="1.7976931348623157E308" prefRowCount="3"
-								wrapText="true" visible="false" managed="false"
+								maxWidth="1.7976931348623157E308" prefRowCount="7"
+								minHeight="150" wrapText="true"
 								GridPane.rowIndex="0" GridPane.columnIndex="1" />
 							<Label text="Received Updates:" style="-fx-opacity: 0.8;"
 								GridPane.rowIndex="1" />
