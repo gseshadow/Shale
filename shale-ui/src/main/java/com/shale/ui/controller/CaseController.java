@@ -1389,6 +1389,7 @@ public class CaseController {
 						LinkedHashMap::new,
 						Collectors.toList()));
 		Map<String, String> sideLabelsByKey = loadPartySideLabelMap();
+		target.setSpacing(mode == PartyRenderMode.MANAGE ? 6 : 8);
 		List<String> sideOrder = List.of("represented", "opposing", "neutral", "unclassified");
 		for (String sideKey : sideOrder) {
 			List<CasePartyDto> group = grouped.get(sideKey);
@@ -1432,7 +1433,8 @@ public class CaseController {
 				: "-fx-opacity: 0.86;");
 		metaLabel.setWrapText(true);
 
-		VBox content = new VBox(mode == PartyRenderMode.READ_ONLY_MINI ? 2 : 6, summaryCard, metaLabel);
+		VBox content = new VBox(mode == PartyRenderMode.READ_ONLY_MINI ? 2 : 4, summaryCard, metaLabel);
+		content.setAlignment(Pos.TOP_LEFT);
 		if (!notes.isBlank()) {
 			Label notesLabel = new Label(notes);
 			notesLabel.setWrapText(true);
@@ -1442,24 +1444,28 @@ public class CaseController {
 			content.getChildren().add(notesLabel);
 		}
 
-		VBox card = new VBox(mode == PartyRenderMode.READ_ONLY_MINI ? 3 : 6, content);
+		VBox card = new VBox(mode == PartyRenderMode.READ_ONLY_MINI ? 2 : 4, content);
 		if (mode == PartyRenderMode.MANAGE) {
 			Button editButton = new Button("Edit");
-			editButton.getStyleClass().add("button-secondary");
+			editButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral", "app-toolbar-button-compact");
 			editButton.setOnAction(e -> onEditParty(party));
 
 			Button removeButton = new Button("Remove");
-			removeButton.getStyleClass().add("button-secondary");
+			removeButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-danger", "app-toolbar-button-compact");
 			removeButton.setOnAction(e -> onRemoveParty(party));
 
-			Region spacer = new Region();
-			HBox.setHgrow(spacer, Priority.ALWAYS);
-			HBox actions = new HBox(8, spacer, editButton, removeButton);
-			card.getChildren().add(actions);
-			card.setPadding(new Insets(10, 12, 10, 12));
+			VBox actions = new VBox(6, editButton, removeButton);
+			actions.setAlignment(Pos.TOP_RIGHT);
+
+			HBox row = new HBox(10, content, actions);
+			row.setAlignment(Pos.TOP_LEFT);
+			HBox.setHgrow(content, Priority.ALWAYS);
+
+			card.getChildren().setAll(row);
+			card.setPadding(new Insets(8, 10, 8, 10));
 			card.getStyleClass().add("secondary-panel");
 		} else {
-			card.setPadding(new Insets(2, 0, 2, 0));
+			card.setPadding(new Insets(1, 0, 1, 0));
 		}
 		return card;
 	}

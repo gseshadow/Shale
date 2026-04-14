@@ -430,6 +430,16 @@
     -fx-font-weight: 700;
 }
 
+.button.app-toolbar-button-compact,
+.menu-button.app-toolbar-button-compact,
+.split-menu-button.app-toolbar-button-compact {
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-padding: 6 12 6 12;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
 .choice-box.app-toolbar-select {
     -fx-min-height: 40;
     -fx-pref-height: 40;
