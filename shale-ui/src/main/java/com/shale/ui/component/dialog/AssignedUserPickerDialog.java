@@ -10,16 +10,15 @@ import com.shale.ui.services.CaseTaskService;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -28,10 +27,10 @@ final class AssignedUserPickerDialog {
     private static final double PICKER_MIN_WIDTH = 420;
     private static final double PICKER_PREF_WIDTH = 440;
     private static final double PICKER_MAX_WIDTH = 460;
+    private static final double PICKER_INITIAL_HEIGHT = 700;
     private static final double PICKER_MIN_HEIGHT = 420;
-    private static final double PICKER_PREF_HEIGHT_RATIO = 0.85;
-    private static final double PICKER_MAX_HEIGHT_RATIO = 0.90;
-    private static final double SCREEN_MARGIN = 40;
+    private static final double PICKER_MAX_HEIGHT = 760;
+    private static final double PICKER_OWNER_HEIGHT_RATIO = 0.85;
 
     private AssignedUserPickerDialog() {
     }
@@ -91,28 +90,34 @@ final class AssignedUserPickerDialog {
 
         VBox topContent = new VBox(heading);
         topContent.setFillWidth(true);
+        topContent.setPadding(new Insets(0, 0, 6, 0));
 
-        VBox root = new VBox(12, topContent, listScrollPane, closeRow);
+        double targetHeight = resolveTargetHeight(owner);
+        listScrollPane.setPrefHeight(Math.max(220, targetHeight - 130));
+        listScrollPane.setMinHeight(Math.max(220, targetHeight - 200));
+        listScrollPane.setMaxHeight(Double.MAX_VALUE);
+
+        BorderPane root = new BorderPane();
         root.getStyleClass().add("app-dialog-root");
         root.setPadding(new Insets(18));
+        root.setTop(topContent);
+        root.setCenter(listScrollPane);
+        root.setBottom(closeRow);
+        BorderPane.setMargin(listScrollPane, new Insets(12, 0, 12, 0));
+
         root.setMinWidth(PICKER_MIN_WIDTH);
         root.setPrefWidth(PICKER_PREF_WIDTH);
         root.setMaxWidth(PICKER_MAX_WIDTH);
-
-        PickerSize pickerSize = resolveSize(owner);
-        root.setMinHeight(pickerSize.minHeight());
-        root.setPrefHeight(pickerSize.prefHeight());
-        root.setMaxHeight(pickerSize.maxHeight());
-        listScrollPane.setMinHeight(Math.max(220, pickerSize.minHeight() - 130));
-        listScrollPane.setPrefHeight(Math.max(220, pickerSize.prefHeight() - 130));
-        listScrollPane.setMaxHeight(Double.MAX_VALUE);
+        root.setMinHeight(PICKER_MIN_HEIGHT);
+        root.setPrefHeight(targetHeight);
+        root.setMaxHeight(PICKER_MAX_HEIGHT);
 
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(cssAnchor.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
-        stage.setMinHeight(pickerSize.minHeight());
-        stage.setHeight(pickerSize.prefHeight());
-        stage.setMaxHeight(pickerSize.maxHeight());
+        stage.setMinHeight(PICKER_MIN_HEIGHT);
+        stage.setHeight(targetHeight);
+        stage.setMaxHeight(PICKER_MAX_HEIGHT);
         stage.setMinWidth(PICKER_MIN_WIDTH);
         stage.setWidth(PICKER_PREF_WIDTH);
         stage.setMaxWidth(PICKER_MAX_WIDTH);
@@ -120,33 +125,13 @@ final class AssignedUserPickerDialog {
         return Optional.ofNullable(holder.value);
     }
 
-    private static PickerSize resolveSize(Window owner) {
+    private static double resolveTargetHeight(Window owner) {
         double ownerHeight = owner == null ? 0 : owner.getHeight();
-        double preferred = ownerHeight > 0 ? ownerHeight * PICKER_PREF_HEIGHT_RATIO : 560;
-        double ownerMax = ownerHeight > 0 ? ownerHeight * PICKER_MAX_HEIGHT_RATIO : 620;
-        double screenMax = maxHeightForScreen(owner);
-
-        double maxHeight = Math.max(PICKER_MIN_HEIGHT, Math.min(ownerMax, screenMax));
-        double prefHeight = Math.max(PICKER_MIN_HEIGHT, Math.min(preferred, maxHeight));
-        double minHeight = Math.min(PICKER_MIN_HEIGHT, maxHeight);
-        return new PickerSize(minHeight, prefHeight, maxHeight);
-    }
-
-    private static double maxHeightForScreen(Window owner) {
-        Screen screen = resolveScreen(owner);
-        Rectangle2D bounds = screen == null ? Screen.getPrimary().getVisualBounds() : screen.getVisualBounds();
-        return Math.max(PICKER_MIN_HEIGHT, bounds.getHeight() - SCREEN_MARGIN);
-    }
-
-    private static Screen resolveScreen(Window owner) {
-        if (owner == null) {
-            return Screen.getPrimary();
+        if (ownerHeight <= 0) {
+            return PICKER_INITIAL_HEIGHT;
         }
-        List<Screen> screens = Screen.getScreensForRectangle(owner.getX(), owner.getY(), owner.getWidth(), owner.getHeight());
-        if (screens != null && !screens.isEmpty()) {
-            return screens.get(0);
-        }
-        return Screen.getPrimary();
+        double preferredFromOwner = ownerHeight * PICKER_OWNER_HEIGHT_RATIO;
+        return Math.min(PICKER_MAX_HEIGHT, Math.max(PICKER_MIN_HEIGHT, preferredFromOwner));
     }
 
     private static String safe(String text) {
@@ -155,8 +140,5 @@ final class AssignedUserPickerDialog {
 
     private static final class ResultHolderAssignable {
         private CaseTaskService.AssignableUserOption value;
-    }
-
-    private record PickerSize(double minHeight, double prefHeight, double maxHeight) {
     }
 }
