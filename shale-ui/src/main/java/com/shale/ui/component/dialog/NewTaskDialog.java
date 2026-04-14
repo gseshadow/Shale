@@ -276,52 +276,6 @@ public final class NewTaskDialog {
     private static Optional<CaseTaskService.AssignableUserOption> showAssignUserPicker(
             Window owner,
             List<CaseTaskService.AssignableUserOption> candidates) {
-        Stage stage = AppDialogs.createModalStage(owner, "Add Assigned User");
-        Label heading = new Label("Add to assigned");
-        heading.getStyleClass().add("app-dialog-title");
-        VBox list = new VBox(8);
-        UserCardFactory cardFactory = new UserCardFactory(id -> {
-        });
-        ResultHolderAssignable holder = new ResultHolderAssignable();
-        if (candidates == null || candidates.isEmpty()) {
-            Label emptyLabel = new Label("No additional users available");
-            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
-            list.getChildren().add(emptyLabel);
-        } else {
-            for (CaseTaskService.AssignableUserOption user : candidates) {
-                if (user == null || user.id() <= 0) {
-                    continue;
-                }
-                var card = cardFactory.create(
-                        new UserCardModel(user.id(), user.displayName(), user.color(), null),
-                        UserCardFactory.Variant.MINI);
-                Button selectButton = new Button();
-                selectButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-                selectButton.setMaxWidth(Double.MAX_VALUE);
-                selectButton.setGraphic(card);
-                selectButton.setOnAction(e -> {
-                    holder.value = user;
-                    stage.close();
-                });
-                list.getChildren().add(selectButton);
-            }
-        }
-        Button closeButton = new Button("Close");
-        closeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-        closeButton.setOnAction(e -> stage.close());
-        VBox root = new VBox(12, heading, list, closeButton);
-        root.getStyleClass().add("app-dialog-root");
-        root.setPadding(new Insets(18));
-        root.setMinWidth(380);
-        Scene scene = new Scene(root);
-        scene.getStylesheets().add(Objects.requireNonNull(
-                NewTaskDialog.class.getResource("/css/app.css")).toExternalForm());
-        stage.setScene(scene);
-        stage.showAndWait();
-        return Optional.ofNullable(holder.value);
-    }
-
-    private static final class ResultHolderAssignable {
-        private CaseTaskService.AssignableUserOption value;
+        return AssignedUserPickerDialog.show(owner, candidates, NewTaskDialog.class);
     }
 }
