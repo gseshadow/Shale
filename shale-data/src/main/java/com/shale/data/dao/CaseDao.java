@@ -571,6 +571,7 @@ public final class CaseDao {
 	}
 
 	private long insertCase(Connection con, NewIntakeCreateRequest request, Timestamp now) throws SQLException {
+		validatePracticeAreaForTenant(con, request.shaleClientId(), request.practiceAreaId());
 		String sql = """
 				INSERT INTO dbo.Cases (
 				  Name,
@@ -629,6 +630,32 @@ public final class CaseDao {
 				return rs.getLong(1);
 			}
 		}
+	}
+
+	private void validatePracticeAreaForTenant(Connection con, int shaleClientId, int practiceAreaId) throws SQLException {
+		if (shaleClientId <= 0 || practiceAreaId <= 0) {
+			throw new IllegalArgumentException("practiceAreaId is required.");
+		}
+		String sql = """
+				SELECT 1
+				FROM dbo.PracticeAreas
+				WHERE Id = ?
+				  AND ShaleClientId = ?
+				  AND IsActive = 1
+				  AND IsDeleted = 0;
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, practiceAreaId);
+			ps.setInt(2, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) {
+					return;
+				}
+			}
+		}
+		System.err.println("[IntakeCreate] invalid practice area selection shaleClientId=" + shaleClientId
+				+ " practiceAreaId=" + practiceAreaId + " (no matching tenant-local active PracticeAreas row)");
+		throw new IllegalArgumentException("Selected practice area is invalid for this tenant.");
 	}
 
 	private void insertCaseParty(
@@ -4701,27 +4728,11 @@ public final class CaseDao {
 								normalizeSystemKey(tenantRs.getString("SystemKey"))
 						));
 					}
-					String globalSql = """
-							SELECT Id, Name, Color, %s
-							FROM dbo.PracticeAreas
-							WHERE ShaleClientId IS NULL
-							  AND IsActive = 1
-							  AND IsDeleted = 0
-							ORDER BY Name, Id;
-							""".formatted(systemKeySelect);
-					try (PreparedStatement globalPs = con.prepareStatement(globalSql);
-							ResultSet globalRs = globalPs.executeQuery()) {
-						List<PracticeAreaRow> globalAreas = new ArrayList<>();
-						while (globalRs.next()) {
-							globalAreas.add(new PracticeAreaRow(
-									globalRs.getInt("Id"),
-									globalRs.getString("Name"),
-									globalRs.getString("Color"),
-									normalizeSystemKey(globalRs.getString("SystemKey"))
-							));
-						}
-						return resolveEffectivePracticeAreas(globalAreas, tenantAreas);
+					if (tenantAreas.isEmpty()) {
+						seedTenantPracticeAreasFromGlobalTemplates(con, shaleClientId);
+						tenantAreas = listTenantPracticeAreas(con, shaleClientId, systemKeySelect);
 					}
+					return tenantAreas;
 				}
 			}
 		} catch (SQLException e) {
@@ -4729,56 +4740,75 @@ public final class CaseDao {
 		}
 	}
 
-	private static List<PracticeAreaRow> resolveEffectivePracticeAreas(List<PracticeAreaRow> globalAreas, List<PracticeAreaRow> tenantAreas) {
-		List<PracticeAreaRow> globalUnkeyed = new ArrayList<>();
-		List<PracticeAreaRow> tenantUnkeyed = new ArrayList<>();
-		Map<String, PracticeAreaRow> bySystemKey = new LinkedHashMap<>();
-
-		if (globalAreas != null) {
-			for (PracticeAreaRow area : globalAreas) {
-				if (area == null)
-					continue;
-				String systemKey = normalizeSystemKey(area.systemKey());
-				if (systemKey == null) {
-					globalUnkeyed.add(area);
-					continue;
+	private List<PracticeAreaRow> listTenantPracticeAreas(Connection con, int shaleClientId, String systemKeySelect) throws SQLException {
+		String tenantSql = """
+				SELECT Id, Name, Color, %s
+				FROM dbo.PracticeAreas
+				WHERE ShaleClientId = ?
+				  AND IsActive = 1
+				  AND IsDeleted = 0
+				ORDER BY Name, Id;
+				""".formatted(systemKeySelect);
+		try (PreparedStatement tenantPs = con.prepareStatement(tenantSql)) {
+			tenantPs.setInt(1, shaleClientId);
+			try (ResultSet tenantRs = tenantPs.executeQuery()) {
+				List<PracticeAreaRow> tenantAreas = new ArrayList<>();
+				while (tenantRs.next()) {
+					tenantAreas.add(new PracticeAreaRow(
+							tenantRs.getInt("Id"),
+							tenantRs.getString("Name"),
+							tenantRs.getString("Color"),
+							normalizeSystemKey(tenantRs.getString("SystemKey"))
+					));
 				}
-				bySystemKey.putIfAbsent(systemKey, area);
+				return tenantAreas;
 			}
 		}
+	}
 
-		if (tenantAreas != null) {
-			for (PracticeAreaRow area : tenantAreas) {
-				if (area == null)
-					continue;
-				String systemKey = normalizeSystemKey(area.systemKey());
-				if (systemKey == null) {
-					tenantUnkeyed.add(area);
-					continue;
-				}
-				bySystemKey.put(systemKey, area);
+	private void seedTenantPracticeAreasFromGlobalTemplates(Connection con, int shaleClientId) throws SQLException {
+		boolean hasSystemKey = tableHasColumn(con, "PracticeAreas", "SystemKey");
+		String insertSql = hasSystemKey
+				? """
+						INSERT INTO dbo.PracticeAreas (ShaleClientId, Name, Color, IsActive, IsDeleted, CreatedAt, UpdatedAt, SystemKey)
+						SELECT ?, pa.Name, pa.Color, pa.IsActive, pa.IsDeleted, SYSUTCDATETIME(), SYSUTCDATETIME(), pa.SystemKey
+						FROM dbo.PracticeAreas pa
+						WHERE pa.ShaleClientId IS NULL
+						  AND pa.IsActive = 1
+						  AND pa.IsDeleted = 0
+						  AND NOT EXISTS (
+						    SELECT 1
+						    FROM dbo.PracticeAreas existing
+						    WHERE existing.ShaleClientId = ?
+						      AND (
+						        (pa.SystemKey IS NOT NULL AND existing.SystemKey = pa.SystemKey)
+						        OR (pa.SystemKey IS NULL AND existing.Name = pa.Name)
+						      )
+						  );
+						"""
+				: """
+						INSERT INTO dbo.PracticeAreas (ShaleClientId, Name, Color, IsActive, IsDeleted, CreatedAt, UpdatedAt)
+						SELECT ?, pa.Name, pa.Color, pa.IsActive, pa.IsDeleted, SYSUTCDATETIME(), SYSUTCDATETIME()
+						FROM dbo.PracticeAreas pa
+						WHERE pa.ShaleClientId IS NULL
+						  AND pa.IsActive = 1
+						  AND pa.IsDeleted = 0
+						  AND NOT EXISTS (
+						    SELECT 1
+						    FROM dbo.PracticeAreas existing
+						    WHERE existing.ShaleClientId = ?
+						      AND existing.Name = pa.Name
+						  );
+						""";
+		try (PreparedStatement ps = con.prepareStatement(insertSql)) {
+			ps.setInt(1, shaleClientId);
+			ps.setInt(2, shaleClientId);
+			int seeded = ps.executeUpdate();
+			if (seeded > 0) {
+				System.out.println("[PracticeAreaSeed] seeded tenant practice areas from templates shaleClientId=" + shaleClientId
+						+ " rowsInserted=" + seeded);
 			}
 		}
-
-		List<PracticeAreaRow> merged = new ArrayList<>(globalUnkeyed.size() + bySystemKey.size() + tenantUnkeyed.size());
-		merged.addAll(globalUnkeyed);
-		merged.addAll(bySystemKey.values());
-		merged.addAll(tenantUnkeyed);
-		merged.sort((a, b) -> {
-			if (a == b)
-				return 0;
-			if (a == null)
-				return 1;
-			if (b == null)
-				return -1;
-			String aName = a.name() == null ? "" : a.name();
-			String bName = b.name() == null ? "" : b.name();
-			int byName = aName.compareToIgnoreCase(bName);
-			if (byName != 0)
-				return byName;
-			return Integer.compare(a.id(), b.id());
-		});
-		return merged;
 	}
 
 	public PracticeAreaRow findPracticeAreaForTenantBySystemKey(int shaleClientId, String systemKey) {
