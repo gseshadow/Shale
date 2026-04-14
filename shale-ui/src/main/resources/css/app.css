@@ -401,17 +401,22 @@
     -fx-border-color: rgba(255, 220, 220, 0.40);
 }
 
-.context-menu .menu-item.app-toolbar-menu-item > .label {
+.context-menu .menu-item > .label,
+.context-menu .custom-menu-item > .label {
     -fx-text-fill: #112542;
 }
 
-.context-menu .menu-item.app-toolbar-menu-item:focused > .label,
-.context-menu .menu-item.app-toolbar-menu-item:hover > .label,
-.context-menu .menu-item.app-toolbar-menu-item:armed > .label {
+.context-menu .menu-item:focused > .label,
+.context-menu .menu-item:hover > .label,
+.context-menu .menu-item:armed > .label,
+.context-menu .custom-menu-item:focused > .label,
+.context-menu .custom-menu-item:hover > .label,
+.context-menu .custom-menu-item:armed > .label {
     -fx-text-fill: #f9fbff;
 }
 
-.context-menu .menu-item.app-toolbar-menu-item:disabled > .label {
+.context-menu .menu-item:disabled > .label,
+.context-menu .custom-menu-item:disabled > .label {
     -fx-text-fill: rgba(17, 37, 66, 0.45);
 }
 
