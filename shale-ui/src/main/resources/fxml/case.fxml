@@ -99,9 +99,17 @@
 							</styleClass>
 							<items>
 								<MenuItem fx:id="generateSummaryHtmlMenuItem"
-									text="Preview HTML" />
+									text="Preview HTML">
+									<styleClass>
+										<String fx:value="app-toolbar-menu-item" />
+									</styleClass>
+								</MenuItem>
 								<MenuItem fx:id="generateSummaryPdfMenuItem"
-									text="Export PDF" />
+									text="Export PDF">
+									<styleClass>
+										<String fx:value="app-toolbar-menu-item" />
+									</styleClass>
+								</MenuItem>
 							</items>
 						</MenuButton>
 						<Label fx:id="summaryGenerationStatusLabel" text=""

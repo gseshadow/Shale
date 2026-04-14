@@ -331,6 +331,21 @@
     -fx-background-color: transparent;
 }
 
+.menu-button.app-toolbar-button {
+    -fx-padding: 0;
+}
+
+.menu-button.app-toolbar-button > .label {
+    -fx-padding: 0 8 0 16;
+    -fx-alignment: center-left;
+}
+
+.menu-button.app-toolbar-button > .arrow-button {
+    -fx-padding: 0 14 0 8;
+    -fx-min-width: 24;
+    -fx-pref-width: 24;
+}
+
 .menu-button.app-toolbar-button > .arrow-button > .arrow,
 .split-menu-button.app-toolbar-button > .arrow-button > .arrow,
 .split-menu-button.app-toolbar-button > .split-menu-button-arrow > .arrow {
@@ -384,6 +399,20 @@
 .split-menu-button.app-toolbar-button-danger:pressed {
     -fx-background-color: linear-gradient(to bottom, rgba(191, 64, 64, 0.98), rgba(153, 44, 44, 1.0));
     -fx-border-color: rgba(255, 220, 220, 0.40);
+}
+
+.context-menu .menu-item.app-toolbar-menu-item > .label {
+    -fx-text-fill: #112542;
+}
+
+.context-menu .menu-item.app-toolbar-menu-item:focused > .label,
+.context-menu .menu-item.app-toolbar-menu-item:hover > .label,
+.context-menu .menu-item.app-toolbar-menu-item:armed > .label {
+    -fx-text-fill: #f9fbff;
+}
+
+.context-menu .menu-item.app-toolbar-menu-item:disabled > .label {
+    -fx-text-fill: rgba(17, 37, 66, 0.45);
 }
 
 .surface-scroll,
