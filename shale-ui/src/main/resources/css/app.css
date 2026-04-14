@@ -401,6 +401,35 @@
     -fx-border-color: rgba(255, 220, 220, 0.40);
 }
 
+.button.app-toolbar-button-success,
+.menu-button.app-toolbar-button-success,
+.split-menu-button.app-toolbar-button-success {
+    -fx-background-color: linear-gradient(to bottom, rgba(71, 176, 118, 0.95), rgba(34, 139, 86, 0.97));
+    -fx-border-color: rgba(220, 249, 234, 0.48);
+}
+
+.button.app-toolbar-button-success:hover,
+.menu-button.app-toolbar-button-success:hover,
+.split-menu-button.app-toolbar-button-success:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(84, 191, 131, 0.97), rgba(43, 152, 98, 0.99));
+    -fx-border-color: rgba(229, 252, 241, 0.62);
+}
+
+.button.app-toolbar-button-success:pressed,
+.menu-button.app-toolbar-button-success:pressed,
+.split-menu-button.app-toolbar-button-success:pressed {
+    -fx-background-color: linear-gradient(to bottom, rgba(40, 151, 97, 0.98), rgba(25, 120, 74, 1.0));
+    -fx-border-color: rgba(205, 245, 224, 0.50);
+}
+
+.button.app-taskcard-action-button {
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-padding: 6 12 6 12;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
 .choice-box.app-toolbar-select {
     -fx-min-height: 40;
     -fx-pref-height: 40;
