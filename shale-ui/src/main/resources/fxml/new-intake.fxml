@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
@@ -144,7 +145,13 @@
                             <HBox alignment="CENTER_LEFT" spacing="8">
                                 <Label text="Parties" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                                 <Region HBox.hgrow="ALWAYS" />
-                                <Button fx:id="addPartyButton" text="Add Party" />
+                                <Button fx:id="addPartyButton" text="Add Party">
+                                    <styleClass>
+                                        <String fx:value="button" />
+                                        <String fx:value="app-toolbar-button" />
+                                        <String fx:value="app-toolbar-button-primary" />
+                                    </styleClass>
+                                </Button>
                             </HBox>
                             <Label fx:id="partiesEmptyLabel" text="No pending parties yet." style="-fx-opacity: 0.75;" wrapText="true" />
                             <VBox fx:id="partiesListBox" spacing="8" maxWidth="1.7976931348623157E308" />
@@ -164,7 +171,13 @@
                                 </HBox>
                                 <HBox spacing="12" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308">
                                     <StackPane fx:id="practiceAreaHost" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
-                                    <Button fx:id="selectPracticeAreaButton" text="Change" minWidth="90" />
+                                    <Button fx:id="selectPracticeAreaButton" text="Change" minWidth="90">
+                                        <styleClass>
+                                            <String fx:value="button" />
+                                            <String fx:value="app-toolbar-button" />
+                                            <String fx:value="app-toolbar-button-primary" />
+                                        </styleClass>
+                                    </Button>
                                 </HBox>
 
                                 <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
@@ -173,7 +186,13 @@
                                 </HBox>
                                 <HBox spacing="12" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308">
                                     <StackPane fx:id="statusHost" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
-                                    <Button fx:id="selectStatusButton" text="Change" minWidth="90" />
+                                    <Button fx:id="selectStatusButton" text="Change" minWidth="90">
+                                        <styleClass>
+                                            <String fx:value="button" />
+                                            <String fx:value="app-toolbar-button" />
+                                            <String fx:value="app-toolbar-button-primary" />
+                                        </styleClass>
+                                    </Button>
                                 </HBox>
 
                                 <Label text="Description" GridPane.rowIndex="2" GridPane.columnSpan="2" />
@@ -204,8 +223,20 @@
         </ScrollPane>
 
         <HBox spacing="10" alignment="CENTER_RIGHT">
-            <Button fx:id="cancelButton" text="Cancel" onAction="#onCancel" />
-            <Button fx:id="createIntakeButton" text="Create Intake" onAction="#onCreateIntake" />
+            <Button fx:id="cancelButton" text="Cancel" onAction="#onCancel">
+                <styleClass>
+                    <String fx:value="button" />
+                    <String fx:value="app-toolbar-button" />
+                    <String fx:value="app-toolbar-button-neutral" />
+                </styleClass>
+            </Button>
+            <Button fx:id="createIntakeButton" text="Create Intake" onAction="#onCreateIntake">
+                <styleClass>
+                    <String fx:value="button" />
+                    <String fx:value="app-toolbar-button" />
+                    <String fx:value="app-toolbar-button-primary" />
+                </styleClass>
+            </Button>
         </HBox>
     </children>
 </VBox>
