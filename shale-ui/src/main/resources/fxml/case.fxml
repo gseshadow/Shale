@@ -760,11 +760,17 @@
 				promptText="Add a case update..." wrapText="true" prefRowCount="4" />
 
 			<Button fx:id="submitCaseUpdateButton" text="Submit"
-				maxWidth="Infinity" />
+				maxWidth="Infinity">
+				<styleClass>
+					<String fx:value="app-toolbar-button" />
+					<String fx:value="app-toolbar-button-primary" />
+				</styleClass>
+			</Button>
 
 			<ScrollPane fx:id="caseUpdatesScrollPane"
-				fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
-				<VBox fx:id="caseUpdatesFeedBox" spacing="8.0">
+				fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS"
+				styleClass="transparent-scroll">
+				<VBox fx:id="caseUpdatesFeedBox" spacing="8.0" styleClass="secondary-panel">
 					<padding>
 						<Insets top="2" right="2" bottom="2" left="2" />
 					</padding>

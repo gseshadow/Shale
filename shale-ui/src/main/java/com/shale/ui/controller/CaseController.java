@@ -3791,8 +3791,8 @@ public class CaseController {
 		}
 
 		VBox card = new VBox(4, topRow, metadataLabel, bodyBox);
-		card.setPadding(new Insets(8, 10, 8, 10));
-		card.setStyle("-fx-background-color: rgba(0,0,0,0.04); -fx-background-radius: 8;");
+		card.setPadding(new Insets(10, 12, 10, 12));
+		card.getStyleClass().add("secondary-panel");
 		return card;
 	}
 
