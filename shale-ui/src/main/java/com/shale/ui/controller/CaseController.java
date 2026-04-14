@@ -7276,11 +7276,11 @@ public class CaseController {
 
 			toggleDetailField(detNameValue, detNameEditor, enabled);
 			toggleDetailField(detCaseNumberValue, detCaseNumberEditor, enabled);
-			setVisibleManaged(detCaseStatusValue, !enabled);
-			setVisibleManaged(detCaseStatusEditorRow, enabled);
-			setVisibleManaged(detPracticeAreaIdValue, !enabled);
-			setVisibleManaged(detPracticeAreaEditorRow, enabled);
-			toggleLargeTextDetailField(detDescriptionValue, detDescriptionEditor, enabled);
+				setVisibleManaged(detCaseStatusValue, !enabled);
+				setVisibleManaged(detCaseStatusEditorRow, enabled);
+				setVisibleManaged(detPracticeAreaIdValue, !enabled);
+				setVisibleManaged(detPracticeAreaEditorRow, enabled);
+				toggleDetailTextDisplayField(detDescriptionValue, detDescriptionEditor, enabled);
 			toggleDetailField(detCallerDateValue, detCallerDateEditor, enabled);
 			toggleDetailField(detCallerTimeValue, detCallerTimeEditor, enabled);
 			toggleDetailField(detAcceptedDateValue, detAcceptedDateEditor, enabled);
@@ -7303,23 +7303,20 @@ public class CaseController {
 			toggleDetailField(detAcceptedConsultantExpertSearchValue, detAcceptedConsultantExpertSearchEditor, enabled);
 			toggleDetailField(detAcceptedTestifyingExpertSearchValue, detAcceptedTestifyingExpertSearchEditor, enabled);
 			toggleDetailField(detAcceptedMedicalLiteratureValue, detAcceptedMedicalLiteratureEditor, enabled);
-			toggleDetailField(detAcceptedDetailValue, detAcceptedDetailEditor, enabled);
-			toggleDetailField(detDeniedChronologyValue, detDeniedChronologyEditor, enabled);
-			toggleDetailField(detDeniedDetailValue, detDeniedDetailEditor, enabled);
-			toggleLargeTextDetailField(detSummaryValue, detSummaryEditor, enabled);
-			toggleDetailField(detReceivedUpdatesValue, detReceivedUpdatesEditor, enabled);
-			if (enabled) {
-				resetAutoSizedDetailTextArea(detDescriptionEditor);
-				resetAutoSizedDetailTextArea(detSummaryEditor);
-			} else
-				Platform.runLater(CaseController.this::autoSizeReadOnlyDetailTextAreas);
-		}
+				toggleDetailField(detAcceptedDetailValue, detAcceptedDetailEditor, enabled);
+				toggleDetailField(detDeniedChronologyValue, detDeniedChronologyEditor, enabled);
+				toggleDetailField(detDeniedDetailValue, detDeniedDetailEditor, enabled);
+				toggleDetailTextDisplayField(detSummaryValue, detSummaryEditor, enabled);
+				toggleDetailField(detReceivedUpdatesValue, detReceivedUpdatesEditor, enabled);
+			}
 
-		private void toggleLargeTextDetailField(Label valueNode, TextArea editorNode, boolean editEnabled) {
-			setVisibleManaged(valueNode, false);
-			setVisibleManaged(editorNode, true);
-			ReadOnlyTextDisplaySupport.apply(editorNode, editEnabled);
-		}
+			private void toggleDetailTextDisplayField(Label valueNode, TextArea editorNode, boolean editEnabled) {
+				setVisibleManaged(valueNode, !editEnabled);
+				setVisibleManaged(editorNode, editEnabled);
+				if (editEnabled) {
+					ReadOnlyTextDisplaySupport.apply(editorNode, true);
+				}
+			}
 
 		private void toggleDetailField(Label valueNode, javafx.scene.control.Control editorNode, boolean editEnabled) {
 			if (editorNode instanceof TextInputControl textInput) {
