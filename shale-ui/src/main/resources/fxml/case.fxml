@@ -637,11 +637,26 @@
 							<Label text="Tasks"
 								style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 							<Region HBox.hgrow="ALWAYS" />
-							<Button fx:id="caseTasksShowCompletedButton" text="Show Completed" />
+							<Button fx:id="caseTasksShowCompletedButton" text="Show Completed">
+								<styleClass>
+									<String fx:value="app-toolbar-button" />
+									<String fx:value="app-toolbar-button-neutral" />
+								</styleClass>
+							</Button>
 							<Label text="Sort By" style="-fx-opacity: 0.8;" />
 							<ChoiceBox fx:id="caseTasksSortChoice" prefWidth="190" />
-							<Button fx:id="addTaskButton" text="New Task" />
-							<Button fx:id="caseTasksShowCompletedButton" text="Show Completed" />
+							<Button fx:id="addTaskButton" text="New Task">
+								<styleClass>
+									<String fx:value="app-toolbar-button" />
+									<String fx:value="app-toolbar-button-primary" />
+								</styleClass>
+							</Button>
+							<Button fx:id="caseTasksShowCompletedButton" text="Show Completed">
+								<styleClass>
+									<String fx:value="app-toolbar-button" />
+									<String fx:value="app-toolbar-button-neutral" />
+								</styleClass>
+							</Button>
 						</HBox>
 						<Label fx:id="tasksTabEmptyLabel"
 							text="No tasks for this case yet." visible="false" managed="false"
