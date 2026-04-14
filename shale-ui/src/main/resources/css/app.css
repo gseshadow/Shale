@@ -264,6 +264,27 @@
     -fx-border-color: rgba(255, 220, 220, 0.40);
 }
 
+.case-main-surface #caseOverviewDeleteCaseButton.button {
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-background-color: linear-gradient(to bottom, rgba(220, 94, 94, 0.94), rgba(178, 55, 55, 0.96));
+    -fx-border-color: rgba(255, 231, 231, 0.42);
+    -fx-border-width: 1;
+    -fx-text-fill: #f9fbff;
+}
+
+.case-main-surface #caseOverviewDeleteCaseButton.button:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(234, 110, 110, 0.96), rgba(194, 70, 70, 0.98));
+    -fx-border-color: rgba(255, 240, 240, 0.56);
+}
+
+.case-main-surface #caseOverviewDeleteCaseButton.button:pressed {
+    -fx-background-color: linear-gradient(to bottom, rgba(191, 64, 64, 0.98), rgba(153, 44, 44, 1.0));
+    -fx-border-color: rgba(255, 220, 220, 0.40);
+}
+
 .surface-scroll,
 .surface-scroll > .viewport {
     -fx-background-color: transparent;

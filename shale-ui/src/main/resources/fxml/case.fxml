@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
@@ -77,9 +78,13 @@
 						<Label fx:id="contentTitleLabel" text="Overview"
 							style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 						<Region HBox.hgrow="ALWAYS" />
-						<Button fx:id="deleteCaseButton" text="Delete Case"
-							styleClass="button app-pill-button app-pill-button-danger"
-							visible="false" managed="false" />
+						<Button fx:id="deleteCaseButton" id="caseOverviewDeleteCaseButton"
+							text="Delete Case" visible="false" managed="false">
+							<styleClass>
+								<String fx:value="app-pill-button" />
+								<String fx:value="app-pill-button-danger" />
+							</styleClass>
+						</Button>
 						<Button fx:id="editButton" text="Edit" />
 						<MenuButton fx:id="generateSummaryMenuButton"
 							text="Generate Summary">
