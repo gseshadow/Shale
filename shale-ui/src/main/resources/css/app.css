@@ -401,23 +401,52 @@
     -fx-border-color: rgba(255, 220, 220, 0.40);
 }
 
-.context-menu .menu-item > .label,
-.context-menu .custom-menu-item > .label {
+.context-menu .menu-item .label,
+.context-menu .custom-menu-item .label {
     -fx-text-fill: #112542;
 }
 
-.context-menu .menu-item:focused > .label,
-.context-menu .menu-item:hover > .label,
-.context-menu .menu-item:armed > .label,
-.context-menu .custom-menu-item:focused > .label,
-.context-menu .custom-menu-item:hover > .label,
-.context-menu .custom-menu-item:armed > .label {
+.context-menu .menu-item .label .text,
+.context-menu .custom-menu-item .label .text,
+.context-menu .menu-item .text,
+.context-menu .custom-menu-item .text {
+    -fx-fill: #112542;
+}
+
+.context-menu .menu-item:armed .label,
+.context-menu .menu-item:hover .label,
+.context-menu .menu-item:focused .label,
+.context-menu .custom-menu-item:armed .label,
+.context-menu .custom-menu-item:hover .label,
+.context-menu .custom-menu-item:focused .label {
     -fx-text-fill: #f9fbff;
 }
 
-.context-menu .menu-item:disabled > .label,
-.context-menu .custom-menu-item:disabled > .label {
+.context-menu .menu-item:armed .label .text,
+.context-menu .menu-item:hover .label .text,
+.context-menu .menu-item:focused .label .text,
+.context-menu .custom-menu-item:armed .label .text,
+.context-menu .custom-menu-item:hover .label .text,
+.context-menu .custom-menu-item:focused .label .text,
+.context-menu .menu-item:armed .text,
+.context-menu .menu-item:hover .text,
+.context-menu .menu-item:focused .text,
+.context-menu .custom-menu-item:armed .text,
+.context-menu .custom-menu-item:hover .text,
+.context-menu .custom-menu-item:focused .text {
+    -fx-fill: #f9fbff;
+}
+
+.context-menu .menu-item:disabled .label,
+.context-menu .custom-menu-item:disabled .label {
     -fx-text-fill: rgba(17, 37, 66, 0.45);
+}
+
+.context-menu .menu-item:disabled .label .text,
+.context-menu .custom-menu-item:disabled .label .text,
+.context-menu .menu-item:disabled .text,
+.context-menu .custom-menu-item:disabled .text {
+    -fx-fill: rgba(17, 37, 66, 0.45);
 }
 
 .surface-scroll,
