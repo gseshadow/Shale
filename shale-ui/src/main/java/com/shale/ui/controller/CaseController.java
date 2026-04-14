@@ -792,6 +792,42 @@ public class CaseController {
 		}
 	}
 
+	private void ensureStyleClass(javafx.scene.Node node, String styleClass) {
+		if (node == null || styleClass == null || styleClass.isBlank()) {
+			return;
+		}
+		if (!node.getStyleClass().contains(styleClass)) {
+			node.getStyleClass().add(styleClass);
+		}
+	}
+
+	private void configureAutoGrowingDetailArea(TextArea area, double minHeight) {
+		if (area == null) {
+			return;
+		}
+		ensureStyleClass(area, "detail-large-text");
+		Text measurer = new Text();
+		measurer.fontProperty().bind(area.fontProperty());
+		Runnable recomputeHeight = () -> {
+			String text = area.getText();
+			measurer.setText((text == null || text.isEmpty()) ? " " : text);
+			Insets insets = area.getInsets();
+			double width = area.getWidth() > 0 ? area.getWidth() : area.prefWidth(-1);
+			double contentWidth = Math.max(0, width - insets.getLeft() - insets.getRight() - 18);
+			measurer.setWrappingWidth(contentWidth);
+			double targetHeight = Math.max(
+					minHeight,
+					Math.ceil(measurer.getLayoutBounds().getHeight() + insets.getTop() + insets.getBottom() + 22));
+			area.setMinHeight(targetHeight);
+			area.setPrefHeight(targetHeight);
+			area.setMaxHeight(targetHeight);
+		};
+		area.textProperty().addListener((obs, oldV, newV) -> recomputeHeight.run());
+		area.widthProperty().addListener((obs, oldV, newV) -> recomputeHeight.run());
+		area.fontProperty().addListener((obs, oldV, newV) -> recomputeHeight.run());
+		Platform.runLater(recomputeHeight);
+	}
+
 	private void wireLiveRefreshLifecycle() {
 		if (caseRootPane == null) {
 			return;
@@ -7244,7 +7280,7 @@ public class CaseController {
 			setVisibleManaged(detCaseStatusEditorRow, enabled);
 			setVisibleManaged(detPracticeAreaIdValue, !enabled);
 			setVisibleManaged(detPracticeAreaEditorRow, enabled);
-			toggleDetailField(detDescriptionValue, detDescriptionEditor, enabled);
+			toggleLargeTextDetailField(detDescriptionValue, detDescriptionEditor, enabled);
 			toggleDetailField(detCallerDateValue, detCallerDateEditor, enabled);
 			toggleDetailField(detCallerTimeValue, detCallerTimeEditor, enabled);
 			toggleDetailField(detAcceptedDateValue, detAcceptedDateEditor, enabled);
@@ -7270,13 +7306,19 @@ public class CaseController {
 			toggleDetailField(detAcceptedDetailValue, detAcceptedDetailEditor, enabled);
 			toggleDetailField(detDeniedChronologyValue, detDeniedChronologyEditor, enabled);
 			toggleDetailField(detDeniedDetailValue, detDeniedDetailEditor, enabled);
-			toggleDetailField(detSummaryValue, detSummaryEditor, enabled);
+			toggleLargeTextDetailField(detSummaryValue, detSummaryEditor, enabled);
 			toggleDetailField(detReceivedUpdatesValue, detReceivedUpdatesEditor, enabled);
 			if (enabled) {
 				resetAutoSizedDetailTextArea(detDescriptionEditor);
 				resetAutoSizedDetailTextArea(detSummaryEditor);
 			} else
 				Platform.runLater(CaseController.this::autoSizeReadOnlyDetailTextAreas);
+		}
+
+		private void toggleLargeTextDetailField(Label valueNode, TextArea editorNode, boolean editEnabled) {
+			setVisibleManaged(valueNode, false);
+			setVisibleManaged(editorNode, true);
+			ReadOnlyTextDisplaySupport.apply(editorNode, editEnabled);
 		}
 
 		private void toggleDetailField(Label valueNode, javafx.scene.control.Control editorNode, boolean editEnabled) {
