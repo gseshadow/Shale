@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.Insets?>
@@ -15,8 +16,19 @@
 			</padding>
 			<TextField fx:id="casesSearchField"
 				promptText="Search cases…" HBox.hgrow="ALWAYS" />
-			<MenuButton fx:id="statusFilterMenuButton" text="Status (8/8)" />
-			<ChoiceBox fx:id="casesSortChoice" prefWidth="220" />
+			<MenuButton fx:id="statusFilterMenuButton" text="Status (8/8)">
+				<styleClass>
+					<String fx:value="menu-button" />
+					<String fx:value="app-toolbar-button" />
+					<String fx:value="app-toolbar-button-neutral" />
+				</styleClass>
+			</MenuButton>
+			<ChoiceBox fx:id="casesSortChoice" prefWidth="220">
+				<styleClass>
+					<String fx:value="choice-box" />
+					<String fx:value="app-toolbar-select" />
+				</styleClass>
+			</ChoiceBox>
 			<Label fx:id="resultsCountLabel" text="0 results" styleClass="cases-results-count" />
 		</HBox>
 	</top>

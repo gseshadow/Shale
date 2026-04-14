@@ -93,6 +93,7 @@ public final class PartyAddWorkflowDialog {
 
 		Node backButton = dialog.getDialogPane().lookupButton(backType);
 		Node addButton = dialog.getDialogPane().lookupButton(addType);
+		Node cancelButton = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
 
 		Label titleLabel = new Label();
 		titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
@@ -108,6 +109,13 @@ public final class PartyAddWorkflowDialog {
 		Button organizationButton = new Button("Organization");
 		contactButton.setMinWidth(200);
 		organizationButton.setMinWidth(200);
+		applyToolbarButtonClasses(createNewButton, "app-toolbar-button-primary");
+		applyToolbarButtonClasses(selectExistingButton, "app-toolbar-button-primary");
+		applyToolbarButtonClasses(contactButton, "app-toolbar-button-primary");
+		applyToolbarButtonClasses(organizationButton, "app-toolbar-button-primary");
+		applyToolbarButtonClasses(asButton(addButton), "app-toolbar-button-primary");
+		applyToolbarButtonClasses(asButton(backButton), "app-toolbar-button-neutral");
+		applyToolbarButtonClasses(asButton(cancelButton), "app-toolbar-button-neutral");
 
 		TextField createFirstNameField = new TextField();
 		TextField createLastNameField = new TextField();
@@ -427,6 +435,22 @@ public final class PartyAddWorkflowDialog {
 			tokens[i] = token.substring(0, 1).toUpperCase(Locale.ROOT) + token.substring(1).toLowerCase(Locale.ROOT);
 		}
 		return String.join(" ", tokens);
+	}
+
+	private static Button asButton(Node node) {
+		return node instanceof Button button ? button : null;
+	}
+
+	private static void applyToolbarButtonClasses(Button button, String variantClass) {
+		if (button == null) {
+			return;
+		}
+		if (!button.getStyleClass().contains("app-toolbar-button")) {
+			button.getStyleClass().add("app-toolbar-button");
+		}
+		if (!button.getStyleClass().contains(variantClass)) {
+			button.getStyleClass().add(variantClass);
+		}
 	}
 
 	private static void setVisibleManaged(Node node, boolean visible) {
