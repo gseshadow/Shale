@@ -17,6 +17,7 @@ import java.util.function.Consumer;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.ui.component.dialog.AppDialogs;
@@ -50,6 +51,7 @@ public final class MyShaleController {
 	private static final String SORT_SOL = "Statute of Limitations Date";
 	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
+	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -63,6 +65,10 @@ public final class MyShaleController {
 	private FlowPane myCasesFlow;
 	@FXML
 	private ChoiceBox<String> myTasksSortChoice;
+	@FXML
+	private ChoiceBox<CaseFilterOption> myTasksCaseFilterChoice;
+	@FXML
+	private TextField myTasksSearchField;
 	@FXML
 	private Button myTasksShowCompletedButton;
 	@FXML
@@ -142,6 +148,15 @@ public final class MyShaleController {
 			myTasksSortChoice.getSelectionModel().select(MY_TASKS_SORT_DUE_ASC);
 			myTasksSortChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> refreshMyTasks());
+		}
+		if (myTasksCaseFilterChoice != null) {
+			myTasksCaseFilterChoice.getItems().setAll(ALL_CASES_OPTION);
+			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
+			myTasksCaseFilterChoice.getSelectionModel().selectedItemProperty()
+					.addListener((obs, oldV, newV) -> renderMyTasks());
+		}
+		if (myTasksSearchField != null) {
+			myTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyTasks());
 		}
 		if (myTasksShowCompletedButton != null) {
 			myTasksShowCompletedButton.setOnAction(e -> {
@@ -542,6 +557,7 @@ public final class MyShaleController {
 				runOnFx(() -> {
 					myTasks = tasks == null ? List.of() : tasks;
 					myTaskAssignedUsers = assignedByTask;
+					syncMyTaskCaseFilterOptions();
 					renderMyTasks();
 				});
 			} catch (Exception ex) {
@@ -559,6 +575,9 @@ public final class MyShaleController {
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
+
+		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
+		List<CaseTaskListItemDto> filteredTasks = filterAndRankMyTasks(myTasks, selectedCaseFilterId(), searchQuery);
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
@@ -568,7 +587,14 @@ public final class MyShaleController {
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
-		for (CaseTaskListItemDto task : myTasks) {
+		if (filteredTasks.isEmpty()) {
+			setVisibleManaged(myTasksEmptyLabel, true);
+			setVisibleManaged(myTasksScroll, false);
+			myTasksEmptyLabel.setText("No tasks found.");
+			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
+			return;
+		}
+		for (CaseTaskListItemDto task : filteredTasks) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
 					task.id(),
 					task.caseId(),
@@ -578,6 +604,7 @@ public final class MyShaleController {
 					task.caseNonEngagementLetterSent(),
 					task.title(),
 					task.description(),
+					task.createdByDisplayName(),
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
@@ -587,6 +614,115 @@ public final class MyShaleController {
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
+	}
+
+	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, Long selectedCaseId, String normalizedQuery) {
+		if (tasks == null || tasks.isEmpty()) {
+			return List.of();
+		}
+		List<CaseTaskListItemDto> caseFiltered = tasks.stream()
+				.filter(task -> selectedCaseId == null || task.caseId() == selectedCaseId.longValue())
+				.toList();
+		if (normalizedQuery.isEmpty()) {
+			return caseFiltered;
+		}
+		record RankedTask(CaseTaskListItemDto task, int score, int originalIndex) {
+		}
+		List<RankedTask> ranked = new ArrayList<>();
+		for (int i = 0; i < caseFiltered.size(); i++) {
+			CaseTaskListItemDto task = caseFiltered.get(i);
+			int score = myTaskSearchScore(task, normalizedQuery);
+			if (score > 0) {
+				ranked.add(new RankedTask(task, score, i));
+			}
+		}
+		ranked.sort(Comparator
+				.comparingInt(RankedTask::score).reversed()
+				.thenComparingInt(RankedTask::originalIndex));
+		return ranked.stream().map(RankedTask::task).toList();
+	}
+
+
+	private void syncMyTaskCaseFilterOptions() {
+		if (myTasksCaseFilterChoice == null) {
+			return;
+		}
+		CaseFilterOption selectedOption = myTasksCaseFilterChoice.getSelectionModel().getSelectedItem();
+		Long selectedId = selectedOption == null ? null : selectedOption.caseId();
+
+		java.util.Map<Long, String> caseById = new java.util.LinkedHashMap<>();
+		for (CaseTaskListItemDto task : myTasks) {
+			if (task == null || task.caseId() <= 0) {
+				continue;
+			}
+			caseById.putIfAbsent(task.caseId(), safe(task.caseName()));
+		}
+
+		List<CaseFilterOption> options = new ArrayList<>();
+		options.add(ALL_CASES_OPTION);
+		caseById.entrySet().stream()
+				.map(entry -> new CaseFilterOption(entry.getKey(), entry.getValue()))
+				.sorted(Comparator.comparing(
+						(CaseFilterOption option) -> normalizeCaseFilterSortKey(option.displayName()),
+						Comparator.nullsLast(String::compareToIgnoreCase)))
+				.forEach(options::add);
+
+		myTasksCaseFilterChoice.getItems().setAll(options);
+		if (selectedId != null && caseById.containsKey(selectedId)) {
+			myTasksCaseFilterChoice.getSelectionModel().select(
+					options.stream()
+							.filter(option -> selectedId.equals(option.caseId()))
+							.findFirst()
+							.orElse(ALL_CASES_OPTION));
+		} else {
+			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
+		}
+	}
+
+	private Long selectedCaseFilterId() {
+		if (myTasksCaseFilterChoice == null) {
+			return null;
+		}
+		CaseFilterOption option = myTasksCaseFilterChoice.getSelectionModel().getSelectedItem();
+		return option == null ? null : option.caseId();
+	}
+
+	private String normalizeCaseFilterSortKey(String caseName) {
+		String trimmed = safe(caseName).trim();
+		if (trimmed.isEmpty()) {
+			return null;
+		}
+		return trimmed.toLowerCase(Locale.ROOT);
+	}
+
+	private int myTaskSearchScore(CaseTaskListItemDto task, String normalizedQuery) {
+		if (task == null || normalizedQuery == null || normalizedQuery.isEmpty()) {
+			return 0;
+		}
+		if (containsIgnoreCase(task.title(), normalizedQuery)) {
+			return 4;
+		}
+		if (containsIgnoreCase(task.description(), normalizedQuery)) {
+			return 3;
+		}
+		if (containsIgnoreCase(task.caseName(), normalizedQuery)) {
+			return 2;
+		}
+		if (containsIgnoreCase(task.createdByDisplayName(), normalizedQuery)) {
+			return 1;
+		}
+		return 0;
+	}
+
+	private String normalizeSearchQuery(String rawQuery) {
+		if (rawQuery == null) {
+			return "";
+		}
+		return rawQuery.trim().toLowerCase(Locale.ROOT);
+	}
+
+	private boolean containsIgnoreCase(String value, String normalizedQuery) {
+		return safe(value).toLowerCase(Locale.ROOT).contains(normalizedQuery);
 	}
 
 	private CaseTaskService.MyTasksSortOption selectedMyTaskSort() {
@@ -647,6 +783,8 @@ public final class MyShaleController {
 	}
 
 	private void showTaskDetailPopup(Long taskId) {
+		long clickReceivedAt = System.nanoTime();
+		System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] click_received taskId=" + taskId);
 		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
 			return;
 		}
@@ -658,29 +796,62 @@ public final class MyShaleController {
 			return;
 		}
 		if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
+			System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] open_skipped_in_flight taskId=" + taskId);
 			return;
 		}
-
-		new Thread(() -> {
-			try {
-				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
-					List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-					List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
-							detail == null
-									? List.of()
-									: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
-					List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
-							? List.of()
-							: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+		Optional<CaseTaskListItemDto> summary = findMyTaskById(taskId);
+		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+				taskId,
+				summary.map(CaseTaskListItemDto::caseId).orElse(0L),
+				summary.map(CaseTaskListItemDto::caseName).orElse(""),
+				summary.map(CaseTaskListItemDto::caseResponsibleAttorney).orElse(""),
+				summary.map(CaseTaskListItemDto::caseResponsibleAttorneyColor).orElse(""),
+				summary.map(CaseTaskListItemDto::caseNonEngagementLetterSent).orElse(null),
+				summary.map(CaseTaskListItemDto::title).orElse(""),
+				summary.map(CaseTaskListItemDto::description).orElse(""),
+				summary.map(CaseTaskListItemDto::dueAt).orElse(null),
+				null,
+				null,
+				summary.map(CaseTaskListItemDto::createdByDisplayName).orElse(""),
+				List.of(),
+				List.of(),
+				List.of(),
+				summary.map(item -> item.completedAt() != null).orElse(false));
+		System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] shell_stage_created_ms="
+				+ ((System.nanoTime() - clickReceivedAt) / 1_000_000L) + " taskId=" + taskId);
+		try {
+			Optional<TaskDetailDialog.TaskDetailResult> result =
+					TaskDetailDialog.showAndWait(
+							"MY_TASKS",
+							clickReceivedAt,
+							taskDialogOwner(),
+							model,
+							List.of(),
+							List.of(),
+							id -> {
+								TaskDetailDto detail = caseTaskService.loadTaskDetail(id, shaleClientId);
+								List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
+								List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+								if (detail == null) {
+									throw new IllegalStateException("Task was not found or may have been deleted.");
+								}
+								return new TaskDetailDialog.CoreTaskHydration(detail, statuses, priorities);
+							},
+							id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+							id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
+									.map(member -> new TaskDetailDialog.AssignedTeamMember(
+											member.userId(),
+											member.displayName(),
+											member.color()))
+									.toList(),
+							id -> caseTaskService.loadTaskActivity(id, shaleClientId).stream()
 									.map(item -> new TaskDetailDialog.TaskActivityEntry(
 											item.title(),
 											item.body(),
 											item.actorDisplayName(),
 											item.occurredAt()))
-									.toList();
-					List<TaskDetailDialog.TaskNoteEntry> noteEntries = detail == null
-							? List.of()
-							: caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
+									.toList(),
+							id -> caseTaskService.loadTaskNotes(id, shaleClientId).stream()
 									.map(note -> new TaskDetailDialog.TaskNoteEntry(
 											note.id(),
 											note.userId(),
@@ -689,43 +860,8 @@ public final class MyShaleController {
 											note.createdAt(),
 											note.updatedAt(),
 											note.userId() == currentUserId))
-									.toList();
-
-				runOnFx(() -> {
-					try {
-						if (detail == null) {
-							showTaskActionError("Task was not found or may have been deleted.");
-							refreshMyTasks();
-							return;
-						}
-						TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
-								detail.id(),
-								detail.caseId(),
-								detail.caseName(),
-								detail.caseResponsibleAttorney(),
-								detail.caseResponsibleAttorneyColor(),
-				detail.caseNonEngagementLetterSent(),
-								detail.title(),
-								detail.description(),
-								detail.dueAt(),
-								detail.priorityId(),
-								detail.createdByDisplayName(),
-										assignedTeam.stream()
-												.map(member -> new TaskDetailDialog.AssignedTeamMember(
-														member.userId(),
-														member.displayName(),
-														member.color()))
-											.toList(),
-										activityEntries,
-										noteEntries,
-										detail.completedAt() != null);
-						Optional<TaskDetailDialog.TaskDetailResult> result =
-								TaskDetailDialog.showAndWait(
-										taskDialogOwner(),
-										model,
-										priorities,
-										id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-											new TaskDetailDialog.AssignmentEditor() {
+									.toList(),
+							new TaskDetailDialog.AssignmentEditor() {
 											@Override
 											public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
 												caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
@@ -778,33 +914,27 @@ public final class MyShaleController {
 																	note.userId() == currentUserId))
 															.toList();
 												}
-											},
-											onOpenUser,
-											onOpenCase);
-						if (result.isEmpty()) {
-							return;
-						}
-						TaskDetailDialog.TaskDetailResult action = result.get();
-						if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
-							deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
-							return;
-						}
-						TaskDetailDialog.SaveTaskPayload payload = action.payload();
-						if (payload == null) {
-							return;
-						}
-						saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
-					} finally {
-						taskDetailDialogInFlight.set(false);
-					}
-				});
-			} catch (Exception ex) {
-				runOnFx(() -> {
-					taskDetailDialogInFlight.set(false);
-					showTaskActionError("Failed to load task details. " + rootCauseMessage(ex));
-				});
+							},
+							onOpenUser,
+							onOpenCase);
+			if (result.isEmpty()) {
+				return;
 			}
-		}, "my-shale-task-detail-" + taskId).start();
+			TaskDetailDialog.TaskDetailResult action = result.get();
+			if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+				deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
+				return;
+			}
+			TaskDetailDialog.SaveTaskPayload payload = action.payload();
+			if (payload == null) {
+				return;
+			}
+			saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+		} catch (Exception ex) {
+			showTaskActionError("Failed to load task details. " + rootCauseMessage(ex));
+		} finally {
+			taskDetailDialogInFlight.set(false);
+		}
 	}
 
 	private void saveTaskFromDetail(
@@ -818,6 +948,7 @@ public final class MyShaleController {
 				payload.title(),
 				payload.description(),
 				payload.dueAt(),
+				payload.statusId(),
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);
@@ -883,6 +1014,13 @@ public final class MyShaleController {
 
 	private static String safe(String s) {
 		return s == null ? "" : s;
+	}
+
+	private record CaseFilterOption(Long caseId, String displayName) {
+		@Override
+		public String toString() {
+			return safe(displayName);
+		}
 	}
 
 	private static final class CaseCardVm {

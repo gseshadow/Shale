@@ -7,6 +7,7 @@ import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
 import com.shale.data.dao.UserDao.UserRoleRow;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
@@ -20,6 +21,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -30,6 +32,7 @@ import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -644,7 +647,7 @@ public final class UserController {
 		HBox row;
 		if (canManageRoles()) {
 			Button removeButton = new Button("Remove");
-			removeButton.getStyleClass().add("button-secondary");
+			removeButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-danger", "app-toolbar-button-compact");
 			removeButton.setOnAction(e -> onRemoveRole(role));
 			Region spacer = new Region();
 			HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -773,6 +776,7 @@ public final class UserController {
 				row.caseNonEngagementLetterSent(),
 				row.title(),
 				row.description(),
+				null,
 				row.priorityColorHex(),
 				row.dueAt(),
 				row.completedAt(),
@@ -1045,6 +1049,7 @@ public final class UserController {
 		new Thread(() -> {
 			try {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+				List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
 				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
 				List<CaseTaskService.AssignedTaskUserOption> assignedTeam = detail == null
 						? List.of()
@@ -1084,10 +1089,11 @@ public final class UserController {
 								detail.caseResponsibleAttorney(),
 								detail.caseResponsibleAttorneyColor(),
 				detail.caseNonEngagementLetterSent(),
-								detail.title(),
-								detail.description(),
-								detail.dueAt(),
-								detail.priorityId(),
+						detail.title(),
+						detail.description(),
+						detail.dueAt(),
+						detail.statusId(),
+						detail.priorityId(),
 								detail.createdByDisplayName(),
 									assignedTeam.stream()
 											.map(member -> new TaskDetailDialog.AssignedTeamMember(
@@ -1099,10 +1105,37 @@ public final class UserController {
 									noteEntries,
 									detail.completedAt() != null);
 						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+								"USER_CONTROLLER",
+								0L,
 								taskDialogOwner(),
 								model,
+								statuses,
 								priorities,
+								null,
 								id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+								id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
+										.map(member -> new TaskDetailDialog.AssignedTeamMember(
+												member.userId(),
+												member.displayName(),
+												member.color()))
+										.toList(),
+								id -> caseTaskService.loadTaskActivity(id, shaleClientId).stream()
+										.map(item -> new TaskDetailDialog.TaskActivityEntry(
+												item.title(),
+												item.body(),
+												item.actorDisplayName(),
+												item.occurredAt()))
+										.toList(),
+								id -> caseTaskService.loadTaskNotes(id, shaleClientId).stream()
+										.map(note -> new TaskDetailDialog.TaskNoteEntry(
+												note.id(),
+												note.userId(),
+												note.userDisplayName(),
+												note.body(),
+												note.createdAt(),
+												note.updatedAt(),
+												note.userId() == currentUserId))
+										.toList(),
 									new TaskDetailDialog.AssignmentEditor() {
 									@Override
 									public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
@@ -1192,6 +1225,7 @@ public final class UserController {
 				payload.title(),
 				payload.description(),
 				payload.dueAt(),
+				payload.statusId(),
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);
@@ -1280,6 +1314,12 @@ public final class UserController {
 	}
 
 	private static void toggleEditableField(Node valueNode, Node editorNode, boolean editMode) {
+		if (editorNode instanceof TextInputControl textInput) {
+			setVisibleManaged(valueNode, false);
+			setVisibleManaged(editorNode, true);
+			ReadOnlyTextDisplaySupport.apply(textInput, editMode);
+			return;
+		}
 		setVisibleManaged(valueNode, !editMode);
 		setVisibleManaged(editorNode, editMode);
 	}

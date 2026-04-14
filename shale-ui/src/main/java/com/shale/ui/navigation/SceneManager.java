@@ -3,6 +3,7 @@ package com.shale.ui.navigation;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
@@ -35,6 +36,7 @@ import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserPreferencesService;
+import com.shale.ui.services.UpdatePollingService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
@@ -87,6 +89,7 @@ public final class SceneManager {
 	private final NotificationPreferencesService notificationPreferencesService;
 	private final DurableNotificationService durableNotificationService;
 	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
+	private final UpdatePollingService updatePollingService;
 	private final ExecutorService notificationStartupExecutor;
 	private final AtomicLong notificationStartupGeneration = new AtomicLong(0);
 	private volatile Future<?> notificationStartupFuture;
@@ -123,6 +126,7 @@ public final class SceneManager {
 		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
+		this.updatePollingService = new UpdatePollingService(updateLauncher, this::onUpdateCheckCompleted);
 	}
 
 	private NotificationCenterService createNotificationCenterService() {
@@ -143,6 +147,7 @@ public final class SceneManager {
 		liveUpdateNotificationBridge.stop();
 		connectivityNotificationProducer.stop();
 		taskDueDateNotificationGenerator.stop();
+		updatePollingService.stop();
 		notificationCenterService.clearAll();
 		var root = load("/fxml/login.fxml", controller ->
 		{
@@ -169,6 +174,7 @@ public final class SceneManager {
 		liveUpdateNotificationBridge.start();
 		connectivityNotificationProducer.start();
 		taskDueDateNotificationGenerator.start();
+		updatePollingService.start();
 		startNotificationBootstrapAsync();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
@@ -231,7 +237,11 @@ public final class SceneManager {
 
 
 	public void onUpdateCheckCompleted(UpdateCheckResult result) {
-		systemUpdateNotificationProducer.onUpdateCheckResult(result);
+		if (Platform.isFxApplicationThread()) {
+			systemUpdateNotificationProducer.onUpdateCheckResult(result);
+			return;
+		}
+		Platform.runLater(() -> systemUpdateNotificationProducer.onUpdateCheckResult(result));
 	}
 
 	public void onUpdaterLaunchSucceeded() {
@@ -727,8 +737,9 @@ public final class SceneManager {
 	private void loadAndOpenTaskDialog(Long taskId, int shaleClientId, int currentUserId, CaseTaskService caseTaskService) {
 		try {
 			TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+			List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
 			List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, priorities));
+			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, statuses, priorities));
 		} catch (Exception ex) {
 			Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
 		}
@@ -740,6 +751,7 @@ public final class SceneManager {
 			int currentUserId,
 			CaseTaskService caseTaskService,
 			TaskDetailDto detail,
+			List<TaskStatusOptionDto> statuses,
 			List<TaskPriorityOptionDto> priorities) {
 		if (detail == null) {
 			AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted.");
@@ -774,6 +786,7 @@ public final class SceneManager {
 				detail.title(),
 				detail.description(),
 				detail.dueAt(),
+				detail.statusId(),
 				detail.priorityId(),
 					detail.createdByDisplayName(),
 						assignedTeam.stream()
@@ -787,10 +800,37 @@ public final class SceneManager {
 				detail.completedAt() != null);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
 		var result = TaskDetailDialog.showAndWait(
+				"SCENE_MANAGER",
+				0L,
 				owner,
 				model,
+				statuses,
 				priorities,
+				null,
 				id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+				id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
+						.map(member -> new TaskDetailDialog.AssignedTeamMember(
+								member.userId(),
+								member.displayName(),
+								member.color()))
+						.toList(),
+				id -> caseTaskService.loadTaskActivity(id, shaleClientId).stream()
+						.map(item -> new TaskDetailDialog.TaskActivityEntry(
+								item.title(),
+								item.body(),
+								item.actorDisplayName(),
+								item.occurredAt()))
+						.toList(),
+				id -> caseTaskService.loadTaskNotes(id, shaleClientId).stream()
+						.map(note -> new TaskDetailDialog.TaskNoteEntry(
+								note.id(),
+								note.userId(),
+								note.userDisplayName(),
+								note.body(),
+								note.createdAt(),
+								note.updatedAt(),
+								note.userId() == currentUserId))
+						.toList(),
 				new TaskDetailDialog.AssignmentEditor() {
 					@Override
 					public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
@@ -871,6 +911,7 @@ public final class SceneManager {
 				payload.title(),
 				payload.description(),
 				payload.dueAt(),
+				payload.statusId(),
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);

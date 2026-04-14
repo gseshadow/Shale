@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.Button?>
@@ -27,10 +28,19 @@
 			<Label text="My Cases" styleClass="page-heading" />
 			<BorderPane VBox.vgrow="ALWAYS">
 				<top>
-					<HBox spacing="10" styleClass="cases-filter-bar">
+					<HBox spacing="10" styleClass="shell-transparent">
 						<TextField fx:id="myCasesSearchField" promptText="Search my cases…" HBox.hgrow="ALWAYS" />
-						<MenuButton fx:id="myCasesStatusFilterMenuButton" text="Status (8/8)" />
-						<ChoiceBox fx:id="myCasesSortChoice" prefWidth="220" />
+						<MenuButton fx:id="myCasesStatusFilterMenuButton" text="Status (8/8)">
+							<styleClass>
+								<String fx:value="app-toolbar-button" />
+								<String fx:value="app-toolbar-button-neutral" />
+							</styleClass>
+						</MenuButton>
+						<ChoiceBox fx:id="myCasesSortChoice" prefWidth="220">
+							<styleClass>
+								<String fx:value="app-toolbar-select" />
+							</styleClass>
+						</ChoiceBox>
 					</HBox>
 				</top>
 				<center>
@@ -53,12 +63,31 @@
 			<padding>
 				<Insets top="10" right="10" bottom="10" left="10" />
 			</padding>
-			<HBox spacing="8" alignment="CENTER_LEFT">
-				<Label text="My Tasks" styleClass="page-heading" />
-				<Region HBox.hgrow="ALWAYS" />
-				<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170" />
-				<Button fx:id="myTasksShowCompletedButton" text="Show Completed" />
-			</HBox>
+			<VBox spacing="8">
+				<HBox spacing="8" alignment="CENTER_LEFT">
+					<Label text="My Tasks" styleClass="page-heading" />
+					<Region HBox.hgrow="ALWAYS" />
+					<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170">
+						<styleClass>
+							<String fx:value="app-toolbar-select" />
+						</styleClass>
+					</ChoiceBox>
+					<Button fx:id="myTasksShowCompletedButton" text="Show Completed">
+						<styleClass>
+							<String fx:value="app-toolbar-button" />
+							<String fx:value="app-toolbar-button-neutral" />
+						</styleClass>
+					</Button>
+				</HBox>
+				<HBox spacing="8" alignment="CENTER_LEFT">
+					<TextField fx:id="myTasksSearchField" promptText="Search my tasks…" HBox.hgrow="ALWAYS" />
+					<ChoiceBox fx:id="myTasksCaseFilterChoice" prefWidth="180">
+						<styleClass>
+							<String fx:value="app-toolbar-select" />
+						</styleClass>
+					</ChoiceBox>
+				</HBox>
+			</VBox>
 			<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" />
 			<ScrollPane fx:id="myTasksScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
 				vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">

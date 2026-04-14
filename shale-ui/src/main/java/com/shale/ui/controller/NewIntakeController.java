@@ -11,6 +11,7 @@ import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
@@ -424,7 +425,21 @@ public final class NewIntakeController {
 		if (owner != null) {
 			dialog.initOwner(owner);
 		}
+		applyToolbarClassesToDialogButton(dialog.getDialogPane().lookupButton(javafx.scene.control.ButtonType.OK), "app-toolbar-button-primary");
+		applyToolbarClassesToDialogButton(dialog.getDialogPane().lookupButton(javafx.scene.control.ButtonType.CANCEL), "app-toolbar-button-neutral");
 		return dialog.showAndWait();
+	}
+
+	private void applyToolbarClassesToDialogButton(Node node, String variantClass) {
+		if (!(node instanceof Button button)) {
+			return;
+		}
+		if (!button.getStyleClass().contains("app-toolbar-button")) {
+			button.getStyleClass().add("app-toolbar-button");
+		}
+		if (!button.getStyleClass().contains(variantClass)) {
+			button.getStyleClass().add(variantClass);
+		}
 	}
 
 	private void preselectDefaultStatusIfAvailable() {
@@ -497,6 +512,8 @@ public final class NewIntakeController {
 		}
 
 		setSaving(true);
+		int tenantId = requireClientId();
+		System.out.println("[NewIntakeController] submit started tenant=" + tenantId + " userId=" + (appState == null ? null : appState.getUserId()));
 		try {
 			CaseDao.NewIntakeCreateRequest request = new CaseDao.NewIntakeCreateRequest(
 				requireClientId(),
@@ -543,12 +560,15 @@ public final class NewIntakeController {
 			);
 
 			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
+			System.out.println("[NewIntakeController] submit succeeded tenant=" + tenantId + " caseId=" + result.caseId());
 			showSuccess("Intake created successfully.");
 			if (stage != null)
 				stage.close();
 			if (onCaseCreated != null)
 				onCaseCreated.accept(Math.toIntExact(result.caseId()));
 		} catch (RuntimeException ex) {
+			System.err.println("[NewIntakeController] submit failed tenant=" + tenantId + " error=" + ex.getMessage());
+			ex.printStackTrace(System.err);
 			showValidation("Create intake failed: " + firstMeaningfulMessage(ex));
 		} finally {
 			setSaving(false);
@@ -588,6 +608,11 @@ public final class NewIntakeController {
 	}
 
 	private List<String> validate() {
+		List<CaseDao.PracticeAreaRow> tenantPracticeAreas = loadTenantPracticeAreasForValidation();
+		boolean hasTenantPracticeAreas = !tenantPracticeAreas.isEmpty();
+		boolean selectedPracticeAreaValid = hasTenantPracticeAreas
+				&& selectedPracticeArea != null
+				&& tenantPracticeAreas.stream().anyMatch(area -> area.id() == selectedPracticeArea.id());
 		return java.util.stream.Stream.of(
 				required(caseNameField.getText(), "Case Name is required."),
 				requiredDate(dateOfIntakePicker.getValue(), "Date of Intake is required."),
@@ -595,12 +620,21 @@ public final class NewIntakeController {
 				required(clientFirstNameField.getText(), "Client First Name is required."),
 				required(clientLastNameField.getText(), "Client Last Name is required."),
 				required(clientPhoneField.getText(), "Client Phone Number is required."),
-				selectedPracticeArea == null ? "Practice Area is required." : null,
+				!hasTenantPracticeAreas ? "No tenant practice areas are configured. Please contact support." : null,
+				hasTenantPracticeAreas && !selectedPracticeAreaValid ? "Practice Area is required." : null,
 				selectedStatus == null ? "Status is required." : null,
 				callerRequiredWhenNotClient(callerFirstNameField.getText(), "Caller First Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerPhoneField.getText(), "Caller Phone Number is required when Caller is Client is unchecked.")
 		).filter(s -> s != null && !s.isBlank()).toList();
+	}
+
+	private List<CaseDao.PracticeAreaRow> loadTenantPracticeAreasForValidation() {
+		try {
+			return caseDao.listPracticeAreasForTenant(requireClientId());
+		} catch (RuntimeException ex) {
+			return List.of();
+		}
 	}
 
 	private String required(String value, String message) {

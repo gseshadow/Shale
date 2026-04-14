@@ -125,15 +125,13 @@ public final class ContactPickerDialog<T> {
 		actions.getStyleClass().add("app-dialog-actions");
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 
-		HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, title, () -> {
+		VBox body = new VBox(16, header, searchField, listView, actions);
+		VBox.setVgrow(listView, Priority.ALWAYS);
+		body.setPadding(new Insets(18));
+		VBox root = AppDialogs.createSecondaryWindowShell(stage, title, () -> {
 			selected = null;
 			stage.close();
-		});
-		VBox root = new VBox(16, windowHeader, header, searchField, listView, actions);
-		root.getStyleClass().add("app-dialog-root");
-		VBox.setVgrow(listView, Priority.ALWAYS);
-
-		root.setPadding(new Insets(18));
+		}, body);
 		root.setPrefSize(520, 600);
 		root.setMinWidth(460);
 

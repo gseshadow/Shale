@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
@@ -18,10 +19,34 @@
                 <Label fx:id="organizationTitleLabel" text="Organization"
                     style="-fx-font-size: 18px; -fx-font-weight: bold;" />
                 <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="editButton" text="Edit" />
-                <Button fx:id="saveButton" text="Save" visible="false" managed="false" />
-                <Button fx:id="cancelButton" text="Cancel" visible="false" managed="false" />
-                <Button fx:id="deleteOrganizationButton" text="Delete Organization" visible="false" managed="false" />
+                <Button fx:id="editButton" text="Edit">
+                    <styleClass>
+                        <String fx:value="button" />
+                        <String fx:value="app-toolbar-button" />
+                        <String fx:value="app-toolbar-button-neutral" />
+                    </styleClass>
+                </Button>
+                <Button fx:id="saveButton" text="Save" visible="false" managed="false">
+                    <styleClass>
+                        <String fx:value="button" />
+                        <String fx:value="app-toolbar-button" />
+                        <String fx:value="app-toolbar-button-primary" />
+                    </styleClass>
+                </Button>
+                <Button fx:id="cancelButton" text="Cancel" visible="false" managed="false">
+                    <styleClass>
+                        <String fx:value="button" />
+                        <String fx:value="app-toolbar-button" />
+                        <String fx:value="app-toolbar-button-neutral" />
+                    </styleClass>
+                </Button>
+                <Button fx:id="deleteOrganizationButton" text="Delete Organization" visible="false" managed="false">
+                    <styleClass>
+                        <String fx:value="button" />
+                        <String fx:value="app-toolbar-button" />
+                        <String fx:value="app-toolbar-button-danger" />
+                    </styleClass>
+                </Button>
             </HBox>
 
             <HBox spacing="10.0" alignment="CENTER_LEFT">

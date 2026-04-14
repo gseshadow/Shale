@@ -149,13 +149,13 @@ public final class ClientAssignmentDialog {
 		HBox.setHgrow(left, Priority.ALWAYS);
 		HBox.setHgrow(right, Priority.ALWAYS);
 
-		HBox header = AppDialogs.createSecondaryWindowHeader(stage, "Manage Clients", () -> {
+		VBox dialogBody = new VBox(12, body, actions);
+		dialogBody.setPadding(new Insets(14));
+		VBox root = AppDialogs.createSecondaryWindowShell(stage, "Manage Clients", () -> {
 			result = Optional.empty();
 			stage.close();
-		});
-		VBox root = new VBox(12, header, body, actions);
+		}, dialogBody);
 		root.getStyleClass().add("secondary-window-shell");
-		root.setPadding(new Insets(14));
 		Scene scene = new Scene(root, 760, 420);
 		stage.setScene(scene);
 	}

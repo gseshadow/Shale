@@ -7,6 +7,8 @@ import java.time.Instant;
 import java.util.Objects;
 
 public final class SystemUpdateNotificationProducer {
+	private static final String UPDATE_AVAILABLE_ID_PREFIX = "update-available-";
+
 	private final NotificationCenterService notificationCenterService;
 	private final NotificationPreferencesService notificationPreferencesService;
 	private final Clock clock;
@@ -32,19 +34,27 @@ public final class SystemUpdateNotificationProducer {
 
 	public void onUpdateCheckResult(UiUpdateLauncher.UpdateCheckResult result) {
 		if (result == null) {
+			log("Update check result skipped: result=<null>");
 			return;
 		}
 		if (!notificationPreferencesService.isEnabled(NotificationPreferenceKey.APP_UPDATES)) {
+			log("Update check result skipped: app update notifications are disabled");
 			return;
 		}
 
+		log("Update check result: updateAvailable=" + result.updateAvailable() + ", mandatory=" + result.mandatory());
 		if (!result.updateAvailable()) {
 			lastUpdateAvailable = false;
 			lastMandatory = false;
+			boolean removed = removeAvailableUpdateNotification();
+			log(removed
+					? "Update notification row removed because app is up to date"
+					: "Update notification row removal skipped: no existing row");
 			return;
 		}
 
 		if (Boolean.TRUE.equals(lastUpdateAvailable) && Objects.equals(lastMandatory, result.mandatory())) {
+			log("Update notification row skipped as duplicate for same availability state");
 			return;
 		}
 
@@ -52,9 +62,11 @@ public final class SystemUpdateNotificationProducer {
 		lastMandatory = result.mandatory();
 
 		boolean mandatory = result.mandatory();
+		String notificationId = UPDATE_AVAILABLE_ID_PREFIX + (mandatory ? "mandatory" : "optional");
+		boolean removedExisting = removeAvailableUpdateNotification();
 		boolean showAsBanner = notificationPreferencesService.isEnabled(NotificationPreferenceKey.APP_UPDATES_BANNER);
 		notificationCenterService.pushNotification(new AppNotification(
-				"update-available-" + (mandatory ? "mandatory" : "optional"),
+				notificationId,
 				NotificationCategory.APP_UPDATE,
 				mandatory ? NotificationSeverity.CRITICAL : NotificationSeverity.WARNING,
 				mandatory ? "Update required" : "Update available",
@@ -65,6 +77,9 @@ public final class SystemUpdateNotificationProducer {
 				true,
 				showAsBanner,
 				NotificationTargetScope.SESSION_SYSTEM));
+		log(removedExisting
+				? "Update notification row refreshed"
+				: "Update notification row created");
 	}
 
 	public void onUpdaterLaunchSucceeded() {
@@ -86,5 +101,18 @@ public final class SystemUpdateNotificationProducer {
 				true,
 				showAsBanner,
 				NotificationTargetScope.SESSION_SYSTEM));
+	}
+
+	private boolean removeAvailableUpdateNotification() {
+		int before = notificationCenterService.getNotificationsNewestFirst().size();
+		notificationCenterService.clearMatching(notification -> notification != null
+				&& notification.getCategory() == NotificationCategory.APP_UPDATE
+				&& notification.getId() != null
+				&& notification.getId().startsWith(UPDATE_AVAILABLE_ID_PREFIX));
+		return notificationCenterService.getNotificationsNewestFirst().size() < before;
+	}
+
+	private static void log(String message) {
+		System.out.println("[UpdateNotification] " + message);
 	}
 }

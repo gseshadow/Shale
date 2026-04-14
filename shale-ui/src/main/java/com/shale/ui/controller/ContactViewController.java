@@ -1,7 +1,9 @@
 package com.shale.ui.controller;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -15,6 +17,7 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -25,6 +28,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -406,6 +410,9 @@ public final class ContactViewController {
         }
 
         List<Node> cards = relatedCases.stream()
+                .sorted(Comparator.comparing(
+                        (RelatedCaseRow row) -> caseNameSortKey(row == null ? null : row.name()),
+                        Comparator.nullsLast(String::compareToIgnoreCase)))
                 .map(this::createRelatedCaseCard)
                 .toList();
 
@@ -440,6 +447,15 @@ public final class ContactViewController {
         VBox container = new VBox(4, card, relationshipMeta);
         VBox.setVgrow(container, javafx.scene.layout.Priority.NEVER);
         return container;
+    }
+
+
+    private static String caseNameSortKey(String name) {
+        String trimmed = safe(name).trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.toLowerCase(Locale.ROOT);
     }
 
     private static String formatRelationshipMeta(String roleName, String side, boolean primary) {
@@ -566,6 +582,12 @@ public final class ContactViewController {
     }
 
     private static void toggleField(Node readOnlyNode, Node editorNode, boolean editing) {
+        if (editorNode instanceof TextInputControl textInput) {
+            setVisibleManaged(readOnlyNode, false);
+            setVisibleManaged(editorNode, true);
+            ReadOnlyTextDisplaySupport.apply(textInput, editing);
+            return;
+        }
         setVisibleManaged(readOnlyNode, !editing);
         setVisibleManaged(editorNode, editing);
     }

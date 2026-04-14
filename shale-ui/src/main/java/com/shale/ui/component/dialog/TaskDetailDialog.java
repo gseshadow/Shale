@@ -8,10 +8,13 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.UserCardFactory;
@@ -29,6 +32,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ScrollPane;
@@ -48,14 +52,22 @@ public final class TaskDetailDialog {
     }
 
     public static Optional<TaskDetailResult> showAndWait(
+            String timingContext,
+            long clickReceivedAtNanos,
             Window owner,
             TaskDetailModel model,
+            List<TaskStatusOptionDto> statuses,
             List<TaskPriorityOptionDto> priorities,
+            Function<Long, CoreTaskHydration> loadCoreTaskData,
             Function<Long, List<CaseTaskService.AssignableUserOption>> loadAssignableUsersForTask,
+            Function<Long, List<AssignedTeamMember>> loadAssignedTeamMembers,
+            Function<Long, List<TaskActivityEntry>> loadActivityEntries,
+            Function<Long, List<TaskNoteEntry>> loadNoteEntries,
             AssignmentEditor assignmentEditor,
             NotesEditor notesEditor,
             Consumer<Integer> onOpenUser,
             Consumer<Integer> onOpenCase) {
+        long dialogCreateStartedAt = System.nanoTime();
         Stage stage = AppDialogs.createModalStage(owner, "Task Details");
         Consumer<Integer> closeAndOpenUser = userId -> {
             stage.close();
@@ -90,6 +102,14 @@ public final class TaskDetailDialog {
         dueTimeField.setPrefColumnCount(8);
         HBox dueRow = new HBox(8, dueDatePicker, dueTimeField);
 
+        ComboBox<TaskStatusOptionDto> statusCombo = new ComboBox<>();
+        statusCombo.setMaxWidth(Double.MAX_VALUE);
+        List<TaskStatusOptionDto> safeStatuses = statuses == null ? List.of() : statuses;
+        statusCombo.getItems().setAll(safeStatuses);
+        statusCombo.setCellFactory(cb -> new StatusListCell());
+        statusCombo.setButtonCell(new StatusListCell());
+        selectStatus(statusCombo, safeStatuses, model.statusId());
+
         ComboBox<TaskPriorityOptionDto> priorityCombo = new ComboBox<>();
         priorityCombo.setMaxWidth(Double.MAX_VALUE);
         List<TaskPriorityOptionDto> safePriorities = priorities == null ? List.of() : priorities;
@@ -97,6 +117,9 @@ public final class TaskDetailDialog {
         priorityCombo.setCellFactory(cb -> new PriorityListCell());
         priorityCombo.setButtonCell(new PriorityListCell());
         selectPriority(priorityCombo, safePriorities, model.priorityId());
+        Label coreLoadingLabel = loadingLabel("Loading task details…");
+        boolean needsCoreHydration = safeStatuses.isEmpty() || safePriorities.isEmpty() || loadCoreTaskData != null;
+        setVisibleManaged(coreLoadingLabel, needsCoreHydration);
 
         CheckBox completedCheck = new CheckBox("Completed");
         completedCheck.setSelected(model.completed());
@@ -141,6 +164,8 @@ public final class TaskDetailDialog {
 
         UserCardFactory assignedTeamCardFactory = new UserCardFactory(closeAndOpenUser);
         VBox assignedTeamList = new VBox(6);
+        Label assignedLoadingLabel = loadingLabel("Loading assigned users…");
+        setVisibleManaged(assignedLoadingLabel, false);
         ScrollPane assignedTeamScrollPane = new ScrollPane(assignedTeamList);
         assignedTeamScrollPane.setFitToWidth(true);
         assignedTeamScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
@@ -189,13 +214,15 @@ public final class TaskDetailDialog {
                     refreshed -> renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed, removeAssignedUserRef[0]),
                     ex -> showError(errorLabel, "Failed to add assigned user. " + rootCauseMessage(ex)));
         });
-        assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedTeamScrollPane);
+        assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedLoadingLabel, assignedTeamScrollPane);
 
         VBox formContent = new VBox(8,
                 createdByLabel,
+                coreLoadingLabel,
                 new Label("Title"), titleField,
                 new Label("Description"), descriptionArea,
                 relatedCaseSection,
+                new Label("Status"), statusCombo,
                 new Label("Priority"), priorityCombo,
                 new Label("Due date/time"), dueRow,
                 assignedTeamSection,
@@ -207,6 +234,8 @@ public final class TaskDetailDialog {
         Label activityLabel = new Label("Activity");
         activityLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
         VBox activityList = new VBox(8);
+        Label activityLoadingLabel = loadingLabel("Loading activity…");
+        setVisibleManaged(activityLoadingLabel, false);
         renderActivityItems(activityList, model.activityEntries());
         ScrollPane activityScrollPane = new ScrollPane(activityList);
         activityScrollPane.setFitToWidth(true);
@@ -215,7 +244,7 @@ public final class TaskDetailDialog {
         activityScrollPane.setPrefViewportHeight(420);
         VBox.setVgrow(activityScrollPane, Priority.ALWAYS);
 
-        VBox activityPanel = new VBox(6, activityLabel, activityScrollPane);
+        VBox activityPanel = new VBox(6, activityLabel, activityLoadingLabel, activityScrollPane);
         activityPanel.setPrefWidth(320);
         activityPanel.setMinWidth(280);
         activityPanel.setMaxWidth(360);
@@ -236,6 +265,8 @@ public final class TaskDetailDialog {
         notesErrorLabel.setVisible(false);
         notesErrorLabel.setManaged(false);
         VBox notesList = new VBox(8);
+        Label notesLoadingLabel = loadingLabel("Loading notes…");
+        setVisibleManaged(notesLoadingLabel, false);
         List<TaskNoteEntry> noteEntries = model.noteEntries() == null ? List.of() : model.noteEntries();
         renderNoteEntries(notesList, noteEntries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
         ScrollPane notesScrollPane = new ScrollPane(notesList);
@@ -268,7 +299,7 @@ public final class TaskDetailDialog {
                     },
                     ex -> showError(notesErrorLabel, "Failed to add note. " + rootCauseMessage(ex)));
         });
-        notesPanel.getChildren().setAll(notesLabel, noteComposer, addNoteButton, notesErrorLabel, notesScrollPane);
+        notesPanel.getChildren().setAll(notesLabel, noteComposer, addNoteButton, notesErrorLabel, notesLoadingLabel, notesScrollPane);
         notesPanel.setPrefWidth(320);
         notesPanel.setMinWidth(280);
         notesPanel.setMaxWidth(360);
@@ -329,6 +360,7 @@ public final class TaskDetailDialog {
         Button saveButton = new Button("Save");
         saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
         saveButton.setDefaultButton(true);
+        saveButton.setDisable(safeStatuses.isEmpty() || safePriorities.isEmpty());
         saveButton.setOnAction(e -> {
             String title = safe(titleField.getText()).trim();
             if (title.isBlank()) {
@@ -347,10 +379,16 @@ public final class TaskDetailDialog {
                 showError(errorLabel, "Priority is required.");
                 return;
             }
+            Integer statusId = Optional.ofNullable(statusCombo.getValue()).map(TaskStatusOptionDto::id).orElse(null);
+            if (statusId == null) {
+                showError(errorLabel, "Status is required.");
+                return;
+            }
             result.value = TaskDetailResult.save(new SaveTaskPayload(
                     title,
                     descriptionArea.getText(),
                     dueAt,
+                    statusId,
                     priorityId,
                     completedCheck.isSelected()));
             stage.close();
@@ -361,10 +399,9 @@ public final class TaskDetailDialog {
         HBox actions = new HBox(10, deleteButton, spacer, cancelButton, saveButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        HBox windowHeader = AppDialogs.createSecondaryWindowHeader(stage, "Task Details", stage::close);
-        VBox root = new VBox(16, windowHeader, heading, message, contentColumns, actions);
-        root.getStyleClass().add("app-dialog-root");
-        root.setPadding(new Insets(22, 24, 22, 24));
+        VBox body = new VBox(16, heading, message, contentColumns, actions);
+        body.setPadding(new Insets(22, 24, 22, 24));
+        VBox root = AppDialogs.createSecondaryWindowShell(stage, "Task Details", stage::close, body);
         root.setMinWidth(860);
         root.setPrefWidth(980);
         root.setMinHeight(620);
@@ -373,8 +410,193 @@ public final class TaskDetailDialog {
         scene.getStylesheets().add(Objects.requireNonNull(
                 TaskDetailDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
+        String context = safe(timingContext).isBlank() ? "UNKNOWN" : timingContext;
+        System.out.println("[TASK_DETAIL_TIMING][" + context + "] dialog_creation_ms=" + elapsedMillis(dialogCreateStartedAt)
+                + " taskId=" + model.taskId());
+        System.out.println("[TASK_DETAIL_TIMING][" + context + "] fxml_load_ms=0 taskId=" + model.taskId() + " reason=programmatic-dialog");
+        stage.setOnShown(e -> {
+            AtomicLong coreLoadVersion = new AtomicLong();
+            AtomicLong assignedLoadVersion = new AtomicLong();
+            AtomicLong activityLoadVersion = new AtomicLong();
+            AtomicLong notesLoadVersion = new AtomicLong();
+            System.out.println("[TASK_DETAIL_TIMING][" + context + "] initial_show_ms=" + elapsedMillis(dialogCreateStartedAt)
+                    + " taskId=" + model.taskId());
+            if (clickReceivedAtNanos > 0L) {
+                System.out.println("[TASK_DETAIL_TIMING][" + context + "] total_time_to_visible_ms="
+                        + elapsedMillis(clickReceivedAtNanos) + " taskId=" + model.taskId());
+            }
+            System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_start_all taskId=" + model.taskId());
+            if (loadCoreTaskData != null) {
+                loadSectionAsync(
+                        context,
+                        "core",
+                        stage,
+                        coreLoadVersion,
+                        model.taskId(),
+                        () -> List.of(loadCoreTaskData.apply(model.taskId())),
+                        entries -> {
+                            CoreTaskHydration core = entries.isEmpty() ? null : entries.get(0);
+                            if (core == null || core.detail() == null) {
+                                return;
+                            }
+                            var detail = core.detail();
+                            titleField.setText(safe(detail.title()));
+                            descriptionArea.setText(safe(detail.description()));
+                            dueDatePicker.setValue(detail.dueAt() == null ? null : detail.dueAt().toLocalDate());
+                            dueTimeField.setText(detail.dueAt() == null ? "" : detail.dueAt().toLocalTime().toString());
+                            completedCheck.setSelected(detail.completedAt() != null);
+                            createdByLabel.setText("Created by: " + displayCreatedBy(detail.createdByDisplayName()));
+                            List<TaskStatusOptionDto> hydratedStatuses = core.statuses() == null ? List.of() : core.statuses();
+                            statusCombo.getItems().setAll(hydratedStatuses);
+                            selectStatus(statusCombo, hydratedStatuses, detail.statusId());
+                            List<TaskPriorityOptionDto> hydratedPriorities = core.priorities() == null ? List.of() : core.priorities();
+                            priorityCombo.getItems().setAll(hydratedPriorities);
+                            selectPriority(priorityCombo, hydratedPriorities, detail.priorityId());
+                            saveButton.setDisable(hydratedStatuses.isEmpty() || hydratedPriorities.isEmpty());
+                            setVisibleManaged(coreLoadingLabel, false);
+                        },
+                        ex -> {
+                            showError(errorLabel, "Failed to load task details. " + rootCauseMessage(ex));
+                            setVisibleManaged(coreLoadingLabel, false);
+                        });
+            } else {
+                setVisibleManaged(coreLoadingLabel, false);
+            }
+            loadSectionAsync(
+                    context,
+                    "assigned",
+                    stage,
+                    assignedLoadVersion,
+                    model.taskId(),
+                    () -> loadAssignedTeamMembers == null ? List.of() : loadAssignedTeamMembers.apply(model.taskId()),
+                    members -> {
+                        setVisibleManaged(assignedLoadingLabel, false);
+                        renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, members, removeAssignedUserRef[0]);
+                        addAssignedUserButton.setDisable(false);
+                    },
+                    ex -> {
+                        setVisibleManaged(assignedLoadingLabel, false);
+                        addAssignedUserButton.setDisable(false);
+                        showError(errorLabel, "Failed to load assigned users. " + rootCauseMessage(ex));
+                    });
+            loadSectionAsync(
+                    context,
+                    "activity",
+                    stage,
+                    activityLoadVersion,
+                    model.taskId(),
+                    () -> loadActivityEntries == null ? List.of() : loadActivityEntries.apply(model.taskId()),
+                    entries -> {
+                        setVisibleManaged(activityLoadingLabel, false);
+                        renderActivityItems(activityList, entries);
+                    },
+                    ex -> {
+                        setVisibleManaged(activityLoadingLabel, false);
+                        showError(errorLabel, "Failed to load activity. " + rootCauseMessage(ex));
+                    });
+            loadSectionAsync(
+                    context,
+                    "notes",
+                    stage,
+                    notesLoadVersion,
+                    model.taskId(),
+                    () -> loadNoteEntries == null ? List.of() : loadNoteEntries.apply(model.taskId()),
+                    entries -> {
+                        setVisibleManaged(notesLoadingLabel, false);
+                        renderNoteEntries(notesList, entries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
+                        noteComposer.setDisable(false);
+                        addNoteButton.setDisable(false);
+                    },
+                    ex -> {
+                        setVisibleManaged(notesLoadingLabel, false);
+                        noteComposer.setDisable(false);
+                        addNoteButton.setDisable(false);
+                        showError(notesErrorLabel, "Failed to load notes. " + rootCauseMessage(ex));
+                    });
+        });
+        if (initialAssignedTeamMembers.isEmpty()) {
+            setVisibleManaged(assignedLoadingLabel, true);
+        }
+        if ((model.activityEntries() == null || model.activityEntries().isEmpty())) {
+            setVisibleManaged(activityLoadingLabel, true);
+        }
+        if (noteEntries.isEmpty()) {
+            setVisibleManaged(notesLoadingLabel, true);
+            noteComposer.setDisable(true);
+            addNoteButton.setDisable(true);
+        }
+        if (initialAssignedTeamMembers.isEmpty()) {
+            addAssignedUserButton.setDisable(true);
+        }
         stage.showAndWait();
         return Optional.ofNullable(result.value);
+    }
+
+    private static <T> void loadSectionAsync(
+            String context,
+            String sectionName,
+            Stage stage,
+            AtomicLong sectionVersion,
+            long taskId,
+            Callable<List<T>> loader,
+            Consumer<List<T>> onSuccess,
+            Consumer<Throwable> onError) {
+        System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_start section=" + sectionName + " taskId=" + taskId);
+        long requestVersion = sectionVersion == null ? 0L : sectionVersion.incrementAndGet();
+        long startedAt = System.nanoTime();
+        new Thread(() -> {
+            try {
+                List<T> value = loader == null ? List.of() : loader.call();
+                Platform.runLater(() -> {
+                    if (stage != null && !stage.isShowing()) {
+                        return;
+                    }
+                    if (sectionVersion != null && sectionVersion.get() != requestVersion) {
+                        return;
+                    }
+                    if (onSuccess != null) {
+                        onSuccess.accept(value == null ? List.of() : value);
+                    }
+                    System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_end section=" + sectionName
+                            + " duration_ms=" + elapsedMillis(startedAt) + " taskId=" + taskId);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    if (stage != null && !stage.isShowing()) {
+                        return;
+                    }
+                    if (sectionVersion != null && sectionVersion.get() != requestVersion) {
+                        return;
+                    }
+                    if (onError != null) {
+                        onError.accept(ex);
+                    }
+                    System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_end section=" + sectionName
+                            + " duration_ms=" + elapsedMillis(startedAt) + " taskId=" + taskId + " status=error");
+                });
+            }
+        }, "task-detail-dialog-load-" + sectionName + "-" + taskId).start();
+    }
+
+    private static Label loadingLabel(String text) {
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.setPrefSize(16, 16);
+        Label label = new Label(text, spinner);
+        label.setGraphicTextGap(8);
+        label.setStyle("-fx-text-fill: rgba(17,37,66,0.72); -fx-font-size: 12px;");
+        return label;
+    }
+
+    private static long elapsedMillis(long startedAtNanos) {
+        return (System.nanoTime() - startedAtNanos) / 1_000_000L;
+    }
+
+    private static void setVisibleManaged(Node node, boolean visible) {
+        if (node == null) {
+            return;
+        }
+        node.setVisible(visible);
+        node.setManaged(visible);
     }
 
     private static <T> void runMutationAsync(
@@ -479,6 +701,28 @@ public final class TaskDetailDialog {
             selected = priorities.get(0);
         }
         priorityCombo.setValue(selected);
+    }
+
+    private static void selectStatus(
+            ComboBox<TaskStatusOptionDto> statusCombo,
+            List<TaskStatusOptionDto> statuses,
+            Integer currentStatusId) {
+        if (statuses == null || statuses.isEmpty()) {
+            return;
+        }
+        TaskStatusOptionDto selected = null;
+        if (currentStatusId != null) {
+            for (TaskStatusOptionDto status : statuses) {
+                if (status != null && status.id() == currentStatusId) {
+                    selected = status;
+                    break;
+                }
+            }
+        }
+        if (selected == null) {
+            selected = statuses.get(0);
+        }
+        statusCombo.setValue(selected);
     }
 
     private static LocalDateTime parseDueAt(LocalDate dueDate, String dueTimeRaw) {
@@ -741,6 +985,7 @@ public final class TaskDetailDialog {
             String title,
             String description,
             LocalDateTime dueAt,
+            Integer statusId,
             Integer priorityId,
             String createdByDisplayName,
             List<AssignedTeamMember> assignedTeamMembers,
@@ -775,8 +1020,15 @@ public final class TaskDetailDialog {
             String title,
             String description,
             LocalDateTime dueAt,
+            Integer statusId,
             Integer priorityId,
             boolean completed) {
+    }
+
+    public record CoreTaskHydration(
+            com.shale.core.dto.TaskDetailDto detail,
+            List<TaskStatusOptionDto> statuses,
+            List<TaskPriorityOptionDto> priorities) {
     }
 
     public record TaskDetailResult(TaskDetailAction action, SaveTaskPayload payload) {
@@ -811,6 +1063,14 @@ public final class TaskDetailDialog {
     private static final class PriorityListCell extends javafx.scene.control.ListCell<TaskPriorityOptionDto> {
         @Override
         protected void updateItem(TaskPriorityOptionDto item, boolean empty) {
+            super.updateItem(item, empty);
+            setText(empty || item == null ? null : item.name());
+        }
+    }
+
+    private static final class StatusListCell extends javafx.scene.control.ListCell<TaskStatusOptionDto> {
+        @Override
+        protected void updateItem(TaskStatusOptionDto item, boolean empty) {
             super.updateItem(item, empty);
             setText(empty || item == null ? null : item.name());
         }
