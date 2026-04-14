@@ -647,7 +647,7 @@ public final class UserController {
 		HBox row;
 		if (canManageRoles()) {
 			Button removeButton = new Button("Remove");
-			removeButton.getStyleClass().add("button-secondary");
+			removeButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-danger", "app-toolbar-button-compact");
 			removeButton.setOnAction(e -> onRemoveRole(role));
 			Region spacer = new Region();
 			HBox.setHgrow(spacer, Priority.ALWAYS);
