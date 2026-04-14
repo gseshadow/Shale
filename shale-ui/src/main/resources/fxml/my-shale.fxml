@@ -28,7 +28,7 @@
 			<Label text="My Cases" styleClass="page-heading" />
 			<BorderPane VBox.vgrow="ALWAYS">
 				<top>
-					<HBox spacing="10" styleClass="cases-filter-bar">
+					<HBox spacing="10" styleClass="shell-transparent">
 						<TextField fx:id="myCasesSearchField" promptText="Search my cases…" HBox.hgrow="ALWAYS" />
 						<MenuButton fx:id="myCasesStatusFilterMenuButton" text="Status (8/8)">
 							<styleClass>
