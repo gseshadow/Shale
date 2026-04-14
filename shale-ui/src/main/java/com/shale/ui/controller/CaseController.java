@@ -102,6 +102,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -728,8 +729,8 @@ public class CaseController {
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
-		ensureStyleClass(detDescriptionEditor, "detail-large-text");
-		ensureStyleClass(detSummaryEditor, "detail-large-text");
+		configureAutoGrowingDetailArea(detDescriptionEditor, 170);
+		configureAutoGrowingDetailArea(detSummaryEditor, 150);
 		setEditMode(false);
 		detailsEditor.setEditMode(false);
 		clearError();
@@ -799,6 +800,33 @@ public class CaseController {
 		if (!node.getStyleClass().contains(styleClass)) {
 			node.getStyleClass().add(styleClass);
 		}
+	}
+
+	private void configureAutoGrowingDetailArea(TextArea area, double minHeight) {
+		if (area == null) {
+			return;
+		}
+		ensureStyleClass(area, "detail-large-text");
+		Text measurer = new Text();
+		measurer.fontProperty().bind(area.fontProperty());
+		Runnable recomputeHeight = () -> {
+			String text = area.getText();
+			measurer.setText((text == null || text.isEmpty()) ? " " : text);
+			Insets insets = area.getInsets();
+			double width = area.getWidth() > 0 ? area.getWidth() : area.prefWidth(-1);
+			double contentWidth = Math.max(0, width - insets.getLeft() - insets.getRight() - 18);
+			measurer.setWrappingWidth(contentWidth);
+			double targetHeight = Math.max(
+					minHeight,
+					Math.ceil(measurer.getLayoutBounds().getHeight() + insets.getTop() + insets.getBottom() + 22));
+			area.setMinHeight(targetHeight);
+			area.setPrefHeight(targetHeight);
+			area.setMaxHeight(targetHeight);
+		};
+		area.textProperty().addListener((obs, oldV, newV) -> recomputeHeight.run());
+		area.widthProperty().addListener((obs, oldV, newV) -> recomputeHeight.run());
+		area.fontProperty().addListener((obs, oldV, newV) -> recomputeHeight.run());
+		Platform.runLater(recomputeHeight);
 	}
 
 	private void wireLiveRefreshLifecycle() {
