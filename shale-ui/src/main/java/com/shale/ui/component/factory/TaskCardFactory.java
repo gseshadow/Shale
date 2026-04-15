@@ -74,7 +74,7 @@ public final class TaskCardFactory {
                 model.caseResponsibleAttorney(),
                 model.caseResponsibleAttorneyColor(),
                 model.caseNonEngagementLetterSent());
-        card.setTitle(model.title());
+        card.setTitle(safeTitle);
         card.setDueAt(model.dueAt());
         card.setCreatedByDisplayName(model.createdByDisplayName());
         card.setDescriptionPreview(safeDescription);
