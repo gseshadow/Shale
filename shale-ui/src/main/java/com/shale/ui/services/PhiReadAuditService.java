@@ -10,6 +10,10 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class PhiReadAuditService {
+    // Developer note:
+    // - PHI field source-of-truth lives in core: com.shale.core.privacy.PhiFieldRegistry.
+    // - AuditLog FieldCode mapping: 1=boolean, 2=int, 3=date, 4=string.
+    // - Phase 3 READ auditing is screen/section-level (view-open intent), not field-render-level.
     private static final int FIELD_CODE_STRING = 4;
     private static final Duration DEDUPE_WINDOW = Duration.ofSeconds(2);
     private static final Map<String, Integer> OBJECT_TYPE_IDS = Map.of(
@@ -38,7 +42,9 @@ public final class PhiReadAuditService {
         if (fieldName == null || fieldName.isBlank()) {
             return;
         }
-        String dedupeKey = userId + "|" + fieldName + "|" + (objectId == null ? 0L : objectId);
+        String normalizedFieldName = fieldName.trim();
+        String normalizedObjectType = objectType == null ? "" : objectType.trim();
+        String dedupeKey = userId + "|" + normalizedObjectType + "|" + normalizedFieldName + "|" + (objectId == null ? 0L : objectId);
         Instant now = Instant.now();
         Instant previous = recentlyAudited.put(dedupeKey, now);
         if (previous != null && Duration.between(previous, now).compareTo(DEDUPE_WINDOW) < 0) {
@@ -46,14 +52,14 @@ public final class PhiReadAuditService {
         }
         recentlyAudited.entrySet().removeIf(entry -> Duration.between(entry.getValue(), now).compareTo(DEDUPE_WINDOW.multipliedBy(2)) > 0);
 
-        Integer objectTypeId = OBJECT_TYPE_IDS.get(objectType == null ? "" : objectType.trim());
+        Integer objectTypeId = OBJECT_TYPE_IDS.get(normalizedObjectType);
         String metadata = "action=READ;screen=" + safe(screenName);
         try {
             auditLogDao.appendPhiWriteAudit(
                     userId,
                     objectTypeId,
                     objectId,
-                    fieldName,
+                    normalizedFieldName,
                     FIELD_CODE_STRING,
                     metadata,
                     null);

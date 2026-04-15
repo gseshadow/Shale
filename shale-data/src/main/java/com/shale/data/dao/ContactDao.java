@@ -1090,20 +1090,15 @@ public final class ContactDao {
     }
 
     private static void logDetectedCoreColumns(ContactSchema schema) {
-        System.out.println("[TEMP][ContactDao] detected columns: tenant=" + schema.tenantColumn()
-                + ", name=" + schema.nameColumn()
-                + ", firstName=" + schema.firstNameColumn()
-                + ", lastName=" + schema.lastNameColumn()
-                + ", email=" + schema.emailColumn()
-                + ", phone=" + schema.phoneColumn());
+        // intentionally no-op: temporary schema/debug tracing removed in stabilization pass
     }
 
     private static void logFindByIdAttempt(int contactId, int shaleClientId) {
-        System.out.println("[TEMP][ContactDao] findById contactId=" + contactId + ", shaleClientId=" + shaleClientId);
+        // intentionally no-op: temporary lookup/debug tracing removed in stabilization pass
     }
 
     private static void logFindByIdResult(int contactId, int shaleClientId, boolean found) {
-        System.out.println("[TEMP][ContactDao] findById contactId=" + contactId + ", shaleClientId=" + shaleClientId + ", returnedRow=" + found);
+        // intentionally no-op: temporary lookup/debug tracing removed in stabilization pass
     }
 
     public static String formatTimestamp(Instant timestamp) {
