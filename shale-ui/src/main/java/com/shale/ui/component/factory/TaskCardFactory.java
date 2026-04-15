@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import com.shale.ui.component.TaskCard;
+import com.shale.ui.privacy.PhiFieldRegistry;
 import com.shale.ui.util.ColorUtil;
 
 public final class TaskCardFactory {
@@ -58,6 +59,11 @@ public final class TaskCardFactory {
         Objects.requireNonNull(model, "model");
 
         TaskCard card = new TaskCard();
+        boolean passiveSurface = variant != Variant.FULL;
+        String displayTitle = model.title();
+        String safeDescription = passiveSurface && PhiFieldRegistry.isPhi("Tasks", "Description")
+                ? null
+                : model.description();
         card.setTaskId(model.taskId());
         card.setOnOpen(onOpenTask);
         card.setOnToggleComplete(onToggleCompleteTask);
@@ -69,10 +75,10 @@ public final class TaskCardFactory {
                 model.caseResponsibleAttorney(),
                 model.caseResponsibleAttorneyColor(),
                 model.caseNonEngagementLetterSent());
-        card.setTitle(model.title());
+        card.setTitle(displayTitle);
         card.setDueAt(model.dueAt());
         card.setCreatedByDisplayName(model.createdByDisplayName());
-        card.setDescriptionPreview(model.description());
+        card.setDescriptionPreview(safeDescription);
         card.setCompleted(model.completedAt() != null);
         card.setBorderByDueState(model.dueAt(), model.completedAt());
         card.setAssignees(model.assignedUsers());
