@@ -129,6 +129,7 @@ public final class AuditLogDao {
             LocalDate dateValue) {
         String sql = """
                 INSERT INTO dbo.AuditLog (
+                  ShaleClientId,
                   UserId,
                   ObjectTypeId,
                   ObjectId,
@@ -140,35 +141,36 @@ public final class AuditLogDao {
                   IntValue,
                   EntryDate
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?);
                 """;
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             FieldCodeBindingMode bindingMode = resolveFieldCodeBindingMode(con);
+            ps.setInt(1, requireCurrentShaleClientId(con));
             if (userId == null || userId <= 0) {
-                ps.setNull(1, java.sql.Types.INTEGER);
-            } else {
-                ps.setInt(1, userId);
-            }
-            if (objectTypeId == null || objectTypeId <= 0) {
                 ps.setNull(2, java.sql.Types.INTEGER);
             } else {
-                ps.setInt(2, objectTypeId);
+                ps.setInt(2, userId);
+            }
+            if (objectTypeId == null || objectTypeId <= 0) {
+                ps.setNull(3, java.sql.Types.INTEGER);
+            } else {
+                ps.setInt(3, objectTypeId);
             }
             if (objectId == null || objectId <= 0) {
-                ps.setNull(3, java.sql.Types.BIGINT);
+                ps.setNull(4, java.sql.Types.BIGINT);
             } else {
-                ps.setLong(3, objectId);
+                ps.setLong(4, objectId);
             }
-            ps.setString(4, fieldName);
-            bindFieldCode(ps, 5, fieldCode, bindingMode);
-            ps.setString(6, stringValue);
+            ps.setString(5, fieldName);
+            bindFieldCode(ps, 6, fieldCode, bindingMode);
+            ps.setString(7, stringValue);
             if (dateValue == null) {
-                ps.setNull(7, java.sql.Types.DATE);
+                ps.setNull(8, java.sql.Types.DATE);
             } else {
-                ps.setDate(7, Date.valueOf(dateValue));
+                ps.setDate(8, Date.valueOf(dateValue));
             }
-            ps.setTimestamp(8, Timestamp.from(java.time.Instant.now()));
+            ps.setTimestamp(9, Timestamp.from(java.time.Instant.now()));
             ps.executeUpdate();
         } catch (SQLException e) {
             System.err.println("[PHI_AUDIT] insert failed"
@@ -182,6 +184,21 @@ public final class AuditLogDao {
                     + " errorCode=" + e.getErrorCode()
                     + " message=" + e.getMessage());
             throw new RuntimeException("Failed to append PHI write audit entry", e);
+        }
+    }
+
+    private static int requireCurrentShaleClientId(Connection con) throws SQLException {
+        String sql = "SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT);";
+        try (PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (!rs.next()) {
+                throw new IllegalStateException("ShaleClientId session context is missing.");
+            }
+            int shaleClientId = rs.getInt(1);
+            if (rs.wasNull()) {
+                throw new IllegalStateException("ShaleClientId session context is missing.");
+            }
+            return shaleClientId;
         }
     }
 
