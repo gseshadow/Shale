@@ -6,13 +6,30 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class AuditLogDao {
+    public record AuditLogEntryRow(
+            LocalDateTime entryDate,
+            Integer userId,
+            Integer objectTypeId,
+            Long objectId,
+            String fieldName,
+            String fieldCode,
+            String stringValue,
+            LocalDate dateValue,
+            Boolean booleanValue,
+            Integer intValue) {
+    }
+
     private enum FieldCodeBindingMode {
         NUMERIC,
         TEXT
@@ -23,6 +40,89 @@ public final class AuditLogDao {
 
     public AuditLogDao(DbSessionProvider db) {
         this.db = Objects.requireNonNull(db, "db");
+    }
+
+    public List<AuditLogEntryRow> listAuditLogEntries(
+            Integer shaleClientId,
+            Integer userId,
+            Long objectId,
+            String fieldName,
+            Integer objectTypeId,
+            LocalDate startDate,
+            LocalDate endDateInclusive) {
+        if (shaleClientId == null || shaleClientId <= 0) {
+            return List.of();
+        }
+        StringBuilder sql = new StringBuilder("""
+                SELECT
+                  EntryDate,
+                  UserId,
+                  ObjectTypeId,
+                  ObjectId,
+                  FieldName,
+                  FieldCode,
+                  StringValue,
+                  DateValue,
+                  BooleanValue,
+                  IntValue
+                FROM dbo.AuditLog
+                WHERE 1=1
+                  AND ShaleClientId = ?
+                """);
+        List<Object> params = new ArrayList<>();
+        params.add(shaleClientId);
+        if (userId != null && userId > 0) {
+            sql.append(" AND UserId = ?");
+            params.add(userId);
+        }
+        if (objectId != null && objectId > 0) {
+            sql.append(" AND ObjectId = ?");
+            params.add(objectId);
+        }
+        if (fieldName != null && !fieldName.isBlank()) {
+            sql.append(" AND FieldName = ?");
+            params.add(fieldName.trim());
+        }
+        if (objectTypeId != null && objectTypeId > 0) {
+            sql.append(" AND ObjectTypeId = ?");
+            params.add(objectTypeId);
+        }
+        if (startDate != null) {
+            sql.append(" AND EntryDate >= ?");
+            params.add(Timestamp.valueOf(startDate.atStartOfDay()));
+        }
+        if (endDateInclusive != null) {
+            sql.append(" AND EntryDate < ?");
+            params.add(Timestamp.valueOf(endDateInclusive.plusDays(1).atStartOfDay()));
+        }
+        sql.append(" ORDER BY EntryDate DESC");
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            List<AuditLogEntryRow> rows = new ArrayList<>();
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Timestamp entryDateTs = rs.getTimestamp("EntryDate");
+                    Date dateValueSql = rs.getDate("DateValue");
+                    rows.add(new AuditLogEntryRow(
+                            entryDateTs == null ? null : entryDateTs.toLocalDateTime(),
+                            asInteger(rs, "UserId"),
+                            asInteger(rs, "ObjectTypeId"),
+                            asLong(rs, "ObjectId"),
+                            rs.getString("FieldName"),
+                            rs.getString("FieldCode"),
+                            rs.getString("StringValue"),
+                            dateValueSql == null ? null : dateValueSql.toLocalDate(),
+                            asBoolean(rs, "BooleanValue"),
+                            asInteger(rs, "IntValue")));
+                }
+            }
+            return rows;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to list audit log entries", e);
+        }
     }
 
     public void appendPhiWriteAudit(
@@ -126,5 +226,20 @@ public final class AuditLogDao {
             return;
         }
         ps.setString(parameterIndex, Integer.toString(resolvedCode));
+    }
+
+    private static Integer asInteger(ResultSet rs, String columnLabel) throws SQLException {
+        int value = rs.getInt(columnLabel);
+        return rs.wasNull() ? null : value;
+    }
+
+    private static Long asLong(ResultSet rs, String columnLabel) throws SQLException {
+        long value = rs.getLong(columnLabel);
+        return rs.wasNull() ? null : value;
+    }
+
+    private static Boolean asBoolean(ResultSet rs, String columnLabel) throws SQLException {
+        boolean value = rs.getBoolean(columnLabel);
+        return rs.wasNull() ? null : value;
     }
 }
