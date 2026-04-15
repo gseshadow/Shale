@@ -70,12 +70,12 @@
                         <Insets top="10" right="12" bottom="12" left="12" />
                     </padding>
 
-                    <FlowPane hgap="16" vgap="16" prefWrapLength="1360" alignment="TOP_LEFT" maxWidth="1360">
+                    <FlowPane hgap="16" vgap="16" prefWrapLength="1700" alignment="TOP_LEFT" maxWidth="1.7976931348623157E308">
                         <padding>
                             <Insets top="12" right="12" bottom="12" left="12" />
                         </padding>
 
-                <VBox spacing="12" styleClass="case-main-surface" minWidth="360" prefWidth="820" maxWidth="1.7976931348623157E308">
+                <VBox spacing="12" styleClass="case-main-surface" minWidth="340" prefWidth="760" maxWidth="1.7976931348623157E308">
                     <padding>
                         <Insets top="12" right="12" bottom="12" left="12" />
                     </padding>
@@ -143,7 +143,7 @@
                     </VBox>
                 </VBox>
 
-                <VBox prefWidth="420" minWidth="300" maxWidth="500" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
+                <VBox prefWidth="380" minWidth="280" maxWidth="480" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
                     <padding>
                         <Insets top="12" right="12" bottom="12" left="12" />
                     </padding>
@@ -168,7 +168,7 @@
                     </ScrollPane>
                 </VBox>
 
-                <VBox prefWidth="420" minWidth="300" maxWidth="500" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
+                <VBox prefWidth="380" minWidth="280" maxWidth="480" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
                     <padding>
                         <Insets top="12" right="12" bottom="12" left="12" />
                     </padding>
