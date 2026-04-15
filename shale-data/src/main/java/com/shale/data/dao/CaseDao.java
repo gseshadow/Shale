@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import com.shale.core.dto.CasePartyDto;
+import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.runtime.DbSessionProvider;
@@ -152,9 +153,11 @@ public final class CaseDao {
 	}
 
 	private final DbSessionProvider db;
+	private final PhiAuditService phiAuditService;
 
 	public CaseDao(DbSessionProvider dbSessionProvider) {
 		this.db = Objects.requireNonNull(dbSessionProvider, "dbSessionProvider");
+		this.phiAuditService = new PhiAuditService(new AuditLogDao(this.db));
 	}
 
 	/** DAO read-model for lists/cards. */
@@ -1719,7 +1722,8 @@ public final class CaseDao {
 			String description,
 			LocalDate incidentDate,
 			LocalDate solDate,
-			byte[] expectedRowVer) {
+			byte[] expectedRowVer,
+			Integer actorUserId) {
 		if (expectedRowVer == null || expectedRowVer.length == 0) {
 			throw new IllegalArgumentException("expectedRowVer is required");
 		}
@@ -1739,6 +1743,7 @@ public final class CaseDao {
 					  AND %s;
 					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
 
+			CaseDetailDto before = selectCaseDetail(con, caseId);
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 
 				ps.setString(1, name);
@@ -1763,6 +1768,10 @@ public final class CaseDao {
 					com.shale.core.dto.CaseDetailDto updated = selectCaseDetail(con, caseId);
 					if (updated == null) {
 						throw new RuntimeException("Case updated but detail row was not found (caseId=" + caseId + ")");
+					}
+					if (before != null) {
+						phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "DateOfInjury", caseId, before.getDateOfInjury(), updated.getDateOfInjury());
 					}
 					return updated;
 				}
@@ -1807,7 +1816,8 @@ public final class CaseDao {
 			String deniedDetail,
 			String summary,
 			String receivedUpdates,
-			byte[] expectedRowVer) {
+			byte[] expectedRowVer,
+			Integer actorUserId) {
 		if (expectedRowVer == null || expectedRowVer.length == 0)
 			throw new IllegalArgumentException("expectedRowVer is required");
 
@@ -1852,6 +1862,7 @@ public final class CaseDao {
 					  AND %s;
 					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
 
+			CaseDetailDto before = selectCaseDetail(con, caseId);
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
 				ps.setString(idx++, name);
@@ -1894,8 +1905,20 @@ public final class CaseDao {
 				int rows = ps.executeUpdate();
 				if (rows == 0)
 					return null;
-				if (rows == 1)
-					return selectCaseDetail(con, caseId);
+				if (rows == 1) {
+					CaseDetailDto updated = selectCaseDetail(con, caseId);
+					if (before != null && updated != null) {
+						phiAuditService.auditUpdate(actorUserId, "Cases", "AcceptedDetail", caseId, before.getAcceptedDetail(), updated.getAcceptedDetail());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "DeniedDetail", caseId, before.getDeniedDetail(), updated.getDeniedDetail());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "ReceivedUpdates", caseId, before.getReceivedUpdates(), updated.getReceivedUpdates());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "DateOfMedicalNegligence", caseId, before.getDateOfMedicalNegligence(), updated.getDateOfMedicalNegligence());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "DateMedicalNegligenceWasDiscovered", caseId, before.getDateMedicalNegligenceWasDiscovered(), updated.getDateMedicalNegligenceWasDiscovered());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "DateOfInjury", caseId, before.getDateOfInjury(), updated.getDateOfInjury());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+					}
+					return updated;
+				}
 				throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
 			}
 		} catch (SQLException e) {
@@ -2005,7 +2028,7 @@ public final class CaseDao {
 		}
 	}
 
-	public void addCaseTimelineEvent(int caseId,
+	public long addCaseTimelineEvent(int caseId,
 			int shaleClientId,
 			String eventType,
 			Integer actorUserId,
@@ -2034,6 +2057,7 @@ public final class CaseDao {
 				  Title,
 				  Body
 				)
+				OUTPUT INSERTED.Id
 				VALUES (?, ?, ?, ?, ?, ?);
 				""";
 
@@ -2048,9 +2072,13 @@ public final class CaseDao {
 				ps.setInt(4, actorUserId);
 			ps.setString(5, normalizedTitle);
 			setNullableString(ps, 6, normalizedBody);
-			int rows = ps.executeUpdate();
-			if (rows != 1) {
-				throw new RuntimeException("Unexpected insert row count for case timeline event (caseId=" + caseId + "): " + rows);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) {
+					throw new RuntimeException("Unexpected insert result for case timeline event (caseId=" + caseId + ")");
+				}
+				long timelineEventId = rs.getLong(1);
+				phiAuditService.auditCreate(actorUserId, "CaseTimelineEvents", "Body", timelineEventId, normalizedBody);
+				return timelineEventId;
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to add case timeline event (caseId=" + caseId + ")", e);
@@ -2134,6 +2162,7 @@ public final class CaseDao {
 				  UpdatedAt,
 				  EditedByUserId
 				)
+				OUTPUT INSERTED.Id
 				VALUES (?, ?, ?, SYSDATETIME(), ?, SYSDATETIME(), NULL);
 				""";
 
@@ -2149,6 +2178,7 @@ public final class CaseDao {
 			con = db.requireConnection();
 			con.setAutoCommit(false);
 
+			long caseUpdateId;
 			try (PreparedStatement ps = con.prepareStatement(insertSql)) {
 				ps.setLong(1, caseId);
 				ps.setInt(2, shaleClientId);
@@ -2158,9 +2188,11 @@ public final class CaseDao {
 				else
 					ps.setInt(4, createdByUserId);
 
-				int rows = ps.executeUpdate();
-				if (rows != 1) {
-					throw new RuntimeException("Unexpected insert row count for case update (caseId=" + caseId + "): " + rows);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next()) {
+						throw new RuntimeException("Unexpected insert result for case update (caseId=" + caseId + ")");
+					}
+					caseUpdateId = rs.getLong(1);
 				}
 			}
 
@@ -2172,6 +2204,7 @@ public final class CaseDao {
 					throw new RuntimeException("Unexpected update row count when touching case UpdatedAt (caseId=" + caseId + "): " + rows);
 				}
 			}
+			phiAuditService.auditCreate(createdByUserId, "CaseUpdates", "NoteText", caseUpdateId, trimmedText);
 
 			con.commit();
 		} catch (SQLException e) {
@@ -2206,6 +2239,14 @@ public final class CaseDao {
 	}
 
 	public void softDeleteCaseUpdate(long caseUpdateId, long caseId, int shaleClientId, Integer deletedByUserId) {
+		String existingSql = """
+				SELECT NoteText
+				FROM dbo.CaseUpdates
+				WHERE Id = ?
+				  AND CaseId = ?
+				  AND ShaleClientId = ?
+				  AND ISNULL(IsDeleted, 0) = 0;
+				""";
 		String sql = """
 				UPDATE dbo.CaseUpdates
 				SET IsDeleted = 1,
@@ -2220,7 +2261,17 @@ public final class CaseDao {
 				""";
 
 		try (Connection con = db.requireConnection();
+				PreparedStatement existingPs = con.prepareStatement(existingSql);
 				PreparedStatement ps = con.prepareStatement(sql)) {
+			existingPs.setLong(1, caseUpdateId);
+			existingPs.setLong(2, caseId);
+			existingPs.setInt(3, shaleClientId);
+			String oldText = null;
+			try (ResultSet rs = existingPs.executeQuery()) {
+				if (rs.next()) {
+					oldText = rs.getString("NoteText");
+				}
+			}
 			if (deletedByUserId == null)
 				ps.setNull(1, java.sql.Types.INTEGER);
 			else
@@ -2232,7 +2283,10 @@ public final class CaseDao {
 			ps.setLong(3, caseUpdateId);
 			ps.setLong(4, caseId);
 			ps.setInt(5, shaleClientId);
-			ps.executeUpdate();
+			int rows = ps.executeUpdate();
+			if (rows > 0) {
+				phiAuditService.auditDelete(deletedByUserId, "CaseUpdates", "NoteText", caseUpdateId, oldText);
+			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to soft delete case update (id=" + caseUpdateId + ")", e);
 		}
@@ -2247,6 +2301,15 @@ public final class CaseDao {
 			throw new IllegalArgumentException("actorUserId is required.");
 		}
 
+		String existingSql = """
+				SELECT NoteText
+				FROM dbo.CaseUpdates
+				WHERE Id = ?
+				  AND CaseId = ?
+				  AND ShaleClientId = ?
+				  AND ISNULL(IsDeleted, 0) = 0
+				  AND CreatedByUserId = ?;
+				""";
 		String sql = """
 				UPDATE dbo.CaseUpdates
 				SET NoteText = ?,
@@ -2260,14 +2323,29 @@ public final class CaseDao {
 				""";
 
 		try (Connection con = db.requireConnection();
+				PreparedStatement existingPs = con.prepareStatement(existingSql);
 				PreparedStatement ps = con.prepareStatement(sql)) {
+			existingPs.setLong(1, caseUpdateId);
+			existingPs.setLong(2, caseId);
+			existingPs.setInt(3, shaleClientId);
+			existingPs.setInt(4, actorUserId);
+			String oldText = null;
+			try (ResultSet rs = existingPs.executeQuery()) {
+				if (rs.next()) {
+					oldText = rs.getString("NoteText");
+				}
+			}
 			ps.setString(1, trimmedText);
 			ps.setInt(2, actorUserId);
 			ps.setLong(3, caseUpdateId);
 			ps.setLong(4, caseId);
 			ps.setInt(5, shaleClientId);
 			ps.setInt(6, actorUserId);
-			return ps.executeUpdate() == 1;
+			boolean updated = ps.executeUpdate() == 1;
+			if (updated) {
+				phiAuditService.auditUpdate(actorUserId, "CaseUpdates", "NoteText", caseUpdateId, oldText, trimmedText);
+			}
+			return updated;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update case update (id=" + caseUpdateId + ")", e);
 		}

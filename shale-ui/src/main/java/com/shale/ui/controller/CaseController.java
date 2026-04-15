@@ -60,6 +60,7 @@ import com.shale.ui.component.dialog.TeamEditorDialog;
 import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
@@ -512,6 +513,7 @@ public class CaseController {
 	private CaseDetailDto current;
 	private CaseOverviewDto currentOverview;
 	private Runnable onCaseDeleted;
+	private PhiReadAuditService phiReadAuditService;
 
 	private CaseEditModel draft;
 
@@ -633,7 +635,7 @@ public class CaseController {
 	}
 
 	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, OrganizationDao organizationDao, ContactDao contactDao,
-			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
+			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted, PhiReadAuditService phiReadAuditService) {
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
 		this.caseTasksLoadedOnce = false;
@@ -653,6 +655,7 @@ public class CaseController {
 		this.caseDocumentService = (caseDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, contactDao);
 		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
 		this.onCaseDeleted = onCaseDeleted;
+		this.phiReadAuditService = phiReadAuditService;
 		this.pageLoadStartNanos = PerfLog.start();
 		PerfLog.log("NAV", "start", "page=case_view caseId=" + caseId);
 		PerfLog.log("CTRL", "start", "controller=CaseController page=case_view caseId=" + caseId);
@@ -1160,6 +1163,7 @@ public class CaseController {
 			contentTitleLabel.setText("Overview");
 		loadCaseUpdatesAsync();
 		loadOverviewOnce();
+		auditCaseRead("Case.Overview.Read", "Case.Overview");
 	}
 
 	private void showTasksTab() {
@@ -1189,6 +1193,7 @@ public class CaseController {
 		if (contentTitleLabel != null)
 			contentTitleLabel.setText("Details");
 		renderDetailsFromCurrent();
+		auditCaseRead("Case.Detail.Read", "Case.Detail");
 	}
 
 	private void showGeneric(String sectionName) {
@@ -1235,6 +1240,7 @@ public class CaseController {
 		setVisibleManaged(timelineScrollPane, true);
 		setVisibleManaged(timelineListBox, true);
 		setVisibleManaged(timelineEmptyLabel, false);
+		auditCaseRead("Case.Timeline.Read", "Case.Timeline");
 		loadCaseTimelineEventsAsync();
 	}
 
@@ -1264,6 +1270,13 @@ public class CaseController {
 		if (caseDao != null && caseId != null && (!partiesLoadedOnce || caseParties == null || caseParties.isEmpty())) {
 			refreshPartiesSectionAsync();
 		}
+	}
+
+	private void auditCaseRead(String fieldName, String screenName) {
+		if (phiReadAuditService == null || caseId == null || caseId <= 0) {
+			return;
+		}
+		phiReadAuditService.auditRead(fieldName, screenName, "Case", caseId.longValue());
 	}
 
 	private void loadCaseTimelineEventsAsync() {
@@ -5014,7 +5027,8 @@ public class CaseController {
 					request.saveDraft().description(),
 					request.desired().desiredIncidentDate(),
 					request.desired().desiredSolDate(),
-					request.baseline().expectedRowVer()
+					request.baseline().expectedRowVer(),
+					request.userId()
 			);
 		}
 
@@ -6232,7 +6246,8 @@ public class CaseController {
 						request.deniedDetail(),
 						request.summary(),
 						request.receivedUpdates(),
-						request.expectedRowVer());
+						request.expectedRowVer(),
+						(appState == null ? null : appState.getUserId()));
 
 				if (updated != null && request.statusChanged() && request.primaryStatusId() != null)
 					caseDao.setPrimaryStatus(request.caseId(), request.primaryStatusId(), null);
