@@ -59,14 +59,26 @@ public final class PhiAuditService {
     private void append(Integer userId, String tableName, String fieldName, Long recordId, String action, Object oldValue, Object newValue) {
         LocalDate dateValue = (newValue instanceof LocalDate d) ? d : null;
         String payload = "old=" + asString(oldValue) + ";new=" + asString(newValue);
-        auditLogDao.appendPhiWriteAudit(
-                userId,
-                objectTypeId(tableName),
-                recordId,
-                tableName + "." + fieldName,
-                action,
-                payload,
-                dateValue);
+        try {
+            auditLogDao.appendPhiWriteAudit(
+                    userId,
+                    objectTypeId(tableName),
+                    recordId,
+                    tableName + "." + fieldName,
+                    action,
+                    payload,
+                    dateValue);
+        } catch (RuntimeException ex) {
+            System.err.println("[PHI_AUDIT] append suppressed"
+                    + " table=" + tableName
+                    + " field=" + fieldName
+                    + " action=" + action
+                    + " recordId=" + recordId
+                    + " userId=" + userId
+                    + " old=" + asString(oldValue)
+                    + " new=" + asString(newValue)
+                    + " error=" + ex.getMessage());
+        }
     }
 
     private static Integer objectTypeId(String tableName) {
