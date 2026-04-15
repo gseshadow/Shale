@@ -16,6 +16,7 @@ import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.services.ContactDetailService;
+import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
@@ -75,6 +76,7 @@ public final class ContactViewController {
     private Runnable onContactDeleted;
     private CaseCardFactory caseCardFactory;
     private List<RelatedCaseRow> relatedCases = List.of();
+    private PhiReadAuditService phiReadAuditService;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contact-view-loader");
@@ -87,13 +89,23 @@ public final class ContactViewController {
             ContactDetailService contactDetailService,
             AppState appState,
             Consumer<Integer> onOpenCase,
-            Runnable onContactDeleted) {
+            Runnable onContactDeleted,
+            PhiReadAuditService phiReadAuditService) {
         this.contactId = contactId;
         this.contactDetailService = contactDetailService;
         this.appState = appState;
         this.onOpenCase = onOpenCase;
         this.onContactDeleted = onContactDeleted;
+        this.phiReadAuditService = phiReadAuditService;
         this.caseCardFactory = new CaseCardFactory(onOpenCase);
+        auditContactRead();
+    }
+
+    private void auditContactRead() {
+        if (phiReadAuditService == null || contactId <= 0) {
+            return;
+        }
+        phiReadAuditService.auditRead("Contact.View.Read", "Contact.View", "Contact", (long) contactId);
     }
 
     @FXML
@@ -195,6 +207,7 @@ public final class ContactViewController {
         ContactProfileUpdateRequest request = new ContactProfileUpdateRequest(
                 currentContact.id(),
                 currentContact.shaleClientId(),
+                appState == null ? null : appState.getUserId(),
                 safeText(nameEditor == null ? null : nameEditor.getText()),
                 safeText(firstNameEditor == null ? null : firstNameEditor.getText()),
                 safeText(lastNameEditor == null ? null : lastNameEditor.getText()),
