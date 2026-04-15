@@ -60,6 +60,7 @@ public final class TaskCardFactory {
 
         TaskCard card = new TaskCard();
         boolean passiveSurface = variant != Variant.FULL;
+        String displayTitle = model.title();
         String safeDescription = passiveSurface && PhiFieldRegistry.isPhi("Tasks", "Description")
                 ? null
                 : model.description();
@@ -74,7 +75,7 @@ public final class TaskCardFactory {
                 model.caseResponsibleAttorney(),
                 model.caseResponsibleAttorneyColor(),
                 model.caseNonEngagementLetterSent());
-        card.setTitle(safeTitle);
+        card.setTitle(displayTitle);
         card.setDueAt(model.dueAt());
         card.setCreatedByDisplayName(model.createdByDisplayName());
         card.setDescriptionPreview(safeDescription);

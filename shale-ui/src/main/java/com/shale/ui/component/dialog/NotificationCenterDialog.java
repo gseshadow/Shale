@@ -213,6 +213,9 @@ public final class NotificationCenterDialog {
 		}
 
 		private static String resolveTaskPreviewTitle(AppNotification item, long taskId) {
+			if (item != null && item.getEntityTitle() != null && !item.getEntityTitle().isBlank()) {
+				return item.getEntityTitle().trim();
+			}
 			return "Task #" + taskId;
 		}
 

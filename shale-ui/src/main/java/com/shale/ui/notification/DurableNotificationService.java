@@ -97,10 +97,6 @@ public final class DurableNotificationService {
 		String message = category == NotificationCategory.TASK
 				? safeTaskNotificationMessage(row.actionType())
 				: Objects.toString(row.message(), "");
-		String entityTitle = row.entityTitle();
-		if (category == NotificationCategory.TASK && PhiFieldRegistry.isPhi("Tasks", "Title")) {
-			entityTitle = null;
-		}
 		return new AppNotification(
 				id,
 				category,
@@ -116,6 +112,31 @@ public final class DurableNotificationService {
 				row.entityType(),
 				row.entityId(),
 				entityTitle);
+	}
+
+	private static String safeTaskNotificationTitle(String actionType) {
+		String normalizedAction = actionType == null ? "" : actionType.trim().toUpperCase();
+		if ("NOTE_ADDED".equals(normalizedAction)) {
+			return "Task note added";
+		}
+		if ("ASSIGNED".equals(normalizedAction)) {
+			return "Task assigned to you";
+		}
+		return "Task updated";
+	}
+
+	private static String safeTaskNotificationMessage(String actionType) {
+		String normalizedAction = actionType == null ? "" : actionType.trim().toUpperCase();
+		if ("NOTE_ADDED".equals(normalizedAction)) {
+			return "A task assigned to you has a new note.";
+		}
+		if ("ASSIGNED".equals(normalizedAction)) {
+			return "A task was assigned to you.";
+		}
+		if ("DUE_OVERDUE".equals(normalizedAction) || "DUE_TODAY".equals(normalizedAction) || "DUE_TOMORROW".equals(normalizedAction)) {
+			return "A task assigned to you has a due date update.";
+		}
+		return "A task assigned to you was updated.";
 	}
 
 	private static String safeTaskNotificationTitle(String actionType) {
