@@ -96,7 +96,6 @@ public final class LiveUpdateNotificationBridge {
 		}
 		Object eventKeyValue = event.patch().get("eventKey");
 		String eventKey = eventKeyValue == null ? null : String.valueOf(eventKeyValue);
-		String taskTitle = stringValue(event.patch().get("title"));
 		notificationCenterService.pushNotification(new AppNotification(
 				event.eventId() == null || event.eventId().isBlank()
 						? "task-" + event.entityId() + "-" + createdAt.toEpochMilli()
@@ -113,7 +112,7 @@ public final class LiveUpdateNotificationBridge {
 					eventKey,
 					"Task",
 					entityId,
-					taskTitle));
+					null));
 	}
 
 	private boolean isTaskNotificationEventForCurrentUser(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -224,14 +223,6 @@ public final class LiveUpdateNotificationBridge {
 		return null;
 	}
 
-	private static String stringValue(Object value) {
-		if (value == null) {
-			return null;
-		}
-		String text = String.valueOf(value).trim();
-		return text.isBlank() ? null : text;
-	}
-
 	private static Instant parseTimestamp(String raw) {
 		if (raw == null || raw.isBlank()) {
 			return Instant.now();
@@ -283,20 +274,7 @@ public final class LiveUpdateNotificationBridge {
 	}
 
 	private static String taskNotificationMessage(UiRuntimeBridge.EntityUpdatedEvent event) {
-		Object titleValue = event.patch().get("title");
-		String title = titleValue == null ? "" : String.valueOf(titleValue).trim();
-		if (!title.isBlank()) {
-			Object caseName = event.patch().get("caseName");
-			if (caseName != null && !String.valueOf(caseName).isBlank()) {
-				return "Task: " + title + " • Case: " + caseName;
-			}
-			Object caseId = event.patch().get("caseId");
-			if (caseId != null) {
-				return "Task: " + title + " • Case #" + caseId;
-			}
-			return "Task: " + title;
-		}
-		return "Task #" + event.entityId() + " was assigned to your queue.";
+		return "A task was assigned to you.";
 	}
 
 	private static boolean isTaskNoteAddedEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -320,33 +298,45 @@ public final class LiveUpdateNotificationBridge {
 	}
 
 	private static String taskNoteNotificationMessage(UiRuntimeBridge.EntityUpdatedEvent event) {
-		String base = taskNotificationMessage(event);
-		Object snippet = event.patch().get("noteSnippet");
-		if (snippet == null) {
-			return base + " • New note added";
-		}
-		String normalized = String.valueOf(snippet).trim();
-		if (normalized.isBlank()) {
-			return base + " • New note added";
-		}
-		return base + " • Note: " + normalized;
+		return "A task assigned to you has a new note.";
 	}
 
 	private static String timelineNotificationTitle(UiRuntimeBridge.EntityUpdatedEvent event) {
-		Object value = event.patch().get("notificationTitle");
-		if (value == null) {
-			return "Task updated";
+		Object eventType = event.patch().get("eventType");
+		if (eventType == null) {
+			eventType = event.patch().get("actionType");
 		}
-		String title = String.valueOf(value).trim();
-		return title.isBlank() ? "Task updated" : title;
+		String normalizedType = eventType == null ? "" : String.valueOf(eventType).trim().toUpperCase();
+		if ("TASK_ASSIGNMENT_ADDED".equals(normalizedType)) {
+			return "Task assigned to you";
+		}
+		return "Task updated";
 	}
 
 	private static String timelineNotificationMessage(UiRuntimeBridge.EntityUpdatedEvent event) {
-		Object value = event.patch().get("notificationMessage");
-		if (value == null) {
-			return taskNotificationMessage(event);
+		Object eventType = event.patch().get("eventType");
+		if (eventType == null) {
+			eventType = event.patch().get("actionType");
 		}
-		String message = String.valueOf(value).trim();
-		return message.isBlank() ? taskNotificationMessage(event) : message;
+		String normalizedType = eventType == null ? "" : String.valueOf(eventType).trim().toUpperCase();
+		if ("TASK_ASSIGNMENT_ADDED".equals(normalizedType)) {
+			return "A task was assigned to you.";
+		}
+		if ("TASK_COMPLETED".equals(normalizedType)) {
+			return "A task assigned to you was marked complete.";
+		}
+		if ("TASK_REOPENED".equals(normalizedType)) {
+			return "A task assigned to you was reopened.";
+		}
+		if ("TASK_DUE_DATE_CHANGED".equals(normalizedType)) {
+			return "A task assigned to you had its due date updated.";
+		}
+		if ("TASK_PRIORITY_CHANGED".equals(normalizedType)) {
+			return "A task assigned to you had its priority updated.";
+		}
+		if ("TASK_ASSIGNMENT_REMOVED".equals(normalizedType)) {
+			return "Task assignments were updated.";
+		}
+		return "A task assigned to you was updated.";
 	}
 }
