@@ -61,6 +61,17 @@
                     </HBox.margin>
                 </Label>
             </HBox>
+
+            <VBox fx:id="auditSection" spacing="8" styleClass="strong-panel">
+                <padding>
+                    <Insets top="12" right="12" bottom="12" left="12"/>
+                </padding>
+                <Label text="Audit" styleClass="app-dialog-field-label"/>
+                <Button fx:id="viewAuditLogButton"
+                        text="View Audit Log"
+                        styleClass="button-secondary"
+                        onAction="#onViewAuditLog"/>
+            </VBox>
         </VBox>
     </content>
 </ScrollPane>
