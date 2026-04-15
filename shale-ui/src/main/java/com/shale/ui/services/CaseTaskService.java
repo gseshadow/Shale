@@ -596,9 +596,6 @@ public final class CaseTaskService {
         if (durableId != null) {
             patch.append(",\"durableNotificationId\":").append(durableId);
         }
-        if (title != null && !title.isBlank()) {
-            patch.append(",\"title\":\"").append(escapeJson(title)).append('"');
-        }
         if (caseId != null && caseId > 0) {
             patch.append(",\"caseId\":").append(caseId);
         }
@@ -649,18 +646,11 @@ public final class CaseTaskService {
             if (durableId != null) {
                 patch.append(",\"durableNotificationId\":").append(durableId);
             }
-            if (taskTitle != null && !taskTitle.isBlank()) {
-                patch.append(",\"title\":\"").append(escapeJson(taskTitle)).append('"');
-            }
             if (caseId != null && caseId > 0) {
                 patch.append(",\"caseId\":").append(caseId);
             }
             if (caseName != null && !caseName.isBlank()) {
                 patch.append(",\"caseName\":\"").append(escapeJson(caseName)).append('"');
-            }
-            String noteSnippet = buildNoteSnippet(noteBody);
-            if (!noteSnippet.isBlank()) {
-                patch.append(",\"noteSnippet\":\"").append(escapeJson(noteSnippet)).append('"');
             }
             patch.append(",\"updatedAtUtc\":\"")
                     .append(LocalDateTime.now().atOffset(ZoneOffset.UTC))
@@ -746,9 +736,6 @@ public final class CaseTaskService {
             if (durableId != null) {
                 patch.append(",\"durableNotificationId\":").append(durableId);
             }
-            if (taskTitle != null && !taskTitle.isBlank()) {
-                patch.append(",\"title\":\"").append(escapeJson(taskTitle)).append('"');
-            }
             if (caseId != null && caseId > 0) {
                 patch.append(",\"caseId\":").append(caseId);
             }
@@ -764,17 +751,7 @@ public final class CaseTaskService {
     }
 
     private static String buildTaskAssignedMessage(String title, Long caseId, String caseName, long taskId) {
-        String trimmedTitle = title == null ? "" : title.trim();
-        if (trimmedTitle.isBlank()) {
-            trimmedTitle = "Task #" + taskId;
-        }
-        if (caseName != null && !caseName.isBlank()) {
-            return "Task: " + trimmedTitle + " • Case: " + caseName;
-        }
-        if (caseId != null && caseId > 0) {
-            return "Task: " + trimmedTitle + " • Case #" + caseId;
-        }
-        return "Task: " + trimmedTitle;
+        return "A task was assigned to you.";
     }
 
     private static String timelineNotificationTitle(String eventType, String eventLabel) {
@@ -788,48 +765,29 @@ public final class CaseTaskService {
     }
 
     private String timelineNotificationMessage(Integer actorUserId, int shaleClientId, String eventType, String taskTitle, Long caseId, String caseName, long taskId) {
-        String actor = resolveActorDisplayName(actorUserId, shaleClientId);
-        String safeTitle = taskTitle == null || taskTitle.isBlank() ? "Task #" + taskId : "'" + taskTitle.trim() + "'";
         if (TaskDao.TaskTimelineEventTypes.TASK_ASSIGNMENT_ADDED.equals(eventType)) {
-            return actor + " assigned you to " + safeTitle;
+            return "A task was assigned to you.";
         }
-        String action = switch (eventType) {
-            case TaskDao.TaskTimelineEventTypes.TASK_COMPLETED -> "marked " + safeTitle + " complete";
-            case TaskDao.TaskTimelineEventTypes.TASK_REOPENED -> "reopened " + safeTitle;
-            case TaskDao.TaskTimelineEventTypes.TASK_DUE_DATE_CHANGED -> "changed the due date on " + safeTitle;
-            case TaskDao.TaskTimelineEventTypes.TASK_PRIORITY_CHANGED -> "changed the priority on " + safeTitle;
-            case TaskDao.TaskTimelineEventTypes.TASK_ASSIGNMENT_REMOVED -> "updated assignees on " + safeTitle;
-            case TaskDao.TaskTimelineEventTypes.TASK_TITLE_CHANGED -> "changed the title of " + safeTitle;
-            case TaskDao.TaskTimelineEventTypes.TASK_DESCRIPTION_CHANGED -> "updated the description for " + safeTitle;
-            default -> "updated " + safeTitle;
-        };
-        StringBuilder out = new StringBuilder(actor).append(' ').append(action);
-        if (caseName != null && !caseName.isBlank()) {
-            out.append(" • Case: ").append(caseName.trim());
-        } else if (caseId != null && caseId > 0) {
-            out.append(" • Case #").append(caseId);
+        if (TaskDao.TaskTimelineEventTypes.TASK_COMPLETED.equals(eventType)) {
+            return "A task assigned to you was marked complete.";
         }
-        return out.toString();
+        if (TaskDao.TaskTimelineEventTypes.TASK_REOPENED.equals(eventType)) {
+            return "A task assigned to you was reopened.";
+        }
+        if (TaskDao.TaskTimelineEventTypes.TASK_DUE_DATE_CHANGED.equals(eventType)) {
+            return "A task assigned to you had its due date updated.";
+        }
+        if (TaskDao.TaskTimelineEventTypes.TASK_PRIORITY_CHANGED.equals(eventType)) {
+            return "A task assigned to you had its priority updated.";
+        }
+        if (TaskDao.TaskTimelineEventTypes.TASK_ASSIGNMENT_REMOVED.equals(eventType)) {
+            return "Task assignments were updated.";
+        }
+        return "A task assigned to you was updated.";
     }
 
     private static String buildTaskNoteAddedMessage(String title, Long caseId, String caseName, long taskId, String noteBody) {
-        String base = buildTaskAssignedMessage(title, caseId, caseName, taskId);
-        String snippet = buildNoteSnippet(noteBody);
-        if (snippet.isBlank()) {
-            return base + " • New note added";
-        }
-        return base + " • Note: " + snippet;
-    }
-
-    private static String buildNoteSnippet(String noteBody) {
-        if (noteBody == null) {
-            return "";
-        }
-        String normalized = noteBody.trim().replaceAll("\\s+", " ");
-        if (normalized.isBlank()) {
-            return "";
-        }
-        return normalized.length() <= 120 ? normalized : normalized.substring(0, 117) + "...";
+        return "A task assigned to you has a new note.";
     }
 
     private static String escapeJson(String text) {
@@ -849,19 +807,6 @@ public final class CaseTaskService {
             return resolved;
         }
         return fallbackWhenMissing ? "User #" + userId : null;
-    }
-
-    private String resolveActorDisplayName(Integer actorUserId, int shaleClientId) {
-        if (actorUserId == null || actorUserId <= 0) {
-            return "Someone";
-        }
-        return userDao.listUsersForTenant(shaleClientId).stream()
-                .filter(user -> user.id() == actorUserId)
-                .map(user -> user.displayName() == null || user.displayName().isBlank()
-                        ? "User #" + actorUserId
-                        : user.displayName().trim())
-                .findFirst()
-                .orElse("User #" + actorUserId);
     }
 
     private Map<Integer, String> loadPriorityLabels(int shaleClientId) {

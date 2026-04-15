@@ -183,14 +183,11 @@ public final class TaskDueDateNotificationGenerator {
 			}
 
 		String message(TaskDueNotificationCandidate candidate) {
-			String taskTitle = candidate.title() == null || candidate.title().isBlank()
-					? "Task #" + candidate.taskId()
-					: candidate.title().trim();
-			String dueDateText = candidate.dueAt() == null ? "" : candidate.dueAt().toLocalDate().toString();
-			if (candidate.caseName() != null && !candidate.caseName().isBlank()) {
-				return "Task: " + taskTitle + " • Case: " + candidate.caseName() + " • Due: " + dueDateText;
-			}
-			return "Task: " + taskTitle + " • Due: " + dueDateText;
+			return switch (this) {
+				case OVERDUE -> "A task assigned to you is overdue.";
+				case DUE_TODAY -> "A task assigned to you is due today.";
+				case DUE_TOMORROW -> "A task assigned to you is due tomorrow.";
+			};
 		}
 	}
 }
