@@ -30,7 +30,7 @@ public final class AuditLogDao {
             Integer objectTypeId,
             Long objectId,
             String fieldName,
-            String actionType,
+            Integer fieldCode,
             String stringValue,
             LocalDate dateValue) {
         String sql = """
@@ -67,7 +67,7 @@ public final class AuditLogDao {
                 ps.setLong(3, objectId);
             }
             ps.setString(4, fieldName);
-            bindFieldCode(ps, 5, actionType, bindingMode);
+            bindFieldCode(ps, 5, fieldCode, bindingMode);
             ps.setString(6, stringValue);
             if (dateValue == null) {
                 ps.setNull(7, java.sql.Types.DATE);
@@ -79,7 +79,7 @@ public final class AuditLogDao {
         } catch (SQLException e) {
             System.err.println("[PHI_AUDIT] insert failed"
                     + " field=" + fieldName
-                    + " action=" + actionType
+                    + " fieldCode=" + fieldCode
                     + " objectId=" + objectId
                     + " objectTypeId=" + objectTypeId
                     + " userId=" + userId
@@ -119,23 +119,12 @@ public final class AuditLogDao {
         return fieldCodeBindingModeRef.get();
     }
 
-    private static void bindFieldCode(PreparedStatement ps, int parameterIndex, String actionType, FieldCodeBindingMode mode) throws SQLException {
+    private static void bindFieldCode(PreparedStatement ps, int parameterIndex, Integer fieldCode, FieldCodeBindingMode mode) throws SQLException {
+        int resolvedCode = fieldCode == null ? 0 : fieldCode;
         if (mode == FieldCodeBindingMode.NUMERIC) {
-            ps.setInt(parameterIndex, actionCode(actionType));
+            ps.setInt(parameterIndex, resolvedCode);
             return;
         }
-        ps.setString(parameterIndex, actionType);
-    }
-
-    private static int actionCode(String actionType) {
-        if (actionType == null) {
-            return 0;
-        }
-        return switch (actionType.trim().toUpperCase(java.util.Locale.ROOT)) {
-            case "CREATE" -> 1;
-            case "UPDATE" -> 2;
-            case "DELETE" -> 3;
-            default -> 0;
-        };
+        ps.setString(parameterIndex, Integer.toString(resolvedCode));
     }
 }

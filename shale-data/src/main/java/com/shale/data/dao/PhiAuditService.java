@@ -58,6 +58,7 @@ public final class PhiAuditService {
 
     private void append(Integer userId, String tableName, String fieldName, Long recordId, String action, Object oldValue, Object newValue) {
         LocalDate dateValue = (newValue instanceof LocalDate d) ? d : null;
+        Integer fieldCode = inferFieldCode(oldValue, newValue);
         String payload = "old=" + asString(oldValue) + ";new=" + asString(newValue);
         try {
             auditLogDao.appendPhiWriteAudit(
@@ -65,7 +66,7 @@ public final class PhiAuditService {
                     objectTypeId(tableName),
                     recordId,
                     tableName + "." + fieldName,
-                    action,
+                    fieldCode,
                     payload,
                     dateValue);
         } catch (RuntimeException ex) {
@@ -73,6 +74,7 @@ public final class PhiAuditService {
                     + " table=" + tableName
                     + " field=" + fieldName
                     + " action=" + action
+                    + " fieldCode=" + fieldCode
                     + " recordId=" + recordId
                     + " userId=" + userId
                     + " old=" + asString(oldValue)
@@ -107,5 +109,19 @@ public final class PhiAuditService {
             return date.toString();
         }
         return String.valueOf(value);
+    }
+
+    private static int inferFieldCode(Object oldValue, Object newValue) {
+        Object candidate = newValue != null ? newValue : oldValue;
+        if (candidate instanceof Boolean) {
+            return 1;
+        }
+        if (candidate instanceof Number) {
+            return 2;
+        }
+        if (candidate instanceof LocalDate) {
+            return 3;
+        }
+        return 4;
     }
 }
