@@ -66,6 +66,8 @@ public final class AuditLogViewerController {
     private void initialize() {
         fxmlReady = true;
         configureColumns();
+        configureTableReadability();
+        configureFilterFieldActions();
         runInitialLoadIfReady();
     }
 
@@ -136,6 +138,30 @@ public final class AuditLogViewerController {
         intValueColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().intValue()));
     }
 
+    private void configureTableReadability() {
+        if (auditTable == null) {
+            return;
+        }
+        auditTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        auditTable.setPlaceholder(new Label("No audit records found."));
+    }
+
+    private void configureFilterFieldActions() {
+        bindEnterToReload(userIdFilterField);
+        bindEnterToReload(objectTypeIdFilterField);
+        bindEnterToReload(objectIdFilterField);
+        bindEnterToReload(fieldNameFilterField);
+        bindEnterToReload(startDateFilterField);
+        bindEnterToReload(endDateFilterField);
+    }
+
+    private void bindEnterToReload(TextField field) {
+        if (field == null) {
+            return;
+        }
+        field.setOnAction(event -> onApplyFilters());
+    }
+
     private boolean isAdminUser() {
         if (appState == null || appState.isAdmin()) {
             return true;
@@ -175,7 +201,11 @@ public final class AuditLogViewerController {
                 startDate,
                 endDate);
         auditTable.setItems(FXCollections.observableArrayList(rows));
-        setStatus(rows.size() + " audit entries");
+        if (rows.isEmpty()) {
+            setStatus("No audit records found.");
+        } else {
+            setStatus(rows.size() + " audit entries");
+        }
     }
 
     private Integer parseOptionalInt(TextField field, String label) {

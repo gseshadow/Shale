@@ -50,7 +50,7 @@
 
     <HBox spacing="8">
         <Button text="Apply" styleClass="button-primary" onAction="#onApplyFilters"/>
-        <Button text="Clear" styleClass="button-secondary" onAction="#onClearFilters"/>
+        <Button text="Clear Filters" styleClass="button-secondary" onAction="#onClearFilters"/>
         <Label fx:id="statusLabel" styleClass="search-summary-text" wrapText="true">
             <HBox.margin>
                 <Insets left="8"/>
