@@ -3,9 +3,11 @@ package com.shale.ui.controller;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
+import com.shale.ui.state.AppState;
 import javafx.fxml.FXML;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.layout.VBox;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -34,22 +36,30 @@ public final class SettingsController {
 	private CheckBox connectivityBannerCheck;
 	@FXML
 	private Label notificationSettingsStatusLabel;
+	@FXML
+	private VBox auditSection;
 
 	private NotificationPreferencesService notificationPreferencesService;
+	private AppState appState;
+	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
 
 	@FXML
 	private void initialize() {
 		fxmlReady = true;
+		updateAuditVisibility();
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
 	}
 
-	public void init(NotificationPreferencesService notificationPreferencesService) {
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
+		this.appState = Objects.requireNonNull(appState, "appState");
+		this.onOpenAuditLog = Objects.requireNonNull(onOpenAuditLog, "onOpenAuditLog");
 		if (fxmlReady) {
 			loadFromPreferences();
+			updateAuditVisibility();
 		}
 	}
 
@@ -75,6 +85,14 @@ public final class SettingsController {
 		if (notificationSettingsStatusLabel != null) {
 			notificationSettingsStatusLabel.setText("Notification settings reset to saved values.");
 		}
+	}
+
+	@FXML
+	private void onViewAuditLog() {
+		if (!isAdminUser() || onOpenAuditLog == null) {
+			return;
+		}
+		onOpenAuditLog.run();
 	}
 
 	private void loadFromPreferences() {
@@ -119,6 +137,18 @@ public final class SettingsController {
 	private static void setChecked(CheckBox checkBox, boolean selected) {
 		if (checkBox != null) {
 			checkBox.setSelected(selected);
+		}
+	}
+
+	private boolean isAdminUser() {
+		return appState != null && appState.isAdmin();
+	}
+
+	private void updateAuditVisibility() {
+		if (auditSection != null) {
+			boolean visible = isAdminUser();
+			auditSection.setVisible(visible);
+			auditSection.setManaged(visible);
 		}
 	}
 }
