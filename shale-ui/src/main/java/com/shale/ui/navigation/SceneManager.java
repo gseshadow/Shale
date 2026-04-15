@@ -16,6 +16,7 @@ import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.ContactViewController;
 import com.shale.ui.controller.ContactsController;
+import com.shale.ui.controller.AuditLogViewerController;
 import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
 import com.shale.ui.controller.MyShaleController;
@@ -46,6 +47,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.fxml.LoadException;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
@@ -498,9 +500,31 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService);
+			c.init(notificationPreferencesService, appState, this::showAuditLogViewer);
 			return c;
 		});
+	}
+
+	public void showAuditLogViewer() {
+		if (!appState.isAdmin()) {
+			showError("Only admin users can view audit logs.");
+			return;
+		}
+		AuditLogDao auditLogDao = new AuditLogDao(dbSessionProvider);
+		Parent viewerRoot = load("/fxml/audit-log-viewer.fxml", controller ->
+		{
+			AuditLogViewerController c = (AuditLogViewerController) controller;
+			c.init(appState, auditLogDao);
+			return c;
+		});
+		Stage dialogStage = AppDialogs.createModalStage(stage, "Audit Log");
+		Region body = viewerRoot instanceof Region region ? region : new VBox(viewerRoot);
+		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		VBox shell = AppDialogs.createSecondaryWindowShell(dialogStage, "Audit Log", dialogStage::close, body);
+		Scene scene = new Scene(shell, 1400, 720);
+		scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/css/app.css")).toExternalForm());
+		dialogStage.setScene(scene);
+		dialogStage.show();
 	}
 
 	public Parent createSearchView(String query,
