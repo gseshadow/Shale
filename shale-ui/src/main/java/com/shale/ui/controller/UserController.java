@@ -76,11 +76,18 @@ public final class UserController {
 	@FXML private Label assignedCasesEmptyLabel;
 	@FXML private TextField assignedCasesSearchField;
 	@FXML private ChoiceBox<String> assignedCasesSortChoice;
+	@FXML private ScrollPane assignedCasesScroll;
 	@FXML private VBox assignedTasksContainer;
 	@FXML private Label assignedTasksEmptyLabel;
 	@FXML private TextField assignedTasksSearchField;
 	@FXML private ChoiceBox<String> assignedTasksSortChoice;
 	@FXML private ScrollPane assignedTasksScroll;
+	@FXML private ScrollPane pageScroll;
+	@FXML private FlowPane sectionsFlow;
+	@FXML private VBox userDetailsSection;
+	@FXML private ScrollPane userDetailsScroll;
+	@FXML private VBox tasksSection;
+	@FXML private VBox casesSection;
 
 	@FXML private Label displayNameValue;
 	@FXML private Label firstNameValue;
@@ -123,6 +130,8 @@ public final class UserController {
 	private boolean colorEditedInSession;
 	private long pageLoadStartNanos;
 	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
+	private static final double MIN_SECTION_HEIGHT = 320;
+	private static final double SECTION_HEIGHT_PADDING = 56;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "user-detail-loader");
@@ -174,10 +183,43 @@ public final class UserController {
 		CaseListFilterSortSupport.initializeControls(assignedCasesSearchField, assignedCasesSortChoice, this::renderAssignedCases);
 		initializeAssignedTaskControls();
 		configureColorEditor();
+		configureResponsiveSectionSizing();
 
 		setEditMode(false);
 		wireLiveRefreshLifecycle();
 		Platform.runLater(this::loadUser);
+	}
+
+	private void configureResponsiveSectionSizing() {
+		if (pageScroll == null || userDetailsSection == null || tasksSection == null || casesSection == null) {
+			return;
+		}
+		pageScroll.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> applyResponsiveSectionSizing());
+		sectionsFlow.widthProperty().addListener((obs, oldWidth, newWidth) -> applyResponsiveSectionSizing());
+		Platform.runLater(this::applyResponsiveSectionSizing);
+	}
+
+	private void applyResponsiveSectionSizing() {
+		if (pageScroll == null) {
+			return;
+		}
+		double viewportHeight = pageScroll.getViewportBounds() == null ? 0 : pageScroll.getViewportBounds().getHeight();
+		if (viewportHeight <= 0) {
+			return;
+		}
+		double targetHeight = Math.max(MIN_SECTION_HEIGHT, viewportHeight - SECTION_HEIGHT_PADDING);
+		applySectionHeight(userDetailsSection, targetHeight);
+		applySectionHeight(tasksSection, targetHeight);
+		applySectionHeight(casesSection, targetHeight);
+	}
+
+	private void applySectionHeight(Region section, double height) {
+		if (section == null) {
+			return;
+		}
+		section.setMinHeight(MIN_SECTION_HEIGHT);
+		section.setPrefHeight(height);
+		section.setMaxHeight(height);
 	}
 
 	private void wireLiveRefreshLifecycle() {
