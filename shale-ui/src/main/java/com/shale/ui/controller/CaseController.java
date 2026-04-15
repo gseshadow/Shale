@@ -5014,7 +5014,8 @@ public class CaseController {
 					request.saveDraft().description(),
 					request.desired().desiredIncidentDate(),
 					request.desired().desiredSolDate(),
-					request.baseline().expectedRowVer()
+					request.baseline().expectedRowVer(),
+					request.userId()
 			);
 		}
 
@@ -6232,7 +6233,8 @@ public class CaseController {
 						request.deniedDetail(),
 						request.summary(),
 						request.receivedUpdates(),
-						request.expectedRowVer());
+						request.expectedRowVer(),
+						(appState == null ? null : appState.getUserId()));
 
 				if (updated != null && request.statusChanged() && request.primaryStatusId() != null)
 					caseDao.setPrimaryStatus(request.caseId(), request.primaryStatusId(), null);

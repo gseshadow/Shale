@@ -195,6 +195,7 @@ public final class ContactViewController {
         ContactProfileUpdateRequest request = new ContactProfileUpdateRequest(
                 currentContact.id(),
                 currentContact.shaleClientId(),
+                appState == null ? null : appState.getUserId(),
                 safeText(nameEditor == null ? null : nameEditor.getText()),
                 safeText(firstNameEditor == null ? null : firstNameEditor.getText()),
                 safeText(lastNameEditor == null ? null : lastNameEditor.getText()),

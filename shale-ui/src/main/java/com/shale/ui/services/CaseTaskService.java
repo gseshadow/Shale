@@ -351,7 +351,8 @@ public final class CaseTaskService {
                 request.dueAt(),
                 request.statusId(),
                 request.priorityId(),
-                request.completed());
+                request.completed(),
+                request.changedByUserId());
         TaskDetailDto after = taskDao.findTaskDetail(request.taskId(), request.shaleClientId());
         if (before == null || after == null) {
             return;
