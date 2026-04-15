@@ -75,16 +75,16 @@
                             <Insets top="12" right="12" bottom="12" left="12" />
                         </padding>
 
-                <VBox spacing="12" styleClass="case-main-surface" minWidth="340" prefWidth="760" maxWidth="1.7976931348623157E308">
+                <VBox spacing="10" styleClass="case-main-surface" minWidth="260" prefWidth="530" maxWidth="1.7976931348623157E308">
                     <padding>
-                        <Insets top="12" right="12" bottom="12" left="12" />
+                        <Insets top="10" right="10" bottom="10" left="10" />
                     </padding>
 
                     <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
 
-                    <GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;" maxWidth="1.7976931348623157E308">
+                    <GridPane hgap="10" vgap="10" style="-fx-alignment: TOP_LEFT;" maxWidth="1.7976931348623157E308">
                         <columnConstraints>
-                            <ColumnConstraints minWidth="120" prefWidth="160" />
+                            <ColumnConstraints minWidth="96" prefWidth="128" />
                             <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
                         </columnConstraints>
 
@@ -138,7 +138,7 @@
                                 </styleClass>
                             </Button>
                         </HBox>
-                        <FlowPane fx:id="rolesFlow" hgap="8" vgap="8" prefWrapLength="720" />
+                        <FlowPane fx:id="rolesFlow" hgap="8" vgap="8" prefWrapLength="460" />
                         <Label fx:id="rolesEmptyLabel" text="No roles assigned" visible="false" managed="false" style="-fx-opacity: 0.75;" />
                     </VBox>
                 </VBox>
