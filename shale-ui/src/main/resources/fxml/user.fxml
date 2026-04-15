@@ -63,26 +63,28 @@
     </top>
 
     <center>
-        <StackPane BorderPane.alignment="CENTER">
-            <padding>
-                <Insets top="10" right="12" bottom="12" left="12" />
-            </padding>
-
-            <HBox spacing="16" maxWidth="1360" alignment="TOP_LEFT">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12" />
-                </padding>
-
-                <VBox spacing="12" styleClass="case-main-surface" minWidth="640" prefWidth="820" maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS">
+        <ScrollPane fitToWidth="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
+            <content>
+                <StackPane BorderPane.alignment="CENTER">
                     <padding>
-                        <Insets top="12" right="12" bottom="12" left="12" />
+                        <Insets top="10" right="12" bottom="12" left="12" />
+                    </padding>
+
+                    <FlowPane hgap="16" vgap="16" prefWrapLength="1700" alignment="TOP_LEFT" maxWidth="1.7976931348623157E308">
+                        <padding>
+                            <Insets top="12" right="12" bottom="12" left="12" />
+                        </padding>
+
+                <VBox spacing="10" styleClass="case-main-surface" minWidth="260" prefWidth="530" maxWidth="1.7976931348623157E308">
+                    <padding>
+                        <Insets top="10" right="10" bottom="10" left="10" />
                     </padding>
 
                     <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
 
-                    <GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
+                    <GridPane hgap="10" vgap="10" style="-fx-alignment: TOP_LEFT;" maxWidth="1.7976931348623157E308">
                         <columnConstraints>
-                            <ColumnConstraints minWidth="160" prefWidth="180" />
+                            <ColumnConstraints minWidth="96" prefWidth="128" />
                             <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
                         </columnConstraints>
 
@@ -136,12 +138,12 @@
                                 </styleClass>
                             </Button>
                         </HBox>
-                        <FlowPane fx:id="rolesFlow" hgap="8" vgap="8" prefWrapLength="720" />
+                        <FlowPane fx:id="rolesFlow" hgap="8" vgap="8" prefWrapLength="460" />
                         <Label fx:id="rolesEmptyLabel" text="No roles assigned" visible="false" managed="false" style="-fx-opacity: 0.75;" />
                     </VBox>
                 </VBox>
 
-                <VBox prefWidth="420" minWidth="360" maxWidth="500" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel" HBox.hgrow="ALWAYS">
+                <VBox prefWidth="380" minWidth="280" maxWidth="480" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
                     <padding>
                         <Insets top="12" right="12" bottom="12" left="12" />
                     </padding>
@@ -151,7 +153,7 @@
                     </HBox>
                     <HBox spacing="8" alignment="CENTER_LEFT">
                         <TextField fx:id="assignedTasksSearchField" promptText="Search assigned tasks…" HBox.hgrow="ALWAYS" />
-                        <ChoiceBox fx:id="assignedTasksSortChoice" prefWidth="180">
+                        <ChoiceBox fx:id="assignedTasksSortChoice" prefWidth="180" minWidth="140" maxWidth="180">
                             <styleClass>
                                 <String fx:value="choice-box" />
                                 <String fx:value="app-toolbar-select" />
@@ -166,7 +168,7 @@
                     </ScrollPane>
                 </VBox>
 
-                <VBox prefWidth="420" minWidth="360" maxWidth="500" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel" HBox.hgrow="ALWAYS">
+                <VBox prefWidth="380" minWidth="280" maxWidth="480" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
                     <padding>
                         <Insets top="12" right="12" bottom="12" left="12" />
                     </padding>
@@ -176,7 +178,7 @@
                     </HBox>
                     <HBox spacing="8" alignment="CENTER_LEFT">
                         <TextField fx:id="assignedCasesSearchField" promptText="Search assigned cases…" HBox.hgrow="ALWAYS" />
-                        <ChoiceBox fx:id="assignedCasesSortChoice" prefWidth="180">
+                        <ChoiceBox fx:id="assignedCasesSortChoice" prefWidth="180" minWidth="140" maxWidth="180">
                             <styleClass>
                                 <String fx:value="choice-box" />
                                 <String fx:value="app-toolbar-select" />
@@ -190,8 +192,10 @@
                         </StackPane>
                     </ScrollPane>
                 </VBox>
-            </HBox>
-        </StackPane>
+                    </FlowPane>
+                </StackPane>
+            </content>
+        </ScrollPane>
     </center>
 
 </BorderPane>
