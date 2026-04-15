@@ -171,6 +171,12 @@ public final class AuditLogViewerController {
     }
 
     private void loadAuditRows() {
+        Integer shaleClientId = appState == null ? null : appState.getShaleClientId();
+        if (shaleClientId == null || shaleClientId <= 0) {
+            auditTable.setItems(FXCollections.emptyObservableList());
+            setStatus("No audit records found.");
+            return;
+        }
         Integer userId = parseOptionalInt(userIdFilterField, "UserId");
         if (userId == null && userIdFilterField != null && hasText(userIdFilterField.getText())) {
             return;
@@ -194,6 +200,7 @@ public final class AuditLogViewerController {
         String fieldName = fieldNameFilterField == null ? null : trimToNull(fieldNameFilterField.getText());
 
         List<AuditLogDao.AuditLogEntryRow> rows = auditLogDao.listAuditLogEntries(
+                shaleClientId,
                 userId,
                 objectId,
                 fieldName,
