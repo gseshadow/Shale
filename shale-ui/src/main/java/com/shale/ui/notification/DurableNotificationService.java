@@ -97,7 +97,7 @@ public final class DurableNotificationService {
 		String message = category == NotificationCategory.TASK
 				? safeTaskNotificationMessage(row.actionType())
 				: Objects.toString(row.message(), "");
-		String entityTitle = category == NotificationCategory.TASK ? null : row.entityTitle();
+		String entityTitle = row.entityTitle();
 		return new AppNotification(
 				id,
 				category,
