@@ -165,10 +165,10 @@
                                 </ChoiceBox>
                             </HBox>
                             <ScrollPane fx:id="assignedTasksScroll" fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
-                                <StackPane>
+                                <javafx.scene.layout.StackPane>
                                     <VBox fx:id="assignedTasksContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
                                     <Label fx:id="assignedTasksEmptyLabel" text="No assigned tasks" visible="false" managed="false" />
-                                </StackPane>
+                                </javafx.scene.layout.StackPane>
                             </ScrollPane>
                         </VBox>
 
@@ -190,10 +190,10 @@
                                 </ChoiceBox>
                             </HBox>
                             <ScrollPane fx:id="assignedCasesScroll" fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
-                                <StackPane>
+                                <javafx.scene.layout.StackPane>
                                     <VBox fx:id="assignedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
                                     <Label fx:id="assignedCasesEmptyLabel" text="No assigned cases" visible="false" managed="false" />
-                                </StackPane>
+                                </javafx.scene.layout.StackPane>
                             </ScrollPane>
                         </VBox>
                     </FlowPane>
