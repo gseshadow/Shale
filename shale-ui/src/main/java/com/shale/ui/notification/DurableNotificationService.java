@@ -2,6 +2,7 @@ package com.shale.ui.notification;
 
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.NotificationDao.NotificationRow;
+import com.shale.ui.privacy.PhiFieldRegistry;
 import com.shale.ui.state.AppState;
 
 import java.util.List;
