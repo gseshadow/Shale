@@ -14,7 +14,6 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
-<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
@@ -63,14 +62,14 @@
     </top>
 
     <center>
-        <ScrollPane fx:id="pageScroll" fitToWidth="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
+        <ScrollPane fx:id="pageScroll" fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
             <content>
-                <StackPane BorderPane.alignment="CENTER">
+                <VBox fillWidth="true" BorderPane.alignment="CENTER">
                     <padding>
                         <Insets top="10" right="12" bottom="12" left="12" />
                     </padding>
 
-                    <FlowPane fx:id="sectionsFlow" hgap="16" vgap="16" prefWrapLength="1700" alignment="TOP_LEFT" maxWidth="1.7976931348623157E308">
+                    <FlowPane fx:id="sectionsFlow" hgap="16" vgap="16" prefWrapLength="1700" alignment="TOP_LEFT" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
                         <padding>
                             <Insets top="12" right="12" bottom="12" left="12" />
                         </padding>
@@ -198,7 +197,7 @@
                             </ScrollPane>
                         </VBox>
                     </FlowPane>
-                </StackPane>
+                </VBox>
             </content>
         </ScrollPane>
     </center>

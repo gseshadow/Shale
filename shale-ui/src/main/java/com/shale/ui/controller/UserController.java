@@ -131,7 +131,7 @@ public final class UserController {
 	private long pageLoadStartNanos;
 	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 	private static final double MIN_SECTION_HEIGHT = 320;
-	private static final double SECTION_HEIGHT_PADDING = 56;
+	private static final double SECTION_HEIGHT_PADDING = 12;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "user-detail-loader");
@@ -195,7 +195,23 @@ public final class UserController {
 			return;
 		}
 		pageScroll.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> applyResponsiveSectionSizing());
+		pageScroll.heightProperty().addListener((obs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
 		sectionsFlow.widthProperty().addListener((obs, oldWidth, newWidth) -> applyResponsiveSectionSizing());
+		sectionsFlow.heightProperty().addListener((obs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
+		pageScroll.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null) {
+				return;
+			}
+			newScene.heightProperty().addListener((sceneObs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
+			if (newScene.getWindow() != null) {
+				newScene.getWindow().heightProperty().addListener((windowObs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
+			}
+			newScene.windowProperty().addListener((windowObs, oldWindow, newWindow) -> {
+				if (newWindow != null) {
+					newWindow.heightProperty().addListener((heightObs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
+				}
+			});
+		});
 		Platform.runLater(this::applyResponsiveSectionSizing);
 	}
 
@@ -208,6 +224,7 @@ public final class UserController {
 			return;
 		}
 		double targetHeight = Math.max(MIN_SECTION_HEIGHT, viewportHeight - SECTION_HEIGHT_PADDING);
+		sectionsFlow.setMinHeight(targetHeight);
 		applySectionHeight(userDetailsSection, targetHeight);
 		applySectionHeight(tasksSection, targetHeight);
 		applySectionHeight(casesSection, targetHeight);
@@ -219,7 +236,7 @@ public final class UserController {
 		}
 		section.setMinHeight(MIN_SECTION_HEIGHT);
 		section.setPrefHeight(height);
-		section.setMaxHeight(height);
+		section.setMaxHeight(Double.MAX_VALUE);
 	}
 
 	private void wireLiveRefreshLifecycle() {
