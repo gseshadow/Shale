@@ -140,9 +140,11 @@ public final class TaskDao {
     }
 
     private final DbSessionProvider db;
+    private final PhiAuditService phiAuditService;
 
     public TaskDao(DbSessionProvider db) {
         this.db = Objects.requireNonNull(db, "db");
+        this.phiAuditService = new PhiAuditService(new AuditLogDao(this.db));
     }
 
     public List<CaseTaskListItemDto> listActiveTasksForCase(long caseId, int shaleClientId, CaseTaskSort sort) {
@@ -1180,7 +1182,10 @@ public final class TaskDao {
                 if (!rs.next()) {
                     throw new RuntimeException("Failed to create task for caseId=" + caseId);
                 }
-                return rs.getLong(1);
+                long taskId = rs.getLong(1);
+                phiAuditService.auditCreate(createdByUserId, "Tasks", "Title", taskId, normalizedTitle);
+                phiAuditService.auditCreate(createdByUserId, "Tasks", "Description", taskId, description);
+                return taskId;
             }
         } catch (SQLException e) {
             throw new RuntimeException(
@@ -1251,7 +1256,8 @@ public final class TaskDao {
             LocalDateTime dueAt,
             Integer statusId,
             Integer priorityId,
-            boolean completed) {
+            boolean completed,
+            Integer updatedByUserId) {
         if (taskId <= 0) {
             throw new IllegalArgumentException("taskId must be > 0");
         }
@@ -1279,6 +1285,7 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
+            TaskDetailDto before = findTaskDetail(taskId, shaleClientId);
             int resolvedStatusId = resolveStatusIdForUpdate(con, shaleClientId, statusId);
             int resolvedPriorityId = resolvePriorityIdForCreate(con, shaleClientId, priorityId);
             int i = 1;
@@ -1290,6 +1297,11 @@ public final class TaskDao {
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
             ps.executeUpdate();
+            TaskDetailDto after = findTaskDetail(taskId, shaleClientId);
+            if (before != null && after != null) {
+                phiAuditService.auditUpdate(updatedByUserId, "Tasks", "Title", taskId, before.title(), after.title());
+                phiAuditService.auditUpdate(updatedByUserId, "Tasks", "Description", taskId, before.description(), after.description());
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update taskId=" + taskId, e);
         }
@@ -1389,7 +1401,9 @@ public final class TaskDao {
                 if (!rs.next()) {
                     throw new RuntimeException("Task timeline insert did not return inserted id");
                 }
-                return rs.getLong(1);
+                long timelineEventId = rs.getLong(1);
+                phiAuditService.auditCreate(actorUserId, "TaskTimelineEvents", "Body", timelineEventId, normalizedBody);
+                return timelineEventId;
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to add task timeline event (taskId=" + taskId + ")", e);
@@ -1547,7 +1561,9 @@ public final class TaskDao {
                 if (!rs.next()) {
                     throw new RuntimeException("Task update insert did not return inserted id");
                 }
-                return rs.getLong(1);
+                long taskUpdateId = rs.getLong(1);
+                phiAuditService.auditCreate(userId, "TaskUpdates", "Body", taskUpdateId, trimmedBody);
+                return taskUpdateId;
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to add task update (taskId=" + taskId + ", caseId=" + caseId + ")", e);
@@ -1569,6 +1585,14 @@ public final class TaskDao {
             throw new IllegalArgumentException("Task update body is required");
         }
 
+        String existingSql = """
+                SELECT Body
+                FROM dbo.TaskUpdates
+                WHERE Id = ?
+                  AND ShaleClientId = ?
+                  AND UserId = ?
+                  AND ISNULL(IsDeleted, 0) = 0;
+                """;
         String sql = """
                 UPDATE dbo.TaskUpdates
                 SET Body = ?,
@@ -1579,12 +1603,26 @@ public final class TaskDao {
                   AND ISNULL(IsDeleted, 0) = 0;
                 """;
         try (Connection con = db.requireConnection();
+             PreparedStatement existingPs = con.prepareStatement(existingSql);
              PreparedStatement ps = con.prepareStatement(sql)) {
+            existingPs.setLong(1, taskUpdateId);
+            existingPs.setInt(2, shaleClientId);
+            existingPs.setInt(3, userId);
+            String oldBody = null;
+            try (ResultSet rs = existingPs.executeQuery()) {
+                if (rs.next()) {
+                    oldBody = rs.getString("Body");
+                }
+            }
             ps.setString(1, trimmedBody);
             ps.setLong(2, taskUpdateId);
             ps.setInt(3, shaleClientId);
             ps.setInt(4, userId);
-            return ps.executeUpdate() == 1;
+            boolean updated = ps.executeUpdate() == 1;
+            if (updated) {
+                phiAuditService.auditUpdate(userId, "TaskUpdates", "Body", taskUpdateId, oldBody, trimmedBody);
+            }
+            return updated;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update task update (id=" + taskUpdateId + ")", e);
         }
@@ -1600,6 +1638,14 @@ public final class TaskDao {
         if (userId <= 0) {
             throw new IllegalArgumentException("userId must be > 0");
         }
+        String existingSql = """
+                SELECT Body
+                FROM dbo.TaskUpdates
+                WHERE Id = ?
+                  AND ShaleClientId = ?
+                  AND UserId = ?
+                  AND ISNULL(IsDeleted, 0) = 0;
+                """;
         String sql = """
                 UPDATE dbo.TaskUpdates
                 SET IsDeleted = 1,
@@ -1610,11 +1656,25 @@ public final class TaskDao {
                   AND ISNULL(IsDeleted, 0) = 0;
                 """;
         try (Connection con = db.requireConnection();
+             PreparedStatement existingPs = con.prepareStatement(existingSql);
              PreparedStatement ps = con.prepareStatement(sql)) {
+            existingPs.setLong(1, taskUpdateId);
+            existingPs.setInt(2, shaleClientId);
+            existingPs.setInt(3, userId);
+            String oldBody = null;
+            try (ResultSet rs = existingPs.executeQuery()) {
+                if (rs.next()) {
+                    oldBody = rs.getString("Body");
+                }
+            }
             ps.setLong(1, taskUpdateId);
             ps.setInt(2, shaleClientId);
             ps.setInt(3, userId);
-            return ps.executeUpdate() == 1;
+            boolean deleted = ps.executeUpdate() == 1;
+            if (deleted) {
+                phiAuditService.auditDelete(userId, "TaskUpdates", "Body", taskUpdateId, oldBody);
+            }
+            return deleted;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to soft delete task update (id=" + taskUpdateId + ")", e);
         }
