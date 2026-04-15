@@ -213,34 +213,7 @@ public final class NotificationCenterDialog {
 		}
 
 		private static String resolveTaskPreviewTitle(AppNotification item, long taskId) {
-			if (item != null && item.getEntityTitle() != null && !item.getEntityTitle().isBlank()) {
-				return item.getEntityTitle().trim();
-			}
-			String messageTitle = extractTaskTitleFromMessage(item == null ? null : item.getMessage());
-			if (messageTitle != null) {
-				return messageTitle;
-			}
 			return "Task #" + taskId;
-		}
-
-		private static String extractTaskTitleFromMessage(String message) {
-			if (message == null) {
-				return null;
-			}
-			String trimmed = message.trim();
-			if (!trimmed.startsWith("Task:")) {
-				return null;
-			}
-			String withoutPrefix = trimmed.substring("Task:".length()).trim();
-			if (withoutPrefix.isBlank()) {
-				return null;
-			}
-			int separator = withoutPrefix.indexOf(" • ");
-			String candidate = separator >= 0 ? withoutPrefix.substring(0, separator).trim() : withoutPrefix;
-			if (candidate.isBlank() || candidate.matches("(?i)^Task\\s*#\\d+$")) {
-				return null;
-			}
-			return candidate;
 		}
 
 		private void onTaskPreviewPressed(AppNotification item, Long taskId, MouseEvent event) {
