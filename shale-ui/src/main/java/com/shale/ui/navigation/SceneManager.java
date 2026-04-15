@@ -549,13 +549,13 @@ public final class SceneManager {
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			UserDetailService userDetailService = new UserDetailService(userDao, caseDao, taskDao);
-			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
-			{
-				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
-				openCaseProfile(relatedCaseId, "OVERVIEW");
-			}, this::openUserProfile, caseTaskService);
-			return c;
-		});
+				c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
+				{
+					System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
+					openCaseProfile(relatedCaseId, "OVERVIEW");
+				}, this::openUserProfile, caseTaskService, phiReadAuditService);
+				return c;
+			});
 	}
 
 	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase, Runnable onContactDeleted) {
@@ -564,9 +564,9 @@ public final class SceneManager {
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			ContactDetailService contactDetailService = new ContactDetailService(contactDao);
-			c.init(contactId, contactDetailService, appState, onOpenCase, onContactDeleted);
-			return c;
-		});
+				c.init(contactId, contactDetailService, appState, onOpenCase, onContactDeleted, phiReadAuditService);
+				return c;
+			});
 	}
 
 	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase) {
@@ -596,9 +596,9 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser);
-			return c;
-		});
+				c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser, phiReadAuditService);
+				return c;
+			});
 	}
 
 	public Parent createCaseView(int caseId, String sectionKey, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {

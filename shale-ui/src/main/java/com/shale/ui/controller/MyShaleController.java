@@ -27,6 +27,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.controller.support.CaseListUiSupport;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
@@ -82,6 +83,7 @@ public final class MyShaleController {
 	private CaseTaskService caseTaskService;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
+	private PhiReadAuditService phiReadAuditService;
 	private Consumer<Integer> onOpenCase;
 	private Consumer<Integer> onOpenUser;
 	private CaseCardFactory caseCardFactory;
@@ -115,11 +117,13 @@ public final class MyShaleController {
 			CaseDao caseDao,
 			CaseTaskService caseTaskService,
 			Consumer<Integer> onOpenCase,
-			Consumer<Integer> onOpenUser) {
+			Consumer<Integer> onOpenUser,
+			PhiReadAuditService phiReadAuditService) {
 		this.caseDao = caseDao;
 		this.caseTaskService = caseTaskService;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
+		this.phiReadAuditService = phiReadAuditService;
 		PerfLog.log("CTRL", "start", "controller=MyShaleController page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		this.onOpenCase = onOpenCase;
 		this.onOpenUser = onOpenUser;
@@ -819,9 +823,10 @@ public final class MyShaleController {
 				summary.map(item -> item.completedAt() != null).orElse(false));
 		System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] shell_stage_created_ms="
 				+ ((System.nanoTime() - clickReceivedAt) / 1_000_000L) + " taskId=" + taskId);
-		try {
-			Optional<TaskDetailDialog.TaskDetailResult> result =
-					TaskDetailDialog.showAndWait(
+			try {
+				auditTaskRead(taskId);
+				Optional<TaskDetailDialog.TaskDetailResult> result =
+						TaskDetailDialog.showAndWait(
 							"MY_TASKS",
 							clickReceivedAt,
 							taskDialogOwner(),
@@ -935,6 +940,14 @@ public final class MyShaleController {
 		} finally {
 			taskDetailDialogInFlight.set(false);
 		}
+	}
+
+	private void auditTaskRead(Long taskId) {
+		if (phiReadAuditService == null || taskId == null || taskId <= 0) {
+			return;
+		}
+		phiReadAuditService.auditRead("Task.Detail.Read", "Task.Detail", "Task", taskId);
+		phiReadAuditService.auditRead("Task.Activity.Read", "Task.Activity", "Task", taskId);
 	}
 
 	private void saveTaskFromDetail(

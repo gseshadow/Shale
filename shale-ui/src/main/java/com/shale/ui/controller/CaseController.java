@@ -2371,9 +2371,10 @@ public class CaseController {
                 summary.map(item -> item.completedAt() != null).orElse(false));
         System.out.println("[TASK_DETAIL_TIMING][CASE_TASKS] shell_stage_created_ms="
                 + ((System.nanoTime() - clickReceivedAt) / 1_000_000L) + " taskId=" + taskId);
-	    try {
-	        Optional<TaskDetailDialog.TaskDetailResult> result =
-	                TaskDetailDialog.showAndWait(
+		    try {
+		    	auditTaskRead(taskId);
+		        Optional<TaskDetailDialog.TaskDetailResult> result =
+		                TaskDetailDialog.showAndWait(
 	                        "CASE_TASKS",
 	                        clickReceivedAt,
 	                        taskDialogOwner(),
@@ -2488,6 +2489,14 @@ public class CaseController {
 	    } finally {
 	        taskDetailDialogInFlight.set(false);
 	    }
+	}
+
+	private void auditTaskRead(Long taskId) {
+		if (phiReadAuditService == null || taskId == null || taskId <= 0) {
+			return;
+		}
+		phiReadAuditService.auditRead("Task.Detail.Read", "Task.Detail", "Task", taskId);
+		phiReadAuditService.auditRead("Task.Activity.Read", "Task.Activity", "Task", taskId);
 	}
 
 	private void saveTaskFromDetail(

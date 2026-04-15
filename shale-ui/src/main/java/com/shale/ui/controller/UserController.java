@@ -15,6 +15,7 @@ import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.state.AppState;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -114,6 +115,7 @@ public final class UserController {
 	private Consumer<Integer> onOpenCase;
 	private Consumer<Integer> onOpenUser;
 	private CaseTaskService caseTaskService;
+	private PhiReadAuditService phiReadAuditService;
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
@@ -145,7 +147,8 @@ public final class UserController {
 			UiRuntimeBridge runtimeBridge,
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenUser,
-			CaseTaskService caseTaskService) {
+			CaseTaskService caseTaskService,
+			PhiReadAuditService phiReadAuditService) {
 		this.userId = userId;
 		this.userDetailService = userDetailService;
 		this.appState = appState;
@@ -154,6 +157,7 @@ public final class UserController {
 		this.onOpenUser = onOpenUser == null ? id -> {
 		} : onOpenUser;
 		this.caseTaskService = caseTaskService;
+		this.phiReadAuditService = phiReadAuditService;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 		this.taskCardFactory = new TaskCardFactory(
 				this::openTask,
@@ -1091,6 +1095,14 @@ public final class UserController {
 		return Optional.empty();
 	}
 
+	private void auditTaskRead(Long taskId) {
+		if (phiReadAuditService == null || taskId == null || taskId <= 0) {
+			return;
+		}
+		phiReadAuditService.auditRead("Task.Detail.Read", "Task.Detail", "Task", taskId);
+		phiReadAuditService.auditRead("Task.Activity.Read", "Task.Activity", "Task", taskId);
+	}
+
 	private void showTaskDetailPopup(Long taskId) {
 		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
 			return;
@@ -1141,7 +1153,7 @@ public final class UserController {
 							refreshAssignedTasksAsync();
 							return;
 						}
-						TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+							TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 								detail.id(),
 								detail.caseId(),
 								detail.caseName(),
@@ -1160,10 +1172,11 @@ public final class UserController {
 													member.displayName(),
 													member.color()))
 											.toList(),
-									activityEntries,
-									noteEntries,
-									detail.completedAt() != null);
-						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+										activityEntries,
+										noteEntries,
+										detail.completedAt() != null);
+							auditTaskRead(detail.id());
+							Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
 								"USER_CONTROLLER",
 								0L,
 								taskDialogOwner(),
