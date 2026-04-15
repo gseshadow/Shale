@@ -59,15 +59,28 @@ public final class AuditLogViewerController {
 
     private AppState appState;
     private AuditLogDao auditLogDao;
+    private boolean fxmlReady;
+    private boolean initialLoadPending;
 
     @FXML
     private void initialize() {
+        fxmlReady = true;
         configureColumns();
+        runInitialLoadIfReady();
     }
 
     public void init(AppState appState, AuditLogDao auditLogDao) {
         this.appState = Objects.requireNonNull(appState, "appState");
         this.auditLogDao = Objects.requireNonNull(auditLogDao, "auditLogDao");
+        initialLoadPending = true;
+        runInitialLoadIfReady();
+    }
+
+    private void runInitialLoadIfReady() {
+        if (!fxmlReady || !initialLoadPending) {
+            return;
+        }
+        initialLoadPending = false;
         if (!this.appState.isAdmin()) {
             auditTable.setItems(FXCollections.emptyObservableList());
             setStatus("Only admin users can view audit logs.");
