@@ -50,6 +50,8 @@ public final class AuditLogViewerController {
     @FXML
     private TableColumn<AuditLogDao.AuditLogEntryRow, String> fieldNameColumn;
     @FXML
+    private TableColumn<AuditLogDao.AuditLogEntryRow, String> actionColumn;
+    @FXML
     private TableColumn<AuditLogDao.AuditLogEntryRow, String> fieldCodeColumn;
     @FXML
     private TableColumn<AuditLogDao.AuditLogEntryRow, String> stringValueColumn;
@@ -145,6 +147,7 @@ public final class AuditLogViewerController {
         objectTypeIdColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(formatObjectTypeDisplay(cell.getValue().objectTypeId())));
         objectIdColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().objectId()));
         fieldNameColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().fieldName()));
+        actionColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(deriveAction(cell.getValue())));
         fieldCodeColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().fieldCode()));
         stringValueColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().stringValue()));
         dateValueColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().dateValue()));
@@ -333,5 +336,53 @@ public final class AuditLogViewerController {
             return null;
         }
         return value.trim();
+    }
+
+    private static String deriveAction(AuditLogDao.AuditLogEntryRow row) {
+        if (row == null) {
+            return "";
+        }
+        String payload = row.stringValue();
+        if (payload == null || payload.isBlank()) {
+            return "";
+        }
+        String normalizedPayload = payload.trim();
+        if (containsIgnoreCase(normalizedPayload, "action=READ")) {
+            return "READ";
+        }
+        String oldValue = extractTokenValue(normalizedPayload, "old=");
+        String newValue = extractTokenValue(normalizedPayload, "new=");
+        if (oldValue == null || newValue == null) {
+            return "";
+        }
+        boolean oldIsNull = "null".equalsIgnoreCase(oldValue.trim());
+        boolean newIsNull = "null".equalsIgnoreCase(newValue.trim());
+        if (oldIsNull && !newIsNull) {
+            return "CREATE";
+        }
+        if (!oldIsNull && newIsNull) {
+            return "DELETE";
+        }
+        if (!oldIsNull && !newIsNull && !oldValue.equals(newValue)) {
+            return "UPDATE";
+        }
+        return "";
+    }
+
+    private static String extractTokenValue(String payload, String token) {
+        int start = payload.indexOf(token);
+        if (start < 0) {
+            return null;
+        }
+        start += token.length();
+        int end = payload.indexOf(';', start);
+        if (end < 0) {
+            end = payload.length();
+        }
+        return payload.substring(start, end).trim();
+    }
+
+    private static boolean containsIgnoreCase(String value, String needle) {
+        return value.toLowerCase(java.util.Locale.ROOT).contains(needle.toLowerCase(java.util.Locale.ROOT));
     }
 }

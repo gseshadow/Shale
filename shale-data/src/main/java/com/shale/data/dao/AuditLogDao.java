@@ -70,7 +70,7 @@ public final class AuditLogDao {
                   AND ShaleClientId = ?
                 """);
         List<Object> params = new ArrayList<>();
-        params.add(shaleClientId);
+        sql.append(" AND ShaleClientId = ?");
         if (userId != null && userId > 0) {
             sql.append(" AND UserId = ?");
             params.add(userId);
@@ -98,6 +98,7 @@ public final class AuditLogDao {
         sql.append(" ORDER BY EntryDate DESC");
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql.toString())) {
+            params.add(0, requireCurrentShaleClientId(con));
             for (int i = 0; i < params.size(); i++) {
                 ps.setObject(i + 1, params.get(i));
             }
