@@ -11,7 +11,6 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -69,40 +68,49 @@ public final class AuditLogDao {
                 WHERE 1=1
                   AND ShaleClientId = ?
                 """);
-        List<Object> params = new ArrayList<>();
         sql.append(" AND ShaleClientId = ?");
         if (userId != null && userId > 0) {
             sql.append(" AND UserId = ?");
-            params.add(userId);
         }
         if (objectId != null && objectId > 0) {
             sql.append(" AND ObjectId = ?");
-            params.add(objectId);
         }
         if (fieldName != null && !fieldName.isBlank()) {
             sql.append(" AND FieldName = ?");
-            params.add(fieldName.trim());
         }
         if (objectTypeId != null && objectTypeId > 0) {
             sql.append(" AND ObjectTypeId = ?");
-            params.add(objectTypeId);
         }
         if (startDate != null) {
             sql.append(" AND EntryDate >= ?");
-            params.add(Timestamp.valueOf(startDate.atStartOfDay()));
         }
         if (endDateInclusive != null) {
             sql.append(" AND EntryDate < ?");
-            params.add(Timestamp.valueOf(endDateInclusive.plusDays(1).atStartOfDay()));
         }
         sql.append(" ORDER BY EntryDate DESC");
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql.toString())) {
-            params.add(0, requireCurrentShaleClientId(con));
-            for (int i = 0; i < params.size(); i++) {
-                ps.setObject(i + 1, params.get(i));
+            int parameterIndex = 1;
+            ps.setInt(parameterIndex++, requireCurrentShaleClientId(con));
+            if (userId != null && userId > 0) {
+                ps.setInt(parameterIndex++, userId);
             }
-            List<AuditLogEntryRow> rows = new ArrayList<>();
+            if (objectId != null && objectId > 0) {
+                ps.setLong(parameterIndex++, objectId);
+            }
+            if (fieldName != null && !fieldName.isBlank()) {
+                ps.setString(parameterIndex++, fieldName.trim());
+            }
+            if (objectTypeId != null && objectTypeId > 0) {
+                ps.setInt(parameterIndex++, objectTypeId);
+            }
+            if (startDate != null) {
+                ps.setTimestamp(parameterIndex++, Timestamp.valueOf(startDate.atStartOfDay()));
+            }
+            if (endDateInclusive != null) {
+                ps.setTimestamp(parameterIndex++, Timestamp.valueOf(endDateInclusive.plusDays(1).atStartOfDay()));
+            }
+            List<AuditLogEntryRow> rows = new java.util.ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     Timestamp entryDateTs = rs.getTimestamp("EntryDate");
