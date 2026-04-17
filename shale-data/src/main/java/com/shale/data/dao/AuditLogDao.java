@@ -49,81 +49,61 @@ public final class AuditLogDao {
             Integer objectTypeId,
             LocalDate startDate,
             LocalDate endDateInclusive) {
-        if (shaleClientId == null || shaleClientId <= 0) {
-            return List.of();
-        }
-        StringBuilder sql = new StringBuilder("""
-                SELECT
-                  EntryDate,
-                  UserId,
-                  ObjectTypeId,
-                  ObjectId,
-                  FieldName,
-                  FieldCode,
-                  StringValue,
-                  DateValue,
-                  BooleanValue,
-                  IntValue
-                FROM dbo.AuditLog
-                WHERE 1=1
-                  AND ShaleClientId = ?
-                """);
-        sql.append(" AND ShaleClientId = ?");
-        if (userId != null && userId > 0) {
-            sql.append(" AND UserId = ?");
-        }
-        if (objectId != null && objectId > 0) {
-            sql.append(" AND ObjectId = ?");
-        }
-        if (fieldName != null && !fieldName.isBlank()) {
-            sql.append(" AND FieldName = ?");
-        }
-        if (objectTypeId != null && objectTypeId > 0) {
-            sql.append(" AND ObjectTypeId = ?");
-        }
-        if (startDate != null) {
-            sql.append(" AND EntryDate >= ?");
-        }
-        if (endDateInclusive != null) {
-            sql.append(" AND EntryDate < ?");
-        }
-        sql.append(" ORDER BY EntryDate DESC");
-        String finalSql = sql.toString();
         try (Connection con = db.requireConnection()) {
             int currentTenantId = requireCurrentShaleClientId(con);
+            StringBuilder sql = new StringBuilder("""
+                    SELECT
+                      EntryDate,
+                      UserId,
+                      ObjectTypeId,
+                      ObjectId,
+                      FieldName,
+                      FieldCode,
+                      StringValue,
+                      DateValue,
+                      BooleanValue,
+                      IntValue
+                    FROM dbo.AuditLog
+                    WHERE 1=1
+                    """);
+            List<Object> bindValues = new java.util.ArrayList<>();
+            sql.append(" AND ShaleClientId = ?");
+            bindValues.add(currentTenantId);
+            if (userId != null && userId > 0) {
+                sql.append(" AND UserId = ?");
+                bindValues.add(userId);
+            }
+            if (objectId != null && objectId > 0) {
+                sql.append(" AND ObjectId = ?");
+                bindValues.add(objectId);
+            }
+            if (fieldName != null && !fieldName.isBlank()) {
+                sql.append(" AND FieldName = ?");
+                bindValues.add(fieldName.trim());
+            }
+            if (objectTypeId != null && objectTypeId > 0) {
+                sql.append(" AND ObjectTypeId = ?");
+                bindValues.add(objectTypeId);
+            }
+            if (startDate != null) {
+                sql.append(" AND EntryDate >= ?");
+                bindValues.add(Timestamp.valueOf(startDate.atStartOfDay()));
+            }
+            if (endDateInclusive != null) {
+                sql.append(" AND EntryDate < ?");
+                bindValues.add(Timestamp.valueOf(endDateInclusive.plusDays(1).atStartOfDay()));
+            }
+            sql.append(" ORDER BY EntryDate DESC");
+            String finalSql = sql.toString();
             try (PreparedStatement ps = con.prepareStatement(finalSql)) {
                 int placeholderCount = countPlaceholders(finalSql);
-                int parameterIndex = 1;
-                ps.setInt(parameterIndex, currentTenantId);
-                logAuditListParamBinding(parameterIndex++, currentTenantId);
-                if (userId != null && userId > 0) {
-                    ps.setInt(parameterIndex, userId);
-                    logAuditListParamBinding(parameterIndex++, userId);
+                int paramIndex = 1;
+                for (Object value : bindValues) {
+                    ps.setObject(paramIndex, value);
+                    logAuditListParamBinding(paramIndex, value);
+                    paramIndex++;
                 }
-                if (objectId != null && objectId > 0) {
-                    ps.setLong(parameterIndex, objectId);
-                    logAuditListParamBinding(parameterIndex++, objectId);
-                }
-                if (fieldName != null && !fieldName.isBlank()) {
-                    String trimmedFieldName = fieldName.trim();
-                    ps.setString(parameterIndex, trimmedFieldName);
-                    logAuditListParamBinding(parameterIndex++, trimmedFieldName);
-                }
-                if (objectTypeId != null && objectTypeId > 0) {
-                    ps.setInt(parameterIndex, objectTypeId);
-                    logAuditListParamBinding(parameterIndex++, objectTypeId);
-                }
-                if (startDate != null) {
-                    Timestamp startTs = Timestamp.valueOf(startDate.atStartOfDay());
-                    ps.setTimestamp(parameterIndex, startTs);
-                    logAuditListParamBinding(parameterIndex++, startTs);
-                }
-                if (endDateInclusive != null) {
-                    Timestamp endExclusiveTs = Timestamp.valueOf(endDateInclusive.plusDays(1).atStartOfDay());
-                    ps.setTimestamp(parameterIndex, endExclusiveTs);
-                    logAuditListParamBinding(parameterIndex++, endExclusiveTs);
-                }
-                int boundParamCount = parameterIndex - 1;
+                int boundParamCount = bindValues.size();
                 System.err.println("[AUDIT_LOG_DAO] listAuditLogEntries sql=" + finalSql);
                 System.err.println("[AUDIT_LOG_DAO] listAuditLogEntries placeholders=" + placeholderCount + " bound=" + boundParamCount);
                 if (boundParamCount != placeholderCount) {
