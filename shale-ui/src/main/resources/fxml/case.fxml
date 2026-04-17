@@ -790,6 +790,9 @@
 				</styleClass>
 			</Button>
 
+			<TextField fx:id="caseUpdatesSearchField"
+				promptText="Search updates..." />
+
 			<ScrollPane fx:id="caseUpdatesScrollPane"
 				fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS"
 				styleClass="transparent-scroll">

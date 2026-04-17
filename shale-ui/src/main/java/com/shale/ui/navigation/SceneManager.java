@@ -514,7 +514,7 @@ public final class SceneManager {
 		Parent viewerRoot = load("/fxml/audit-log-viewer.fxml", controller ->
 		{
 			AuditLogViewerController c = (AuditLogViewerController) controller;
-			c.init(appState, auditLogDao);
+			c.init(appState, auditLogDao, new UserDao(dbSessionProvider));
 			return c;
 		});
 		Stage dialogStage = AppDialogs.createModalStage(stage, "Audit Log");

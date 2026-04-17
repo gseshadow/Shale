@@ -260,6 +260,11 @@ public final class TaskDetailDialog {
         noteComposer.setWrapText(true);
         Button addNoteButton = new Button("Add Note");
         addNoteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        Label uncommittedNoteWarningLabel = new Label("You have an unadded note. Click Add Note or clear the text to continue.");
+        uncommittedNoteWarningLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #b42318;");
+        uncommittedNoteWarningLabel.setWrapText(true);
+        uncommittedNoteWarningLabel.setVisible(false);
+        uncommittedNoteWarningLabel.setManaged(false);
         Label notesErrorLabel = new Label();
         notesErrorLabel.setStyle("-fx-text-fill: #b42318;");
         notesErrorLabel.setVisible(false);
@@ -299,7 +304,14 @@ public final class TaskDetailDialog {
                     },
                     ex -> showError(notesErrorLabel, "Failed to add note. " + rootCauseMessage(ex)));
         });
-        notesPanel.getChildren().setAll(notesLabel, noteComposer, addNoteButton, notesErrorLabel, notesLoadingLabel, notesScrollPane);
+        notesPanel.getChildren().setAll(
+                notesLabel,
+                noteComposer,
+                addNoteButton,
+                uncommittedNoteWarningLabel,
+                notesErrorLabel,
+                notesLoadingLabel,
+                notesScrollPane);
         notesPanel.setPrefWidth(320);
         notesPanel.setMinWidth(280);
         notesPanel.setMaxWidth(360);
@@ -355,13 +367,51 @@ public final class TaskDetailDialog {
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
         cancelButton.setCancelButton(true);
-        cancelButton.setOnAction(e -> stage.close());
+        cancelButton.setOnAction(e -> {
+            if (hasUncommittedNoteText(noteComposer)) {
+                boolean discardUncommitted = AppDialogs.showConfirmation(
+                        stage,
+                        "Discard Unadded Note?",
+                        "You have note text that has not been added.",
+                        "Click Add Note first to keep this text, or continue to discard it.",
+                        "Discard Note Text",
+                        AppDialogs.DialogActionKind.DANGER);
+                if (!discardUncommitted) {
+                    return;
+                }
+            }
+            stage.close();
+        });
 
         Button saveButton = new Button("Save");
         saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
         saveButton.setDefaultButton(true);
-        saveButton.setDisable(safeStatuses.isEmpty() || safePriorities.isEmpty());
+        final boolean[] saveBlockedByCoreState = new boolean[] { safeStatuses.isEmpty() || safePriorities.isEmpty() };
+        updateSaveCancelAvailability(
+                saveButton,
+                cancelButton,
+                noteComposer,
+                uncommittedNoteWarningLabel,
+                saveBlockedByCoreState[0]);
+        noteComposer.textProperty().addListener((obs, oldText, newText) -> updateSaveCancelAvailability(
+                saveButton,
+                cancelButton,
+                noteComposer,
+                uncommittedNoteWarningLabel,
+                saveBlockedByCoreState[0]));
         saveButton.setOnAction(e -> {
+            if (hasUncommittedNoteText(noteComposer)) {
+                boolean discardUncommitted = AppDialogs.showConfirmation(
+                        stage,
+                        "Save Without Adding Note?",
+                        "You have note text that has not been added.",
+                        "Click Add Note first to keep this text, or continue to save without it.",
+                        "Save Without Note",
+                        AppDialogs.DialogActionKind.DANGER);
+                if (!discardUncommitted) {
+                    return;
+                }
+            }
             String title = safe(titleField.getText()).trim();
             if (title.isBlank()) {
                 showError(errorLabel, "Title is required.");
@@ -452,7 +502,13 @@ public final class TaskDetailDialog {
                             List<TaskPriorityOptionDto> hydratedPriorities = core.priorities() == null ? List.of() : core.priorities();
                             priorityCombo.getItems().setAll(hydratedPriorities);
                             selectPriority(priorityCombo, hydratedPriorities, detail.priorityId());
-                            saveButton.setDisable(hydratedStatuses.isEmpty() || hydratedPriorities.isEmpty());
+                            saveBlockedByCoreState[0] = hydratedStatuses.isEmpty() || hydratedPriorities.isEmpty();
+                            updateSaveCancelAvailability(
+                                    saveButton,
+                                    cancelButton,
+                                    noteComposer,
+                                    uncommittedNoteWarningLabel,
+                                    saveBlockedByCoreState[0]);
                             setVisibleManaged(coreLoadingLabel, false);
                         },
                         ex -> {
@@ -740,6 +796,26 @@ public final class TaskDetailDialog {
         errorLabel.setText(message);
         errorLabel.setManaged(true);
         errorLabel.setVisible(true);
+    }
+
+    private static boolean hasUncommittedNoteText(TextArea noteComposer) {
+        return !safe(noteComposer == null ? null : noteComposer.getText()).trim().isBlank();
+    }
+
+    private static void updateSaveCancelAvailability(
+            Button saveButton,
+            Button cancelButton,
+            TextArea noteComposer,
+            Label uncommittedNoteWarningLabel,
+            boolean saveBlockedByCoreState) {
+        boolean hasUncommittedText = hasUncommittedNoteText(noteComposer);
+        if (saveButton != null) {
+            saveButton.setDisable(saveBlockedByCoreState || hasUncommittedText);
+        }
+        if (cancelButton != null) {
+            cancelButton.setDisable(hasUncommittedText);
+        }
+        setVisibleManaged(uncommittedNoteWarningLabel, hasUncommittedText);
     }
 
     private static String safe(String text) {

@@ -42,6 +42,7 @@ public final class AuditLogDao {
     }
 
     public List<AuditLogEntryRow> listAuditLogEntries(
+            Integer shaleClientId,
             Integer userId,
             Long objectId,
             String fieldName,
