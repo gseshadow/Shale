@@ -90,12 +90,12 @@ public final class AuditLogDao {
         sql.append(" ORDER BY EntryDate DESC");
         String finalSql = sql.toString();
         try (Connection con = db.requireConnection()) {
-            int shaleClientId = requireCurrentShaleClientId(con);
+            int currentTenantId = requireCurrentShaleClientId(con);
             try (PreparedStatement ps = con.prepareStatement(finalSql)) {
                 int placeholderCount = countPlaceholders(finalSql);
                 int parameterIndex = 1;
-                ps.setInt(parameterIndex, shaleClientId);
-                logAuditListParamBinding(parameterIndex++, shaleClientId);
+                ps.setInt(parameterIndex, currentTenantId);
+                logAuditListParamBinding(parameterIndex++, currentTenantId);
                 if (userId != null && userId > 0) {
                     ps.setInt(parameterIndex, userId);
                     logAuditListParamBinding(parameterIndex++, userId);
