@@ -65,6 +65,7 @@
             <TableColumn fx:id="objectTypeIdColumn" text="ObjectTypeId" prefWidth="100"/>
             <TableColumn fx:id="objectIdColumn" text="ObjectId" prefWidth="100"/>
             <TableColumn fx:id="fieldNameColumn" text="FieldName" prefWidth="130"/>
+            <TableColumn fx:id="actionColumn" text="Action" prefWidth="90"/>
             <TableColumn fx:id="fieldCodeColumn" text="FieldCode" prefWidth="100"/>
             <TableColumn fx:id="stringValueColumn" text="StringValue" prefWidth="200"/>
             <TableColumn fx:id="dateValueColumn" text="DateValue" prefWidth="110"/>
