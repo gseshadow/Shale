@@ -42,12 +42,16 @@ public final class AuditLogDao {
     }
 
     public List<AuditLogEntryRow> listAuditLogEntries(
+            Integer shaleClientId,
             Integer userId,
             Long objectId,
             String fieldName,
             Integer objectTypeId,
             LocalDate startDate,
             LocalDate endDateInclusive) {
+        if (shaleClientId == null || shaleClientId <= 0) {
+            return List.of();
+        }
         StringBuilder sql = new StringBuilder("""
                 SELECT
                   EntryDate,
@@ -62,6 +66,7 @@ public final class AuditLogDao {
                   IntValue
                 FROM dbo.AuditLog
                 WHERE 1=1
+                  AND ShaleClientId = ?
                 """);
         sql.append(" AND ShaleClientId = ?");
         if (userId != null && userId > 0) {

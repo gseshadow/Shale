@@ -50,7 +50,7 @@
 
     <HBox spacing="8">
         <Button text="Apply" styleClass="button-primary" onAction="#onApplyFilters"/>
-        <Button text="Clear" styleClass="button-secondary" onAction="#onClearFilters"/>
+        <Button text="Clear Filters" styleClass="button-secondary" onAction="#onClearFilters"/>
         <Label fx:id="statusLabel" styleClass="search-summary-text" wrapText="true">
             <HBox.margin>
                 <Insets left="8"/>
@@ -61,8 +61,8 @@
     <TableView fx:id="auditTable" VBox.vgrow="ALWAYS">
         <columns>
             <TableColumn fx:id="entryDateColumn" text="EntryDate" prefWidth="170"/>
-            <TableColumn fx:id="userIdColumn" text="UserId" prefWidth="80"/>
-            <TableColumn fx:id="objectTypeIdColumn" text="ObjectTypeId" prefWidth="100"/>
+            <TableColumn fx:id="userIdColumn" text="User / UserId" prefWidth="150"/>
+            <TableColumn fx:id="objectTypeIdColumn" text="Object Type / Id" prefWidth="150"/>
             <TableColumn fx:id="objectIdColumn" text="ObjectId" prefWidth="100"/>
             <TableColumn fx:id="fieldNameColumn" text="FieldName" prefWidth="130"/>
             <TableColumn fx:id="actionColumn" text="Action" prefWidth="90"/>
@@ -71,6 +71,7 @@
             <TableColumn fx:id="dateValueColumn" text="DateValue" prefWidth="110"/>
             <TableColumn fx:id="booleanValueColumn" text="BooleanValue" prefWidth="110"/>
             <TableColumn fx:id="intValueColumn" text="IntValue" prefWidth="90"/>
+            <TableColumn fx:id="fieldCodeColumn" text="FieldCode" prefWidth="100"/>
         </columns>
     </TableView>
 </VBox>
