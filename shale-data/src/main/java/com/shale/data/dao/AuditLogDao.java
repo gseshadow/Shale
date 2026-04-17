@@ -88,50 +88,86 @@ public final class AuditLogDao {
             sql.append(" AND EntryDate < ?");
         }
         sql.append(" ORDER BY EntryDate DESC");
-        try (Connection con = db.requireConnection();
-             PreparedStatement ps = con.prepareStatement(sql.toString())) {
-            int parameterIndex = 1;
-            ps.setInt(parameterIndex++, requireCurrentShaleClientId(con));
-            if (userId != null && userId > 0) {
-                ps.setInt(parameterIndex++, userId);
-            }
-            if (objectId != null && objectId > 0) {
-                ps.setLong(parameterIndex++, objectId);
-            }
-            if (fieldName != null && !fieldName.isBlank()) {
-                ps.setString(parameterIndex++, fieldName.trim());
-            }
-            if (objectTypeId != null && objectTypeId > 0) {
-                ps.setInt(parameterIndex++, objectTypeId);
-            }
-            if (startDate != null) {
-                ps.setTimestamp(parameterIndex++, Timestamp.valueOf(startDate.atStartOfDay()));
-            }
-            if (endDateInclusive != null) {
-                ps.setTimestamp(parameterIndex++, Timestamp.valueOf(endDateInclusive.plusDays(1).atStartOfDay()));
-            }
-            List<AuditLogEntryRow> rows = new java.util.ArrayList<>();
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Timestamp entryDateTs = rs.getTimestamp("EntryDate");
-                    Date dateValueSql = rs.getDate("DateValue");
-                    rows.add(new AuditLogEntryRow(
-                            entryDateTs == null ? null : entryDateTs.toLocalDateTime(),
-                            asInteger(rs, "UserId"),
-                            asInteger(rs, "ObjectTypeId"),
-                            asLong(rs, "ObjectId"),
-                            rs.getString("FieldName"),
-                            rs.getString("FieldCode"),
-                            rs.getString("StringValue"),
-                            dateValueSql == null ? null : dateValueSql.toLocalDate(),
-                            asBoolean(rs, "BooleanValue"),
-                            asInteger(rs, "IntValue")));
+        String finalSql = sql.toString();
+        try (Connection con = db.requireConnection()) {
+            int shaleClientId = requireCurrentShaleClientId(con);
+            try (PreparedStatement ps = con.prepareStatement(finalSql)) {
+                int placeholderCount = countPlaceholders(finalSql);
+                int parameterIndex = 1;
+                ps.setInt(parameterIndex, shaleClientId);
+                logAuditListParamBinding(parameterIndex++, shaleClientId);
+                if (userId != null && userId > 0) {
+                    ps.setInt(parameterIndex, userId);
+                    logAuditListParamBinding(parameterIndex++, userId);
                 }
+                if (objectId != null && objectId > 0) {
+                    ps.setLong(parameterIndex, objectId);
+                    logAuditListParamBinding(parameterIndex++, objectId);
+                }
+                if (fieldName != null && !fieldName.isBlank()) {
+                    String trimmedFieldName = fieldName.trim();
+                    ps.setString(parameterIndex, trimmedFieldName);
+                    logAuditListParamBinding(parameterIndex++, trimmedFieldName);
+                }
+                if (objectTypeId != null && objectTypeId > 0) {
+                    ps.setInt(parameterIndex, objectTypeId);
+                    logAuditListParamBinding(parameterIndex++, objectTypeId);
+                }
+                if (startDate != null) {
+                    Timestamp startTs = Timestamp.valueOf(startDate.atStartOfDay());
+                    ps.setTimestamp(parameterIndex, startTs);
+                    logAuditListParamBinding(parameterIndex++, startTs);
+                }
+                if (endDateInclusive != null) {
+                    Timestamp endExclusiveTs = Timestamp.valueOf(endDateInclusive.plusDays(1).atStartOfDay());
+                    ps.setTimestamp(parameterIndex, endExclusiveTs);
+                    logAuditListParamBinding(parameterIndex++, endExclusiveTs);
+                }
+                int boundParamCount = parameterIndex - 1;
+                System.err.println("[AUDIT_LOG_DAO] listAuditLogEntries sql=" + finalSql);
+                System.err.println("[AUDIT_LOG_DAO] listAuditLogEntries placeholders=" + placeholderCount + " bound=" + boundParamCount);
+                if (boundParamCount != placeholderCount) {
+                    throw new IllegalStateException(
+                            "AuditLogDao.listAuditLogEntries parameter mismatch: placeholders="
+                                    + placeholderCount + ", bound=" + boundParamCount);
+                }
+                List<AuditLogEntryRow> rows = new java.util.ArrayList<>();
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        Timestamp entryDateTs = rs.getTimestamp("EntryDate");
+                        Date dateValueSql = rs.getDate("DateValue");
+                        rows.add(new AuditLogEntryRow(
+                                entryDateTs == null ? null : entryDateTs.toLocalDateTime(),
+                                asInteger(rs, "UserId"),
+                                asInteger(rs, "ObjectTypeId"),
+                                asLong(rs, "ObjectId"),
+                                rs.getString("FieldName"),
+                                rs.getString("FieldCode"),
+                                rs.getString("StringValue"),
+                                dateValueSql == null ? null : dateValueSql.toLocalDate(),
+                                asBoolean(rs, "BooleanValue"),
+                                asInteger(rs, "IntValue")));
+                    }
+                }
+                return rows;
             }
-            return rows;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to list audit log entries", e);
         }
+    }
+
+    private static int countPlaceholders(String sql) {
+        int count = 0;
+        for (int i = 0; i < sql.length(); i++) {
+            if (sql.charAt(i) == '?') {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static void logAuditListParamBinding(int parameterIndex, Object value) {
+        System.err.println("[AUDIT_LOG_DAO] listAuditLogEntries bind[" + parameterIndex + "]=" + value);
     }
 
     public void appendPhiWriteAudit(
