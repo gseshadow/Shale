@@ -307,6 +307,8 @@ public class CaseController {
 	@FXML
 	private Button submitCaseUpdateButton;
 	@FXML
+	private TextField caseUpdatesSearchField;
+	@FXML
 	private VBox caseUpdatesPane;
 	@FXML
 	private ScrollPane caseUpdatesScrollPane;
@@ -752,6 +754,9 @@ public class CaseController {
 			btnEditTeam.setOnAction(e -> onEditTeam());
 		if (submitCaseUpdateButton != null)
 			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
+		if (caseUpdatesSearchField != null) {
+			caseUpdatesSearchField.textProperty().addListener((obs, oldText, newText) -> applyCaseUpdateFilter());
+		}
 		if (deleteCaseButton != null) {
 			deleteCaseButton.setOnAction(e -> onDeleteCase());
 			setVisibleManaged(deleteCaseButton, false);
@@ -3660,12 +3665,6 @@ public class CaseController {
 	}
 
 	private void renderCaseUpdatesInternal(List<CaseUpdateDto> updates) {
-		if (caseUpdatesFeedBox == null)
-			return;
-		long renderStartNanos = PerfLog.start();
-		PerfLog.log("RENDER", "start", "panel=case_updates page=case_view caseId=" + caseId);
-
-		caseUpdatesFeedBox.getChildren().clear();
 		List<CaseUpdateDto> safeUpdates = updates == null ? List.of() : List.copyOf(updates);
 		caseUpdates = safeUpdates;
 		if (editingCaseUpdateId != null
@@ -3674,9 +3673,29 @@ public class CaseController {
 			editingCaseUpdateDraftText = "";
 			savingCaseUpdateEdit = false;
 		}
+		applyCaseUpdateFilterInternal();
+	}
 
-		if (safeUpdates.isEmpty()) {
-			Label empty = new Label("No updates yet.");
+	private void applyCaseUpdateFilter() {
+		updatesPanelController.applyCaseUpdateFilter();
+	}
+
+	private void applyCaseUpdateFilterInternal() {
+		if (caseUpdatesFeedBox == null)
+			return;
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=case_updates page=case_view caseId=" + caseId);
+
+		caseUpdatesFeedBox.getChildren().clear();
+		String searchQuery = safeText(caseUpdatesSearchField == null ? null : caseUpdatesSearchField.getText())
+				.trim()
+				.toLowerCase(java.util.Locale.ROOT);
+		List<CaseUpdateDto> visibleUpdates = caseUpdates == null ? List.of() : caseUpdates.stream()
+				.filter(dto -> caseUpdateMatchesSearch(dto, searchQuery))
+				.toList();
+
+		if (visibleUpdates.isEmpty()) {
+			Label empty = new Label(searchQuery.isBlank() ? "No updates yet." : "No updates found.");
 			empty.setWrapText(true);
 			empty.setStyle("-fx-opacity: 0.7;");
 			caseUpdatesFeedBox.getChildren().add(empty);
@@ -3686,7 +3705,7 @@ public class CaseController {
 			return;
 		}
 
-		for (CaseUpdateDto dto : safeUpdates) {
+		for (CaseUpdateDto dto : visibleUpdates) {
 			if (dto == null)
 				continue;
 			caseUpdatesFeedBox.getChildren().add(createCaseUpdateCard(dto));
@@ -3695,6 +3714,25 @@ public class CaseController {
 		if (caseUpdatesScrollPane != null)
 			caseUpdatesScrollPane.setVvalue(0.0);
 		PerfLog.logDone("RENDER", "panel=case_updates page=case_view caseId=" + caseId + " childCount=" + caseUpdatesFeedBox.getChildren().size(), renderStartNanos);
+	}
+
+	private boolean caseUpdateMatchesSearch(CaseUpdateDto dto, String searchQuery) {
+		if (dto == null) {
+			return false;
+		}
+		if (searchQuery == null || searchQuery.isBlank()) {
+			return true;
+		}
+		String noteText = safeText(dto.getNoteText()).toLowerCase(java.util.Locale.ROOT);
+		if (noteText.contains(searchQuery)) {
+			return true;
+		}
+		String authorText = safeAuthorName(dto).toLowerCase(java.util.Locale.ROOT);
+		if (authorText.contains(searchQuery)) {
+			return true;
+		}
+		String metadataText = safeText(buildCaseUpdateMetadata(dto)).toLowerCase(java.util.Locale.ROOT);
+		return metadataText.contains(searchQuery);
 	}
 
 	private void onSubmitCaseUpdate() {
@@ -6037,6 +6075,10 @@ public class CaseController {
 
 		void onSubmitCaseUpdate() {
 			onSubmitCaseUpdateInternal();
+		}
+
+		void applyCaseUpdateFilter() {
+			applyCaseUpdateFilterInternal();
 		}
 
 		Node createCaseUpdateCard(CaseUpdateDto dto) {
