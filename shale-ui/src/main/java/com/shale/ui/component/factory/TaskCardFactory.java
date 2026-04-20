@@ -61,6 +61,7 @@ public final class TaskCardFactory {
         TaskCard card = new TaskCard();
         boolean passiveSurface = variant != Variant.FULL;
         boolean suppressTitleForPassiveSurface = passiveSurface
+                && variant != Variant.COMPACT
                 && variant != Variant.MINI
                 && PhiFieldRegistry.isPhi("Tasks", "Title");
         String displayTitle = suppressTitleForPassiveSurface

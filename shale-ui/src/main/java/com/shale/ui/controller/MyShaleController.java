@@ -3,9 +3,11 @@ package com.shale.ui.controller;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -30,6 +32,7 @@ import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
@@ -42,7 +45,11 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.geometry.Pos;
 import javafx.stage.Window;
 
 public final class MyShaleController {
@@ -53,6 +60,8 @@ public final class MyShaleController {
 	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
 	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
+	private static final String SECTION_OVERVIEW = "Overview";
+	private static final String SECTION_TASKS = "Tasks";
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -78,6 +87,18 @@ public final class MyShaleController {
 	private VBox myTasksList;
 	@FXML
 	private Label myTasksEmptyLabel;
+	@FXML
+	private VBox sectionButtonsBox;
+	@FXML
+	private VBox overviewSectionPane;
+	@FXML
+	private VBox tasksSectionPane;
+	@FXML
+	private VBox myTasksPanel;
+	@FXML
+	private VBox tasksSectionContentHost;
+	@FXML
+	private HBox overviewMainRow;
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
@@ -104,6 +125,8 @@ public final class MyShaleController {
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
+	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
+	private String activeSection = SECTION_OVERVIEW;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "my-cases-loader");
@@ -138,6 +161,8 @@ public final class MyShaleController {
 
 	@FXML
 	private void initialize() {
+		setupSections();
+
 		if (myCasesSortChoice != null) {
 			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
 			myCasesSortChoice.getSelectionModel().select(SORT_NAME);
@@ -174,6 +199,7 @@ public final class MyShaleController {
 		reloadStatusFilterOptionsAndThen(this::rerender);
 
 		Platform.runLater(() -> {
+			onSectionSelected(SECTION_OVERVIEW);
 			wireInfiniteScroll();
 			loadFirstPage();
 			refreshMyTasks();
@@ -191,6 +217,52 @@ public final class MyShaleController {
 		}
 
 		subscribeLiveCaseUpdates();
+	}
+
+	private void setupSections() {
+		if (sectionButtonsBox == null) {
+			return;
+		}
+		sectionButtons.clear();
+		sectionButtonsBox.getChildren().clear();
+		for (String section : List.of(SECTION_OVERVIEW, SECTION_TASKS)) {
+			Button button = new Button(section);
+			button.setMaxWidth(Double.MAX_VALUE);
+			button.setAlignment(Pos.CENTER_LEFT);
+			NavButtonStyler.applyBaseStyle(button);
+			button.setOnAction(e -> onSectionSelected(section));
+			VBox.setVgrow(button, Priority.NEVER);
+			sectionButtons.put(section, button);
+			sectionButtonsBox.getChildren().add(button);
+		}
+	}
+
+	private void onSectionSelected(String section) {
+		if (section == null) {
+			return;
+		}
+		activeSection = section;
+		Button activeButton = sectionButtons.get(section);
+		NavButtonStyler.setActive(activeButton, sectionButtons.values());
+		boolean showOverview = SECTION_OVERVIEW.equals(section);
+		setVisibleManaged(overviewSectionPane, showOverview);
+		setVisibleManaged(tasksSectionPane, !showOverview);
+		attachTasksPanel(showOverview ? overviewMainRow : tasksSectionContentHost);
+	}
+
+	private void attachTasksPanel(Pane host) {
+		if (host == null || myTasksPanel == null) {
+			return;
+		}
+		var parent = myTasksPanel.getParent();
+		if (parent instanceof HBox hBoxParent) {
+			hBoxParent.getChildren().remove(myTasksPanel);
+		} else if (parent instanceof VBox vBoxParent) {
+			vBoxParent.getChildren().remove(myTasksPanel);
+		}
+		if (!host.getChildren().contains(myTasksPanel)) {
+			host.getChildren().add(myTasksPanel);
+		}
 	}
 
 	private void subscribeLiveCaseUpdates() {
@@ -606,7 +678,7 @@ public final class MyShaleController {
 					task.caseResponsibleAttorney(),
 					task.caseResponsibleAttorneyColor(),
 					task.caseNonEngagementLetterSent(),
-					task.title(),
+					resolveMyTaskCardTitle(task),
 					task.description(),
 					task.createdByDisplayName(),
 					task.priorityColorHex(),
@@ -618,6 +690,14 @@ public final class MyShaleController {
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
+	}
+
+	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {
+		if (task == null) {
+			return null;
+		}
+		String title = safe(task.title()).trim();
+		return title.isBlank() ? "Task #" + task.id() : title;
 	}
 
 	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, Long selectedCaseId, String normalizedQuery) {
