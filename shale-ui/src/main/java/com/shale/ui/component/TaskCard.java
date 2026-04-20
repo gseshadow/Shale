@@ -288,7 +288,7 @@ public final class TaskCard extends VBox {
 	public void applyFull() {
 		applyCompact();
 		currentVariant = Variant.FULL;
-		getChildren().add(descriptionLabel);
+		getChildren().setAll(compactTitleRow, compactMetadataRow, descriptionLabel, completedLabel, actionsRow);
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
 	}
@@ -335,6 +335,8 @@ public final class TaskCard extends VBox {
 	}
 
 	private void configureRelatedSections() {
+		caseSection.getChildren().setAll(caseSectionLabel, relatedCaseHost);
+		teamSection.getChildren().setAll(teamSectionLabel, assigneeHost);
 		caseSectionLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
 		teamSectionLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
 		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
