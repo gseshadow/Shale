@@ -514,6 +514,9 @@ public class CaseController {
 
 	private CaseDetailDto current;
 	private CaseOverviewDto currentOverview;
+	private byte[] latestCaseRowVer;
+	private byte[] overviewEditRowVer;
+	private byte[] detailsEditRowVer;
 	private Runnable onCaseDeleted;
 	private PhiReadAuditService phiReadAuditService;
 
@@ -2687,7 +2690,7 @@ public class CaseController {
 				CaseOverviewDto effectiveOverview = applyCallerFromCaseParties(overview, caseParties);
 				applyOverviewEditSafe(effectiveOverview);
 
-				current = detail;
+				applyCurrentDetailSnapshot(detail);
 				detailsLocalViewOverride = null;
 				renderDetailsFromCurrent();
 				if (!editMode)
@@ -2721,7 +2724,7 @@ public class CaseController {
 						applyOverviewEditSafe(currentOverview);
 					}
 					if (detail != null) {
-						current = detail;
+						applyCurrentDetailSnapshot(detail);
 						detailsLocalViewOverride = null;
 						renderDetailsFromCurrent();
 						if (!editMode) {
@@ -3315,7 +3318,7 @@ public class CaseController {
 						showRemoteUpdateBanner();
 						return;
 					}
-					current = fresh;
+					applyCurrentDetailSnapshot(fresh);
 				});
 			} catch (Exception ignored) {
 			}
@@ -3340,10 +3343,47 @@ public class CaseController {
 				}
 				if (overview != null)
 					currentOverview = overview;
-				current = detail;
+				applyCurrentDetailSnapshot(detail);
 				detailsBaseline = CaseDetailsDraft.from(detail, currentOverview);
+				detailsEditRowVer = cloneRowVer(detail.getRowVer());
 			});
 		}, "case-details-remote-baseline-" + activeCaseId).start();
+	}
+
+	private void applyCurrentDetailSnapshot(CaseDetailDto detail) {
+		if (detail == null)
+			return;
+		current = detail;
+		latestCaseRowVer = cloneRowVer(detail.getRowVer());
+	}
+
+	private static byte[] cloneRowVer(byte[] token) {
+		return token == null ? null : java.util.Arrays.copyOf(token, token.length);
+	}
+
+	private static String rowVerHex(byte[] token) {
+		if (token == null || token.length == 0)
+			return "(null)";
+		StringBuilder sb = new StringBuilder(token.length * 2);
+		for (byte b : token)
+			sb.append(String.format("%02x", b));
+		return "0x" + sb;
+	}
+
+	private void logCaseConcurrencyConflict(String sourcePath, long caseId, byte[] loadedToken, byte[] submittedToken) {
+		byte[] dbToken = null;
+		try {
+			CaseDetailDto dbDetail = caseDao == null ? null : caseDao.getDetail(caseId);
+			dbToken = (dbDetail == null ? null : dbDetail.getRowVer());
+		} catch (Exception ex) {
+			System.err.println("Concurrency debug lookup failed for caseId=" + caseId + ", source=" + sourcePath + ": " + ex.getMessage());
+		}
+		System.err.println("Case concurrency conflict"
+				+ " source=" + sourcePath
+				+ " caseId=" + caseId
+				+ " loadedToken=" + rowVerHex(loadedToken)
+				+ " submittedToken=" + rowVerHex(submittedToken)
+				+ " dbToken=" + rowVerHex(dbToken));
 	}
 
 	private void applyLiveCaseName(String newName) {
@@ -4659,6 +4699,7 @@ public class CaseController {
 			snapshotDraftState();
 			if (!ensureCurrentDetailReady())
 				return;
+			overviewEditRowVer = cloneRowVer(latestCaseRowVer != null ? latestCaseRowVer : current.getRowVer());
 			applyDraftStateToEditors();
 			hideRemoteUpdateBanner();
 			clearError();
@@ -4716,6 +4757,7 @@ public class CaseController {
 
 		void clearDraftState() {
 			draft = null;
+			overviewEditRowVer = null;
 			draftPrimaryStatusId = null;
 			draftPrimaryCallerContactId = null;
 			draftPrimaryCallerName = null;
@@ -4833,13 +4875,19 @@ public class CaseController {
 
 			draft = new CaseEditModel(name, number, description);
 			CaseEditModel saveDraft = draft;
+			byte[] expectedRowVer = cloneRowVer(overviewEditRowVer != null ? overviewEditRowVer
+					: (latestCaseRowVer != null ? latestCaseRowVer : current.getRowVer()));
+			if (expectedRowVer == null || expectedRowVer.length == 0) {
+				showError("Case concurrency token is missing. Reload and try again.");
+				return null;
+			}
 
 			SaveBaseline baseline = new SaveBaseline(
 					safeText(current.getCaseName()).trim(),
 					safeText(current.getDescription()),
 					safeText(current.getCaseNumber()).trim(),
 					currentOverview,
-					current.getRowVer()
+					expectedRowVer
 			);
 
 			SaveDesiredValues desiredValues = captureRequestedValues();
@@ -4875,6 +4923,11 @@ public class CaseController {
 				SaveComputation computation = computeChangeSet(request);
 				CaseDetailDto updated = persistBaseCaseFields(request);
 				if (updated == null) {
+					logCaseConcurrencyConflict(
+							"CaseOverviewSaveCoordinator.runSaveWorker",
+							request.saveCaseId(),
+							request.baseline().expectedRowVer(),
+							request.baseline().expectedRowVer());
 					handleConcurrentUpdate();
 					return;
 				}
@@ -5012,7 +5065,8 @@ public class CaseController {
 					);
 				}
 
-				CaseDetailDto updatedForUi = updated;
+				CaseDetailDto latestDetail = caseDao.getDetail(request.saveCaseId());
+				CaseDetailDto updatedForUi = latestDetail != null ? latestDetail : updated;
 
 				runOnFx(() -> finalizeSuccessfulSave(request, updatedForUi, computation, teamChanged));
 			} catch (Exception ex) {
@@ -5138,7 +5192,7 @@ public class CaseController {
 				SaveComputation computation,
 				boolean teamChanged) {
 
-			current = updated;
+			applyCurrentDetailSnapshot(updated);
 
 			setEditMode(false);
 			draft = null;
@@ -6234,9 +6288,15 @@ public class CaseController {
 				return;
 
 			detailsEditor.captureEditors(detailsDraft);
+			byte[] expectedRowVer = cloneRowVer(detailsEditRowVer != null ? detailsEditRowVer
+					: (latestCaseRowVer != null ? latestCaseRowVer : (current == null ? null : current.getRowVer())));
+			if (expectedRowVer == null || expectedRowVer.length == 0) {
+				showError("Case concurrency token is missing. Reload and try again.");
+				return;
+			}
 			DetailsSaveRequest request;
 			try {
-				request = buildSaveRequest(detailsDraft, current);
+				request = buildSaveRequest(detailsDraft, current, expectedRowVer);
 			} catch (IllegalArgumentException ex) {
 				showError(ex.getMessage());
 				return;
@@ -6246,6 +6306,7 @@ public class CaseController {
 				detailsLocalViewOverride = null;
 				detailsDraft = null;
 				detailsBaseline = null;
+				detailsEditRowVer = null;
 				detailsEditor.setEditMode(false);
 				renderDetailsFromCurrent();
 				showError("No changes to save.");
@@ -6299,6 +6360,13 @@ public class CaseController {
 						request.receivedUpdates(),
 						request.expectedRowVer(),
 						(appState == null ? null : appState.getUserId()));
+				if (updated == null) {
+					logCaseConcurrencyConflict(
+							"CaseDetailsSaveCoordinator.runSaveWorker",
+							request.caseId(),
+							request.expectedRowVer(),
+							request.expectedRowVer());
+				}
 
 				if (updated != null && request.statusChanged() && request.primaryStatusId() != null)
 					caseDao.setPrimaryStatus(request.caseId(), request.primaryStatusId(), null);
@@ -6576,8 +6644,14 @@ public class CaseController {
 				}
 				if (updated != null)
 					currentOverview = caseDao.getOverview(request.caseId());
+				if (updated != null) {
+					CaseDetailDto latestDetail = caseDao.getDetail(request.caseId());
+					if (latestDetail != null)
+						updated = latestDetail;
+				}
 
-				runOnFx(() -> handleSaveResult(request, updated));
+				final CaseDetailDto finalUpdated = updated;
+				runOnFx(() -> handleSaveResult(request, finalUpdated));
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
@@ -6593,10 +6667,11 @@ public class CaseController {
 				setBusy(false);
 				return;
 			}
-			current = updated;
+			applyCurrentDetailSnapshot(updated);
 			detailsLocalViewOverride = null;
 			detailsDraft = null;
 			detailsBaseline = null;
+			detailsEditRowVer = null;
 			detailsEditor.setEditMode(false);
 			renderDetailsFromCurrent();
 			applyDetail(updated);
@@ -6656,7 +6731,7 @@ public class CaseController {
 				publishCaseFieldUpdated(caseId, field, after);
 		}
 
-		private DetailsSaveRequest buildSaveRequest(CaseDetailsDraft source, CaseDetailDto baseline) {
+		private DetailsSaveRequest buildSaveRequest(CaseDetailsDraft source, CaseDetailDto baseline, byte[] expectedRowVer) {
 			String name = normalizeRequired(source.name);
 			if (name.isBlank())
 				throw new IllegalArgumentException("Case Name is required.");
@@ -6780,7 +6855,7 @@ public class CaseController {
 					deniedDetail,
 					summary,
 					receivedUpdates,
-					baseline.getRowVer(),
+					expectedRowVer,
 					baseline,
 					statusChanged,
 					changed);
@@ -7328,6 +7403,7 @@ public class CaseController {
 			CaseDetailsDraft base = resolveDetailsViewModel();
 			detailsBaseline = base.copy();
 			detailsDraft = base.copy();
+			detailsEditRowVer = cloneRowVer(latestCaseRowVer != null ? latestCaseRowVer : (current == null ? null : current.getRowVer()));
 			renderEditors(detailsDraft);
 			setEditMode(true);
 		}
@@ -7337,6 +7413,7 @@ public class CaseController {
 			renderView(restore);
 			detailsDraft = null;
 			detailsBaseline = null;
+			detailsEditRowVer = null;
 			setEditMode(false);
 		}
 
