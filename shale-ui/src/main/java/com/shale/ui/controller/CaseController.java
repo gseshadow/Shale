@@ -6650,7 +6650,8 @@ public class CaseController {
 						updated = latestDetail;
 				}
 
-				runOnFx(() -> handleSaveResult(request, updated));
+				final CaseDetailDto finalUpdated = updated;
+				runOnFx(() -> handleSaveResult(request, finalUpdated));
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
