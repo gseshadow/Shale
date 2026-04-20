@@ -678,7 +678,7 @@ public final class MyShaleController {
 					task.caseResponsibleAttorney(),
 					task.caseResponsibleAttorneyColor(),
 					task.caseNonEngagementLetterSent(),
-					task.title(),
+					resolveMyTaskCardTitle(task),
 					task.description(),
 					task.createdByDisplayName(),
 					task.priorityColorHex(),
@@ -690,6 +690,14 @@ public final class MyShaleController {
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
+	}
+
+	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {
+		if (task == null) {
+			return null;
+		}
+		String title = safe(task.title()).trim();
+		return title.isBlank() ? "Task #" + task.id() : title;
 	}
 
 	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, Long selectedCaseId, String normalizedQuery) {
