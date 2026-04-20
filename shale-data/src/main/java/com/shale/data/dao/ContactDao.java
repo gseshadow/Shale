@@ -54,6 +54,7 @@ public final class ContactDao {
     public record ContactProfileUpdateRequest(
             int contactId,
             int shaleClientId,
+            Integer actorUserId,
             String name,
             String firstName,
             String lastName,
@@ -94,9 +95,11 @@ public final class ContactDao {
     }
 
     private final DbSessionProvider db;
+    private final PhiAuditService phiAuditService;
 
     public ContactDao(DbSessionProvider db) {
         this.db = Objects.requireNonNull(db, "db");
+        this.phiAuditService = new PhiAuditService(new AuditLogDao(this.db));
     }
 
     public List<DirectoryContactRow> listContactsForTenant(int shaleClientId) {
@@ -425,6 +428,7 @@ public final class ContactDao {
 
         try (Connection con = db.requireConnection()) {
             verifyTenantMatchesSession(con, request.shaleClientId());
+            ContactDetailRow before = findById(request.contactId(), request.shaleClientId());
             ContactSchema schema = ContactSchema.load(con);
             logDetectedCoreColumns(schema);
 
@@ -488,7 +492,20 @@ public final class ContactDao {
                 }
                 ps.setInt(idx++, request.contactId());
                 ps.setInt(idx++, request.shaleClientId());
-                return ps.executeUpdate() > 0;
+                boolean updated = ps.executeUpdate() > 0;
+                if (updated) {
+                    ContactDetailRow after = findById(request.contactId(), request.shaleClientId());
+                    if (before != null && after != null) {
+                        phiAuditService.auditUpdate(
+                                request.actorUserId(),
+                                "Contacts",
+                                "Condition",
+                                (long) request.contactId(),
+                                before.condition(),
+                                after.condition());
+                    }
+                }
+                return updated;
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update contact basic profile (id=" + request.contactId() + ")", e);
@@ -1073,20 +1090,15 @@ public final class ContactDao {
     }
 
     private static void logDetectedCoreColumns(ContactSchema schema) {
-        System.out.println("[TEMP][ContactDao] detected columns: tenant=" + schema.tenantColumn()
-                + ", name=" + schema.nameColumn()
-                + ", firstName=" + schema.firstNameColumn()
-                + ", lastName=" + schema.lastNameColumn()
-                + ", email=" + schema.emailColumn()
-                + ", phone=" + schema.phoneColumn());
+        // intentionally no-op: temporary schema/debug tracing removed in stabilization pass
     }
 
     private static void logFindByIdAttempt(int contactId, int shaleClientId) {
-        System.out.println("[TEMP][ContactDao] findById contactId=" + contactId + ", shaleClientId=" + shaleClientId);
+        // intentionally no-op: temporary lookup/debug tracing removed in stabilization pass
     }
 
     private static void logFindByIdResult(int contactId, int shaleClientId, boolean found) {
-        System.out.println("[TEMP][ContactDao] findById contactId=" + contactId + ", shaleClientId=" + shaleClientId + ", returnedRow=" + found);
+        // intentionally no-op: temporary lookup/debug tracing removed in stabilization pass
     }
 
     public static String formatTimestamp(Instant timestamp) {

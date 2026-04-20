@@ -11,10 +11,12 @@ import com.shale.data.dao.UserDao;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.UserPreferencesDao;
+import com.shale.data.dao.AuditLogDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.ContactViewController;
 import com.shale.ui.controller.ContactsController;
+import com.shale.ui.controller.AuditLogViewerController;
 import com.shale.ui.controller.LoginController;
 import com.shale.ui.controller.MainController;
 import com.shale.ui.controller.MyShaleController;
@@ -37,6 +39,7 @@ import com.shale.ui.services.UiAuthService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.services.UpdatePollingService;
+import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
@@ -44,6 +47,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.fxml.LoadException;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
@@ -90,6 +94,7 @@ public final class SceneManager {
 	private final DurableNotificationService durableNotificationService;
 	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
 	private final UpdatePollingService updatePollingService;
+	private final PhiReadAuditService phiReadAuditService;
 	private final ExecutorService notificationStartupExecutor;
 	private final AtomicLong notificationStartupGeneration = new AtomicLong(0);
 	private volatile Future<?> notificationStartupFuture;
@@ -127,6 +132,7 @@ public final class SceneManager {
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
 		this.updatePollingService = new UpdatePollingService(updateLauncher, this::onUpdateCheckCompleted);
+		this.phiReadAuditService = new PhiReadAuditService(new AuditLogDao(dbSessionProvider), appState);
 	}
 
 	private NotificationCenterService createNotificationCenterService() {
@@ -494,9 +500,31 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService);
+			c.init(notificationPreferencesService, appState, this::showAuditLogViewer);
 			return c;
 		});
+	}
+
+	public void showAuditLogViewer() {
+		if (!appState.isAdmin()) {
+			showError("Only admin users can view audit logs.");
+			return;
+		}
+		AuditLogDao auditLogDao = new AuditLogDao(dbSessionProvider);
+		Parent viewerRoot = load("/fxml/audit-log-viewer.fxml", controller ->
+		{
+			AuditLogViewerController c = (AuditLogViewerController) controller;
+			c.init(appState, auditLogDao, new UserDao(dbSessionProvider));
+			return c;
+		});
+		Stage dialogStage = AppDialogs.createModalStage(stage, "Audit Log");
+		Region body = viewerRoot instanceof Region region ? region : new VBox(viewerRoot);
+		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		VBox shell = AppDialogs.createSecondaryWindowShell(dialogStage, "Audit Log", dialogStage::close, body);
+		Scene scene = new Scene(shell, 1400, 720);
+		scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/css/app.css")).toExternalForm());
+		dialogStage.setScene(scene);
+		dialogStage.show();
 	}
 
 	public Parent createSearchView(String query,
@@ -545,13 +573,13 @@ public final class SceneManager {
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			UserDetailService userDetailService = new UserDetailService(userDao, caseDao, taskDao);
-			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
-			{
-				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
-				openCaseProfile(relatedCaseId, "OVERVIEW");
-			}, this::openUserProfile, caseTaskService);
-			return c;
-		});
+				c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
+				{
+					System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
+					openCaseProfile(relatedCaseId, "OVERVIEW");
+				}, this::openUserProfile, caseTaskService, phiReadAuditService);
+				return c;
+			});
 	}
 
 	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase, Runnable onContactDeleted) {
@@ -560,9 +588,9 @@ public final class SceneManager {
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			ContactDetailService contactDetailService = new ContactDetailService(contactDao);
-			c.init(contactId, contactDetailService, appState, onOpenCase, onContactDeleted);
-			return c;
-		});
+				c.init(contactId, contactDetailService, appState, onOpenCase, onContactDeleted, phiReadAuditService);
+				return c;
+			});
 	}
 
 	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase) {
@@ -592,9 +620,9 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser);
-			return c;
-		});
+				c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser, phiReadAuditService);
+				return c;
+			});
 	}
 
 	public Parent createCaseView(int caseId, String sectionKey, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {
@@ -609,7 +637,7 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(caseId, caseDao, caseDetailService, caseTaskService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted);
+			c.init(caseId, caseDao, caseDetailService, caseTaskService, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted, phiReadAuditService);
 			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
@@ -799,6 +827,8 @@ public final class SceneManager {
 					noteEntries,
 				detail.completedAt() != null);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
+		phiReadAuditService.auditRead("Task.Detail.Read", "Task.Detail", "Task", detail.id());
+		phiReadAuditService.auditRead("Task.Activity.Read", "Task.Activity", "Task", detail.id());
 		var result = TaskDetailDialog.showAndWait(
 				"SCENE_MANAGER",
 				0L,

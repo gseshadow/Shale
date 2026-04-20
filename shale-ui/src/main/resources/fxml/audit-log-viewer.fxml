@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.shale.ui.controller.AuditLogViewerController"
+      spacing="10"
+      styleClass="glass-panel">
+    <padding>
+        <Insets top="12" right="12" bottom="12" left="12"/>
+    </padding>
+
+    <Label text="Audit Log" styleClass="search-section-title"/>
+    <Label text="Read-only audit entries. Newest entries appear first." styleClass="search-summary-text" wrapText="true"/>
+
+    <GridPane hgap="8" vgap="8">
+        <columnConstraints>
+            <javafx.scene.layout.ColumnConstraints percentWidth="16"/>
+            <javafx.scene.layout.ColumnConstraints percentWidth="17"/>
+            <javafx.scene.layout.ColumnConstraints percentWidth="16"/>
+            <javafx.scene.layout.ColumnConstraints percentWidth="17"/>
+            <javafx.scene.layout.ColumnConstraints percentWidth="16"/>
+            <javafx.scene.layout.ColumnConstraints percentWidth="18"/>
+        </columnConstraints>
+
+        <Label text="UserId" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+        <TextField fx:id="userIdFilterField" promptText="e.g. 42" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+        <Label text="ObjectTypeId" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+        <TextField fx:id="objectTypeIdFilterField" promptText="e.g. 7" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+        <Label text="ObjectId" GridPane.columnIndex="4" GridPane.rowIndex="0"/>
+        <TextField fx:id="objectIdFilterField" promptText="e.g. 1001" GridPane.columnIndex="5" GridPane.rowIndex="0"/>
+
+        <Label text="FieldName" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+        <TextField fx:id="fieldNameFilterField" promptText="exact field name" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+        <Label text="StartDate" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
+        <TextField fx:id="startDateFilterField" promptText="YYYY-MM-DD" GridPane.columnIndex="3" GridPane.rowIndex="1"/>
+        <Label text="EndDate" GridPane.columnIndex="4" GridPane.rowIndex="1"/>
+        <TextField fx:id="endDateFilterField" promptText="YYYY-MM-DD" GridPane.columnIndex="5" GridPane.rowIndex="1"/>
+    </GridPane>
+
+    <HBox spacing="8">
+        <Button text="Apply" styleClass="button-primary" onAction="#onApplyFilters"/>
+        <Button text="Clear Filters" styleClass="button-secondary" onAction="#onClearFilters"/>
+        <Label fx:id="statusLabel" styleClass="search-summary-text" wrapText="true">
+            <HBox.margin>
+                <Insets left="8"/>
+            </HBox.margin>
+        </Label>
+    </HBox>
+
+    <TableView fx:id="auditTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="entryDateColumn" text="EntryDate" prefWidth="170"/>
+            <TableColumn fx:id="userIdColumn" text="User / UserId" prefWidth="150"/>
+            <TableColumn fx:id="objectTypeIdColumn" text="Object Type / Id" prefWidth="150"/>
+            <TableColumn fx:id="objectIdColumn" text="ObjectId" prefWidth="100"/>
+            <TableColumn fx:id="fieldNameColumn" text="FieldName" prefWidth="130"/>
+            <TableColumn fx:id="actionColumn" text="Action" prefWidth="90"/>
+            <TableColumn fx:id="fieldCodeColumn" text="FieldCode" prefWidth="100"/>
+            <TableColumn fx:id="stringValueColumn" text="StringValue" prefWidth="200"/>
+            <TableColumn fx:id="dateValueColumn" text="DateValue" prefWidth="110"/>
+            <TableColumn fx:id="booleanValueColumn" text="BooleanValue" prefWidth="110"/>
+            <TableColumn fx:id="intValueColumn" text="IntValue" prefWidth="90"/>
+            <TableColumn fx:id="fieldCodeColumn" text="FieldCode" prefWidth="100"/>
+        </columns>
+    </TableView>
+</VBox>

@@ -60,6 +60,7 @@ import com.shale.ui.component.dialog.TeamEditorDialog;
 import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
@@ -306,6 +307,8 @@ public class CaseController {
 	@FXML
 	private Button submitCaseUpdateButton;
 	@FXML
+	private TextField caseUpdatesSearchField;
+	@FXML
 	private VBox caseUpdatesPane;
 	@FXML
 	private ScrollPane caseUpdatesScrollPane;
@@ -511,7 +514,11 @@ public class CaseController {
 
 	private CaseDetailDto current;
 	private CaseOverviewDto currentOverview;
+	private byte[] latestCaseRowVer;
+	private byte[] overviewEditRowVer;
+	private byte[] detailsEditRowVer;
 	private Runnable onCaseDeleted;
+	private PhiReadAuditService phiReadAuditService;
 
 	private CaseEditModel draft;
 
@@ -633,7 +640,7 @@ public class CaseController {
 	}
 
 	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, OrganizationDao organizationDao, ContactDao contactDao,
-			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted) {
+			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted, PhiReadAuditService phiReadAuditService) {
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
 		this.caseTasksLoadedOnce = false;
@@ -653,6 +660,7 @@ public class CaseController {
 		this.caseDocumentService = (caseDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, contactDao);
 		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
 		this.onCaseDeleted = onCaseDeleted;
+		this.phiReadAuditService = phiReadAuditService;
 		this.pageLoadStartNanos = PerfLog.start();
 		PerfLog.log("NAV", "start", "page=case_view caseId=" + caseId);
 		PerfLog.log("CTRL", "start", "controller=CaseController page=case_view caseId=" + caseId);
@@ -749,6 +757,9 @@ public class CaseController {
 			btnEditTeam.setOnAction(e -> onEditTeam());
 		if (submitCaseUpdateButton != null)
 			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
+		if (caseUpdatesSearchField != null) {
+			caseUpdatesSearchField.textProperty().addListener((obs, oldText, newText) -> applyCaseUpdateFilter());
+		}
 		if (deleteCaseButton != null) {
 			deleteCaseButton.setOnAction(e -> onDeleteCase());
 			setVisibleManaged(deleteCaseButton, false);
@@ -1160,6 +1171,7 @@ public class CaseController {
 			contentTitleLabel.setText("Overview");
 		loadCaseUpdatesAsync();
 		loadOverviewOnce();
+		auditCaseRead("Case.Overview.Read", "Case.Overview");
 	}
 
 	private void showTasksTab() {
@@ -1189,6 +1201,7 @@ public class CaseController {
 		if (contentTitleLabel != null)
 			contentTitleLabel.setText("Details");
 		renderDetailsFromCurrent();
+		auditCaseRead("Case.Detail.Read", "Case.Detail");
 	}
 
 	private void showGeneric(String sectionName) {
@@ -1235,6 +1248,7 @@ public class CaseController {
 		setVisibleManaged(timelineScrollPane, true);
 		setVisibleManaged(timelineListBox, true);
 		setVisibleManaged(timelineEmptyLabel, false);
+		auditCaseRead("Case.Timeline.Read", "Case.Timeline");
 		loadCaseTimelineEventsAsync();
 	}
 
@@ -1264,6 +1278,13 @@ public class CaseController {
 		if (caseDao != null && caseId != null && (!partiesLoadedOnce || caseParties == null || caseParties.isEmpty())) {
 			refreshPartiesSectionAsync();
 		}
+	}
+
+	private void auditCaseRead(String fieldName, String screenName) {
+		if (phiReadAuditService == null || caseId == null || caseId <= 0) {
+			return;
+		}
+		phiReadAuditService.auditRead(fieldName, screenName, "Case", caseId.longValue());
 	}
 
 	private void loadCaseTimelineEventsAsync() {
@@ -2358,9 +2379,10 @@ public class CaseController {
                 summary.map(item -> item.completedAt() != null).orElse(false));
         System.out.println("[TASK_DETAIL_TIMING][CASE_TASKS] shell_stage_created_ms="
                 + ((System.nanoTime() - clickReceivedAt) / 1_000_000L) + " taskId=" + taskId);
-	    try {
-	        Optional<TaskDetailDialog.TaskDetailResult> result =
-	                TaskDetailDialog.showAndWait(
+		    try {
+		    	auditTaskRead(taskId);
+		        Optional<TaskDetailDialog.TaskDetailResult> result =
+		                TaskDetailDialog.showAndWait(
 	                        "CASE_TASKS",
 	                        clickReceivedAt,
 	                        taskDialogOwner(),
@@ -2475,6 +2497,14 @@ public class CaseController {
 	    } finally {
 	        taskDetailDialogInFlight.set(false);
 	    }
+	}
+
+	private void auditTaskRead(Long taskId) {
+		if (phiReadAuditService == null || taskId == null || taskId <= 0) {
+			return;
+		}
+		phiReadAuditService.auditRead("Task.Detail.Read", "Task.Detail", "Task", taskId);
+		phiReadAuditService.auditRead("Task.Activity.Read", "Task.Activity", "Task", taskId);
 	}
 
 	private void saveTaskFromDetail(
@@ -2660,7 +2690,7 @@ public class CaseController {
 				CaseOverviewDto effectiveOverview = applyCallerFromCaseParties(overview, caseParties);
 				applyOverviewEditSafe(effectiveOverview);
 
-				current = detail;
+				applyCurrentDetailSnapshot(detail);
 				detailsLocalViewOverride = null;
 				renderDetailsFromCurrent();
 				if (!editMode)
@@ -2694,7 +2724,7 @@ public class CaseController {
 						applyOverviewEditSafe(currentOverview);
 					}
 					if (detail != null) {
-						current = detail;
+						applyCurrentDetailSnapshot(detail);
 						detailsLocalViewOverride = null;
 						renderDetailsFromCurrent();
 						if (!editMode) {
@@ -3288,7 +3318,7 @@ public class CaseController {
 						showRemoteUpdateBanner();
 						return;
 					}
-					current = fresh;
+					applyCurrentDetailSnapshot(fresh);
 				});
 			} catch (Exception ignored) {
 			}
@@ -3313,10 +3343,47 @@ public class CaseController {
 				}
 				if (overview != null)
 					currentOverview = overview;
-				current = detail;
+				applyCurrentDetailSnapshot(detail);
 				detailsBaseline = CaseDetailsDraft.from(detail, currentOverview);
+				detailsEditRowVer = cloneRowVer(detail.getRowVer());
 			});
 		}, "case-details-remote-baseline-" + activeCaseId).start();
+	}
+
+	private void applyCurrentDetailSnapshot(CaseDetailDto detail) {
+		if (detail == null)
+			return;
+		current = detail;
+		latestCaseRowVer = cloneRowVer(detail.getRowVer());
+	}
+
+	private static byte[] cloneRowVer(byte[] token) {
+		return token == null ? null : java.util.Arrays.copyOf(token, token.length);
+	}
+
+	private static String rowVerHex(byte[] token) {
+		if (token == null || token.length == 0)
+			return "(null)";
+		StringBuilder sb = new StringBuilder(token.length * 2);
+		for (byte b : token)
+			sb.append(String.format("%02x", b));
+		return "0x" + sb;
+	}
+
+	private void logCaseConcurrencyConflict(String sourcePath, long caseId, byte[] loadedToken, byte[] submittedToken) {
+		byte[] dbToken = null;
+		try {
+			CaseDetailDto dbDetail = caseDao == null ? null : caseDao.getDetail(caseId);
+			dbToken = (dbDetail == null ? null : dbDetail.getRowVer());
+		} catch (Exception ex) {
+			System.err.println("Concurrency debug lookup failed for caseId=" + caseId + ", source=" + sourcePath + ": " + ex.getMessage());
+		}
+		System.err.println("Case concurrency conflict"
+				+ " source=" + sourcePath
+				+ " caseId=" + caseId
+				+ " loadedToken=" + rowVerHex(loadedToken)
+				+ " submittedToken=" + rowVerHex(submittedToken)
+				+ " dbToken=" + rowVerHex(dbToken));
 	}
 
 	private void applyLiveCaseName(String newName) {
@@ -3638,12 +3705,6 @@ public class CaseController {
 	}
 
 	private void renderCaseUpdatesInternal(List<CaseUpdateDto> updates) {
-		if (caseUpdatesFeedBox == null)
-			return;
-		long renderStartNanos = PerfLog.start();
-		PerfLog.log("RENDER", "start", "panel=case_updates page=case_view caseId=" + caseId);
-
-		caseUpdatesFeedBox.getChildren().clear();
 		List<CaseUpdateDto> safeUpdates = updates == null ? List.of() : List.copyOf(updates);
 		caseUpdates = safeUpdates;
 		if (editingCaseUpdateId != null
@@ -3652,9 +3713,29 @@ public class CaseController {
 			editingCaseUpdateDraftText = "";
 			savingCaseUpdateEdit = false;
 		}
+		applyCaseUpdateFilterInternal();
+	}
 
-		if (safeUpdates.isEmpty()) {
-			Label empty = new Label("No updates yet.");
+	private void applyCaseUpdateFilter() {
+		updatesPanelController.applyCaseUpdateFilter();
+	}
+
+	private void applyCaseUpdateFilterInternal() {
+		if (caseUpdatesFeedBox == null)
+			return;
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=case_updates page=case_view caseId=" + caseId);
+
+		caseUpdatesFeedBox.getChildren().clear();
+		String searchQuery = safeText(caseUpdatesSearchField == null ? null : caseUpdatesSearchField.getText())
+				.trim()
+				.toLowerCase(java.util.Locale.ROOT);
+		List<CaseUpdateDto> visibleUpdates = caseUpdates == null ? List.of() : caseUpdates.stream()
+				.filter(dto -> caseUpdateMatchesSearch(dto, searchQuery))
+				.toList();
+
+		if (visibleUpdates.isEmpty()) {
+			Label empty = new Label(searchQuery.isBlank() ? "No updates yet." : "No updates found.");
 			empty.setWrapText(true);
 			empty.setStyle("-fx-opacity: 0.7;");
 			caseUpdatesFeedBox.getChildren().add(empty);
@@ -3664,7 +3745,7 @@ public class CaseController {
 			return;
 		}
 
-		for (CaseUpdateDto dto : safeUpdates) {
+		for (CaseUpdateDto dto : visibleUpdates) {
 			if (dto == null)
 				continue;
 			caseUpdatesFeedBox.getChildren().add(createCaseUpdateCard(dto));
@@ -3673,6 +3754,25 @@ public class CaseController {
 		if (caseUpdatesScrollPane != null)
 			caseUpdatesScrollPane.setVvalue(0.0);
 		PerfLog.logDone("RENDER", "panel=case_updates page=case_view caseId=" + caseId + " childCount=" + caseUpdatesFeedBox.getChildren().size(), renderStartNanos);
+	}
+
+	private boolean caseUpdateMatchesSearch(CaseUpdateDto dto, String searchQuery) {
+		if (dto == null) {
+			return false;
+		}
+		if (searchQuery == null || searchQuery.isBlank()) {
+			return true;
+		}
+		String noteText = safeText(dto.getNoteText()).toLowerCase(java.util.Locale.ROOT);
+		if (noteText.contains(searchQuery)) {
+			return true;
+		}
+		String authorText = safeAuthorName(dto).toLowerCase(java.util.Locale.ROOT);
+		if (authorText.contains(searchQuery)) {
+			return true;
+		}
+		String metadataText = safeText(buildCaseUpdateMetadata(dto)).toLowerCase(java.util.Locale.ROOT);
+		return metadataText.contains(searchQuery);
 	}
 
 	private void onSubmitCaseUpdate() {
@@ -4599,6 +4699,7 @@ public class CaseController {
 			snapshotDraftState();
 			if (!ensureCurrentDetailReady())
 				return;
+			overviewEditRowVer = cloneRowVer(latestCaseRowVer != null ? latestCaseRowVer : current.getRowVer());
 			applyDraftStateToEditors();
 			hideRemoteUpdateBanner();
 			clearError();
@@ -4656,6 +4757,7 @@ public class CaseController {
 
 		void clearDraftState() {
 			draft = null;
+			overviewEditRowVer = null;
 			draftPrimaryStatusId = null;
 			draftPrimaryCallerContactId = null;
 			draftPrimaryCallerName = null;
@@ -4773,13 +4875,19 @@ public class CaseController {
 
 			draft = new CaseEditModel(name, number, description);
 			CaseEditModel saveDraft = draft;
+			byte[] expectedRowVer = cloneRowVer(overviewEditRowVer != null ? overviewEditRowVer
+					: (latestCaseRowVer != null ? latestCaseRowVer : current.getRowVer()));
+			if (expectedRowVer == null || expectedRowVer.length == 0) {
+				showError("Case concurrency token is missing. Reload and try again.");
+				return null;
+			}
 
 			SaveBaseline baseline = new SaveBaseline(
 					safeText(current.getCaseName()).trim(),
 					safeText(current.getDescription()),
 					safeText(current.getCaseNumber()).trim(),
 					currentOverview,
-					current.getRowVer()
+					expectedRowVer
 			);
 
 			SaveDesiredValues desiredValues = captureRequestedValues();
@@ -4815,6 +4923,11 @@ public class CaseController {
 				SaveComputation computation = computeChangeSet(request);
 				CaseDetailDto updated = persistBaseCaseFields(request);
 				if (updated == null) {
+					logCaseConcurrencyConflict(
+							"CaseOverviewSaveCoordinator.runSaveWorker",
+							request.saveCaseId(),
+							request.baseline().expectedRowVer(),
+							request.baseline().expectedRowVer());
 					handleConcurrentUpdate();
 					return;
 				}
@@ -4952,7 +5065,8 @@ public class CaseController {
 					);
 				}
 
-				CaseDetailDto updatedForUi = updated;
+				CaseDetailDto latestDetail = caseDao.getDetail(request.saveCaseId());
+				CaseDetailDto updatedForUi = latestDetail != null ? latestDetail : updated;
 
 				runOnFx(() -> finalizeSuccessfulSave(request, updatedForUi, computation, teamChanged));
 			} catch (Exception ex) {
@@ -5014,7 +5128,8 @@ public class CaseController {
 					request.saveDraft().description(),
 					request.desired().desiredIncidentDate(),
 					request.desired().desiredSolDate(),
-					request.baseline().expectedRowVer()
+					request.baseline().expectedRowVer(),
+					request.userId()
 			);
 		}
 
@@ -5077,7 +5192,7 @@ public class CaseController {
 				SaveComputation computation,
 				boolean teamChanged) {
 
-			current = updated;
+			applyCurrentDetailSnapshot(updated);
 
 			setEditMode(false);
 			draft = null;
@@ -6016,6 +6131,10 @@ public class CaseController {
 			onSubmitCaseUpdateInternal();
 		}
 
+		void applyCaseUpdateFilter() {
+			applyCaseUpdateFilterInternal();
+		}
+
 		Node createCaseUpdateCard(CaseUpdateDto dto) {
 			return createCaseUpdateCardInternal(dto);
 		}
@@ -6169,9 +6288,15 @@ public class CaseController {
 				return;
 
 			detailsEditor.captureEditors(detailsDraft);
+			byte[] expectedRowVer = cloneRowVer(detailsEditRowVer != null ? detailsEditRowVer
+					: (latestCaseRowVer != null ? latestCaseRowVer : (current == null ? null : current.getRowVer())));
+			if (expectedRowVer == null || expectedRowVer.length == 0) {
+				showError("Case concurrency token is missing. Reload and try again.");
+				return;
+			}
 			DetailsSaveRequest request;
 			try {
-				request = buildSaveRequest(detailsDraft, current);
+				request = buildSaveRequest(detailsDraft, current, expectedRowVer);
 			} catch (IllegalArgumentException ex) {
 				showError(ex.getMessage());
 				return;
@@ -6181,6 +6306,7 @@ public class CaseController {
 				detailsLocalViewOverride = null;
 				detailsDraft = null;
 				detailsBaseline = null;
+				detailsEditRowVer = null;
 				detailsEditor.setEditMode(false);
 				renderDetailsFromCurrent();
 				showError("No changes to save.");
@@ -6232,7 +6358,15 @@ public class CaseController {
 						request.deniedDetail(),
 						request.summary(),
 						request.receivedUpdates(),
-						request.expectedRowVer());
+						request.expectedRowVer(),
+						(appState == null ? null : appState.getUserId()));
+				if (updated == null) {
+					logCaseConcurrencyConflict(
+							"CaseDetailsSaveCoordinator.runSaveWorker",
+							request.caseId(),
+							request.expectedRowVer(),
+							request.expectedRowVer());
+				}
 
 				if (updated != null && request.statusChanged() && request.primaryStatusId() != null)
 					caseDao.setPrimaryStatus(request.caseId(), request.primaryStatusId(), null);
@@ -6510,8 +6644,14 @@ public class CaseController {
 				}
 				if (updated != null)
 					currentOverview = caseDao.getOverview(request.caseId());
+				if (updated != null) {
+					CaseDetailDto latestDetail = caseDao.getDetail(request.caseId());
+					if (latestDetail != null)
+						updated = latestDetail;
+				}
 
-				runOnFx(() -> handleSaveResult(request, updated));
+				final CaseDetailDto finalUpdated = updated;
+				runOnFx(() -> handleSaveResult(request, finalUpdated));
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
@@ -6527,10 +6667,11 @@ public class CaseController {
 				setBusy(false);
 				return;
 			}
-			current = updated;
+			applyCurrentDetailSnapshot(updated);
 			detailsLocalViewOverride = null;
 			detailsDraft = null;
 			detailsBaseline = null;
+			detailsEditRowVer = null;
 			detailsEditor.setEditMode(false);
 			renderDetailsFromCurrent();
 			applyDetail(updated);
@@ -6590,7 +6731,7 @@ public class CaseController {
 				publishCaseFieldUpdated(caseId, field, after);
 		}
 
-		private DetailsSaveRequest buildSaveRequest(CaseDetailsDraft source, CaseDetailDto baseline) {
+		private DetailsSaveRequest buildSaveRequest(CaseDetailsDraft source, CaseDetailDto baseline, byte[] expectedRowVer) {
 			String name = normalizeRequired(source.name);
 			if (name.isBlank())
 				throw new IllegalArgumentException("Case Name is required.");
@@ -6714,7 +6855,7 @@ public class CaseController {
 					deniedDetail,
 					summary,
 					receivedUpdates,
-					baseline.getRowVer(),
+					expectedRowVer,
 					baseline,
 					statusChanged,
 					changed);
@@ -7262,6 +7403,7 @@ public class CaseController {
 			CaseDetailsDraft base = resolveDetailsViewModel();
 			detailsBaseline = base.copy();
 			detailsDraft = base.copy();
+			detailsEditRowVer = cloneRowVer(latestCaseRowVer != null ? latestCaseRowVer : (current == null ? null : current.getRowVer()));
 			renderEditors(detailsDraft);
 			setEditMode(true);
 		}
@@ -7271,6 +7413,7 @@ public class CaseController {
 			renderView(restore);
 			detailsDraft = null;
 			detailsBaseline = null;
+			detailsEditRowVer = null;
 			setEditMode(false);
 		}
 
