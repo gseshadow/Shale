@@ -132,6 +132,7 @@ public final class MyShaleController {
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
+	private final Set<Long> pinnedMyTaskCaseIds = new LinkedHashSet<>();
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
@@ -782,19 +783,49 @@ public final class MyShaleController {
 
 		boolean sortByDueDate = MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE.equals(
 				myTasksColumnOrderChoice == null ? null : myTasksColumnOrderChoice.getValue());
-		Comparator<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> comparator = sortByDueDate
-				? Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, Integer>comparing(
-						entry -> isNoCaseColumn(entry.getKey()) ? 1 : 0)
-						.thenComparing(entry -> oldestIncompleteDueDate(entry.getValue()), Comparator.nullsLast(Comparator.naturalOrder()))
-						.thenComparing(entry -> normalizeCaseName(entry.getKey().displayName()), Comparator.nullsLast(String::compareToIgnoreCase))
-						.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE))
-				: Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, Integer>comparing(
-						entry -> isNoCaseColumn(entry.getKey()) ? 1 : 0)
-						.thenComparing(entry -> normalizeCaseName(entry.getKey().displayName()), Comparator.nullsLast(String::compareToIgnoreCase))
-						.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE));
+		Comparator<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> comparator = caseColumnComparator(originalIndexes, sortByDueDate);
 
-		entries.sort(comparator);
-		return entries;
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> pinned = new ArrayList<>();
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> unpinned = new ArrayList<>();
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> noCase = new ArrayList<>();
+
+		for (Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>> entry : entries) {
+			CaseColumnKey key = entry.getKey();
+			if (isNoCaseColumn(key)) {
+				noCase.add(entry);
+				continue;
+			}
+			if (isCasePinned(key.caseId())) {
+				pinned.add(entry);
+			} else {
+				unpinned.add(entry);
+			}
+		}
+
+		pinned.sort(comparator);
+		unpinned.sort(comparator);
+
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> ordered = new ArrayList<>(entries.size());
+		ordered.addAll(pinned);
+		ordered.addAll(unpinned);
+		ordered.addAll(noCase);
+		return ordered;
+	}
+
+	private Comparator<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> caseColumnComparator(
+			Map<CaseColumnKey, Integer> originalIndexes,
+			boolean sortByDueDate) {
+		if (sortByDueDate) {
+			return Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, java.time.LocalDateTime>comparing(
+					entry -> oldestIncompleteDueDate(entry.getValue()),
+					Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(entry -> normalizeCaseName(entry.getKey().displayName()), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE));
+		}
+		return Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, String>comparing(
+				entry -> normalizeCaseName(entry.getKey().displayName()),
+				Comparator.nullsLast(String::compareToIgnoreCase))
+				.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE));
 	}
 
 	private java.time.LocalDateTime oldestIncompleteDueDate(List<CaseTaskListItemDto> tasks) {
@@ -815,6 +846,22 @@ public final class MyShaleController {
 	private String normalizeCaseName(String caseName) {
 		String normalized = safe(caseName).trim();
 		return normalized.isEmpty() ? null : normalized;
+	}
+
+	private boolean isCasePinned(Long caseId) {
+		return caseId != null && caseId > 0 && pinnedMyTaskCaseIds.contains(caseId);
+	}
+
+	private void toggleCasePinned(Long caseId) {
+		if (caseId == null || caseId <= 0) {
+			return;
+		}
+		if (pinnedMyTaskCaseIds.contains(caseId)) {
+			pinnedMyTaskCaseIds.remove(caseId);
+		} else {
+			pinnedMyTaskCaseIds.add(caseId);
+		}
+		renderMyTasks();
 	}
 
 	private CaseColumnKey caseColumnKey(CaseTaskListItemDto task) {
@@ -839,7 +886,7 @@ public final class MyShaleController {
 			noCaseHeader.getStyleClass().add("sidebar-header");
 			return noCaseHeader;
 		}
-		return caseCardFactory.create(
+		Node caseCard = caseCardFactory.create(
 				new CaseCardModel(
 						key.caseId(),
 						key.displayName(),
@@ -849,6 +896,22 @@ public final class MyShaleController {
 						key.responsibleAttorneyColor(),
 						key.nonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
+		Button pinButton = new Button(isCasePinned(key.caseId()) ? "★" : "☆");
+		pinButton.setFocusTraversable(false);
+		pinButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
+		pinButton.setMinWidth(26);
+		pinButton.setPrefWidth(26);
+		pinButton.setOnAction(e -> toggleCasePinned(key.caseId()));
+
+		HBox pinRow = new HBox(6);
+		pinRow.setAlignment(Pos.CENTER_RIGHT);
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		pinRow.getChildren().addAll(spacer, pinButton);
+
+		VBox header = new VBox(4);
+		header.getChildren().addAll(pinRow, caseCard);
+		return header;
 	}
 
 	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {
