@@ -37,6 +37,8 @@ import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
@@ -48,8 +50,8 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.geometry.Pos;
 import javafx.stage.Window;
 
 public final class MyShaleController {
@@ -62,6 +64,10 @@ public final class MyShaleController {
 	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
 	private static final String SECTION_OVERVIEW = "Overview";
 	private static final String SECTION_TASKS = "Tasks";
+	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 320;
+	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 370;
+	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 430;
+	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -84,7 +90,7 @@ public final class MyShaleController {
 	@FXML
 	private ScrollPane myTasksScroll;
 	@FXML
-	private VBox myTasksList;
+	private HBox myTasksList;
 	@FXML
 	private Label myTasksEmptyLabel;
 	@FXML
@@ -264,6 +270,14 @@ public final class MyShaleController {
 		if (!host.getChildren().contains(myTasksPanel)) {
 			host.getChildren().add(myTasksPanel);
 		}
+		if (host instanceof VBox) {
+			VBox.setVgrow(myTasksPanel, Priority.ALWAYS);
+		}
+		if (host instanceof HBox) {
+			HBox.setHgrow(myTasksPanel, Priority.ALWAYS);
+		}
+		myTasksPanel.setMaxHeight(Double.MAX_VALUE);
+		myTasksPanel.setMaxWidth(Double.MAX_VALUE);
 	}
 
 	private void subscribeLiveCaseUpdates() {
@@ -652,6 +666,10 @@ public final class MyShaleController {
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
+		myTasksList.setFillHeight(true);
+		myTasksList.setMinHeight(0);
+		myTasksList.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		myTasksList.setMaxHeight(Double.MAX_VALUE);
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
 		List<CaseTaskListItemDto> filteredTasks = filterAndRankMyTasks(myTasks, selectedCaseFilterId(), searchQuery);
@@ -672,30 +690,104 @@ public final class MyShaleController {
 			return;
 		}
 		boolean fullVariant = SECTION_TASKS.equals(activeSection);
-		for (CaseTaskListItemDto task : filteredTasks) {
-			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
-					task.id(),
-					task.caseId(),
-					task.caseName(),
-					task.caseResponsibleAttorney(),
-					task.caseResponsibleAttorneyColor(),
-					task.caseNonEngagementLetterSent(),
-					resolveMyTaskCardTitle(task),
-					task.description(),
-					task.createdByDisplayName(),
-					task.priorityColorHex(),
-					task.dueAt(),
-					task.completedAt(),
-					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			if (fullVariant) {
-				myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
-			} else {
-				myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+		Map<CaseColumnKey, List<CaseTaskListItemDto>> tasksByCase = groupTasksByCase(filteredTasks);
+		for (Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>> entry : tasksByCase.entrySet()) {
+			VBox caseColumn = new VBox(8);
+			caseColumn.setMinWidth(TASKS_CASE_COLUMN_MIN_WIDTH);
+			caseColumn.setPrefWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
+			caseColumn.setMaxWidth(TASKS_CASE_COLUMN_MAX_WIDTH);
+			caseColumn.setMinHeight(0);
+			caseColumn.setMaxHeight(Double.MAX_VALUE);
+			caseColumn.setPadding(new Insets(8));
+			caseColumn.getStyleClass().addAll("strong-panel", "glass-panel");
+			Node caseHeader = buildCaseColumnHeader(entry.getKey());
+
+			VBox caseTaskCards = new VBox(10);
+			caseTaskCards.setFillWidth(true);
+
+			for (CaseTaskListItemDto task : entry.getValue()) {
+				TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+						task.id(),
+						task.caseId(),
+						task.caseName(),
+						task.caseResponsibleAttorney(),
+						task.caseResponsibleAttorneyColor(),
+						task.caseNonEngagementLetterSent(),
+						resolveMyTaskCardTitle(task),
+						task.description(),
+						task.createdByDisplayName(),
+						task.priorityColorHex(),
+						task.dueAt(),
+						task.completedAt(),
+						myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+				if (fullVariant) {
+					caseTaskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
+				} else {
+					caseTaskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+				}
 			}
+
+			ScrollPane caseColumnScroll = new ScrollPane(caseTaskCards);
+			caseColumnScroll.setFitToWidth(true);
+			caseColumnScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+			caseColumnScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+			caseColumnScroll.getStyleClass().add("surface-scroll");
+			VBox.setVgrow(caseColumnScroll, Priority.ALWAYS);
+			caseColumnScroll.setMinHeight(0);
+			caseColumnScroll.setMaxHeight(Double.MAX_VALUE);
+
+			caseColumn.getChildren().addAll(caseHeader, caseColumnScroll);
+			myTasksList.getChildren().add(caseColumn);
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
+	}
+
+	private Map<CaseColumnKey, List<CaseTaskListItemDto>> groupTasksByCase(List<CaseTaskListItemDto> tasks) {
+		Map<CaseColumnKey, List<CaseTaskListItemDto>> grouped = new LinkedHashMap<>();
+		if (tasks == null || tasks.isEmpty()) {
+			return grouped;
+		}
+		for (CaseTaskListItemDto task : tasks) {
+			CaseColumnKey key = caseColumnKey(task);
+			grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(task);
+		}
+		return grouped;
+	}
+
+	private CaseColumnKey caseColumnKey(CaseTaskListItemDto task) {
+		if (task == null || task.caseId() <= 0) {
+			return new CaseColumnKey(null, NO_CASE_COLUMN_TITLE, "", "", false);
+		}
+		String caseName = safe(task.caseName()).trim();
+		if (caseName.isEmpty()) {
+			caseName = "Case #" + task.caseId();
+		}
+		return new CaseColumnKey(
+				task.caseId(),
+				caseName,
+				safe(task.caseResponsibleAttorney()),
+				safe(task.caseResponsibleAttorneyColor()),
+				Boolean.TRUE.equals(task.caseNonEngagementLetterSent()));
+	}
+
+	private Node buildCaseColumnHeader(CaseColumnKey key) {
+		if (key == null || key.caseId() == null || key.caseId() <= 0) {
+			Label noCaseHeader = new Label(NO_CASE_COLUMN_TITLE);
+			noCaseHeader.getStyleClass().add("sidebar-header");
+			return noCaseHeader;
+		}
+		return caseCardFactory.create(
+				new CaseCardModel(
+						key.caseId(),
+						key.displayName(),
+						null,
+						null,
+						key.responsibleAttorney(),
+						key.responsibleAttorneyColor(),
+						key.nonEngagementLetterSent()),
+				CaseCardFactory.Variant.MINI);
 	}
 
 	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {
@@ -1120,6 +1212,14 @@ public final class MyShaleController {
 		public String toString() {
 			return safe(displayName);
 		}
+	}
+
+	private record CaseColumnKey(
+			Long caseId,
+			String displayName,
+			String responsibleAttorney,
+			String responsibleAttorneyColor,
+			boolean nonEngagementLetterSent) {
 	}
 
 	private static final class CaseCardVm {

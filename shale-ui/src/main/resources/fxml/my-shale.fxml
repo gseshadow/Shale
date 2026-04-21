@@ -102,14 +102,14 @@
 							</HBox>
 						</VBox>
 						<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" />
-						<ScrollPane fx:id="myTasksScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
-							vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
+						<ScrollPane fx:id="myTasksScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
+							vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
 							<content>
-								<VBox fx:id="myTasksList" spacing="10" styleClass="cases-content-surface glass-panel">
+								<HBox fx:id="myTasksList" spacing="10" styleClass="cases-content-surface glass-panel">
 									<padding>
 										<Insets top="10" right="10" bottom="10" left="10" />
 									</padding>
-								</VBox>
+								</HBox>
 							</content>
 						</ScrollPane>
 					</VBox>
