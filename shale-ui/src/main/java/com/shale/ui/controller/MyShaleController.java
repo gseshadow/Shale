@@ -50,6 +50,7 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
@@ -269,6 +270,14 @@ public final class MyShaleController {
 		if (!host.getChildren().contains(myTasksPanel)) {
 			host.getChildren().add(myTasksPanel);
 		}
+		if (host instanceof VBox) {
+			VBox.setVgrow(myTasksPanel, Priority.ALWAYS);
+		}
+		if (host instanceof HBox) {
+			HBox.setHgrow(myTasksPanel, Priority.ALWAYS);
+		}
+		myTasksPanel.setMaxHeight(Double.MAX_VALUE);
+		myTasksPanel.setMaxWidth(Double.MAX_VALUE);
 	}
 
 	private void subscribeLiveCaseUpdates() {
@@ -657,6 +666,10 @@ public final class MyShaleController {
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
+		myTasksList.setFillHeight(true);
+		myTasksList.setMinHeight(0);
+		myTasksList.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		myTasksList.setMaxHeight(Double.MAX_VALUE);
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
 		List<CaseTaskListItemDto> filteredTasks = filterAndRankMyTasks(myTasks, selectedCaseFilterId(), searchQuery);
@@ -683,12 +696,11 @@ public final class MyShaleController {
 			caseColumn.setMinWidth(TASKS_CASE_COLUMN_MIN_WIDTH);
 			caseColumn.setPrefWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
 			caseColumn.setMaxWidth(TASKS_CASE_COLUMN_MAX_WIDTH);
+			caseColumn.setMinHeight(0);
+			caseColumn.setMaxHeight(Double.MAX_VALUE);
 			caseColumn.setPadding(new Insets(8));
 			caseColumn.getStyleClass().addAll("strong-panel", "glass-panel");
-			caseColumn.prefHeightProperty().bind(myTasksScroll.heightProperty().subtract(20));
-
-			Label caseHeader = new Label(entry.getKey().displayName());
-			caseHeader.getStyleClass().add("sidebar-header");
+			Node caseHeader = buildCaseColumnHeader(entry.getKey());
 
 			VBox caseTaskCards = new VBox(10);
 			caseTaskCards.setFillWidth(true);
@@ -721,6 +733,8 @@ public final class MyShaleController {
 			caseColumnScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 			caseColumnScroll.getStyleClass().add("surface-scroll");
 			VBox.setVgrow(caseColumnScroll, Priority.ALWAYS);
+			caseColumnScroll.setMinHeight(0);
+			caseColumnScroll.setMaxHeight(Double.MAX_VALUE);
 
 			caseColumn.getChildren().addAll(caseHeader, caseColumnScroll);
 			myTasksList.getChildren().add(caseColumn);
@@ -744,13 +758,36 @@ public final class MyShaleController {
 
 	private CaseColumnKey caseColumnKey(CaseTaskListItemDto task) {
 		if (task == null || task.caseId() <= 0) {
-			return new CaseColumnKey(null, NO_CASE_COLUMN_TITLE);
+			return new CaseColumnKey(null, NO_CASE_COLUMN_TITLE, "", "", false);
 		}
 		String caseName = safe(task.caseName()).trim();
 		if (caseName.isEmpty()) {
 			caseName = "Case #" + task.caseId();
 		}
-		return new CaseColumnKey(task.caseId(), caseName);
+		return new CaseColumnKey(
+				task.caseId(),
+				caseName,
+				safe(task.caseResponsibleAttorney()),
+				safe(task.caseResponsibleAttorneyColor()),
+				Boolean.TRUE.equals(task.caseNonEngagementLetterSent()));
+	}
+
+	private Node buildCaseColumnHeader(CaseColumnKey key) {
+		if (key == null || key.caseId() == null || key.caseId() <= 0) {
+			Label noCaseHeader = new Label(NO_CASE_COLUMN_TITLE);
+			noCaseHeader.getStyleClass().add("sidebar-header");
+			return noCaseHeader;
+		}
+		return caseCardFactory.create(
+				new CaseCardModel(
+						key.caseId(),
+						key.displayName(),
+						null,
+						null,
+						key.responsibleAttorney(),
+						key.responsibleAttorneyColor(),
+						key.nonEngagementLetterSent()),
+				CaseCardFactory.Variant.MINI);
 	}
 
 	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {
@@ -1177,7 +1214,12 @@ public final class MyShaleController {
 		}
 	}
 
-	private record CaseColumnKey(Long caseId, String displayName) {
+	private record CaseColumnKey(
+			Long caseId,
+			String displayName,
+			String responsibleAttorney,
+			String responsibleAttorneyColor,
+			boolean nonEngagementLetterSent) {
 	}
 
 	private static final class CaseCardVm {
