@@ -36,6 +36,7 @@ import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -713,6 +714,9 @@ public final class MyShaleController {
 			caseColumn.setMaxWidth(TASKS_CASE_COLUMN_MAX_WIDTH);
 			caseColumn.setMinHeight(0);
 			caseColumn.setMaxHeight(Double.MAX_VALUE);
+			caseColumn.prefHeightProperty().bind(Bindings.createDoubleBinding(
+					() -> Math.max(0, myTasksScroll.getViewportBounds().getHeight() - 16),
+					myTasksScroll.viewportBoundsProperty()));
 			caseColumn.setPadding(new Insets(8));
 			caseColumn.getStyleClass().addAll("strong-panel", "glass-panel");
 			Node caseHeader = buildCaseColumnHeader(entry.getKey());
@@ -784,30 +788,22 @@ public final class MyShaleController {
 		boolean sortByDueDate = MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE.equals(
 				myTasksColumnOrderChoice == null ? null : myTasksColumnOrderChoice.getValue());
 		Comparator<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> comparator = caseColumnComparator(originalIndexes, sortByDueDate);
-
-		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> pinned = new ArrayList<>();
-		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> unpinned = new ArrayList<>();
 		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> noCase = new ArrayList<>();
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> sortableCases = new ArrayList<>();
 
 		for (Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>> entry : entries) {
 			CaseColumnKey key = entry.getKey();
 			if (isNoCaseColumn(key)) {
 				noCase.add(entry);
-				continue;
-			}
-			if (isCasePinned(key.caseId())) {
-				pinned.add(entry);
 			} else {
-				unpinned.add(entry);
+				sortableCases.add(entry);
 			}
 		}
 
-		pinned.sort(comparator);
-		unpinned.sort(comparator);
+		sortableCases.sort(comparator);
 
 		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> ordered = new ArrayList<>(entries.size());
-		ordered.addAll(pinned);
-		ordered.addAll(unpinned);
+		ordered.addAll(sortableCases);
 		ordered.addAll(noCase);
 		return ordered;
 	}
@@ -848,22 +844,6 @@ public final class MyShaleController {
 		return normalized.isEmpty() ? null : normalized;
 	}
 
-	private boolean isCasePinned(Long caseId) {
-		return caseId != null && caseId > 0 && pinnedMyTaskCaseIds.contains(caseId);
-	}
-
-	private void toggleCasePinned(Long caseId) {
-		if (caseId == null || caseId <= 0) {
-			return;
-		}
-		if (pinnedMyTaskCaseIds.contains(caseId)) {
-			pinnedMyTaskCaseIds.remove(caseId);
-		} else {
-			pinnedMyTaskCaseIds.add(caseId);
-		}
-		renderMyTasks();
-	}
-
 	private CaseColumnKey caseColumnKey(CaseTaskListItemDto task) {
 		if (task == null || task.caseId() <= 0) {
 			return new CaseColumnKey(null, NO_CASE_COLUMN_TITLE, "", "", false);
@@ -896,22 +876,7 @@ public final class MyShaleController {
 						key.responsibleAttorneyColor(),
 						key.nonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		Button pinButton = new Button(isCasePinned(key.caseId()) ? "★" : "☆");
-		pinButton.setFocusTraversable(false);
-		pinButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
-		pinButton.setMinWidth(26);
-		pinButton.setPrefWidth(26);
-		pinButton.setOnAction(e -> toggleCasePinned(key.caseId()));
-
-		HBox pinRow = new HBox(6);
-		pinRow.setAlignment(Pos.CENTER_RIGHT);
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		pinRow.getChildren().addAll(spacer, pinButton);
-
-		VBox header = new VBox(4);
-		header.getChildren().addAll(pinRow, caseCard);
-		return header;
+		return caseCard;
 	}
 
 	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {

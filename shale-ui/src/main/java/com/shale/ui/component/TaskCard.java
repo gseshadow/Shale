@@ -50,10 +50,9 @@ public final class TaskCard extends VBox {
 	private final Button toggleCompleteButton = new Button();
 	private final Region actionsSpacer = new Region();
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
-	private final Button expandDetailsButton = new Button("▸");
-	private final Region fullHeaderSpacer = new Region();
+	private final Button expandDetailsButton = new Button("+");
 	private final VBox fullHeaderText = new VBox(2, titleLabel, dueLabel);
-	private final HBox fullHeaderRow = new HBox(8, fullHeaderText, fullHeaderSpacer, expandDetailsButton);
+	private final HBox fullHeaderRow = new HBox(6, fullHeaderText, expandDetailsButton);
 	private final VBox fullExpandedContent = new VBox(6, createdByLabel, caseSection, teamSection, descriptionLabel, completedLabel, actionsRow);
 	private final UserCardFactory userCardFactory = new UserCardFactory(id -> {
 	});
@@ -298,6 +297,7 @@ public final class TaskCard extends VBox {
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		titleLabel.setMinWidth(0);
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
 		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		dueLabel.setWrapText(false);
@@ -324,15 +324,16 @@ public final class TaskCard extends VBox {
 		HBox.setHgrow(compactMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(fullHeaderText, javafx.scene.layout.Priority.ALWAYS);
-		HBox.setHgrow(fullHeaderSpacer, javafx.scene.layout.Priority.ALWAYS);
 		toggleCompleteButton.getStyleClass().addAll(
 				"app-toolbar-button",
 				"app-toolbar-button-success",
 				"app-taskcard-action-button");
-		expandDetailsButton.getStyleClass().addAll(
-				"app-toolbar-button",
-				"app-toolbar-button-neutral");
+		expandDetailsButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
 		expandDetailsButton.setFocusTraversable(false);
+		expandDetailsButton.setMinSize(20, 20);
+		expandDetailsButton.setPrefSize(20, 20);
+		expandDetailsButton.setMaxSize(20, 20);
+		expandDetailsButton.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 0 0 0 0;");
 		expandDetailsButton.setOnAction(e -> {
 			e.consume();
 			if (currentVariant != Variant.FULL) {
@@ -377,7 +378,7 @@ public final class TaskCard extends VBox {
 		if (currentVariant == Variant.FULL) {
 			fullExpandedContent.setManaged(expanded);
 			fullExpandedContent.setVisible(expanded);
-			expandDetailsButton.setText(expanded ? "▾" : "▸");
+			expandDetailsButton.setText(expanded ? "−" : "+");
 		}
 	}
 
