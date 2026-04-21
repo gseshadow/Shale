@@ -103,6 +103,11 @@
 										<String fx:value="app-toolbar-select" />
 									</styleClass>
 								</ChoiceBox>
+								<ChoiceBox fx:id="myTasksColumnOrderChoice" prefWidth="220">
+									<styleClass>
+										<String fx:value="app-toolbar-select" />
+									</styleClass>
+								</ChoiceBox>
 							</HBox>
 						</VBox>
 						<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" />

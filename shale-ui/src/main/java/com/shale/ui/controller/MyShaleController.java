@@ -61,12 +61,14 @@ public final class MyShaleController {
 	private static final String SORT_SOL = "Statute of Limitations Date";
 	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
+	private static final String MY_TASKS_COLUMN_ORDER_CASE_NAME = "Case Name";
+	private static final String MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE = "Oldest Incomplete Due Date";
 	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
 	private static final String SECTION_OVERVIEW = "Overview";
 	private static final String SECTION_TASKS = "Tasks";
-	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 320;
-	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 370;
-	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 430;
+	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
+	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
+	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 300;
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 
 	@FXML
@@ -83,6 +85,8 @@ public final class MyShaleController {
 	private ChoiceBox<String> myTasksSortChoice;
 	@FXML
 	private ChoiceBox<CaseFilterOption> myTasksCaseFilterChoice;
+	@FXML
+	private ChoiceBox<String> myTasksColumnOrderChoice;
 	@FXML
 	private TextField myTasksSearchField;
 	@FXML
@@ -188,6 +192,14 @@ public final class MyShaleController {
 			myTasksCaseFilterChoice.getItems().setAll(ALL_CASES_OPTION);
 			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
 			myTasksCaseFilterChoice.getSelectionModel().selectedItemProperty()
+					.addListener((obs, oldV, newV) -> renderMyTasks());
+		}
+		if (myTasksColumnOrderChoice != null) {
+			myTasksColumnOrderChoice.getItems().setAll(
+					MY_TASKS_COLUMN_ORDER_CASE_NAME,
+					MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE);
+			myTasksColumnOrderChoice.getSelectionModel().select(MY_TASKS_COLUMN_ORDER_CASE_NAME);
+			myTasksColumnOrderChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> renderMyTasks());
 		}
 		if (myTasksSearchField != null) {
@@ -693,7 +705,7 @@ public final class MyShaleController {
 		}
 		boolean fullVariant = SECTION_TASKS.equals(activeSection);
 		Map<CaseColumnKey, List<CaseTaskListItemDto>> tasksByCase = groupTasksByCase(filteredTasks);
-		for (Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>> entry : tasksByCase.entrySet()) {
+		for (Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>> entry : orderCaseColumns(tasksByCase)) {
 			VBox caseColumn = new VBox(8);
 			caseColumn.setMinWidth(TASKS_CASE_COLUMN_MIN_WIDTH);
 			caseColumn.setPrefWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
@@ -756,6 +768,53 @@ public final class MyShaleController {
 			grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(task);
 		}
 		return grouped;
+	}
+
+	private List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> orderCaseColumns(Map<CaseColumnKey, List<CaseTaskListItemDto>> tasksByCase) {
+		if (tasksByCase == null || tasksByCase.isEmpty()) {
+			return List.of();
+		}
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> entries = new ArrayList<>(tasksByCase.entrySet());
+		Map<CaseColumnKey, Integer> originalIndexes = new LinkedHashMap<>();
+		for (int i = 0; i < entries.size(); i++) {
+			originalIndexes.put(entries.get(i).getKey(), i);
+		}
+
+		boolean sortByDueDate = MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE.equals(
+				myTasksColumnOrderChoice == null ? null : myTasksColumnOrderChoice.getValue());
+		Comparator<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> comparator = sortByDueDate
+				? Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, Integer>comparing(
+						entry -> isNoCaseColumn(entry.getKey()) ? 1 : 0)
+						.thenComparing(entry -> oldestIncompleteDueDate(entry.getValue()), Comparator.nullsLast(Comparator.naturalOrder()))
+						.thenComparing(entry -> normalizeCaseName(entry.getKey().displayName()), Comparator.nullsLast(String::compareToIgnoreCase))
+						.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE))
+				: Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, Integer>comparing(
+						entry -> isNoCaseColumn(entry.getKey()) ? 1 : 0)
+						.thenComparing(entry -> normalizeCaseName(entry.getKey().displayName()), Comparator.nullsLast(String::compareToIgnoreCase))
+						.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE));
+
+		entries.sort(comparator);
+		return entries;
+	}
+
+	private java.time.LocalDateTime oldestIncompleteDueDate(List<CaseTaskListItemDto> tasks) {
+		if (tasks == null || tasks.isEmpty()) {
+			return null;
+		}
+		return tasks.stream()
+				.filter(task -> task != null && task.completedAt() == null && task.dueAt() != null)
+				.map(CaseTaskListItemDto::dueAt)
+				.min(Comparator.naturalOrder())
+				.orElse(null);
+	}
+
+	private boolean isNoCaseColumn(CaseColumnKey key) {
+		return key == null || key.caseId() == null || key.caseId() <= 0;
+	}
+
+	private String normalizeCaseName(String caseName) {
+		String normalized = safe(caseName).trim();
+		return normalized.isEmpty() ? null : normalized;
 	}
 
 	private CaseColumnKey caseColumnKey(CaseTaskListItemDto task) {
