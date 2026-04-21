@@ -50,6 +50,10 @@ public final class TaskCard extends VBox {
 	private final Button toggleCompleteButton = new Button();
 	private final Region actionsSpacer = new Region();
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
+	private final Button expandDetailsButton = new Button("+");
+	private final VBox fullHeaderText = new VBox(2, titleLabel, dueLabel);
+	private final HBox fullHeaderRow = new HBox(6, fullHeaderText, expandDetailsButton);
+	private final VBox fullExpandedContent = new VBox(6, createdByLabel, caseSection, teamSection, descriptionLabel, completedLabel, actionsRow);
 	private final UserCardFactory userCardFactory = new UserCardFactory(id -> {
 	});
 	private final CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {
@@ -65,6 +69,7 @@ public final class TaskCard extends VBox {
 	private String backgroundCss;
 	private String borderCss;
 	private boolean hovered;
+	private boolean fullExpanded;
 
 	public TaskCard() {
 		setCursor(Cursor.HAND);
@@ -286,11 +291,31 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyFull() {
-		applyCompact();
 		currentVariant = Variant.FULL;
-		getChildren().setAll(compactTitleRow, compactMetadataRow, descriptionLabel, completedLabel, actionsRow);
+		setDueAt(dueAtValue);
+		configureRelatedSections();
+		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		titleLabel.setWrapText(false);
+		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		titleLabel.setMinWidth(0);
+		titleLabel.setMaxWidth(Double.MAX_VALUE);
+		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		dueLabel.setWrapText(false);
+		dueLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
+		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+		setSpacing(6);
+		setPadding(new Insets(8, 10, 8, 10));
+		setAlignment(Pos.TOP_LEFT);
+		setMinWidth(0);
+		setPrefWidth(Region.USE_COMPUTED_SIZE);
+		setMaxWidth(Double.MAX_VALUE);
+		actionsRow.setAlignment(Pos.CENTER_RIGHT);
+
+		getChildren().setAll(fullHeaderRow, fullExpandedContent);
+		setFullExpanded(false);
 	}
 
 	private void wireEvents() {
@@ -298,10 +323,24 @@ public final class TaskCard extends VBox {
 		HBox.setHgrow(compactDueHost, javafx.scene.layout.Priority.NEVER);
 		HBox.setHgrow(compactMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
+		HBox.setHgrow(fullHeaderText, javafx.scene.layout.Priority.ALWAYS);
 		toggleCompleteButton.getStyleClass().addAll(
 				"app-toolbar-button",
 				"app-toolbar-button-success",
 				"app-taskcard-action-button");
+		expandDetailsButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
+		expandDetailsButton.setFocusTraversable(false);
+		expandDetailsButton.setMinSize(20, 20);
+		expandDetailsButton.setPrefSize(20, 20);
+		expandDetailsButton.setMaxSize(20, 20);
+		expandDetailsButton.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 0 0 0 0;");
+		expandDetailsButton.setOnAction(e -> {
+			e.consume();
+			if (currentVariant != Variant.FULL) {
+				return;
+			}
+			setFullExpanded(!fullExpanded);
+		});
 		toggleCompleteButton.setOnAction(e ->
 		{
 			e.consume();
@@ -332,6 +371,15 @@ public final class TaskCard extends VBox {
 		});
 		setAssignees(List.of());
 		setRelatedCase(null, null, null, null, null);
+	}
+
+	private void setFullExpanded(boolean expanded) {
+		fullExpanded = expanded;
+		if (currentVariant == Variant.FULL) {
+			fullExpandedContent.setManaged(expanded);
+			fullExpandedContent.setVisible(expanded);
+			expandDetailsButton.setText(expanded ? "−" : "+");
+		}
 	}
 
 	private void configureRelatedSections() {
