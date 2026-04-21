@@ -253,7 +253,9 @@ public final class MyShaleController {
 		boolean showOverview = SECTION_OVERVIEW.equals(section);
 		setVisibleManaged(overviewSectionPane, showOverview);
 		setVisibleManaged(tasksSectionPane, !showOverview);
-		attachTasksPanel(showOverview ? overviewMainRow : tasksSectionContentHost);
+		if (!showOverview) {
+			attachTasksPanel(tasksSectionContentHost);
+		}
 		renderMyTasks();
 	}
 

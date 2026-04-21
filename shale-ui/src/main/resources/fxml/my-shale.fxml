@@ -71,8 +71,12 @@
 							</center>
 						</BorderPane>
 					</VBox>
+				</HBox>
+			</VBox>
 
-					<VBox fx:id="myTasksPanel" spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390">
+			<VBox fx:id="tasksSectionPane" spacing="8" visible="false" managed="false">
+				<VBox fx:id="tasksSectionContentHost" VBox.vgrow="ALWAYS">
+					<VBox fx:id="myTasksPanel" spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390" VBox.vgrow="ALWAYS">
 						<padding>
 							<Insets top="10" right="10" bottom="10" left="10" />
 						</padding>
@@ -113,11 +117,7 @@
 							</content>
 						</ScrollPane>
 					</VBox>
-				</HBox>
-			</VBox>
-
-			<VBox fx:id="tasksSectionPane" spacing="8" visible="false" managed="false">
-				<VBox fx:id="tasksSectionContentHost" VBox.vgrow="ALWAYS" />
+				</VBox>
 			</VBox>
 		</StackPane>
 	</center>
