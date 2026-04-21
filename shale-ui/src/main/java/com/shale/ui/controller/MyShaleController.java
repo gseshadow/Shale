@@ -248,6 +248,7 @@ public final class MyShaleController {
 		setVisibleManaged(overviewSectionPane, showOverview);
 		setVisibleManaged(tasksSectionPane, !showOverview);
 		attachTasksPanel(showOverview ? overviewMainRow : tasksSectionContentHost);
+		renderMyTasks();
 	}
 
 	private void attachTasksPanel(Pane host) {
@@ -670,6 +671,7 @@ public final class MyShaleController {
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
+		boolean fullVariant = SECTION_TASKS.equals(activeSection);
 		for (CaseTaskListItemDto task : filteredTasks) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
 					task.id(),
@@ -685,7 +687,11 @@ public final class MyShaleController {
 					task.dueAt(),
 					task.completedAt(),
 					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL));
+			if (fullVariant) {
+				myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
+			} else {
+				myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+			}
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
