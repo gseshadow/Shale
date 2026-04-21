@@ -685,7 +685,7 @@ public final class MyShaleController {
 					task.dueAt(),
 					task.completedAt(),
 					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL));
+			myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);

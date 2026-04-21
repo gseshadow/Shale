@@ -56,6 +56,10 @@ public final class TaskCardFactory {
     }
 
     public TaskCard create(TaskCardModel model, Variant variant) {
+        return create(model, variant, false);
+    }
+
+    public TaskCard create(TaskCardModel model, Variant variant, boolean allowPhiDescriptionForFull) {
         Objects.requireNonNull(model, "model");
 
         TaskCard card = new TaskCard();
@@ -67,7 +71,8 @@ public final class TaskCardFactory {
         String displayTitle = suppressTitleForPassiveSurface
                 ? "Task #" + model.taskId()
                 : model.title();
-        String safeDescription = variant == Variant.FULL && !PhiFieldRegistry.isPhi("Tasks", "Description")
+        String safeDescription = variant == Variant.FULL
+                && (allowPhiDescriptionForFull || !PhiFieldRegistry.isPhi("Tasks", "Description"))
                 ? model.description()
                 : null;
         card.setTaskId(model.taskId());
