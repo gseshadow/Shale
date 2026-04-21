@@ -71,8 +71,12 @@
 							</center>
 						</BorderPane>
 					</VBox>
+				</HBox>
+			</VBox>
 
-					<VBox fx:id="myTasksPanel" spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390">
+			<VBox fx:id="tasksSectionPane" spacing="8" visible="false" managed="false" maxHeight="1.7976931348623157E308">
+				<VBox fx:id="tasksSectionContentHost" VBox.vgrow="ALWAYS" maxHeight="1.7976931348623157E308">
+					<VBox fx:id="myTasksPanel" spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390" VBox.vgrow="ALWAYS" maxHeight="1.7976931348623157E308">
 						<padding>
 							<Insets top="10" right="10" bottom="10" left="10" />
 						</padding>
@@ -99,25 +103,26 @@
 										<String fx:value="app-toolbar-select" />
 									</styleClass>
 								</ChoiceBox>
+								<ChoiceBox fx:id="myTasksColumnOrderChoice" prefWidth="220">
+									<styleClass>
+										<String fx:value="app-toolbar-select" />
+									</styleClass>
+								</ChoiceBox>
 							</HBox>
 						</VBox>
 						<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" />
-						<ScrollPane fx:id="myTasksScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
-							vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
+						<ScrollPane fx:id="myTasksScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
+							vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
 							<content>
-								<VBox fx:id="myTasksList" spacing="10" styleClass="cases-content-surface glass-panel">
+								<HBox fx:id="myTasksList" spacing="10" styleClass="cases-content-surface glass-panel">
 									<padding>
-										<Insets top="10" right="10" bottom="10" left="10" />
+										<Insets top="10" right="10" bottom="18" left="10" />
 									</padding>
-								</VBox>
+								</HBox>
 							</content>
 						</ScrollPane>
 					</VBox>
-				</HBox>
-			</VBox>
-
-			<VBox fx:id="tasksSectionPane" spacing="8" visible="false" managed="false">
-				<VBox fx:id="tasksSectionContentHost" VBox.vgrow="ALWAYS" />
+				</VBox>
 			</VBox>
 		</StackPane>
 	</center>
