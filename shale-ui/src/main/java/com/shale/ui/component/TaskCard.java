@@ -38,9 +38,8 @@ public final class TaskCard extends VBox {
 	private final Label completedLabel = new Label();
 	private final StackPane relatedCaseHost = new StackPane();
 	private final StackPane assigneeHost = new StackPane();
-	private final VBox compactTitleBlock = new VBox(2, titleLabel, createdByLabel);
-	private final StackPane compactDueHost = new StackPane(dueLabel);
-	private final HBox compactTitleRow = new HBox(8, compactTitleBlock, compactDueHost);
+	private final VBox compactTitleBlock = new VBox(2, titleLabel, createdByLabel, dueLabel);
+	private final HBox compactTitleRow = new HBox(8, compactTitleBlock);
 	private final Label caseSectionLabel = new Label("Case:");
 	private final VBox caseSection = new VBox(3, caseSectionLabel, relatedCaseHost);
 	private final Label teamSectionLabel = new Label("Team:");
@@ -50,6 +49,10 @@ public final class TaskCard extends VBox {
 	private final Button toggleCompleteButton = new Button();
 	private final Region actionsSpacer = new Region();
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
+	private final Button expandDetailsButton = new Button("+");
+	private final VBox fullHeaderText = new VBox(2, titleLabel, dueLabel);
+	private final HBox fullHeaderRow = new HBox(6, fullHeaderText, expandDetailsButton);
+	private final VBox fullExpandedContent = new VBox(6, createdByLabel, teamSection, descriptionLabel, completedLabel, actionsRow);
 	private final UserCardFactory userCardFactory = new UserCardFactory(id -> {
 	});
 	private final CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {
@@ -65,6 +68,7 @@ public final class TaskCard extends VBox {
 	private String backgroundCss;
 	private String borderCss;
 	private boolean hovered;
+	private boolean fullExpanded;
 
 	public TaskCard() {
 		setCursor(Cursor.HAND);
@@ -247,8 +251,8 @@ public final class TaskCard extends VBox {
 	public void applyCompact() {
 		currentVariant = Variant.COMPACT;
 		setDueAt(dueAtValue);
-		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel);
-		compactTitleRow.getChildren().setAll(compactTitleBlock, compactDueHost);
+		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel, dueLabel);
+		compactTitleRow.getChildren().setAll(compactTitleBlock);
 		getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel, actionsRow);
 		setSpacing(5);
 		setPadding(new Insets(8, 10, 8, 10));
@@ -265,9 +269,6 @@ public final class TaskCard extends VBox {
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
 		compactTitleBlock.setMinWidth(0);
 		dueLabel.setWrapText(false);
-		compactDueHost.setAlignment(Pos.CENTER_RIGHT);
-		compactDueHost.setMinWidth(Region.USE_PREF_SIZE);
-		compactDueHost.setMaxWidth(Region.USE_PREF_SIZE);
 		compactTitleRow.setAlignment(Pos.CENTER_LEFT);
 		configureRelatedSections();
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
@@ -286,22 +287,56 @@ public final class TaskCard extends VBox {
 	}
 
 	public void applyFull() {
-		applyCompact();
 		currentVariant = Variant.FULL;
-		getChildren().setAll(compactTitleRow, compactMetadataRow, descriptionLabel, completedLabel, actionsRow);
+		fullHeaderText.getChildren().setAll(titleLabel, dueLabel);
+		setDueAt(dueAtValue);
+		configureRelatedSections();
+		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		titleLabel.setWrapText(false);
+		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		titleLabel.setMinWidth(0);
+		titleLabel.setMaxWidth(Double.MAX_VALUE);
+		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		dueLabel.setWrapText(false);
+		dueLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
+		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+		setSpacing(6);
+		setPadding(new Insets(8, 10, 8, 10));
+		setAlignment(Pos.TOP_LEFT);
+		setMinWidth(0);
+		setPrefWidth(Region.USE_COMPUTED_SIZE);
+		setMaxWidth(Double.MAX_VALUE);
+		actionsRow.setAlignment(Pos.CENTER_RIGHT);
+
+		getChildren().setAll(fullHeaderRow, fullExpandedContent);
+		setFullExpanded(false);
 	}
 
 	private void wireEvents() {
 		HBox.setHgrow(compactTitleBlock, javafx.scene.layout.Priority.ALWAYS);
-		HBox.setHgrow(compactDueHost, javafx.scene.layout.Priority.NEVER);
 		HBox.setHgrow(compactMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
+		HBox.setHgrow(fullHeaderText, javafx.scene.layout.Priority.ALWAYS);
 		toggleCompleteButton.getStyleClass().addAll(
 				"app-toolbar-button",
 				"app-toolbar-button-success",
 				"app-taskcard-action-button");
+		expandDetailsButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
+		expandDetailsButton.setFocusTraversable(false);
+		expandDetailsButton.setMinSize(20, 20);
+		expandDetailsButton.setPrefSize(20, 20);
+		expandDetailsButton.setMaxSize(20, 20);
+		expandDetailsButton.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 0 0 0 0;");
+		expandDetailsButton.setOnAction(e -> {
+			e.consume();
+			if (currentVariant != Variant.FULL) {
+				return;
+			}
+			setFullExpanded(!fullExpanded);
+		});
 		toggleCompleteButton.setOnAction(e ->
 		{
 			e.consume();
@@ -332,6 +367,15 @@ public final class TaskCard extends VBox {
 		});
 		setAssignees(List.of());
 		setRelatedCase(null, null, null, null, null);
+	}
+
+	private void setFullExpanded(boolean expanded) {
+		fullExpanded = expanded;
+		if (currentVariant == Variant.FULL) {
+			fullExpandedContent.setManaged(expanded);
+			fullExpandedContent.setVisible(expanded);
+			expandDetailsButton.setText(expanded ? "−" : "+");
+		}
 	}
 
 	private void configureRelatedSections() {
