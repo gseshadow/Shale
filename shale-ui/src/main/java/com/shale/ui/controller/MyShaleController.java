@@ -3,9 +3,11 @@ package com.shale.ui.controller;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -30,10 +32,14 @@ import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
@@ -42,6 +48,11 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
@@ -52,7 +63,16 @@ public final class MyShaleController {
 	private static final String SORT_SOL = "Statute of Limitations Date";
 	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
+	private static final String MY_TASKS_COLUMN_ORDER_CASE_NAME = "Case Name";
+	private static final String MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE = "Oldest Incomplete Due Date";
 	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
+	private static final PriorityFilterOption ALL_PRIORITIES_OPTION = new PriorityFilterOption(null, "All Priorities");
+	private static final String SECTION_OVERVIEW = "Overview";
+	private static final String SECTION_TASKS = "Tasks";
+	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
+	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
+	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 300;
+	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -69,15 +89,33 @@ public final class MyShaleController {
 	@FXML
 	private ChoiceBox<CaseFilterOption> myTasksCaseFilterChoice;
 	@FXML
+	private ChoiceBox<PriorityFilterOption> myTasksPriorityFilterChoice;
+	@FXML
+	private ChoiceBox<String> myTasksColumnOrderChoice;
+	@FXML
 	private TextField myTasksSearchField;
 	@FXML
 	private Button myTasksShowCompletedButton;
 	@FXML
 	private ScrollPane myTasksScroll;
 	@FXML
-	private VBox myTasksList;
+	private HBox myTasksList;
 	@FXML
 	private Label myTasksEmptyLabel;
+	@FXML
+	private VBox sectionButtonsBox;
+	@FXML
+	private VBox overviewSectionPane;
+	@FXML
+	private VBox tasksSectionPane;
+	@FXML
+	private VBox myTasksPanel;
+	@FXML
+	private VBox tasksSectionContentHost;
+	@FXML
+	private HBox overviewMainRow;
+	@FXML
+	private StackPane sectionContentStack;
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
@@ -101,9 +139,12 @@ public final class MyShaleController {
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
+	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
+	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
+	private String activeSection = SECTION_OVERVIEW;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "my-cases-loader");
@@ -138,6 +179,9 @@ public final class MyShaleController {
 
 	@FXML
 	private void initialize() {
+		setupSections();
+		configureSectionSizing();
+
 		if (myCasesSortChoice != null) {
 			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
 			myCasesSortChoice.getSelectionModel().select(SORT_NAME);
@@ -159,6 +203,20 @@ public final class MyShaleController {
 			myTasksCaseFilterChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> renderMyTasks());
 		}
+		if (myTasksPriorityFilterChoice != null) {
+			myTasksPriorityFilterChoice.getItems().setAll(ALL_PRIORITIES_OPTION);
+			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
+			myTasksPriorityFilterChoice.getSelectionModel().selectedItemProperty()
+					.addListener((obs, oldV, newV) -> renderMyTasks());
+		}
+		if (myTasksColumnOrderChoice != null) {
+			myTasksColumnOrderChoice.getItems().setAll(
+					MY_TASKS_COLUMN_ORDER_CASE_NAME,
+					MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE);
+			myTasksColumnOrderChoice.getSelectionModel().select(MY_TASKS_COLUMN_ORDER_CASE_NAME);
+			myTasksColumnOrderChoice.getSelectionModel().selectedItemProperty()
+					.addListener((obs, oldV, newV) -> renderMyTasks());
+		}
 		if (myTasksSearchField != null) {
 			myTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyTasks());
 		}
@@ -174,6 +232,7 @@ public final class MyShaleController {
 		reloadStatusFilterOptionsAndThen(this::rerender);
 
 		Platform.runLater(() -> {
+			onSectionSelected(SECTION_OVERVIEW);
 			wireInfiniteScroll();
 			loadFirstPage();
 			refreshMyTasks();
@@ -191,6 +250,91 @@ public final class MyShaleController {
 		}
 
 		subscribeLiveCaseUpdates();
+	}
+
+	private void configureSectionSizing() {
+		if (sectionContentStack != null) {
+			sectionContentStack.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		if (overviewSectionPane != null) {
+			overviewSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+			StackPane.setAlignment(overviewSectionPane, Pos.TOP_LEFT);
+		}
+		if (tasksSectionPane != null) {
+			tasksSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+			StackPane.setAlignment(tasksSectionPane, Pos.TOP_LEFT);
+		}
+		if (tasksSectionContentHost != null) {
+			VBox.setVgrow(tasksSectionContentHost, Priority.ALWAYS);
+			tasksSectionContentHost.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		if (myTasksPanel != null) {
+			VBox.setVgrow(myTasksPanel, Priority.ALWAYS);
+			myTasksPanel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		if (myTasksScroll != null) {
+			VBox.setVgrow(myTasksScroll, Priority.ALWAYS);
+			myTasksScroll.setFitToHeight(true);
+			myTasksScroll.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+	}
+
+	private void setupSections() {
+		if (sectionButtonsBox == null) {
+			return;
+		}
+		sectionButtons.clear();
+		sectionButtonsBox.getChildren().clear();
+		for (String section : List.of(SECTION_OVERVIEW, SECTION_TASKS)) {
+			Button button = new Button(section);
+			button.setMaxWidth(Double.MAX_VALUE);
+			button.setAlignment(Pos.CENTER_LEFT);
+			NavButtonStyler.applyBaseStyle(button);
+			button.setOnAction(e -> onSectionSelected(section));
+			VBox.setVgrow(button, Priority.NEVER);
+			sectionButtons.put(section, button);
+			sectionButtonsBox.getChildren().add(button);
+		}
+	}
+
+	private void onSectionSelected(String section) {
+		if (section == null) {
+			return;
+		}
+		activeSection = section;
+		Button activeButton = sectionButtons.get(section);
+		NavButtonStyler.setActive(activeButton, sectionButtons.values());
+		boolean showOverview = SECTION_OVERVIEW.equals(section);
+		setVisibleManaged(overviewSectionPane, showOverview);
+		setVisibleManaged(tasksSectionPane, !showOverview);
+		if (!showOverview) {
+			attachTasksPanel(tasksSectionContentHost);
+		}
+		renderMyTasks();
+	}
+
+	private void attachTasksPanel(Pane host) {
+		if (host == null || myTasksPanel == null) {
+			return;
+		}
+		var parent = myTasksPanel.getParent();
+		if (parent instanceof HBox hBoxParent) {
+			hBoxParent.getChildren().remove(myTasksPanel);
+		} else if (parent instanceof VBox vBoxParent) {
+			vBoxParent.getChildren().remove(myTasksPanel);
+		}
+		if (!host.getChildren().contains(myTasksPanel)) {
+			host.getChildren().add(myTasksPanel);
+		}
+		if (host instanceof VBox) {
+			VBox.setVgrow(myTasksPanel, Priority.ALWAYS);
+			myTasksPanel.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		}
+		if (host instanceof HBox) {
+			HBox.setHgrow(myTasksPanel, Priority.ALWAYS);
+		}
+		myTasksPanel.setMaxHeight(Double.MAX_VALUE);
+		myTasksPanel.setMaxWidth(Double.MAX_VALUE);
 	}
 
 	private void subscribeLiveCaseUpdates() {
@@ -546,8 +690,8 @@ public final class MyShaleController {
 				PerfLog.logDone("DAO", "method=loadMyTasks page=my_shale userId=" + userId + " rows=" + (tasks == null ? 0 : tasks.size()), loadStartNanos);
 				long usersLoadStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId);
-				java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
-						.loadAssignedUsersForTasks(taskIds, shaleClientId)
+					java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
+							.loadAssignedUsersForTasks(taskIds, shaleClientId)
 						.stream()
 						.collect(java.util.stream.Collectors.groupingBy(
 								CaseTaskService.TaskAssignedUsersByTask::taskId,
@@ -556,14 +700,23 @@ public final class MyShaleController {
 												row.userId(),
 												row.displayName(),
 												row.color()),
-										java.util.stream.Collectors.toList())));
-				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
-				runOnFx(() -> {
-					myTasks = tasks == null ? List.of() : tasks;
-					myTaskAssignedUsers = assignedByTask;
-					syncMyTaskCaseFilterOptions();
-					renderMyTasks();
-				});
+											java.util.stream.Collectors.toList())));
+					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientId).stream()
+							.filter(Objects::nonNull)
+							.collect(java.util.stream.Collectors.toMap(
+									TaskPriorityOptionDto::id,
+									option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
+									(existing, replacement) -> existing,
+									java.util.LinkedHashMap::new));
+					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
+					runOnFx(() -> {
+						myTasks = tasks == null ? List.of() : tasks;
+						myTaskAssignedUsers = assignedByTask;
+						myTaskPrioritiesById = prioritiesById;
+						syncMyTaskPriorityFilterOptions();
+						syncMyTaskCaseFilterOptions();
+						renderMyTasks();
+					});
 			} catch (Exception ex) {
 				System.err.println("My tasks load failed: " + ex.getMessage());
 				ex.printStackTrace();
@@ -579,9 +732,14 @@ public final class MyShaleController {
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
+		myTasksList.setFillHeight(true);
+		myTasksList.setMinHeight(0);
+		myTasksList.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		myTasksList.setMaxHeight(Double.MAX_VALUE);
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
-		List<CaseTaskListItemDto> filteredTasks = filterAndRankMyTasks(myTasks, selectedCaseFilterId(), searchQuery);
+		List<CaseTaskListItemDto> taskFiltered = filterAndRankMyTasks(myTasks, selectedPriorityFilterId(), searchQuery);
+		List<CaseTaskListItemDto> filteredTasks = applyCaseColumnFilter(taskFiltered, selectedCaseFilterId());
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
@@ -598,43 +756,202 @@ public final class MyShaleController {
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
-		for (CaseTaskListItemDto task : filteredTasks) {
-			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
-					task.id(),
-					task.caseId(),
-					task.caseName(),
-					task.caseResponsibleAttorney(),
-					task.caseResponsibleAttorneyColor(),
-					task.caseNonEngagementLetterSent(),
-					task.title(),
-					task.description(),
-					task.createdByDisplayName(),
-					task.priorityColorHex(),
-					task.dueAt(),
-					task.completedAt(),
-					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			myTasksList.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+		boolean fullVariant = SECTION_TASKS.equals(activeSection);
+		Map<CaseColumnKey, List<CaseTaskListItemDto>> tasksByCase = groupTasksByCase(filteredTasks);
+		for (Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>> entry : orderCaseColumns(tasksByCase)) {
+			VBox caseColumn = new VBox(8);
+			caseColumn.setMinWidth(TASKS_CASE_COLUMN_MIN_WIDTH);
+			caseColumn.setPrefWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
+			caseColumn.setMaxWidth(TASKS_CASE_COLUMN_MAX_WIDTH);
+			caseColumn.setMinHeight(280);
+			caseColumn.setPrefHeight(Region.USE_COMPUTED_SIZE);
+			caseColumn.setMaxHeight(Double.MAX_VALUE);
+			caseColumn.setPadding(new Insets(8));
+			caseColumn.getStyleClass().addAll("strong-panel", "glass-panel");
+			Node caseHeader = buildCaseColumnHeader(entry.getKey());
+
+			VBox caseTaskCards = new VBox(10);
+			caseTaskCards.setFillWidth(true);
+
+			for (CaseTaskListItemDto task : entry.getValue()) {
+				TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+						task.id(),
+						task.caseId(),
+						task.caseName(),
+						task.caseResponsibleAttorney(),
+						task.caseResponsibleAttorneyColor(),
+						task.caseNonEngagementLetterSent(),
+						resolveMyTaskCardTitle(task),
+						task.description(),
+						task.createdByDisplayName(),
+						task.priorityColorHex(),
+						task.dueAt(),
+						task.completedAt(),
+						myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+				if (fullVariant) {
+					caseTaskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
+				} else {
+					caseTaskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+				}
+			}
+
+			ScrollPane caseColumnScroll = new ScrollPane(caseTaskCards);
+			caseColumnScroll.setFitToWidth(true);
+			caseColumnScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+			caseColumnScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+			caseColumnScroll.getStyleClass().add("surface-scroll");
+			VBox.setVgrow(caseColumnScroll, Priority.ALWAYS);
+			caseColumnScroll.setMinHeight(200);
+			caseColumnScroll.setPrefHeight(Region.USE_COMPUTED_SIZE);
+			caseColumnScroll.setMaxHeight(Double.MAX_VALUE);
+
+			caseColumn.getChildren().addAll(caseHeader, caseColumnScroll);
+			myTasksList.getChildren().add(caseColumn);
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
 	}
 
-	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, Long selectedCaseId, String normalizedQuery) {
+	private Map<CaseColumnKey, List<CaseTaskListItemDto>> groupTasksByCase(List<CaseTaskListItemDto> tasks) {
+		Map<CaseColumnKey, List<CaseTaskListItemDto>> grouped = new LinkedHashMap<>();
+		if (tasks == null || tasks.isEmpty()) {
+			return grouped;
+		}
+		for (CaseTaskListItemDto task : tasks) {
+			CaseColumnKey key = caseColumnKey(task);
+			grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(task);
+		}
+		return grouped;
+	}
+
+	private List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> orderCaseColumns(Map<CaseColumnKey, List<CaseTaskListItemDto>> tasksByCase) {
+		if (tasksByCase == null || tasksByCase.isEmpty()) {
+			return List.of();
+		}
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> entries = new ArrayList<>(tasksByCase.entrySet());
+		Map<CaseColumnKey, Integer> originalIndexes = new LinkedHashMap<>();
+		for (int i = 0; i < entries.size(); i++) {
+			originalIndexes.put(entries.get(i).getKey(), i);
+		}
+
+		boolean sortByDueDate = MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE.equals(
+				myTasksColumnOrderChoice == null ? null : myTasksColumnOrderChoice.getValue());
+		Comparator<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> comparator = caseColumnComparator(originalIndexes, sortByDueDate);
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> noCase = new ArrayList<>();
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> sortableCases = new ArrayList<>();
+
+		for (Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>> entry : entries) {
+			CaseColumnKey key = entry.getKey();
+			if (isNoCaseColumn(key)) {
+				noCase.add(entry);
+			} else {
+				sortableCases.add(entry);
+			}
+		}
+
+		sortableCases.sort(comparator);
+
+		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> ordered = new ArrayList<>(entries.size());
+		ordered.addAll(sortableCases);
+		ordered.addAll(noCase);
+		return ordered;
+	}
+
+	private Comparator<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> caseColumnComparator(
+			Map<CaseColumnKey, Integer> originalIndexes,
+			boolean sortByDueDate) {
+		if (sortByDueDate) {
+			return Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, java.time.LocalDateTime>comparing(
+					entry -> oldestIncompleteDueDate(entry.getValue()),
+					Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(entry -> normalizeCaseName(entry.getKey().displayName()), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE));
+		}
+		return Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, String>comparing(
+				entry -> normalizeCaseName(entry.getKey().displayName()),
+				Comparator.nullsLast(String::compareToIgnoreCase))
+				.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE));
+	}
+
+	private java.time.LocalDateTime oldestIncompleteDueDate(List<CaseTaskListItemDto> tasks) {
+		if (tasks == null || tasks.isEmpty()) {
+			return null;
+		}
+		return tasks.stream()
+				.filter(task -> task != null && task.completedAt() == null && task.dueAt() != null)
+				.map(CaseTaskListItemDto::dueAt)
+				.min(Comparator.naturalOrder())
+				.orElse(null);
+	}
+
+	private boolean isNoCaseColumn(CaseColumnKey key) {
+		return key == null || key.caseId() == null || key.caseId() <= 0;
+	}
+
+	private String normalizeCaseName(String caseName) {
+		String normalized = safe(caseName).trim();
+		return normalized.isEmpty() ? null : normalized;
+	}
+
+	private CaseColumnKey caseColumnKey(CaseTaskListItemDto task) {
+		if (task == null || task.caseId() <= 0) {
+			return new CaseColumnKey(null, NO_CASE_COLUMN_TITLE, "", "", false);
+		}
+		String caseName = safe(task.caseName()).trim();
+		if (caseName.isEmpty()) {
+			caseName = "Case #" + task.caseId();
+		}
+		return new CaseColumnKey(
+				task.caseId(),
+				caseName,
+				safe(task.caseResponsibleAttorney()),
+				safe(task.caseResponsibleAttorneyColor()),
+				Boolean.TRUE.equals(task.caseNonEngagementLetterSent()));
+	}
+
+	private Node buildCaseColumnHeader(CaseColumnKey key) {
+		if (key == null || key.caseId() == null || key.caseId() <= 0) {
+			Label noCaseHeader = new Label(NO_CASE_COLUMN_TITLE);
+			noCaseHeader.getStyleClass().add("sidebar-header");
+			return noCaseHeader;
+		}
+		Node caseCard = caseCardFactory.create(
+				new CaseCardModel(
+						key.caseId(),
+						key.displayName(),
+						null,
+						null,
+						key.responsibleAttorney(),
+						key.responsibleAttorneyColor(),
+						key.nonEngagementLetterSent()),
+				CaseCardFactory.Variant.MINI);
+		return caseCard;
+	}
+
+	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {
+		if (task == null) {
+			return null;
+		}
+		String title = safe(task.title()).trim();
+		return title.isBlank() ? "Task #" + task.id() : title;
+	}
+
+	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, Integer selectedPriorityId, String normalizedQuery) {
 		if (tasks == null || tasks.isEmpty()) {
 			return List.of();
 		}
-		List<CaseTaskListItemDto> caseFiltered = tasks.stream()
-				.filter(task -> selectedCaseId == null || task.caseId() == selectedCaseId.longValue())
+		List<CaseTaskListItemDto> priorityFiltered = tasks.stream()
+				.filter(task -> selectedPriorityId == null || Objects.equals(task.priorityId(), selectedPriorityId))
 				.toList();
 		if (normalizedQuery.isEmpty()) {
-			return caseFiltered;
+			return priorityFiltered;
 		}
 		record RankedTask(CaseTaskListItemDto task, int score, int originalIndex) {
 		}
 		List<RankedTask> ranked = new ArrayList<>();
-		for (int i = 0; i < caseFiltered.size(); i++) {
-			CaseTaskListItemDto task = caseFiltered.get(i);
+		for (int i = 0; i < priorityFiltered.size(); i++) {
+			CaseTaskListItemDto task = priorityFiltered.get(i);
 			int score = myTaskSearchScore(task, normalizedQuery);
 			if (score > 0) {
 				ranked.add(new RankedTask(task, score, i));
@@ -644,6 +961,53 @@ public final class MyShaleController {
 				.comparingInt(RankedTask::score).reversed()
 				.thenComparingInt(RankedTask::originalIndex));
 		return ranked.stream().map(RankedTask::task).toList();
+	}
+
+	private List<CaseTaskListItemDto> applyCaseColumnFilter(List<CaseTaskListItemDto> tasks, Long selectedCaseId) {
+		if (tasks == null || tasks.isEmpty()) {
+			return List.of();
+		}
+		if (selectedCaseId == null) {
+			return tasks;
+		}
+		return tasks.stream()
+				.filter(task -> task.caseId() == selectedCaseId.longValue())
+				.toList();
+	}
+
+	private void syncMyTaskPriorityFilterOptions() {
+		if (myTasksPriorityFilterChoice == null) {
+			return;
+		}
+		PriorityFilterOption selectedOption = myTasksPriorityFilterChoice.getSelectionModel().getSelectedItem();
+		Integer selectedId = selectedOption == null ? null : selectedOption.priorityId();
+		java.util.Map<Integer, String> priorities = myTaskPrioritiesById == null ? java.util.Map.of() : myTaskPrioritiesById;
+		List<PriorityFilterOption> options = new ArrayList<>();
+		options.add(ALL_PRIORITIES_OPTION);
+		priorities.entrySet().stream()
+				.map(entry -> new PriorityFilterOption(entry.getKey(), entry.getValue()))
+				.sorted(Comparator.comparing(
+						(PriorityFilterOption option) -> safe(option.displayName()).toLowerCase(Locale.ROOT),
+						Comparator.nullsLast(String::compareToIgnoreCase)))
+				.forEach(options::add);
+		myTasksPriorityFilterChoice.getItems().setAll(options);
+		if (selectedId != null && priorities.containsKey(selectedId)) {
+			myTasksPriorityFilterChoice.getSelectionModel().select(
+					options.stream()
+							.filter(option -> selectedId.equals(option.priorityId()))
+							.findFirst()
+							.orElse(ALL_PRIORITIES_OPTION));
+		} else {
+			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
+		}
+	}
+
+	private Integer selectedPriorityFilterId() {
+		if (myTasksPriorityFilterChoice == null) {
+			return null;
+		}
+		PriorityFilterOption option = myTasksPriorityFilterChoice.getSelectionModel().getSelectedItem();
+		return option == null ? null : option.priorityId();
 	}
 
 
@@ -1034,6 +1398,22 @@ public final class MyShaleController {
 		public String toString() {
 			return safe(displayName);
 		}
+	}
+
+	private record PriorityFilterOption(Integer priorityId, String displayName) {
+		@Override
+		public String toString() {
+			String text = safe(displayName).trim();
+			return text.isBlank() ? "All Priorities" : text;
+		}
+	}
+
+	private record CaseColumnKey(
+			Long caseId,
+			String displayName,
+			String responsibleAttorney,
+			String responsibleAttorneyColor,
+			boolean nonEngagementLetterSent) {
 	}
 
 	private static final class CaseCardVm {
