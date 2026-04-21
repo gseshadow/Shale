@@ -45,7 +45,7 @@ public final class TaskCard extends VBox {
 	private final Label teamSectionLabel = new Label("Team:");
 	private final VBox teamSection = new VBox(3, teamSectionLabel, assigneeHost);
 	private final Region compactMetadataSpacer = new Region();
-	private final HBox compactMetadataRow = new HBox(12, teamSection, compactMetadataSpacer, caseSection);
+	private final HBox compactMetadataRow = new HBox(12, caseSection, compactMetadataSpacer);
 	private final Button toggleCompleteButton = new Button();
 	private final Region actionsSpacer = new Region();
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
@@ -253,7 +253,7 @@ public final class TaskCard extends VBox {
 		setDueAt(dueAtValue);
 		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel, dueLabel);
 		compactTitleRow.getChildren().setAll(compactTitleBlock);
-		getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel, actionsRow);
+		getChildren().setAll(compactTitleRow, compactMetadataRow, teamSection, completedLabel, actionsRow);
 		setSpacing(5);
 		setPadding(new Insets(8, 10, 8, 10));
 		setAlignment(Pos.TOP_LEFT);
