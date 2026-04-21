@@ -26,14 +26,14 @@
 			<VBox fx:id="sectionButtonsBox" spacing="6.0" prefWidth="200.0" />
 		</VBox>
 	</left>
-	<center>
-		<StackPane BorderPane.alignment="CENTER">
-			<padding>
-				<Insets top="10" right="12" bottom="12" left="12" />
-			</padding>
+		<center>
+			<StackPane fx:id="sectionContentStack" BorderPane.alignment="CENTER" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+				<padding>
+					<Insets top="10" right="12" bottom="12" left="12" />
+				</padding>
 
-			<VBox fx:id="overviewSectionPane" spacing="10">
-				<HBox fx:id="overviewMainRow" spacing="10" fillHeight="true">
+				<VBox fx:id="overviewSectionPane" spacing="10" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+					<HBox fx:id="overviewMainRow" spacing="10" fillHeight="true">
 					<VBox spacing="8" styleClass="strong-panel" HBox.hgrow="ALWAYS">
 						<padding>
 							<Insets top="10" right="10" bottom="10" left="10" />
@@ -74,9 +74,9 @@
 				</HBox>
 			</VBox>
 
-			<VBox fx:id="tasksSectionPane" spacing="8" visible="false" managed="false" maxHeight="1.7976931348623157E308">
-				<VBox fx:id="tasksSectionContentHost" VBox.vgrow="ALWAYS" maxHeight="1.7976931348623157E308">
-					<VBox fx:id="myTasksPanel" spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390" VBox.vgrow="ALWAYS" maxHeight="1.7976931348623157E308">
+				<VBox fx:id="tasksSectionPane" spacing="8" visible="false" managed="false" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+					<VBox fx:id="tasksSectionContentHost" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+						<VBox fx:id="myTasksPanel" spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 						<padding>
 							<Insets top="10" right="10" bottom="10" left="10" />
 						</padding>

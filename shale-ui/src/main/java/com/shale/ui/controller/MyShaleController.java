@@ -52,6 +52,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
@@ -110,6 +111,8 @@ public final class MyShaleController {
 	private VBox tasksSectionContentHost;
 	@FXML
 	private HBox overviewMainRow;
+	@FXML
+	private StackPane sectionContentStack;
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
@@ -174,6 +177,7 @@ public final class MyShaleController {
 	@FXML
 	private void initialize() {
 		setupSections();
+		configureSectionSizing();
 
 		if (myCasesSortChoice != null) {
 			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
@@ -237,6 +241,33 @@ public final class MyShaleController {
 		}
 
 		subscribeLiveCaseUpdates();
+	}
+
+	private void configureSectionSizing() {
+		if (sectionContentStack != null) {
+			sectionContentStack.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		if (overviewSectionPane != null) {
+			overviewSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+			StackPane.setAlignment(overviewSectionPane, Pos.TOP_LEFT);
+		}
+		if (tasksSectionPane != null) {
+			tasksSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+			StackPane.setAlignment(tasksSectionPane, Pos.TOP_LEFT);
+		}
+		if (tasksSectionContentHost != null) {
+			VBox.setVgrow(tasksSectionContentHost, Priority.ALWAYS);
+			tasksSectionContentHost.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		if (myTasksPanel != null) {
+			VBox.setVgrow(myTasksPanel, Priority.ALWAYS);
+			myTasksPanel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		if (myTasksScroll != null) {
+			VBox.setVgrow(myTasksScroll, Priority.ALWAYS);
+			myTasksScroll.setFitToHeight(true);
+			myTasksScroll.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
 	}
 
 	private void setupSections() {
