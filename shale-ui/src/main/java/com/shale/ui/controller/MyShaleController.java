@@ -66,6 +66,7 @@ public final class MyShaleController {
 	private static final String MY_TASKS_COLUMN_ORDER_CASE_NAME = "Case Name";
 	private static final String MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE = "Oldest Incomplete Due Date";
 	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
+	private static final PriorityFilterOption ALL_PRIORITIES_OPTION = new PriorityFilterOption(null, "All Priorities");
 	private static final String SECTION_OVERVIEW = "Overview";
 	private static final String SECTION_TASKS = "Tasks";
 	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
@@ -87,6 +88,8 @@ public final class MyShaleController {
 	private ChoiceBox<String> myTasksSortChoice;
 	@FXML
 	private ChoiceBox<CaseFilterOption> myTasksCaseFilterChoice;
+	@FXML
+	private ChoiceBox<PriorityFilterOption> myTasksPriorityFilterChoice;
 	@FXML
 	private ChoiceBox<String> myTasksColumnOrderChoice;
 	@FXML
@@ -136,7 +139,7 @@ public final class MyShaleController {
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
-	private final Set<Long> pinnedMyTaskCaseIds = new LinkedHashSet<>();
+	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
@@ -198,6 +201,12 @@ public final class MyShaleController {
 			myTasksCaseFilterChoice.getItems().setAll(ALL_CASES_OPTION);
 			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
 			myTasksCaseFilterChoice.getSelectionModel().selectedItemProperty()
+					.addListener((obs, oldV, newV) -> renderMyTasks());
+		}
+		if (myTasksPriorityFilterChoice != null) {
+			myTasksPriorityFilterChoice.getItems().setAll(ALL_PRIORITIES_OPTION);
+			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
+			myTasksPriorityFilterChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> renderMyTasks());
 		}
 		if (myTasksColumnOrderChoice != null) {
@@ -681,8 +690,8 @@ public final class MyShaleController {
 				PerfLog.logDone("DAO", "method=loadMyTasks page=my_shale userId=" + userId + " rows=" + (tasks == null ? 0 : tasks.size()), loadStartNanos);
 				long usersLoadStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId);
-				java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
-						.loadAssignedUsersForTasks(taskIds, shaleClientId)
+					java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
+							.loadAssignedUsersForTasks(taskIds, shaleClientId)
 						.stream()
 						.collect(java.util.stream.Collectors.groupingBy(
 								CaseTaskService.TaskAssignedUsersByTask::taskId,
@@ -691,14 +700,23 @@ public final class MyShaleController {
 												row.userId(),
 												row.displayName(),
 												row.color()),
-										java.util.stream.Collectors.toList())));
-				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
-				runOnFx(() -> {
-					myTasks = tasks == null ? List.of() : tasks;
-					myTaskAssignedUsers = assignedByTask;
-					syncMyTaskCaseFilterOptions();
-					renderMyTasks();
-				});
+											java.util.stream.Collectors.toList())));
+					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientId).stream()
+							.filter(Objects::nonNull)
+							.collect(java.util.stream.Collectors.toMap(
+									TaskPriorityOptionDto::id,
+									option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
+									(existing, replacement) -> existing,
+									java.util.LinkedHashMap::new));
+					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
+					runOnFx(() -> {
+						myTasks = tasks == null ? List.of() : tasks;
+						myTaskAssignedUsers = assignedByTask;
+						myTaskPrioritiesById = prioritiesById;
+						syncMyTaskPriorityFilterOptions();
+						syncMyTaskCaseFilterOptions();
+						renderMyTasks();
+					});
 			} catch (Exception ex) {
 				System.err.println("My tasks load failed: " + ex.getMessage());
 				ex.printStackTrace();
@@ -720,7 +738,8 @@ public final class MyShaleController {
 		myTasksList.setMaxHeight(Double.MAX_VALUE);
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
-		List<CaseTaskListItemDto> filteredTasks = filterAndRankMyTasks(myTasks, selectedCaseFilterId(), searchQuery);
+		List<CaseTaskListItemDto> taskFiltered = filterAndRankMyTasks(myTasks, selectedPriorityFilterId(), searchQuery);
+		List<CaseTaskListItemDto> filteredTasks = applyCaseColumnFilter(taskFiltered, selectedCaseFilterId());
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
@@ -918,21 +937,21 @@ public final class MyShaleController {
 		return title.isBlank() ? "Task #" + task.id() : title;
 	}
 
-	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, Long selectedCaseId, String normalizedQuery) {
+	private List<CaseTaskListItemDto> filterAndRankMyTasks(List<CaseTaskListItemDto> tasks, Integer selectedPriorityId, String normalizedQuery) {
 		if (tasks == null || tasks.isEmpty()) {
 			return List.of();
 		}
-		List<CaseTaskListItemDto> caseFiltered = tasks.stream()
-				.filter(task -> selectedCaseId == null || task.caseId() == selectedCaseId.longValue())
+		List<CaseTaskListItemDto> priorityFiltered = tasks.stream()
+				.filter(task -> selectedPriorityId == null || Objects.equals(task.priorityId(), selectedPriorityId))
 				.toList();
 		if (normalizedQuery.isEmpty()) {
-			return caseFiltered;
+			return priorityFiltered;
 		}
 		record RankedTask(CaseTaskListItemDto task, int score, int originalIndex) {
 		}
 		List<RankedTask> ranked = new ArrayList<>();
-		for (int i = 0; i < caseFiltered.size(); i++) {
-			CaseTaskListItemDto task = caseFiltered.get(i);
+		for (int i = 0; i < priorityFiltered.size(); i++) {
+			CaseTaskListItemDto task = priorityFiltered.get(i);
 			int score = myTaskSearchScore(task, normalizedQuery);
 			if (score > 0) {
 				ranked.add(new RankedTask(task, score, i));
@@ -942,6 +961,53 @@ public final class MyShaleController {
 				.comparingInt(RankedTask::score).reversed()
 				.thenComparingInt(RankedTask::originalIndex));
 		return ranked.stream().map(RankedTask::task).toList();
+	}
+
+	private List<CaseTaskListItemDto> applyCaseColumnFilter(List<CaseTaskListItemDto> tasks, Long selectedCaseId) {
+		if (tasks == null || tasks.isEmpty()) {
+			return List.of();
+		}
+		if (selectedCaseId == null) {
+			return tasks;
+		}
+		return tasks.stream()
+				.filter(task -> task.caseId() == selectedCaseId.longValue())
+				.toList();
+	}
+
+	private void syncMyTaskPriorityFilterOptions() {
+		if (myTasksPriorityFilterChoice == null) {
+			return;
+		}
+		PriorityFilterOption selectedOption = myTasksPriorityFilterChoice.getSelectionModel().getSelectedItem();
+		Integer selectedId = selectedOption == null ? null : selectedOption.priorityId();
+		java.util.Map<Integer, String> priorities = myTaskPrioritiesById == null ? java.util.Map.of() : myTaskPrioritiesById;
+		List<PriorityFilterOption> options = new ArrayList<>();
+		options.add(ALL_PRIORITIES_OPTION);
+		priorities.entrySet().stream()
+				.map(entry -> new PriorityFilterOption(entry.getKey(), entry.getValue()))
+				.sorted(Comparator.comparing(
+						(PriorityFilterOption option) -> safe(option.displayName()).toLowerCase(Locale.ROOT),
+						Comparator.nullsLast(String::compareToIgnoreCase)))
+				.forEach(options::add);
+		myTasksPriorityFilterChoice.getItems().setAll(options);
+		if (selectedId != null && priorities.containsKey(selectedId)) {
+			myTasksPriorityFilterChoice.getSelectionModel().select(
+					options.stream()
+							.filter(option -> selectedId.equals(option.priorityId()))
+							.findFirst()
+							.orElse(ALL_PRIORITIES_OPTION));
+		} else {
+			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
+		}
+	}
+
+	private Integer selectedPriorityFilterId() {
+		if (myTasksPriorityFilterChoice == null) {
+			return null;
+		}
+		PriorityFilterOption option = myTasksPriorityFilterChoice.getSelectionModel().getSelectedItem();
+		return option == null ? null : option.priorityId();
 	}
 
 
@@ -1331,6 +1397,14 @@ public final class MyShaleController {
 		@Override
 		public String toString() {
 			return safe(displayName);
+		}
+	}
+
+	private record PriorityFilterOption(Integer priorityId, String displayName) {
+		@Override
+		public String toString() {
+			String text = safe(displayName).trim();
+			return text.isBlank() ? "All Priorities" : text;
 		}
 	}
 

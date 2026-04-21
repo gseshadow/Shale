@@ -15,6 +15,7 @@ public record CaseTaskListItemDto(
         Boolean caseNonEngagementLetterSent,
         String title,
         String description,
+        Integer priorityId,
         String priorityColorHex,
         LocalDateTime dueAt,
         LocalDateTime completedAt,
