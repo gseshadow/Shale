@@ -38,9 +38,8 @@ public final class TaskCard extends VBox {
 	private final Label completedLabel = new Label();
 	private final StackPane relatedCaseHost = new StackPane();
 	private final StackPane assigneeHost = new StackPane();
-	private final VBox compactTitleBlock = new VBox(2, titleLabel, createdByLabel);
-	private final StackPane compactDueHost = new StackPane(dueLabel);
-	private final HBox compactTitleRow = new HBox(8, compactTitleBlock, compactDueHost);
+	private final VBox compactTitleBlock = new VBox(2, titleLabel, createdByLabel, dueLabel);
+	private final HBox compactTitleRow = new HBox(8, compactTitleBlock);
 	private final Label caseSectionLabel = new Label("Case:");
 	private final VBox caseSection = new VBox(3, caseSectionLabel, relatedCaseHost);
 	private final Label teamSectionLabel = new Label("Team:");
@@ -53,7 +52,7 @@ public final class TaskCard extends VBox {
 	private final Button expandDetailsButton = new Button("+");
 	private final VBox fullHeaderText = new VBox(2, titleLabel, dueLabel);
 	private final HBox fullHeaderRow = new HBox(6, fullHeaderText, expandDetailsButton);
-	private final VBox fullExpandedContent = new VBox(6, createdByLabel, caseSection, teamSection, descriptionLabel, completedLabel, actionsRow);
+	private final VBox fullExpandedContent = new VBox(6, createdByLabel, teamSection, descriptionLabel, completedLabel, actionsRow);
 	private final UserCardFactory userCardFactory = new UserCardFactory(id -> {
 	});
 	private final CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {
@@ -252,8 +251,8 @@ public final class TaskCard extends VBox {
 	public void applyCompact() {
 		currentVariant = Variant.COMPACT;
 		setDueAt(dueAtValue);
-		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel);
-		compactTitleRow.getChildren().setAll(compactTitleBlock, compactDueHost);
+		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel, dueLabel);
+		compactTitleRow.getChildren().setAll(compactTitleBlock);
 		getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel, actionsRow);
 		setSpacing(5);
 		setPadding(new Insets(8, 10, 8, 10));
@@ -270,9 +269,6 @@ public final class TaskCard extends VBox {
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
 		compactTitleBlock.setMinWidth(0);
 		dueLabel.setWrapText(false);
-		compactDueHost.setAlignment(Pos.CENTER_RIGHT);
-		compactDueHost.setMinWidth(Region.USE_PREF_SIZE);
-		compactDueHost.setMaxWidth(Region.USE_PREF_SIZE);
 		compactTitleRow.setAlignment(Pos.CENTER_LEFT);
 		configureRelatedSections();
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
@@ -321,7 +317,6 @@ public final class TaskCard extends VBox {
 
 	private void wireEvents() {
 		HBox.setHgrow(compactTitleBlock, javafx.scene.layout.Priority.ALWAYS);
-		HBox.setHgrow(compactDueHost, javafx.scene.layout.Priority.NEVER);
 		HBox.setHgrow(compactMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(fullHeaderText, javafx.scene.layout.Priority.ALWAYS);
