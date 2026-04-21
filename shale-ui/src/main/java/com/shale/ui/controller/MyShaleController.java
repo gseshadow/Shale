@@ -712,11 +712,9 @@ public final class MyShaleController {
 			caseColumn.setMinWidth(TASKS_CASE_COLUMN_MIN_WIDTH);
 			caseColumn.setPrefWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
 			caseColumn.setMaxWidth(TASKS_CASE_COLUMN_MAX_WIDTH);
-			caseColumn.setMinHeight(0);
+			caseColumn.setMinHeight(280);
+			caseColumn.setPrefHeight(Region.USE_COMPUTED_SIZE);
 			caseColumn.setMaxHeight(Double.MAX_VALUE);
-			caseColumn.prefHeightProperty().bind(Bindings.createDoubleBinding(
-					() -> Math.max(0, myTasksScroll.getViewportBounds().getHeight() - 16),
-					myTasksScroll.viewportBoundsProperty()));
 			caseColumn.setPadding(new Insets(8));
 			caseColumn.getStyleClass().addAll("strong-panel", "glass-panel");
 			Node caseHeader = buildCaseColumnHeader(entry.getKey());
@@ -752,7 +750,8 @@ public final class MyShaleController {
 			caseColumnScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 			caseColumnScroll.getStyleClass().add("surface-scroll");
 			VBox.setVgrow(caseColumnScroll, Priority.ALWAYS);
-			caseColumnScroll.setMinHeight(0);
+			caseColumnScroll.setMinHeight(200);
+			caseColumnScroll.setPrefHeight(Region.USE_COMPUTED_SIZE);
 			caseColumnScroll.setMaxHeight(Double.MAX_VALUE);
 
 			caseColumn.getChildren().addAll(caseHeader, caseColumnScroll);
