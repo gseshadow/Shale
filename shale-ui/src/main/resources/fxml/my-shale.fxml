@@ -74,9 +74,9 @@
 				</HBox>
 			</VBox>
 
-			<VBox fx:id="tasksSectionPane" spacing="8" visible="false" managed="false">
-				<VBox fx:id="tasksSectionContentHost" VBox.vgrow="ALWAYS">
-					<VBox fx:id="myTasksPanel" spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390" VBox.vgrow="ALWAYS">
+			<VBox fx:id="tasksSectionPane" spacing="8" visible="false" managed="false" maxHeight="1.7976931348623157E308">
+				<VBox fx:id="tasksSectionContentHost" VBox.vgrow="ALWAYS" maxHeight="1.7976931348623157E308">
+					<VBox fx:id="myTasksPanel" spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390" VBox.vgrow="ALWAYS" maxHeight="1.7976931348623157E308">
 						<padding>
 							<Insets top="10" right="10" bottom="10" left="10" />
 						</padding>
@@ -116,7 +116,7 @@
 							<content>
 								<HBox fx:id="myTasksList" spacing="10" styleClass="cases-content-surface glass-panel">
 									<padding>
-										<Insets top="10" right="10" bottom="10" left="10" />
+										<Insets top="10" right="10" bottom="18" left="10" />
 									</padding>
 								</HBox>
 							</content>

@@ -292,6 +292,7 @@ public final class TaskCard extends VBox {
 
 	public void applyFull() {
 		currentVariant = Variant.FULL;
+		fullHeaderText.getChildren().setAll(titleLabel, dueLabel);
 		setDueAt(dueAtValue);
 		configureRelatedSections();
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
