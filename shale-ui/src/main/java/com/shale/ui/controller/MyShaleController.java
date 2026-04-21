@@ -36,6 +36,7 @@ import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
