@@ -288,6 +288,10 @@ public final class MyShaleController {
 		}
 		if (host instanceof VBox) {
 			VBox.setVgrow(myTasksPanel, Priority.ALWAYS);
+			if (myTasksPanel.prefHeightProperty().isBound()) {
+				myTasksPanel.prefHeightProperty().unbind();
+			}
+			myTasksPanel.prefHeightProperty().bind(((VBox) host).heightProperty());
 		}
 		if (host instanceof HBox) {
 			HBox.setHgrow(myTasksPanel, Priority.ALWAYS);
