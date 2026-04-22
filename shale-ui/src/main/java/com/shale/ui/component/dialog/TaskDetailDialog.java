@@ -119,6 +119,9 @@ public final class TaskDetailDialog {
         priorityCombo.setCellFactory(cb -> new PriorityListCell());
         priorityCombo.setButtonCell(new PriorityListCell());
         selectPriority(priorityCombo, safePriorities, model.priorityId());
+        applyColoredToolbarSelect(priorityCombo, Optional.ofNullable(priorityCombo.getValue()).map(TaskPriorityOptionDto::colorHex).orElse(null));
+        priorityCombo.valueProperty().addListener((obs, oldValue, newValue) ->
+                applyColoredToolbarSelect(priorityCombo, newValue == null ? null : newValue.colorHex()));
         Label coreLoadingLabel = loadingLabel("Loading task details…");
         boolean needsCoreHydration = safeStatuses.isEmpty() || safePriorities.isEmpty() || loadCoreTaskData != null;
         setVisibleManaged(coreLoadingLabel, needsCoreHydration);
@@ -486,6 +489,7 @@ public final class TaskDetailDialog {
                             List<TaskPriorityOptionDto> hydratedPriorities = core.priorities() == null ? List.of() : core.priorities();
                             priorityCombo.getItems().setAll(hydratedPriorities);
                             selectPriority(priorityCombo, hydratedPriorities, detail.priorityId());
+                            applyColoredToolbarSelect(priorityCombo, Optional.ofNullable(priorityCombo.getValue()).map(TaskPriorityOptionDto::colorHex).orElse(null));
                             saveBlockedByCoreState[0] = hydratedStatuses.isEmpty() || hydratedPriorities.isEmpty();
                             updateSaveCancelAvailability(
                                     saveButton,
@@ -1058,6 +1062,76 @@ public final class TaskDetailDialog {
             LocalDateTime occurredAt,
             TaskActivityEntry activity,
             TaskNoteEntry note) {
+    }
+
+    private static void applyColoredToolbarSelect(ComboBox<?> comboBox, String colorHex) {
+        if (comboBox == null) {
+            return;
+        }
+        RgbColor baseColor = parseHexColor(colorHex);
+        if (baseColor == null) {
+            comboBox.setStyle("");
+            return;
+        }
+        RgbColor top = blend(baseColor, new RgbColor(255, 255, 255), 0.18);
+        RgbColor bottom = blend(baseColor, new RgbColor(0, 0, 0), 0.12);
+        RgbColor border = blend(baseColor, new RgbColor(255, 255, 255), 0.30);
+        String textColor = contrastTextColor(baseColor);
+        comboBox.setStyle(
+                "-app-toolbar-select-bg-top: " + toCssRgba(top, 0.95) + ";"
+                        + "-app-toolbar-select-bg-bottom: " + toCssRgba(bottom, 0.98) + ";"
+                        + "-app-toolbar-select-border: " + toCssRgba(border, 0.88) + ";"
+                        + "-app-toolbar-select-text: " + textColor + ";");
+    }
+
+    private static RgbColor parseHexColor(String rawHex) {
+        String normalized = safe(rawHex).trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        if (normalized.startsWith("#")) {
+            normalized = normalized.substring(1);
+        } else if (normalized.regionMatches(true, 0, "0x", 0, 2)) {
+            normalized = normalized.substring(2);
+        }
+        if (normalized.length() == 8) {
+            normalized = normalized.substring(0, 6);
+        }
+        if (normalized.length() != 6 || !normalized.matches("[0-9a-fA-F]{6}")) {
+            return null;
+        }
+        try {
+            int red = Integer.parseInt(normalized.substring(0, 2), 16);
+            int green = Integer.parseInt(normalized.substring(2, 4), 16);
+            int blue = Integer.parseInt(normalized.substring(4, 6), 16);
+            return new RgbColor(red, green, blue);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private static String contrastTextColor(RgbColor color) {
+        double red = color.red() / 255.0;
+        double green = color.green() / 255.0;
+        double blue = color.blue() / 255.0;
+        double luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+        return luminance >= 0.58 ? "#112542" : "#f9fbff";
+    }
+
+    private static RgbColor blend(RgbColor source, RgbColor target, double ratio) {
+        double clamped = Math.max(0.0, Math.min(1.0, ratio));
+        int red = (int) Math.round((source.red() * (1 - clamped)) + (target.red() * clamped));
+        int green = (int) Math.round((source.green() * (1 - clamped)) + (target.green() * clamped));
+        int blue = (int) Math.round((source.blue() * (1 - clamped)) + (target.blue() * clamped));
+        return new RgbColor(red, green, blue);
+    }
+
+    private static String toCssRgba(RgbColor color, double alpha) {
+        double clampedAlpha = Math.max(0.0, Math.min(1.0, alpha));
+        return "rgba(" + color.red() + ", " + color.green() + ", " + color.blue() + ", " + clampedAlpha + ")";
+    }
+
+    private record RgbColor(int red, int green, int blue) {
     }
 
     private static String formatDateTime(LocalDateTime value) {
