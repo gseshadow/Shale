@@ -1146,6 +1146,30 @@ public final class TaskDetailDialog {
     private record RgbColor(int red, int green, int blue) {
     }
 
+    private static String contrastTextColor(RgbColor color) {
+        double red = color.red() / 255.0;
+        double green = color.green() / 255.0;
+        double blue = color.blue() / 255.0;
+        double luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+        return luminance >= 0.58 ? "#112542" : "#f9fbff";
+    }
+
+    private static RgbColor blend(RgbColor source, RgbColor target, double ratio) {
+        double clamped = Math.max(0.0, Math.min(1.0, ratio));
+        int red = (int) Math.round((source.red() * (1 - clamped)) + (target.red() * clamped));
+        int green = (int) Math.round((source.green() * (1 - clamped)) + (target.green() * clamped));
+        int blue = (int) Math.round((source.blue() * (1 - clamped)) + (target.blue() * clamped));
+        return new RgbColor(red, green, blue);
+    }
+
+    private static String toCssRgba(RgbColor color, double alpha) {
+        double clampedAlpha = Math.max(0.0, Math.min(1.0, alpha));
+        return "rgba(" + color.red() + ", " + color.green() + ", " + color.blue() + ", " + clampedAlpha + ")";
+    }
+
+    private record RgbColor(int red, int green, int blue) {
+    }
+
     private static String formatDateTime(LocalDateTime value) {
         return UtcDateTimeDisplayFormatter.formatUtcToLocal(value, TASK_ACTIVITY_TIMESTAMP_FORMAT);
     }
