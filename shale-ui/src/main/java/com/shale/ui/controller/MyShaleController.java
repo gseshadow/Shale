@@ -699,25 +699,26 @@ public final class MyShaleController {
 
 		CaseTaskService.MyTasksSortOption sortOption = selectedMyTaskSort();
 		final boolean includeCompleted = showCompletedMyTasks;
-		dbExec.submit(() ->
-		{
+		final int shaleClientIdValue = shaleClientId;
+		final int userIdValue = userId;
+		dbExec.submit(() -> {
 			try {
 				long loadStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=loadMyTasks page=my_shale userId=" + userId);
+				PerfLog.log("DAO", "start", "method=loadMyTasks page=my_shale userId=" + userIdValue);
 				List<CaseTaskListItemDto> tasks = caseTaskService.loadMyTasks(
-						shaleClientId,
-						userId,
+						shaleClientIdValue,
+						userIdValue,
 						sortOption,
 						includeCompleted);
-				Set<Long> pinnedLaneCaseIds = loadPinnedTaskLaneCaseIds(shaleClientId, userId);
+				Set<Long> pinnedLaneCaseIds = loadPinnedTaskLaneCaseIds(shaleClientIdValue, userIdValue);
 				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
 						.map(CaseTaskListItemDto::id)
 						.toList();
-				PerfLog.logDone("DAO", "method=loadMyTasks page=my_shale userId=" + userId + " rows=" + (tasks == null ? 0 : tasks.size()), loadStartNanos);
+				PerfLog.logDone("DAO", "method=loadMyTasks page=my_shale userId=" + userIdValue + " rows=" + (tasks == null ? 0 : tasks.size()), loadStartNanos);
 				long usersLoadStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId);
-				java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
-						.loadAssignedUsersForTasks(taskIds, shaleClientId)
+				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue);
+					java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
+							.loadAssignedUsersForTasks(taskIds, shaleClientIdValue)
 						.stream()
 						.collect(java.util.stream.Collectors.groupingBy(
 								CaseTaskService.TaskAssignedUsersByTask::taskId,
@@ -727,14 +728,14 @@ public final class MyShaleController {
 												row.displayName(),
 												row.color()),
 											java.util.stream.Collectors.toList())));
-					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientId).stream()
+					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientIdValue).stream()
 							.filter(Objects::nonNull)
 							.collect(java.util.stream.Collectors.toMap(
 									TaskPriorityOptionDto::id,
 									option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
 									(existing, replacement) -> existing,
 									java.util.LinkedHashMap::new));
-					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
+					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " rows=" + assignedByTask.size(), usersLoadStartNanos);
 					runOnFx(() -> {
 						myTasks = tasks == null ? List.of() : tasks;
 						pinnedTaskLaneCaseIds.clear();
@@ -997,16 +998,18 @@ public final class MyShaleController {
 			return;
 		}
 		String laneKey = String.valueOf(key.caseId());
+		final int shaleClientIdValue = shaleClientId;
+		final int userIdValue = userId;
 		dbExec.submit(() -> userBoardLanePreferencesDao.upsertLanePreference(
-				shaleClientId,
-				userId,
+				shaleClientIdValue,
+				userIdValue,
 				MY_TASKS_BOARD_KEY,
 				MY_TASKS_LANE_TYPE_CASE,
 				laneKey,
 				isPinned,
 				null,
 				null,
-				userId));
+				userIdValue));
 	}
 
 	private Node buildTaskLaneBody(List<CaseTaskListItemDto> tasksInLane, boolean fullVariant) {
