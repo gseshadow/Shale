@@ -8,6 +8,7 @@ import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardMo
 import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.ArrayList;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -94,9 +96,16 @@ public final class NewIntakeController {
 	private AppState appState;
 	private CaseDao caseDao;
 	private OrganizationDao organizationDao;
+	private UiRuntimeBridge runtimeBridge;
 	private Stage stage;
 	private Consumer<Integer> onCaseCreated;
 	private boolean saving;
+	private Boolean knownOnlineState;
+	private final Consumer<UiRuntimeBridge.ConnectivityEvent> connectivityHandler = event -> {
+		if (event != null) {
+			knownOnlineState = event.online();
+		}
+	};
 
 	private boolean caseNameManuallyOverridden;
 	private boolean updatingCaseNameProgrammatically;
@@ -108,13 +117,36 @@ public final class NewIntakeController {
 	private List<PartyAddWorkflowDialog.AddPartyDraft> pendingParties = new java.util.ArrayList<>();
 	private Map<Long, String> partyRoleLabelsById = Map.of();
 	private Map<String, String> partySideLabelsByKey = Map.of();
+	private IntakeFormSnapshot initialSnapshot;
 
-	public void init(AppState appState, CaseDao caseDao, OrganizationDao organizationDao, Stage stage, Consumer<Integer> onCaseCreated) {
+	public void init(
+			AppState appState,
+			CaseDao caseDao,
+			OrganizationDao organizationDao,
+			UiRuntimeBridge runtimeBridge,
+			Stage stage,
+			Consumer<Integer> onCaseCreated) {
 		this.appState = appState;
 		this.caseDao = caseDao;
 		this.organizationDao = organizationDao;
+		this.runtimeBridge = runtimeBridge;
 		this.stage = stage;
 		this.onCaseCreated = onCaseCreated;
+		if (this.runtimeBridge != null) {
+			this.runtimeBridge.subscribeConnectivity(connectivityHandler);
+		}
+		if (this.stage != null) {
+			this.stage.setOnHidden(event -> {
+				if (this.runtimeBridge != null) {
+					this.runtimeBridge.unsubscribeConnectivity(connectivityHandler);
+				}
+			});
+			this.stage.setOnCloseRequest(event -> {
+				if (!confirmDiscardIfDirty()) {
+					event.consume();
+				}
+			});
+		}
 		Platform.runLater(this::preselectDefaultStatusIfAvailable);
 		Platform.runLater(this::initializePartyMetadata);
 	}
@@ -152,6 +184,7 @@ public final class NewIntakeController {
 		renderPendingParties();
 
 		Platform.runLater(this::autoGenerateCaseName);
+		Platform.runLater(this::captureInitialSnapshot);
 	}
 
 	private void initializePartyMetadata() {
@@ -455,6 +488,9 @@ public final class NewIntakeController {
 			if (defaultOpenStatus.isPresent()) {
 				selectedStatus = defaultOpenStatus.get();
 				renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
+				if (!hasUnsavedChanges()) {
+					captureInitialSnapshot();
+				}
 			}
 		} catch (RuntimeException ignored) {
 			// If statuses cannot be loaded at initialization time, keep existing fallback (unselected).
@@ -504,6 +540,10 @@ public final class NewIntakeController {
 	private void onCreateIntake() {
 		if (saving)
 			return;
+		if (Boolean.FALSE.equals(knownOnlineState)) {
+			showValidation("Unable to save intake while offline. Please reconnect and try again.");
+			return;
+		}
 
 		List<String> errors = validate();
 		if (!errors.isEmpty()) {
@@ -560,6 +600,7 @@ public final class NewIntakeController {
 			);
 
 			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
+			captureInitialSnapshot();
 			System.out.println("[NewIntakeController] submit succeeded tenant=" + tenantId + " caseId=" + result.caseId());
 			showSuccess("Intake created successfully.");
 			if (stage != null)
@@ -569,7 +610,7 @@ public final class NewIntakeController {
 		} catch (RuntimeException ex) {
 			System.err.println("[NewIntakeController] submit failed tenant=" + tenantId + " error=" + ex.getMessage());
 			ex.printStackTrace(System.err);
-			showValidation("Create intake failed: " + firstMeaningfulMessage(ex));
+			showValidation("Unable to save intake. Your information has not been discarded. Please try again.");
 		} finally {
 			setSaving(false);
 		}
@@ -577,9 +618,75 @@ public final class NewIntakeController {
 
 	@FXML
 	private void onCancel() {
-		if (stage != null) {
+		requestClose();
+	}
+
+	private void requestClose() {
+		if (stage != null && confirmDiscardIfDirty()) {
 			stage.close();
 		}
+	}
+
+	private boolean confirmDiscardIfDirty() {
+		if (saving) {
+			showValidation("Create Intake is in progress. Please wait.");
+			return false;
+		}
+		if (!hasUnsavedChanges()) {
+			return true;
+		}
+		Optional<Boolean> decision = AppDialogs.showChoice(
+				stage,
+				"Discard New Intake?",
+				"Discard New Intake?",
+				"You have unsaved information in this intake. Canceling will discard it. Do you want to continue?",
+				List.of(
+						AppDialogs.DialogAction.cancel("Keep Editing", false),
+						AppDialogs.DialogAction.of("Discard", true, AppDialogs.DialogActionKind.DANGER, true, false)));
+		return decision.orElse(false);
+	}
+
+	private boolean hasUnsavedChanges() {
+		if (initialSnapshot == null) {
+			return false;
+		}
+		return !initialSnapshot.equals(captureCurrentSnapshot());
+	}
+
+	private void captureInitialSnapshot() {
+		this.initialSnapshot = captureCurrentSnapshot();
+	}
+
+	private IntakeFormSnapshot captureCurrentSnapshot() {
+		return new IntakeFormSnapshot(
+				safeTrim(caseNameField == null ? null : caseNameField.getText()),
+				dateOfIntakePicker == null ? null : dateOfIntakePicker.getValue(),
+				safeTrim(timeOfIntakeField == null ? null : timeOfIntakeField.getText()),
+				estateCaseCheckBox != null && estateCaseCheckBox.isSelected(),
+				safeTrim(clientFirstNameField == null ? null : clientFirstNameField.getText()),
+				safeTrim(clientLastNameField == null ? null : clientLastNameField.getText()),
+				safeTrim(clientAddressField == null ? null : clientAddressField.getText()),
+				safeTrim(clientPhoneField == null ? null : clientPhoneField.getText()),
+				safeTrim(clientEmailField == null ? null : clientEmailField.getText()),
+				clientDateOfBirthPicker == null ? null : clientDateOfBirthPicker.getValue(),
+				clientDeceasedCheckBox != null && clientDeceasedCheckBox.isSelected(),
+				safeTrim(clientConditionArea == null ? null : clientConditionArea.getText()),
+				callerIsClientCheckBox != null && callerIsClientCheckBox.isSelected(),
+				safeTrim(callerFirstNameField == null ? null : callerFirstNameField.getText()),
+				safeTrim(callerLastNameField == null ? null : callerLastNameField.getText()),
+				safeTrim(callerPhoneField == null ? null : callerPhoneField.getText()),
+				safeTrim(callerAddressField == null ? null : callerAddressField.getText()),
+				safeTrim(callerEmailField == null ? null : callerEmailField.getText()),
+				selectedPracticeArea == null ? null : selectedPracticeArea.id(),
+				selectedStatus == null ? null : selectedStatus.id(),
+				safeTrim(descriptionArea == null ? null : descriptionArea.getText()),
+				safeTrim(summaryArea == null ? null : summaryArea.getText()),
+				dateMedicalNegligencePicker == null ? null : dateMedicalNegligencePicker.getValue(),
+				dateMedicalNegligenceDiscoveredPicker == null ? null : dateMedicalNegligenceDiscoveredPicker.getValue(),
+				dateOfInjuryPicker == null ? null : dateOfInjuryPicker.getValue(),
+				statuteOfLimitationsPicker == null ? null : statuteOfLimitationsPicker.getValue(),
+				tortClaimsNoticePicker == null ? null : tortClaimsNoticePicker.getValue(),
+				pendingParties == null ? List.of() : new ArrayList<>(pendingParties));
 	}
 
 	private void setSaving(boolean saving) {
@@ -694,5 +801,36 @@ public final class NewIntakeController {
 
 	private static String safeTrim(String value) {
 		return value == null ? "" : value.trim();
+	}
+
+	private record IntakeFormSnapshot(
+			String caseName,
+			LocalDate dateOfIntake,
+			String timeOfIntake,
+			boolean estateCase,
+			String clientFirstName,
+			String clientLastName,
+			String clientAddress,
+			String clientPhone,
+			String clientEmail,
+			LocalDate clientDateOfBirth,
+			boolean clientDeceased,
+			String clientCondition,
+			boolean callerIsClient,
+			String callerFirstName,
+			String callerLastName,
+			String callerPhone,
+			String callerAddress,
+			String callerEmail,
+			Integer practiceAreaId,
+			Integer statusId,
+			String description,
+			String summary,
+			LocalDate medicalNegligenceDate,
+			LocalDate medicalNegligenceDiscoveredDate,
+			LocalDate injuryDate,
+			LocalDate statuteOfLimitationsDate,
+			LocalDate tortClaimsNoticeDate,
+			List<PartyAddWorkflowDialog.AddPartyDraft> pendingParties) {
 	}
 }
