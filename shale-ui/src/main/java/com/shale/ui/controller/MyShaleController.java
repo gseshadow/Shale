@@ -934,14 +934,7 @@ public final class MyShaleController {
 
 		titleAndMeta.getChildren().addAll(laneTitle, metaRow);
 
-		Button pinButton = new Button("📌");
-		pinButton.setFocusTraversable(false);
-		pinButton.setMinSize(26, 26);
-		pinButton.setPrefSize(26, 26);
-		pinButton.setMaxSize(26, 26);
-		pinButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral", "my-tasks-lane-pin-button");
-
-		headerRow.getChildren().addAll(titleAndMeta, pinButton);
+		headerRow.getChildren().add(titleAndMeta);
 		return headerRow;
 	}
 
