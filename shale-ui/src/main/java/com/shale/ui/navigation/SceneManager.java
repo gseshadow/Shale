@@ -10,6 +10,7 @@ import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.NotificationDao;
+import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.data.dao.UserPreferencesDao;
 import com.shale.data.dao.AuditLogDao;
 import com.shale.ui.controller.CaseController;
@@ -618,9 +619,10 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
+			UserBoardLanePreferencesDao userBoardLanePreferencesDao = new UserBoardLanePreferencesDao(dbSessionProvider);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-				c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase, onOpenUser, phiReadAuditService);
+				c.init(appState, runtimeBridge, caseDao, caseTaskService, userBoardLanePreferencesDao, onOpenCase, onOpenUser, phiReadAuditService);
 				return c;
 			});
 	}

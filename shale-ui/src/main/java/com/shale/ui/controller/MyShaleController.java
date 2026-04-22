@@ -22,6 +22,7 @@ import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
+import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.component.board.LaneBoardLayout;
@@ -74,6 +75,8 @@ public final class MyShaleController {
 	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
 	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 300;
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
+	private static final String MY_TASKS_BOARD_KEY = "my_shale_tasks";
+	private static final String MY_TASKS_LANE_TYPE_CASE = "CASE";
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -120,6 +123,7 @@ public final class MyShaleController {
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
+	private UserBoardLanePreferencesDao userBoardLanePreferencesDao;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private PhiReadAuditService phiReadAuditService;
@@ -160,11 +164,13 @@ public final class MyShaleController {
 			UiRuntimeBridge runtimeBridge,
 			CaseDao caseDao,
 			CaseTaskService caseTaskService,
+			UserBoardLanePreferencesDao userBoardLanePreferencesDao,
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenUser,
 			PhiReadAuditService phiReadAuditService) {
 		this.caseDao = caseDao;
 		this.caseTaskService = caseTaskService;
+		this.userBoardLanePreferencesDao = userBoardLanePreferencesDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.phiReadAuditService = phiReadAuditService;
@@ -703,6 +709,7 @@ public final class MyShaleController {
 						userId,
 						sortOption,
 						includeCompleted);
+				Set<Long> pinnedLaneCaseIds = loadPinnedTaskLaneCaseIds(shaleClientId, userId);
 				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
 						.map(CaseTaskListItemDto::id)
 						.toList();
@@ -719,24 +726,25 @@ public final class MyShaleController {
 												row.userId(),
 												row.displayName(),
 												row.color()),
-										java.util.stream.Collectors.toList())));
-				java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientId).stream()
-						.filter(Objects::nonNull)
-						.collect(java.util.stream.Collectors.toMap(
-								TaskPriorityOptionDto::id,
-								option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
-								(existing, replacement) -> existing,
-								java.util.LinkedHashMap::new));
-				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
-				runOnFx(() ->
-				{
-					myTasks = tasks == null ? List.of() : tasks;
-					myTaskAssignedUsers = assignedByTask;
-					myTaskPrioritiesById = prioritiesById;
-					syncMyTaskPriorityFilterOptions();
-					syncMyTaskCaseFilterOptions();
-					renderMyTasks();
-				});
+											java.util.stream.Collectors.toList())));
+					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientId).stream()
+							.filter(Objects::nonNull)
+							.collect(java.util.stream.Collectors.toMap(
+									TaskPriorityOptionDto::id,
+									option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
+									(existing, replacement) -> existing,
+									java.util.LinkedHashMap::new));
+					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
+					runOnFx(() -> {
+						myTasks = tasks == null ? List.of() : tasks;
+						pinnedTaskLaneCaseIds.clear();
+						pinnedTaskLaneCaseIds.addAll(pinnedLaneCaseIds);
+						myTaskAssignedUsers = assignedByTask;
+						myTaskPrioritiesById = prioritiesById;
+						syncMyTaskPriorityFilterOptions();
+						syncMyTaskCaseFilterOptions();
+						renderMyTasks();
+					});
 			} catch (Exception ex) {
 				System.err.println("My tasks load failed: " + ex.getMessage());
 				ex.printStackTrace();
@@ -917,13 +925,13 @@ public final class MyShaleController {
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		header.getChildren().add(spacer);
-		Button pinButton = new Button(isPinnedLane(key) ? "📌" : "📍");
+		Button pinButton = new Button(isPinnedLane(key) ? "Unpin" : "Pin");
 		pinButton.setFocusTraversable(false);
 		pinButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
 		pinButton.setTooltip(new Tooltip(isPinnedLane(key) ? "Unpin lane" : "Pin lane"));
-		pinButton.setOnAction(event ->
-		{
-			toggleLanePinned(key);
+		pinButton.setOnAction(event -> {
+			boolean pinnedNow = toggleLanePinned(key);
+			persistLanePinnedState(key, pinnedNow);
 			renderMyTasks();
 		});
 		header.getChildren().add(pinButton);
@@ -937,14 +945,68 @@ public final class MyShaleController {
 				&& pinnedTaskLaneCaseIds.contains(key.caseId());
 	}
 
-	private void toggleLanePinned(TaskLaneKey key) {
+	private boolean toggleLanePinned(TaskLaneKey key) {
 		if (key == null || key.caseId() == null || key.caseId() <= 0) {
-			return;
+			return false;
 		}
 		Long laneId = key.caseId();
-		if (!pinnedTaskLaneCaseIds.add(laneId)) {
+		if (pinnedTaskLaneCaseIds.add(laneId)) {
+			return true;
+		}
+		if (pinnedTaskLaneCaseIds.contains(laneId)) {
 			pinnedTaskLaneCaseIds.remove(laneId);
 		}
+		return false;
+	}
+
+	private Set<Long> loadPinnedTaskLaneCaseIds(int shaleClientId, int userId) {
+		if (userBoardLanePreferencesDao == null || shaleClientId <= 0 || userId <= 0) {
+			return Set.of();
+		}
+		Set<String> laneKeys = userBoardLanePreferencesDao.listPinnedLaneKeys(
+				shaleClientId,
+				userId,
+				MY_TASKS_BOARD_KEY,
+				MY_TASKS_LANE_TYPE_CASE);
+		if (laneKeys.isEmpty()) {
+			return Set.of();
+		}
+		Set<Long> pinnedLaneIds = new LinkedHashSet<>();
+		for (String laneKey : laneKeys) {
+			if (laneKey == null || laneKey.isBlank()) {
+				continue;
+			}
+			try {
+				long laneId = Long.parseLong(laneKey.trim());
+				if (laneId > 0) {
+					pinnedLaneIds.add(laneId);
+				}
+			} catch (NumberFormatException ignored) {
+			}
+		}
+		return pinnedLaneIds;
+	}
+
+	private void persistLanePinnedState(TaskLaneKey key, boolean isPinned) {
+		if (key == null || key.caseId() == null || key.caseId() <= 0 || userBoardLanePreferencesDao == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return;
+		}
+		String laneKey = String.valueOf(key.caseId());
+		dbExec.submit(() -> userBoardLanePreferencesDao.upsertLanePreference(
+				shaleClientId,
+				userId,
+				MY_TASKS_BOARD_KEY,
+				MY_TASKS_LANE_TYPE_CASE,
+				laneKey,
+				isPinned,
+				null,
+				null,
+				userId));
 	}
 
 	private Node buildTaskLaneBody(List<CaseTaskListItemDto> tasksInLane, boolean fullVariant) {
