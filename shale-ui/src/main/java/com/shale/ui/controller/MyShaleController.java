@@ -963,11 +963,6 @@ public final class MyShaleController {
 		Label taskCountLabel = new Label(formatTaskCountLabel(tasks));
 		taskCountLabel.getStyleClass().add("my-tasks-lane-count");
 		metaRow.getChildren().add(taskCountLabel);
-		if (hasOverdueIncompleteTasks(tasks)) {
-			Label overdueIndicator = new Label("Overdue");
-			overdueIndicator.getStyleClass().add("my-tasks-lane-urgency-indicator");
-			metaRow.getChildren().add(overdueIndicator);
-		}
 
 		titleAndMeta.getChildren().addAll(laneTitle, metaRow);
 
@@ -996,18 +991,6 @@ public final class MyShaleController {
 						key.responsibleAttorneyColor(),
 						key.nonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-	}
-
-	private boolean hasOverdueIncompleteTasks(List<CaseTaskListItemDto> tasks) {
-		if (tasks == null || tasks.isEmpty()) {
-			return false;
-		}
-		LocalDate today = LocalDate.now();
-		return tasks.stream()
-				.filter(Objects::nonNull)
-				.anyMatch(task -> task.completedAt() == null
-						&& task.dueAt() != null
-						&& task.dueAt().toLocalDate().isBefore(today));
 	}
 
 	private String formatTaskCountLabel(List<CaseTaskListItemDto> tasks) {
