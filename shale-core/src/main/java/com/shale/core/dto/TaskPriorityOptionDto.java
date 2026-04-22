@@ -6,5 +6,6 @@ package com.shale.core.dto;
 public record TaskPriorityOptionDto(
         int id,
         String name,
-        Integer sortOrder) {
+        Integer sortOrder,
+        String colorHex) {
 }
