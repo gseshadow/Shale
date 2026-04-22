@@ -430,6 +430,48 @@
     -fx-font-weight: 700;
 }
 
+.button.lane-pin-button {
+    -fx-min-width: 28;
+    -fx-pref-width: 28;
+    -fx-max-width: 28;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-padding: 0;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-width: 1.2;
+    -fx-font-size: 13px;
+    -fx-font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Symbol";
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+
+.button.lane-pin-button-unpinned {
+    -fx-background-color: rgba(38, 56, 84, 0.28);
+    -fx-border-color: rgba(201, 218, 243, 0.58);
+    -fx-text-fill: rgba(216, 230, 255, 0.9);
+}
+
+.button.lane-pin-button-unpinned:hover {
+    -fx-background-color: rgba(58, 81, 118, 0.42);
+    -fx-border-color: rgba(224, 236, 255, 0.72);
+    -fx-text-fill: #f1f7ff;
+}
+
+.button.lane-pin-button-pinned {
+    -fx-background-color: linear-gradient(to bottom, rgba(116, 154, 212, 0.98), rgba(66, 109, 182, 1.0));
+    -fx-border-color: rgba(242, 248, 255, 0.82);
+    -fx-text-fill: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(115, 166, 237, 0.45), 8, 0.2, 0, 0);
+}
+
+.button.lane-pin-button-pinned:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(136, 176, 232, 1.0), rgba(81, 128, 206, 1.0));
+    -fx-border-color: rgba(249, 252, 255, 0.92);
+    -fx-text-fill: #ffffff;
+}
+
 .button.app-toolbar-button-compact,
 .menu-button.app-toolbar-button-compact,
 .split-menu-button.app-toolbar-button-compact {

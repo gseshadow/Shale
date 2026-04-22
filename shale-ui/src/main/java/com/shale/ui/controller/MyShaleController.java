@@ -930,12 +930,9 @@ public final class MyShaleController {
 		Button pinButton = new Button("📌");
 		pinButton.setFocusTraversable(false);
 		pinButton.getStyleClass().addAll(
-				"app-toolbar-button",
-				pinned ? "app-toolbar-button-primary" : "app-toolbar-button-neutral",
-				"app-taskcard-action-button");
-		pinButton.setMinWidth(34);
-		pinButton.setPrefWidth(34);
-		pinButton.setTooltip(new Tooltip(pinned ? "Unpin" : "Pin"));
+				"lane-pin-button",
+				pinned ? "lane-pin-button-pinned" : "lane-pin-button-unpinned");
+		pinButton.setTooltip(new Tooltip(pinned ? "Unpin lane" : "Pin lane"));
 		pinButton.setOnAction(event -> {
 			boolean pinnedNow = toggleLanePinned(key);
 			persistLanePinnedState(key, pinnedNow);
