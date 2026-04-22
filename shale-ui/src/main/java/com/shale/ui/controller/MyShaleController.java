@@ -811,6 +811,7 @@ public final class MyShaleController {
 			caseColumnScroll.setMaxHeight(Double.MAX_VALUE);
 
 			caseColumn.getChildren().addAll(caseHeader, caseColumnScroll);
+			removeLaneLevelOverdueNodes(caseColumn);
 			myTasksList.getChildren().add(caseColumn);
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
@@ -848,6 +849,58 @@ public final class MyShaleController {
 			}
 		}
 		myTasksPinTraceLogged = true;
+	}
+
+	private void removeLaneLevelOverdueNodes(Node root) {
+		if (!(root instanceof Parent parentRoot)) {
+			return;
+		}
+		List<Node> queue = new ArrayList<>();
+		queue.add(parentRoot);
+		while (!queue.isEmpty()) {
+			Node current = queue.remove(0);
+			if (!(current instanceof Parent parent)) {
+				continue;
+			}
+			List<Node> children = new ArrayList<>(parent.getChildrenUnmodifiable());
+			for (Node child : children) {
+				if (isLaneLevelOverdueLabel(child)) {
+					removeFromParent(child);
+					continue;
+				}
+				if (child instanceof Parent childParent) {
+					queue.add(childParent);
+				}
+			}
+		}
+	}
+
+	private boolean isLaneLevelOverdueLabel(Node node) {
+		if (!(node instanceof Labeled labeled)) {
+			return false;
+		}
+		if (!"Overdue".equalsIgnoreCase(safe(labeled.getText()).trim())) {
+			return false;
+		}
+		return !isInsideTaskCard(node);
+	}
+
+	private boolean isInsideTaskCard(Node node) {
+		Node cursor = node;
+		while (cursor != null) {
+			if (cursor instanceof com.shale.ui.component.TaskCard) {
+				return true;
+			}
+			cursor = cursor.getParent();
+		}
+		return false;
+	}
+
+	private void removeFromParent(Node node) {
+		Parent parent = node.getParent();
+		if (parent instanceof Pane pane) {
+			pane.getChildren().remove(node);
+		}
 	}
 
 	private Map<CaseColumnKey, List<CaseTaskListItemDto>> groupTasksByCase(List<CaseTaskListItemDto> tasks) {
@@ -963,11 +1016,6 @@ public final class MyShaleController {
 		Label taskCountLabel = new Label(formatTaskCountLabel(tasks));
 		taskCountLabel.getStyleClass().add("my-tasks-lane-count");
 		metaRow.getChildren().add(taskCountLabel);
-		if (hasOverdueIncompleteTasks(tasks)) {
-			Label overdueIndicator = new Label("Overdue");
-			overdueIndicator.getStyleClass().add("my-tasks-lane-urgency-indicator");
-			metaRow.getChildren().add(overdueIndicator);
-		}
 
 		titleAndMeta.getChildren().addAll(laneTitle, metaRow);
 
@@ -996,18 +1044,6 @@ public final class MyShaleController {
 						key.responsibleAttorneyColor(),
 						key.nonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-	}
-
-	private boolean hasOverdueIncompleteTasks(List<CaseTaskListItemDto> tasks) {
-		if (tasks == null || tasks.isEmpty()) {
-			return false;
-		}
-		LocalDate today = LocalDate.now();
-		return tasks.stream()
-				.filter(Objects::nonNull)
-				.anyMatch(task -> task.completedAt() == null
-						&& task.dueAt() != null
-						&& task.dueAt().toLocalDate().isBefore(today));
 	}
 
 	private String formatTaskCountLabel(List<CaseTaskListItemDto> tasks) {
