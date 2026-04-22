@@ -104,6 +104,7 @@ public final class TaskDetailDialog {
 
         ComboBox<TaskStatusOptionDto> statusCombo = new ComboBox<>();
         statusCombo.setMaxWidth(Double.MAX_VALUE);
+        statusCombo.getStyleClass().add("app-toolbar-select");
         List<TaskStatusOptionDto> safeStatuses = statuses == null ? List.of() : statuses;
         statusCombo.getItems().setAll(safeStatuses);
         statusCombo.setCellFactory(cb -> new StatusListCell());
@@ -112,6 +113,7 @@ public final class TaskDetailDialog {
 
         ComboBox<TaskPriorityOptionDto> priorityCombo = new ComboBox<>();
         priorityCombo.setMaxWidth(Double.MAX_VALUE);
+        priorityCombo.getStyleClass().add("app-toolbar-select");
         List<TaskPriorityOptionDto> safePriorities = priorities == null ? List.of() : priorities;
         priorityCombo.getItems().setAll(safePriorities);
         priorityCombo.setCellFactory(cb -> new PriorityListCell());
@@ -250,6 +252,7 @@ public final class TaskDetailDialog {
         notesErrorLabel.setVisible(false);
         notesErrorLabel.setManaged(false);
         VBox historyList = new VBox(8);
+        historyList.setPadding(new Insets(6, 10, 8, 10));
         Label historyLoadingLabel = loadingLabel("Loading history…");
         setVisibleManaged(historyLoadingLabel, false);
         final boolean[] loadingActivityState = new boolean[] { false };
