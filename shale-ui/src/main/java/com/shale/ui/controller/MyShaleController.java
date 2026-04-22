@@ -22,8 +22,10 @@ import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
+import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.TaskDetailDialog;
+import com.shale.ui.component.board.LaneBoardLayout;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.TaskCardFactory;
@@ -38,7 +40,6 @@ import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -47,6 +48,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -73,6 +75,9 @@ public final class MyShaleController {
 	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
 	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 300;
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
+	private static final String MY_TASKS_BOARD_KEY = "my_shale_tasks";
+	private static final String MY_TASKS_LANE_TYPE_CASE = "CASE";
+	private static final int MY_TASKS_DUE_SOON_DAYS = 2;
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -119,6 +124,7 @@ public final class MyShaleController {
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
+	private UserBoardLanePreferencesDao userBoardLanePreferencesDao;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private PhiReadAuditService phiReadAuditService;
@@ -142,6 +148,7 @@ public final class MyShaleController {
 	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
+	private final Set<Long> pinnedTaskLaneCaseIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
@@ -157,11 +164,13 @@ public final class MyShaleController {
 			UiRuntimeBridge runtimeBridge,
 			CaseDao caseDao,
 			CaseTaskService caseTaskService,
+			UserBoardLanePreferencesDao userBoardLanePreferencesDao,
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenUser,
 			PhiReadAuditService phiReadAuditService) {
 		this.caseDao = caseDao;
 		this.caseTaskService = caseTaskService;
+		this.userBoardLanePreferencesDao = userBoardLanePreferencesDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.phiReadAuditService = phiReadAuditService;
@@ -675,23 +684,26 @@ public final class MyShaleController {
 
 		CaseTaskService.MyTasksSortOption sortOption = selectedMyTaskSort();
 		final boolean includeCompleted = showCompletedMyTasks;
+		final int shaleClientIdValue = shaleClientId;
+		final int userIdValue = userId;
 		dbExec.submit(() -> {
 			try {
 				long loadStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=loadMyTasks page=my_shale userId=" + userId);
+				PerfLog.log("DAO", "start", "method=loadMyTasks page=my_shale userId=" + userIdValue);
 				List<CaseTaskListItemDto> tasks = caseTaskService.loadMyTasks(
-						shaleClientId,
-						userId,
+						shaleClientIdValue,
+						userIdValue,
 						sortOption,
 						includeCompleted);
+				Set<Long> pinnedLaneCaseIds = loadPinnedTaskLaneCaseIds(shaleClientIdValue, userIdValue);
 				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
 						.map(CaseTaskListItemDto::id)
 						.toList();
-				PerfLog.logDone("DAO", "method=loadMyTasks page=my_shale userId=" + userId + " rows=" + (tasks == null ? 0 : tasks.size()), loadStartNanos);
+				PerfLog.logDone("DAO", "method=loadMyTasks page=my_shale userId=" + userIdValue + " rows=" + (tasks == null ? 0 : tasks.size()), loadStartNanos);
 				long usersLoadStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId);
+				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue);
 					java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
-							.loadAssignedUsersForTasks(taskIds, shaleClientId)
+							.loadAssignedUsersForTasks(taskIds, shaleClientIdValue)
 						.stream()
 						.collect(java.util.stream.Collectors.groupingBy(
 								CaseTaskService.TaskAssignedUsersByTask::taskId,
@@ -701,16 +713,18 @@ public final class MyShaleController {
 												row.displayName(),
 												row.color()),
 											java.util.stream.Collectors.toList())));
-					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientId).stream()
+					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientIdValue).stream()
 							.filter(Objects::nonNull)
 							.collect(java.util.stream.Collectors.toMap(
 									TaskPriorityOptionDto::id,
 									option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
 									(existing, replacement) -> existing,
 									java.util.LinkedHashMap::new));
-					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
+					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " rows=" + assignedByTask.size(), usersLoadStartNanos);
 					runOnFx(() -> {
 						myTasks = tasks == null ? List.of() : tasks;
+						pinnedTaskLaneCaseIds.clear();
+						pinnedTaskLaneCaseIds.addAll(pinnedLaneCaseIds);
 						myTaskAssignedUsers = assignedByTask;
 						myTaskPrioritiesById = prioritiesById;
 						syncMyTaskPriorityFilterOptions();
@@ -732,10 +746,7 @@ public final class MyShaleController {
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
-		myTasksList.setFillHeight(true);
-		myTasksList.setMinHeight(0);
-		myTasksList.setPrefHeight(Region.USE_COMPUTED_SIZE);
-		myTasksList.setMaxHeight(Double.MAX_VALUE);
+		LaneBoardLayout.configureBoardRow(myTasksList);
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
 		List<CaseTaskListItemDto> taskFiltered = filterAndRankMyTasks(myTasks, selectedPriorityFilterId(), searchQuery);
@@ -757,118 +768,85 @@ public final class MyShaleController {
 			return;
 		}
 		boolean fullVariant = SECTION_TASKS.equals(activeSection);
-		Map<CaseColumnKey, List<CaseTaskListItemDto>> tasksByCase = groupTasksByCase(filteredTasks);
-		for (Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>> entry : orderCaseColumns(tasksByCase)) {
-			VBox caseColumn = new VBox(8);
-			caseColumn.setMinWidth(TASKS_CASE_COLUMN_MIN_WIDTH);
-			caseColumn.setPrefWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
-			caseColumn.setMaxWidth(TASKS_CASE_COLUMN_MAX_WIDTH);
-			caseColumn.setMinHeight(280);
-			caseColumn.setPrefHeight(Region.USE_COMPUTED_SIZE);
-			caseColumn.setMaxHeight(Double.MAX_VALUE);
-			caseColumn.setPadding(new Insets(8));
-			caseColumn.getStyleClass().addAll("strong-panel", "glass-panel");
-			Node caseHeader = buildCaseColumnHeader(entry.getKey());
-
-			VBox caseTaskCards = new VBox(10);
-			caseTaskCards.setFillWidth(true);
-
-			for (CaseTaskListItemDto task : entry.getValue()) {
-				TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
-						task.id(),
-						task.caseId(),
-						task.caseName(),
-						task.caseResponsibleAttorney(),
-						task.caseResponsibleAttorneyColor(),
-						task.caseNonEngagementLetterSent(),
-						resolveMyTaskCardTitle(task),
-						task.description(),
-						task.createdByDisplayName(),
-						task.priorityColorHex(),
-						task.dueAt(),
-						task.completedAt(),
-						myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-				if (fullVariant) {
-					caseTaskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
-				} else {
-					caseTaskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
-				}
-			}
-
-			ScrollPane caseColumnScroll = new ScrollPane(caseTaskCards);
-			caseColumnScroll.setFitToWidth(true);
-			caseColumnScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-			caseColumnScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-			caseColumnScroll.getStyleClass().add("surface-scroll");
-			VBox.setVgrow(caseColumnScroll, Priority.ALWAYS);
-			caseColumnScroll.setMinHeight(200);
-			caseColumnScroll.setPrefHeight(Region.USE_COMPUTED_SIZE);
-			caseColumnScroll.setMaxHeight(Double.MAX_VALUE);
-
-			caseColumn.getChildren().addAll(caseHeader, caseColumnScroll);
-			myTasksList.getChildren().add(caseColumn);
+		Map<TaskLaneKey, List<CaseTaskListItemDto>> tasksByLane = groupTasksByLane(filteredTasks);
+		for (Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>> entry : orderTaskLanes(tasksByLane)) {
+			Node laneHeader = buildTaskLaneHeader(entry.getKey(), entry.getValue());
+			Node laneBody = buildTaskLaneBody(entry.getValue(), fullVariant);
+			VBox lane = LaneBoardLayout.createLane(
+					laneHeader,
+					laneBody,
+					new LaneBoardLayout.LaneWidth(
+							TASKS_CASE_COLUMN_MIN_WIDTH,
+							TASKS_CASE_COLUMN_PREF_WIDTH,
+							TASKS_CASE_COLUMN_MAX_WIDTH));
+			myTasksList.getChildren().add(lane);
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
 	}
 
-	private Map<CaseColumnKey, List<CaseTaskListItemDto>> groupTasksByCase(List<CaseTaskListItemDto> tasks) {
-		Map<CaseColumnKey, List<CaseTaskListItemDto>> grouped = new LinkedHashMap<>();
+	private Map<TaskLaneKey, List<CaseTaskListItemDto>> groupTasksByLane(List<CaseTaskListItemDto> tasks) {
+		Map<TaskLaneKey, List<CaseTaskListItemDto>> grouped = new LinkedHashMap<>();
 		if (tasks == null || tasks.isEmpty()) {
 			return grouped;
 		}
 		for (CaseTaskListItemDto task : tasks) {
-			CaseColumnKey key = caseColumnKey(task);
+			TaskLaneKey key = taskLaneKey(task);
 			grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(task);
 		}
 		return grouped;
 	}
 
-	private List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> orderCaseColumns(Map<CaseColumnKey, List<CaseTaskListItemDto>> tasksByCase) {
-		if (tasksByCase == null || tasksByCase.isEmpty()) {
+	private List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> orderTaskLanes(Map<TaskLaneKey, List<CaseTaskListItemDto>> tasksByLane) {
+		if (tasksByLane == null || tasksByLane.isEmpty()) {
 			return List.of();
 		}
-		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> entries = new ArrayList<>(tasksByCase.entrySet());
-		Map<CaseColumnKey, Integer> originalIndexes = new LinkedHashMap<>();
+		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> entries = new ArrayList<>(tasksByLane.entrySet());
+		Map<TaskLaneKey, Integer> originalIndexes = new LinkedHashMap<>();
 		for (int i = 0; i < entries.size(); i++) {
 			originalIndexes.put(entries.get(i).getKey(), i);
 		}
 
 		boolean sortByDueDate = MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE.equals(
 				myTasksColumnOrderChoice == null ? null : myTasksColumnOrderChoice.getValue());
-		Comparator<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> comparator = caseColumnComparator(originalIndexes, sortByDueDate);
-		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> noCase = new ArrayList<>();
-		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> sortableCases = new ArrayList<>();
+		Comparator<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> comparator = taskLaneComparator(originalIndexes, sortByDueDate);
+		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> noCase = new ArrayList<>();
+		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> pinnedLanes = new ArrayList<>();
+		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> unpinnedLanes = new ArrayList<>();
 
-		for (Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>> entry : entries) {
-			CaseColumnKey key = entry.getKey();
-			if (isNoCaseColumn(key)) {
+		for (Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>> entry : entries) {
+			TaskLaneKey key = entry.getKey();
+			if (isUnassignedLane(key)) {
 				noCase.add(entry);
+			} else if (isPinnedLane(key)) {
+				pinnedLanes.add(entry);
 			} else {
-				sortableCases.add(entry);
+				unpinnedLanes.add(entry);
 			}
 		}
 
-		sortableCases.sort(comparator);
+		pinnedLanes.sort(comparator);
+		unpinnedLanes.sort(comparator);
 
-		List<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> ordered = new ArrayList<>(entries.size());
-		ordered.addAll(sortableCases);
+		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> ordered = new ArrayList<>(entries.size());
+		ordered.addAll(pinnedLanes);
+		ordered.addAll(unpinnedLanes);
 		ordered.addAll(noCase);
 		return ordered;
 	}
 
-	private Comparator<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>> caseColumnComparator(
-			Map<CaseColumnKey, Integer> originalIndexes,
+	private Comparator<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> taskLaneComparator(
+			Map<TaskLaneKey, Integer> originalIndexes,
 			boolean sortByDueDate) {
 		if (sortByDueDate) {
-			return Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, java.time.LocalDateTime>comparing(
+			return Comparator.<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>, java.time.LocalDateTime>comparing(
 					entry -> oldestIncompleteDueDate(entry.getValue()),
 					Comparator.nullsLast(Comparator.naturalOrder()))
 					.thenComparing(entry -> normalizeCaseName(entry.getKey().displayName()), Comparator.nullsLast(String::compareToIgnoreCase))
 					.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE));
 		}
-		return Comparator.<Map.Entry<CaseColumnKey, List<CaseTaskListItemDto>>, String>comparing(
+		return Comparator.<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>, String>comparing(
 				entry -> normalizeCaseName(entry.getKey().displayName()),
 				Comparator.nullsLast(String::compareToIgnoreCase))
 				.thenComparingInt(entry -> originalIndexes.getOrDefault(entry.getKey(), Integer.MAX_VALUE));
@@ -885,7 +863,7 @@ public final class MyShaleController {
 				.orElse(null);
 	}
 
-	private boolean isNoCaseColumn(CaseColumnKey key) {
+	private boolean isUnassignedLane(TaskLaneKey key) {
 		return key == null || key.caseId() == null || key.caseId() <= 0;
 	}
 
@@ -894,15 +872,15 @@ public final class MyShaleController {
 		return normalized.isEmpty() ? null : normalized;
 	}
 
-	private CaseColumnKey caseColumnKey(CaseTaskListItemDto task) {
+	private TaskLaneKey taskLaneKey(CaseTaskListItemDto task) {
 		if (task == null || task.caseId() <= 0) {
-			return new CaseColumnKey(null, NO_CASE_COLUMN_TITLE, "", "", false);
+			return new TaskLaneKey(null, NO_CASE_COLUMN_TITLE, "", "", false);
 		}
 		String caseName = safe(task.caseName()).trim();
 		if (caseName.isEmpty()) {
 			caseName = "Case #" + task.caseId();
 		}
-		return new CaseColumnKey(
+		return new TaskLaneKey(
 				task.caseId(),
 				caseName,
 				safe(task.caseResponsibleAttorney()),
@@ -910,23 +888,189 @@ public final class MyShaleController {
 				Boolean.TRUE.equals(task.caseNonEngagementLetterSent()));
 	}
 
-	private Node buildCaseColumnHeader(CaseColumnKey key) {
-		if (key == null || key.caseId() == null || key.caseId() <= 0) {
-			Label noCaseHeader = new Label(NO_CASE_COLUMN_TITLE);
-			noCaseHeader.getStyleClass().add("sidebar-header");
-			return noCaseHeader;
-		}
+	private Node buildTaskLaneHeader(TaskLaneKey key, List<CaseTaskListItemDto> tasksInLane) {
+		int taskCount = tasksInLane == null ? 0 : tasksInLane.size();
+		LaneUrgency laneUrgency = evaluateLaneUrgency(tasksInLane);
 		Node caseCard = caseCardFactory.create(
 				new CaseCardModel(
-						key.caseId(),
-						key.displayName(),
+						key == null || key.caseId() == null ? 0L : key.caseId(),
+						key == null ? NO_CASE_COLUMN_TITLE : key.displayName(),
 						null,
 						null,
-						key.responsibleAttorney(),
-						key.responsibleAttorneyColor(),
-						key.nonEngagementLetterSent()),
+						key == null ? "" : key.responsibleAttorney(),
+						key == null ? "" : key.responsibleAttorneyColor(),
+						key != null && key.nonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		return caseCard;
+		VBox header = new VBox(6);
+		HBox headerTopRow = new HBox(8);
+		headerTopRow.setAlignment(Pos.CENTER_LEFT);
+		headerTopRow.getChildren().add(caseCard);
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		headerTopRow.getChildren().add(spacer);
+		if (key != null && key.caseId() != null && key.caseId() > 0) {
+			boolean pinned = isPinnedLane(key);
+			Button pinButton = new Button("📌");
+			pinButton.setFocusTraversable(false);
+			pinButton.getStyleClass().addAll(
+					"lane-pin-button",
+					pinned ? "lane-pin-button-pinned" : "lane-pin-button-unpinned");
+			pinButton.setTooltip(new Tooltip(pinned ? "Unpin lane" : "Pin lane"));
+			pinButton.setOnAction(event -> {
+				boolean pinnedNow = toggleLanePinned(key);
+				persistLanePinnedState(key, pinnedNow);
+				renderMyTasks();
+			});
+			headerTopRow.getChildren().add(pinButton);
+		}
+
+		HBox laneMetaRow = new HBox(6);
+		laneMetaRow.setAlignment(Pos.CENTER_LEFT);
+		laneMetaRow.getStyleClass().add("lane-header-meta");
+		Label taskCountLabel = new Label(taskCount == 1 ? "1 task" : (taskCount + " tasks"));
+		taskCountLabel.getStyleClass().add("lane-task-count");
+		laneMetaRow.getChildren().add(taskCountLabel);
+		if (laneUrgency.overdue()) {
+			Label urgencyLabel = new Label("Overdue");
+			urgencyLabel.getStyleClass().addAll("lane-urgency-badge", "lane-urgency-overdue");
+			laneMetaRow.getChildren().add(urgencyLabel);
+		} else if (laneUrgency.dueSoon()) {
+			Label urgencyLabel = new Label("Due soon");
+			urgencyLabel.getStyleClass().addAll("lane-urgency-badge", "lane-urgency-soon");
+			laneMetaRow.getChildren().add(urgencyLabel);
+		}
+
+		header.getChildren().addAll(headerTopRow, laneMetaRow);
+		return header;
+	}
+
+	private LaneUrgency evaluateLaneUrgency(List<CaseTaskListItemDto> tasksInLane) {
+		if (tasksInLane == null || tasksInLane.isEmpty()) {
+			return LaneUrgency.NONE;
+		}
+		java.time.LocalDateTime now = java.time.LocalDateTime.now();
+		java.time.LocalDateTime dueSoonCutoff = now.plusDays(MY_TASKS_DUE_SOON_DAYS);
+		boolean hasOverdue = false;
+		boolean hasDueSoon = false;
+		for (CaseTaskListItemDto task : tasksInLane) {
+			if (task == null || task.completedAt() != null || task.dueAt() == null) {
+				continue;
+			}
+			if (task.dueAt().isBefore(now)) {
+				hasOverdue = true;
+				break;
+			}
+			if (!task.dueAt().isAfter(dueSoonCutoff)) {
+				hasDueSoon = true;
+			}
+		}
+		return new LaneUrgency(hasOverdue, !hasOverdue && hasDueSoon);
+	}
+
+	private boolean isPinnedLane(TaskLaneKey key) {
+		return key != null
+				&& key.caseId() != null
+				&& key.caseId() > 0
+				&& pinnedTaskLaneCaseIds.contains(key.caseId());
+	}
+
+	private boolean toggleLanePinned(TaskLaneKey key) {
+		if (key == null || key.caseId() == null || key.caseId() <= 0) {
+			return false;
+		}
+		Long laneId = key.caseId();
+		if (pinnedTaskLaneCaseIds.add(laneId)) {
+			return true;
+		}
+		if (pinnedTaskLaneCaseIds.contains(laneId)) {
+			pinnedTaskLaneCaseIds.remove(laneId);
+		}
+		return false;
+	}
+
+	private Set<Long> loadPinnedTaskLaneCaseIds(int shaleClientId, int userId) {
+		if (userBoardLanePreferencesDao == null || shaleClientId <= 0 || userId <= 0) {
+			return Set.of();
+		}
+		Set<String> laneKeys = userBoardLanePreferencesDao.listPinnedLaneKeys(
+				shaleClientId,
+				userId,
+				MY_TASKS_BOARD_KEY,
+				MY_TASKS_LANE_TYPE_CASE);
+		if (laneKeys.isEmpty()) {
+			return Set.of();
+		}
+		Set<Long> pinnedLaneIds = new LinkedHashSet<>();
+		for (String laneKey : laneKeys) {
+			if (laneKey == null || laneKey.isBlank()) {
+				continue;
+			}
+			try {
+				long laneId = Long.parseLong(laneKey.trim());
+				if (laneId > 0) {
+					pinnedLaneIds.add(laneId);
+				}
+			} catch (NumberFormatException ignored) {
+			}
+		}
+		return pinnedLaneIds;
+	}
+
+	private void persistLanePinnedState(TaskLaneKey key, boolean isPinned) {
+		if (key == null || key.caseId() == null || key.caseId() <= 0 || userBoardLanePreferencesDao == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return;
+		}
+		String laneKey = String.valueOf(key.caseId());
+		final int shaleClientIdValue = shaleClientId;
+		final int userIdValue = userId;
+		dbExec.submit(() -> userBoardLanePreferencesDao.upsertLanePreference(
+				shaleClientIdValue,
+				userIdValue,
+				MY_TASKS_BOARD_KEY,
+				MY_TASKS_LANE_TYPE_CASE,
+				laneKey,
+				isPinned,
+				null,
+				null,
+				userIdValue));
+	}
+
+	private Node buildTaskLaneBody(List<CaseTaskListItemDto> tasksInLane, boolean fullVariant) {
+		VBox taskCards = new VBox(10);
+		taskCards.setFillWidth(true);
+		if (tasksInLane == null || tasksInLane.isEmpty()) {
+			Label emptyLabel = new Label("No tasks");
+			emptyLabel.getStyleClass().add("lane-empty-state");
+			taskCards.getChildren().add(emptyLabel);
+			return taskCards;
+		}
+		for (CaseTaskListItemDto task : tasksInLane) {
+			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+					task.id(),
+					task.caseId(),
+					task.caseName(),
+					task.caseResponsibleAttorney(),
+					task.caseResponsibleAttorneyColor(),
+					task.caseNonEngagementLetterSent(),
+					resolveMyTaskCardTitle(task),
+					task.description(),
+					task.createdByDisplayName(),
+					task.priorityColorHex(),
+					task.dueAt(),
+					task.completedAt(),
+					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+			if (fullVariant) {
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
+			} else {
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+			}
+		}
+		return taskCards;
 	}
 
 	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {
@@ -1408,12 +1552,16 @@ public final class MyShaleController {
 		}
 	}
 
-	private record CaseColumnKey(
+	private record TaskLaneKey(
 			Long caseId,
 			String displayName,
 			String responsibleAttorney,
 			String responsibleAttorneyColor,
 			boolean nonEngagementLetterSent) {
+	}
+
+	private record LaneUrgency(boolean overdue, boolean dueSoon) {
+		private static final LaneUrgency NONE = new LaneUrgency(false, false);
 	}
 
 	private static final class CaseCardVm {
