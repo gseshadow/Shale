@@ -80,7 +80,7 @@ public final class TaskDao {
      */
     public static final byte DEFAULT_PRIMARY_ASSIGNMENT_ROLE = 1;
 
-    private record PriorityLookupRow(int id, String name, Integer sortOrder, String systemKey) {
+    private record PriorityLookupRow(int id, String name, Integer sortOrder, String systemKey, String colorHex) {
     }
     private record TaskStatusLookupRow(int id, String name, Integer sortOrder, String systemKey) {
     }
@@ -1218,7 +1218,7 @@ public final class TaskDao {
                 String displayName = row.name() == null || row.name().isBlank()
                         ? "Priority " + row.id()
                         : row.name().trim();
-                out.add(new TaskPriorityOptionDto(row.id(), displayName, row.sortOrder()));
+                out.add(new TaskPriorityOptionDto(row.id(), displayName, row.sortOrder(), row.colorHex()));
             }
             return out;
         } catch (SQLException e) {
@@ -1996,7 +1996,8 @@ public final class TaskDao {
                 rs.getInt("Id"),
                 hasName ? rs.getString("Name") : null,
                 hasSortOrder ? (Integer) rs.getObject("SortOrder") : null,
-                resolvePrioritySystemKey(rs.getString("SystemKey"), hasName ? rs.getString("Name") : null)
+                resolvePrioritySystemKey(rs.getString("SystemKey"), hasName ? rs.getString("Name") : null),
+                rs.getString("ColorHex")
         );
     }
 
@@ -2066,14 +2067,16 @@ public final class TaskDao {
         boolean hasSortOrder = hasColumn(con, PRIORITIES_TABLE, "SortOrder");
         boolean hasIsActive = hasColumn(con, PRIORITIES_TABLE, "IsActive");
         boolean hasSystemKey = hasColumn(con, PRIORITIES_TABLE, "SystemKey");
+        boolean hasColorHex = hasColumn(con, PRIORITIES_TABLE, "ColorHex");
 
         String nameSelect = hasName ? "p.Name" : "NULL AS Name";
         String sortOrderSelect = hasSortOrder ? "p.SortOrder" : "NULL AS SortOrder";
         String systemKeySelect = hasSystemKey ? "p.SystemKey" : "NULL AS SystemKey";
+        String colorHexSelect = hasColorHex ? "p.ColorHex" : "NULL AS ColorHex";
         String activeFilter = (activeOnly && hasIsActive) ? "\n  AND ISNULL(p.IsActive, 1) = 1" : "";
 
         String tenantSql = """
-                SELECT p.Id, %s, %s, %s
+                SELECT p.Id, %s, %s, %s, %s
                 FROM dbo.Priorities p
                 WHERE p.ShaleClientId = ?%s
                 ORDER BY %s, p.Id;
@@ -2081,6 +2084,7 @@ public final class TaskDao {
                 nameSelect,
                 sortOrderSelect,
                 systemKeySelect,
+                colorHexSelect,
                 activeFilter,
                 hasSortOrder ? "ISNULL(p.SortOrder, 2147483647)" : "p.Id");
         try (PreparedStatement tenantPs = con.prepareStatement(tenantSql)) {
@@ -2092,7 +2096,7 @@ public final class TaskDao {
                 }
 
                 String globalSql = """
-                        SELECT p.Id, %s, %s, %s
+                        SELECT p.Id, %s, %s, %s, %s
                         FROM dbo.Priorities p
                         WHERE p.ShaleClientId IS NULL%s
                         ORDER BY %s, p.Id;
@@ -2100,6 +2104,7 @@ public final class TaskDao {
                         nameSelect,
                         sortOrderSelect,
                         systemKeySelect,
+                        colorHexSelect,
                         activeFilter,
                         hasSortOrder ? "ISNULL(p.SortOrder, 2147483647)" : "p.Id");
                 try (PreparedStatement globalPs = con.prepareStatement(globalSql);
