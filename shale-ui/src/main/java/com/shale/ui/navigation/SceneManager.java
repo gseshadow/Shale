@@ -719,7 +719,7 @@ public final class SceneManager {
 			NewIntakeController controller = loader.getController();
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			controller.init(appState, caseDao, organizationDao, dialog, onCaseCreated);
+			controller.init(appState, caseDao, organizationDao, runtimeBridge, dialog, onCaseCreated);
 
 			VBox dialogRoot = new VBox(
 					AppDialogs.createSecondaryWindowHeader(dialog, "New Intake", dialog::close),
