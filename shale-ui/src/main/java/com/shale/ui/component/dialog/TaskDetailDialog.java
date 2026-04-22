@@ -8,6 +8,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -110,8 +111,20 @@ public final class TaskDetailDialog {
         statusCombo.setButtonCell(new StatusListCell(false));
         selectStatus(statusCombo, safeStatuses, model.statusId());
         applyColoredToolbarSelect(statusCombo, Optional.ofNullable(statusCombo.getValue()).map(TaskStatusOptionDto::colorHex).orElse(null));
-        statusCombo.valueProperty().addListener((obs, oldValue, newValue) ->
-                applyColoredToolbarSelect(statusCombo, newValue == null ? null : newValue.colorHex()));
+        final boolean[] completedState = new boolean[] { model.completed() };
+        final Integer[] lastNonCompletedStatusId = new Integer[] { null };
+        TaskStatusOptionDto initialStatus = statusCombo.getValue();
+        if (initialStatus != null && !isCompletedStatus(initialStatus)) {
+            lastNonCompletedStatusId[0] = initialStatus.id();
+        }
+        statusCombo.valueProperty().addListener((obs, oldValue, newValue) -> {
+            applyColoredToolbarSelect(statusCombo, newValue == null ? null : newValue.colorHex());
+            boolean newCompleted = newValue != null && isCompletedStatus(newValue);
+            completedState[0] = newCompleted;
+            if (newValue != null && !newCompleted) {
+                lastNonCompletedStatusId[0] = newValue.id();
+            }
+        });
 
         ComboBox<TaskPriorityOptionDto> priorityCombo = new ComboBox<>();
         priorityCombo.setMaxWidth(Double.MAX_VALUE);
@@ -127,8 +140,6 @@ public final class TaskDetailDialog {
         Label coreLoadingLabel = loadingLabel("Loading task details…");
         boolean needsCoreHydration = safeStatuses.isEmpty() || safePriorities.isEmpty() || loadCoreTaskData != null;
         setVisibleManaged(coreLoadingLabel, needsCoreHydration);
-
-        final boolean[] completedState = new boolean[] { model.completed() };
 
         Label errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: #b42318;");
@@ -374,7 +385,21 @@ public final class TaskDetailDialog {
         completionToggleButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
         completionToggleButton.setMinWidth(132);
         completionToggleButton.setOnAction(e -> {
-            completedState[0] = !completedState[0];
+            if (!completedState[0]) {
+                TaskStatusOptionDto completedStatus = findCompletedStatus(statusCombo.getItems());
+                if (completedStatus != null) {
+                    TaskStatusOptionDto current = statusCombo.getValue();
+                    if (current != null && !isCompletedStatus(current)) {
+                        lastNonCompletedStatusId[0] = current.id();
+                    }
+                    statusCombo.setValue(completedStatus);
+                }
+            } else {
+                TaskStatusOptionDto fallback = findIncompleteFallbackStatus(statusCombo.getItems(), lastNonCompletedStatusId[0]);
+                if (fallback != null) {
+                    statusCombo.setValue(fallback);
+                }
+            }
             completionToggleButton.setText(completionToggleLabel(completedState[0]));
         });
 
@@ -489,13 +514,20 @@ public final class TaskDetailDialog {
                             descriptionArea.setText(safe(detail.description()));
                             dueDatePicker.setValue(detail.dueAt() == null ? null : detail.dueAt().toLocalDate());
                             dueTimeField.setText(detail.dueAt() == null ? "" : detail.dueAt().toLocalTime().toString());
-                            completedState[0] = detail.completedAt() != null;
-                            completionToggleButton.setText(completionToggleLabel(completedState[0]));
                             createdByLabel.setText("Created by: " + displayCreatedBy(detail.createdByDisplayName()));
                             List<TaskStatusOptionDto> hydratedStatuses = core.statuses() == null ? List.of() : core.statuses();
                             statusCombo.getItems().setAll(hydratedStatuses);
                             selectStatus(statusCombo, hydratedStatuses, detail.statusId());
                             applyColoredToolbarSelect(statusCombo, Optional.ofNullable(statusCombo.getValue()).map(TaskStatusOptionDto::colorHex).orElse(null));
+                            TaskStatusOptionDto selectedStatus = statusCombo.getValue();
+                            if (selectedStatus != null && !isCompletedStatus(selectedStatus)) {
+                                lastNonCompletedStatusId[0] = selectedStatus.id();
+                            } else if (selectedStatus == null) {
+                                lastNonCompletedStatusId[0] = null;
+                            }
+                            boolean completedFromStatus = selectedStatus != null && isCompletedStatus(selectedStatus);
+                            completedState[0] = completedFromStatus || detail.completedAt() != null;
+                            completionToggleButton.setText(completionToggleLabel(completedState[0]));
                             List<TaskPriorityOptionDto> hydratedPriorities = core.priorities() == null ? List.of() : core.priorities();
                             priorityCombo.getItems().setAll(hydratedPriorities);
                             selectPriority(priorityCombo, hydratedPriorities, detail.priorityId());
@@ -819,6 +851,50 @@ public final class TaskDetailDialog {
 
     private static String completionToggleLabel(boolean completed) {
         return completed ? "Mark Incomplete" : "Complete Task";
+    }
+
+    private static TaskStatusOptionDto findCompletedStatus(List<TaskStatusOptionDto> statuses) {
+        if (statuses == null) {
+            return null;
+        }
+        for (TaskStatusOptionDto status : statuses) {
+            if (isCompletedStatus(status)) {
+                return status;
+            }
+        }
+        return null;
+    }
+
+    private static TaskStatusOptionDto findIncompleteFallbackStatus(List<TaskStatusOptionDto> statuses, Integer preferredId) {
+        if (statuses == null || statuses.isEmpty()) {
+            return null;
+        }
+        if (preferredId != null) {
+            for (TaskStatusOptionDto status : statuses) {
+                if (status != null && status.id() == preferredId && !isCompletedStatus(status)) {
+                    return status;
+                }
+            }
+        }
+        for (TaskStatusOptionDto status : statuses) {
+            if (status != null && "open".equalsIgnoreCase(safe(status.systemKey()).trim())) {
+                return status;
+            }
+        }
+        for (TaskStatusOptionDto status : statuses) {
+            if (status != null && !isCompletedStatus(status)) {
+                return status;
+            }
+        }
+        return statuses.get(0);
+    }
+
+    private static boolean isCompletedStatus(TaskStatusOptionDto status) {
+        if (status == null) {
+            return false;
+        }
+        String key = safe(status.systemKey()).trim().toLowerCase(Locale.ROOT);
+        return key.equals("completed") || key.equals("complete") || key.equals("closed") || key.equals("done");
     }
 
     private static boolean hasUncommittedNoteText(TextArea noteComposer) {

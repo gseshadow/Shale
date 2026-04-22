@@ -1244,7 +1244,7 @@ public final class TaskDao {
                 String displayName = row.name() == null || row.name().isBlank()
                         ? "Status " + row.id()
                         : row.name().trim();
-                out.add(new TaskStatusOptionDto(row.id(), displayName, row.sortOrder(), row.colorHex()));
+                out.add(new TaskStatusOptionDto(row.id(), displayName, row.sortOrder(), row.colorHex(), row.systemKey()));
             }
             return out;
         } catch (SQLException e) {
