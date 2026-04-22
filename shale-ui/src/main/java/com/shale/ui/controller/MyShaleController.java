@@ -41,11 +41,9 @@ import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.Labeled;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -851,55 +849,14 @@ public final class MyShaleController {
 		myTasksPinTraceLogged = true;
 	}
 
-	private void removeLaneLevelOverdueNodes(Node root) {
-		if (!(root instanceof Parent parentRoot)) {
+	private void suppressMyTasksScrollTopRightCornerOverlay() {
+		if (myTasksScroll == null) {
 			return;
 		}
-		List<Node> queue = new ArrayList<>();
-		queue.add(parentRoot);
-		while (!queue.isEmpty()) {
-			Node current = queue.remove(0);
-			if (!(current instanceof Parent parent)) {
-				continue;
-			}
-			List<Node> children = new ArrayList<>(parent.getChildrenUnmodifiable());
-			for (Node child : children) {
-				if (isLaneLevelOverdueLabel(child)) {
-					removeFromParent(child);
-					continue;
-				}
-				if (child instanceof Parent childParent) {
-					queue.add(childParent);
-				}
-			}
-		}
-	}
-
-	private boolean isLaneLevelOverdueLabel(Node node) {
-		if (!(node instanceof Labeled labeled)) {
-			return false;
-		}
-		if (!"Overdue".equalsIgnoreCase(safe(labeled.getText()).trim())) {
-			return false;
-		}
-		return !isInsideTaskCard(node);
-	}
-
-	private boolean isInsideTaskCard(Node node) {
-		Node cursor = node;
-		while (cursor != null) {
-			if (cursor instanceof com.shale.ui.component.TaskCard) {
-				return true;
-			}
-			cursor = cursor.getParent();
-		}
-		return false;
-	}
-
-	private void removeFromParent(Node node) {
-		Parent parent = node.getParent();
-		if (parent instanceof Pane pane) {
-			pane.getChildren().remove(node);
+		myTasksScroll.applyCss();
+		Node corner = myTasksScroll.lookup(".corner");
+		if (corner != null) {
+			setVisibleManaged(corner, false);
 		}
 	}
 
