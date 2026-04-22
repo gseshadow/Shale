@@ -147,7 +147,7 @@ public final class MyShaleController {
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
-	private boolean myTasksLaneShellTraceLogged;
+	private boolean myTasksPinTraceLogged;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "my-cases-loader");
@@ -815,60 +815,39 @@ public final class MyShaleController {
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
-		suppressMyTasksScrollTopRightCornerOverlay();
-		logMyTasksLaneShellHierarchyOnce();
+		traceAndPruneGhostPinNodes();
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
 	}
 
-	private void suppressMyTasksScrollTopRightCornerOverlay() {
-		if (myTasksScroll == null) {
+	private void traceAndPruneGhostPinNodes() {
+		if (myTasksPanel == null) {
 			return;
 		}
-		myTasksScroll.applyCss();
-		myTasksScroll.layout();
-		for (Node corner : myTasksScroll.lookupAll(".corner")) {
-			setVisibleManaged(corner, false);
-			System.out.println("[DEBUG UI][MY_TASKS] hiding myTasksScroll .corner node class="
-					+ corner.getClass().getSimpleName()
-					+ " styles=" + corner.getStyleClass());
-		}
-	}
-
-	private void logMyTasksLaneShellHierarchyOnce() {
-		if (myTasksLaneShellTraceLogged || myTasksPanel == null) {
-			return;
-		}
-		myTasksLaneShellTraceLogged = true;
-		System.out.println("[DEBUG UI][MY_TASKS] lane/container hierarchy trace start");
-		logNodeTree(myTasksPanel, 0, 4);
-		System.out.println("[DEBUG UI][MY_TASKS] lane/container hierarchy trace end");
-	}
-
-	private void logNodeTree(Node node, int depth, int maxDepth) {
-		if (node == null || depth > maxDepth) {
-			return;
-		}
-		StringBuilder line = new StringBuilder()
-				.append("  ".repeat(Math.max(0, depth)))
-				.append("- ")
-				.append(node.getClass().getSimpleName());
-		if (node.getId() != null && !node.getId().isBlank()) {
-			line.append("#").append(node.getId());
-		}
-		if (!node.getStyleClass().isEmpty()) {
-			line.append(" styles=").append(node.getStyleClass());
-		}
-		if (node instanceof Labeled labeled && labeled.getText() != null && !labeled.getText().isBlank()) {
-			line.append(" text='").append(labeled.getText()).append("'");
-		}
-		line.append(" visible=").append(node.isVisible())
-				.append(" managed=").append(node.isManaged());
-		System.out.println("[DEBUG UI][MY_TASKS] " + line);
-		if (node instanceof Parent parent) {
-			for (Node child : parent.getChildrenUnmodifiable()) {
-				logNodeTree(child, depth + 1, maxDepth);
+		List<Node> queue = new ArrayList<>();
+		queue.add(myTasksPanel);
+		while (!queue.isEmpty()) {
+			Node node = queue.remove(0);
+			if (node instanceof Button button) {
+				String text = safe(button.getText()).trim();
+				String styleClasses = String.join(" ", button.getStyleClass()).toLowerCase(Locale.ROOT);
+				boolean pinText = text.contains("📌") || text.contains("📍");
+				boolean pinClass = styleClasses.contains("pin") || styleClasses.contains("thumb") || styleClasses.contains("tack");
+				boolean pinGraphic = button.getGraphic() != null && button.getGraphic().getClass().getSimpleName().toLowerCase(Locale.ROOT).contains("pin");
+				if (pinText || pinClass || pinGraphic) {
+					System.out.println("[DEBUG UI][MY_TASKS][PIN_CANDIDATE] class=" + button.getClass().getSimpleName()
+							+ " text='" + text + "' styles=" + button.getStyleClass()
+							+ " graphic=" + (button.getGraphic() == null ? "<none>" : button.getGraphic().getClass().getName()));
+					setVisibleManaged(button, false);
+				} else if (!myTasksPinTraceLogged) {
+					System.out.println("[DEBUG UI][MY_TASKS][BUTTON_TRACE] text='" + text + "' styles=" + button.getStyleClass()
+							+ " graphic=" + (button.getGraphic() == null ? "<none>" : button.getGraphic().getClass().getName()));
+				}
+			}
+			if (node instanceof javafx.scene.Parent parent) {
+				queue.addAll(parent.getChildrenUnmodifiable());
 			}
 		}
+		myTasksPinTraceLogged = true;
 	}
 
 	private Map<CaseColumnKey, List<CaseTaskListItemDto>> groupTasksByCase(List<CaseTaskListItemDto> tasks) {
@@ -993,6 +972,11 @@ public final class MyShaleController {
 		titleAndMeta.getChildren().addAll(laneTitle, metaRow);
 
 		headerRow.getChildren().add(titleAndMeta);
+		System.out.println("[DEBUG UI][MY_TASKS][LANE_HEADER] caseId=" + (key == null ? null : key.caseId())
+				+ " titleNode=" + laneTitle.getClass().getSimpleName()
+				+ " children=" + headerRow.getChildren().stream()
+				.map(child -> child.getClass().getSimpleName() + ":" + child.getStyleClass())
+				.toList());
 		return headerRow;
 	}
 
