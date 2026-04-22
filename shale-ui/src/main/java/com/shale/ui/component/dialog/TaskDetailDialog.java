@@ -107,8 +107,8 @@ public final class TaskDetailDialog {
         statusCombo.getStyleClass().add("app-toolbar-select");
         List<TaskStatusOptionDto> safeStatuses = statuses == null ? List.of() : statuses;
         statusCombo.getItems().setAll(safeStatuses);
-        statusCombo.setCellFactory(cb -> new StatusListCell());
-        statusCombo.setButtonCell(new StatusListCell());
+        statusCombo.setCellFactory(cb -> new StatusListCell(true));
+        statusCombo.setButtonCell(new StatusListCell(false));
         selectStatus(statusCombo, safeStatuses, model.statusId());
         applyColoredToolbarSelect(statusCombo, Optional.ofNullable(statusCombo.getValue()).map(TaskStatusOptionDto::colorHex).orElse(null));
         statusCombo.valueProperty().addListener((obs, oldValue, newValue) ->
@@ -119,8 +119,8 @@ public final class TaskDetailDialog {
         priorityCombo.getStyleClass().add("app-toolbar-select");
         List<TaskPriorityOptionDto> safePriorities = priorities == null ? List.of() : priorities;
         priorityCombo.getItems().setAll(safePriorities);
-        priorityCombo.setCellFactory(cb -> new PriorityListCell());
-        priorityCombo.setButtonCell(new PriorityListCell());
+        priorityCombo.setCellFactory(cb -> new PriorityListCell(true));
+        priorityCombo.setButtonCell(new PriorityListCell(false));
         selectPriority(priorityCombo, safePriorities, model.priorityId());
         applyColoredToolbarSelect(priorityCombo, Optional.ofNullable(priorityCombo.getValue()).map(TaskPriorityOptionDto::colorHex).orElse(null));
         priorityCombo.valueProperty().addListener((obs, oldValue, newValue) ->
@@ -227,9 +227,9 @@ public final class TaskDetailDialog {
         VBox formContent = new VBox(8,
                 createdByLabel,
                 coreLoadingLabel,
+                relatedCaseSection,
                 new Label("Title"), titleField,
                 new Label("Description"), descriptionArea,
-                relatedCaseSection,
                 new Label("Status"), statusCombo,
                 new Label("Priority"), priorityCombo,
                 new Label("Due date/time"), dueRow,
@@ -1135,6 +1135,38 @@ public final class TaskDetailDialog {
         return "rgba(" + color.red() + ", " + color.green() + ", " + color.blue() + ", " + clampedAlpha + ")";
     }
 
+    private static String colorBarStyle(String colorHex) {
+        RgbColor parsed = parseHexColor(colorHex);
+        if (parsed == null) {
+            return "-fx-background-color: rgba(63, 90, 132, 0.70); -fx-background-radius: 2;";
+        }
+        return "-fx-background-color: " + toCssRgba(parsed, 0.95) + "; -fx-background-radius: 2;";
+    }
+
+    private record RgbColor(int red, int green, int blue) {
+    }
+
+    private static String contrastTextColor(RgbColor color) {
+        double red = color.red() / 255.0;
+        double green = color.green() / 255.0;
+        double blue = color.blue() / 255.0;
+        double luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+        return luminance >= 0.58 ? "#112542" : "#f9fbff";
+    }
+
+    private static RgbColor blend(RgbColor source, RgbColor target, double ratio) {
+        double clamped = Math.max(0.0, Math.min(1.0, ratio));
+        int red = (int) Math.round((source.red() * (1 - clamped)) + (target.red() * clamped));
+        int green = (int) Math.round((source.green() * (1 - clamped)) + (target.green() * clamped));
+        int blue = (int) Math.round((source.blue() * (1 - clamped)) + (target.blue() * clamped));
+        return new RgbColor(red, green, blue);
+    }
+
+    private static String toCssRgba(RgbColor color, double alpha) {
+        double clampedAlpha = Math.max(0.0, Math.min(1.0, alpha));
+        return "rgba(" + color.red() + ", " + color.green() + ", " + color.blue() + ", " + clampedAlpha + ")";
+    }
+
     private record RgbColor(int red, int green, int blue) {
     }
 
@@ -1232,18 +1264,66 @@ public final class TaskDetailDialog {
     }
 
     private static final class PriorityListCell extends javafx.scene.control.ListCell<TaskPriorityOptionDto> {
+        private final boolean showColorBar;
+        private final Region colorBar = new Region();
+
+        private PriorityListCell(boolean showColorBar) {
+            this.showColorBar = showColorBar;
+            colorBar.setMinWidth(4);
+            colorBar.setPrefWidth(4);
+            colorBar.setMaxWidth(4);
+            colorBar.setMinHeight(14);
+            colorBar.setPrefHeight(14);
+        }
+
         @Override
         protected void updateItem(TaskPriorityOptionDto item, boolean empty) {
             super.updateItem(item, empty);
-            setText(empty || item == null ? null : item.name());
+            if (empty || item == null) {
+                setText(null);
+                setGraphic(null);
+                return;
+            }
+            setText(item.name());
+            if (showColorBar) {
+                colorBar.setStyle(colorBarStyle(item.colorHex()));
+                setGraphic(colorBar);
+                setGraphicTextGap(8);
+            } else {
+                setGraphic(null);
+            }
         }
     }
 
     private static final class StatusListCell extends javafx.scene.control.ListCell<TaskStatusOptionDto> {
+        private final boolean showColorBar;
+        private final Region colorBar = new Region();
+
+        private StatusListCell(boolean showColorBar) {
+            this.showColorBar = showColorBar;
+            colorBar.setMinWidth(4);
+            colorBar.setPrefWidth(4);
+            colorBar.setMaxWidth(4);
+            colorBar.setMinHeight(14);
+            colorBar.setPrefHeight(14);
+        }
+
         @Override
         protected void updateItem(TaskStatusOptionDto item, boolean empty) {
             super.updateItem(item, empty);
-            setText(empty || item == null ? null : item.name());
+            if (empty || item == null) {
+                setText(null);
+                setGraphic(null);
+                return;
+            }
+            setText(item.name());
+            if (showColorBar) {
+                colorBar.setStyle(colorBarStyle(item.colorHex()));
+                setGraphic(colorBar);
+                setGraphicTextGap(8);
+            } else {
+                setGraphic(null);
+            }
         }
     }
 
