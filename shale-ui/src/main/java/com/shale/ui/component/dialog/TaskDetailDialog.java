@@ -31,7 +31,6 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
@@ -129,8 +128,7 @@ public final class TaskDetailDialog {
         boolean needsCoreHydration = safeStatuses.isEmpty() || safePriorities.isEmpty() || loadCoreTaskData != null;
         setVisibleManaged(coreLoadingLabel, needsCoreHydration);
 
-        CheckBox completedCheck = new CheckBox("Completed");
-        completedCheck.setSelected(model.completed());
+        final boolean[] completedState = new boolean[] { model.completed() };
 
         Label errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: #b42318;");
@@ -234,7 +232,6 @@ public final class TaskDetailDialog {
                 new Label("Priority"), priorityCombo,
                 new Label("Due date/time"), dueRow,
                 assignedTeamSection,
-                completedCheck,
                 errorLabel);
         formContent.setPadding(new Insets(8, 2, 4, 2));
         HBox.setHgrow(formContent, Priority.ALWAYS);
@@ -373,6 +370,14 @@ public final class TaskDetailDialog {
             stage.close();
         });
 
+        Button completionToggleButton = new Button(completionToggleLabel(completedState[0]));
+        completionToggleButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        completionToggleButton.setMinWidth(132);
+        completionToggleButton.setOnAction(e -> {
+            completedState[0] = !completedState[0];
+            completionToggleButton.setText(completionToggleLabel(completedState[0]));
+        });
+
         Button saveButton = new Button("Save");
         saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
         saveButton.setDefaultButton(true);
@@ -430,13 +435,13 @@ public final class TaskDetailDialog {
                     dueAt,
                     statusId,
                     priorityId,
-                    completedCheck.isSelected()));
+                    completedState[0]));
             stage.close();
         });
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox actions = new HBox(10, deleteButton, spacer, cancelButton, saveButton);
+        HBox actions = new HBox(10, deleteButton, spacer, cancelButton, completionToggleButton, saveButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
         VBox body = new VBox(16, heading, message, contentColumns, actions);
@@ -484,7 +489,8 @@ public final class TaskDetailDialog {
                             descriptionArea.setText(safe(detail.description()));
                             dueDatePicker.setValue(detail.dueAt() == null ? null : detail.dueAt().toLocalDate());
                             dueTimeField.setText(detail.dueAt() == null ? "" : detail.dueAt().toLocalTime().toString());
-                            completedCheck.setSelected(detail.completedAt() != null);
+                            completedState[0] = detail.completedAt() != null;
+                            completionToggleButton.setText(completionToggleLabel(completedState[0]));
                             createdByLabel.setText("Created by: " + displayCreatedBy(detail.createdByDisplayName()));
                             List<TaskStatusOptionDto> hydratedStatuses = core.statuses() == null ? List.of() : core.statuses();
                             statusCombo.getItems().setAll(hydratedStatuses);
@@ -809,6 +815,10 @@ public final class TaskDetailDialog {
         errorLabel.setText(message);
         errorLabel.setManaged(true);
         errorLabel.setVisible(true);
+    }
+
+    private static String completionToggleLabel(boolean completed) {
+        return completed ? "Mark Incomplete" : "Complete Task";
     }
 
     private static boolean hasUncommittedNoteText(TextArea noteComposer) {
@@ -1141,30 +1151,6 @@ public final class TaskDetailDialog {
             return "-fx-background-color: rgba(63, 90, 132, 0.70); -fx-background-radius: 2;";
         }
         return "-fx-background-color: " + toCssRgba(parsed, 0.95) + "; -fx-background-radius: 2;";
-    }
-
-    private record RgbColor(int red, int green, int blue) {
-    }
-
-    private static String contrastTextColor(RgbColor color) {
-        double red = color.red() / 255.0;
-        double green = color.green() / 255.0;
-        double blue = color.blue() / 255.0;
-        double luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
-        return luminance >= 0.58 ? "#112542" : "#f9fbff";
-    }
-
-    private static RgbColor blend(RgbColor source, RgbColor target, double ratio) {
-        double clamped = Math.max(0.0, Math.min(1.0, ratio));
-        int red = (int) Math.round((source.red() * (1 - clamped)) + (target.red() * clamped));
-        int green = (int) Math.round((source.green() * (1 - clamped)) + (target.green() * clamped));
-        int blue = (int) Math.round((source.blue() * (1 - clamped)) + (target.blue() * clamped));
-        return new RgbColor(red, green, blue);
-    }
-
-    private static String toCssRgba(RgbColor color, double alpha) {
-        double clampedAlpha = Math.max(0.0, Math.min(1.0, alpha));
-        return "rgba(" + color.red() + ", " + color.green() + ", " + color.blue() + ", " + clampedAlpha + ")";
     }
 
     private record RgbColor(int red, int green, int blue) {
