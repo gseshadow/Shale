@@ -148,7 +148,8 @@ public final class MyShaleController {
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
 
-	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
+	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
+	{
 		Thread t = new Thread(r, "my-cases-loader");
 		t.setDaemon(true);
 		return t;
@@ -175,7 +176,8 @@ public final class MyShaleController {
 				this::openTask,
 				this::onToggleMyTaskComplete,
 				onOpenCase,
-				onOpenUser == null ? id -> {
+				onOpenUser == null ? id ->
+				{
 				} : onOpenUser);
 	}
 
@@ -223,7 +225,8 @@ public final class MyShaleController {
 			myTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyTasks());
 		}
 		if (myTasksShowCompletedButton != null) {
-			myTasksShowCompletedButton.setOnAction(e -> {
+			myTasksShowCompletedButton.setOnAction(e ->
+			{
 				showCompletedMyTasks = !showCompletedMyTasks;
 				updateMyTasksCompletionToggleLabel();
 				refreshMyTasks();
@@ -233,7 +236,8 @@ public final class MyShaleController {
 
 		reloadStatusFilterOptionsAndThen(this::rerender);
 
-		Platform.runLater(() -> {
+		Platform.runLater(() ->
+		{
 			onSectionSelected(SECTION_OVERVIEW);
 			wireInfiniteScroll();
 			loadFirstPage();
@@ -241,7 +245,8 @@ public final class MyShaleController {
 		});
 
 		if (myCasesFlow != null) {
-			myCasesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			myCasesFlow.sceneProperty().addListener((obs, oldScene, newScene) ->
+			{
 				System.out.println("[DEBUG LIVE][MY_CASES] scene changed old=" + (oldScene != null) + " new=" + (newScene != null));
 				if (newScene == null) {
 					unsubscribeLiveCaseUpdates();
@@ -390,7 +395,8 @@ public final class MyShaleController {
 			return;
 		}
 
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
 			List<CaseListUiSupport.StatusFilterOption> options = statuses == null
 					? List.of()
@@ -402,7 +408,8 @@ public final class MyShaleController {
 									CaseDao.isTerminalStatus(status)))
 							.toList();
 
-			Platform.runLater(() -> {
+			Platform.runLater(() ->
+			{
 				Set<Integer> statusIds = options.stream()
 						.map(CaseListUiSupport.StatusFilterOption::id)
 						.collect(java.util.stream.Collectors.toSet());
@@ -416,7 +423,6 @@ public final class MyShaleController {
 		});
 	}
 
-
 	private void refreshCaseIncremental(long caseId) {
 		if (caseDao == null || appState == null || appState.getUserId() == null || appState.getUserId() <= 0) {
 			System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh skipped: missing dependencies");
@@ -425,10 +431,12 @@ public final class MyShaleController {
 
 		final int userId = appState.getUserId();
 		final int generationAtSubmit = loadGeneration;
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				CaseDao.CaseRow row = caseDao.getMyCaseRow(userId, caseId);
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (generationAtSubmit != loadGeneration) {
 						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh ignored due to generation mismatch");
 						return;
@@ -481,21 +489,22 @@ public final class MyShaleController {
 
 	private CaseCardVm toVm(CaseDao.CaseRow r) {
 		return new CaseCardVm(
-			r.id(),
-			safe(r.name()),
-			r.intakeDate(),
-			r.statuteOfLimitationsDate(),
-			r.primaryStatusId(),
-			safe(r.responsibleAttorneyName()),
-			safe(r.responsibleAttorneyColor()),
-			r.nonEngagementLetterSent()
+				r.id(),
+				safe(r.name()),
+				r.intakeDate(),
+				r.statuteOfLimitationsDate(),
+				r.primaryStatusId(),
+				safe(r.responsibleAttorneyName()),
+				safe(r.responsibleAttorneyColor()),
+				r.nonEngagementLetterSent()
 		);
 	}
 
 	private void wireInfiniteScroll() {
 		if (myCasesScroll == null)
 			return;
-		myCasesScroll.vvalueProperty().addListener((obs, oldV, newV) -> {
+		myCasesScroll.vvalueProperty().addListener((obs, oldV, newV) ->
+		{
 			if (newV != null && newV.doubleValue() >= 0.95 && !isSearchActive()) {
 				loadNextPage();
 			}
@@ -505,7 +514,8 @@ public final class MyShaleController {
 	private void loadFirstPage() {
 		PerfLog.log("PAGE", "start", "page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		loadGeneration++;
-		System.out.println("[DEBUG LIVE][MY_CASES] loadFirstPage generation=" + loadGeneration + " sort=" + (myCasesSortChoice == null ? "<null>" : myCasesSortChoice.getValue()) + " query='" + normalizedSearchQuery() + "' selectedStatuses=" + selectedStatusIds.size());
+		System.out.println("[DEBUG LIVE][MY_CASES] loadFirstPage generation=" + loadGeneration + " sort=" + (myCasesSortChoice == null ? "<null>" : myCasesSortChoice.getValue())
+				+ " query='" + normalizedSearchQuery() + "' selectedStatuses=" + selectedStatusIds.size());
 		currentPage = 0;
 		loading = false;
 		hasMore = true;
@@ -526,17 +536,20 @@ public final class MyShaleController {
 		final int generationAtSubmit = loadGeneration;
 		final int userId = appState.getUserId();
 
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				long daoStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=findMyCasesPage page=my_shale userId=" + userId + " pageIndex=" + pageToLoad);
 				var page = caseDao.findMyCasesPage(userId, pageToLoad, pageSize, selectedSort(), false);
-				PerfLog.logDone("DAO", "method=findMyCasesPage page=my_shale userId=" + userId + " pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
+				PerfLog.logDone("DAO", "method=findMyCasesPage page=my_shale userId=" + userId + " pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0
+						: page.items().size()), daoStartNanos);
 				List<CaseCardVm> newItems = page.items().stream()
 						.map(this::toVm)
 						.toList();
 
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (generationAtSubmit != loadGeneration) {
 						loading = false;
 						return;
@@ -544,14 +557,16 @@ public final class MyShaleController {
 					for (CaseCardVm vm : newItems) {
 						upsertLoadedCase(vm);
 					}
-					System.out.println("[DEBUG LIVE][MY_CASES] page loaded page=" + pageToLoad + " items=" + newItems.size() + " total=" + page.total() + " loadedUnique=" + loaded.size());
+					System.out.println("[DEBUG LIVE][MY_CASES] page loaded page=" + pageToLoad + " items=" + newItems.size() + " total=" + page.total() + " loadedUnique=" + loaded
+							.size());
 					currentPage++;
 					hasMore = loaded.size() < page.total();
 					loading = false;
 					rerender();
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (generationAtSubmit == loadGeneration) {
 						loading = false;
 						System.out.println("[DEBUG LIVE][MY_CASES] load failed generation=" + generationAtSubmit + " message=" + ex.getMessage());
@@ -583,7 +598,8 @@ public final class MyShaleController {
 
 		List<CaseCardVm> view = q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList();
 		myCasesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
-		PerfLog.logDone("RENDER", "panel=my_cases page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myCasesFlow.getChildren().size(), renderStartNanos);
+		PerfLog.logDone("RENDER", "panel=my_cases page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myCasesFlow.getChildren().size(),
+				renderStartNanos);
 	}
 
 	private CaseSort selectedSort() {
@@ -677,7 +693,8 @@ public final class MyShaleController {
 
 		CaseTaskService.MyTasksSortOption sortOption = selectedMyTaskSort();
 		final boolean includeCompleted = showCompletedMyTasks;
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				long loadStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadMyTasks page=my_shale userId=" + userId);
@@ -692,8 +709,8 @@ public final class MyShaleController {
 				PerfLog.logDone("DAO", "method=loadMyTasks page=my_shale userId=" + userId + " rows=" + (tasks == null ? 0 : tasks.size()), loadStartNanos);
 				long usersLoadStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId);
-					java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
-							.loadAssignedUsersForTasks(taskIds, shaleClientId)
+				java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
+						.loadAssignedUsersForTasks(taskIds, shaleClientId)
 						.stream()
 						.collect(java.util.stream.Collectors.groupingBy(
 								CaseTaskService.TaskAssignedUsersByTask::taskId,
@@ -702,23 +719,24 @@ public final class MyShaleController {
 												row.userId(),
 												row.displayName(),
 												row.color()),
-											java.util.stream.Collectors.toList())));
-					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientId).stream()
-							.filter(Objects::nonNull)
-							.collect(java.util.stream.Collectors.toMap(
-									TaskPriorityOptionDto::id,
-									option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
-									(existing, replacement) -> existing,
-									java.util.LinkedHashMap::new));
-					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
-					runOnFx(() -> {
-						myTasks = tasks == null ? List.of() : tasks;
-						myTaskAssignedUsers = assignedByTask;
-						myTaskPrioritiesById = prioritiesById;
-						syncMyTaskPriorityFilterOptions();
-						syncMyTaskCaseFilterOptions();
-						renderMyTasks();
-					});
+										java.util.stream.Collectors.toList())));
+				java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientId).stream()
+						.filter(Objects::nonNull)
+						.collect(java.util.stream.Collectors.toMap(
+								TaskPriorityOptionDto::id,
+								option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
+								(existing, replacement) -> existing,
+								java.util.LinkedHashMap::new));
+				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userId + " rows=" + assignedByTask.size(), usersLoadStartNanos);
+				runOnFx(() ->
+				{
+					myTasks = tasks == null ? List.of() : tasks;
+					myTaskAssignedUsers = assignedByTask;
+					myTaskPrioritiesById = prioritiesById;
+					syncMyTaskPriorityFilterOptions();
+					syncMyTaskCaseFilterOptions();
+					renderMyTasks();
+				});
 			} catch (Exception ex) {
 				System.err.println("My tasks load failed: " + ex.getMessage());
 				ex.printStackTrace();
@@ -771,7 +789,8 @@ public final class MyShaleController {
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
-		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
+		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(),
+				renderStartNanos);
 	}
 
 	private Map<TaskLaneKey, List<CaseTaskListItemDto>> groupTasksByLane(List<CaseTaskListItemDto> tasks) {
@@ -902,7 +921,8 @@ public final class MyShaleController {
 		pinButton.setFocusTraversable(false);
 		pinButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
 		pinButton.setTooltip(new Tooltip(isPinnedLane(key) ? "Unpin lane" : "Pin lane"));
-		pinButton.setOnAction(event -> {
+		pinButton.setOnAction(event ->
+		{
 			toggleLanePinned(key);
 			renderMyTasks();
 		});
@@ -925,33 +945,6 @@ public final class MyShaleController {
 		if (!pinnedTaskLaneCaseIds.add(laneId)) {
 			pinnedTaskLaneCaseIds.remove(laneId);
 		}
-	}
-
-	private Node buildTaskLaneBody(List<CaseTaskListItemDto> tasksInLane, boolean fullVariant) {
-		VBox taskCards = new VBox(10);
-		taskCards.setFillWidth(true);
-		for (CaseTaskListItemDto task : tasksInLane) {
-			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
-					task.id(),
-					task.caseId(),
-					task.caseName(),
-					task.caseResponsibleAttorney(),
-					task.caseResponsibleAttorneyColor(),
-					task.caseNonEngagementLetterSent(),
-					resolveMyTaskCardTitle(task),
-					task.description(),
-					task.createdByDisplayName(),
-					task.priorityColorHex(),
-					task.dueAt(),
-					task.completedAt(),
-					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			if (fullVariant) {
-				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
-			} else {
-				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
-			}
-		}
-		return taskCards;
 	}
 
 	private Node buildTaskLaneBody(List<CaseTaskListItemDto> tasksInLane, boolean fullVariant) {
@@ -1061,7 +1054,6 @@ public final class MyShaleController {
 		PriorityFilterOption option = myTasksPriorityFilterChoice.getSelectionModel().getSelectedItem();
 		return option == null ? null : option.priorityId();
 	}
-
 
 	private void syncMyTaskCaseFilterOptions() {
 		if (myTasksCaseFilterChoice == null) {
@@ -1176,7 +1168,8 @@ public final class MyShaleController {
 				.map(task -> task.completedAt() != null)
 				.orElse(false);
 
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				if (currentlyCompleted) {
 					caseTaskService.uncompleteTask(taskId, shaleClientId, appState.getUserId());
@@ -1239,40 +1232,77 @@ public final class MyShaleController {
 				summary.map(item -> item.completedAt() != null).orElse(false));
 		System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] shell_stage_created_ms="
 				+ ((System.nanoTime() - clickReceivedAt) / 1_000_000L) + " taskId=" + taskId);
-			try {
-				auditTaskRead(taskId);
-				Optional<TaskDetailDialog.TaskDetailResult> result =
-						TaskDetailDialog.showAndWait(
-							"MY_TASKS",
-							clickReceivedAt,
-							taskDialogOwner(),
-							model,
-							List.of(),
-							List.of(),
-							id -> {
-								TaskDetailDto detail = caseTaskService.loadTaskDetail(id, shaleClientId);
-								List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
-								List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-								if (detail == null) {
-									throw new IllegalStateException("Task was not found or may have been deleted.");
-								}
-								return new TaskDetailDialog.CoreTaskHydration(detail, statuses, priorities);
-							},
-							id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-							id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
+		try {
+			auditTaskRead(taskId);
+			Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+					"MY_TASKS",
+					clickReceivedAt,
+					taskDialogOwner(),
+					model,
+					List.of(),
+					List.of(),
+					id ->
+					{
+						TaskDetailDto detail = caseTaskService.loadTaskDetail(id, shaleClientId);
+						List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
+						List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+						if (detail == null) {
+							throw new IllegalStateException("Task was not found or may have been deleted.");
+						}
+						return new TaskDetailDialog.CoreTaskHydration(detail, statuses, priorities);
+					},
+					id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+					id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
+							.map(member -> new TaskDetailDialog.AssignedTeamMember(
+									member.userId(),
+									member.displayName(),
+									member.color()))
+							.toList(),
+					id -> caseTaskService.loadTaskActivity(id, shaleClientId).stream()
+							.map(item -> new TaskDetailDialog.TaskActivityEntry(
+									item.title(),
+									item.body(),
+									item.actorDisplayName(),
+									item.occurredAt()))
+							.toList(),
+					id -> caseTaskService.loadTaskNotes(id, shaleClientId).stream()
+							.map(note -> new TaskDetailDialog.TaskNoteEntry(
+									note.id(),
+									note.userId(),
+									note.userDisplayName(),
+									note.body(),
+									note.createdAt(),
+									note.updatedAt(),
+									note.userId() == currentUserId))
+							.toList(),
+					new TaskDetailDialog.AssignmentEditor() {
+						@Override
+						public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
+							caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+							return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
 									.map(member -> new TaskDetailDialog.AssignedTeamMember(
 											member.userId(),
 											member.displayName(),
 											member.color()))
-									.toList(),
-							id -> caseTaskService.loadTaskActivity(id, shaleClientId).stream()
-									.map(item -> new TaskDetailDialog.TaskActivityEntry(
-											item.title(),
-											item.body(),
-											item.actorDisplayName(),
-											item.occurredAt()))
-									.toList(),
-							id -> caseTaskService.loadTaskNotes(id, shaleClientId).stream()
+									.toList();
+						}
+
+						@Override
+						public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
+							caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+							return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+									.map(member -> new TaskDetailDialog.AssignedTeamMember(
+											member.userId(),
+											member.displayName(),
+											member.color()))
+									.toList();
+						}
+					},
+					new TaskDetailDialog.NotesEditor() {
+						@Override
+						public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
+							caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
+							return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
 									.map(note -> new TaskDetailDialog.TaskNoteEntry(
 											note.id(),
 											note.userId(),
@@ -1281,63 +1311,26 @@ public final class MyShaleController {
 											note.createdAt(),
 											note.updatedAt(),
 											note.userId() == currentUserId))
-									.toList(),
-							new TaskDetailDialog.AssignmentEditor() {
-											@Override
-											public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
-												caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-												return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-														.map(member -> new TaskDetailDialog.AssignedTeamMember(
-																member.userId(),
-																member.displayName(),
-																member.color()))
-														.toList();
-											}
+									.toList();
+						}
 
-											@Override
-											public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
-												caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-												return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-														.map(member -> new TaskDetailDialog.AssignedTeamMember(
-																member.userId(),
-																member.displayName(),
-																member.color()))
-														.toList();
-											}
-											},
-											new TaskDetailDialog.NotesEditor() {
-												@Override
-												public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
-													caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
-													return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
-															.map(note -> new TaskDetailDialog.TaskNoteEntry(
-																	note.id(),
-																	note.userId(),
-																	note.userDisplayName(),
-																	note.body(),
-																	note.createdAt(),
-																	note.updatedAt(),
-																	note.userId() == currentUserId))
-															.toList();
-												}
-
-												@Override
-												public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
-													caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
-													return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
-															.map(note -> new TaskDetailDialog.TaskNoteEntry(
-																	note.id(),
-																	note.userId(),
-																	note.userDisplayName(),
-																	note.body(),
-																	note.createdAt(),
-																	note.updatedAt(),
-																	note.userId() == currentUserId))
-															.toList();
-												}
-							},
-							onOpenUser,
-							onOpenCase);
+						@Override
+						public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
+							caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
+							return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+									.map(note -> new TaskDetailDialog.TaskNoteEntry(
+											note.id(),
+											note.userId(),
+											note.userDisplayName(),
+											note.body(),
+											note.createdAt(),
+											note.updatedAt(),
+											note.userId() == currentUserId))
+									.toList();
+						}
+					},
+					onOpenUser,
+					onOpenCase);
 			if (result.isEmpty()) {
 				return;
 			}
@@ -1381,7 +1374,8 @@ public final class MyShaleController {
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseTaskService.updateTask(request);
 				runOnFx(this::refreshMyTasks);
@@ -1392,7 +1386,8 @@ public final class MyShaleController {
 	}
 
 	private void deleteTaskFromDetail(long taskId, int shaleClientId, int currentUserId) {
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 				runOnFx(this::refreshMyTasks);
@@ -1465,7 +1460,8 @@ public final class MyShaleController {
 			String displayName,
 			String responsibleAttorney,
 			String responsibleAttorneyColor,
-			boolean nonEngagementLetterSent) {
+			boolean nonEngagementLetterSent
+	) {
 	}
 
 	private static final class CaseCardVm {
