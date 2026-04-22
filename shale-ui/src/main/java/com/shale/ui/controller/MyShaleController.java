@@ -768,7 +768,7 @@ public final class MyShaleController {
 			caseColumn.setMaxHeight(Double.MAX_VALUE);
 			caseColumn.setPadding(new Insets(8));
 			caseColumn.getStyleClass().addAll("strong-panel", "glass-panel");
-			Node caseHeader = buildCaseColumnHeader(entry.getKey());
+			Node caseHeader = buildCaseColumnHeader(entry.getKey(), entry.getValue());
 
 			VBox caseTaskCards = new VBox(10);
 			caseTaskCards.setFillWidth(true);
@@ -910,13 +910,48 @@ public final class MyShaleController {
 				Boolean.TRUE.equals(task.caseNonEngagementLetterSent()));
 	}
 
-	private Node buildCaseColumnHeader(CaseColumnKey key) {
+	private Node buildCaseColumnHeader(CaseColumnKey key, List<CaseTaskListItemDto> tasks) {
+		HBox headerRow = new HBox(8);
+		headerRow.setAlignment(Pos.CENTER_LEFT);
+		headerRow.getStyleClass().add("my-tasks-lane-header");
+
+		VBox titleAndMeta = new VBox(4);
+		titleAndMeta.setAlignment(Pos.CENTER_LEFT);
+		HBox.setHgrow(titleAndMeta, Priority.ALWAYS);
+
+		Node laneTitle = buildCaseColumnHeaderTitle(key);
+
+		HBox metaRow = new HBox(6);
+		metaRow.setAlignment(Pos.CENTER_LEFT);
+		Label taskCountLabel = new Label(formatTaskCountLabel(tasks));
+		taskCountLabel.getStyleClass().add("my-tasks-lane-count");
+		metaRow.getChildren().add(taskCountLabel);
+		if (hasOverdueIncompleteTasks(tasks)) {
+			Label overdueIndicator = new Label("Overdue");
+			overdueIndicator.getStyleClass().add("my-tasks-lane-urgency-indicator");
+			metaRow.getChildren().add(overdueIndicator);
+		}
+
+		titleAndMeta.getChildren().addAll(laneTitle, metaRow);
+
+		Button pinButton = new Button("📌");
+		pinButton.setFocusTraversable(false);
+		pinButton.setMinSize(26, 26);
+		pinButton.setPrefSize(26, 26);
+		pinButton.setMaxSize(26, 26);
+		pinButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral", "my-tasks-lane-pin-button");
+
+		headerRow.getChildren().addAll(titleAndMeta, pinButton);
+		return headerRow;
+	}
+
+	private Node buildCaseColumnHeaderTitle(CaseColumnKey key) {
 		if (key == null || key.caseId() == null || key.caseId() <= 0) {
 			Label noCaseHeader = new Label(NO_CASE_COLUMN_TITLE);
 			noCaseHeader.getStyleClass().add("sidebar-header");
 			return noCaseHeader;
 		}
-		Node caseCard = caseCardFactory.create(
+		return caseCardFactory.create(
 				new CaseCardModel(
 						key.caseId(),
 						key.displayName(),
@@ -926,7 +961,23 @@ public final class MyShaleController {
 						key.responsibleAttorneyColor(),
 						key.nonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		return caseCard;
+	}
+
+	private boolean hasOverdueIncompleteTasks(List<CaseTaskListItemDto> tasks) {
+		if (tasks == null || tasks.isEmpty()) {
+			return false;
+		}
+		LocalDate today = LocalDate.now();
+		return tasks.stream()
+				.filter(Objects::nonNull)
+				.anyMatch(task -> task.completedAt() == null
+						&& task.dueAt() != null
+						&& task.dueAt().toLocalDate().isBefore(today));
+	}
+
+	private String formatTaskCountLabel(List<CaseTaskListItemDto> tasks) {
+		int count = tasks == null ? 0 : tasks.size();
+		return count == 1 ? "1 task" : count + " tasks";
 	}
 
 	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {
