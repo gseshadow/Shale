@@ -85,8 +85,11 @@
 								<Label text="My Tasks" styleClass="page-heading" />
 								<Region HBox.hgrow="ALWAYS" />
 							</HBox>
-							<HBox spacing="12" alignment="TOP_LEFT">
-								<VBox spacing="4" HBox.hgrow="ALWAYS">
+							<HBox spacing="10" alignment="TOP_LEFT">
+								<VBox spacing="4" styleClass="glass-panel" HBox.hgrow="ALWAYS">
+									<padding>
+										<Insets top="8" right="10" bottom="8" left="10" />
+									</padding>
 									<Label text="Task Controls" styleClass="sidebar-header" />
 									<HBox spacing="8" alignment="CENTER_LEFT">
 										<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170">
@@ -107,8 +110,11 @@
 										</ChoiceBox>
 									</HBox>
 								</VBox>
-								<VBox spacing="4">
-									<Label text="Column Controls" styleClass="sidebar-header" />
+								<VBox spacing="4" styleClass="glass-panel">
+									<padding>
+										<Insets top="8" right="10" bottom="8" left="10" />
+									</padding>
+									<Label text="Lane Controls" styleClass="sidebar-header" />
 									<HBox spacing="8" alignment="CENTER_LEFT">
 										<Label text="Cases" />
 										<ChoiceBox fx:id="myTasksCaseFilterChoice" prefWidth="180">
