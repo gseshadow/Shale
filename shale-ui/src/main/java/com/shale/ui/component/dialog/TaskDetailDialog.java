@@ -919,18 +919,16 @@ public final class TaskDetailDialog {
     }
 
     private static VBox createActivityRow(TaskActivityEntry entry) {
-        Label textLabel = new Label(safe(entry.title()).trim().isBlank() ? "Activity event" : safe(entry.title()).trim());
-        textLabel.setWrapText(true);
-        textLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
-
         String body = safe(entry.body()).trim();
-        VBox content = new VBox(2, textLabel);
-        if (!body.isBlank()) {
-            Label bodyLabel = new Label(body);
-            bodyLabel.setWrapText(true);
-            bodyLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.64);");
-            content.getChildren().add(bodyLabel);
+        String title = safe(entry.title()).trim();
+        String message = body.isBlank() ? title : body;
+        if (message.isBlank()) {
+            message = "Activity event";
         }
+        Label messageLabel = new Label(message);
+        messageLabel.setWrapText(true);
+        messageLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
+        VBox content = new VBox(1, messageLabel);
 
         String actor = safe(entry.actorDisplayName()).trim();
         if (actor.isBlank()) {
@@ -941,7 +939,7 @@ public final class TaskDetailDialog {
         content.getChildren().add(metaLabel);
 
         VBox row = new VBox(content);
-        row.setPadding(new Insets(4, 6, 4, 6));
+        row.setPadding(new Insets(3, 6, 3, 6));
         return row;
     }
 
@@ -1022,6 +1020,7 @@ public final class TaskDetailDialog {
         VBox card = new VBox(cardContent);
         card.setPadding(new Insets(10, 12, 10, 12));
         card.getStyleClass().add("secondary-panel");
+        card.setStyle("-fx-background-color: rgba(52, 110, 201, 0.22);");
         return card;
     }
 
