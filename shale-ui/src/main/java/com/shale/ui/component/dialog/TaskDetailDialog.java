@@ -1183,6 +1183,70 @@ public final class TaskDetailDialog {
             List<TaskActivityEntry> activityEntries,
             List<TaskNoteEntry> noteEntries,
             boolean completed) {
+
+        public TaskDetailModel(
+                long taskId,
+                String title,
+                String description,
+                LocalDateTime dueAt,
+                Integer statusId,
+                Integer priorityId,
+                String createdByDisplayName,
+                List<AssignedTeamMember> assignedTeamMembers,
+                List<TaskActivityEntry> activityEntries,
+                List<TaskNoteEntry> noteEntries,
+                boolean completed) {
+            this(
+                    taskId,
+                    0L,
+                    "",
+                    "",
+                    "",
+                    null,
+                    title,
+                    description,
+                    dueAt,
+                    statusId,
+                    priorityId,
+                    createdByDisplayName,
+                    assignedTeamMembers,
+                    activityEntries,
+                    noteEntries,
+                    completed);
+        }
+
+        public TaskDetailModel(
+                long taskId,
+                long caseId,
+                String caseName,
+                String title,
+                String description,
+                LocalDateTime dueAt,
+                Integer statusId,
+                Integer priorityId,
+                String createdByDisplayName,
+                List<AssignedTeamMember> assignedTeamMembers,
+                List<TaskActivityEntry> activityEntries,
+                List<TaskNoteEntry> noteEntries,
+                boolean completed) {
+            this(
+                    taskId,
+                    caseId,
+                    caseName,
+                    "",
+                    "",
+                    null,
+                    title,
+                    description,
+                    dueAt,
+                    statusId,
+                    priorityId,
+                    createdByDisplayName,
+                    assignedTeamMembers,
+                    activityEntries,
+                    noteEntries,
+                    completed);
+        }
     }
 
     public record TaskActivityEntry(
