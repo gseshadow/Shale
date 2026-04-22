@@ -401,18 +401,6 @@
     -fx-padding: 1 6 1 6;
 }
 
-.my-tasks-lane-pin-button {
-    -fx-min-height: 26;
-    -fx-pref-height: 26;
-    -fx-max-height: 26;
-    -fx-min-width: 26;
-    -fx-pref-width: 26;
-    -fx-max-width: 26;
-    -fx-padding: 0;
-    -fx-font-size: 11px;
-    -fx-font-weight: 700;
-}
-
 .button.app-toolbar-button-danger,
 .menu-button.app-toolbar-button-danger,
 .split-menu-button.app-toolbar-button-danger {
@@ -569,6 +557,11 @@
 .surface-scroll,
 .surface-scroll > .viewport {
     -fx-background-color: transparent;
+}
+
+.surface-scroll > .corner {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
 }
 
 .transparent-scroll {
