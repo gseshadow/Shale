@@ -47,6 +47,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -142,6 +143,7 @@ public final class MyShaleController {
 	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
+	private final Set<Long> pinnedTaskLaneCaseIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
@@ -798,21 +800,26 @@ public final class MyShaleController {
 				myTasksColumnOrderChoice == null ? null : myTasksColumnOrderChoice.getValue());
 		Comparator<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> comparator = taskLaneComparator(originalIndexes, sortByDueDate);
 		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> noCase = new ArrayList<>();
-		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> sortableLanes = new ArrayList<>();
+		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> pinnedLanes = new ArrayList<>();
+		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> unpinnedLanes = new ArrayList<>();
 
 		for (Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>> entry : entries) {
 			TaskLaneKey key = entry.getKey();
 			if (isUnassignedLane(key)) {
 				noCase.add(entry);
+			} else if (isPinnedLane(key)) {
+				pinnedLanes.add(entry);
 			} else {
-				sortableLanes.add(entry);
+				unpinnedLanes.add(entry);
 			}
 		}
 
-		sortableLanes.sort(comparator);
+		pinnedLanes.sort(comparator);
+		unpinnedLanes.sort(comparator);
 
 		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> ordered = new ArrayList<>(entries.size());
-		ordered.addAll(sortableLanes);
+		ordered.addAll(pinnedLanes);
+		ordered.addAll(unpinnedLanes);
 		ordered.addAll(noCase);
 		return ordered;
 	}
@@ -885,7 +892,66 @@ public final class MyShaleController {
 						key.responsibleAttorneyColor(),
 						key.nonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		return caseCard;
+		HBox header = new HBox(8);
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.getChildren().add(caseCard);
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		header.getChildren().add(spacer);
+		Button pinButton = new Button(isPinnedLane(key) ? "📌" : "📍");
+		pinButton.setFocusTraversable(false);
+		pinButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
+		pinButton.setTooltip(new Tooltip(isPinnedLane(key) ? "Unpin lane" : "Pin lane"));
+		pinButton.setOnAction(event -> {
+			toggleLanePinned(key);
+			renderMyTasks();
+		});
+		header.getChildren().add(pinButton);
+		return header;
+	}
+
+	private boolean isPinnedLane(TaskLaneKey key) {
+		return key != null
+				&& key.caseId() != null
+				&& key.caseId() > 0
+				&& pinnedTaskLaneCaseIds.contains(key.caseId());
+	}
+
+	private void toggleLanePinned(TaskLaneKey key) {
+		if (key == null || key.caseId() == null || key.caseId() <= 0) {
+			return;
+		}
+		Long laneId = key.caseId();
+		if (!pinnedTaskLaneCaseIds.add(laneId)) {
+			pinnedTaskLaneCaseIds.remove(laneId);
+		}
+	}
+
+	private Node buildTaskLaneBody(List<CaseTaskListItemDto> tasksInLane, boolean fullVariant) {
+		VBox taskCards = new VBox(10);
+		taskCards.setFillWidth(true);
+		for (CaseTaskListItemDto task : tasksInLane) {
+			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+					task.id(),
+					task.caseId(),
+					task.caseName(),
+					task.caseResponsibleAttorney(),
+					task.caseResponsibleAttorneyColor(),
+					task.caseNonEngagementLetterSent(),
+					resolveMyTaskCardTitle(task),
+					task.description(),
+					task.createdByDisplayName(),
+					task.priorityColorHex(),
+					task.dueAt(),
+					task.completedAt(),
+					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+			if (fullVariant) {
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
+			} else {
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+			}
+		}
+		return taskCards;
 	}
 
 	private Node buildTaskLaneBody(List<CaseTaskListItemDto> tasksInLane, boolean fullVariant) {
