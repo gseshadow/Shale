@@ -41,9 +41,11 @@ import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Labeled;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -145,6 +147,7 @@ public final class MyShaleController {
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
+	private boolean myTasksLaneShellTraceLogged;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "my-cases-loader");
@@ -746,6 +749,7 @@ public final class MyShaleController {
 			myTasksEmptyLabel.setText(showCompletedMyTasks
 					? "No tasks assigned to you."
 					: "No incomplete tasks assigned to you.");
+			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
@@ -753,6 +757,7 @@ public final class MyShaleController {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
 			myTasksEmptyLabel.setText("No tasks found.");
+			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
@@ -810,7 +815,60 @@ public final class MyShaleController {
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
 		setVisibleManaged(myTasksScroll, true);
+		suppressMyTasksScrollTopRightCornerOverlay();
+		logMyTasksLaneShellHierarchyOnce();
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(), renderStartNanos);
+	}
+
+	private void suppressMyTasksScrollTopRightCornerOverlay() {
+		if (myTasksScroll == null) {
+			return;
+		}
+		myTasksScroll.applyCss();
+		myTasksScroll.layout();
+		for (Node corner : myTasksScroll.lookupAll(".corner")) {
+			setVisibleManaged(corner, false);
+			System.out.println("[DEBUG UI][MY_TASKS] hiding myTasksScroll .corner node class="
+					+ corner.getClass().getSimpleName()
+					+ " styles=" + corner.getStyleClass());
+		}
+	}
+
+	private void logMyTasksLaneShellHierarchyOnce() {
+		if (myTasksLaneShellTraceLogged || myTasksPanel == null) {
+			return;
+		}
+		myTasksLaneShellTraceLogged = true;
+		System.out.println("[DEBUG UI][MY_TASKS] lane/container hierarchy trace start");
+		logNodeTree(myTasksPanel, 0, 4);
+		System.out.println("[DEBUG UI][MY_TASKS] lane/container hierarchy trace end");
+	}
+
+	private void logNodeTree(Node node, int depth, int maxDepth) {
+		if (node == null || depth > maxDepth) {
+			return;
+		}
+		StringBuilder line = new StringBuilder()
+				.append("  ".repeat(Math.max(0, depth)))
+				.append("- ")
+				.append(node.getClass().getSimpleName());
+		if (node.getId() != null && !node.getId().isBlank()) {
+			line.append("#").append(node.getId());
+		}
+		if (!node.getStyleClass().isEmpty()) {
+			line.append(" styles=").append(node.getStyleClass());
+		}
+		if (node instanceof Labeled labeled && labeled.getText() != null && !labeled.getText().isBlank()) {
+			line.append(" text='").append(labeled.getText()).append("'");
+		}
+		line.append(" visible=").append(node.isVisible())
+				.append(" managed=").append(node.isManaged());
+		System.out.println("[DEBUG UI][MY_TASKS] " + line);
+		if (node instanceof Parent parent) {
+			for (Node child : parent.getChildrenUnmodifiable()) {
+				logNodeTree(child, depth + 1, maxDepth);
+			}
+		}
 	}
 
 	private Map<CaseColumnKey, List<CaseTaskListItemDto>> groupTasksByCase(List<CaseTaskListItemDto> tasks) {

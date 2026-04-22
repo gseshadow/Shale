@@ -559,6 +559,11 @@
     -fx-background-color: transparent;
 }
 
+.surface-scroll > .corner {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
 .transparent-scroll {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
