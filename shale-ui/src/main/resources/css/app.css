@@ -472,6 +472,42 @@
     -fx-text-fill: #ffffff;
 }
 
+.lane-header-meta {
+    -fx-padding: 0 2 0 2;
+}
+
+.label.lane-task-count {
+    -fx-text-fill: rgba(225, 236, 251, 0.86);
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.label.lane-urgency-badge {
+    -fx-padding: 2 8 2 8;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
+.label.lane-urgency-overdue {
+    -fx-background-color: rgba(194, 70, 70, 0.22);
+    -fx-border-color: rgba(255, 182, 182, 0.5);
+    -fx-text-fill: #ffdede;
+}
+
+.label.lane-urgency-soon {
+    -fx-background-color: rgba(203, 155, 64, 0.2);
+    -fx-border-color: rgba(246, 219, 166, 0.44);
+    -fx-text-fill: #ffe9bf;
+}
+
+.label.lane-empty-state {
+    -fx-text-fill: rgba(220, 232, 250, 0.72);
+    -fx-font-size: 12px;
+    -fx-padding: 12 8 12 8;
+}
+
 .button.app-toolbar-button-compact,
 .menu-button.app-toolbar-button-compact,
 .split-menu-button.app-toolbar-button-compact {
