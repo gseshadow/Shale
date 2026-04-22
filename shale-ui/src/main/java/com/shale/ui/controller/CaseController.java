@@ -136,6 +136,8 @@ public class CaseController {
 	@FXML
 	private Label caseTitleLabel;
 	@FXML
+	private Label caseMetadataLabel;
+	@FXML
 	private Label statusLabel;
 	@FXML
 	private StackPane statusHost;
@@ -1054,12 +1056,22 @@ public class CaseController {
 			return;
 
 		caseTitleLabel.setText("Case #" + caseId + " (Placeholder)");
+		refreshCaseMetadata(null);
 		renderPrimaryStatusMini(null, "—", null);
 		renderResponsibleAttorneyMini(null, "—", null);
 		renderPracticeAreaMini(null, "—", null);
 
 		if (lastUpdatedLabel != null)
 			lastUpdatedLabel.setText("Last updated: —");
+	}
+
+	private void refreshCaseMetadata(String caseNumberRaw) {
+		if (caseMetadataLabel == null) {
+			return;
+		}
+		String safeNumber = safeText(caseNumberRaw).trim();
+		String idText = caseId == null ? "Case #—" : "Case #" + caseId;
+		caseMetadataLabel.setText(safeNumber.isBlank() ? idText : idText + " • " + safeNumber);
 	}
 
 	private void refreshOverviewPlaceholders() {
@@ -3396,7 +3408,8 @@ public class CaseController {
 
 		String num = (current == null) ? "" : safeText(current.getCaseNumber());
 		if (caseTitleLabel != null)
-			caseTitleLabel.setText(num.isBlank() ? safeName : safeName + " — " + num);
+			caseTitleLabel.setText(safeName);
+		refreshCaseMetadata(num);
 	}
 
 	private void applyLiveCaseNumber(String newNumber) {
@@ -3406,14 +3419,9 @@ public class CaseController {
 			ovCaseNumberValue.setText(safeNum.isBlank() ? "—" : safeNum);
 
 		String name = (current == null) ? "" : safeText(current.getCaseName()).trim();
-		if (caseTitleLabel != null) {
-			if (!name.isBlank() && !safeNum.isBlank())
-				caseTitleLabel.setText(name + " — " + safeNum);
-			else if (!name.isBlank())
-				caseTitleLabel.setText(name);
-			else if (!safeNum.isBlank())
-				caseTitleLabel.setText(safeNum);
-		}
+		if (caseTitleLabel != null && !name.isBlank())
+			caseTitleLabel.setText(name);
+		refreshCaseMetadata(safeNum);
 	}
 
 	private void applyLiveCaseDescription(String newDescription) {
@@ -4665,15 +4673,11 @@ public class CaseController {
 			if (caseTitleLabel == null)
 				return;
 			String name = safeText(dto.getCaseName()).trim();
-			String num = safeText(dto.getCaseNumber()).trim();
-			if (!name.isBlank() && !num.isBlank())
-				caseTitleLabel.setText(name + " — " + num);
-			else if (!name.isBlank())
+			if (!name.isBlank())
 				caseTitleLabel.setText(name);
-			else if (!num.isBlank())
-				caseTitleLabel.setText(num);
 			else
 				caseTitleLabel.setText("Case #" + dto.getCaseId());
+			refreshCaseMetadata(safeText(dto.getCaseNumber()).trim());
 		}
 
 		private void renderHeaderTitleFromDetail(CaseDetailDto detail) {
@@ -4681,12 +4685,11 @@ public class CaseController {
 				return;
 			String num = safeText(detail.getCaseNumber()).trim();
 			String name = safeText(detail.getCaseName()).trim();
-			if (!name.isBlank() && !num.isBlank())
-				caseTitleLabel.setText(name + " — " + num);
-			else if (!name.isBlank())
+			if (!name.isBlank())
 				caseTitleLabel.setText(name);
-			else if (!num.isBlank())
-				caseTitleLabel.setText(num);
+			else if (caseId != null)
+				caseTitleLabel.setText("Case #" + caseId);
+			refreshCaseMetadata(num);
 		}
 
 		private void renderLastUpdated(LocalDateTime updatedAt) {

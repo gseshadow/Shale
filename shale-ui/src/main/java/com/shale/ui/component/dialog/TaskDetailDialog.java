@@ -5,11 +5,15 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -28,20 +32,16 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -104,25 +104,42 @@ public final class TaskDetailDialog {
 
         ComboBox<TaskStatusOptionDto> statusCombo = new ComboBox<>();
         statusCombo.setMaxWidth(Double.MAX_VALUE);
+        statusCombo.getStyleClass().add("app-toolbar-select");
         List<TaskStatusOptionDto> safeStatuses = statuses == null ? List.of() : statuses;
         statusCombo.getItems().setAll(safeStatuses);
-        statusCombo.setCellFactory(cb -> new StatusListCell());
-        statusCombo.setButtonCell(new StatusListCell());
+        statusCombo.setCellFactory(cb -> new StatusListCell(true));
+        statusCombo.setButtonCell(new StatusListCell(false));
         selectStatus(statusCombo, safeStatuses, model.statusId());
+        applyColoredToolbarSelect(statusCombo, Optional.ofNullable(statusCombo.getValue()).map(TaskStatusOptionDto::colorHex).orElse(null));
+        final boolean[] completedState = new boolean[] { model.completed() };
+        final Integer[] lastNonCompletedStatusId = new Integer[] { null };
+        TaskStatusOptionDto initialStatus = statusCombo.getValue();
+        if (initialStatus != null && !isCompletedStatus(initialStatus)) {
+            lastNonCompletedStatusId[0] = initialStatus.id();
+        }
+        statusCombo.valueProperty().addListener((obs, oldValue, newValue) -> {
+            applyColoredToolbarSelect(statusCombo, newValue == null ? null : newValue.colorHex());
+            boolean newCompleted = newValue != null && isCompletedStatus(newValue);
+            completedState[0] = newCompleted;
+            if (newValue != null && !newCompleted) {
+                lastNonCompletedStatusId[0] = newValue.id();
+            }
+        });
 
         ComboBox<TaskPriorityOptionDto> priorityCombo = new ComboBox<>();
         priorityCombo.setMaxWidth(Double.MAX_VALUE);
+        priorityCombo.getStyleClass().add("app-toolbar-select");
         List<TaskPriorityOptionDto> safePriorities = priorities == null ? List.of() : priorities;
         priorityCombo.getItems().setAll(safePriorities);
-        priorityCombo.setCellFactory(cb -> new PriorityListCell());
-        priorityCombo.setButtonCell(new PriorityListCell());
+        priorityCombo.setCellFactory(cb -> new PriorityListCell(true));
+        priorityCombo.setButtonCell(new PriorityListCell(false));
         selectPriority(priorityCombo, safePriorities, model.priorityId());
+        applyColoredToolbarSelect(priorityCombo, Optional.ofNullable(priorityCombo.getValue()).map(TaskPriorityOptionDto::colorHex).orElse(null));
+        priorityCombo.valueProperty().addListener((obs, oldValue, newValue) ->
+                applyColoredToolbarSelect(priorityCombo, newValue == null ? null : newValue.colorHex()));
         Label coreLoadingLabel = loadingLabel("Loading task details…");
         boolean needsCoreHydration = safeStatuses.isEmpty() || safePriorities.isEmpty() || loadCoreTaskData != null;
         setVisibleManaged(coreLoadingLabel, needsCoreHydration);
-
-        CheckBox completedCheck = new CheckBox("Completed");
-        completedCheck.setSelected(model.completed());
 
         Label errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: #b42318;");
@@ -154,7 +171,7 @@ public final class TaskDetailDialog {
         VBox assignedTeamSection = new VBox(6);
         Label assignedTeamLabel = new Label("Assigned");
         assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
-        Button addAssignedUserButton = new Button("Add");
+        Button addAssignedUserButton = new Button("Add Assignee");
         addAssignedUserButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
         addAssignedUserButton.setFocusTraversable(false);
         Region assignedHeaderSpacer = new Region();
@@ -219,41 +236,20 @@ public final class TaskDetailDialog {
         VBox formContent = new VBox(8,
                 createdByLabel,
                 coreLoadingLabel,
+                relatedCaseSection,
                 new Label("Title"), titleField,
                 new Label("Description"), descriptionArea,
-                relatedCaseSection,
                 new Label("Status"), statusCombo,
                 new Label("Priority"), priorityCombo,
                 new Label("Due date/time"), dueRow,
                 assignedTeamSection,
-                completedCheck,
                 errorLabel);
         formContent.setPadding(new Insets(8, 2, 4, 2));
         HBox.setHgrow(formContent, Priority.ALWAYS);
 
-        Label activityLabel = new Label("Activity");
-        activityLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
-        VBox activityList = new VBox(8);
-        Label activityLoadingLabel = loadingLabel("Loading activity…");
-        setVisibleManaged(activityLoadingLabel, false);
-        renderActivityItems(activityList, model.activityEntries());
-        ScrollPane activityScrollPane = new ScrollPane(activityList);
-        activityScrollPane.setFitToWidth(true);
-        activityScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        activityScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        activityScrollPane.setPrefViewportHeight(420);
-        VBox.setVgrow(activityScrollPane, Priority.ALWAYS);
-
-        VBox activityPanel = new VBox(6, activityLabel, activityLoadingLabel, activityScrollPane);
-        activityPanel.setPrefWidth(320);
-        activityPanel.setMinWidth(280);
-        activityPanel.setMaxWidth(360);
-        activityPanel.setPadding(new Insets(8, 2, 4, 8));
-        VBox.setVgrow(activityPanel, Priority.ALWAYS);
-
-        VBox notesPanel = new VBox(8);
-        Label notesLabel = new Label("Notes");
-        notesLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        VBox historyPanel = new VBox(8);
+        Label historyLabel = new Label("History");
+        historyLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
         TextArea noteComposer = new TextArea();
         noteComposer.setPromptText("Add note...");
         noteComposer.setPrefRowCount(3);
@@ -269,20 +265,33 @@ public final class TaskDetailDialog {
         notesErrorLabel.setStyle("-fx-text-fill: #b42318;");
         notesErrorLabel.setVisible(false);
         notesErrorLabel.setManaged(false);
-        VBox notesList = new VBox(8);
-        Label notesLoadingLabel = loadingLabel("Loading notes…");
-        setVisibleManaged(notesLoadingLabel, false);
+        VBox historyList = new VBox(8);
+        historyList.setPadding(new Insets(6, 10, 8, 10));
+        Label historyLoadingLabel = loadingLabel("Loading history…");
+        setVisibleManaged(historyLoadingLabel, false);
+        final boolean[] loadingActivityState = new boolean[] { false };
+        final boolean[] loadingNotesState = new boolean[] { false };
         List<TaskNoteEntry> noteEntries = model.noteEntries() == null ? List.of() : model.noteEntries();
-        renderNoteEntries(notesList, noteEntries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
-        ScrollPane notesScrollPane = new ScrollPane(notesList);
-        notesScrollPane.setFitToWidth(true);
-        notesScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        notesScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        notesScrollPane.setPrefViewportHeight(420);
-        VBox.setVgrow(notesScrollPane, Priority.ALWAYS);
+        List<TaskActivityEntry> activityEntries = model.activityEntries() == null ? List.of() : model.activityEntries();
+        AtomicReference<List<TaskNoteEntry>> noteEntriesState = new AtomicReference<>(noteEntries);
+        AtomicReference<List<TaskActivityEntry>> activityEntriesState = new AtomicReference<>(activityEntries);
+        renderUnifiedHistoryFeed(
+                historyList,
+                activityEntriesState.get(),
+                noteEntriesState.get(),
+                notesEditor,
+                notesErrorLabel,
+                busyMutationState,
+                busyMutationUi);
+        ScrollPane historyScrollPane = new ScrollPane(historyList);
+        historyScrollPane.setFitToWidth(true);
+        historyScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        historyScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        historyScrollPane.setPrefViewportHeight(420);
+        VBox.setVgrow(historyScrollPane, Priority.ALWAYS);
         busyMutationUi.register(addNoteButton);
         busyMutationUi.register(noteComposer);
-        busyMutationUi.register(notesScrollPane);
+        busyMutationUi.register(historyScrollPane);
         addNoteButton.setOnAction(e -> {
             if (busyMutationState.isBusy()) {
                 return;
@@ -295,53 +304,42 @@ public final class TaskDetailDialog {
             runMutationAsync(
                     busyMutationState,
                     busyMutationUi::refresh,
-                    () -> notesEditor == null ? noteEntries : notesEditor.addAndReload(body),
+                    () -> notesEditor == null ? noteEntriesState.get() : notesEditor.addAndReload(body),
                     refreshed -> {
-                        renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
+                        noteEntriesState.set(refreshed == null ? List.of() : refreshed);
+                        renderUnifiedHistoryFeed(
+                                historyList,
+                                activityEntriesState.get(),
+                                noteEntriesState.get(),
+                                notesEditor,
+                                notesErrorLabel,
+                                busyMutationState,
+                                busyMutationUi);
                         noteComposer.clear();
                         notesErrorLabel.setManaged(false);
                         notesErrorLabel.setVisible(false);
                     },
                     ex -> showError(notesErrorLabel, "Failed to add note. " + rootCauseMessage(ex)));
         });
-        notesPanel.getChildren().setAll(
-                notesLabel,
+        historyPanel.getChildren().setAll(
+                historyLabel,
                 noteComposer,
                 addNoteButton,
                 uncommittedNoteWarningLabel,
                 notesErrorLabel,
-                notesLoadingLabel,
-                notesScrollPane);
-        notesPanel.setPrefWidth(320);
-        notesPanel.setMinWidth(280);
-        notesPanel.setMaxWidth(360);
-        notesPanel.setPadding(new Insets(8, 2, 4, 8));
-        VBox.setVgrow(notesPanel, Priority.ALWAYS);
+                historyLoadingLabel,
+                historyScrollPane);
+        historyPanel.setPrefWidth(320);
+        historyPanel.setMinWidth(280);
+        historyPanel.setMaxWidth(360);
+        historyPanel.setPadding(new Insets(8, 2, 4, 8));
+        VBox.setVgrow(historyPanel, Priority.ALWAYS);
 
-        ToggleGroup rightRailToggle = new ToggleGroup();
-        ToggleButton activityToggle = new ToggleButton("Activity");
-        activityToggle.setToggleGroup(rightRailToggle);
-        ToggleButton notesToggle = new ToggleButton("Notes");
-        notesToggle.setToggleGroup(rightRailToggle);
-        notesToggle.setSelected(true);
-        HBox rightRailTabs = new HBox(6, activityToggle, notesToggle);
-
-        StackPane rightRailBody = new StackPane(activityPanel, notesPanel);
-        activityPanel.setVisible(false);
-        activityPanel.setManaged(false);
-        rightRailToggle.selectedToggleProperty().addListener((obs, oldToggle, selectedToggle) -> {
-            boolean showNotes = selectedToggle == notesToggle;
-            notesPanel.setVisible(showNotes);
-            notesPanel.setManaged(showNotes);
-            activityPanel.setVisible(!showNotes);
-            activityPanel.setManaged(!showNotes);
-        });
-
-        VBox rightRail = new VBox(8, rightRailTabs, rightRailBody);
+        VBox rightRail = new VBox(8, historyPanel);
         rightRail.setPrefWidth(340);
         rightRail.setMinWidth(300);
         rightRail.setMaxWidth(380);
-        VBox.setVgrow(rightRailBody, Priority.ALWAYS);
+        VBox.setVgrow(historyPanel, Priority.ALWAYS);
 
         HBox contentColumns = new HBox(12, formContent, rightRail);
         HBox.setHgrow(formContent, Priority.ALWAYS);
@@ -381,6 +379,28 @@ public final class TaskDetailDialog {
                 }
             }
             stage.close();
+        });
+
+        Button completionToggleButton = new Button(completionToggleLabel(completedState[0]));
+        completionToggleButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        completionToggleButton.setMinWidth(132);
+        completionToggleButton.setOnAction(e -> {
+            if (!completedState[0]) {
+                TaskStatusOptionDto completedStatus = findCompletedStatus(statusCombo.getItems());
+                if (completedStatus != null) {
+                    TaskStatusOptionDto current = statusCombo.getValue();
+                    if (current != null && !isCompletedStatus(current)) {
+                        lastNonCompletedStatusId[0] = current.id();
+                    }
+                    statusCombo.setValue(completedStatus);
+                }
+            } else {
+                TaskStatusOptionDto fallback = findIncompleteFallbackStatus(statusCombo.getItems(), lastNonCompletedStatusId[0]);
+                if (fallback != null) {
+                    statusCombo.setValue(fallback);
+                }
+            }
+            completionToggleButton.setText(completionToggleLabel(completedState[0]));
         });
 
         Button saveButton = new Button("Save");
@@ -440,13 +460,13 @@ public final class TaskDetailDialog {
                     dueAt,
                     statusId,
                     priorityId,
-                    completedCheck.isSelected()));
+                    completedState[0]));
             stage.close();
         });
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox actions = new HBox(10, deleteButton, spacer, cancelButton, saveButton);
+        HBox actions = new HBox(10, deleteButton, spacer, cancelButton, completionToggleButton, saveButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
         VBox body = new VBox(16, heading, message, contentColumns, actions);
@@ -494,14 +514,24 @@ public final class TaskDetailDialog {
                             descriptionArea.setText(safe(detail.description()));
                             dueDatePicker.setValue(detail.dueAt() == null ? null : detail.dueAt().toLocalDate());
                             dueTimeField.setText(detail.dueAt() == null ? "" : detail.dueAt().toLocalTime().toString());
-                            completedCheck.setSelected(detail.completedAt() != null);
                             createdByLabel.setText("Created by: " + displayCreatedBy(detail.createdByDisplayName()));
                             List<TaskStatusOptionDto> hydratedStatuses = core.statuses() == null ? List.of() : core.statuses();
                             statusCombo.getItems().setAll(hydratedStatuses);
                             selectStatus(statusCombo, hydratedStatuses, detail.statusId());
+                            applyColoredToolbarSelect(statusCombo, Optional.ofNullable(statusCombo.getValue()).map(TaskStatusOptionDto::colorHex).orElse(null));
+                            TaskStatusOptionDto selectedStatus = statusCombo.getValue();
+                            if (selectedStatus != null && !isCompletedStatus(selectedStatus)) {
+                                lastNonCompletedStatusId[0] = selectedStatus.id();
+                            } else if (selectedStatus == null) {
+                                lastNonCompletedStatusId[0] = null;
+                            }
+                            boolean completedFromStatus = selectedStatus != null && isCompletedStatus(selectedStatus);
+                            completedState[0] = completedFromStatus || detail.completedAt() != null;
+                            completionToggleButton.setText(completionToggleLabel(completedState[0]));
                             List<TaskPriorityOptionDto> hydratedPriorities = core.priorities() == null ? List.of() : core.priorities();
                             priorityCombo.getItems().setAll(hydratedPriorities);
                             selectPriority(priorityCombo, hydratedPriorities, detail.priorityId());
+                            applyColoredToolbarSelect(priorityCombo, Optional.ofNullable(priorityCombo.getValue()).map(TaskPriorityOptionDto::colorHex).orElse(null));
                             saveBlockedByCoreState[0] = hydratedStatuses.isEmpty() || hydratedPriorities.isEmpty();
                             updateSaveCancelAvailability(
                                     saveButton,
@@ -543,11 +573,21 @@ public final class TaskDetailDialog {
                     model.taskId(),
                     () -> loadActivityEntries == null ? List.of() : loadActivityEntries.apply(model.taskId()),
                     entries -> {
-                        setVisibleManaged(activityLoadingLabel, false);
-                        renderActivityItems(activityList, entries);
+                        activityEntriesState.set(entries == null ? List.of() : entries);
+                        loadingActivityState[0] = false;
+                        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
+                        renderUnifiedHistoryFeed(
+                                historyList,
+                                activityEntriesState.get(),
+                                noteEntriesState.get(),
+                                notesEditor,
+                                notesErrorLabel,
+                                busyMutationState,
+                                busyMutationUi);
                     },
                     ex -> {
-                        setVisibleManaged(activityLoadingLabel, false);
+                        loadingActivityState[0] = false;
+                        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
                         showError(errorLabel, "Failed to load activity. " + rootCauseMessage(ex));
                     });
             loadSectionAsync(
@@ -558,13 +598,23 @@ public final class TaskDetailDialog {
                     model.taskId(),
                     () -> loadNoteEntries == null ? List.of() : loadNoteEntries.apply(model.taskId()),
                     entries -> {
-                        setVisibleManaged(notesLoadingLabel, false);
-                        renderNoteEntries(notesList, entries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
+                        noteEntriesState.set(entries == null ? List.of() : entries);
+                        loadingNotesState[0] = false;
+                        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
+                        renderUnifiedHistoryFeed(
+                                historyList,
+                                activityEntriesState.get(),
+                                noteEntriesState.get(),
+                                notesEditor,
+                                notesErrorLabel,
+                                busyMutationState,
+                                busyMutationUi);
                         noteComposer.setDisable(false);
                         addNoteButton.setDisable(false);
                     },
                     ex -> {
-                        setVisibleManaged(notesLoadingLabel, false);
+                        loadingNotesState[0] = false;
+                        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
                         noteComposer.setDisable(false);
                         addNoteButton.setDisable(false);
                         showError(notesErrorLabel, "Failed to load notes. " + rootCauseMessage(ex));
@@ -574,13 +624,14 @@ public final class TaskDetailDialog {
             setVisibleManaged(assignedLoadingLabel, true);
         }
         if ((model.activityEntries() == null || model.activityEntries().isEmpty())) {
-            setVisibleManaged(activityLoadingLabel, true);
+            loadingActivityState[0] = true;
         }
         if (noteEntries.isEmpty()) {
-            setVisibleManaged(notesLoadingLabel, true);
+            loadingNotesState[0] = true;
             noteComposer.setDisable(true);
             addNoteButton.setDisable(true);
         }
+        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
         if (initialAssignedTeamMembers.isEmpty()) {
             addAssignedUserButton.setDisable(true);
         }
@@ -798,6 +849,54 @@ public final class TaskDetailDialog {
         errorLabel.setVisible(true);
     }
 
+    private static String completionToggleLabel(boolean completed) {
+        return completed ? "Mark Incomplete" : "Complete Task";
+    }
+
+    private static TaskStatusOptionDto findCompletedStatus(List<TaskStatusOptionDto> statuses) {
+        if (statuses == null) {
+            return null;
+        }
+        for (TaskStatusOptionDto status : statuses) {
+            if (isCompletedStatus(status)) {
+                return status;
+            }
+        }
+        return null;
+    }
+
+    private static TaskStatusOptionDto findIncompleteFallbackStatus(List<TaskStatusOptionDto> statuses, Integer preferredId) {
+        if (statuses == null || statuses.isEmpty()) {
+            return null;
+        }
+        if (preferredId != null) {
+            for (TaskStatusOptionDto status : statuses) {
+                if (status != null && status.id() == preferredId && !isCompletedStatus(status)) {
+                    return status;
+                }
+            }
+        }
+        for (TaskStatusOptionDto status : statuses) {
+            if (status != null && "open".equalsIgnoreCase(safe(status.systemKey()).trim())) {
+                return status;
+            }
+        }
+        for (TaskStatusOptionDto status : statuses) {
+            if (status != null && !isCompletedStatus(status)) {
+                return status;
+            }
+        }
+        return statuses.get(0);
+    }
+
+    private static boolean isCompletedStatus(TaskStatusOptionDto status) {
+        if (status == null) {
+            return false;
+        }
+        String key = safe(status.systemKey()).trim().toLowerCase(Locale.ROOT);
+        return key.equals("completed") || key.equals("complete") || key.equals("closed") || key.equals("done");
+    }
+
     private static boolean hasUncommittedNoteText(TextArea noteComposer) {
         return !safe(noteComposer == null ? null : noteComposer.getText()).trim().isBlank();
     }
@@ -869,131 +968,268 @@ public final class TaskDetailDialog {
         }
     }
 
-    private static void renderActivityItems(VBox activityList, List<TaskActivityEntry> entries) {
-        activityList.getChildren().clear();
-        List<TaskActivityEntry> safeEntries = entries == null ? List.of() : entries;
-        if (safeEntries.isEmpty()) {
-            Label emptyLabel = new Label("No activity yet.");
-            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
-            activityList.getChildren().add(emptyLabel);
-            return;
-        }
-
-        for (TaskActivityEntry entry : safeEntries) {
-            if (entry == null) {
-                continue;
-            }
-            Label titleLabel = new Label(safe(entry.title()).trim().isBlank() ? "Activity event" : safe(entry.title()).trim());
-            titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700;");
-            titleLabel.setWrapText(true);
-
-            VBox cardContent = new VBox(4, titleLabel);
-            String body = safe(entry.body()).trim();
-            if (!body.isBlank()) {
-                Label bodyLabel = new Label(body);
-                bodyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.88);");
-                bodyLabel.setWrapText(true);
-                cardContent.getChildren().add(bodyLabel);
-            }
-
-            String actor = safe(entry.actorDisplayName()).trim();
-            if (actor.isBlank()) {
-                actor = "System";
-            }
-            String metaText = actor + " · " + formatDateTime(entry.occurredAt());
-            Label metaLabel = new Label(metaText);
-            metaLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
-            cardContent.getChildren().add(metaLabel);
-
-            VBox card = new VBox(cardContent);
-            card.setPadding(new Insets(10, 12, 10, 12));
-            card.getStyleClass().add("secondary-panel");
-            activityList.getChildren().add(card);
-        }
-    }
-
-    private static void renderNoteEntries(
-            VBox notesList,
-            List<TaskNoteEntry> entries,
+    private static void renderUnifiedHistoryFeed(
+            VBox historyList,
+            List<TaskActivityEntry> activityEntries,
+            List<TaskNoteEntry> noteEntries,
             NotesEditor notesEditor,
             Label notesErrorLabel,
             BusyMutationState busyMutationState,
             BusyMutationUi busyMutationUi) {
-        notesList.getChildren().clear();
-        List<TaskNoteEntry> safeEntries = entries == null ? List.of() : entries;
-        if (safeEntries.isEmpty()) {
-            Label empty = new Label("No notes yet.");
+        historyList.getChildren().clear();
+        List<TaskActivityEntry> safeActivities = activityEntries == null ? List.of() : activityEntries;
+        List<TaskNoteEntry> safeNotes = noteEntries == null ? List.of() : noteEntries;
+        List<HistoryFeedItem> items = mergeHistoryItems(safeActivities, safeNotes);
+        if (items.isEmpty()) {
+            Label empty = new Label("No history yet.");
             empty.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
-            notesList.getChildren().add(empty);
+            historyList.getChildren().add(empty);
             return;
         }
 
-        for (TaskNoteEntry entry : safeEntries) {
-            if (entry == null) {
+        Runnable rerender = () -> renderUnifiedHistoryFeed(
+                historyList,
+                activityEntries,
+                noteEntries,
+                notesEditor,
+                notesErrorLabel,
+                busyMutationState,
+                busyMutationUi);
+        for (HistoryFeedItem item : items) {
+            if (item.type() == HistoryFeedItemType.NOTE && item.note() != null) {
+                historyList.getChildren().add(createNoteCard(
+                        historyList,
+                        item.note(),
+                        safeNotes,
+                        safeActivities,
+                        notesEditor,
+                        notesErrorLabel,
+                        busyMutationState,
+                        busyMutationUi,
+                        rerender));
                 continue;
             }
-            Label authorLabel = new Label((safe(entry.userDisplayName()).trim().isBlank() ? "Unknown user" : entry.userDisplayName())
-                    + " · " + formatDateTime(entry.createdAt()));
-            authorLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
-
-            String updated = "";
-            if (entry.updatedAt() != null && !entry.updatedAt().equals(entry.createdAt())) {
-                updated = " (edited " + formatDateTime(entry.updatedAt()) + ")";
+            if (item.type() == HistoryFeedItemType.ACTIVITY && item.activity() != null) {
+                historyList.getChildren().add(createActivityRow(item.activity()));
             }
-            if (!updated.isBlank()) {
-                authorLabel.setText(authorLabel.getText() + updated);
-            }
-
-            Label bodyLabel = new Label(safe(entry.body()));
-            bodyLabel.setWrapText(true);
-
-            VBox cardContent = new VBox(6, authorLabel, bodyLabel);
-            if (entry.editable()) {
-                Button editButton = new Button("Edit");
-                editButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-                editButton.setOnAction(e -> {
-                    TextArea editArea = new TextArea(safe(entry.body()));
-                    editArea.setWrapText(true);
-                    editArea.setPrefRowCount(3);
-                    Button saveButton = new Button("Save");
-                    saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
-                    Button cancelButton = new Button("Cancel");
-                    cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-                    HBox actions = new HBox(6, saveButton, cancelButton);
-                    VBox editContent = new VBox(6, authorLabel, editArea, actions);
-                    VBox card = (VBox) ((Button) e.getSource()).getParent().getParent();
-                    card.getChildren().setAll(editContent);
-                    saveButton.setOnAction(saveEvent -> {
-                        if (busyMutationState != null && busyMutationState.isBusy()) {
-                            return;
-                        }
-                        String updatedText = safe(editArea.getText()).trim();
-                        if (updatedText.isBlank()) {
-                            showError(notesErrorLabel, "Note text is required.");
-                            return;
-                        }
-                        runMutationAsync(
-                                busyMutationState,
-                                busyMutationUi == null ? null : busyMutationUi::refresh,
-                                () -> notesEditor == null ? safeEntries : notesEditor.editAndReload(entry.id(), updatedText),
-                                refreshed -> {
-                                    renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
-                                    notesErrorLabel.setManaged(false);
-                                    notesErrorLabel.setVisible(false);
-                                },
-                                ex -> showError(notesErrorLabel, "Failed to update note. " + rootCauseMessage(ex)));
-                    });
-                    cancelButton.setOnAction(cancelEvent -> renderNoteEntries(notesList, safeEntries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi));
-                });
-                HBox actionRow = new HBox(6, editButton);
-                cardContent.getChildren().add(actionRow);
-            }
-
-            VBox card = new VBox(cardContent);
-            card.setPadding(new Insets(10, 12, 10, 12));
-            card.getStyleClass().add("secondary-panel");
-            notesList.getChildren().add(card);
         }
+    }
+
+    private static VBox createActivityRow(TaskActivityEntry entry) {
+        String body = safe(entry.body()).trim();
+        String title = safe(entry.title()).trim();
+        String message = body.isBlank() ? title : body;
+        if (message.isBlank()) {
+            message = "Activity event";
+        }
+        Label messageLabel = new Label(message);
+        messageLabel.setWrapText(true);
+        messageLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
+        VBox content = new VBox(1, messageLabel);
+
+        String actor = safe(entry.actorDisplayName()).trim();
+        if (actor.isBlank()) {
+            actor = "System";
+        }
+        Label metaLabel = new Label(actor + " · " + formatDateTime(entry.occurredAt()));
+        metaLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.56);");
+        content.getChildren().add(metaLabel);
+
+        VBox row = new VBox(content);
+        row.setPadding(new Insets(3, 6, 3, 6));
+        return row;
+    }
+
+    private static VBox createNoteCard(
+            VBox historyList,
+            TaskNoteEntry entry,
+            List<TaskNoteEntry> safeNotes,
+            List<TaskActivityEntry> safeActivities,
+            NotesEditor notesEditor,
+            Label notesErrorLabel,
+            BusyMutationState busyMutationState,
+            BusyMutationUi busyMutationUi,
+            Runnable rerender) {
+        Label authorLabel = new Label((safe(entry.userDisplayName()).trim().isBlank() ? "Unknown user" : entry.userDisplayName())
+                + " · " + formatDateTime(entry.createdAt()));
+        authorLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
+
+        String updated = "";
+        if (entry.updatedAt() != null && !entry.updatedAt().equals(entry.createdAt())) {
+            updated = " (edited " + formatDateTime(entry.updatedAt()) + ")";
+        }
+        if (!updated.isBlank()) {
+            authorLabel.setText(authorLabel.getText() + updated);
+        }
+
+        Label bodyLabel = new Label(safe(entry.body()));
+        bodyLabel.setWrapText(true);
+
+        VBox cardContent = new VBox(6, authorLabel, bodyLabel);
+        if (entry.editable()) {
+            Button editButton = new Button("Edit");
+            editButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            editButton.getStyleClass().add("app-dialog-button-compact");
+            editButton.setOnAction(e -> {
+                TextArea editArea = new TextArea(safe(entry.body()));
+                editArea.setWrapText(true);
+                editArea.setPrefRowCount(3);
+                Button saveButton = new Button("Save");
+                saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+                Button cancelButton = new Button("Cancel");
+                cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+                HBox actions = new HBox(6, saveButton, cancelButton);
+                VBox editContent = new VBox(6, authorLabel, editArea, actions);
+                VBox card = (VBox) ((Button) e.getSource()).getParent().getParent();
+                card.getChildren().setAll(editContent);
+                saveButton.setOnAction(saveEvent -> {
+                    if (busyMutationState != null && busyMutationState.isBusy()) {
+                        return;
+                    }
+                    String updatedText = safe(editArea.getText()).trim();
+                    if (updatedText.isBlank()) {
+                        showError(notesErrorLabel, "Note text is required.");
+                        return;
+                    }
+                    runMutationAsync(
+                            busyMutationState,
+                            busyMutationUi == null ? null : busyMutationUi::refresh,
+                            () -> notesEditor == null ? safeNotes : notesEditor.editAndReload(entry.id(), updatedText),
+                            refreshed -> {
+                                renderUnifiedHistoryFeed(
+                                        historyList,
+                                        safeActivities,
+                                        refreshed,
+                                        notesEditor,
+                                        notesErrorLabel,
+                                        busyMutationState,
+                                        busyMutationUi);
+                                notesErrorLabel.setManaged(false);
+                                notesErrorLabel.setVisible(false);
+                            },
+                            ex -> showError(notesErrorLabel, "Failed to update note. " + rootCauseMessage(ex)));
+                });
+                cancelButton.setOnAction(cancelEvent -> rerender.run());
+            });
+            HBox actionRow = new HBox(6, editButton);
+            actionRow.setAlignment(Pos.CENTER_RIGHT);
+            actionRow.setMaxWidth(Double.MAX_VALUE);
+            cardContent.getChildren().add(actionRow);
+        }
+
+        VBox card = new VBox(cardContent);
+        card.setPadding(new Insets(10, 12, 10, 12));
+        card.getStyleClass().add("secondary-panel");
+        card.setStyle("-fx-background-color: rgba(52, 110, 201, 0.22);");
+        return card;
+    }
+
+    private static List<HistoryFeedItem> mergeHistoryItems(List<TaskActivityEntry> activityEntries, List<TaskNoteEntry> noteEntries) {
+        List<HistoryFeedItem> combined = new ArrayList<>();
+        for (TaskActivityEntry activity : activityEntries) {
+            if (activity == null) {
+                continue;
+            }
+            combined.add(new HistoryFeedItem(HistoryFeedItemType.ACTIVITY, activity.occurredAt(), activity, null));
+        }
+        for (TaskNoteEntry note : noteEntries) {
+            if (note == null) {
+                continue;
+            }
+            combined.add(new HistoryFeedItem(HistoryFeedItemType.NOTE, note.createdAt(), null, note));
+        }
+        combined.sort(Comparator.comparing(HistoryFeedItem::occurredAt, Comparator.nullsLast(LocalDateTime::compareTo)).reversed());
+        return combined;
+    }
+
+    private enum HistoryFeedItemType {
+        NOTE,
+        ACTIVITY
+    }
+
+    private record HistoryFeedItem(
+            HistoryFeedItemType type,
+            LocalDateTime occurredAt,
+            TaskActivityEntry activity,
+            TaskNoteEntry note) {
+    }
+
+    private static void applyColoredToolbarSelect(ComboBox<?> comboBox, String colorHex) {
+        if (comboBox == null) {
+            return;
+        }
+        RgbColor baseColor = parseHexColor(colorHex);
+        if (baseColor == null) {
+            comboBox.setStyle("");
+            return;
+        }
+        RgbColor top = blend(baseColor, new RgbColor(255, 255, 255), 0.18);
+        RgbColor bottom = blend(baseColor, new RgbColor(0, 0, 0), 0.12);
+        RgbColor border = blend(baseColor, new RgbColor(255, 255, 255), 0.30);
+        String textColor = contrastTextColor(baseColor);
+        comboBox.setStyle(
+                "-app-toolbar-select-bg-top: " + toCssRgba(top, 0.95) + ";"
+                        + "-app-toolbar-select-bg-bottom: " + toCssRgba(bottom, 0.98) + ";"
+                        + "-app-toolbar-select-border: " + toCssRgba(border, 0.88) + ";"
+                        + "-app-toolbar-select-text: " + textColor + ";");
+    }
+
+    private static RgbColor parseHexColor(String rawHex) {
+        String normalized = safe(rawHex).trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        if (normalized.startsWith("#")) {
+            normalized = normalized.substring(1);
+        } else if (normalized.regionMatches(true, 0, "0x", 0, 2)) {
+            normalized = normalized.substring(2);
+        }
+        if (normalized.length() == 8) {
+            normalized = normalized.substring(0, 6);
+        }
+        if (normalized.length() != 6 || !normalized.matches("[0-9a-fA-F]{6}")) {
+            return null;
+        }
+        try {
+            int red = Integer.parseInt(normalized.substring(0, 2), 16);
+            int green = Integer.parseInt(normalized.substring(2, 4), 16);
+            int blue = Integer.parseInt(normalized.substring(4, 6), 16);
+            return new RgbColor(red, green, blue);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private static String contrastTextColor(RgbColor color) {
+        double red = color.red() / 255.0;
+        double green = color.green() / 255.0;
+        double blue = color.blue() / 255.0;
+        double luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+        return luminance >= 0.58 ? "#112542" : "#f9fbff";
+    }
+
+    private static RgbColor blend(RgbColor source, RgbColor target, double ratio) {
+        double clamped = Math.max(0.0, Math.min(1.0, ratio));
+        int red = (int) Math.round((source.red() * (1 - clamped)) + (target.red() * clamped));
+        int green = (int) Math.round((source.green() * (1 - clamped)) + (target.green() * clamped));
+        int blue = (int) Math.round((source.blue() * (1 - clamped)) + (target.blue() * clamped));
+        return new RgbColor(red, green, blue);
+    }
+
+    private static String toCssRgba(RgbColor color, double alpha) {
+        double clampedAlpha = Math.max(0.0, Math.min(1.0, alpha));
+        return "rgba(" + color.red() + ", " + color.green() + ", " + color.blue() + ", " + clampedAlpha + ")";
+    }
+
+    private static String colorBarStyle(String colorHex) {
+        RgbColor parsed = parseHexColor(colorHex);
+        if (parsed == null) {
+            return "-fx-background-color: rgba(63, 90, 132, 0.70); -fx-background-radius: 2;";
+        }
+        return "-fx-background-color: " + toCssRgba(parsed, 0.95) + "; -fx-background-radius: 2;";
+    }
+
+    private record RgbColor(int red, int green, int blue) {
     }
 
     private static String formatDateTime(LocalDateTime value) {
@@ -1023,6 +1259,70 @@ public final class TaskDetailDialog {
             List<TaskActivityEntry> activityEntries,
             List<TaskNoteEntry> noteEntries,
             boolean completed) {
+
+        public TaskDetailModel(
+                long taskId,
+                String title,
+                String description,
+                LocalDateTime dueAt,
+                Integer statusId,
+                Integer priorityId,
+                String createdByDisplayName,
+                List<AssignedTeamMember> assignedTeamMembers,
+                List<TaskActivityEntry> activityEntries,
+                List<TaskNoteEntry> noteEntries,
+                boolean completed) {
+            this(
+                    taskId,
+                    0L,
+                    "",
+                    "",
+                    "",
+                    null,
+                    title,
+                    description,
+                    dueAt,
+                    statusId,
+                    priorityId,
+                    createdByDisplayName,
+                    assignedTeamMembers,
+                    activityEntries,
+                    noteEntries,
+                    completed);
+        }
+
+        public TaskDetailModel(
+                long taskId,
+                long caseId,
+                String caseName,
+                String title,
+                String description,
+                LocalDateTime dueAt,
+                Integer statusId,
+                Integer priorityId,
+                String createdByDisplayName,
+                List<AssignedTeamMember> assignedTeamMembers,
+                List<TaskActivityEntry> activityEntries,
+                List<TaskNoteEntry> noteEntries,
+                boolean completed) {
+            this(
+                    taskId,
+                    caseId,
+                    caseName,
+                    "",
+                    "",
+                    null,
+                    title,
+                    description,
+                    dueAt,
+                    statusId,
+                    priorityId,
+                    createdByDisplayName,
+                    assignedTeamMembers,
+                    activityEntries,
+                    noteEntries,
+                    completed);
+        }
     }
 
     public record TaskActivityEntry(
@@ -1090,18 +1390,66 @@ public final class TaskDetailDialog {
     }
 
     private static final class PriorityListCell extends javafx.scene.control.ListCell<TaskPriorityOptionDto> {
+        private final boolean showColorBar;
+        private final Region colorBar = new Region();
+
+        private PriorityListCell(boolean showColorBar) {
+            this.showColorBar = showColorBar;
+            colorBar.setMinWidth(4);
+            colorBar.setPrefWidth(4);
+            colorBar.setMaxWidth(4);
+            colorBar.setMinHeight(14);
+            colorBar.setPrefHeight(14);
+        }
+
         @Override
         protected void updateItem(TaskPriorityOptionDto item, boolean empty) {
             super.updateItem(item, empty);
-            setText(empty || item == null ? null : item.name());
+            if (empty || item == null) {
+                setText(null);
+                setGraphic(null);
+                return;
+            }
+            setText(item.name());
+            if (showColorBar) {
+                colorBar.setStyle(colorBarStyle(item.colorHex()));
+                setGraphic(colorBar);
+                setGraphicTextGap(8);
+            } else {
+                setGraphic(null);
+            }
         }
     }
 
     private static final class StatusListCell extends javafx.scene.control.ListCell<TaskStatusOptionDto> {
+        private final boolean showColorBar;
+        private final Region colorBar = new Region();
+
+        private StatusListCell(boolean showColorBar) {
+            this.showColorBar = showColorBar;
+            colorBar.setMinWidth(4);
+            colorBar.setPrefWidth(4);
+            colorBar.setMaxWidth(4);
+            colorBar.setMinHeight(14);
+            colorBar.setPrefHeight(14);
+        }
+
         @Override
         protected void updateItem(TaskStatusOptionDto item, boolean empty) {
             super.updateItem(item, empty);
-            setText(empty || item == null ? null : item.name());
+            if (empty || item == null) {
+                setText(null);
+                setGraphic(null);
+                return;
+            }
+            setText(item.name());
+            if (showColorBar) {
+                colorBar.setStyle(colorBarStyle(item.colorHex()));
+                setGraphic(colorBar);
+                setGraphicTextGap(8);
+            } else {
+                setGraphic(null);
+            }
         }
     }
 
