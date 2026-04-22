@@ -330,6 +330,8 @@ public final class TaskCard extends VBox {
 		expandDetailsButton.setPrefSize(20, 20);
 		expandDetailsButton.setMaxSize(20, 20);
 		expandDetailsButton.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 0 0 0 0;");
+		System.out.println("[DEBUG UI][MY_TASKS][TASK_CARD_BUTTON_CREATE] button=expandDetailsButton text='"
+				+ expandDetailsButton.getText() + "' styles=" + expandDetailsButton.getStyleClass());
 		expandDetailsButton.setOnAction(e -> {
 			e.consume();
 			if (currentVariant != Variant.FULL) {
