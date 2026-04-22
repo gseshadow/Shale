@@ -110,6 +110,9 @@ public final class TaskDetailDialog {
         statusCombo.setCellFactory(cb -> new StatusListCell());
         statusCombo.setButtonCell(new StatusListCell());
         selectStatus(statusCombo, safeStatuses, model.statusId());
+        applyColoredToolbarSelect(statusCombo, Optional.ofNullable(statusCombo.getValue()).map(TaskStatusOptionDto::colorHex).orElse(null));
+        statusCombo.valueProperty().addListener((obs, oldValue, newValue) ->
+                applyColoredToolbarSelect(statusCombo, newValue == null ? null : newValue.colorHex()));
 
         ComboBox<TaskPriorityOptionDto> priorityCombo = new ComboBox<>();
         priorityCombo.setMaxWidth(Double.MAX_VALUE);
@@ -486,6 +489,7 @@ public final class TaskDetailDialog {
                             List<TaskStatusOptionDto> hydratedStatuses = core.statuses() == null ? List.of() : core.statuses();
                             statusCombo.getItems().setAll(hydratedStatuses);
                             selectStatus(statusCombo, hydratedStatuses, detail.statusId());
+                            applyColoredToolbarSelect(statusCombo, Optional.ofNullable(statusCombo.getValue()).map(TaskStatusOptionDto::colorHex).orElse(null));
                             List<TaskPriorityOptionDto> hydratedPriorities = core.priorities() == null ? List.of() : core.priorities();
                             priorityCombo.getItems().setAll(hydratedPriorities);
                             selectPriority(priorityCombo, hydratedPriorities, detail.priorityId());
