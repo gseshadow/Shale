@@ -743,6 +743,11 @@
     -fx-cursor: hand;
 }
 
+.app-dialog-button-compact {
+    -fx-padding: 4 10 4 10;
+    -fx-font-size: 11px;
+}
+
 .app-dialog-button-primary {
     -fx-background-color: linear-gradient(to bottom, #4a83d2, #315fba);
     -fx-text-fill: white;

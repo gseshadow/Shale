@@ -156,7 +156,7 @@ public final class TaskDetailDialog {
         VBox assignedTeamSection = new VBox(6);
         Label assignedTeamLabel = new Label("Assigned");
         assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
-        Button addAssignedUserButton = new Button("Add");
+        Button addAssignedUserButton = new Button("Add Assignee");
         addAssignedUserButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
         addAssignedUserButton.setFocusTraversable(false);
         Region assignedHeaderSpacer = new Region();
@@ -975,6 +975,7 @@ public final class TaskDetailDialog {
         if (entry.editable()) {
             Button editButton = new Button("Edit");
             editButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            editButton.getStyleClass().add("app-dialog-button-compact");
             editButton.setOnAction(e -> {
                 TextArea editArea = new TextArea(safe(entry.body()));
                 editArea.setWrapText(true);
@@ -1017,6 +1018,8 @@ public final class TaskDetailDialog {
                 cancelButton.setOnAction(cancelEvent -> rerender.run());
             });
             HBox actionRow = new HBox(6, editButton);
+            actionRow.setAlignment(Pos.CENTER_RIGHT);
+            actionRow.setMaxWidth(Double.MAX_VALUE);
             cardContent.getChildren().add(actionRow);
         }
 
