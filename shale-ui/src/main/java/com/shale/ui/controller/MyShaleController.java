@@ -954,6 +954,33 @@ public final class MyShaleController {
 		return taskCards;
 	}
 
+	private Node buildTaskLaneBody(List<CaseTaskListItemDto> tasksInLane, boolean fullVariant) {
+		VBox taskCards = new VBox(10);
+		taskCards.setFillWidth(true);
+		for (CaseTaskListItemDto task : tasksInLane) {
+			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+					task.id(),
+					task.caseId(),
+					task.caseName(),
+					task.caseResponsibleAttorney(),
+					task.caseResponsibleAttorneyColor(),
+					task.caseNonEngagementLetterSent(),
+					resolveMyTaskCardTitle(task),
+					task.description(),
+					task.createdByDisplayName(),
+					task.priorityColorHex(),
+					task.dueAt(),
+					task.completedAt(),
+					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+			if (fullVariant) {
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
+			} else {
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+			}
+		}
+		return taskCards;
+	}
+
 	private String resolveMyTaskCardTitle(CaseTaskListItemDto task) {
 		if (task == null) {
 			return null;
