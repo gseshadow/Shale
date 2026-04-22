@@ -8,6 +8,7 @@ import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardMo
 import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -95,9 +96,16 @@ public final class NewIntakeController {
 	private AppState appState;
 	private CaseDao caseDao;
 	private OrganizationDao organizationDao;
+	private UiRuntimeBridge runtimeBridge;
 	private Stage stage;
 	private Consumer<Integer> onCaseCreated;
 	private boolean saving;
+	private Boolean knownOnlineState;
+	private final Consumer<UiRuntimeBridge.ConnectivityEvent> connectivityHandler = event -> {
+		if (event != null) {
+			knownOnlineState = event.online();
+		}
+	};
 
 	private boolean caseNameManuallyOverridden;
 	private boolean updatingCaseNameProgrammatically;
@@ -111,13 +119,28 @@ public final class NewIntakeController {
 	private Map<String, String> partySideLabelsByKey = Map.of();
 	private IntakeFormSnapshot initialSnapshot;
 
-	public void init(AppState appState, CaseDao caseDao, OrganizationDao organizationDao, Stage stage, Consumer<Integer> onCaseCreated) {
+	public void init(
+			AppState appState,
+			CaseDao caseDao,
+			OrganizationDao organizationDao,
+			UiRuntimeBridge runtimeBridge,
+			Stage stage,
+			Consumer<Integer> onCaseCreated) {
 		this.appState = appState;
 		this.caseDao = caseDao;
 		this.organizationDao = organizationDao;
+		this.runtimeBridge = runtimeBridge;
 		this.stage = stage;
 		this.onCaseCreated = onCaseCreated;
+		if (this.runtimeBridge != null) {
+			this.runtimeBridge.subscribeConnectivity(connectivityHandler);
+		}
 		if (this.stage != null) {
+			this.stage.setOnHidden(event -> {
+				if (this.runtimeBridge != null) {
+					this.runtimeBridge.unsubscribeConnectivity(connectivityHandler);
+				}
+			});
 			this.stage.setOnCloseRequest(event -> {
 				if (!confirmDiscardIfDirty()) {
 					event.consume();
@@ -517,6 +540,10 @@ public final class NewIntakeController {
 	private void onCreateIntake() {
 		if (saving)
 			return;
+		if (Boolean.FALSE.equals(knownOnlineState)) {
+			showValidation("Unable to save intake while offline. Please reconnect and try again.");
+			return;
+		}
 
 		List<String> errors = validate();
 		if (!errors.isEmpty()) {
@@ -573,6 +600,7 @@ public final class NewIntakeController {
 			);
 
 			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
+			captureInitialSnapshot();
 			System.out.println("[NewIntakeController] submit succeeded tenant=" + tenantId + " caseId=" + result.caseId());
 			showSuccess("Intake created successfully.");
 			if (stage != null)
@@ -582,7 +610,7 @@ public final class NewIntakeController {
 		} catch (RuntimeException ex) {
 			System.err.println("[NewIntakeController] submit failed tenant=" + tenantId + " error=" + ex.getMessage());
 			ex.printStackTrace(System.err);
-			showValidation("Create intake failed: " + firstMeaningfulMessage(ex));
+			showValidation("Unable to save intake. Your information has not been discarded. Please try again.");
 		} finally {
 			setSaving(false);
 		}
@@ -600,6 +628,10 @@ public final class NewIntakeController {
 	}
 
 	private boolean confirmDiscardIfDirty() {
+		if (saving) {
+			showValidation("Create Intake is in progress. Please wait.");
+			return false;
+		}
 		if (!hasUnsavedChanges()) {
 			return true;
 		}
@@ -615,9 +647,6 @@ public final class NewIntakeController {
 	}
 
 	private boolean hasUnsavedChanges() {
-		if (saving) {
-			return false;
-		}
 		if (initialSnapshot == null) {
 			return false;
 		}
