@@ -5,11 +5,14 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -33,15 +36,12 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -104,6 +104,7 @@ public final class TaskDetailDialog {
 
         ComboBox<TaskStatusOptionDto> statusCombo = new ComboBox<>();
         statusCombo.setMaxWidth(Double.MAX_VALUE);
+        statusCombo.getStyleClass().add("app-toolbar-select");
         List<TaskStatusOptionDto> safeStatuses = statuses == null ? List.of() : statuses;
         statusCombo.getItems().setAll(safeStatuses);
         statusCombo.setCellFactory(cb -> new StatusListCell());
@@ -112,6 +113,7 @@ public final class TaskDetailDialog {
 
         ComboBox<TaskPriorityOptionDto> priorityCombo = new ComboBox<>();
         priorityCombo.setMaxWidth(Double.MAX_VALUE);
+        priorityCombo.getStyleClass().add("app-toolbar-select");
         List<TaskPriorityOptionDto> safePriorities = priorities == null ? List.of() : priorities;
         priorityCombo.getItems().setAll(safePriorities);
         priorityCombo.setCellFactory(cb -> new PriorityListCell());
@@ -154,7 +156,7 @@ public final class TaskDetailDialog {
         VBox assignedTeamSection = new VBox(6);
         Label assignedTeamLabel = new Label("Assigned");
         assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
-        Button addAssignedUserButton = new Button("Add");
+        Button addAssignedUserButton = new Button("Add Assignee");
         addAssignedUserButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
         addAssignedUserButton.setFocusTraversable(false);
         Region assignedHeaderSpacer = new Region();
@@ -231,29 +233,9 @@ public final class TaskDetailDialog {
         formContent.setPadding(new Insets(8, 2, 4, 2));
         HBox.setHgrow(formContent, Priority.ALWAYS);
 
-        Label activityLabel = new Label("Activity");
-        activityLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
-        VBox activityList = new VBox(8);
-        Label activityLoadingLabel = loadingLabel("Loading activity…");
-        setVisibleManaged(activityLoadingLabel, false);
-        renderActivityItems(activityList, model.activityEntries());
-        ScrollPane activityScrollPane = new ScrollPane(activityList);
-        activityScrollPane.setFitToWidth(true);
-        activityScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        activityScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        activityScrollPane.setPrefViewportHeight(420);
-        VBox.setVgrow(activityScrollPane, Priority.ALWAYS);
-
-        VBox activityPanel = new VBox(6, activityLabel, activityLoadingLabel, activityScrollPane);
-        activityPanel.setPrefWidth(320);
-        activityPanel.setMinWidth(280);
-        activityPanel.setMaxWidth(360);
-        activityPanel.setPadding(new Insets(8, 2, 4, 8));
-        VBox.setVgrow(activityPanel, Priority.ALWAYS);
-
-        VBox notesPanel = new VBox(8);
-        Label notesLabel = new Label("Notes");
-        notesLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        VBox historyPanel = new VBox(8);
+        Label historyLabel = new Label("History");
+        historyLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
         TextArea noteComposer = new TextArea();
         noteComposer.setPromptText("Add note...");
         noteComposer.setPrefRowCount(3);
@@ -269,20 +251,33 @@ public final class TaskDetailDialog {
         notesErrorLabel.setStyle("-fx-text-fill: #b42318;");
         notesErrorLabel.setVisible(false);
         notesErrorLabel.setManaged(false);
-        VBox notesList = new VBox(8);
-        Label notesLoadingLabel = loadingLabel("Loading notes…");
-        setVisibleManaged(notesLoadingLabel, false);
+        VBox historyList = new VBox(8);
+        historyList.setPadding(new Insets(6, 10, 8, 10));
+        Label historyLoadingLabel = loadingLabel("Loading history…");
+        setVisibleManaged(historyLoadingLabel, false);
+        final boolean[] loadingActivityState = new boolean[] { false };
+        final boolean[] loadingNotesState = new boolean[] { false };
         List<TaskNoteEntry> noteEntries = model.noteEntries() == null ? List.of() : model.noteEntries();
-        renderNoteEntries(notesList, noteEntries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
-        ScrollPane notesScrollPane = new ScrollPane(notesList);
-        notesScrollPane.setFitToWidth(true);
-        notesScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        notesScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        notesScrollPane.setPrefViewportHeight(420);
-        VBox.setVgrow(notesScrollPane, Priority.ALWAYS);
+        List<TaskActivityEntry> activityEntries = model.activityEntries() == null ? List.of() : model.activityEntries();
+        AtomicReference<List<TaskNoteEntry>> noteEntriesState = new AtomicReference<>(noteEntries);
+        AtomicReference<List<TaskActivityEntry>> activityEntriesState = new AtomicReference<>(activityEntries);
+        renderUnifiedHistoryFeed(
+                historyList,
+                activityEntriesState.get(),
+                noteEntriesState.get(),
+                notesEditor,
+                notesErrorLabel,
+                busyMutationState,
+                busyMutationUi);
+        ScrollPane historyScrollPane = new ScrollPane(historyList);
+        historyScrollPane.setFitToWidth(true);
+        historyScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        historyScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        historyScrollPane.setPrefViewportHeight(420);
+        VBox.setVgrow(historyScrollPane, Priority.ALWAYS);
         busyMutationUi.register(addNoteButton);
         busyMutationUi.register(noteComposer);
-        busyMutationUi.register(notesScrollPane);
+        busyMutationUi.register(historyScrollPane);
         addNoteButton.setOnAction(e -> {
             if (busyMutationState.isBusy()) {
                 return;
@@ -295,53 +290,42 @@ public final class TaskDetailDialog {
             runMutationAsync(
                     busyMutationState,
                     busyMutationUi::refresh,
-                    () -> notesEditor == null ? noteEntries : notesEditor.addAndReload(body),
+                    () -> notesEditor == null ? noteEntriesState.get() : notesEditor.addAndReload(body),
                     refreshed -> {
-                        renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
+                        noteEntriesState.set(refreshed == null ? List.of() : refreshed);
+                        renderUnifiedHistoryFeed(
+                                historyList,
+                                activityEntriesState.get(),
+                                noteEntriesState.get(),
+                                notesEditor,
+                                notesErrorLabel,
+                                busyMutationState,
+                                busyMutationUi);
                         noteComposer.clear();
                         notesErrorLabel.setManaged(false);
                         notesErrorLabel.setVisible(false);
                     },
                     ex -> showError(notesErrorLabel, "Failed to add note. " + rootCauseMessage(ex)));
         });
-        notesPanel.getChildren().setAll(
-                notesLabel,
+        historyPanel.getChildren().setAll(
+                historyLabel,
                 noteComposer,
                 addNoteButton,
                 uncommittedNoteWarningLabel,
                 notesErrorLabel,
-                notesLoadingLabel,
-                notesScrollPane);
-        notesPanel.setPrefWidth(320);
-        notesPanel.setMinWidth(280);
-        notesPanel.setMaxWidth(360);
-        notesPanel.setPadding(new Insets(8, 2, 4, 8));
-        VBox.setVgrow(notesPanel, Priority.ALWAYS);
+                historyLoadingLabel,
+                historyScrollPane);
+        historyPanel.setPrefWidth(320);
+        historyPanel.setMinWidth(280);
+        historyPanel.setMaxWidth(360);
+        historyPanel.setPadding(new Insets(8, 2, 4, 8));
+        VBox.setVgrow(historyPanel, Priority.ALWAYS);
 
-        ToggleGroup rightRailToggle = new ToggleGroup();
-        ToggleButton activityToggle = new ToggleButton("Activity");
-        activityToggle.setToggleGroup(rightRailToggle);
-        ToggleButton notesToggle = new ToggleButton("Notes");
-        notesToggle.setToggleGroup(rightRailToggle);
-        notesToggle.setSelected(true);
-        HBox rightRailTabs = new HBox(6, activityToggle, notesToggle);
-
-        StackPane rightRailBody = new StackPane(activityPanel, notesPanel);
-        activityPanel.setVisible(false);
-        activityPanel.setManaged(false);
-        rightRailToggle.selectedToggleProperty().addListener((obs, oldToggle, selectedToggle) -> {
-            boolean showNotes = selectedToggle == notesToggle;
-            notesPanel.setVisible(showNotes);
-            notesPanel.setManaged(showNotes);
-            activityPanel.setVisible(!showNotes);
-            activityPanel.setManaged(!showNotes);
-        });
-
-        VBox rightRail = new VBox(8, rightRailTabs, rightRailBody);
+        VBox rightRail = new VBox(8, historyPanel);
         rightRail.setPrefWidth(340);
         rightRail.setMinWidth(300);
         rightRail.setMaxWidth(380);
-        VBox.setVgrow(rightRailBody, Priority.ALWAYS);
+        VBox.setVgrow(historyPanel, Priority.ALWAYS);
 
         HBox contentColumns = new HBox(12, formContent, rightRail);
         HBox.setHgrow(formContent, Priority.ALWAYS);
@@ -543,11 +527,21 @@ public final class TaskDetailDialog {
                     model.taskId(),
                     () -> loadActivityEntries == null ? List.of() : loadActivityEntries.apply(model.taskId()),
                     entries -> {
-                        setVisibleManaged(activityLoadingLabel, false);
-                        renderActivityItems(activityList, entries);
+                        activityEntriesState.set(entries == null ? List.of() : entries);
+                        loadingActivityState[0] = false;
+                        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
+                        renderUnifiedHistoryFeed(
+                                historyList,
+                                activityEntriesState.get(),
+                                noteEntriesState.get(),
+                                notesEditor,
+                                notesErrorLabel,
+                                busyMutationState,
+                                busyMutationUi);
                     },
                     ex -> {
-                        setVisibleManaged(activityLoadingLabel, false);
+                        loadingActivityState[0] = false;
+                        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
                         showError(errorLabel, "Failed to load activity. " + rootCauseMessage(ex));
                     });
             loadSectionAsync(
@@ -558,13 +552,23 @@ public final class TaskDetailDialog {
                     model.taskId(),
                     () -> loadNoteEntries == null ? List.of() : loadNoteEntries.apply(model.taskId()),
                     entries -> {
-                        setVisibleManaged(notesLoadingLabel, false);
-                        renderNoteEntries(notesList, entries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
+                        noteEntriesState.set(entries == null ? List.of() : entries);
+                        loadingNotesState[0] = false;
+                        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
+                        renderUnifiedHistoryFeed(
+                                historyList,
+                                activityEntriesState.get(),
+                                noteEntriesState.get(),
+                                notesEditor,
+                                notesErrorLabel,
+                                busyMutationState,
+                                busyMutationUi);
                         noteComposer.setDisable(false);
                         addNoteButton.setDisable(false);
                     },
                     ex -> {
-                        setVisibleManaged(notesLoadingLabel, false);
+                        loadingNotesState[0] = false;
+                        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
                         noteComposer.setDisable(false);
                         addNoteButton.setDisable(false);
                         showError(notesErrorLabel, "Failed to load notes. " + rootCauseMessage(ex));
@@ -574,13 +578,14 @@ public final class TaskDetailDialog {
             setVisibleManaged(assignedLoadingLabel, true);
         }
         if ((model.activityEntries() == null || model.activityEntries().isEmpty())) {
-            setVisibleManaged(activityLoadingLabel, true);
+            loadingActivityState[0] = true;
         }
         if (noteEntries.isEmpty()) {
-            setVisibleManaged(notesLoadingLabel, true);
+            loadingNotesState[0] = true;
             noteComposer.setDisable(true);
             addNoteButton.setDisable(true);
         }
+        setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
         if (initialAssignedTeamMembers.isEmpty()) {
             addAssignedUserButton.setDisable(true);
         }
@@ -869,131 +874,190 @@ public final class TaskDetailDialog {
         }
     }
 
-    private static void renderActivityItems(VBox activityList, List<TaskActivityEntry> entries) {
-        activityList.getChildren().clear();
-        List<TaskActivityEntry> safeEntries = entries == null ? List.of() : entries;
-        if (safeEntries.isEmpty()) {
-            Label emptyLabel = new Label("No activity yet.");
-            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
-            activityList.getChildren().add(emptyLabel);
-            return;
-        }
-
-        for (TaskActivityEntry entry : safeEntries) {
-            if (entry == null) {
-                continue;
-            }
-            Label titleLabel = new Label(safe(entry.title()).trim().isBlank() ? "Activity event" : safe(entry.title()).trim());
-            titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700;");
-            titleLabel.setWrapText(true);
-
-            VBox cardContent = new VBox(4, titleLabel);
-            String body = safe(entry.body()).trim();
-            if (!body.isBlank()) {
-                Label bodyLabel = new Label(body);
-                bodyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.88);");
-                bodyLabel.setWrapText(true);
-                cardContent.getChildren().add(bodyLabel);
-            }
-
-            String actor = safe(entry.actorDisplayName()).trim();
-            if (actor.isBlank()) {
-                actor = "System";
-            }
-            String metaText = actor + " · " + formatDateTime(entry.occurredAt());
-            Label metaLabel = new Label(metaText);
-            metaLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
-            cardContent.getChildren().add(metaLabel);
-
-            VBox card = new VBox(cardContent);
-            card.setPadding(new Insets(10, 12, 10, 12));
-            card.getStyleClass().add("secondary-panel");
-            activityList.getChildren().add(card);
-        }
-    }
-
-    private static void renderNoteEntries(
-            VBox notesList,
-            List<TaskNoteEntry> entries,
+    private static void renderUnifiedHistoryFeed(
+            VBox historyList,
+            List<TaskActivityEntry> activityEntries,
+            List<TaskNoteEntry> noteEntries,
             NotesEditor notesEditor,
             Label notesErrorLabel,
             BusyMutationState busyMutationState,
             BusyMutationUi busyMutationUi) {
-        notesList.getChildren().clear();
-        List<TaskNoteEntry> safeEntries = entries == null ? List.of() : entries;
-        if (safeEntries.isEmpty()) {
-            Label empty = new Label("No notes yet.");
+        historyList.getChildren().clear();
+        List<TaskActivityEntry> safeActivities = activityEntries == null ? List.of() : activityEntries;
+        List<TaskNoteEntry> safeNotes = noteEntries == null ? List.of() : noteEntries;
+        List<HistoryFeedItem> items = mergeHistoryItems(safeActivities, safeNotes);
+        if (items.isEmpty()) {
+            Label empty = new Label("No history yet.");
             empty.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
-            notesList.getChildren().add(empty);
+            historyList.getChildren().add(empty);
             return;
         }
 
-        for (TaskNoteEntry entry : safeEntries) {
-            if (entry == null) {
+        Runnable rerender = () -> renderUnifiedHistoryFeed(
+                historyList,
+                activityEntries,
+                noteEntries,
+                notesEditor,
+                notesErrorLabel,
+                busyMutationState,
+                busyMutationUi);
+        for (HistoryFeedItem item : items) {
+            if (item.type() == HistoryFeedItemType.NOTE && item.note() != null) {
+                historyList.getChildren().add(createNoteCard(
+                        historyList,
+                        item.note(),
+                        safeNotes,
+                        safeActivities,
+                        notesEditor,
+                        notesErrorLabel,
+                        busyMutationState,
+                        busyMutationUi,
+                        rerender));
                 continue;
             }
-            Label authorLabel = new Label((safe(entry.userDisplayName()).trim().isBlank() ? "Unknown user" : entry.userDisplayName())
-                    + " · " + formatDateTime(entry.createdAt()));
-            authorLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
-
-            String updated = "";
-            if (entry.updatedAt() != null && !entry.updatedAt().equals(entry.createdAt())) {
-                updated = " (edited " + formatDateTime(entry.updatedAt()) + ")";
+            if (item.type() == HistoryFeedItemType.ACTIVITY && item.activity() != null) {
+                historyList.getChildren().add(createActivityRow(item.activity()));
             }
-            if (!updated.isBlank()) {
-                authorLabel.setText(authorLabel.getText() + updated);
-            }
-
-            Label bodyLabel = new Label(safe(entry.body()));
-            bodyLabel.setWrapText(true);
-
-            VBox cardContent = new VBox(6, authorLabel, bodyLabel);
-            if (entry.editable()) {
-                Button editButton = new Button("Edit");
-                editButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-                editButton.setOnAction(e -> {
-                    TextArea editArea = new TextArea(safe(entry.body()));
-                    editArea.setWrapText(true);
-                    editArea.setPrefRowCount(3);
-                    Button saveButton = new Button("Save");
-                    saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
-                    Button cancelButton = new Button("Cancel");
-                    cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-                    HBox actions = new HBox(6, saveButton, cancelButton);
-                    VBox editContent = new VBox(6, authorLabel, editArea, actions);
-                    VBox card = (VBox) ((Button) e.getSource()).getParent().getParent();
-                    card.getChildren().setAll(editContent);
-                    saveButton.setOnAction(saveEvent -> {
-                        if (busyMutationState != null && busyMutationState.isBusy()) {
-                            return;
-                        }
-                        String updatedText = safe(editArea.getText()).trim();
-                        if (updatedText.isBlank()) {
-                            showError(notesErrorLabel, "Note text is required.");
-                            return;
-                        }
-                        runMutationAsync(
-                                busyMutationState,
-                                busyMutationUi == null ? null : busyMutationUi::refresh,
-                                () -> notesEditor == null ? safeEntries : notesEditor.editAndReload(entry.id(), updatedText),
-                                refreshed -> {
-                                    renderNoteEntries(notesList, refreshed, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi);
-                                    notesErrorLabel.setManaged(false);
-                                    notesErrorLabel.setVisible(false);
-                                },
-                                ex -> showError(notesErrorLabel, "Failed to update note. " + rootCauseMessage(ex)));
-                    });
-                    cancelButton.setOnAction(cancelEvent -> renderNoteEntries(notesList, safeEntries, notesEditor, notesErrorLabel, busyMutationState, busyMutationUi));
-                });
-                HBox actionRow = new HBox(6, editButton);
-                cardContent.getChildren().add(actionRow);
-            }
-
-            VBox card = new VBox(cardContent);
-            card.setPadding(new Insets(10, 12, 10, 12));
-            card.getStyleClass().add("secondary-panel");
-            notesList.getChildren().add(card);
         }
+    }
+
+    private static VBox createActivityRow(TaskActivityEntry entry) {
+        String body = safe(entry.body()).trim();
+        String title = safe(entry.title()).trim();
+        String message = body.isBlank() ? title : body;
+        if (message.isBlank()) {
+            message = "Activity event";
+        }
+        Label messageLabel = new Label(message);
+        messageLabel.setWrapText(true);
+        messageLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
+        VBox content = new VBox(1, messageLabel);
+
+        String actor = safe(entry.actorDisplayName()).trim();
+        if (actor.isBlank()) {
+            actor = "System";
+        }
+        Label metaLabel = new Label(actor + " · " + formatDateTime(entry.occurredAt()));
+        metaLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.56);");
+        content.getChildren().add(metaLabel);
+
+        VBox row = new VBox(content);
+        row.setPadding(new Insets(3, 6, 3, 6));
+        return row;
+    }
+
+    private static VBox createNoteCard(
+            VBox historyList,
+            TaskNoteEntry entry,
+            List<TaskNoteEntry> safeNotes,
+            List<TaskActivityEntry> safeActivities,
+            NotesEditor notesEditor,
+            Label notesErrorLabel,
+            BusyMutationState busyMutationState,
+            BusyMutationUi busyMutationUi,
+            Runnable rerender) {
+        Label authorLabel = new Label((safe(entry.userDisplayName()).trim().isBlank() ? "Unknown user" : entry.userDisplayName())
+                + " · " + formatDateTime(entry.createdAt()));
+        authorLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
+
+        String updated = "";
+        if (entry.updatedAt() != null && !entry.updatedAt().equals(entry.createdAt())) {
+            updated = " (edited " + formatDateTime(entry.updatedAt()) + ")";
+        }
+        if (!updated.isBlank()) {
+            authorLabel.setText(authorLabel.getText() + updated);
+        }
+
+        Label bodyLabel = new Label(safe(entry.body()));
+        bodyLabel.setWrapText(true);
+
+        VBox cardContent = new VBox(6, authorLabel, bodyLabel);
+        if (entry.editable()) {
+            Button editButton = new Button("Edit");
+            editButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            editButton.getStyleClass().add("app-dialog-button-compact");
+            editButton.setOnAction(e -> {
+                TextArea editArea = new TextArea(safe(entry.body()));
+                editArea.setWrapText(true);
+                editArea.setPrefRowCount(3);
+                Button saveButton = new Button("Save");
+                saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+                Button cancelButton = new Button("Cancel");
+                cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+                HBox actions = new HBox(6, saveButton, cancelButton);
+                VBox editContent = new VBox(6, authorLabel, editArea, actions);
+                VBox card = (VBox) ((Button) e.getSource()).getParent().getParent();
+                card.getChildren().setAll(editContent);
+                saveButton.setOnAction(saveEvent -> {
+                    if (busyMutationState != null && busyMutationState.isBusy()) {
+                        return;
+                    }
+                    String updatedText = safe(editArea.getText()).trim();
+                    if (updatedText.isBlank()) {
+                        showError(notesErrorLabel, "Note text is required.");
+                        return;
+                    }
+                    runMutationAsync(
+                            busyMutationState,
+                            busyMutationUi == null ? null : busyMutationUi::refresh,
+                            () -> notesEditor == null ? safeNotes : notesEditor.editAndReload(entry.id(), updatedText),
+                            refreshed -> {
+                                renderUnifiedHistoryFeed(
+                                        historyList,
+                                        safeActivities,
+                                        refreshed,
+                                        notesEditor,
+                                        notesErrorLabel,
+                                        busyMutationState,
+                                        busyMutationUi);
+                                notesErrorLabel.setManaged(false);
+                                notesErrorLabel.setVisible(false);
+                            },
+                            ex -> showError(notesErrorLabel, "Failed to update note. " + rootCauseMessage(ex)));
+                });
+                cancelButton.setOnAction(cancelEvent -> rerender.run());
+            });
+            HBox actionRow = new HBox(6, editButton);
+            actionRow.setAlignment(Pos.CENTER_RIGHT);
+            actionRow.setMaxWidth(Double.MAX_VALUE);
+            cardContent.getChildren().add(actionRow);
+        }
+
+        VBox card = new VBox(cardContent);
+        card.setPadding(new Insets(10, 12, 10, 12));
+        card.getStyleClass().add("secondary-panel");
+        card.setStyle("-fx-background-color: rgba(52, 110, 201, 0.22);");
+        return card;
+    }
+
+    private static List<HistoryFeedItem> mergeHistoryItems(List<TaskActivityEntry> activityEntries, List<TaskNoteEntry> noteEntries) {
+        List<HistoryFeedItem> combined = new ArrayList<>();
+        for (TaskActivityEntry activity : activityEntries) {
+            if (activity == null) {
+                continue;
+            }
+            combined.add(new HistoryFeedItem(HistoryFeedItemType.ACTIVITY, activity.occurredAt(), activity, null));
+        }
+        for (TaskNoteEntry note : noteEntries) {
+            if (note == null) {
+                continue;
+            }
+            combined.add(new HistoryFeedItem(HistoryFeedItemType.NOTE, note.createdAt(), null, note));
+        }
+        combined.sort(Comparator.comparing(HistoryFeedItem::occurredAt, Comparator.nullsLast(LocalDateTime::compareTo)).reversed());
+        return combined;
+    }
+
+    private enum HistoryFeedItemType {
+        NOTE,
+        ACTIVITY
+    }
+
+    private record HistoryFeedItem(
+            HistoryFeedItemType type,
+            LocalDateTime occurredAt,
+            TaskActivityEntry activity,
+            TaskNoteEntry note) {
     }
 
     private static String formatDateTime(LocalDateTime value) {
