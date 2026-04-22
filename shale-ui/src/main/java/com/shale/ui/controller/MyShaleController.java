@@ -809,6 +809,7 @@ public final class MyShaleController {
 			caseColumnScroll.setMaxHeight(Double.MAX_VALUE);
 
 			caseColumn.getChildren().addAll(caseHeader, caseColumnScroll);
+			removeLaneLevelOverdueNodes(caseColumn);
 			myTasksList.getChildren().add(caseColumn);
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
