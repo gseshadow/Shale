@@ -390,17 +390,6 @@
     -fx-text-fill: rgba(17, 37, 66, 0.72);
 }
 
-.my-tasks-lane-urgency-indicator {
-    -fx-font-size: 10px;
-    -fx-font-weight: 700;
-    -fx-text-fill: #9f1239;
-    -fx-background-color: rgba(244, 63, 94, 0.16);
-    -fx-border-color: rgba(225, 29, 72, 0.26);
-    -fx-border-radius: 999;
-    -fx-background-radius: 999;
-    -fx-padding: 1 6 1 6;
-}
-
 .button.app-toolbar-button-danger,
 .menu-button.app-toolbar-button-danger,
 .split-menu-button.app-toolbar-button-danger {

@@ -41,11 +41,9 @@ import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.Labeled;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -850,6 +848,17 @@ public final class MyShaleController {
 		myTasksPinTraceLogged = true;
 	}
 
+	private void suppressMyTasksScrollTopRightCornerOverlay() {
+		if (myTasksScroll == null) {
+			return;
+		}
+		myTasksScroll.applyCss();
+		Node corner = myTasksScroll.lookup(".corner");
+		if (corner != null) {
+			setVisibleManaged(corner, false);
+		}
+	}
+
 	private Map<CaseColumnKey, List<CaseTaskListItemDto>> groupTasksByCase(List<CaseTaskListItemDto> tasks) {
 		Map<CaseColumnKey, List<CaseTaskListItemDto>> grouped = new LinkedHashMap<>();
 		if (tasks == null || tasks.isEmpty()) {
@@ -963,11 +972,6 @@ public final class MyShaleController {
 		Label taskCountLabel = new Label(formatTaskCountLabel(tasks));
 		taskCountLabel.getStyleClass().add("my-tasks-lane-count");
 		metaRow.getChildren().add(taskCountLabel);
-		if (hasOverdueIncompleteTasks(tasks)) {
-			Label overdueIndicator = new Label("Overdue");
-			overdueIndicator.getStyleClass().add("my-tasks-lane-urgency-indicator");
-			metaRow.getChildren().add(overdueIndicator);
-		}
 
 		titleAndMeta.getChildren().addAll(laneTitle, metaRow);
 
@@ -996,18 +1000,6 @@ public final class MyShaleController {
 						key.responsibleAttorneyColor(),
 						key.nonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-	}
-
-	private boolean hasOverdueIncompleteTasks(List<CaseTaskListItemDto> tasks) {
-		if (tasks == null || tasks.isEmpty()) {
-			return false;
-		}
-		LocalDate today = LocalDate.now();
-		return tasks.stream()
-				.filter(Objects::nonNull)
-				.anyMatch(task -> task.completedAt() == null
-						&& task.dueAt() != null
-						&& task.dueAt().toLocalDate().isBefore(today));
 	}
 
 	private String formatTaskCountLabel(List<CaseTaskListItemDto> tasks) {
