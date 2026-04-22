@@ -77,6 +77,7 @@ public final class MyShaleController {
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 	private static final String MY_TASKS_BOARD_KEY = "my_shale_tasks";
 	private static final String MY_TASKS_LANE_TYPE_CASE = "CASE";
+	private static final int MY_TASKS_DUE_SOON_DAYS = 2;
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -785,7 +786,7 @@ public final class MyShaleController {
 		boolean fullVariant = SECTION_TASKS.equals(activeSection);
 		Map<TaskLaneKey, List<CaseTaskListItemDto>> tasksByLane = groupTasksByLane(filteredTasks);
 		for (Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>> entry : orderTaskLanes(tasksByLane)) {
-			Node laneHeader = buildTaskLaneHeader(entry.getKey());
+			Node laneHeader = buildTaskLaneHeader(entry.getKey(), entry.getValue());
 			Node laneBody = buildTaskLaneBody(entry.getValue(), fullVariant);
 			VBox lane = LaneBoardLayout.createLane(
 					laneHeader,
@@ -904,42 +905,83 @@ public final class MyShaleController {
 				Boolean.TRUE.equals(task.caseNonEngagementLetterSent()));
 	}
 
-	private Node buildTaskLaneHeader(TaskLaneKey key) {
-		if (key == null || key.caseId() == null || key.caseId() <= 0) {
-			Label noCaseHeader = new Label(NO_CASE_COLUMN_TITLE);
-			noCaseHeader.getStyleClass().add("sidebar-header");
-			return noCaseHeader;
-		}
+	private Node buildTaskLaneHeader(TaskLaneKey key, List<CaseTaskListItemDto> tasksInLane) {
+		int taskCount = tasksInLane == null ? 0 : tasksInLane.size();
+		LaneUrgency laneUrgency = evaluateLaneUrgency(tasksInLane);
 		Node caseCard = caseCardFactory.create(
 				new CaseCardModel(
-						key.caseId(),
-						key.displayName(),
+						key == null || key.caseId() == null ? 0L : key.caseId(),
+						key == null ? NO_CASE_COLUMN_TITLE : key.displayName(),
 						null,
 						null,
-						key.responsibleAttorney(),
-						key.responsibleAttorneyColor(),
-						key.nonEngagementLetterSent()),
+						key == null ? "" : key.responsibleAttorney(),
+						key == null ? "" : key.responsibleAttorneyColor(),
+						key != null && key.nonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		HBox header = new HBox(8);
-		header.setAlignment(Pos.CENTER_LEFT);
-		header.getChildren().add(caseCard);
+		VBox header = new VBox(6);
+		HBox headerTopRow = new HBox(8);
+		headerTopRow.setAlignment(Pos.CENTER_LEFT);
+		headerTopRow.getChildren().add(caseCard);
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		header.getChildren().add(spacer);
-		boolean pinned = isPinnedLane(key);
-		Button pinButton = new Button("📌");
-		pinButton.setFocusTraversable(false);
-		pinButton.getStyleClass().addAll(
-				"lane-pin-button",
-				pinned ? "lane-pin-button-pinned" : "lane-pin-button-unpinned");
-		pinButton.setTooltip(new Tooltip(pinned ? "Unpin lane" : "Pin lane"));
-		pinButton.setOnAction(event -> {
-			boolean pinnedNow = toggleLanePinned(key);
-			persistLanePinnedState(key, pinnedNow);
-			renderMyTasks();
-		});
-		header.getChildren().add(pinButton);
+		headerTopRow.getChildren().add(spacer);
+		if (key != null && key.caseId() != null && key.caseId() > 0) {
+			boolean pinned = isPinnedLane(key);
+			Button pinButton = new Button("📌");
+			pinButton.setFocusTraversable(false);
+			pinButton.getStyleClass().addAll(
+					"lane-pin-button",
+					pinned ? "lane-pin-button-pinned" : "lane-pin-button-unpinned");
+			pinButton.setTooltip(new Tooltip(pinned ? "Unpin lane" : "Pin lane"));
+			pinButton.setOnAction(event -> {
+				boolean pinnedNow = toggleLanePinned(key);
+				persistLanePinnedState(key, pinnedNow);
+				renderMyTasks();
+			});
+			headerTopRow.getChildren().add(pinButton);
+		}
+
+		HBox laneMetaRow = new HBox(6);
+		laneMetaRow.setAlignment(Pos.CENTER_LEFT);
+		laneMetaRow.getStyleClass().add("lane-header-meta");
+		Label taskCountLabel = new Label(taskCount == 1 ? "1 task" : (taskCount + " tasks"));
+		taskCountLabel.getStyleClass().add("lane-task-count");
+		laneMetaRow.getChildren().add(taskCountLabel);
+		if (laneUrgency.overdue()) {
+			Label urgencyLabel = new Label("Overdue");
+			urgencyLabel.getStyleClass().addAll("lane-urgency-badge", "lane-urgency-overdue");
+			laneMetaRow.getChildren().add(urgencyLabel);
+		} else if (laneUrgency.dueSoon()) {
+			Label urgencyLabel = new Label("Due soon");
+			urgencyLabel.getStyleClass().addAll("lane-urgency-badge", "lane-urgency-soon");
+			laneMetaRow.getChildren().add(urgencyLabel);
+		}
+
+		header.getChildren().addAll(headerTopRow, laneMetaRow);
 		return header;
+	}
+
+	private LaneUrgency evaluateLaneUrgency(List<CaseTaskListItemDto> tasksInLane) {
+		if (tasksInLane == null || tasksInLane.isEmpty()) {
+			return LaneUrgency.NONE;
+		}
+		java.time.LocalDateTime now = java.time.LocalDateTime.now();
+		java.time.LocalDateTime dueSoonCutoff = now.plusDays(MY_TASKS_DUE_SOON_DAYS);
+		boolean hasOverdue = false;
+		boolean hasDueSoon = false;
+		for (CaseTaskListItemDto task : tasksInLane) {
+			if (task == null || task.completedAt() != null || task.dueAt() == null) {
+				continue;
+			}
+			if (task.dueAt().isBefore(now)) {
+				hasOverdue = true;
+				break;
+			}
+			if (!task.dueAt().isAfter(dueSoonCutoff)) {
+				hasDueSoon = true;
+			}
+		}
+		return new LaneUrgency(hasOverdue, !hasOverdue && hasDueSoon);
 	}
 
 	private boolean isPinnedLane(TaskLaneKey key) {
@@ -1018,6 +1060,12 @@ public final class MyShaleController {
 	private Node buildTaskLaneBody(List<CaseTaskListItemDto> tasksInLane, boolean fullVariant) {
 		VBox taskCards = new VBox(10);
 		taskCards.setFillWidth(true);
+		if (tasksInLane == null || tasksInLane.isEmpty()) {
+			Label emptyLabel = new Label("No tasks");
+			emptyLabel.getStyleClass().add("lane-empty-state");
+			taskCards.getChildren().add(emptyLabel);
+			return taskCards;
+		}
 		for (CaseTaskListItemDto task : tasksInLane) {
 			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
 					task.id(),
@@ -1530,6 +1578,10 @@ public final class MyShaleController {
 			String responsibleAttorneyColor,
 			boolean nonEngagementLetterSent
 	) {
+	}
+
+	private record LaneUrgency(boolean overdue, boolean dueSoon) {
+		private static final LaneUrgency NONE = new LaneUrgency(false, false);
 	}
 
 	private static final class CaseCardVm {
