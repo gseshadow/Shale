@@ -853,7 +853,7 @@ public final class TaskDetailDialog {
         return completed ? "Mark Incomplete" : "Complete Task";
     }
 
-    private static TaskStatusOptionDto findCompletedStatus(List<TaskStatusOptionDto> statuses) {
+    static TaskStatusOptionDto findCompletedStatus(List<TaskStatusOptionDto> statuses) {
         if (statuses == null) {
             return null;
         }
@@ -865,7 +865,7 @@ public final class TaskDetailDialog {
         return null;
     }
 
-    private static TaskStatusOptionDto findIncompleteFallbackStatus(List<TaskStatusOptionDto> statuses, Integer preferredId) {
+    static TaskStatusOptionDto findIncompleteFallbackStatus(List<TaskStatusOptionDto> statuses, Integer preferredId) {
         if (statuses == null || statuses.isEmpty()) {
             return null;
         }
@@ -889,7 +889,7 @@ public final class TaskDetailDialog {
         return statuses.get(0);
     }
 
-    private static boolean isCompletedStatus(TaskStatusOptionDto status) {
+    static boolean isCompletedStatus(TaskStatusOptionDto status) {
         if (status == null) {
             return false;
         }
