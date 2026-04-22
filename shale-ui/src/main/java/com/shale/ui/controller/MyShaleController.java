@@ -41,9 +41,11 @@ import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Labeled;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -747,6 +749,7 @@ public final class MyShaleController {
 			myTasksEmptyLabel.setText(showCompletedMyTasks
 					? "No tasks assigned to you."
 					: "No incomplete tasks assigned to you.");
+			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
@@ -754,6 +757,7 @@ public final class MyShaleController {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
 			myTasksEmptyLabel.setText("No tasks found.");
+			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
