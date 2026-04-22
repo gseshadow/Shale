@@ -527,6 +527,50 @@
     -fx-opacity: 0.65;
 }
 
+.combo-box.app-toolbar-select {
+    -fx-min-height: 40;
+    -fx-pref-height: 40;
+    -fx-padding: 0;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-border-width: 1;
+    -fx-background-color: linear-gradient(to bottom, rgba(63, 90, 132, 0.78), rgba(36, 57, 90, 0.84));
+    -fx-border-color: rgba(232, 242, 255, 0.26);
+}
+
+.combo-box.app-toolbar-select > .list-cell {
+    -fx-padding: 0 8 0 14;
+    -fx-text-fill: #f9fbff;
+    -fx-font-weight: 700;
+}
+
+.combo-box.app-toolbar-select > .arrow-button {
+    -fx-padding: 0 14 0 8;
+    -fx-background-color: transparent;
+}
+
+.combo-box.app-toolbar-select > .arrow-button > .arrow {
+    -fx-background-color: #f9fbff;
+}
+
+.combo-box.app-toolbar-select:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(77, 107, 151, 0.82), rgba(45, 69, 106, 0.88));
+    -fx-border-color: rgba(238, 246, 255, 0.38);
+}
+
+.combo-box.app-toolbar-select:showing,
+.combo-box.app-toolbar-select:focused {
+    -fx-background-color: linear-gradient(to bottom, rgba(50, 74, 112, 0.86), rgba(31, 50, 80, 0.92));
+    -fx-border-color: rgba(214, 229, 249, 0.42);
+    -fx-effect: dropshadow(gaussian, rgba(123, 178, 255, 0.45), 10, 0.2, 0, 0);
+}
+
+.combo-box.app-toolbar-select:disabled {
+    -fx-opacity: 0.65;
+}
+
 .context-menu .menu-item .label,
 .context-menu .custom-menu-item .label {
     -fx-text-fill: #112542;
