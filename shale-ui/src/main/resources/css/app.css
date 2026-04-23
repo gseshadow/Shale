@@ -449,12 +449,13 @@
 }
 
 .app-taskcard-compact-meta-row {
-    -fx-spacing: 8;
+    -fx-spacing: 6;
     -fx-padding: 0;
 }
 
 .app-taskcard-compact-meta-section {
     -fx-spacing: 2;
+    -fx-min-width: 0;
 }
 
 .button.lane-pin-button {

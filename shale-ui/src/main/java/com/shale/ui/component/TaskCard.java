@@ -30,6 +30,7 @@ public final class TaskCard extends VBox {
 
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
 	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
+	private static final double COMPACT_CARD_WIDTH = 210;
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
@@ -257,9 +258,9 @@ public final class TaskCard extends VBox {
 		setSpacing(3);
 		setPadding(new Insets(6, 8, 6, 8));
 		setAlignment(Pos.TOP_LEFT);
-		setMinWidth(300);
-		setPrefWidth(300);
-		setMaxWidth(300);
+		setMinWidth(COMPACT_CARD_WIDTH);
+		setPrefWidth(COMPACT_CARD_WIDTH);
+		setMaxWidth(COMPACT_CARD_WIDTH);
 		titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		dueLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
@@ -279,6 +280,8 @@ public final class TaskCard extends VBox {
 		teamSection.getStyleClass().setAll("app-taskcard-compact-meta-section");
 		compactTitleRow.getStyleClass().setAll("app-taskcard-compact-title-row");
 		compactTitleBlock.getStyleClass().setAll("app-taskcard-compact-title-block");
+		caseSection.setMinWidth(0);
+		teamSection.setMinWidth(0);
 		refreshSurfaceStyle();
 	}
 
