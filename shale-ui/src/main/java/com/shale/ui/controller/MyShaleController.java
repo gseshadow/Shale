@@ -145,6 +145,8 @@ public final class MyShaleController {
 	private TextField myCasesBoardSearchField;
 	@FXML
 	private ChoiceBox<String> myCasesBoardSortChoice;
+	@FXML
+	private ChoiceBox<BoardStatusFilterOption> myCasesBoardStatusFilterChoice;
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
@@ -182,6 +184,7 @@ public final class MyShaleController {
 	private boolean suppressMyTaskPreferenceWrites;
 	private Integer preferredMyTasksPriorityFilterId;
 	private Long preferredMyTasksCaseFilterId;
+	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
 	{
@@ -295,6 +298,11 @@ public final class MyShaleController {
 		}
 		if (myCasesBoardSearchField != null) {
 			myCasesBoardSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
+		}
+		if (myCasesBoardStatusFilterChoice != null) {
+			myCasesBoardStatusFilterChoice.getItems().setAll(ALL_BOARD_STATUSES_OPTION);
+			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
+			myCasesBoardStatusFilterChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
 		}
 
 		reloadStatusFilterOptionsAndThen(() -> {
@@ -503,6 +511,7 @@ public final class MyShaleController {
 				}
 				statusFilterOptions = options;
 				CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+				syncMyCasesBoardStatusFilterOptions();
 			});
 		});
 	}
@@ -878,6 +887,7 @@ public final class MyShaleController {
 		LaneBoardLayout.configureBoardRow(myCasesBoardList);
 		String searchQuery = normalizeSearchQuery(myCasesBoardSearchField == null ? null : myCasesBoardSearchField.getText());
 		Comparator<CaseCardVm> laneSort = myCasesLaneComparator(myCasesBoardSortChoice == null ? SORT_NAME : myCasesBoardSortChoice.getValue());
+		Integer selectedStatusId = selectedMyCasesBoardStatusId();
 
 		Map<Integer, List<CaseCardVm>> byStatus = new LinkedHashMap<>();
 		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
@@ -891,6 +901,9 @@ public final class MyShaleController {
 				continue;
 			}
 			if (!matchesMyCasesBoardSearch(vm, searchQuery)) {
+				continue;
+			}
+			if (selectedStatusId != null && !Objects.equals(selectedStatusId, vm.primaryStatusId)) {
 				continue;
 			}
 			Integer statusId = vm.primaryStatusId;
@@ -924,6 +937,40 @@ public final class MyShaleController {
 		boolean hasAnyCards = myCasesBoardList.getChildren().stream().anyMatch(Objects::nonNull);
 		setVisibleManaged(myCasesBoardEmptyLabel, !hasAnyCards);
 		setVisibleManaged(myCasesBoardScroll, hasAnyCards);
+	}
+
+	private void syncMyCasesBoardStatusFilterOptions() {
+		if (myCasesBoardStatusFilterChoice == null) {
+			return;
+		}
+		BoardStatusFilterOption previouslySelected = myCasesBoardStatusFilterChoice.getValue();
+		Integer previousStatusId = previouslySelected == null ? null : previouslySelected.statusId();
+		List<BoardStatusFilterOption> options = new ArrayList<>();
+		options.add(ALL_BOARD_STATUSES_OPTION);
+		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
+			if (status == null) {
+				continue;
+			}
+			String label = safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim();
+			options.add(new BoardStatusFilterOption(status.id(), label));
+		}
+		myCasesBoardStatusFilterChoice.getItems().setAll(options);
+		if (previousStatusId == null) {
+			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
+			return;
+		}
+		Optional<BoardStatusFilterOption> matching = options.stream()
+				.filter(option -> Objects.equals(option.statusId(), previousStatusId))
+				.findFirst();
+		myCasesBoardStatusFilterChoice.getSelectionModel().select(matching.orElse(ALL_BOARD_STATUSES_OPTION));
+	}
+
+	private Integer selectedMyCasesBoardStatusId() {
+		if (myCasesBoardStatusFilterChoice == null) {
+			return null;
+		}
+		BoardStatusFilterOption selected = myCasesBoardStatusFilterChoice.getValue();
+		return selected == null ? null : selected.statusId();
 	}
 
 	private VBox createMyCasesStatusLane(String statusName, List<CaseCardVm> laneCases) {
@@ -1967,6 +2014,14 @@ public final class MyShaleController {
 		public String toString() {
 			String text = safe(displayName).trim();
 			return text.isBlank() ? "All Priorities" : text;
+		}
+	}
+
+	private record BoardStatusFilterOption(Integer statusId, String displayName) {
+		@Override
+		public String toString() {
+			String text = safe(displayName).trim();
+			return text.isBlank() ? "All Statuses" : text;
 		}
 	}
 
