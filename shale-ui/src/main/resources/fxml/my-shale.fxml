@@ -33,46 +33,13 @@
 				</padding>
 
 				<VBox fx:id="overviewSectionPane" spacing="10" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
-					<HBox fx:id="overviewMainRow" spacing="10" fillHeight="true">
-					<VBox spacing="8" styleClass="strong-panel" HBox.hgrow="ALWAYS">
-						<padding>
-							<Insets top="10" right="10" bottom="10" left="10" />
-						</padding>
-						<Label text="My Cases" styleClass="page-heading" />
-						<BorderPane VBox.vgrow="ALWAYS">
-							<top>
-								<HBox spacing="10" styleClass="shell-transparent">
-									<TextField fx:id="myCasesSearchField" promptText="Search my cases…" HBox.hgrow="ALWAYS" />
-									<MenuButton fx:id="myCasesStatusFilterMenuButton" text="Status (8/8)">
-										<styleClass>
-											<String fx:value="app-toolbar-button" />
-											<String fx:value="app-toolbar-button-neutral" />
-										</styleClass>
-									</MenuButton>
-									<ChoiceBox fx:id="myCasesSortChoice" prefWidth="220">
-										<styleClass>
-											<String fx:value="app-toolbar-select" />
-										</styleClass>
-									</ChoiceBox>
-								</HBox>
-							</top>
-							<center>
-								<ScrollPane fx:id="myCasesScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
-									vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
-									<content>
-										<FlowPane fx:id="myCasesFlow" hgap="10" vgap="10" prefWrapLength="900"
-											styleClass="cases-content-surface glass-panel">
-											<padding>
-												<Insets top="10" right="10" bottom="10" left="10" />
-											</padding>
-										</FlowPane>
-									</content>
-								</ScrollPane>
-							</center>
-						</BorderPane>
-					</VBox>
-				</HBox>
-			</VBox>
+					<ScrollPane fx:id="overviewScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
+						vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
+						<content>
+							<VBox fx:id="overviewMainRow" spacing="10" fillWidth="true" />
+						</content>
+					</ScrollPane>
+				</VBox>
 
 				<VBox fx:id="tasksSectionPane" spacing="8" visible="false" managed="false" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 					<VBox fx:id="tasksSectionContentHost" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
