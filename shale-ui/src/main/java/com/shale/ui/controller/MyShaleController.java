@@ -207,6 +207,9 @@ public final class MyShaleController {
 	private CheckBox overviewOverdueOnlyCheckControl;
 	private ChoiceBox<String> overviewSortChoiceControl;
 	private boolean suppressOverviewControlEvents;
+	private boolean loadingOverview;
+	private boolean loadingMyTasks;
+	private boolean loadingMyCases;
 	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
@@ -336,8 +339,6 @@ public final class MyShaleController {
 		{
 			onSectionSelected(SECTION_OVERVIEW);
 			wireInfiniteScroll();
-			refreshMyTasks();
-			refreshMyCasesBoard();
 		});
 
 		if (myCasesFlow != null) {
@@ -437,12 +438,17 @@ public final class MyShaleController {
 		setVisibleManaged(myCasesSectionPane, showMyCases);
 		if (showOverview) {
 			renderMyOverview();
+			refreshMyTasks();
 		}
 		if (showTasks) {
 			attachTasksPanel(tasksSectionContentHost);
+			renderMyTasks();
+			refreshMyTasks();
 		}
-		renderMyTasks();
-		renderMyCasesBoard();
+		if (showMyCases) {
+			renderMyCasesBoard();
+			refreshMyCasesBoard();
+		}
 	}
 
 	private void attachTasksPanel(Pane host) {
@@ -809,11 +815,17 @@ public final class MyShaleController {
 		if (caseTaskService == null || appState == null) {
 			return;
 		}
+		loadingOverview = true;
+		loadingMyTasks = true;
+		renderMyOverview();
+		renderMyTasks();
 		Integer shaleClientId = appState.getShaleClientId();
 		Integer userId = appState.getUserId();
 		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
 			myTasks = List.of();
 			myTaskAssignedUsers = java.util.Map.of();
+			loadingOverview = false;
+			loadingMyTasks = false;
 			renderMyOverview();
 			renderMyTasks();
 			return;
@@ -860,6 +872,8 @@ public final class MyShaleController {
 									java.util.LinkedHashMap::new));
 					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " rows=" + assignedByTask.size(), usersLoadStartNanos);
 					runOnFx(() -> {
+						loadingOverview = false;
+						loadingMyTasks = false;
 						myTasks = tasks == null ? List.of() : tasks;
 						pinnedTaskLaneCaseIds.clear();
 						pinnedTaskLaneCaseIds.addAll(pinnedLaneCaseIds);
@@ -875,7 +889,13 @@ public final class MyShaleController {
 			} catch (Exception ex) {
 				System.err.println("My tasks load failed: " + ex.getMessage());
 				ex.printStackTrace();
-				runOnFx(() -> showTaskActionError("Failed to load your tasks."));
+				runOnFx(() -> {
+					loadingOverview = false;
+					loadingMyTasks = false;
+					renderMyOverview();
+					renderMyTasks();
+					showTaskActionError("Failed to load your tasks.");
+				});
 			}
 		});
 	}
@@ -884,10 +904,13 @@ public final class MyShaleController {
 		if (caseDao == null || appState == null) {
 			return;
 		}
+		loadingMyCases = true;
+		renderMyCasesBoard();
 		Integer userId = appState.getUserId();
 		Integer shaleClientId = appState.getShaleClientId();
 		if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
 			myAssignedCasesBoard = List.of();
+			loadingMyCases = false;
 			renderMyCasesBoard();
 			return;
 		}
@@ -900,6 +923,7 @@ public final class MyShaleController {
 						.map(this::toVm)
 						.toList();
 				runOnFx(() -> {
+					loadingMyCases = false;
 					myAssignedCasesBoard = cases;
 					renderMyCasesBoard();
 				});
@@ -907,6 +931,7 @@ public final class MyShaleController {
 				System.err.println("My cases board load failed: " + ex.getMessage());
 				ex.printStackTrace();
 				runOnFx(() -> {
+					loadingMyCases = false;
 					myAssignedCasesBoard = List.of();
 					renderMyCasesBoard();
 				});
@@ -916,6 +941,13 @@ public final class MyShaleController {
 
 	private void renderMyCasesBoard() {
 		if (myCasesBoardList == null || myCasesBoardEmptyLabel == null || myCasesBoardScroll == null) {
+			return;
+		}
+		if (loadingMyCases) {
+			myCasesBoardList.getChildren().clear();
+			myCasesBoardEmptyLabel.setText("Loading your cases...");
+			setVisibleManaged(myCasesBoardEmptyLabel, true);
+			setVisibleManaged(myCasesBoardScroll, false);
 			return;
 		}
 		myCasesBoardList.getChildren().clear();
@@ -1064,6 +1096,14 @@ public final class MyShaleController {
 		if (myTasksList == null || myTasksEmptyLabel == null || myTasksScroll == null) {
 			return;
 		}
+		if (loadingMyTasks) {
+			myTasksList.getChildren().clear();
+			myTasksEmptyLabel.setText("Loading your tasks...");
+			setVisibleManaged(myTasksEmptyLabel, true);
+			setVisibleManaged(myTasksScroll, false);
+			suppressMyTasksScrollTopRightCornerOverlay();
+			return;
+		}
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
@@ -1120,6 +1160,12 @@ public final class MyShaleController {
 
 	private void renderMyOverview() {
 		if (overviewMainRow == null) {
+			return;
+		}
+		if (loadingOverview) {
+			Label loadingLabel = new Label("Loading your overview...");
+			loadingLabel.getStyleClass().add("muted-text");
+			overviewMainRow.getChildren().setAll(loadingLabel);
 			return;
 		}
 		ensureOverviewContentShell();
