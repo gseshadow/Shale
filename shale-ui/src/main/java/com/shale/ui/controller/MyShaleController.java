@@ -77,7 +77,6 @@ public final class MyShaleController {
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 	private static final String MY_TASKS_BOARD_KEY = "my_shale_tasks";
 	private static final String MY_TASKS_LANE_TYPE_CASE = "CASE";
-	private static final int MY_TASKS_DUE_SOON_DAYS = 2;
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -907,7 +906,6 @@ public final class MyShaleController {
 
 	private Node buildTaskLaneHeader(TaskLaneKey key, List<CaseTaskListItemDto> tasksInLane) {
 		int taskCount = tasksInLane == null ? 0 : tasksInLane.size();
-		LaneUrgency laneUrgency = evaluateLaneUrgency(tasksInLane);
 		Node caseCard = caseCardFactory.create(
 				new CaseCardModel(
 						key == null || key.caseId() == null ? 0L : key.caseId(),
@@ -947,41 +945,9 @@ public final class MyShaleController {
 		Label taskCountLabel = new Label(taskCount == 1 ? "1 task" : (taskCount + " tasks"));
 		taskCountLabel.getStyleClass().add("lane-task-count");
 		laneMetaRow.getChildren().add(taskCountLabel);
-		if (laneUrgency.overdue()) {
-			Label urgencyLabel = new Label("Overdue");
-			urgencyLabel.getStyleClass().addAll("lane-urgency-badge", "lane-urgency-overdue");
-			laneMetaRow.getChildren().add(urgencyLabel);
-		} else if (laneUrgency.dueSoon()) {
-			Label urgencyLabel = new Label("Due soon");
-			urgencyLabel.getStyleClass().addAll("lane-urgency-badge", "lane-urgency-soon");
-			laneMetaRow.getChildren().add(urgencyLabel);
-		}
 
 		header.getChildren().addAll(headerTopRow, laneMetaRow);
 		return header;
-	}
-
-	private LaneUrgency evaluateLaneUrgency(List<CaseTaskListItemDto> tasksInLane) {
-		if (tasksInLane == null || tasksInLane.isEmpty()) {
-			return LaneUrgency.NONE;
-		}
-		java.time.LocalDateTime now = java.time.LocalDateTime.now();
-		java.time.LocalDateTime dueSoonCutoff = now.plusDays(MY_TASKS_DUE_SOON_DAYS);
-		boolean hasOverdue = false;
-		boolean hasDueSoon = false;
-		for (CaseTaskListItemDto task : tasksInLane) {
-			if (task == null || task.completedAt() != null || task.dueAt() == null) {
-				continue;
-			}
-			if (task.dueAt().isBefore(now)) {
-				hasOverdue = true;
-				break;
-			}
-			if (!task.dueAt().isAfter(dueSoonCutoff)) {
-				hasDueSoon = true;
-			}
-		}
-		return new LaneUrgency(hasOverdue, !hasOverdue && hasDueSoon);
 	}
 
 	private boolean isPinnedLane(TaskLaneKey key) {
@@ -1578,10 +1544,6 @@ public final class MyShaleController {
 			String responsibleAttorneyColor,
 			boolean nonEngagementLetterSent
 	) {
-	}
-
-	private record LaneUrgency(boolean overdue, boolean dueSoon) {
-		private static final LaneUrgency NONE = new LaneUrgency(false, false);
 	}
 
 	private static final class CaseCardVm {
