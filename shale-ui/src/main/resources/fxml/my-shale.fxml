@@ -156,8 +156,33 @@
 							</content>
 						</ScrollPane>
 					</VBox>
+					</VBox>
 				</VBox>
-			</VBox>
+
+				<VBox fx:id="myCasesSectionPane" spacing="8" visible="false" managed="false" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+					<VBox fx:id="myCasesSectionContentHost" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+						<VBox spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+							<padding>
+								<Insets top="10" right="10" bottom="10" left="10" />
+							</padding>
+							<HBox spacing="8" alignment="CENTER_LEFT">
+								<Label text="My Cases" styleClass="page-heading" />
+								<Region HBox.hgrow="ALWAYS" />
+							</HBox>
+							<Label fx:id="myCasesBoardEmptyLabel" text="No cases assigned to you." managed="false" visible="false" />
+							<ScrollPane fx:id="myCasesBoardScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
+								vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
+								<content>
+									<HBox fx:id="myCasesBoardList" spacing="10" styleClass="cases-content-surface glass-panel">
+										<padding>
+											<Insets top="10" right="10" bottom="18" left="10" />
+										</padding>
+									</HBox>
+								</content>
+							</ScrollPane>
+						</VBox>
+					</VBox>
+				</VBox>
 		</StackPane>
 	</center>
 </BorderPane>
