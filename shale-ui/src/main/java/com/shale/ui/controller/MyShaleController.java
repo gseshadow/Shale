@@ -152,6 +152,7 @@ public final class MyShaleController {
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
+	private boolean myTasksPinTraceLogged;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
 	{
@@ -773,6 +774,7 @@ public final class MyShaleController {
 			myTasksEmptyLabel.setText(showCompletedMyTasks
 					? "No tasks assigned to you."
 					: "No incomplete tasks assigned to you.");
+			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
@@ -780,6 +782,7 @@ public final class MyShaleController {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
 			myTasksEmptyLabel.setText("No tasks found.");
+			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
