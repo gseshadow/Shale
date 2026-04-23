@@ -83,6 +83,7 @@ public final class MyShaleController {
 	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 320;
 	private static final double OVERVIEW_CARD_GAP = 10;
 	private static final double OVERVIEW_SECTION_HORIZONTAL_PADDING = 10;
+	private static final double OVERVIEW_COMPACT_TASK_CARD_WIDTH = 210;
 	private static final String OVERVIEW_SORT_DUE_ASC = "Due Date (earliest first)";
 	private static final String OVERVIEW_SORT_DUE_DESC = "Due Date (latest first)";
 	private static final String OVERVIEW_SORT_PRIORITY = "Priority";
@@ -1493,9 +1494,9 @@ public final class MyShaleController {
 							myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
 				Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT);
 				if (card instanceof Region regionCard) {
-					regionCard.setMinWidth(320);
-					regionCard.setPrefWidth(320);
-					regionCard.setMaxWidth(320);
+					regionCard.setMinWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
+					regionCard.setPrefWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
+					regionCard.setMaxWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
 				}
 				taskCards.getChildren().add(card);
 			}
