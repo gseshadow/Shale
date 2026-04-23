@@ -20,6 +20,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 
 public final class MainController {
 
@@ -79,6 +80,9 @@ public final class MainController {
 
 	@FXML
 	private Label sectionSubtitleLabel;
+
+	@FXML
+	private VBox sectionHeaderBox;
 
 	@FXML
 	private StackPane sectionContent;
@@ -247,8 +251,7 @@ public final class MainController {
 
 	public void showMyShaleView() {
 		highlightNav(navMyShaleButton);
-		sectionTitleLabel.setText("My Shale");
-		sectionSubtitleLabel.setText("Overview of your tasks, assigned cases, and recent activity.");
+		setSectionHeader("My Shale", "Overview of your tasks, assigned cases, and recent activity.", true);
 		Node myShaleRoot = sceneManager.createMyShaleView(
 				caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"),
 				sceneManager::openUserProfile);
@@ -257,48 +260,42 @@ public final class MainController {
 
 	public void showCasesListView() {
 		highlightNav(navCasesButton);
-		sectionTitleLabel.setText("Cases");
-		sectionSubtitleLabel.setText("Browse, search, and manage cases.");
+		setSectionHeader("Cases", "Browse, search, and manage cases.", true);
 		Node casesRoot = sceneManager.createCasesView(caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"));
 		sectionContent.getChildren().setAll(casesRoot);
 	}
 
 	public void showContactsListView() {
 		highlightNav(navContactsButton);
-		sectionTitleLabel.setText("Contacts");
-		sectionSubtitleLabel.setText("Manage clients, experts, and other contacts.");
+		setSectionHeader("Contacts", "Manage clients, experts, and other contacts.", true);
 		Node contactsRoot = sceneManager.createContactsView(sceneManager::openContactProfile);
 		sectionContent.getChildren().setAll(contactsRoot);
 	}
 
 	public void showOrganizationsListView() {
 		highlightNav(navOrganizationsButton);
-		sectionTitleLabel.setText("Organizations");
-		sectionSubtitleLabel.setText("Browse, search, and manage organizations.");
+		setSectionHeader("Organizations", "Browse, search, and manage organizations.", true);
 		Node organizationsRoot = sceneManager.createOrganizationsView(sceneManager::openOrganizationProfile);
 		sectionContent.getChildren().setAll(organizationsRoot);
 	}
 
 	public void showTeamListView() {
 		highlightNav(navTeamButton);
-		sectionTitleLabel.setText("Team");
-		sectionSubtitleLabel.setText("See and manage your team members.");
+		setSectionHeader("Team", "See and manage your team members.", true);
 		Node teamRoot = sceneManager.createTeamView(sceneManager::openUserProfile);
 		sectionContent.getChildren().setAll(teamRoot);
 	}
 
 	public void showSettingsView() {
 		highlightNav(navSettingsButton);
-		sectionTitleLabel.setText("Settings");
-		sectionSubtitleLabel.setText("Configure Shale preferences and system settings.");
+		setSectionHeader("Settings", "Configure Shale preferences and system settings.", true);
 		Node settingsRoot = sceneManager.createSettingsView();
 		sectionContent.getChildren().setAll(settingsRoot);
 	}
 
 	public void showSearchResultsView(String query) {
 		highlightNav(null);
-		sectionTitleLabel.setText("Search");
-		sectionSubtitleLabel.setText("Results for: \"" + query + "\"");
+		setSectionHeader("Search", "Results for: \"" + query + "\"", true);
 		Node searchRoot = sceneManager.createSearchView(
 				query,
 				caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"),
@@ -310,31 +307,40 @@ public final class MainController {
 
 	public void showCaseProfileView(int caseId, String sectionKey) {
 		highlightNav(navCasesButton);
-		sectionTitleLabel.setText("Case");
-		sectionSubtitleLabel.setText("Case #" + caseId);
+		setSectionHeader("", "", false);
 		Node caseRoot = sceneManager.createCaseView(caseId, sectionKey, sceneManager::openOrganizationProfile, sceneManager::openCasesListView);
 		sectionContent.getChildren().setAll(caseRoot);
 	}
 
 	public void showOrganizationProfileView(int organizationId, Node organizationRoot) {
 		highlightNav(navOrganizationsButton);
-		sectionTitleLabel.setText("Organization");
-		sectionSubtitleLabel.setText("Organization #" + organizationId);
+		setSectionHeader("", "", false);
 		sectionContent.getChildren().setAll(organizationRoot);
 	}
 
 	public void showUserView(int userId, Node userRoot) {
 		highlightNav(navTeamButton);
-		sectionTitleLabel.setText("User");
-		sectionSubtitleLabel.setText("User #" + userId);
+		setSectionHeader("", "", false);
 		sectionContent.getChildren().setAll(userRoot);
 	}
 
 	public void showContactView(int contactId, Node contactRoot) {
 		highlightNav(navContactsButton);
-		sectionTitleLabel.setText("Contact");
-		sectionSubtitleLabel.setText("Contact #" + contactId);
+		setSectionHeader("", "", false);
 		sectionContent.getChildren().setAll(contactRoot);
+	}
+
+	private void setSectionHeader(String title, String subtitle, boolean visible) {
+		if (sectionTitleLabel != null) {
+			sectionTitleLabel.setText(title == null ? "" : title);
+		}
+		if (sectionSubtitleLabel != null) {
+			sectionSubtitleLabel.setText(subtitle == null ? "" : subtitle);
+		}
+		if (sectionHeaderBox != null) {
+			sectionHeaderBox.setVisible(visible);
+			sectionHeaderBox.setManaged(visible);
+		}
 	}
 
 	public void updateBackButtonState(boolean canGoBack) {

@@ -843,8 +843,14 @@ public final class ContactDao {
                     OR LOWER(%s) LIKE ?
                     OR LOWER(%s) LIKE ?
                     OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
                   )
                 """.formatted(
+                coreTextExpression(schema.nameColumn(), alias),
+                coreTextExpression(schema.firstNameColumn(), alias),
+                coreTextExpression(schema.lastNameColumn(), alias),
                 displayNameExpression(schema, alias),
                 coreTextExpression(schema.emailColumn(), alias),
                 coreTextExpression(schema.phoneColumn(), alias));
@@ -859,6 +865,9 @@ public final class ContactDao {
         String normalizedSearch = normalizeSearchQuery(searchQuery);
         String likeValue = likeParameter(normalizedSearch);
         ps.setString(idx++, normalizedSearch);
+        ps.setString(idx++, likeValue);
+        ps.setString(idx++, likeValue);
+        ps.setString(idx++, likeValue);
         ps.setString(idx++, likeValue);
         ps.setString(idx++, likeValue);
         ps.setString(idx++, likeValue);

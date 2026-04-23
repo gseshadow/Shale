@@ -22,9 +22,9 @@
     fx:controller="com.shale.ui.controller.ContactViewController" styleClass="app-shell">
 
     <top>
-        <VBox spacing="6.0" BorderPane.alignment="CENTER">
+        <VBox spacing="4.0" BorderPane.alignment="CENTER">
             <padding>
-                <Insets top="10" right="12" bottom="8" left="12" />
+                <Insets top="8" right="12" bottom="6" left="12" />
             </padding>
 
             <HBox spacing="8.0" alignment="CENTER_LEFT">
@@ -61,9 +61,9 @@
                 </Button>
             </HBox>
 
-            <HBox spacing="10.0" alignment="CENTER_LEFT">
+            <HBox spacing="8.0" alignment="CENTER_LEFT">
                 <Label fx:id="contactSubtitleLabel" text="Contact #—" style="-fx-opacity: 0.8;" />
-                <Region HBox.hgrow="ALWAYS" />
+                <Label text="•" style="-fx-opacity: 0.55;" />
                 <Label fx:id="lastUpdatedLabel" text="Last updated: —" style="-fx-opacity: 0.7;" />
             </HBox>
         </VBox>

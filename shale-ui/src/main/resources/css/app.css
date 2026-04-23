@@ -440,6 +440,76 @@
     -fx-font-weight: 700;
 }
 
+.button.lane-pin-button {
+    -fx-min-width: 28;
+    -fx-pref-width: 28;
+    -fx-max-width: 28;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-padding: 0;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-width: 1.2;
+    -fx-font-size: 13px;
+    -fx-font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Symbol";
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+
+.button.lane-pin-button-unpinned {
+    -fx-background-color: rgba(38, 56, 84, 0.28);
+    -fx-border-color: rgba(201, 218, 243, 0.58);
+    -fx-text-fill: rgba(216, 230, 255, 0.9);
+}
+
+.button.lane-pin-button-unpinned:hover {
+    -fx-background-color: rgba(58, 81, 118, 0.42);
+    -fx-border-color: rgba(224, 236, 255, 0.72);
+    -fx-text-fill: #f1f7ff;
+}
+
+.button.lane-pin-button-pinned {
+    -fx-background-color: linear-gradient(to bottom, rgba(116, 154, 212, 0.98), rgba(66, 109, 182, 1.0));
+    -fx-border-color: rgba(242, 248, 255, 0.82);
+    -fx-text-fill: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(115, 166, 237, 0.45), 8, 0.2, 0, 0);
+}
+
+.button.lane-pin-button-pinned:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(136, 176, 232, 1.0), rgba(81, 128, 206, 1.0));
+    -fx-border-color: rgba(249, 252, 255, 0.92);
+    -fx-text-fill: #ffffff;
+}
+
+.lane-header-top-row {
+    -fx-padding: 0 2 0 2;
+}
+
+.lane-header-top-row {
+    -fx-padding: 0 2 0 2;
+}
+
+.label.lane-task-count {
+    -fx-text-fill: rgba(225, 236, 251, 0.86);
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.label.lane-task-count-inline {
+    -fx-text-fill: rgba(208, 223, 246, 0.9);
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-padding: 0 0 1 0;
+}
+
+.label.lane-empty-state {
+    -fx-text-fill: rgba(220, 232, 250, 0.72);
+    -fx-font-size: 12px;
+    -fx-padding: 10 8 10 8;
+    -fx-font-style: italic;
+}
+
 .button.app-toolbar-button-compact,
 .menu-button.app-toolbar-button-compact,
 .split-menu-button.app-toolbar-button-compact {
@@ -492,6 +562,54 @@
 }
 
 .choice-box.app-toolbar-select:disabled {
+    -fx-opacity: 0.65;
+}
+
+.combo-box.app-toolbar-select {
+    -app-toolbar-select-bg-top: rgba(63, 90, 132, 0.78);
+    -app-toolbar-select-bg-bottom: rgba(36, 57, 90, 0.84);
+    -app-toolbar-select-border: rgba(232, 242, 255, 0.26);
+    -app-toolbar-select-text: #f9fbff;
+    -fx-min-height: 40;
+    -fx-pref-height: 40;
+    -fx-padding: 0;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-border-width: 1;
+    -fx-background-color: linear-gradient(to bottom, -app-toolbar-select-bg-top, -app-toolbar-select-bg-bottom);
+    -fx-border-color: -app-toolbar-select-border;
+}
+
+.combo-box.app-toolbar-select > .list-cell {
+    -fx-padding: 0 8 0 14;
+    -fx-text-fill: -app-toolbar-select-text;
+    -fx-font-weight: 700;
+}
+
+.combo-box.app-toolbar-select > .arrow-button {
+    -fx-padding: 0 14 0 8;
+    -fx-background-color: transparent;
+}
+
+.combo-box.app-toolbar-select > .arrow-button > .arrow {
+    -fx-background-color: -app-toolbar-select-text;
+}
+
+.combo-box.app-toolbar-select:hover {
+    -fx-background-color: linear-gradient(to bottom, -app-toolbar-select-bg-top, -app-toolbar-select-bg-bottom);
+    -fx-border-color: -app-toolbar-select-border;
+}
+
+.combo-box.app-toolbar-select:showing,
+.combo-box.app-toolbar-select:focused {
+    -fx-background-color: linear-gradient(to bottom, -app-toolbar-select-bg-top, -app-toolbar-select-bg-bottom);
+    -fx-border-color: -app-toolbar-select-border;
+    -fx-effect: dropshadow(gaussian, rgba(123, 178, 255, 0.45), 10, 0.2, 0, 0);
+}
+
+.combo-box.app-toolbar-select:disabled {
     -fx-opacity: 0.65;
 }
 
@@ -670,6 +788,11 @@
     -fx-padding: 8 14 8 14;
     -fx-font-weight: 600;
     -fx-cursor: hand;
+}
+
+.app-dialog-button-compact {
+    -fx-padding: 4 10 4 10;
+    -fx-font-size: 11px;
 }
 
 .app-dialog-button-primary {

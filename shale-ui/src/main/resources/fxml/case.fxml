@@ -12,34 +12,27 @@
 
 	<!-- TOP: Header / Command Bar (slightly tighter) -->
 	<top>
-		<VBox spacing="6.0" BorderPane.alignment="CENTER">
+		<VBox spacing="4.0" BorderPane.alignment="CENTER">
 			<padding>
-				<Insets top="10" right="12" bottom="8" left="12" />
+				<Insets top="8" right="12" bottom="6" left="12" />
 			</padding>
 
-			<!-- Main header row: (usercard) : Case# -->
+			<!-- Main header row: case title + status -->
 			<HBox spacing="8.0" alignment="CENTER_LEFT">
-
-				<!-- Responsible Attorney MINI card -->
-				<StackPane fx:id="assignedUserHost" />
-
-				<!-- Colon separator -->
-				<Label text=":" style="-fx-font-size: 16px; -fx-opacity: 0.6;" />
-
-				<!-- Case Title -->
 				<Label fx:id="caseTitleLabel" text="Case (Placeholder)"
 					style="-fx-font-size: 18px; -fx-font-weight: bold;" />
-
-				<Region HBox.hgrow="ALWAYS" />
-
-			</HBox>
-
-			<!-- Secondary row: status + last updated -->
-			<HBox spacing="10.0" alignment="CENTER_LEFT">
 				<StackPane fx:id="statusHost" />
 
 				<Region HBox.hgrow="ALWAYS" />
+			</HBox>
 
+			<!-- Secondary row: compact metadata -->
+			<HBox spacing="8.0" alignment="CENTER_LEFT">
+				<Label fx:id="caseMetadataLabel" text="Case #—"
+					style="-fx-opacity: 0.8;" />
+				<Label text="•" style="-fx-opacity: 0.55;" />
+				<StackPane fx:id="assignedUserHost" />
+				<Label text="•" style="-fx-opacity: 0.55;" />
 				<Label fx:id="lastUpdatedLabel" text="Last updated: —"
 					style="-fx-opacity: 0.7;" />
 			</HBox>
@@ -55,7 +48,7 @@
 			</padding>
 
 			<Label text="Sections" styleClass="sidebar-header" />
-			<VBox fx:id="sectionButtonsBox" spacing="6.0" prefWidth="200.0" />
+			<VBox fx:id="sectionButtonsBox" spacing="6.0" minWidth="100.0" prefWidth="100.0" maxWidth="100.0" />
 		</VBox>
 	</left>
 

@@ -89,15 +89,17 @@
 
 	<!-- Main content area (shell-controlled) -->
 	<center>
-		<VBox spacing="10" styleClass="content-root shell-transparent">
+		<VBox spacing="6" styleClass="content-root shell-transparent">
 			<children>
-				<Label fx:id="sectionTitleLabel" text="My Shale"
-					styleClass="section-title" />
-
-				<Separator />
-
-				<Label fx:id="sectionSubtitleLabel" wrapText="true"
-					text="Select a section from the left to get started." />
+				<VBox fx:id="sectionHeaderBox" spacing="2">
+					<children>
+						<Label fx:id="sectionTitleLabel" text="My Shale"
+							styleClass="section-title" />
+						<Label fx:id="sectionSubtitleLabel" wrapText="true"
+							text="Select a section from the left to get started."
+							style="-fx-opacity: 0.8;" />
+					</children>
+				</VBox>
 
 				<!-- Shell-controlled content placeholder -->
 				<StackPane fx:id="sectionContent">
@@ -108,7 +110,7 @@
 				</StackPane>
 			</children>
 			<padding>
-				<Insets top="16" right="16" bottom="16" left="16" />
+				<Insets top="10" right="16" bottom="16" left="16" />
 			</padding>
 		</VBox>
 	</center>
