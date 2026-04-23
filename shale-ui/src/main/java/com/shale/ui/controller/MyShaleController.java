@@ -125,6 +125,8 @@ public final class MyShaleController {
 	@FXML
 	private HBox myTasksList;
 	@FXML
+	private Label myTasksLoadingLabel;
+	@FXML
 	private Label myTasksEmptyLabel;
 	@FXML
 	private VBox sectionButtonsBox;
@@ -145,11 +147,15 @@ public final class MyShaleController {
 	@FXML
 	private ScrollPane overviewScroll;
 	@FXML
+	private Label overviewLoadingLabel;
+	@FXML
 	private StackPane sectionContentStack;
 	@FXML
 	private ScrollPane myCasesBoardScroll;
 	@FXML
 	private HBox myCasesBoardList;
+	@FXML
+	private Label myCasesLoadingLabel;
 	@FXML
 	private Label myCasesBoardEmptyLabel;
 	@FXML
@@ -185,6 +191,10 @@ public final class MyShaleController {
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
 	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
 	private List<CaseCardVm> myAssignedCasesBoard = List.of();
+	private boolean loadingOverview;
+	private boolean loadingMyTasks;
+	private boolean loadingMyCases;
+	private boolean myCasesLoadFailed;
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private final Set<Long> pinnedTaskLaneCaseIds = new LinkedHashSet<>();
@@ -908,9 +918,15 @@ public final class MyShaleController {
 		renderMyCasesBoard();
 		Integer userId = appState.getUserId();
 		Integer shaleClientId = appState.getShaleClientId();
+		System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.refreshMyCasesBoard] load started userId=" + userId
+				+ " selectedUserId=" + userId);
+		loadingMyCases = true;
+		myCasesLoadFailed = false;
+		renderMyCasesBoard();
 		if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
 			myAssignedCasesBoard = List.of();
 			loadingMyCases = false;
+			myCasesLoadFailed = false;
 			renderMyCasesBoard();
 			return;
 		}
@@ -918,20 +934,25 @@ public final class MyShaleController {
 		dbExec.submit(() -> {
 			try {
 				List<CaseDao.CaseRow> rows = caseDao.listAssignedCasesForBoard(userIdValue);
+				int rowCount = rows == null ? 0 : rows.size();
+				System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.refreshMyCasesBoard] dao returned rowCount=" + rowCount
+						+ " userId=" + userIdValue);
 				List<CaseCardVm> cases = (rows == null ? List.<CaseDao.CaseRow>of() : rows).stream()
 						.filter(Objects::nonNull)
 						.map(this::toVm)
 						.toList();
 				runOnFx(() -> {
 					loadingMyCases = false;
+					myCasesLoadFailed = false;
 					myAssignedCasesBoard = cases;
 					renderMyCasesBoard();
 				});
 			} catch (Exception ex) {
-				System.err.println("My cases board load failed: " + ex.getMessage());
+				System.err.println("My cases board load failed userId=" + userIdValue + ": " + ex.getMessage());
 				ex.printStackTrace();
 				runOnFx(() -> {
 					loadingMyCases = false;
+					myCasesLoadFailed = true;
 					myAssignedCasesBoard = List.of();
 					renderMyCasesBoard();
 				});
@@ -940,7 +961,7 @@ public final class MyShaleController {
 	}
 
 	private void renderMyCasesBoard() {
-		if (myCasesBoardList == null || myCasesBoardEmptyLabel == null || myCasesBoardScroll == null) {
+		if (myCasesBoardList == null || myCasesBoardEmptyLabel == null || myCasesBoardScroll == null || myCasesLoadingLabel == null) {
 			return;
 		}
 		if (loadingMyCases) {
@@ -951,6 +972,22 @@ public final class MyShaleController {
 			return;
 		}
 		myCasesBoardList.getChildren().clear();
+		if (loadingMyCases) {
+			myCasesLoadingLabel.setText("Loading cases…");
+			setVisibleManaged(myCasesLoadingLabel, true);
+			setVisibleManaged(myCasesBoardEmptyLabel, false);
+			setVisibleManaged(myCasesBoardScroll, false);
+			return;
+		}
+		setVisibleManaged(myCasesLoadingLabel, false);
+		if (myCasesLoadFailed) {
+			myCasesBoardEmptyLabel.setText("Unable to load assigned cases.");
+			setVisibleManaged(myCasesBoardEmptyLabel, true);
+			setVisibleManaged(myCasesBoardScroll, false);
+			System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.renderMyCasesBoard] error state rendered");
+			return;
+		}
+
 		LaneBoardLayout.configureBoardRow(myCasesBoardList);
 		String searchQuery = normalizeSearchQuery(myCasesBoardSearchField == null ? null : myCasesBoardSearchField.getText());
 		Comparator<CaseCardVm> laneSort = myCasesLaneComparator(myCasesBoardSortChoice == null ? SORT_NAME : myCasesBoardSortChoice.getValue());
@@ -981,6 +1018,8 @@ public final class MyShaleController {
 			byStatus.computeIfAbsent(statusId, ignored -> new ArrayList<>()).add(vm);
 		}
 
+		int laneCount = 0;
+		int cardCount = 0;
 		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
 			if (status == null) {
 				continue;
@@ -993,17 +1032,31 @@ public final class MyShaleController {
 				continue;
 			}
 			myCasesBoardList.getChildren().add(createMyCasesStatusLane(statusName, laneCases));
+			laneCount++;
+			cardCount += laneCases.size();
 		}
 		if (!noStatus.isEmpty()) {
 			List<CaseCardVm> sortedNoStatus = noStatus.stream()
 					.sorted(laneSort)
 					.toList();
 			myCasesBoardList.getChildren().add(createMyCasesStatusLane("No Status", sortedNoStatus));
+			laneCount++;
+			cardCount += sortedNoStatus.size();
 		}
 
-		boolean hasAnyCards = myCasesBoardList.getChildren().stream().anyMatch(Objects::nonNull);
-		setVisibleManaged(myCasesBoardEmptyLabel, !hasAnyCards);
-		setVisibleManaged(myCasesBoardScroll, hasAnyCards);
+		boolean hasAnyCards = cardCount > 0;
+		if (!hasAnyCards) {
+			myCasesBoardEmptyLabel.setText("No assigned cases found.");
+			setVisibleManaged(myCasesBoardEmptyLabel, true);
+			setVisibleManaged(myCasesBoardScroll, false);
+			System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.renderMyCasesBoard] empty state rendered");
+			return;
+		}
+
+		setVisibleManaged(myCasesBoardEmptyLabel, false);
+		setVisibleManaged(myCasesBoardScroll, true);
+		System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.renderMyCasesBoard] board rendered laneCount=" + laneCount
+				+ " cardCount=" + cardCount);
 	}
 
 	private void syncMyCasesBoardStatusFilterOptions() {

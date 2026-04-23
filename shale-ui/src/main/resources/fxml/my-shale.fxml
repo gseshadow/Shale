@@ -33,6 +33,7 @@
 				</padding>
 
 				<VBox fx:id="overviewSectionPane" spacing="10" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+					<Label fx:id="overviewLoadingLabel" text="Loading your overview..." managed="false" visible="false" styleClass="lane-empty-state" />
 					<ScrollPane fx:id="overviewScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
 						vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
 						<content>
@@ -111,6 +112,7 @@
 								<TextField fx:id="myTasksSearchField" promptText="Search my tasks…" HBox.hgrow="ALWAYS" />
 							</HBox>
 						</VBox>
+						<Label fx:id="myTasksLoadingLabel" text="Loading your tasks..." managed="false" visible="false" styleClass="lane-empty-state" />
 						<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" />
 						<ScrollPane fx:id="myTasksScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
 							vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
@@ -162,6 +164,7 @@
 									</HBox>
 								</VBox>
 							</HBox>
+							<Label fx:id="myCasesLoadingLabel" text="Loading your cases..." managed="false" visible="false" styleClass="lane-empty-state" />
 							<Label fx:id="myCasesBoardEmptyLabel" text="No cases assigned to you." managed="false" visible="false" />
 							<ScrollPane fx:id="myCasesBoardScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
 								vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
