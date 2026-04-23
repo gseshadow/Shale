@@ -620,9 +620,10 @@ public final class SceneManager {
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
 			UserBoardLanePreferencesDao userBoardLanePreferencesDao = new UserBoardLanePreferencesDao(dbSessionProvider);
+			UserPreferencesService userPreferencesService = new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-				c.init(appState, runtimeBridge, caseDao, caseTaskService, userBoardLanePreferencesDao, onOpenCase, onOpenUser, phiReadAuditService);
+				c.init(appState, runtimeBridge, caseDao, caseTaskService, userBoardLanePreferencesDao, userPreferencesService, onOpenCase, onOpenUser, phiReadAuditService);
 				return c;
 			});
 	}

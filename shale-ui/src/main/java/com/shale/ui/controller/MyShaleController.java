@@ -34,6 +34,7 @@ import com.shale.ui.controller.support.CaseListUiSupport;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.PerfLog;
@@ -78,6 +79,11 @@ public final class MyShaleController {
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 	private static final String MY_TASKS_BOARD_KEY = "my_shale_tasks";
 	private static final String MY_TASKS_LANE_TYPE_CASE = "CASE";
+	private static final String PREF_MY_TASKS_SORT = "my_shale_tasks.task_sort";
+	private static final String PREF_MY_TASKS_SHOW_COMPLETED = "my_shale_tasks.show_completed";
+	private static final String PREF_MY_TASKS_PRIORITY_FILTER = "my_shale_tasks.priority_filter";
+	private static final String PREF_MY_TASKS_LANE_ORDER = "my_shale_tasks.lane_order";
+	private static final String PREF_MY_TASKS_CASE_FILTER = "my_shale_tasks.case_filter";
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -128,6 +134,7 @@ public final class MyShaleController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private PhiReadAuditService phiReadAuditService;
+	private UserPreferencesService userPreferencesService;
 	private Consumer<Integer> onOpenCase;
 	private Consumer<Integer> onOpenUser;
 	private CaseCardFactory caseCardFactory;
@@ -152,6 +159,9 @@ public final class MyShaleController {
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
+	private boolean suppressMyTaskPreferenceWrites;
+	private Integer preferredMyTasksPriorityFilterId;
+	private Long preferredMyTasksCaseFilterId;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
 	{
@@ -166,12 +176,14 @@ public final class MyShaleController {
 			CaseDao caseDao,
 			CaseTaskService caseTaskService,
 			UserBoardLanePreferencesDao userBoardLanePreferencesDao,
+			UserPreferencesService userPreferencesService,
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenUser,
 			PhiReadAuditService phiReadAuditService) {
 		this.caseDao = caseDao;
 		this.caseTaskService = caseTaskService;
 		this.userBoardLanePreferencesDao = userBoardLanePreferencesDao;
+		this.userPreferencesService = userPreferencesService;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.phiReadAuditService = phiReadAuditService;
@@ -204,42 +216,58 @@ public final class MyShaleController {
 		}
 		if (myTasksSortChoice != null) {
 			myTasksSortChoice.getItems().setAll(MY_TASKS_SORT_DUE_ASC, MY_TASKS_SORT_DUE_DESC);
-			myTasksSortChoice.getSelectionModel().select(MY_TASKS_SORT_DUE_ASC);
+			myTasksSortChoice.getSelectionModel().select(restoreMyTasksSortPreference());
 			myTasksSortChoice.getSelectionModel().selectedItemProperty()
-					.addListener((obs, oldV, newV) -> refreshMyTasks());
+					.addListener((obs, oldV, newV) -> {
+						persistMyTasksSortPreference(newV);
+						refreshMyTasks();
+					});
 		}
 		if (myTasksCaseFilterChoice != null) {
 			myTasksCaseFilterChoice.getItems().setAll(ALL_CASES_OPTION);
 			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
 			myTasksCaseFilterChoice.getSelectionModel().selectedItemProperty()
-					.addListener((obs, oldV, newV) -> renderMyTasks());
+					.addListener((obs, oldV, newV) -> {
+						persistMyTasksCaseFilterPreference(newV);
+						renderMyTasks();
+					});
 		}
 		if (myTasksPriorityFilterChoice != null) {
 			myTasksPriorityFilterChoice.getItems().setAll(ALL_PRIORITIES_OPTION);
 			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
 			myTasksPriorityFilterChoice.getSelectionModel().selectedItemProperty()
-					.addListener((obs, oldV, newV) -> renderMyTasks());
+					.addListener((obs, oldV, newV) -> {
+						persistMyTasksPriorityFilterPreference(newV);
+						renderMyTasks();
+					});
 		}
 		if (myTasksColumnOrderChoice != null) {
 			myTasksColumnOrderChoice.getItems().setAll(
 					MY_TASKS_COLUMN_ORDER_CASE_NAME,
 					MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE);
-			myTasksColumnOrderChoice.getSelectionModel().select(MY_TASKS_COLUMN_ORDER_CASE_NAME);
+			myTasksColumnOrderChoice.getSelectionModel().select(restoreMyTasksLaneOrderPreference());
 			myTasksColumnOrderChoice.getSelectionModel().selectedItemProperty()
-					.addListener((obs, oldV, newV) -> renderMyTasks());
+					.addListener((obs, oldV, newV) -> {
+						persistMyTasksLaneOrderPreference(newV);
+						renderMyTasks();
+					});
 		}
 		if (myTasksSearchField != null) {
 			myTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyTasks());
 		}
 		if (myTasksShowCompletedButton != null) {
+			showCompletedMyTasks = restoreMyTasksShowCompletedPreference();
 			myTasksShowCompletedButton.setOnAction(e ->
 			{
 				showCompletedMyTasks = !showCompletedMyTasks;
+				persistMyTasksShowCompletedPreference(showCompletedMyTasks);
 				updateMyTasksCompletionToggleLabel();
 				refreshMyTasks();
 			});
 			updateMyTasksCompletionToggleLabel();
 		}
+		preferredMyTasksPriorityFilterId = restoreMyTasksPriorityFilterPreference();
+		preferredMyTasksCaseFilterId = restoreMyTasksCaseFilterPreference();
 
 		reloadStatusFilterOptionsAndThen(this::rerender);
 
@@ -1138,15 +1166,18 @@ public final class MyShaleController {
 						Comparator.nullsLast(String::compareToIgnoreCase)))
 				.forEach(options::add);
 		myTasksPriorityFilterChoice.getItems().setAll(options);
-		if (selectedId != null && priorities.containsKey(selectedId)) {
+		Integer priorityIdToApply = selectedId != null ? selectedId : preferredMyTasksPriorityFilterId;
+		if (priorityIdToApply != null && priorities.containsKey(priorityIdToApply)) {
+			final Integer targetPriorityId = priorityIdToApply;
 			myTasksPriorityFilterChoice.getSelectionModel().select(
 					options.stream()
-							.filter(option -> selectedId.equals(option.priorityId()))
+							.filter(option -> targetPriorityId.equals(option.priorityId()))
 							.findFirst()
 							.orElse(ALL_PRIORITIES_OPTION));
 		} else {
 			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
 		}
+		preferredMyTasksPriorityFilterId = null;
 	}
 
 	private Integer selectedPriorityFilterId() {
@@ -1182,15 +1213,101 @@ public final class MyShaleController {
 				.forEach(options::add);
 
 		myTasksCaseFilterChoice.getItems().setAll(options);
-		if (selectedId != null && caseById.containsKey(selectedId)) {
+		Long caseIdToApply = selectedId != null ? selectedId : preferredMyTasksCaseFilterId;
+		if (caseIdToApply != null && caseById.containsKey(caseIdToApply)) {
+			final Long targetCaseId = caseIdToApply;
 			myTasksCaseFilterChoice.getSelectionModel().select(
 					options.stream()
-							.filter(option -> selectedId.equals(option.caseId()))
+							.filter(option -> targetCaseId.equals(option.caseId()))
 							.findFirst()
 							.orElse(ALL_CASES_OPTION));
 		} else {
 			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
 		}
+		preferredMyTasksCaseFilterId = null;
+	}
+
+	private String restoreMyTasksSortPreference() {
+		String value = userPreferencesService == null ? null : userPreferencesService.getString(PREF_MY_TASKS_SORT, MY_TASKS_SORT_DUE_ASC);
+		return MY_TASKS_SORT_DUE_DESC.equals(value) ? MY_TASKS_SORT_DUE_DESC : MY_TASKS_SORT_DUE_ASC;
+	}
+
+	private boolean restoreMyTasksShowCompletedPreference() {
+		return userPreferencesService != null && userPreferencesService.getBoolean(PREF_MY_TASKS_SHOW_COMPLETED, false);
+	}
+
+	private Integer restoreMyTasksPriorityFilterPreference() {
+		String value = userPreferencesService == null ? null : userPreferencesService.getString(PREF_MY_TASKS_PRIORITY_FILTER, "");
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		try {
+			int parsed = Integer.parseInt(value.trim());
+			return parsed > 0 ? parsed : null;
+		} catch (NumberFormatException ignored) {
+			return null;
+		}
+	}
+
+	private String restoreMyTasksLaneOrderPreference() {
+		String value = userPreferencesService == null ? null : userPreferencesService.getString(PREF_MY_TASKS_LANE_ORDER, MY_TASKS_COLUMN_ORDER_CASE_NAME);
+		return MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE.equals(value)
+				? MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE
+				: MY_TASKS_COLUMN_ORDER_CASE_NAME;
+	}
+
+	private Long restoreMyTasksCaseFilterPreference() {
+		String value = userPreferencesService == null ? null : userPreferencesService.getString(PREF_MY_TASKS_CASE_FILTER, "");
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		try {
+			long parsed = Long.parseLong(value.trim());
+			return parsed > 0 ? parsed : null;
+		} catch (NumberFormatException ignored) {
+			return null;
+		}
+	}
+
+	private void persistMyTasksSortPreference(String value) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		userPreferencesService.putString(PREF_MY_TASKS_SORT, MY_TASKS_SORT_DUE_DESC.equals(value) ? MY_TASKS_SORT_DUE_DESC : MY_TASKS_SORT_DUE_ASC);
+	}
+
+	private void persistMyTasksShowCompletedPreference(boolean value) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		userPreferencesService.putBoolean(PREF_MY_TASKS_SHOW_COMPLETED, value);
+	}
+
+	private void persistMyTasksPriorityFilterPreference(PriorityFilterOption option) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		Integer priorityId = option == null ? null : option.priorityId();
+		userPreferencesService.putString(PREF_MY_TASKS_PRIORITY_FILTER, priorityId == null ? "" : String.valueOf(priorityId));
+	}
+
+	private void persistMyTasksLaneOrderPreference(String value) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		userPreferencesService.putString(
+				PREF_MY_TASKS_LANE_ORDER,
+				MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE.equals(value)
+						? MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE
+						: MY_TASKS_COLUMN_ORDER_CASE_NAME);
+	}
+
+	private void persistMyTasksCaseFilterPreference(CaseFilterOption option) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		Long caseId = option == null ? null : option.caseId();
+		userPreferencesService.putString(PREF_MY_TASKS_CASE_FILTER, caseId == null ? "" : String.valueOf(caseId));
 	}
 
 	private Long selectedCaseFilterId() {
