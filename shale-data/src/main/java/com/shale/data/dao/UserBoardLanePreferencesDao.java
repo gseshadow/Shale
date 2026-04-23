@@ -53,6 +53,41 @@ public final class UserBoardLanePreferencesDao {
 		}
 	}
 
+	public Set<String> listCollapsedLaneKeys(int shaleClientId, int userId, String boardKey, String laneType) {
+		if (shaleClientId <= 0 || userId <= 0 || isBlank(boardKey) || isBlank(laneType)) {
+			return Set.of();
+		}
+		String sql = """
+				SELECT LaneKey
+				FROM dbo.UserBoardLanePreferences
+				WHERE ShaleClientId = ?
+				  AND UserId = ?
+				  AND BoardKey = ?
+				  AND LaneType = ?
+				  AND IsCollapsed = 1
+				ORDER BY LaneKey;
+				""";
+		try (Connection con = db.requireConnection();
+		     PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			ps.setInt(2, userId);
+			ps.setString(3, boardKey);
+			ps.setString(4, laneType);
+			try (ResultSet rs = ps.executeQuery()) {
+				Set<String> collapsed = new LinkedHashSet<>();
+				while (rs.next()) {
+					String laneKey = rs.getString("LaneKey");
+					if (!isBlank(laneKey)) {
+						collapsed.add(laneKey.trim());
+					}
+				}
+				return collapsed;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list collapsed board lane preferences", e);
+		}
+	}
+
 	public void upsertLanePreference(
 			int shaleClientId,
 			int userId,
