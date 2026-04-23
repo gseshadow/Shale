@@ -34,6 +34,7 @@ import com.shale.ui.controller.support.CaseListUiSupport;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.PerfLog;
@@ -72,12 +73,21 @@ public final class MyShaleController {
 	private static final PriorityFilterOption ALL_PRIORITIES_OPTION = new PriorityFilterOption(null, "All Priorities");
 	private static final String SECTION_OVERVIEW = "Overview";
 	private static final String SECTION_TASKS = "Tasks";
+	private static final String SECTION_MY_CASES = "My Cases";
 	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
 	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
 	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 300;
+	private static final double MY_CASES_STATUS_COLUMN_MIN_WIDTH = 245;
+	private static final double MY_CASES_STATUS_COLUMN_PREF_WIDTH = 280;
+	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 320;
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 	private static final String MY_TASKS_BOARD_KEY = "my_shale_tasks";
 	private static final String MY_TASKS_LANE_TYPE_CASE = "CASE";
+	private static final String PREF_MY_TASKS_SORT = "my_shale_tasks.task_sort";
+	private static final String PREF_MY_TASKS_SHOW_COMPLETED = "my_shale_tasks.show_completed";
+	private static final String PREF_MY_TASKS_PRIORITY_FILTER = "my_shale_tasks.priority_filter";
+	private static final String PREF_MY_TASKS_LANE_ORDER = "my_shale_tasks.lane_order";
+	private static final String PREF_MY_TASKS_CASE_FILTER = "my_shale_tasks.case_filter";
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -114,13 +124,29 @@ public final class MyShaleController {
 	@FXML
 	private VBox tasksSectionPane;
 	@FXML
+	private VBox myCasesSectionPane;
+	@FXML
 	private VBox myTasksPanel;
 	@FXML
 	private VBox tasksSectionContentHost;
 	@FXML
+	private VBox myCasesSectionContentHost;
+	@FXML
 	private HBox overviewMainRow;
 	@FXML
 	private StackPane sectionContentStack;
+	@FXML
+	private ScrollPane myCasesBoardScroll;
+	@FXML
+	private HBox myCasesBoardList;
+	@FXML
+	private Label myCasesBoardEmptyLabel;
+	@FXML
+	private TextField myCasesBoardSearchField;
+	@FXML
+	private ChoiceBox<String> myCasesBoardSortChoice;
+	@FXML
+	private ChoiceBox<BoardStatusFilterOption> myCasesBoardStatusFilterChoice;
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
@@ -128,6 +154,7 @@ public final class MyShaleController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private PhiReadAuditService phiReadAuditService;
+	private UserPreferencesService userPreferencesService;
 	private Consumer<Integer> onOpenCase;
 	private Consumer<Integer> onOpenUser;
 	private CaseCardFactory caseCardFactory;
@@ -146,13 +173,18 @@ public final class MyShaleController {
 	private List<CaseTaskListItemDto> myTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
 	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
+	private List<CaseCardVm> myAssignedCasesBoard = List.of();
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private final Set<Long> pinnedTaskLaneCaseIds = new LinkedHashSet<>();
+	private final Set<Long> collapsedTaskLaneCaseIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
 	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
-	private boolean myTasksPinTraceLogged;
+	private boolean suppressMyTaskPreferenceWrites;
+	private Integer preferredMyTasksPriorityFilterId;
+	private Long preferredMyTasksCaseFilterId;
+	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
 	{
@@ -167,12 +199,14 @@ public final class MyShaleController {
 			CaseDao caseDao,
 			CaseTaskService caseTaskService,
 			UserBoardLanePreferencesDao userBoardLanePreferencesDao,
+			UserPreferencesService userPreferencesService,
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenUser,
 			PhiReadAuditService phiReadAuditService) {
 		this.caseDao = caseDao;
 		this.caseTaskService = caseTaskService;
 		this.userBoardLanePreferencesDao = userBoardLanePreferencesDao;
+		this.userPreferencesService = userPreferencesService;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.phiReadAuditService = phiReadAuditService;
@@ -205,44 +239,76 @@ public final class MyShaleController {
 		}
 		if (myTasksSortChoice != null) {
 			myTasksSortChoice.getItems().setAll(MY_TASKS_SORT_DUE_ASC, MY_TASKS_SORT_DUE_DESC);
-			myTasksSortChoice.getSelectionModel().select(MY_TASKS_SORT_DUE_ASC);
+			myTasksSortChoice.getSelectionModel().select(restoreMyTasksSortPreference());
 			myTasksSortChoice.getSelectionModel().selectedItemProperty()
-					.addListener((obs, oldV, newV) -> refreshMyTasks());
+					.addListener((obs, oldV, newV) -> {
+						persistMyTasksSortPreference(newV);
+						refreshMyTasks();
+					});
 		}
 		if (myTasksCaseFilterChoice != null) {
 			myTasksCaseFilterChoice.getItems().setAll(ALL_CASES_OPTION);
 			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
 			myTasksCaseFilterChoice.getSelectionModel().selectedItemProperty()
-					.addListener((obs, oldV, newV) -> renderMyTasks());
+					.addListener((obs, oldV, newV) -> {
+						persistMyTasksCaseFilterPreference(newV);
+						renderMyTasks();
+					});
 		}
 		if (myTasksPriorityFilterChoice != null) {
 			myTasksPriorityFilterChoice.getItems().setAll(ALL_PRIORITIES_OPTION);
 			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
 			myTasksPriorityFilterChoice.getSelectionModel().selectedItemProperty()
-					.addListener((obs, oldV, newV) -> renderMyTasks());
+					.addListener((obs, oldV, newV) -> {
+						persistMyTasksPriorityFilterPreference(newV);
+						renderMyTasks();
+					});
 		}
 		if (myTasksColumnOrderChoice != null) {
 			myTasksColumnOrderChoice.getItems().setAll(
 					MY_TASKS_COLUMN_ORDER_CASE_NAME,
 					MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE);
-			myTasksColumnOrderChoice.getSelectionModel().select(MY_TASKS_COLUMN_ORDER_CASE_NAME);
+			myTasksColumnOrderChoice.getSelectionModel().select(restoreMyTasksLaneOrderPreference());
 			myTasksColumnOrderChoice.getSelectionModel().selectedItemProperty()
-					.addListener((obs, oldV, newV) -> renderMyTasks());
+					.addListener((obs, oldV, newV) -> {
+						persistMyTasksLaneOrderPreference(newV);
+						renderMyTasks();
+					});
 		}
 		if (myTasksSearchField != null) {
 			myTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyTasks());
 		}
 		if (myTasksShowCompletedButton != null) {
+			showCompletedMyTasks = restoreMyTasksShowCompletedPreference();
 			myTasksShowCompletedButton.setOnAction(e ->
 			{
 				showCompletedMyTasks = !showCompletedMyTasks;
+				persistMyTasksShowCompletedPreference(showCompletedMyTasks);
 				updateMyTasksCompletionToggleLabel();
 				refreshMyTasks();
 			});
 			updateMyTasksCompletionToggleLabel();
 		}
+		preferredMyTasksPriorityFilterId = restoreMyTasksPriorityFilterPreference();
+		preferredMyTasksCaseFilterId = restoreMyTasksCaseFilterPreference();
+		if (myCasesBoardSortChoice != null) {
+			myCasesBoardSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
+			myCasesBoardSortChoice.getSelectionModel().select(SORT_NAME);
+			myCasesBoardSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
+		}
+		if (myCasesBoardSearchField != null) {
+			myCasesBoardSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
+		}
+		if (myCasesBoardStatusFilterChoice != null) {
+			myCasesBoardStatusFilterChoice.getItems().setAll(ALL_BOARD_STATUSES_OPTION);
+			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
+			myCasesBoardStatusFilterChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
+		}
 
-		reloadStatusFilterOptionsAndThen(this::rerender);
+		reloadStatusFilterOptionsAndThen(() -> {
+			rerender();
+			renderMyCasesBoard();
+		});
 
 		Platform.runLater(() ->
 		{
@@ -250,6 +316,7 @@ public final class MyShaleController {
 			wireInfiniteScroll();
 			loadFirstPage();
 			refreshMyTasks();
+			refreshMyCasesBoard();
 		});
 
 		if (myCasesFlow != null) {
@@ -279,9 +346,17 @@ public final class MyShaleController {
 			tasksSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 			StackPane.setAlignment(tasksSectionPane, Pos.TOP_LEFT);
 		}
+		if (myCasesSectionPane != null) {
+			myCasesSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+			StackPane.setAlignment(myCasesSectionPane, Pos.TOP_LEFT);
+		}
 		if (tasksSectionContentHost != null) {
 			VBox.setVgrow(tasksSectionContentHost, Priority.ALWAYS);
 			tasksSectionContentHost.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		if (myCasesSectionContentHost != null) {
+			VBox.setVgrow(myCasesSectionContentHost, Priority.ALWAYS);
+			myCasesSectionContentHost.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		}
 		if (myTasksPanel != null) {
 			VBox.setVgrow(myTasksPanel, Priority.ALWAYS);
@@ -292,6 +367,11 @@ public final class MyShaleController {
 			myTasksScroll.setFitToHeight(true);
 			myTasksScroll.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		}
+		if (myCasesBoardScroll != null) {
+			VBox.setVgrow(myCasesBoardScroll, Priority.ALWAYS);
+			myCasesBoardScroll.setFitToHeight(true);
+			myCasesBoardScroll.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
 	}
 
 	private void setupSections() {
@@ -300,7 +380,7 @@ public final class MyShaleController {
 		}
 		sectionButtons.clear();
 		sectionButtonsBox.getChildren().clear();
-		for (String section : List.of(SECTION_OVERVIEW, SECTION_TASKS)) {
+		for (String section : List.of(SECTION_OVERVIEW, SECTION_TASKS, SECTION_MY_CASES)) {
 			Button button = new Button(section);
 			button.setMaxWidth(Double.MAX_VALUE);
 			button.setAlignment(Pos.CENTER_LEFT);
@@ -320,12 +400,16 @@ public final class MyShaleController {
 		Button activeButton = sectionButtons.get(section);
 		NavButtonStyler.setActive(activeButton, sectionButtons.values());
 		boolean showOverview = SECTION_OVERVIEW.equals(section);
+		boolean showTasks = SECTION_TASKS.equals(section);
+		boolean showMyCases = SECTION_MY_CASES.equals(section);
 		setVisibleManaged(overviewSectionPane, showOverview);
-		setVisibleManaged(tasksSectionPane, !showOverview);
-		if (!showOverview) {
+		setVisibleManaged(tasksSectionPane, showTasks);
+		setVisibleManaged(myCasesSectionPane, showMyCases);
+		if (showTasks) {
 			attachTasksPanel(tasksSectionContentHost);
 		}
 		renderMyTasks();
+		renderMyCasesBoard();
 	}
 
 	private void attachTasksPanel(Pane host) {
@@ -427,6 +511,7 @@ public final class MyShaleController {
 				}
 				statusFilterOptions = options;
 				CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+				syncMyCasesBoardStatusFilterOptions();
 			});
 		});
 	}
@@ -461,6 +546,7 @@ public final class MyShaleController {
 
 					if (changed) {
 						rerender();
+						refreshMyCasesBoard();
 					}
 				});
 			} catch (Exception ex) {
@@ -713,6 +799,7 @@ public final class MyShaleController {
 						sortOption,
 						includeCompleted);
 				Set<Long> pinnedLaneCaseIds = loadPinnedTaskLaneCaseIds(shaleClientIdValue, userIdValue);
+				Set<Long> collapsedLaneCaseIds = loadCollapsedTaskLaneCaseIds(shaleClientIdValue, userIdValue);
 				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
 						.map(CaseTaskListItemDto::id)
 						.toList();
@@ -742,6 +829,8 @@ public final class MyShaleController {
 						myTasks = tasks == null ? List.of() : tasks;
 						pinnedTaskLaneCaseIds.clear();
 						pinnedTaskLaneCaseIds.addAll(pinnedLaneCaseIds);
+						collapsedTaskLaneCaseIds.clear();
+						collapsedTaskLaneCaseIds.addAll(collapsedLaneCaseIds);
 						myTaskAssignedUsers = assignedByTask;
 						myTaskPrioritiesById = prioritiesById;
 						syncMyTaskPriorityFilterOptions();
@@ -754,6 +843,186 @@ public final class MyShaleController {
 				runOnFx(() -> showTaskActionError("Failed to load your tasks."));
 			}
 		});
+	}
+
+	private void refreshMyCasesBoard() {
+		if (caseDao == null || appState == null) {
+			return;
+		}
+		Integer userId = appState.getUserId();
+		Integer shaleClientId = appState.getShaleClientId();
+		if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
+			myAssignedCasesBoard = List.of();
+			renderMyCasesBoard();
+			return;
+		}
+		final int userIdValue = userId;
+		dbExec.submit(() -> {
+			try {
+				List<CaseDao.CaseRow> rows = caseDao.listAssignedCasesForBoard(userIdValue);
+				List<CaseCardVm> cases = (rows == null ? List.<CaseDao.CaseRow>of() : rows).stream()
+						.filter(Objects::nonNull)
+						.map(this::toVm)
+						.toList();
+				runOnFx(() -> {
+					myAssignedCasesBoard = cases;
+					renderMyCasesBoard();
+				});
+			} catch (Exception ex) {
+				System.err.println("My cases board load failed: " + ex.getMessage());
+				ex.printStackTrace();
+				runOnFx(() -> {
+					myAssignedCasesBoard = List.of();
+					renderMyCasesBoard();
+				});
+			}
+		});
+	}
+
+	private void renderMyCasesBoard() {
+		if (myCasesBoardList == null || myCasesBoardEmptyLabel == null || myCasesBoardScroll == null) {
+			return;
+		}
+		myCasesBoardList.getChildren().clear();
+		LaneBoardLayout.configureBoardRow(myCasesBoardList);
+		String searchQuery = normalizeSearchQuery(myCasesBoardSearchField == null ? null : myCasesBoardSearchField.getText());
+		Comparator<CaseCardVm> laneSort = myCasesLaneComparator(myCasesBoardSortChoice == null ? SORT_NAME : myCasesBoardSortChoice.getValue());
+		Integer selectedStatusId = selectedMyCasesBoardStatusId();
+
+		Map<Integer, List<CaseCardVm>> byStatus = new LinkedHashMap<>();
+		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
+			if (status != null) {
+				byStatus.putIfAbsent(status.id(), new ArrayList<>());
+			}
+		}
+		List<CaseCardVm> noStatus = new ArrayList<>();
+		for (CaseCardVm vm : myAssignedCasesBoard) {
+			if (vm == null || vm.id <= 0) {
+				continue;
+			}
+			if (!matchesMyCasesBoardSearch(vm, searchQuery)) {
+				continue;
+			}
+			if (selectedStatusId != null && !Objects.equals(selectedStatusId, vm.primaryStatusId)) {
+				continue;
+			}
+			Integer statusId = vm.primaryStatusId;
+			if (statusId == null) {
+				noStatus.add(vm);
+				continue;
+			}
+			byStatus.computeIfAbsent(statusId, ignored -> new ArrayList<>()).add(vm);
+		}
+
+		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
+			if (status == null) {
+				continue;
+			}
+			String statusName = safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim();
+			List<CaseCardVm> laneCases = byStatus.getOrDefault(status.id(), List.of()).stream()
+					.sorted(laneSort)
+					.toList();
+			if (laneCases.isEmpty()) {
+				continue;
+			}
+			myCasesBoardList.getChildren().add(createMyCasesStatusLane(statusName, laneCases));
+		}
+		if (!noStatus.isEmpty()) {
+			List<CaseCardVm> sortedNoStatus = noStatus.stream()
+					.sorted(laneSort)
+					.toList();
+			myCasesBoardList.getChildren().add(createMyCasesStatusLane("No Status", sortedNoStatus));
+		}
+
+		boolean hasAnyCards = myCasesBoardList.getChildren().stream().anyMatch(Objects::nonNull);
+		setVisibleManaged(myCasesBoardEmptyLabel, !hasAnyCards);
+		setVisibleManaged(myCasesBoardScroll, hasAnyCards);
+	}
+
+	private void syncMyCasesBoardStatusFilterOptions() {
+		if (myCasesBoardStatusFilterChoice == null) {
+			return;
+		}
+		BoardStatusFilterOption previouslySelected = myCasesBoardStatusFilterChoice.getValue();
+		Integer previousStatusId = previouslySelected == null ? null : previouslySelected.statusId();
+		List<BoardStatusFilterOption> options = new ArrayList<>();
+		options.add(ALL_BOARD_STATUSES_OPTION);
+		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
+			if (status == null) {
+				continue;
+			}
+			String label = safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim();
+			options.add(new BoardStatusFilterOption(status.id(), label));
+		}
+		myCasesBoardStatusFilterChoice.getItems().setAll(options);
+		if (previousStatusId == null) {
+			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
+			return;
+		}
+		Optional<BoardStatusFilterOption> matching = options.stream()
+				.filter(option -> Objects.equals(option.statusId(), previousStatusId))
+				.findFirst();
+		myCasesBoardStatusFilterChoice.getSelectionModel().select(matching.orElse(ALL_BOARD_STATUSES_OPTION));
+	}
+
+	private Integer selectedMyCasesBoardStatusId() {
+		if (myCasesBoardStatusFilterChoice == null) {
+			return null;
+		}
+		BoardStatusFilterOption selected = myCasesBoardStatusFilterChoice.getValue();
+		return selected == null ? null : selected.statusId();
+	}
+
+	private VBox createMyCasesStatusLane(String statusName, List<CaseCardVm> laneCases) {
+		int caseCount = laneCases == null ? 0 : laneCases.size();
+		HBox header = new HBox(8);
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.getStyleClass().add("lane-header-top-row");
+		Label titleLabel = new Label(statusName);
+		titleLabel.getStyleClass().add("my-cases-lane-title");
+		Label countLabel = new Label("(" + caseCount + ")");
+		countLabel.getStyleClass().add("my-cases-lane-count");
+		header.getChildren().addAll(titleLabel, countLabel);
+
+		VBox body = new VBox(10);
+		body.setFillWidth(true);
+		for (CaseCardVm vm : laneCases) {
+			body.getChildren().add(buildCaseCard(vm));
+		}
+		return LaneBoardLayout.createLane(
+				header,
+				body,
+				new LaneBoardLayout.LaneWidth(
+						MY_CASES_STATUS_COLUMN_MIN_WIDTH,
+						MY_CASES_STATUS_COLUMN_PREF_WIDTH,
+						MY_CASES_STATUS_COLUMN_MAX_WIDTH));
+	}
+
+	private Comparator<CaseCardVm> myCasesLaneComparator(String sortOption) {
+		if (SORT_INTAKE.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.intakeDate, Comparator.nullsLast(Comparator.reverseOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		if (SORT_SOL.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.solDate, Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		return Comparator.comparing((CaseCardVm vm) -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+				.thenComparingLong(vm -> vm.id);
+	}
+
+	private boolean matchesMyCasesBoardSearch(CaseCardVm vm, String query) {
+		if (vm == null) {
+			return false;
+		}
+		if (query == null || query.isBlank()) {
+			return true;
+		}
+		String normalized = query.toLowerCase(Locale.ROOT);
+		return safe(vm.name).toLowerCase(Locale.ROOT).contains(normalized)
+				|| String.valueOf(vm.id).contains(normalized);
 	}
 
 	private void renderMyTasks() {
@@ -798,6 +1067,14 @@ public final class MyShaleController {
 							TASKS_CASE_COLUMN_MIN_WIDTH,
 							TASKS_CASE_COLUMN_PREF_WIDTH,
 							TASKS_CASE_COLUMN_MAX_WIDTH));
+			if (isCollapsedLane(entry.getKey())) {
+				if (lane.getChildren().size() > 1) {
+					Node laneBodyScroll = lane.getChildren().get(1);
+					laneBodyScroll.setVisible(false);
+					laneBodyScroll.setManaged(false);
+				}
+				lane.setMinHeight(Region.USE_PREF_SIZE);
+			}
 			myTasksList.getChildren().add(lane);
 		}
 		setVisibleManaged(myTasksEmptyLabel, false);
@@ -911,6 +1188,7 @@ public final class MyShaleController {
 	private Node buildTaskLaneHeader(TaskLaneKey key, List<CaseTaskListItemDto> tasksInLane) {
 		int taskCount = tasksInLane == null ? 0 : tasksInLane.size();
 		LaneUrgency laneUrgency = resolveLaneUrgency(tasksInLane);
+		boolean laneCollapsed = isCollapsedLane(key);
 		Node caseCard = caseCardFactory.create(
 				new CaseCardModel(
 						key == null || key.caseId() == null ? 0L : key.caseId(),
@@ -933,6 +1211,17 @@ public final class MyShaleController {
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		headerTopRow.getChildren().add(spacer);
 		if (key != null && key.caseId() != null && key.caseId() > 0) {
+			Button collapseButton = new Button(laneCollapsed ? "▸" : "▾");
+			collapseButton.setFocusTraversable(false);
+			collapseButton.getStyleClass().add("lane-collapse-button");
+			collapseButton.setTooltip(new Tooltip(laneCollapsed ? "Expand lane" : "Collapse lane"));
+			collapseButton.setOnAction(event -> {
+				boolean collapsedNow = toggleLaneCollapsed(key);
+				persistLaneCollapseState(key, collapsedNow);
+				renderMyTasks();
+			});
+			headerTopRow.getChildren().add(collapseButton);
+
 			boolean pinned = isPinnedLane(key);
 			Button pinButton = new Button("📌");
 			pinButton.setFocusTraversable(false);
@@ -979,6 +1268,13 @@ public final class MyShaleController {
 				&& pinnedTaskLaneCaseIds.contains(key.caseId());
 	}
 
+	private boolean isCollapsedLane(TaskLaneKey key) {
+		return key != null
+				&& key.caseId() != null
+				&& key.caseId() > 0
+				&& collapsedTaskLaneCaseIds.contains(key.caseId());
+	}
+
 	private boolean toggleLanePinned(TaskLaneKey key) {
 		if (key == null || key.caseId() == null || key.caseId() <= 0) {
 			return false;
@@ -989,6 +1285,20 @@ public final class MyShaleController {
 		}
 		if (pinnedTaskLaneCaseIds.contains(laneId)) {
 			pinnedTaskLaneCaseIds.remove(laneId);
+		}
+		return false;
+	}
+
+	private boolean toggleLaneCollapsed(TaskLaneKey key) {
+		if (key == null || key.caseId() == null || key.caseId() <= 0) {
+			return false;
+		}
+		Long laneId = key.caseId();
+		if (collapsedTaskLaneCaseIds.add(laneId)) {
+			return true;
+		}
+		if (collapsedTaskLaneCaseIds.contains(laneId)) {
+			collapsedTaskLaneCaseIds.remove(laneId);
 		}
 		return false;
 	}
@@ -1021,6 +1331,34 @@ public final class MyShaleController {
 		return pinnedLaneIds;
 	}
 
+	private Set<Long> loadCollapsedTaskLaneCaseIds(int shaleClientId, int userId) {
+		if (userBoardLanePreferencesDao == null || shaleClientId <= 0 || userId <= 0) {
+			return Set.of();
+		}
+		Set<String> laneKeys = userBoardLanePreferencesDao.listCollapsedLaneKeys(
+				shaleClientId,
+				userId,
+				MY_TASKS_BOARD_KEY,
+				MY_TASKS_LANE_TYPE_CASE);
+		if (laneKeys.isEmpty()) {
+			return Set.of();
+		}
+		Set<Long> collapsedLaneIds = new LinkedHashSet<>();
+		for (String laneKey : laneKeys) {
+			if (laneKey == null || laneKey.isBlank()) {
+				continue;
+			}
+			try {
+				long laneId = Long.parseLong(laneKey.trim());
+				if (laneId > 0) {
+					collapsedLaneIds.add(laneId);
+				}
+			} catch (NumberFormatException ignored) {
+			}
+		}
+		return collapsedLaneIds;
+	}
+
 	private void persistLanePinnedState(TaskLaneKey key, boolean isPinned) {
 		if (key == null || key.caseId() == null || key.caseId() <= 0 || userBoardLanePreferencesDao == null || appState == null) {
 			return;
@@ -1033,6 +1371,7 @@ public final class MyShaleController {
 		String laneKey = String.valueOf(key.caseId());
 		final int shaleClientIdValue = shaleClientId;
 		final int userIdValue = userId;
+		final boolean collapsed = isCollapsedLane(key);
 		dbExec.submit(() -> userBoardLanePreferencesDao.upsertLanePreference(
 				shaleClientIdValue,
 				userIdValue,
@@ -1041,7 +1380,32 @@ public final class MyShaleController {
 				laneKey,
 				isPinned,
 				null,
+				collapsed,
+				userIdValue));
+	}
+
+	private void persistLaneCollapseState(TaskLaneKey key, boolean isCollapsed) {
+		if (key == null || key.caseId() == null || key.caseId() <= 0 || userBoardLanePreferencesDao == null || appState == null) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return;
+		}
+		String laneKey = String.valueOf(key.caseId());
+		final int shaleClientIdValue = shaleClientId;
+		final int userIdValue = userId;
+		final boolean pinned = isPinnedLane(key);
+		dbExec.submit(() -> userBoardLanePreferencesDao.upsertLanePreference(
+				shaleClientIdValue,
+				userIdValue,
+				MY_TASKS_BOARD_KEY,
+				MY_TASKS_LANE_TYPE_CASE,
+				laneKey,
+				pinned,
 				null,
+				isCollapsed,
 				userIdValue));
 	}
 
@@ -1141,15 +1505,18 @@ public final class MyShaleController {
 						Comparator.nullsLast(String::compareToIgnoreCase)))
 				.forEach(options::add);
 		myTasksPriorityFilterChoice.getItems().setAll(options);
-		if (selectedId != null && priorities.containsKey(selectedId)) {
+		Integer priorityIdToApply = selectedId != null ? selectedId : preferredMyTasksPriorityFilterId;
+		if (priorityIdToApply != null && priorities.containsKey(priorityIdToApply)) {
+			final Integer targetPriorityId = priorityIdToApply;
 			myTasksPriorityFilterChoice.getSelectionModel().select(
 					options.stream()
-							.filter(option -> selectedId.equals(option.priorityId()))
+							.filter(option -> targetPriorityId.equals(option.priorityId()))
 							.findFirst()
 							.orElse(ALL_PRIORITIES_OPTION));
 		} else {
 			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
 		}
+		preferredMyTasksPriorityFilterId = null;
 	}
 
 	private Integer selectedPriorityFilterId() {
@@ -1185,15 +1552,101 @@ public final class MyShaleController {
 				.forEach(options::add);
 
 		myTasksCaseFilterChoice.getItems().setAll(options);
-		if (selectedId != null && caseById.containsKey(selectedId)) {
+		Long caseIdToApply = selectedId != null ? selectedId : preferredMyTasksCaseFilterId;
+		if (caseIdToApply != null && caseById.containsKey(caseIdToApply)) {
+			final Long targetCaseId = caseIdToApply;
 			myTasksCaseFilterChoice.getSelectionModel().select(
 					options.stream()
-							.filter(option -> selectedId.equals(option.caseId()))
+							.filter(option -> targetCaseId.equals(option.caseId()))
 							.findFirst()
 							.orElse(ALL_CASES_OPTION));
 		} else {
 			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
 		}
+		preferredMyTasksCaseFilterId = null;
+	}
+
+	private String restoreMyTasksSortPreference() {
+		String value = userPreferencesService == null ? null : userPreferencesService.getString(PREF_MY_TASKS_SORT, MY_TASKS_SORT_DUE_ASC);
+		return MY_TASKS_SORT_DUE_DESC.equals(value) ? MY_TASKS_SORT_DUE_DESC : MY_TASKS_SORT_DUE_ASC;
+	}
+
+	private boolean restoreMyTasksShowCompletedPreference() {
+		return userPreferencesService != null && userPreferencesService.getBoolean(PREF_MY_TASKS_SHOW_COMPLETED, false);
+	}
+
+	private Integer restoreMyTasksPriorityFilterPreference() {
+		String value = userPreferencesService == null ? null : userPreferencesService.getString(PREF_MY_TASKS_PRIORITY_FILTER, "");
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		try {
+			int parsed = Integer.parseInt(value.trim());
+			return parsed > 0 ? parsed : null;
+		} catch (NumberFormatException ignored) {
+			return null;
+		}
+	}
+
+	private String restoreMyTasksLaneOrderPreference() {
+		String value = userPreferencesService == null ? null : userPreferencesService.getString(PREF_MY_TASKS_LANE_ORDER, MY_TASKS_COLUMN_ORDER_CASE_NAME);
+		return MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE.equals(value)
+				? MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE
+				: MY_TASKS_COLUMN_ORDER_CASE_NAME;
+	}
+
+	private Long restoreMyTasksCaseFilterPreference() {
+		String value = userPreferencesService == null ? null : userPreferencesService.getString(PREF_MY_TASKS_CASE_FILTER, "");
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		try {
+			long parsed = Long.parseLong(value.trim());
+			return parsed > 0 ? parsed : null;
+		} catch (NumberFormatException ignored) {
+			return null;
+		}
+	}
+
+	private void persistMyTasksSortPreference(String value) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		userPreferencesService.putString(PREF_MY_TASKS_SORT, MY_TASKS_SORT_DUE_DESC.equals(value) ? MY_TASKS_SORT_DUE_DESC : MY_TASKS_SORT_DUE_ASC);
+	}
+
+	private void persistMyTasksShowCompletedPreference(boolean value) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		userPreferencesService.putBoolean(PREF_MY_TASKS_SHOW_COMPLETED, value);
+	}
+
+	private void persistMyTasksPriorityFilterPreference(PriorityFilterOption option) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		Integer priorityId = option == null ? null : option.priorityId();
+		userPreferencesService.putString(PREF_MY_TASKS_PRIORITY_FILTER, priorityId == null ? "" : String.valueOf(priorityId));
+	}
+
+	private void persistMyTasksLaneOrderPreference(String value) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		userPreferencesService.putString(
+				PREF_MY_TASKS_LANE_ORDER,
+				MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE.equals(value)
+						? MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE
+						: MY_TASKS_COLUMN_ORDER_CASE_NAME);
+	}
+
+	private void persistMyTasksCaseFilterPreference(CaseFilterOption option) {
+		if (suppressMyTaskPreferenceWrites || userPreferencesService == null) {
+			return;
+		}
+		Long caseId = option == null ? null : option.caseId();
+		userPreferencesService.putString(PREF_MY_TASKS_CASE_FILTER, caseId == null ? "" : String.valueOf(caseId));
 	}
 
 	private Long selectedCaseFilterId() {
@@ -1506,6 +1959,10 @@ public final class MyShaleController {
 		AppDialogs.showError(taskDialogOwner(), "Tasks", message);
 	}
 
+	private void suppressMyTasksScrollTopRightCornerOverlay() {
+		// no-op: retained to keep existing my-tasks rendering flow stable
+	}
+
 	private String rootCauseMessage(Throwable throwable) {
 		if (throwable == null) {
 			return "";
@@ -1557,6 +2014,14 @@ public final class MyShaleController {
 		public String toString() {
 			String text = safe(displayName).trim();
 			return text.isBlank() ? "All Priorities" : text;
+		}
+	}
+
+	private record BoardStatusFilterOption(Integer statusId, String displayName) {
+		@Override
+		public String toString() {
+			String text = safe(displayName).trim();
+			return text.isBlank() ? "All Statuses" : text;
 		}
 	}
 

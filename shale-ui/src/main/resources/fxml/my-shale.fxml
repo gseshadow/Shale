@@ -90,7 +90,12 @@
 									<padding>
 										<Insets top="8" right="10" bottom="8" left="10" />
 									</padding>
-									<Label text="Task Controls" styleClass="sidebar-header" />
+									<Label text="Task Controls">
+										<styleClass>
+											<String fx:value="sidebar-header" />
+											<String fx:value="my-shale-tasks-controls-label" />
+										</styleClass>
+									</Label>
 									<HBox spacing="8" alignment="CENTER_LEFT">
 										<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170">
 											<styleClass>
@@ -114,7 +119,12 @@
 									<padding>
 										<Insets top="8" right="10" bottom="8" left="10" />
 									</padding>
-									<Label text="Lane Controls" styleClass="sidebar-header" />
+									<Label text="Lane Controls">
+										<styleClass>
+											<String fx:value="sidebar-header" />
+											<String fx:value="my-shale-tasks-controls-label" />
+										</styleClass>
+									</Label>
 									<HBox spacing="8" alignment="CENTER_LEFT">
 										<Label text="Cases" />
 										<ChoiceBox fx:id="myTasksCaseFilterChoice" prefWidth="180">
@@ -146,8 +156,59 @@
 							</content>
 						</ScrollPane>
 					</VBox>
+					</VBox>
 				</VBox>
-			</VBox>
+
+				<VBox fx:id="myCasesSectionPane" spacing="8" visible="false" managed="false" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+					<VBox fx:id="myCasesSectionContentHost" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+						<VBox spacing="8" styleClass="strong-panel" prefWidth="430" minWidth="390" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+							<padding>
+								<Insets top="10" right="10" bottom="10" left="10" />
+							</padding>
+							<HBox spacing="8" alignment="CENTER_LEFT">
+								<Label text="My Cases" styleClass="page-heading" />
+								<Region HBox.hgrow="ALWAYS" />
+							</HBox>
+							<HBox spacing="10" alignment="TOP_LEFT">
+								<VBox spacing="4" styleClass="glass-panel" HBox.hgrow="ALWAYS">
+									<padding>
+										<Insets top="8" right="10" bottom="8" left="10" />
+									</padding>
+									<Label text="Case Controls">
+										<styleClass>
+											<String fx:value="sidebar-header" />
+											<String fx:value="my-shale-tasks-controls-label" />
+										</styleClass>
+									</Label>
+									<HBox spacing="8" alignment="CENTER_LEFT">
+										<TextField fx:id="myCasesBoardSearchField" promptText="Search case name or case number…" HBox.hgrow="ALWAYS" />
+										<ChoiceBox fx:id="myCasesBoardStatusFilterChoice" prefWidth="200">
+											<styleClass>
+												<String fx:value="app-toolbar-select" />
+											</styleClass>
+										</ChoiceBox>
+										<ChoiceBox fx:id="myCasesBoardSortChoice" prefWidth="220">
+											<styleClass>
+												<String fx:value="app-toolbar-select" />
+											</styleClass>
+										</ChoiceBox>
+									</HBox>
+								</VBox>
+							</HBox>
+							<Label fx:id="myCasesBoardEmptyLabel" text="No cases assigned to you." managed="false" visible="false" />
+							<ScrollPane fx:id="myCasesBoardScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
+								vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
+								<content>
+									<HBox fx:id="myCasesBoardList" spacing="10" styleClass="cases-content-surface glass-panel">
+										<padding>
+											<Insets top="10" right="10" bottom="18" left="10" />
+										</padding>
+									</HBox>
+								</content>
+							</ScrollPane>
+						</VBox>
+					</VBox>
+				</VBox>
 		</StackPane>
 	</center>
 </BorderPane>

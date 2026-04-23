@@ -457,6 +457,31 @@
     -fx-cursor: hand;
 }
 
+.button.lane-collapse-button {
+    -fx-min-width: 24;
+    -fx-pref-width: 24;
+    -fx-max-width: 24;
+    -fx-min-height: 24;
+    -fx-pref-height: 24;
+    -fx-max-height: 24;
+    -fx-padding: 0;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-width: 1.1;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+    -fx-text-fill: rgba(225, 237, 255, 0.95);
+    -fx-background-color: rgba(38, 56, 84, 0.24);
+    -fx-border-color: rgba(201, 218, 243, 0.48);
+    -fx-cursor: hand;
+}
+
+.button.lane-collapse-button:hover {
+    -fx-background-color: rgba(58, 81, 118, 0.38);
+    -fx-border-color: rgba(224, 236, 255, 0.62);
+    -fx-text-fill: #f1f7ff;
+}
+
 .button.lane-pin-button-unpinned {
     -fx-background-color: rgba(38, 56, 84, 0.28);
     -fx-border-color: rgba(201, 218, 243, 0.58);
@@ -510,6 +535,20 @@
     -fx-font-style: italic;
 }
 
+.label.my-cases-lane-title {
+    -fx-text-fill: #1a2230;
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+    -fx-opacity: 1.0;
+}
+
+.label.my-cases-lane-count {
+    -fx-text-fill: #2c3a4f;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+    -fx-opacity: 1.0;
+}
+
 .button.app-toolbar-button-compact,
 .menu-button.app-toolbar-button-compact,
 .split-menu-button.app-toolbar-button-compact {
@@ -535,13 +574,14 @@
 }
 
 .choice-box.app-toolbar-select > .label {
-    -fx-padding: 0 8 0 14;
+    -fx-padding: 0 22 0 14;
     -fx-text-fill: #f9fbff;
     -fx-font-weight: 700;
 }
 
 .choice-box.app-toolbar-select > .open-button {
     -fx-padding: 0 14 0 8;
+    -fx-min-width: 34;
     -fx-background-color: transparent;
 }
 
@@ -583,14 +623,19 @@
 }
 
 .combo-box.app-toolbar-select > .list-cell {
-    -fx-padding: 0 8 0 14;
+    -fx-padding: 0 22 0 14;
     -fx-text-fill: -app-toolbar-select-text;
     -fx-font-weight: 700;
 }
 
 .combo-box.app-toolbar-select > .arrow-button {
     -fx-padding: 0 14 0 8;
+    -fx-min-width: 34;
     -fx-background-color: transparent;
+}
+
+.label.my-shale-tasks-controls-label {
+    -fx-text-fill: rgba(17, 37, 66, 0.88);
 }
 
 .combo-box.app-toolbar-select > .arrow-button > .arrow {
