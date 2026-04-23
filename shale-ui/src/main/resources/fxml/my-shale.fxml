@@ -90,7 +90,12 @@
 									<padding>
 										<Insets top="8" right="10" bottom="8" left="10" />
 									</padding>
-									<Label text="Task Controls" styleClass="sidebar-header" />
+									<Label text="Task Controls">
+										<styleClass>
+											<String fx:value="sidebar-header" />
+											<String fx:value="my-shale-tasks-controls-label" />
+										</styleClass>
+									</Label>
 									<HBox spacing="8" alignment="CENTER_LEFT">
 										<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170">
 											<styleClass>
@@ -114,7 +119,12 @@
 									<padding>
 										<Insets top="8" right="10" bottom="8" left="10" />
 									</padding>
-									<Label text="Lane Controls" styleClass="sidebar-header" />
+									<Label text="Lane Controls">
+										<styleClass>
+											<String fx:value="sidebar-header" />
+											<String fx:value="my-shale-tasks-controls-label" />
+										</styleClass>
+									</Label>
 									<HBox spacing="8" alignment="CENTER_LEFT">
 										<Label text="Cases" />
 										<ChoiceBox fx:id="myTasksCaseFilterChoice" prefWidth="180">

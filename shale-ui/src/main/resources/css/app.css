@@ -535,13 +535,14 @@
 }
 
 .choice-box.app-toolbar-select > .label {
-    -fx-padding: 0 8 0 14;
+    -fx-padding: 0 22 0 14;
     -fx-text-fill: #f9fbff;
     -fx-font-weight: 700;
 }
 
 .choice-box.app-toolbar-select > .open-button {
     -fx-padding: 0 14 0 8;
+    -fx-min-width: 34;
     -fx-background-color: transparent;
 }
 
@@ -583,14 +584,19 @@
 }
 
 .combo-box.app-toolbar-select > .list-cell {
-    -fx-padding: 0 8 0 14;
+    -fx-padding: 0 22 0 14;
     -fx-text-fill: -app-toolbar-select-text;
     -fx-font-weight: 700;
 }
 
 .combo-box.app-toolbar-select > .arrow-button {
     -fx-padding: 0 14 0 8;
+    -fx-min-width: 34;
     -fx-background-color: transparent;
+}
+
+.label.my-shale-tasks-controls-label {
+    -fx-text-fill: rgba(17, 37, 66, 0.88);
 }
 
 .combo-box.app-toolbar-select > .arrow-button > .arrow {
