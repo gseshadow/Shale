@@ -45,7 +45,6 @@ import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
@@ -73,7 +72,7 @@ public final class MyShaleController {
 	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
 	private static final PriorityFilterOption ALL_PRIORITIES_OPTION = new PriorityFilterOption(null, "All Priorities");
 	private static final String SECTION_OVERVIEW = "Overview";
-	private static final String SECTION_TASKS = "My Tasks";
+	private static final String SECTION_TASKS = "Tasks";
 	private static final String SECTION_MY_CASES = "My Cases";
 	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
 	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
@@ -81,14 +80,6 @@ public final class MyShaleController {
 	private static final double MY_CASES_STATUS_COLUMN_MIN_WIDTH = 245;
 	private static final double MY_CASES_STATUS_COLUMN_PREF_WIDTH = 280;
 	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 320;
-	private static final double OVERVIEW_CARD_GAP = 10;
-	private static final double OVERVIEW_SECTION_HORIZONTAL_PADDING = 10;
-	private static final double OVERVIEW_COMPACT_TASK_CARD_WIDTH = 210;
-	private static final String OVERVIEW_SORT_DUE_ASC = "Due Date (earliest first)";
-	private static final String OVERVIEW_SORT_DUE_DESC = "Due Date (latest first)";
-	private static final String OVERVIEW_SORT_PRIORITY = "Priority";
-	private static final String OVERVIEW_SORT_CASE_NAME = "Case Name";
-	private static final String OVERVIEW_SORT_TITLE = "Title";
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 	private static final String MY_TASKS_BOARD_KEY = "my_shale_tasks";
 	private static final String MY_TASKS_LANE_TYPE_CASE = "CASE";
@@ -141,9 +132,7 @@ public final class MyShaleController {
 	@FXML
 	private VBox myCasesSectionContentHost;
 	@FXML
-	private VBox overviewMainRow;
-	@FXML
-	private ScrollPane overviewScroll;
+	private HBox overviewMainRow;
 	@FXML
 	private StackPane sectionContentStack;
 	@FXML
@@ -195,21 +184,6 @@ public final class MyShaleController {
 	private boolean suppressMyTaskPreferenceWrites;
 	private Integer preferredMyTasksPriorityFilterId;
 	private Long preferredMyTasksCaseFilterId;
-	private String overviewSearchText = "";
-	private Integer overviewPriorityFilterId;
-	private Long overviewCaseFilterId;
-	private boolean overviewOverdueOnly;
-	private String overviewSortMode = OVERVIEW_SORT_DUE_ASC;
-	private VBox overviewSectionsContainer;
-	private TextField overviewSearchFieldControl;
-	private ChoiceBox<PriorityFilterOption> overviewPriorityChoiceControl;
-	private ChoiceBox<CaseFilterOption> overviewCaseChoiceControl;
-	private CheckBox overviewOverdueOnlyCheckControl;
-	private ChoiceBox<String> overviewSortChoiceControl;
-	private boolean suppressOverviewControlEvents;
-	private boolean loadingOverview;
-	private boolean loadingMyTasks;
-	private boolean loadingMyCases;
 	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
@@ -332,6 +306,7 @@ public final class MyShaleController {
 		}
 
 		reloadStatusFilterOptionsAndThen(() -> {
+			rerender();
 			renderMyCasesBoard();
 		});
 
@@ -339,6 +314,9 @@ public final class MyShaleController {
 		{
 			onSectionSelected(SECTION_OVERVIEW);
 			wireInfiniteScroll();
+			loadFirstPage();
+			refreshMyTasks();
+			refreshMyCasesBoard();
 		});
 
 		if (myCasesFlow != null) {
@@ -363,15 +341,6 @@ public final class MyShaleController {
 		if (overviewSectionPane != null) {
 			overviewSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 			StackPane.setAlignment(overviewSectionPane, Pos.TOP_LEFT);
-		}
-		if (overviewScroll != null) {
-			VBox.setVgrow(overviewScroll, Priority.ALWAYS);
-			overviewScroll.setFitToWidth(true);
-			overviewScroll.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-		}
-		if (overviewMainRow != null) {
-			VBox.setVgrow(overviewMainRow, Priority.ALWAYS);
-			overviewMainRow.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		}
 		if (tasksSectionPane != null) {
 			tasksSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -436,19 +405,11 @@ public final class MyShaleController {
 		setVisibleManaged(overviewSectionPane, showOverview);
 		setVisibleManaged(tasksSectionPane, showTasks);
 		setVisibleManaged(myCasesSectionPane, showMyCases);
-		if (showOverview) {
-			renderMyOverview();
-			refreshMyTasks();
-		}
 		if (showTasks) {
 			attachTasksPanel(tasksSectionContentHost);
-			renderMyTasks();
-			refreshMyTasks();
 		}
-		if (showMyCases) {
-			renderMyCasesBoard();
-			refreshMyCasesBoard();
-		}
+		renderMyTasks();
+		renderMyCasesBoard();
 	}
 
 	private void attachTasksPanel(Pane host) {
@@ -815,18 +776,11 @@ public final class MyShaleController {
 		if (caseTaskService == null || appState == null) {
 			return;
 		}
-		loadingOverview = true;
-		loadingMyTasks = true;
-		renderMyOverview();
-		renderMyTasks();
 		Integer shaleClientId = appState.getShaleClientId();
 		Integer userId = appState.getUserId();
 		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
 			myTasks = List.of();
 			myTaskAssignedUsers = java.util.Map.of();
-			loadingOverview = false;
-			loadingMyTasks = false;
-			renderMyOverview();
 			renderMyTasks();
 			return;
 		}
@@ -872,8 +826,6 @@ public final class MyShaleController {
 									java.util.LinkedHashMap::new));
 					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " rows=" + assignedByTask.size(), usersLoadStartNanos);
 					runOnFx(() -> {
-						loadingOverview = false;
-						loadingMyTasks = false;
 						myTasks = tasks == null ? List.of() : tasks;
 						pinnedTaskLaneCaseIds.clear();
 						pinnedTaskLaneCaseIds.addAll(pinnedLaneCaseIds);
@@ -883,19 +835,12 @@ public final class MyShaleController {
 						myTaskPrioritiesById = prioritiesById;
 						syncMyTaskPriorityFilterOptions();
 						syncMyTaskCaseFilterOptions();
-						renderMyOverview();
 						renderMyTasks();
 					});
 			} catch (Exception ex) {
 				System.err.println("My tasks load failed: " + ex.getMessage());
 				ex.printStackTrace();
-				runOnFx(() -> {
-					loadingOverview = false;
-					loadingMyTasks = false;
-					renderMyOverview();
-					renderMyTasks();
-					showTaskActionError("Failed to load your tasks.");
-				});
+				runOnFx(() -> showTaskActionError("Failed to load your tasks."));
 			}
 		});
 	}
@@ -904,13 +849,10 @@ public final class MyShaleController {
 		if (caseDao == null || appState == null) {
 			return;
 		}
-		loadingMyCases = true;
-		renderMyCasesBoard();
 		Integer userId = appState.getUserId();
 		Integer shaleClientId = appState.getShaleClientId();
 		if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
 			myAssignedCasesBoard = List.of();
-			loadingMyCases = false;
 			renderMyCasesBoard();
 			return;
 		}
@@ -923,7 +865,6 @@ public final class MyShaleController {
 						.map(this::toVm)
 						.toList();
 				runOnFx(() -> {
-					loadingMyCases = false;
 					myAssignedCasesBoard = cases;
 					renderMyCasesBoard();
 				});
@@ -931,7 +872,6 @@ public final class MyShaleController {
 				System.err.println("My cases board load failed: " + ex.getMessage());
 				ex.printStackTrace();
 				runOnFx(() -> {
-					loadingMyCases = false;
 					myAssignedCasesBoard = List.of();
 					renderMyCasesBoard();
 				});
@@ -941,13 +881,6 @@ public final class MyShaleController {
 
 	private void renderMyCasesBoard() {
 		if (myCasesBoardList == null || myCasesBoardEmptyLabel == null || myCasesBoardScroll == null) {
-			return;
-		}
-		if (loadingMyCases) {
-			myCasesBoardList.getChildren().clear();
-			myCasesBoardEmptyLabel.setText("Loading your cases...");
-			setVisibleManaged(myCasesBoardEmptyLabel, true);
-			setVisibleManaged(myCasesBoardScroll, false);
 			return;
 		}
 		myCasesBoardList.getChildren().clear();
@@ -1096,14 +1029,6 @@ public final class MyShaleController {
 		if (myTasksList == null || myTasksEmptyLabel == null || myTasksScroll == null) {
 			return;
 		}
-		if (loadingMyTasks) {
-			myTasksList.getChildren().clear();
-			myTasksEmptyLabel.setText("Loading your tasks...");
-			setVisibleManaged(myTasksEmptyLabel, true);
-			setVisibleManaged(myTasksScroll, false);
-			suppressMyTasksScrollTopRightCornerOverlay();
-			return;
-		}
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
@@ -1156,399 +1081,6 @@ public final class MyShaleController {
 		setVisibleManaged(myTasksScroll, true);
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(),
 				renderStartNanos);
-	}
-
-	private void renderMyOverview() {
-		if (overviewMainRow == null) {
-			return;
-		}
-		if (loadingOverview) {
-			Label loadingLabel = new Label("Loading your overview...");
-			loadingLabel.getStyleClass().add("muted-text");
-			overviewMainRow.getChildren().setAll(loadingLabel);
-			return;
-		}
-		ensureOverviewContentShell();
-		List<CaseTaskListItemDto> overviewSource = overviewEligibleTasks(myTasks);
-		syncOverviewControlOptions(overviewSource);
-		renderOverviewSections(overviewSource);
-	}
-
-	private void ensureOverviewContentShell() {
-		if (overviewSectionsContainer != null
-				&& overviewMainRow.getChildren().contains(overviewSectionsContainer)
-				&& overviewSearchFieldControl != null) {
-			return;
-		}
-		VBox sections = new VBox(10);
-		sections.setFillWidth(true);
-		sections.getChildren().add(buildOverviewControlBar());
-		overviewSectionsContainer = sections;
-		overviewMainRow.getChildren().setAll(sections);
-	}
-
-	private void renderOverviewSections(List<CaseTaskListItemDto> overviewSource) {
-		if (overviewSectionsContainer == null) {
-			return;
-		}
-		LocalDate today = LocalDate.now();
-		List<CaseTaskListItemDto> filteredOverviewTasks = applyOverviewFilters(overviewSource, today);
-		Map<String, List<CaseTaskListItemDto>> buckets = bucketOverviewTasksByDueWindow(filteredOverviewTasks, today);
-		List<CaseTaskListItemDto> todayTasks = sortOverviewTasks(buckets.getOrDefault("today", List.of()));
-		List<CaseTaskListItemDto> upcomingTasks = sortOverviewTasks(buckets.getOrDefault("upcoming", List.of()));
-		List<CaseTaskListItemDto> laterTasks = sortOverviewTasks(buckets.getOrDefault("later", List.of()));
-
-		List<Node> sectionNodes = new ArrayList<>();
-		if (overviewSectionsContainer.getChildren().isEmpty()) {
-			sectionNodes.add(buildOverviewControlBar());
-		} else {
-			sectionNodes.add(overviewSectionsContainer.getChildren().get(0));
-		}
-		sectionNodes.add(buildOverviewTaskSection(
-				"Today",
-				todayTasks,
-				"Nothing due today",
-				true));
-		sectionNodes.add(buildOverviewTaskSection(
-				"Upcoming",
-				upcomingTasks,
-				"No tasks due in the next 7 days",
-				false));
-		sectionNodes.add(buildOverviewTaskSection(
-				"Later",
-				laterTasks,
-				"No tasks due later this month",
-				false));
-		overviewSectionsContainer.getChildren().setAll(sectionNodes);
-	}
-
-	private Node buildOverviewControlBar() {
-		HBox controls = new HBox(8);
-		controls.setAlignment(Pos.CENTER_LEFT);
-		controls.getStyleClass().add("glass-panel");
-		controls.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
-
-		overviewSearchFieldControl = new TextField(safe(overviewSearchText));
-		overviewSearchFieldControl.setPromptText("Search title, case, or creator…");
-		HBox.setHgrow(overviewSearchFieldControl, Priority.ALWAYS);
-		overviewSearchFieldControl.textProperty().addListener((obs, oldV, newV) -> {
-			if (suppressOverviewControlEvents) {
-				return;
-			}
-			overviewSearchText = safe(newV);
-			renderOverviewSections(overviewEligibleTasks(myTasks));
-		});
-
-		overviewPriorityChoiceControl = new ChoiceBox<>();
-		overviewPriorityChoiceControl.getStyleClass().add("app-toolbar-select");
-		overviewPriorityChoiceControl.setPrefWidth(190);
-		overviewPriorityChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
-			if (suppressOverviewControlEvents) {
-				return;
-			}
-			overviewPriorityFilterId = newV == null ? null : newV.priorityId();
-			renderOverviewSections(overviewEligibleTasks(myTasks));
-		});
-
-		overviewCaseChoiceControl = new ChoiceBox<>();
-		overviewCaseChoiceControl.getStyleClass().add("app-toolbar-select");
-		overviewCaseChoiceControl.setPrefWidth(200);
-		overviewCaseChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
-			if (suppressOverviewControlEvents) {
-				return;
-			}
-			overviewCaseFilterId = newV == null ? null : newV.caseId();
-			renderOverviewSections(overviewEligibleTasks(myTasks));
-		});
-
-		overviewOverdueOnlyCheckControl = new CheckBox("Overdue only");
-		overviewOverdueOnlyCheckControl.setSelected(overviewOverdueOnly);
-		overviewOverdueOnlyCheckControl.selectedProperty().addListener((obs, oldV, newV) -> {
-			if (suppressOverviewControlEvents) {
-				return;
-			}
-			overviewOverdueOnly = Boolean.TRUE.equals(newV);
-			renderOverviewSections(overviewEligibleTasks(myTasks));
-		});
-
-		overviewSortChoiceControl = new ChoiceBox<>();
-		overviewSortChoiceControl.getStyleClass().add("app-toolbar-select");
-		overviewSortChoiceControl.setPrefWidth(210);
-		overviewSortChoiceControl.getItems().setAll(
-				OVERVIEW_SORT_DUE_ASC,
-				OVERVIEW_SORT_DUE_DESC,
-				OVERVIEW_SORT_PRIORITY,
-				OVERVIEW_SORT_CASE_NAME,
-				OVERVIEW_SORT_TITLE);
-		overviewSortChoiceControl.getSelectionModel().select(
-				overviewSortChoiceControl.getItems().contains(overviewSortMode) ? overviewSortMode : OVERVIEW_SORT_DUE_ASC);
-		overviewSortChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
-			if (suppressOverviewControlEvents) {
-				return;
-			}
-			overviewSortMode = safe(newV).isBlank() ? OVERVIEW_SORT_DUE_ASC : newV;
-			renderOverviewSections(overviewEligibleTasks(myTasks));
-		});
-
-		controls.getChildren().addAll(
-				overviewSearchFieldControl,
-				overviewPriorityChoiceControl,
-				overviewCaseChoiceControl,
-				overviewOverdueOnlyCheckControl,
-				overviewSortChoiceControl);
-		return controls;
-	}
-
-	private void syncOverviewControlOptions(List<CaseTaskListItemDto> overviewSource) {
-		if (overviewPriorityChoiceControl == null
-				|| overviewCaseChoiceControl == null
-				|| overviewSearchFieldControl == null
-				|| overviewSortChoiceControl == null
-				|| overviewOverdueOnlyCheckControl == null) {
-			return;
-		}
-		suppressOverviewControlEvents = true;
-		try {
-			overviewSearchFieldControl.setText(safe(overviewSearchText));
-			overviewOverdueOnlyCheckControl.setSelected(overviewOverdueOnly);
-			overviewSortChoiceControl.getSelectionModel().select(
-					overviewSortChoiceControl.getItems().contains(overviewSortMode) ? overviewSortMode : OVERVIEW_SORT_DUE_ASC);
-
-			List<PriorityFilterOption> priorityOptions = new ArrayList<>();
-			priorityOptions.add(ALL_PRIORITIES_OPTION);
-			overviewSource.stream()
-					.filter(Objects::nonNull)
-					.map(CaseTaskListItemDto::priorityId)
-					.filter(Objects::nonNull)
-					.distinct()
-					.sorted(Comparator.naturalOrder())
-					.forEach(priorityId -> priorityOptions.add(new PriorityFilterOption(priorityId, resolvePriorityName(priorityId))));
-			overviewPriorityChoiceControl.getItems().setAll(priorityOptions);
-			PriorityFilterOption selectedPriority = priorityOptions.stream()
-					.filter(option -> Objects.equals(option.priorityId(), overviewPriorityFilterId))
-					.findFirst()
-					.orElse(ALL_PRIORITIES_OPTION);
-			overviewPriorityChoiceControl.getSelectionModel().select(selectedPriority);
-
-			List<CaseFilterOption> caseOptions = new ArrayList<>();
-			caseOptions.add(ALL_CASES_OPTION);
-			overviewSource.stream()
-					.filter(Objects::nonNull)
-					.filter(task -> task.caseId() > 0)
-					.collect(java.util.stream.Collectors.toMap(
-							CaseTaskListItemDto::caseId,
-							task -> normalizeOverviewCaseName(task.caseName(), task.caseId()),
-							(existing, ignored) -> existing,
-							LinkedHashMap::new))
-					.entrySet().stream()
-					.sorted(Map.Entry.comparingByValue(String.CASE_INSENSITIVE_ORDER))
-					.forEach(entry -> caseOptions.add(new CaseFilterOption(entry.getKey(), entry.getValue())));
-			overviewCaseChoiceControl.getItems().setAll(caseOptions);
-			CaseFilterOption selectedCase = caseOptions.stream()
-					.filter(option -> Objects.equals(option.caseId(), overviewCaseFilterId))
-					.findFirst()
-					.orElse(ALL_CASES_OPTION);
-			overviewCaseChoiceControl.getSelectionModel().select(selectedCase);
-		} finally {
-			suppressOverviewControlEvents = false;
-		}
-	}
-
-	private List<CaseTaskListItemDto> overviewEligibleTasks(List<CaseTaskListItemDto> tasks) {
-		if (tasks == null || tasks.isEmpty()) {
-			return List.of();
-		}
-		return tasks.stream()
-				.filter(Objects::nonNull)
-				.filter(task -> task.completedAt() == null)
-				.filter(task -> task.dueAt() != null)
-				.toList();
-	}
-
-	private List<CaseTaskListItemDto> applyOverviewFilters(List<CaseTaskListItemDto> tasks, LocalDate today) {
-		if (tasks == null || tasks.isEmpty()) {
-			return List.of();
-		}
-		String normalizedQuery = safe(overviewSearchText).trim().toLowerCase(Locale.ROOT);
-		return tasks.stream()
-				.filter(task -> matchesOverviewSearch(task, normalizedQuery))
-				.filter(this::matchesOverviewPriorityFilter)
-				.filter(this::matchesOverviewCaseFilter)
-				.filter(task -> matchesOverviewOverdueOnly(task, today))
-				.toList();
-	}
-
-	private boolean matchesOverviewSearch(CaseTaskListItemDto task, String normalizedQuery) {
-		if (task == null) {
-			return false;
-		}
-		if (normalizedQuery == null || normalizedQuery.isBlank()) {
-			return true;
-		}
-		return safe(task.title()).toLowerCase(Locale.ROOT).contains(normalizedQuery)
-				|| safe(task.caseName()).toLowerCase(Locale.ROOT).contains(normalizedQuery)
-				|| safe(task.createdByDisplayName()).toLowerCase(Locale.ROOT).contains(normalizedQuery);
-	}
-
-	private boolean matchesOverviewPriorityFilter(CaseTaskListItemDto task) {
-		return overviewPriorityFilterId == null || Objects.equals(task.priorityId(), overviewPriorityFilterId);
-	}
-
-	private boolean matchesOverviewCaseFilter(CaseTaskListItemDto task) {
-		return overviewCaseFilterId == null || Objects.equals(task.caseId(), overviewCaseFilterId);
-	}
-
-	private boolean matchesOverviewOverdueOnly(CaseTaskListItemDto task, LocalDate today) {
-		if (!overviewOverdueOnly) {
-			return true;
-		}
-		LocalDate dueDate = task == null || task.dueAt() == null ? null : task.dueAt().toLocalDate();
-		return dueDate != null && dueDate.isBefore(today);
-	}
-
-	private Map<String, List<CaseTaskListItemDto>> bucketOverviewTasksByDueWindow(List<CaseTaskListItemDto> tasks, LocalDate today) {
-		List<CaseTaskListItemDto> todayTasks = new ArrayList<>();
-		List<CaseTaskListItemDto> upcomingTasks = new ArrayList<>();
-		List<CaseTaskListItemDto> laterTasks = new ArrayList<>();
-		if (tasks != null) {
-			for (CaseTaskListItemDto task : tasks) {
-				if (task == null || task.dueAt() == null) {
-					continue;
-				}
-				if (isTaskInTodayBucket(task, today)) {
-					todayTasks.add(task);
-				} else if (isTaskInUpcomingBucket(task, today)) {
-					upcomingTasks.add(task);
-				} else if (isTaskInLaterBucket(task, today)) {
-					laterTasks.add(task);
-				}
-			}
-		}
-		Map<String, List<CaseTaskListItemDto>> buckets = new LinkedHashMap<>();
-		buckets.put("today", todayTasks);
-		buckets.put("upcoming", upcomingTasks);
-		buckets.put("later", laterTasks);
-		return buckets;
-	}
-
-	private List<CaseTaskListItemDto> sortOverviewTasks(List<CaseTaskListItemDto> tasks) {
-		if (tasks == null || tasks.isEmpty()) {
-			return List.of();
-		}
-		Comparator<CaseTaskListItemDto> dueAscThenTitle = Comparator
-				.comparing(CaseTaskListItemDto::dueAt)
-				.thenComparing(task -> safe(resolveMyTaskCardTitle(task)), String.CASE_INSENSITIVE_ORDER);
-		Comparator<CaseTaskListItemDto> comparator = switch (safe(overviewSortMode)) {
-			case OVERVIEW_SORT_DUE_DESC -> Comparator
-					.comparing(CaseTaskListItemDto::dueAt, Comparator.reverseOrder())
-					.thenComparing(task -> safe(resolveMyTaskCardTitle(task)), String.CASE_INSENSITIVE_ORDER);
-			case OVERVIEW_SORT_PRIORITY -> Comparator
-					.comparing((CaseTaskListItemDto task) -> resolvePriorityName(task.priorityId()), String.CASE_INSENSITIVE_ORDER)
-					.thenComparing(CaseTaskListItemDto::dueAt)
-					.thenComparing(task -> safe(resolveMyTaskCardTitle(task)), String.CASE_INSENSITIVE_ORDER);
-			case OVERVIEW_SORT_CASE_NAME -> Comparator
-					.comparing((CaseTaskListItemDto task) -> normalizeOverviewCaseName(task.caseName(), task.caseId()), String.CASE_INSENSITIVE_ORDER)
-					.thenComparing(CaseTaskListItemDto::dueAt)
-					.thenComparing(task -> safe(resolveMyTaskCardTitle(task)), String.CASE_INSENSITIVE_ORDER);
-			case OVERVIEW_SORT_TITLE -> Comparator
-					.comparing((CaseTaskListItemDto task) -> safe(resolveMyTaskCardTitle(task)), String.CASE_INSENSITIVE_ORDER)
-					.thenComparing(CaseTaskListItemDto::dueAt);
-			default -> dueAscThenTitle;
-		};
-		return tasks.stream()
-				.sorted(comparator)
-				.toList();
-	}
-
-	private String resolvePriorityName(Integer priorityId) {
-		if (priorityId == null) {
-			return "zzzzzz";
-		}
-		String name = myTaskPrioritiesById.get(priorityId);
-		if (safe(name).isBlank()) {
-			return "Priority #" + priorityId;
-		}
-		return safe(name).trim();
-	}
-
-	private String normalizeOverviewCaseName(String caseName, long caseId) {
-		String normalized = safe(caseName).trim();
-		return normalized.isBlank() ? ("Case #" + caseId) : normalized;
-	}
-
-	private boolean isTaskInTodayBucket(CaseTaskListItemDto task, LocalDate today) {
-		LocalDate dueDate = task == null || task.dueAt() == null ? null : task.dueAt().toLocalDate();
-		return dueDate != null && (dueDate.isBefore(today) || dueDate.isEqual(today));
-	}
-
-	private boolean isTaskInUpcomingBucket(CaseTaskListItemDto task, LocalDate today) {
-		LocalDate dueDate = task == null || task.dueAt() == null ? null : task.dueAt().toLocalDate();
-		if (dueDate == null) {
-			return false;
-		}
-		LocalDate start = today.plusDays(1);
-		LocalDate end = today.plusDays(7);
-		return !dueDate.isBefore(start) && !dueDate.isAfter(end);
-	}
-
-	private boolean isTaskInLaterBucket(CaseTaskListItemDto task, LocalDate today) {
-		LocalDate dueDate = task == null || task.dueAt() == null ? null : task.dueAt().toLocalDate();
-		if (dueDate == null) {
-			return false;
-		}
-		LocalDate start = today.plusDays(8);
-		LocalDate end = today.plusDays(30);
-		return !dueDate.isBefore(start) && !dueDate.isAfter(end);
-	}
-
-	private Node buildOverviewTaskSection(String title, List<CaseTaskListItemDto> tasks, String emptyState, boolean prominent) {
-		VBox section = new VBox(8);
-		section.setFillWidth(true);
-		section.getStyleClass().add(prominent ? "strong-panel" : "glass-panel");
-		section.setPadding(new javafx.geometry.Insets(10));
-
-		Label header = new Label(title + " (" + (tasks == null ? 0 : tasks.size()) + ")");
-		header.getStyleClass().add(prominent ? "page-heading" : "sidebar-header");
-		section.getChildren().add(header);
-
-		FlowPane taskCards = new FlowPane();
-		taskCards.setHgap(OVERVIEW_CARD_GAP);
-		taskCards.setVgap(OVERVIEW_CARD_GAP);
-		taskCards.setPrefWrapLength(700);
-		taskCards.setMaxWidth(Double.MAX_VALUE);
-		taskCards.prefWrapLengthProperty().bind(section.widthProperty()
-				.subtract((OVERVIEW_SECTION_HORIZONTAL_PADDING * 2) + 2));
-		if (tasks == null || tasks.isEmpty()) {
-			Label emptyLabel = new Label(emptyState);
-			emptyLabel.getStyleClass().add("lane-empty-state");
-			taskCards.getChildren().add(emptyLabel);
-		} else {
-			for (CaseTaskListItemDto task : tasks) {
-				TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
-						task.id(),
-						task.caseId(),
-						task.caseName(),
-						task.caseResponsibleAttorney(),
-						task.caseResponsibleAttorneyColor(),
-						task.caseNonEngagementLetterSent(),
-						resolveMyTaskCardTitle(task),
-						task.description(),
-						task.createdByDisplayName(),
-							task.priorityColorHex(),
-							task.dueAt(),
-							task.completedAt(),
-							myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-				Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT);
-				if (card instanceof Region regionCard) {
-					regionCard.setMinWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
-					regionCard.setPrefWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
-					regionCard.setMaxWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
-				}
-				taskCards.getChildren().add(card);
-			}
-		}
-		section.getChildren().add(taskCards);
-		return section;
 	}
 
 	private Map<TaskLaneKey, List<CaseTaskListItemDto>> groupTasksByLane(List<CaseTaskListItemDto> tasks) {
