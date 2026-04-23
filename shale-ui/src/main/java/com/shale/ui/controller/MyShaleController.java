@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -906,6 +907,7 @@ public final class MyShaleController {
 
 	private Node buildTaskLaneHeader(TaskLaneKey key, List<CaseTaskListItemDto> tasksInLane) {
 		int taskCount = tasksInLane == null ? 0 : tasksInLane.size();
+		LaneUrgency laneUrgency = resolveLaneUrgency(tasksInLane);
 		Node caseCard = caseCardFactory.create(
 				new CaseCardModel(
 						key == null || key.caseId() == null ? 0L : key.caseId(),
@@ -919,7 +921,11 @@ public final class MyShaleController {
 		VBox header = new VBox(6);
 		HBox headerTopRow = new HBox(8);
 		headerTopRow.setAlignment(Pos.CENTER_LEFT);
+		headerTopRow.getStyleClass().add("lane-header-top-row");
 		headerTopRow.getChildren().add(caseCard);
+		Label inlineCountLabel = new Label("(" + taskCount + ")");
+		inlineCountLabel.getStyleClass().add("lane-task-count-inline");
+		headerTopRow.getChildren().add(inlineCountLabel);
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		headerTopRow.getChildren().add(spacer);
@@ -939,15 +945,39 @@ public final class MyShaleController {
 			headerTopRow.getChildren().add(pinButton);
 		}
 
-		HBox laneMetaRow = new HBox(6);
-		laneMetaRow.setAlignment(Pos.CENTER_LEFT);
-		laneMetaRow.getStyleClass().add("lane-header-meta");
-		Label taskCountLabel = new Label(taskCount == 1 ? "1 task" : (taskCount + " tasks"));
-		taskCountLabel.getStyleClass().add("lane-task-count");
-		laneMetaRow.getChildren().add(taskCountLabel);
-
-		header.getChildren().addAll(headerTopRow, laneMetaRow);
+		header.getChildren().add(headerTopRow);
+		if (laneUrgency != LaneUrgency.NONE) {
+			HBox laneMetaRow = new HBox(6);
+			laneMetaRow.setAlignment(Pos.CENTER_LEFT);
+			laneMetaRow.getStyleClass().add("lane-header-meta");
+			Label urgencyBadge = new Label(laneUrgency == LaneUrgency.OVERDUE ? "Overdue" : "Due soon");
+			urgencyBadge.getStyleClass().addAll(
+					"lane-urgency-badge",
+					laneUrgency == LaneUrgency.OVERDUE ? "lane-urgency-overdue" : "lane-urgency-soon");
+			laneMetaRow.getChildren().add(urgencyBadge);
+			header.getChildren().add(laneMetaRow);
+		}
 		return header;
+	}
+
+	private LaneUrgency resolveLaneUrgency(List<CaseTaskListItemDto> tasksInLane) {
+		if (tasksInLane == null || tasksInLane.isEmpty()) {
+			return LaneUrgency.NONE;
+		}
+		LocalDateTime now = LocalDateTime.now();
+		boolean hasDueSoon = false;
+		for (CaseTaskListItemDto task : tasksInLane) {
+			if (task == null || task.completedAt() != null || task.dueAt() == null) {
+				continue;
+			}
+			if (task.dueAt().isBefore(now)) {
+				return LaneUrgency.OVERDUE;
+			}
+			if (!task.dueAt().isAfter(now.plusWeeks(1))) {
+				hasDueSoon = true;
+			}
+		}
+		return hasDueSoon ? LaneUrgency.DUE_SOON : LaneUrgency.NONE;
 	}
 
 	private boolean isPinnedLane(TaskLaneKey key) {
@@ -1029,6 +1059,7 @@ public final class MyShaleController {
 		if (tasksInLane == null || tasksInLane.isEmpty()) {
 			Label emptyLabel = new Label("No tasks");
 			emptyLabel.getStyleClass().add("lane-empty-state");
+			taskCards.setAlignment(Pos.TOP_LEFT);
 			taskCards.getChildren().add(emptyLabel);
 			return taskCards;
 		}
@@ -1544,6 +1575,12 @@ public final class MyShaleController {
 			String responsibleAttorneyColor,
 			boolean nonEngagementLetterSent
 	) {
+	}
+
+	private enum LaneUrgency {
+		NONE,
+		DUE_SOON,
+		OVERDUE
 	}
 
 	private static final class CaseCardVm {
