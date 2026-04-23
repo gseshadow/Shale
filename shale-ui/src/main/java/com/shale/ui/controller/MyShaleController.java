@@ -80,6 +80,8 @@ public final class MyShaleController {
 	private static final double MY_CASES_STATUS_COLUMN_MIN_WIDTH = 245;
 	private static final double MY_CASES_STATUS_COLUMN_PREF_WIDTH = 280;
 	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 320;
+	private static final double OVERVIEW_CARD_GAP = 10;
+	private static final double OVERVIEW_SECTION_HORIZONTAL_PADDING = 10;
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 	private static final String MY_TASKS_BOARD_KEY = "my_shale_tasks";
 	private static final String MY_TASKS_LANE_TYPE_CASE = "CASE";
@@ -1198,8 +1200,13 @@ public final class MyShaleController {
 		header.getStyleClass().add(prominent ? "page-heading" : "sidebar-header");
 		section.getChildren().add(header);
 
-		VBox taskCards = new VBox(8);
-		taskCards.setFillWidth(true);
+		FlowPane taskCards = new FlowPane();
+		taskCards.setHgap(OVERVIEW_CARD_GAP);
+		taskCards.setVgap(OVERVIEW_CARD_GAP);
+		taskCards.setPrefWrapLength(700);
+		taskCards.setMaxWidth(Double.MAX_VALUE);
+		taskCards.prefWrapLengthProperty().bind(section.widthProperty()
+				.subtract((OVERVIEW_SECTION_HORIZONTAL_PADDING * 2) + 2));
 		if (tasks == null || tasks.isEmpty()) {
 			Label emptyLabel = new Label(emptyState);
 			emptyLabel.getStyleClass().add("lane-empty-state");
@@ -1216,11 +1223,17 @@ public final class MyShaleController {
 						resolveMyTaskCardTitle(task),
 						task.description(),
 						task.createdByDisplayName(),
-						task.priorityColorHex(),
-						task.dueAt(),
-						task.completedAt(),
-						myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+							task.priorityColorHex(),
+							task.dueAt(),
+							task.completedAt(),
+							myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+				Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT);
+				if (card instanceof Region regionCard) {
+					regionCard.setMinWidth(320);
+					regionCard.setPrefWidth(320);
+					regionCard.setMaxWidth(320);
+				}
+				taskCards.getChildren().add(card);
 			}
 		}
 		section.getChildren().add(taskCards);
