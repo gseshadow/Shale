@@ -946,17 +946,6 @@ public final class MyShaleController {
 		}
 
 		header.getChildren().add(headerTopRow);
-		if (laneUrgency != LaneUrgency.NONE) {
-			HBox laneMetaRow = new HBox(6);
-			laneMetaRow.setAlignment(Pos.CENTER_LEFT);
-			laneMetaRow.getStyleClass().add("lane-header-meta");
-			Label urgencyBadge = new Label(laneUrgency == LaneUrgency.OVERDUE ? "Overdue" : "Due soon");
-			urgencyBadge.getStyleClass().addAll(
-					"lane-urgency-badge",
-					laneUrgency == LaneUrgency.OVERDUE ? "lane-urgency-overdue" : "lane-urgency-soon");
-			laneMetaRow.getChildren().add(urgencyBadge);
-			header.getChildren().add(laneMetaRow);
-		}
 		return header;
 	}
 
