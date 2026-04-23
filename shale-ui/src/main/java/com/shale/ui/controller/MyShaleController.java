@@ -199,6 +199,13 @@ public final class MyShaleController {
 	private Long overviewCaseFilterId;
 	private boolean overviewOverdueOnly;
 	private String overviewSortMode = OVERVIEW_SORT_DUE_ASC;
+	private VBox overviewSectionsContainer;
+	private TextField overviewSearchFieldControl;
+	private ChoiceBox<PriorityFilterOption> overviewPriorityChoiceControl;
+	private ChoiceBox<CaseFilterOption> overviewCaseChoiceControl;
+	private CheckBox overviewOverdueOnlyCheckControl;
+	private ChoiceBox<String> overviewSortChoiceControl;
+	private boolean suppressOverviewControlEvents;
 	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
@@ -1114,130 +1121,190 @@ public final class MyShaleController {
 		if (overviewMainRow == null) {
 			return;
 		}
-		overviewMainRow.getChildren().setAll(buildOverviewContent());
+		ensureOverviewContentShell();
+		List<CaseTaskListItemDto> overviewSource = overviewEligibleTasks(myTasks);
+		syncOverviewControlOptions(overviewSource);
+		renderOverviewSections(overviewSource);
 	}
 
-	private Node buildOverviewContent() {
+	private void ensureOverviewContentShell() {
+		if (overviewSectionsContainer != null
+				&& overviewMainRow.getChildren().contains(overviewSectionsContainer)
+				&& overviewSearchFieldControl != null) {
+			return;
+		}
+		VBox sections = new VBox(10);
+		sections.setFillWidth(true);
+		sections.getChildren().add(buildOverviewControlBar());
+		overviewSectionsContainer = sections;
+		overviewMainRow.getChildren().setAll(sections);
+	}
+
+	private void renderOverviewSections(List<CaseTaskListItemDto> overviewSource) {
+		if (overviewSectionsContainer == null) {
+			return;
+		}
 		LocalDate today = LocalDate.now();
-		List<CaseTaskListItemDto> overviewSource = overviewEligibleTasks(myTasks);
 		List<CaseTaskListItemDto> filteredOverviewTasks = applyOverviewFilters(overviewSource, today);
 		Map<String, List<CaseTaskListItemDto>> buckets = bucketOverviewTasksByDueWindow(filteredOverviewTasks, today);
 		List<CaseTaskListItemDto> todayTasks = sortOverviewTasks(buckets.getOrDefault("today", List.of()));
 		List<CaseTaskListItemDto> upcomingTasks = sortOverviewTasks(buckets.getOrDefault("upcoming", List.of()));
 		List<CaseTaskListItemDto> laterTasks = sortOverviewTasks(buckets.getOrDefault("later", List.of()));
 
-		VBox sections = new VBox(10);
-		sections.setFillWidth(true);
-		sections.getChildren().add(buildOverviewControlBar(overviewSource));
-		sections.getChildren().add(buildOverviewTaskSection(
+		List<Node> sectionNodes = new ArrayList<>();
+		if (overviewSectionsContainer.getChildren().isEmpty()) {
+			sectionNodes.add(buildOverviewControlBar());
+		} else {
+			sectionNodes.add(overviewSectionsContainer.getChildren().get(0));
+		}
+		sectionNodes.add(buildOverviewTaskSection(
 				"Today",
 				todayTasks,
 				"Nothing due today",
 				true));
-		sections.getChildren().add(buildOverviewTaskSection(
+		sectionNodes.add(buildOverviewTaskSection(
 				"Upcoming",
 				upcomingTasks,
 				"No tasks due in the next 7 days",
 				false));
-		sections.getChildren().add(buildOverviewTaskSection(
+		sectionNodes.add(buildOverviewTaskSection(
 				"Later",
 				laterTasks,
 				"No tasks due later this month",
 				false));
-		return sections;
+		overviewSectionsContainer.getChildren().setAll(sectionNodes);
 	}
 
-	private Node buildOverviewControlBar(List<CaseTaskListItemDto> overviewSource) {
+	private Node buildOverviewControlBar() {
 		HBox controls = new HBox(8);
 		controls.setAlignment(Pos.CENTER_LEFT);
 		controls.getStyleClass().add("glass-panel");
 		controls.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
 
-		TextField searchField = new TextField(safe(overviewSearchText));
-		searchField.setPromptText("Search title, case, or creator…");
-		HBox.setHgrow(searchField, Priority.ALWAYS);
-		searchField.textProperty().addListener((obs, oldV, newV) -> {
+		overviewSearchFieldControl = new TextField(safe(overviewSearchText));
+		overviewSearchFieldControl.setPromptText("Search title, case, or creator…");
+		HBox.setHgrow(overviewSearchFieldControl, Priority.ALWAYS);
+		overviewSearchFieldControl.textProperty().addListener((obs, oldV, newV) -> {
+			if (suppressOverviewControlEvents) {
+				return;
+			}
 			overviewSearchText = safe(newV);
-			renderMyOverview();
+			renderOverviewSections(overviewEligibleTasks(myTasks));
 		});
 
-		ChoiceBox<PriorityFilterOption> priorityChoice = new ChoiceBox<>();
-		priorityChoice.getStyleClass().add("app-toolbar-select");
-		priorityChoice.setPrefWidth(190);
-		List<PriorityFilterOption> priorityOptions = new ArrayList<>();
-		priorityOptions.add(ALL_PRIORITIES_OPTION);
-		overviewSource.stream()
-				.filter(Objects::nonNull)
-				.map(CaseTaskListItemDto::priorityId)
-				.filter(Objects::nonNull)
-				.distinct()
-				.sorted(Comparator.naturalOrder())
-				.forEach(priorityId -> priorityOptions.add(new PriorityFilterOption(
-						priorityId,
-						resolvePriorityName(priorityId))));
-		priorityChoice.getItems().setAll(priorityOptions);
-		PriorityFilterOption selectedPriority = priorityOptions.stream()
-				.filter(option -> Objects.equals(option.priorityId(), overviewPriorityFilterId))
-				.findFirst()
-				.orElse(ALL_PRIORITIES_OPTION);
-		priorityChoice.getSelectionModel().select(selectedPriority);
-		priorityChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+		overviewPriorityChoiceControl = new ChoiceBox<>();
+		overviewPriorityChoiceControl.getStyleClass().add("app-toolbar-select");
+		overviewPriorityChoiceControl.setPrefWidth(190);
+		overviewPriorityChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+			if (suppressOverviewControlEvents) {
+				return;
+			}
 			overviewPriorityFilterId = newV == null ? null : newV.priorityId();
-			renderMyOverview();
+			renderOverviewSections(overviewEligibleTasks(myTasks));
 		});
 
-		ChoiceBox<CaseFilterOption> caseChoice = new ChoiceBox<>();
-		caseChoice.getStyleClass().add("app-toolbar-select");
-		caseChoice.setPrefWidth(200);
-		List<CaseFilterOption> caseOptions = new ArrayList<>();
-		caseOptions.add(ALL_CASES_OPTION);
-		overviewSource.stream()
-				.filter(Objects::nonNull)
-				.filter(task -> task.caseId() > 0)
-				.collect(java.util.stream.Collectors.toMap(
-						CaseTaskListItemDto::caseId,
-						task -> normalizeOverviewCaseName(task.caseName(), task.caseId()),
-						(existing, ignored) -> existing,
-						LinkedHashMap::new))
-				.entrySet().stream()
-				.sorted(Map.Entry.comparingByValue(String.CASE_INSENSITIVE_ORDER))
-				.forEach(entry -> caseOptions.add(new CaseFilterOption(entry.getKey(), entry.getValue())));
-		caseChoice.getItems().setAll(caseOptions);
-		CaseFilterOption selectedCase = caseOptions.stream()
-				.filter(option -> Objects.equals(option.caseId(), overviewCaseFilterId))
-				.findFirst()
-				.orElse(ALL_CASES_OPTION);
-		caseChoice.getSelectionModel().select(selectedCase);
-		caseChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+		overviewCaseChoiceControl = new ChoiceBox<>();
+		overviewCaseChoiceControl.getStyleClass().add("app-toolbar-select");
+		overviewCaseChoiceControl.setPrefWidth(200);
+		overviewCaseChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+			if (suppressOverviewControlEvents) {
+				return;
+			}
 			overviewCaseFilterId = newV == null ? null : newV.caseId();
-			renderMyOverview();
+			renderOverviewSections(overviewEligibleTasks(myTasks));
 		});
 
-		CheckBox overdueOnlyCheck = new CheckBox("Overdue only");
-		overdueOnlyCheck.setSelected(overviewOverdueOnly);
-		overdueOnlyCheck.selectedProperty().addListener((obs, oldV, newV) -> {
+		overviewOverdueOnlyCheckControl = new CheckBox("Overdue only");
+		overviewOverdueOnlyCheckControl.setSelected(overviewOverdueOnly);
+		overviewOverdueOnlyCheckControl.selectedProperty().addListener((obs, oldV, newV) -> {
+			if (suppressOverviewControlEvents) {
+				return;
+			}
 			overviewOverdueOnly = Boolean.TRUE.equals(newV);
-			renderMyOverview();
+			renderOverviewSections(overviewEligibleTasks(myTasks));
 		});
 
-		ChoiceBox<String> sortChoice = new ChoiceBox<>();
-		sortChoice.getStyleClass().add("app-toolbar-select");
-		sortChoice.setPrefWidth(210);
-		sortChoice.getItems().setAll(
+		overviewSortChoiceControl = new ChoiceBox<>();
+		overviewSortChoiceControl.getStyleClass().add("app-toolbar-select");
+		overviewSortChoiceControl.setPrefWidth(210);
+		overviewSortChoiceControl.getItems().setAll(
 				OVERVIEW_SORT_DUE_ASC,
 				OVERVIEW_SORT_DUE_DESC,
 				OVERVIEW_SORT_PRIORITY,
 				OVERVIEW_SORT_CASE_NAME,
 				OVERVIEW_SORT_TITLE);
-		sortChoice.getSelectionModel().select(
-				sortChoice.getItems().contains(overviewSortMode) ? overviewSortMode : OVERVIEW_SORT_DUE_ASC);
-		sortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+		overviewSortChoiceControl.getSelectionModel().select(
+				overviewSortChoiceControl.getItems().contains(overviewSortMode) ? overviewSortMode : OVERVIEW_SORT_DUE_ASC);
+		overviewSortChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+			if (suppressOverviewControlEvents) {
+				return;
+			}
 			overviewSortMode = safe(newV).isBlank() ? OVERVIEW_SORT_DUE_ASC : newV;
-			renderMyOverview();
+			renderOverviewSections(overviewEligibleTasks(myTasks));
 		});
 
-		controls.getChildren().addAll(searchField, priorityChoice, caseChoice, overdueOnlyCheck, sortChoice);
+		controls.getChildren().addAll(
+				overviewSearchFieldControl,
+				overviewPriorityChoiceControl,
+				overviewCaseChoiceControl,
+				overviewOverdueOnlyCheckControl,
+				overviewSortChoiceControl);
 		return controls;
+	}
+
+	private void syncOverviewControlOptions(List<CaseTaskListItemDto> overviewSource) {
+		if (overviewPriorityChoiceControl == null
+				|| overviewCaseChoiceControl == null
+				|| overviewSearchFieldControl == null
+				|| overviewSortChoiceControl == null
+				|| overviewOverdueOnlyCheckControl == null) {
+			return;
+		}
+		suppressOverviewControlEvents = true;
+		try {
+			overviewSearchFieldControl.setText(safe(overviewSearchText));
+			overviewOverdueOnlyCheckControl.setSelected(overviewOverdueOnly);
+			overviewSortChoiceControl.getSelectionModel().select(
+					overviewSortChoiceControl.getItems().contains(overviewSortMode) ? overviewSortMode : OVERVIEW_SORT_DUE_ASC);
+
+			List<PriorityFilterOption> priorityOptions = new ArrayList<>();
+			priorityOptions.add(ALL_PRIORITIES_OPTION);
+			overviewSource.stream()
+					.filter(Objects::nonNull)
+					.map(CaseTaskListItemDto::priorityId)
+					.filter(Objects::nonNull)
+					.distinct()
+					.sorted(Comparator.naturalOrder())
+					.forEach(priorityId -> priorityOptions.add(new PriorityFilterOption(priorityId, resolvePriorityName(priorityId))));
+			overviewPriorityChoiceControl.getItems().setAll(priorityOptions);
+			PriorityFilterOption selectedPriority = priorityOptions.stream()
+					.filter(option -> Objects.equals(option.priorityId(), overviewPriorityFilterId))
+					.findFirst()
+					.orElse(ALL_PRIORITIES_OPTION);
+			overviewPriorityChoiceControl.getSelectionModel().select(selectedPriority);
+
+			List<CaseFilterOption> caseOptions = new ArrayList<>();
+			caseOptions.add(ALL_CASES_OPTION);
+			overviewSource.stream()
+					.filter(Objects::nonNull)
+					.filter(task -> task.caseId() > 0)
+					.collect(java.util.stream.Collectors.toMap(
+							CaseTaskListItemDto::caseId,
+							task -> normalizeOverviewCaseName(task.caseName(), task.caseId()),
+							(existing, ignored) -> existing,
+							LinkedHashMap::new))
+					.entrySet().stream()
+					.sorted(Map.Entry.comparingByValue(String.CASE_INSENSITIVE_ORDER))
+					.forEach(entry -> caseOptions.add(new CaseFilterOption(entry.getKey(), entry.getValue())));
+			overviewCaseChoiceControl.getItems().setAll(caseOptions);
+			CaseFilterOption selectedCase = caseOptions.stream()
+					.filter(option -> Objects.equals(option.caseId(), overviewCaseFilterId))
+					.findFirst()
+					.orElse(ALL_CASES_OPTION);
+			overviewCaseChoiceControl.getSelectionModel().select(selectedCase);
+		} finally {
+			suppressOverviewControlEvents = false;
+		}
 	}
 
 	private List<CaseTaskListItemDto> overviewEligibleTasks(List<CaseTaskListItemDto> tasks) {
