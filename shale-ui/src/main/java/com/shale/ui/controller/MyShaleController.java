@@ -217,6 +217,9 @@ public final class MyShaleController {
 	private CheckBox overviewOverdueOnlyCheckControl;
 	private ChoiceBox<String> overviewSortChoiceControl;
 	private boolean suppressOverviewControlEvents;
+	private boolean loadingOverview;
+	private boolean loadingMyTasks;
+	private boolean loadingMyCases;
 	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
@@ -911,6 +914,8 @@ public final class MyShaleController {
 		if (caseDao == null || appState == null) {
 			return;
 		}
+		loadingMyCases = true;
+		renderMyCasesBoard();
 		Integer userId = appState.getUserId();
 		Integer shaleClientId = appState.getShaleClientId();
 		System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.refreshMyCasesBoard] load started userId=" + userId
@@ -957,6 +962,13 @@ public final class MyShaleController {
 
 	private void renderMyCasesBoard() {
 		if (myCasesBoardList == null || myCasesBoardEmptyLabel == null || myCasesBoardScroll == null || myCasesLoadingLabel == null) {
+			return;
+		}
+		if (loadingMyCases) {
+			myCasesBoardList.getChildren().clear();
+			myCasesBoardEmptyLabel.setText("Loading your cases...");
+			setVisibleManaged(myCasesBoardEmptyLabel, true);
+			setVisibleManaged(myCasesBoardScroll, false);
 			return;
 		}
 		myCasesBoardList.getChildren().clear();
