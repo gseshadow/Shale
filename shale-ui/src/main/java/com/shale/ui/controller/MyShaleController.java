@@ -132,7 +132,9 @@ public final class MyShaleController {
 	@FXML
 	private VBox myCasesSectionContentHost;
 	@FXML
-	private HBox overviewMainRow;
+	private VBox overviewMainRow;
+	@FXML
+	private ScrollPane overviewScroll;
 	@FXML
 	private StackPane sectionContentStack;
 	@FXML
@@ -306,7 +308,6 @@ public final class MyShaleController {
 		}
 
 		reloadStatusFilterOptionsAndThen(() -> {
-			rerender();
 			renderMyCasesBoard();
 		});
 
@@ -314,7 +315,6 @@ public final class MyShaleController {
 		{
 			onSectionSelected(SECTION_OVERVIEW);
 			wireInfiniteScroll();
-			loadFirstPage();
 			refreshMyTasks();
 			refreshMyCasesBoard();
 		});
@@ -341,6 +341,15 @@ public final class MyShaleController {
 		if (overviewSectionPane != null) {
 			overviewSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 			StackPane.setAlignment(overviewSectionPane, Pos.TOP_LEFT);
+		}
+		if (overviewScroll != null) {
+			VBox.setVgrow(overviewScroll, Priority.ALWAYS);
+			overviewScroll.setFitToWidth(true);
+			overviewScroll.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		if (overviewMainRow != null) {
+			VBox.setVgrow(overviewMainRow, Priority.ALWAYS);
+			overviewMainRow.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		}
 		if (tasksSectionPane != null) {
 			tasksSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -405,6 +414,9 @@ public final class MyShaleController {
 		setVisibleManaged(overviewSectionPane, showOverview);
 		setVisibleManaged(tasksSectionPane, showTasks);
 		setVisibleManaged(myCasesSectionPane, showMyCases);
+		if (showOverview) {
+			renderMyOverview();
+		}
 		if (showTasks) {
 			attachTasksPanel(tasksSectionContentHost);
 		}
@@ -1098,7 +1110,6 @@ public final class MyShaleController {
 
 		VBox sections = new VBox(10);
 		sections.setFillWidth(true);
-		HBox.setHgrow(sections, Priority.ALWAYS);
 		sections.getChildren().add(buildOverviewTaskSection(
 				"Today",
 				buckets.getOrDefault("today", List.of()),
@@ -1181,7 +1192,6 @@ public final class MyShaleController {
 		VBox section = new VBox(8);
 		section.setFillWidth(true);
 		section.getStyleClass().add(prominent ? "strong-panel" : "glass-panel");
-		HBox.setHgrow(section, Priority.ALWAYS);
 		section.setPadding(new javafx.geometry.Insets(10));
 
 		Label header = new Label(title + " (" + (tasks == null ? 0 : tasks.size()) + ")");
