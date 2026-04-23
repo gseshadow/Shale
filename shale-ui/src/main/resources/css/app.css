@@ -476,16 +476,28 @@
     -fx-padding: 0 2 0 2;
 }
 
+.lane-header-top-row {
+    -fx-padding: 0 2 0 2;
+}
+
 .label.lane-task-count {
     -fx-text-fill: rgba(225, 236, 251, 0.86);
     -fx-font-size: 11px;
     -fx-font-weight: 700;
 }
 
+.label.lane-task-count-inline {
+    -fx-text-fill: rgba(208, 223, 246, 0.9);
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-padding: 0 0 1 0;
+}
+
 .label.lane-urgency-badge {
-    -fx-padding: 2 8 2 8;
+    -fx-padding: 1 8 1 8;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
+    -fx-border-width: 1;
     -fx-font-size: 10px;
     -fx-font-weight: 700;
 }
@@ -505,7 +517,8 @@
 .label.lane-empty-state {
     -fx-text-fill: rgba(220, 232, 250, 0.72);
     -fx-font-size: 12px;
-    -fx-padding: 12 8 12 8;
+    -fx-padding: 10 8 10 8;
+    -fx-font-style: italic;
 }
 
 .button.app-toolbar-button-compact,
