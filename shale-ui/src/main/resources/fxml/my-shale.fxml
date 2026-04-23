@@ -169,6 +169,27 @@
 								<Label text="My Cases" styleClass="page-heading" />
 								<Region HBox.hgrow="ALWAYS" />
 							</HBox>
+							<HBox spacing="10" alignment="TOP_LEFT">
+								<VBox spacing="4" styleClass="glass-panel" HBox.hgrow="ALWAYS">
+									<padding>
+										<Insets top="8" right="10" bottom="8" left="10" />
+									</padding>
+									<Label text="Case Controls">
+										<styleClass>
+											<String fx:value="sidebar-header" />
+											<String fx:value="my-shale-tasks-controls-label" />
+										</styleClass>
+									</Label>
+									<HBox spacing="8" alignment="CENTER_LEFT">
+										<TextField fx:id="myCasesBoardSearchField" promptText="Search case name or case number…" HBox.hgrow="ALWAYS" />
+										<ChoiceBox fx:id="myCasesBoardSortChoice" prefWidth="220">
+											<styleClass>
+												<String fx:value="app-toolbar-select" />
+											</styleClass>
+										</ChoiceBox>
+									</HBox>
+								</VBox>
+							</HBox>
 							<Label fx:id="myCasesBoardEmptyLabel" text="No cases assigned to you." managed="false" visible="false" />
 							<ScrollPane fx:id="myCasesBoardScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
 								vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">

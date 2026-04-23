@@ -535,6 +535,18 @@
     -fx-font-style: italic;
 }
 
+.label.my-cases-lane-title {
+    -fx-text-fill: rgba(242, 248, 255, 0.98);
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+}
+
+.label.my-cases-lane-count {
+    -fx-text-fill: rgba(233, 243, 255, 0.92);
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+}
+
 .button.app-toolbar-button-compact,
 .menu-button.app-toolbar-button-compact,
 .split-menu-button.app-toolbar-button-compact {

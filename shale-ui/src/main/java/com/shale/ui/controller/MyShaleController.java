@@ -141,6 +141,10 @@ public final class MyShaleController {
 	private HBox myCasesBoardList;
 	@FXML
 	private Label myCasesBoardEmptyLabel;
+	@FXML
+	private TextField myCasesBoardSearchField;
+	@FXML
+	private ChoiceBox<String> myCasesBoardSortChoice;
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
@@ -284,6 +288,14 @@ public final class MyShaleController {
 		}
 		preferredMyTasksPriorityFilterId = restoreMyTasksPriorityFilterPreference();
 		preferredMyTasksCaseFilterId = restoreMyTasksCaseFilterPreference();
+		if (myCasesBoardSortChoice != null) {
+			myCasesBoardSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
+			myCasesBoardSortChoice.getSelectionModel().select(SORT_NAME);
+			myCasesBoardSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
+		}
+		if (myCasesBoardSearchField != null) {
+			myCasesBoardSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
+		}
 
 		reloadStatusFilterOptionsAndThen(() -> {
 			rerender();
@@ -864,6 +876,8 @@ public final class MyShaleController {
 		}
 		myCasesBoardList.getChildren().clear();
 		LaneBoardLayout.configureBoardRow(myCasesBoardList);
+		String searchQuery = normalizeSearchQuery(myCasesBoardSearchField == null ? null : myCasesBoardSearchField.getText());
+		Comparator<CaseCardVm> laneSort = myCasesLaneComparator(myCasesBoardSortChoice == null ? SORT_NAME : myCasesBoardSortChoice.getValue());
 
 		Map<Integer, List<CaseCardVm>> byStatus = new LinkedHashMap<>();
 		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
@@ -874,6 +888,9 @@ public final class MyShaleController {
 		List<CaseCardVm> noStatus = new ArrayList<>();
 		for (CaseCardVm vm : myAssignedCasesBoard) {
 			if (vm == null || vm.id <= 0) {
+				continue;
+			}
+			if (!matchesMyCasesBoardSearch(vm, searchQuery)) {
 				continue;
 			}
 			Integer statusId = vm.primaryStatusId;
@@ -889,11 +906,19 @@ public final class MyShaleController {
 				continue;
 			}
 			String statusName = safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim();
-			List<CaseCardVm> laneCases = byStatus.getOrDefault(status.id(), List.of());
+			List<CaseCardVm> laneCases = byStatus.getOrDefault(status.id(), List.of()).stream()
+					.sorted(laneSort)
+					.toList();
+			if (laneCases.isEmpty()) {
+				continue;
+			}
 			myCasesBoardList.getChildren().add(createMyCasesStatusLane(statusName, laneCases));
 		}
 		if (!noStatus.isEmpty()) {
-			myCasesBoardList.getChildren().add(createMyCasesStatusLane("No Status", noStatus));
+			List<CaseCardVm> sortedNoStatus = noStatus.stream()
+					.sorted(laneSort)
+					.toList();
+			myCasesBoardList.getChildren().add(createMyCasesStatusLane("No Status", sortedNoStatus));
 		}
 
 		boolean hasAnyCards = myCasesBoardList.getChildren().stream().anyMatch(Objects::nonNull);
@@ -907,21 +932,15 @@ public final class MyShaleController {
 		header.setAlignment(Pos.CENTER_LEFT);
 		header.getStyleClass().add("lane-header-top-row");
 		Label titleLabel = new Label(statusName);
-		titleLabel.getStyleClass().add("sidebar-header");
+		titleLabel.getStyleClass().add("my-cases-lane-title");
 		Label countLabel = new Label("(" + caseCount + ")");
-		countLabel.getStyleClass().add("lane-task-count-inline");
+		countLabel.getStyleClass().add("my-cases-lane-count");
 		header.getChildren().addAll(titleLabel, countLabel);
 
 		VBox body = new VBox(10);
 		body.setFillWidth(true);
-		if (laneCases == null || laneCases.isEmpty()) {
-			Label emptyLabel = new Label("No cases");
-			emptyLabel.getStyleClass().add("lane-empty-state");
-			body.getChildren().add(emptyLabel);
-		} else {
-			for (CaseCardVm vm : laneCases) {
-				body.getChildren().add(buildCaseCard(vm));
-			}
+		for (CaseCardVm vm : laneCases) {
+			body.getChildren().add(buildCaseCard(vm));
 		}
 		return LaneBoardLayout.createLane(
 				header,
@@ -930,6 +949,33 @@ public final class MyShaleController {
 						MY_CASES_STATUS_COLUMN_MIN_WIDTH,
 						MY_CASES_STATUS_COLUMN_PREF_WIDTH,
 						MY_CASES_STATUS_COLUMN_MAX_WIDTH));
+	}
+
+	private Comparator<CaseCardVm> myCasesLaneComparator(String sortOption) {
+		if (SORT_INTAKE.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.intakeDate, Comparator.nullsLast(Comparator.reverseOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		if (SORT_SOL.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.solDate, Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		return Comparator.comparing((CaseCardVm vm) -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+				.thenComparingLong(vm -> vm.id);
+	}
+
+	private boolean matchesMyCasesBoardSearch(CaseCardVm vm, String query) {
+		if (vm == null) {
+			return false;
+		}
+		if (query == null || query.isBlank()) {
+			return true;
+		}
+		String normalized = query.toLowerCase(Locale.ROOT);
+		return safe(vm.name).toLowerCase(Locale.ROOT).contains(normalized)
+				|| String.valueOf(vm.id).contains(normalized);
 	}
 
 	private void renderMyTasks() {
