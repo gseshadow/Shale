@@ -919,7 +919,11 @@ public final class MyShaleController {
 		VBox header = new VBox(6);
 		HBox headerTopRow = new HBox(8);
 		headerTopRow.setAlignment(Pos.CENTER_LEFT);
+		headerTopRow.getStyleClass().add("lane-header-top-row");
 		headerTopRow.getChildren().add(caseCard);
+		Label inlineCountLabel = new Label("(" + taskCount + ")");
+		inlineCountLabel.getStyleClass().add("lane-task-count-inline");
+		headerTopRow.getChildren().add(inlineCountLabel);
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		headerTopRow.getChildren().add(spacer);
@@ -939,14 +943,7 @@ public final class MyShaleController {
 			headerTopRow.getChildren().add(pinButton);
 		}
 
-		HBox laneMetaRow = new HBox(6);
-		laneMetaRow.setAlignment(Pos.CENTER_LEFT);
-		laneMetaRow.getStyleClass().add("lane-header-meta");
-		Label taskCountLabel = new Label(taskCount == 1 ? "1 task" : (taskCount + " tasks"));
-		taskCountLabel.getStyleClass().add("lane-task-count");
-		laneMetaRow.getChildren().add(taskCountLabel);
-
-		header.getChildren().addAll(headerTopRow, laneMetaRow);
+		header.getChildren().add(headerTopRow);
 		return header;
 	}
 
@@ -1029,6 +1026,7 @@ public final class MyShaleController {
 		if (tasksInLane == null || tasksInLane.isEmpty()) {
 			Label emptyLabel = new Label("No tasks");
 			emptyLabel.getStyleClass().add("lane-empty-state");
+			taskCards.setAlignment(Pos.TOP_LEFT);
 			taskCards.getChildren().add(emptyLabel);
 			return taskCards;
 		}
