@@ -30,6 +30,7 @@ public final class TaskCard extends VBox {
 
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
 	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
+	private static final double COMPACT_CARD_WIDTH = 210;
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
@@ -45,7 +46,7 @@ public final class TaskCard extends VBox {
 	private final Label teamSectionLabel = new Label("Team:");
 	private final VBox teamSection = new VBox(3, teamSectionLabel, assigneeHost);
 	private final Region compactMetadataSpacer = new Region();
-	private final HBox compactMetadataRow = new HBox(12, caseSection, compactMetadataSpacer);
+	private final HBox compactMetadataRow = new HBox(8, caseSection, compactMetadataSpacer, teamSection);
 	private final Button toggleCompleteButton = new Button();
 	private final Region actionsSpacer = new Region();
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
@@ -253,27 +254,34 @@ public final class TaskCard extends VBox {
 		setDueAt(dueAtValue);
 		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel, dueLabel);
 		compactTitleRow.getChildren().setAll(compactTitleBlock);
-		getChildren().setAll(compactTitleRow, compactMetadataRow, teamSection, completedLabel, actionsRow);
-		setSpacing(5);
-		setPadding(new Insets(8, 10, 8, 10));
+		getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel);
+		setSpacing(3);
+		setPadding(new Insets(6, 8, 6, 8));
 		setAlignment(Pos.TOP_LEFT);
-		setMinWidth(320);
-		setPrefWidth(320);
-		setMaxWidth(320);
-		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
-		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
-		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		setMinWidth(COMPACT_CARD_WIDTH);
+		setPrefWidth(COMPACT_CARD_WIDTH);
+		setMaxWidth(COMPACT_CARD_WIDTH);
+		titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		dueLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
 		compactTitleBlock.setMinWidth(0);
+		compactTitleBlock.setSpacing(1);
 		dueLabel.setWrapText(false);
 		compactTitleRow.setAlignment(Pos.CENTER_LEFT);
 		configureRelatedSections();
-		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+		completedLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
 		compactMetadataRow.setAlignment(Pos.TOP_LEFT);
-		actionsRow.setAlignment(Pos.CENTER_RIGHT);
+		compactMetadataRow.getStyleClass().setAll("app-taskcard-compact-meta-row");
+		caseSection.getStyleClass().setAll("app-taskcard-compact-meta-section");
+		teamSection.getStyleClass().setAll("app-taskcard-compact-meta-section");
+		compactTitleRow.getStyleClass().setAll("app-taskcard-compact-title-row");
+		compactTitleBlock.getStyleClass().setAll("app-taskcard-compact-title-block");
+		caseSection.setMinWidth(0);
+		teamSection.setMinWidth(0);
 		refreshSurfaceStyle();
 	}
 
@@ -383,8 +391,11 @@ public final class TaskCard extends VBox {
 	private void configureRelatedSections() {
 		caseSection.getChildren().setAll(caseSectionLabel, relatedCaseHost);
 		teamSection.getChildren().setAll(teamSectionLabel, assigneeHost);
-		caseSectionLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
-		teamSectionLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+		String sectionLabelStyle = currentVariant == Variant.COMPACT || currentVariant == Variant.COMPACT_FLUID
+				? "-fx-font-size: 9px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);"
+				: "-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);";
+		caseSectionLabel.setStyle(sectionLabelStyle);
+		teamSectionLabel.setStyle(sectionLabelStyle);
 		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
 		relatedCaseHost.setMaxWidth(Region.USE_PREF_SIZE);
 		assigneeHost.setAlignment(Pos.CENTER_LEFT);
