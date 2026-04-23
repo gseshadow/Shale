@@ -536,15 +536,17 @@
 }
 
 .label.my-cases-lane-title {
-    -fx-text-fill: rgba(242, 248, 255, 0.98);
+    -fx-text-fill: #1a2230;
     -fx-font-size: 12px;
     -fx-font-weight: 800;
+    -fx-opacity: 1.0;
 }
 
 .label.my-cases-lane-count {
-    -fx-text-fill: rgba(233, 243, 255, 0.92);
+    -fx-text-fill: #2c3a4f;
     -fx-font-size: 11px;
     -fx-font-weight: 800;
+    -fx-opacity: 1.0;
 }
 
 .button.app-toolbar-button-compact,
