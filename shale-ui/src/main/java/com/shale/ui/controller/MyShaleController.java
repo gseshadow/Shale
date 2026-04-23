@@ -73,9 +73,13 @@ public final class MyShaleController {
 	private static final PriorityFilterOption ALL_PRIORITIES_OPTION = new PriorityFilterOption(null, "All Priorities");
 	private static final String SECTION_OVERVIEW = "Overview";
 	private static final String SECTION_TASKS = "Tasks";
+	private static final String SECTION_MY_CASES = "My Cases";
 	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
 	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
 	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 300;
+	private static final double MY_CASES_STATUS_COLUMN_MIN_WIDTH = 245;
+	private static final double MY_CASES_STATUS_COLUMN_PREF_WIDTH = 280;
+	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 320;
 	private static final String NO_CASE_COLUMN_TITLE = "No Case";
 	private static final String MY_TASKS_BOARD_KEY = "my_shale_tasks";
 	private static final String MY_TASKS_LANE_TYPE_CASE = "CASE";
@@ -120,13 +124,23 @@ public final class MyShaleController {
 	@FXML
 	private VBox tasksSectionPane;
 	@FXML
+	private VBox myCasesSectionPane;
+	@FXML
 	private VBox myTasksPanel;
 	@FXML
 	private VBox tasksSectionContentHost;
 	@FXML
+	private VBox myCasesSectionContentHost;
+	@FXML
 	private HBox overviewMainRow;
 	@FXML
 	private StackPane sectionContentStack;
+	@FXML
+	private ScrollPane myCasesBoardScroll;
+	@FXML
+	private HBox myCasesBoardList;
+	@FXML
+	private Label myCasesBoardEmptyLabel;
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
@@ -153,6 +167,7 @@ public final class MyShaleController {
 	private List<CaseTaskListItemDto> myTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
 	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
+	private List<CaseCardVm> myAssignedCasesBoard = List.of();
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private final Set<Long> pinnedTaskLaneCaseIds = new LinkedHashSet<>();
@@ -270,7 +285,10 @@ public final class MyShaleController {
 		preferredMyTasksPriorityFilterId = restoreMyTasksPriorityFilterPreference();
 		preferredMyTasksCaseFilterId = restoreMyTasksCaseFilterPreference();
 
-		reloadStatusFilterOptionsAndThen(this::rerender);
+		reloadStatusFilterOptionsAndThen(() -> {
+			rerender();
+			renderMyCasesBoard();
+		});
 
 		Platform.runLater(() ->
 		{
@@ -278,6 +296,7 @@ public final class MyShaleController {
 			wireInfiniteScroll();
 			loadFirstPage();
 			refreshMyTasks();
+			refreshMyCasesBoard();
 		});
 
 		if (myCasesFlow != null) {
@@ -307,9 +326,17 @@ public final class MyShaleController {
 			tasksSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 			StackPane.setAlignment(tasksSectionPane, Pos.TOP_LEFT);
 		}
+		if (myCasesSectionPane != null) {
+			myCasesSectionPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+			StackPane.setAlignment(myCasesSectionPane, Pos.TOP_LEFT);
+		}
 		if (tasksSectionContentHost != null) {
 			VBox.setVgrow(tasksSectionContentHost, Priority.ALWAYS);
 			tasksSectionContentHost.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
+		if (myCasesSectionContentHost != null) {
+			VBox.setVgrow(myCasesSectionContentHost, Priority.ALWAYS);
+			myCasesSectionContentHost.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		}
 		if (myTasksPanel != null) {
 			VBox.setVgrow(myTasksPanel, Priority.ALWAYS);
@@ -320,6 +347,11 @@ public final class MyShaleController {
 			myTasksScroll.setFitToHeight(true);
 			myTasksScroll.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		}
+		if (myCasesBoardScroll != null) {
+			VBox.setVgrow(myCasesBoardScroll, Priority.ALWAYS);
+			myCasesBoardScroll.setFitToHeight(true);
+			myCasesBoardScroll.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		}
 	}
 
 	private void setupSections() {
@@ -328,7 +360,7 @@ public final class MyShaleController {
 		}
 		sectionButtons.clear();
 		sectionButtonsBox.getChildren().clear();
-		for (String section : List.of(SECTION_OVERVIEW, SECTION_TASKS)) {
+		for (String section : List.of(SECTION_OVERVIEW, SECTION_TASKS, SECTION_MY_CASES)) {
 			Button button = new Button(section);
 			button.setMaxWidth(Double.MAX_VALUE);
 			button.setAlignment(Pos.CENTER_LEFT);
@@ -348,12 +380,16 @@ public final class MyShaleController {
 		Button activeButton = sectionButtons.get(section);
 		NavButtonStyler.setActive(activeButton, sectionButtons.values());
 		boolean showOverview = SECTION_OVERVIEW.equals(section);
+		boolean showTasks = SECTION_TASKS.equals(section);
+		boolean showMyCases = SECTION_MY_CASES.equals(section);
 		setVisibleManaged(overviewSectionPane, showOverview);
-		setVisibleManaged(tasksSectionPane, !showOverview);
-		if (!showOverview) {
+		setVisibleManaged(tasksSectionPane, showTasks);
+		setVisibleManaged(myCasesSectionPane, showMyCases);
+		if (showTasks) {
 			attachTasksPanel(tasksSectionContentHost);
 		}
 		renderMyTasks();
+		renderMyCasesBoard();
 	}
 
 	private void attachTasksPanel(Pane host) {
@@ -489,6 +525,7 @@ public final class MyShaleController {
 
 					if (changed) {
 						rerender();
+						refreshMyCasesBoard();
 					}
 				});
 			} catch (Exception ex) {
@@ -785,6 +822,114 @@ public final class MyShaleController {
 				runOnFx(() -> showTaskActionError("Failed to load your tasks."));
 			}
 		});
+	}
+
+	private void refreshMyCasesBoard() {
+		if (caseDao == null || appState == null) {
+			return;
+		}
+		Integer userId = appState.getUserId();
+		Integer shaleClientId = appState.getShaleClientId();
+		if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
+			myAssignedCasesBoard = List.of();
+			renderMyCasesBoard();
+			return;
+		}
+		final int userIdValue = userId;
+		dbExec.submit(() -> {
+			try {
+				List<CaseDao.CaseRow> rows = caseDao.listAssignedCasesForBoard(userIdValue);
+				List<CaseCardVm> cases = (rows == null ? List.<CaseDao.CaseRow>of() : rows).stream()
+						.filter(Objects::nonNull)
+						.map(this::toVm)
+						.toList();
+				runOnFx(() -> {
+					myAssignedCasesBoard = cases;
+					renderMyCasesBoard();
+				});
+			} catch (Exception ex) {
+				System.err.println("My cases board load failed: " + ex.getMessage());
+				ex.printStackTrace();
+				runOnFx(() -> {
+					myAssignedCasesBoard = List.of();
+					renderMyCasesBoard();
+				});
+			}
+		});
+	}
+
+	private void renderMyCasesBoard() {
+		if (myCasesBoardList == null || myCasesBoardEmptyLabel == null || myCasesBoardScroll == null) {
+			return;
+		}
+		myCasesBoardList.getChildren().clear();
+		LaneBoardLayout.configureBoardRow(myCasesBoardList);
+
+		Map<Integer, List<CaseCardVm>> byStatus = new LinkedHashMap<>();
+		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
+			if (status != null) {
+				byStatus.putIfAbsent(status.id(), new ArrayList<>());
+			}
+		}
+		List<CaseCardVm> noStatus = new ArrayList<>();
+		for (CaseCardVm vm : myAssignedCasesBoard) {
+			if (vm == null || vm.id <= 0) {
+				continue;
+			}
+			Integer statusId = vm.primaryStatusId;
+			if (statusId == null) {
+				noStatus.add(vm);
+				continue;
+			}
+			byStatus.computeIfAbsent(statusId, ignored -> new ArrayList<>()).add(vm);
+		}
+
+		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
+			if (status == null) {
+				continue;
+			}
+			String statusName = safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim();
+			List<CaseCardVm> laneCases = byStatus.getOrDefault(status.id(), List.of());
+			myCasesBoardList.getChildren().add(createMyCasesStatusLane(statusName, laneCases));
+		}
+		if (!noStatus.isEmpty()) {
+			myCasesBoardList.getChildren().add(createMyCasesStatusLane("No Status", noStatus));
+		}
+
+		boolean hasAnyCards = myCasesBoardList.getChildren().stream().anyMatch(Objects::nonNull);
+		setVisibleManaged(myCasesBoardEmptyLabel, !hasAnyCards);
+		setVisibleManaged(myCasesBoardScroll, hasAnyCards);
+	}
+
+	private VBox createMyCasesStatusLane(String statusName, List<CaseCardVm> laneCases) {
+		int caseCount = laneCases == null ? 0 : laneCases.size();
+		HBox header = new HBox(8);
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.getStyleClass().add("lane-header-top-row");
+		Label titleLabel = new Label(statusName);
+		titleLabel.getStyleClass().add("sidebar-header");
+		Label countLabel = new Label("(" + caseCount + ")");
+		countLabel.getStyleClass().add("lane-task-count-inline");
+		header.getChildren().addAll(titleLabel, countLabel);
+
+		VBox body = new VBox(10);
+		body.setFillWidth(true);
+		if (laneCases == null || laneCases.isEmpty()) {
+			Label emptyLabel = new Label("No cases");
+			emptyLabel.getStyleClass().add("lane-empty-state");
+			body.getChildren().add(emptyLabel);
+		} else {
+			for (CaseCardVm vm : laneCases) {
+				body.getChildren().add(buildCaseCard(vm));
+			}
+		}
+		return LaneBoardLayout.createLane(
+				header,
+				body,
+				new LaneBoardLayout.LaneWidth(
+						MY_CASES_STATUS_COLUMN_MIN_WIDTH,
+						MY_CASES_STATUS_COLUMN_PREF_WIDTH,
+						MY_CASES_STATUS_COLUMN_MAX_WIDTH));
 	}
 
 	private void renderMyTasks() {
@@ -1719,6 +1864,10 @@ public final class MyShaleController {
 
 	private void showTaskActionError(String message) {
 		AppDialogs.showError(taskDialogOwner(), "Tasks", message);
+	}
+
+	private void suppressMyTasksScrollTopRightCornerOverlay() {
+		// no-op: retained to keep existing my-tasks rendering flow stable
 	}
 
 	private String rootCauseMessage(Throwable throwable) {

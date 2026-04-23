@@ -899,6 +899,106 @@ public final class CaseDao {
 		}
 	}
 
+	public List<CaseRow> listAssignedCasesForBoard(int userId) {
+		if (userId <= 0) {
+			return List.of();
+		}
+		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listAssignedCasesForBoard] "
+				+ "daoQueryMethodName=listAssignedCasesForBoard "
+				+ " daoInputUserId=" + userId
+				+ " selectedUserId=" + userId);
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			int shaleClientId = requireCurrentShaleClientId(con);
+			String caseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "cu_scope");
+			String sql = """
+					SELECT
+					  c.Id,
+					  c.Name,
+					  c.CallerDate,
+					  c.StatuteOfLimitations,
+					  current_status.PrimaryStatusId,
+					  ra.UserId AS ResponsibleAttorneyId,
+					  u.color AS ResponsibleAttorneyColor,
+					  c.NonEngagementLetterSent AS NonEngagementLetterSent,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS ResponsibleAttorneyName
+					FROM %s c
+					OUTER APPLY (
+					    SELECT TOP (1) s.Id AS PrimaryStatusId
+					    FROM %s cs
+					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    WHERE cs.CaseId = c.Id
+					    ORDER BY
+					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+					      cs.UpdatedAt DESC,
+					      cs.CreatedAt DESC,
+					      cs.Id DESC
+					) current_status
+					OUTER APPLY (
+					    SELECT TOP (1) cu.UserId
+					    FROM %s cu
+					    WHERE cu.CaseId = c.Id
+					      AND cu.RoleId = ?
+					      AND cu.IsPrimary = 1
+					    ORDER BY
+					      cu.UpdatedAt DESC,
+					      cu.CreatedAt DESC,
+					      cu.Id DESC
+					) ra
+					LEFT JOIN %s u
+					  ON u.id = ra.UserId
+					WHERE %s
+					  AND c.ShaleClientId = ?
+					  AND EXISTS (
+					    SELECT 1
+					    FROM %s cu_scope
+					    WHERE cu_scope.CaseId = c.Id
+					      AND cu_scope.UserId = ?
+					      AND %s
+					  )
+					ORDER BY c.CallerDate DESC, c.Id DESC;
+					""".formatted(
+					CASES_TABLE,
+					CASE_STATUSES_TABLE,
+					STATUSES_TABLE,
+					CASE_USERS_TABLE,
+					USERS_TABLE,
+					activeFilter(schema.deletedColumn(), "c"),
+					CASE_USERS_TABLE,
+					caseUserActiveFilter);
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, shaleClientId);
+				ps.setInt(idx++, userId);
+
+				List<CaseRow> out = new ArrayList<>();
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						out.add(new CaseRow(
+								rs.getLong("Id"),
+								rs.getString("Name"),
+								toLocalDate(rs.getDate("CallerDate")),
+								toLocalDate(rs.getDate("StatuteOfLimitations")),
+								getNullableInt(rs, "PrimaryStatusId"),
+								getNullableInt(rs, "ResponsibleAttorneyId"),
+								rs.getString("ResponsibleAttorneyName"),
+								rs.getString("ResponsibleAttorneyColor"),
+								getNullableBoolean(rs, "NonEngagementLetterSent")));
+					}
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list assigned cases for board (userId=" + userId + ")", e);
+		}
+	}
+
 	public List<CaseRow> searchCasesByName(String query) {
 		String normalizedQuery = normalizeSearchQuery(query);
 		if (normalizedQuery.isBlank()) {
