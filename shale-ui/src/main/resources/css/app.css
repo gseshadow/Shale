@@ -476,6 +476,10 @@
     -fx-padding: 0 2 0 2;
 }
 
+.lane-header-top-row {
+    -fx-padding: 0 2 0 2;
+}
+
 .label.lane-task-count {
     -fx-text-fill: rgba(225, 236, 251, 0.86);
     -fx-font-size: 11px;
