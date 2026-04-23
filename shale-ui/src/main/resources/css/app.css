@@ -440,6 +440,23 @@
     -fx-font-weight: 700;
 }
 
+.app-taskcard-compact-title-row {
+    -fx-padding: 0 0 1 0;
+}
+
+.app-taskcard-compact-title-block {
+    -fx-spacing: 1;
+}
+
+.app-taskcard-compact-meta-row {
+    -fx-spacing: 8;
+    -fx-padding: 0;
+}
+
+.app-taskcard-compact-meta-section {
+    -fx-spacing: 2;
+}
+
 .button.lane-pin-button {
     -fx-min-width: 28;
     -fx-pref-width: 28;
