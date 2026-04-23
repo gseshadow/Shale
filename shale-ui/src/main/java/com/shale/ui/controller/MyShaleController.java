@@ -72,7 +72,7 @@ public final class MyShaleController {
 	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
 	private static final PriorityFilterOption ALL_PRIORITIES_OPTION = new PriorityFilterOption(null, "All Priorities");
 	private static final String SECTION_OVERVIEW = "Overview";
-	private static final String SECTION_TASKS = "Tasks";
+	private static final String SECTION_TASKS = "My Tasks";
 	private static final String SECTION_MY_CASES = "My Cases";
 	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
 	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
@@ -781,6 +781,7 @@ public final class MyShaleController {
 		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
 			myTasks = List.of();
 			myTaskAssignedUsers = java.util.Map.of();
+			renderMyOverview();
 			renderMyTasks();
 			return;
 		}
@@ -835,6 +836,7 @@ public final class MyShaleController {
 						myTaskPrioritiesById = prioritiesById;
 						syncMyTaskPriorityFilterOptions();
 						syncMyTaskCaseFilterOptions();
+						renderMyOverview();
 						renderMyTasks();
 					});
 			} catch (Exception ex) {
@@ -1081,6 +1083,138 @@ public final class MyShaleController {
 		setVisibleManaged(myTasksScroll, true);
 		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(),
 				renderStartNanos);
+	}
+
+	private void renderMyOverview() {
+		if (overviewMainRow == null) {
+			return;
+		}
+		overviewMainRow.getChildren().setAll(buildOverviewContent());
+	}
+
+	private Node buildOverviewContent() {
+		LocalDate today = LocalDate.now();
+		Map<String, List<CaseTaskListItemDto>> buckets = bucketOverviewTasksByDueWindow(myTasks, today);
+
+		VBox sections = new VBox(10);
+		sections.setFillWidth(true);
+		HBox.setHgrow(sections, Priority.ALWAYS);
+		sections.getChildren().add(buildOverviewTaskSection(
+				"Today",
+				buckets.getOrDefault("today", List.of()),
+				"Nothing due today",
+				true));
+		sections.getChildren().add(buildOverviewTaskSection(
+				"Upcoming",
+				buckets.getOrDefault("upcoming", List.of()),
+				"No tasks due in the next 7 days",
+				false));
+		sections.getChildren().add(buildOverviewTaskSection(
+				"Later",
+				buckets.getOrDefault("later", List.of()),
+				"No tasks due later this month",
+				false));
+		return sections;
+	}
+
+	private Map<String, List<CaseTaskListItemDto>> bucketOverviewTasksByDueWindow(List<CaseTaskListItemDto> tasks, LocalDate today) {
+		List<CaseTaskListItemDto> todayTasks = new ArrayList<>();
+		List<CaseTaskListItemDto> upcomingTasks = new ArrayList<>();
+		List<CaseTaskListItemDto> laterTasks = new ArrayList<>();
+		if (tasks != null) {
+			for (CaseTaskListItemDto task : tasks) {
+				if (task == null || task.completedAt() != null || task.dueAt() == null) {
+					continue;
+				}
+				if (isTaskInTodayBucket(task, today)) {
+					todayTasks.add(task);
+				} else if (isTaskInUpcomingBucket(task, today)) {
+					upcomingTasks.add(task);
+				} else if (isTaskInLaterBucket(task, today)) {
+					laterTasks.add(task);
+				}
+			}
+		}
+		todayTasks.sort(Comparator
+				.comparing((CaseTaskListItemDto task) -> task.dueAt().toLocalDate().isBefore(today) ? 0 : 1)
+				.thenComparing(CaseTaskListItemDto::dueAt)
+				.thenComparing(task -> safe(resolveMyTaskCardTitle(task)), String.CASE_INSENSITIVE_ORDER));
+		Comparator<CaseTaskListItemDto> byDueThenTitle = Comparator
+				.comparing(CaseTaskListItemDto::dueAt)
+				.thenComparing(task -> safe(resolveMyTaskCardTitle(task)), String.CASE_INSENSITIVE_ORDER);
+		upcomingTasks.sort(byDueThenTitle);
+		laterTasks.sort(byDueThenTitle);
+
+		Map<String, List<CaseTaskListItemDto>> buckets = new LinkedHashMap<>();
+		buckets.put("today", todayTasks);
+		buckets.put("upcoming", upcomingTasks);
+		buckets.put("later", laterTasks);
+		return buckets;
+	}
+
+	private boolean isTaskInTodayBucket(CaseTaskListItemDto task, LocalDate today) {
+		LocalDate dueDate = task == null || task.dueAt() == null ? null : task.dueAt().toLocalDate();
+		return dueDate != null && (dueDate.isBefore(today) || dueDate.isEqual(today));
+	}
+
+	private boolean isTaskInUpcomingBucket(CaseTaskListItemDto task, LocalDate today) {
+		LocalDate dueDate = task == null || task.dueAt() == null ? null : task.dueAt().toLocalDate();
+		if (dueDate == null) {
+			return false;
+		}
+		LocalDate start = today.plusDays(1);
+		LocalDate end = today.plusDays(7);
+		return !dueDate.isBefore(start) && !dueDate.isAfter(end);
+	}
+
+	private boolean isTaskInLaterBucket(CaseTaskListItemDto task, LocalDate today) {
+		LocalDate dueDate = task == null || task.dueAt() == null ? null : task.dueAt().toLocalDate();
+		if (dueDate == null) {
+			return false;
+		}
+		LocalDate start = today.plusDays(8);
+		LocalDate end = today.plusDays(30);
+		return !dueDate.isBefore(start) && !dueDate.isAfter(end);
+	}
+
+	private Node buildOverviewTaskSection(String title, List<CaseTaskListItemDto> tasks, String emptyState, boolean prominent) {
+		VBox section = new VBox(8);
+		section.setFillWidth(true);
+		section.getStyleClass().add(prominent ? "strong-panel" : "glass-panel");
+		HBox.setHgrow(section, Priority.ALWAYS);
+		section.setPadding(new javafx.geometry.Insets(10));
+
+		Label header = new Label(title + " (" + (tasks == null ? 0 : tasks.size()) + ")");
+		header.getStyleClass().add(prominent ? "page-heading" : "sidebar-header");
+		section.getChildren().add(header);
+
+		VBox taskCards = new VBox(8);
+		taskCards.setFillWidth(true);
+		if (tasks == null || tasks.isEmpty()) {
+			Label emptyLabel = new Label(emptyState);
+			emptyLabel.getStyleClass().add("lane-empty-state");
+			taskCards.getChildren().add(emptyLabel);
+		} else {
+			for (CaseTaskListItemDto task : tasks) {
+				TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+						task.id(),
+						task.caseId(),
+						task.caseName(),
+						task.caseResponsibleAttorney(),
+						task.caseResponsibleAttorneyColor(),
+						task.caseNonEngagementLetterSent(),
+						resolveMyTaskCardTitle(task),
+						task.description(),
+						task.createdByDisplayName(),
+						task.priorityColorHex(),
+						task.dueAt(),
+						task.completedAt(),
+						myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+			}
+		}
+		section.getChildren().add(taskCards);
+		return section;
 	}
 
 	private Map<TaskLaneKey, List<CaseTaskListItemDto>> groupTasksByLane(List<CaseTaskListItemDto> tasks) {
