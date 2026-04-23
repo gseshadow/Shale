@@ -801,6 +801,7 @@ public final class MyShaleController {
 			myTasksEmptyLabel.setText(showCompletedMyTasks
 					? "No tasks assigned to you."
 					: "No incomplete tasks assigned to you.");
+			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}
@@ -808,6 +809,7 @@ public final class MyShaleController {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
 			myTasksEmptyLabel.setText("No tasks found.");
+			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
 		}

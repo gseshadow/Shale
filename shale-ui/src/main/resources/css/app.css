@@ -380,6 +380,16 @@
     -fx-border-color: rgba(214, 229, 249, 0.42);
 }
 
+.my-tasks-lane-header {
+    -fx-padding: 2 0 0 0;
+}
+
+.my-tasks-lane-count {
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: rgba(17, 37, 66, 0.72);
+}
+
 .button.app-toolbar-button-danger,
 .menu-button.app-toolbar-button-danger,
 .split-menu-button.app-toolbar-button-danger {
@@ -654,6 +664,11 @@
 .surface-scroll,
 .surface-scroll > .viewport {
     -fx-background-color: transparent;
+}
+
+.surface-scroll > .corner {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
 }
 
 .transparent-scroll {
