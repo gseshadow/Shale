@@ -47,6 +47,22 @@
 							<HBox spacing="8" alignment="CENTER_LEFT">
 								<Label text="My Tasks" styleClass="page-heading" />
 								<Region HBox.hgrow="ALWAYS" />
+								<HBox spacing="6" alignment="CENTER_RIGHT" styleClass="my-tasks-view-toggle-group">
+									<Button fx:id="myTasksBoardViewButton" text="Board">
+										<styleClass>
+											<String fx:value="app-toolbar-button" />
+											<String fx:value="app-toolbar-button-neutral" />
+											<String fx:value="my-tasks-view-toggle" />
+										</styleClass>
+									</Button>
+									<Button fx:id="myTasksGridViewButton" text="Grid">
+										<styleClass>
+											<String fx:value="app-toolbar-button" />
+											<String fx:value="app-toolbar-button-neutral" />
+											<String fx:value="my-tasks-view-toggle" />
+										</styleClass>
+									</Button>
+								</HBox>
 							</HBox>
 							<HBox spacing="10" alignment="TOP_LEFT">
 								<VBox spacing="4" styleClass="glass-panel" HBox.hgrow="ALWAYS">

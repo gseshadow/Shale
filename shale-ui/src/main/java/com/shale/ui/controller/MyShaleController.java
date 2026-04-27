@@ -97,6 +97,8 @@ public final class MyShaleController {
 	private static final String PREF_MY_TASKS_PRIORITY_FILTER = "my_shale_tasks.priority_filter";
 	private static final String PREF_MY_TASKS_LANE_ORDER = "my_shale_tasks.lane_order";
 	private static final String PREF_MY_TASKS_CASE_FILTER = "my_shale_tasks.case_filter";
+	private static final double MY_TASKS_GRID_HGAP = 10;
+	private static final double MY_TASKS_GRID_VGAP = 10;
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -120,6 +122,10 @@ public final class MyShaleController {
 	private TextField myTasksSearchField;
 	@FXML
 	private Button myTasksShowCompletedButton;
+	@FXML
+	private Button myTasksBoardViewButton;
+	@FXML
+	private Button myTasksGridViewButton;
 	@FXML
 	private ScrollPane myTasksScroll;
 	@FXML
@@ -203,6 +209,7 @@ public final class MyShaleController {
 	private final Map<String, Button> sectionTabs = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
 	private boolean suppressMyTaskPreferenceWrites;
+	private MyTasksViewMode myTasksViewMode = MyTasksViewMode.BOARD;
 	private Integer preferredMyTasksPriorityFilterId;
 	private Long preferredMyTasksCaseFilterId;
 	private String overviewSearchText = "";
@@ -218,6 +225,12 @@ public final class MyShaleController {
 	private ChoiceBox<String> overviewSortChoiceControl;
 	private boolean suppressOverviewControlEvents;
 	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
+	private FlowPane myTasksGrid;
+
+	private enum MyTasksViewMode {
+		BOARD,
+		GRID
+	}
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
 	{
@@ -322,6 +335,13 @@ public final class MyShaleController {
 			});
 			updateMyTasksCompletionToggleLabel();
 		}
+		if (myTasksBoardViewButton != null) {
+			myTasksBoardViewButton.setOnAction(e -> setMyTasksViewMode(MyTasksViewMode.BOARD));
+		}
+		if (myTasksGridViewButton != null) {
+			myTasksGridViewButton.setOnAction(e -> setMyTasksViewMode(MyTasksViewMode.GRID));
+		}
+		updateMyTasksViewToggleStyles();
 		preferredMyTasksPriorityFilterId = restoreMyTasksPriorityFilterPreference();
 		preferredMyTasksCaseFilterId = restoreMyTasksCaseFilterPreference();
 		if (myCasesBoardSortChoice != null) {
@@ -1142,8 +1162,13 @@ public final class MyShaleController {
 		if (myTasksList == null || myTasksEmptyLabel == null || myTasksScroll == null) {
 			return;
 		}
+		updateMyTasksViewToggleStyles();
 		if (loadingMyTasks) {
 			myTasksList.getChildren().clear();
+			FlowPane grid = myTasksGrid;
+			if (grid != null) {
+				grid.getChildren().clear();
+			}
 			myTasksEmptyLabel.setText("Loading your tasks...");
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
@@ -1153,7 +1178,6 @@ public final class MyShaleController {
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
-		LaneBoardLayout.configureBoardRow(myTasksList);
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
 		List<CaseTaskListItemDto> taskFiltered = filterAndRankMyTasks(myTasks, selectedPriorityFilterId(), searchQuery);
@@ -1175,6 +1199,27 @@ public final class MyShaleController {
 			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
+		}
+		if (myTasksViewMode == MyTasksViewMode.BOARD) {
+			renderMyTasksBoard(filteredTasks);
+		} else {
+			renderMyTasksGrid(filteredTasks);
+		}
+		setVisibleManaged(myTasksEmptyLabel, false);
+		setVisibleManaged(myTasksScroll, true);
+		int childCount = myTasksViewMode == MyTasksViewMode.BOARD ? myTasksList.getChildren().size() : ensureMyTasksGrid().getChildren().size();
+		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + childCount,
+				renderStartNanos);
+	}
+
+	private void renderMyTasksBoard(List<CaseTaskListItemDto> filteredTasks) {
+		LaneBoardLayout.configureBoardRow(myTasksList);
+		myTasksScroll.setFitToHeight(true);
+		myTasksScroll.setFitToWidth(false);
+		myTasksScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+		myTasksScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		if (myTasksScroll.getContent() != myTasksList) {
+			myTasksScroll.setContent(myTasksList);
 		}
 		boolean fullVariant = SECTION_TASKS.equals(activeSection);
 		Map<TaskLaneKey, List<CaseTaskListItemDto>> tasksByLane = groupTasksByLane(filteredTasks);
@@ -1198,10 +1243,76 @@ public final class MyShaleController {
 			}
 			myTasksList.getChildren().add(lane);
 		}
-		setVisibleManaged(myTasksEmptyLabel, false);
-		setVisibleManaged(myTasksScroll, true);
-		PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myTasksList.getChildren().size(),
-				renderStartNanos);
+	}
+
+	private void renderMyTasksGrid(List<CaseTaskListItemDto> filteredTasks) {
+		FlowPane grid = ensureMyTasksGrid();
+		grid.getChildren().clear();
+		myTasksScroll.setFitToHeight(false);
+		myTasksScroll.setFitToWidth(true);
+		myTasksScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		myTasksScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+		if (myTasksScroll.getContent() != grid) {
+			myTasksScroll.setContent(grid);
+		}
+		for (CaseTaskListItemDto task : filteredTasks) {
+			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
+					task.id(),
+					task.caseId(),
+					task.caseName(),
+					task.caseResponsibleAttorney(),
+					task.caseResponsibleAttorneyColor(),
+					task.caseNonEngagementLetterSent(),
+					resolveMyTaskCardTitle(task),
+					task.description(),
+					task.createdByDisplayName(),
+					task.priorityColorHex(),
+					task.dueAt(),
+					task.completedAt(),
+					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+			var taskCard = taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true);
+			taskCard.getStyleClass().add("my-tasks-grid-card");
+			taskCard.setMinWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
+			taskCard.setPrefWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
+			taskCard.setMaxWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
+			grid.getChildren().add(taskCard);
+		}
+	}
+
+	private FlowPane ensureMyTasksGrid() {
+		if (myTasksGrid == null) {
+			myTasksGrid = new FlowPane();
+			myTasksGrid.setHgap(MY_TASKS_GRID_HGAP);
+			myTasksGrid.setVgap(MY_TASKS_GRID_VGAP);
+			myTasksGrid.setPrefWrapLength(900);
+			myTasksGrid.getStyleClass().addAll("cases-content-surface", "glass-panel", "my-tasks-grid-container");
+			myTasksGrid.setMaxWidth(Double.MAX_VALUE);
+			myTasksGrid.prefWrapLengthProperty().bind(Bindings.createDoubleBinding(
+					() -> Math.max(320, myTasksScroll.getViewportBounds().getWidth() - 20),
+					myTasksScroll.viewportBoundsProperty()));
+		}
+		return myTasksGrid;
+	}
+
+	private void setMyTasksViewMode(MyTasksViewMode viewMode) {
+		if (viewMode == null || viewMode == myTasksViewMode) {
+			return;
+		}
+		myTasksViewMode = viewMode;
+		renderMyTasks();
+	}
+
+	private void updateMyTasksViewToggleStyles() {
+		updateViewToggleButtonStyles(myTasksBoardViewButton, myTasksViewMode == MyTasksViewMode.BOARD);
+		updateViewToggleButtonStyles(myTasksGridViewButton, myTasksViewMode == MyTasksViewMode.GRID);
+	}
+
+	private void updateViewToggleButtonStyles(Button button, boolean selected) {
+		if (button == null) {
+			return;
+		}
+		button.getStyleClass().removeAll("my-tasks-view-toggle-selected", "my-tasks-view-toggle-unselected");
+		button.getStyleClass().add(selected ? "my-tasks-view-toggle-selected" : "my-tasks-view-toggle-unselected");
 	}
 
 	private void renderMyOverview() {
