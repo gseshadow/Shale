@@ -36,7 +36,7 @@ import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
-import com.shale.ui.util.NavButtonStyler;
+import com.shale.ui.util.AppSectionTabs;
 import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
@@ -129,7 +129,7 @@ public final class MyShaleController {
 	@FXML
 	private Label myTasksEmptyLabel;
 	@FXML
-	private VBox sectionButtonsBox;
+	private HBox sectionTabsBar;
 	@FXML
 	private VBox overviewSectionPane;
 	@FXML
@@ -200,7 +200,7 @@ public final class MyShaleController {
 	private final Set<Long> pinnedTaskLaneCaseIds = new LinkedHashSet<>();
 	private final Set<Long> collapsedTaskLaneCaseIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
-	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
+	private final Map<String, Button> sectionTabs = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
 	private boolean suppressMyTaskPreferenceWrites;
 	private Integer preferredMyTasksPriorityFilterId;
@@ -413,21 +413,17 @@ public final class MyShaleController {
 	}
 
 	private void setupSections() {
-		if (sectionButtonsBox == null) {
+		if (sectionTabsBar == null) {
 			return;
 		}
-		sectionButtons.clear();
-		sectionButtonsBox.getChildren().clear();
-		for (String section : List.of(SECTION_OVERVIEW, SECTION_TASKS, SECTION_MY_CASES)) {
-			Button button = new Button(section);
-			button.setMaxWidth(Double.MAX_VALUE);
-			button.setAlignment(Pos.CENTER_LEFT);
-			NavButtonStyler.applyBaseStyle(button);
-			button.setOnAction(e -> onSectionSelected(section));
-			VBox.setVgrow(button, Priority.NEVER);
-			sectionButtons.put(section, button);
-			sectionButtonsBox.getChildren().add(button);
-		}
+		sectionTabs.clear();
+		sectionTabs.putAll(AppSectionTabs.buildTabs(
+				sectionTabsBar,
+				List.of(
+						new AppSectionTabs.TabSpec<>(SECTION_OVERVIEW, SECTION_OVERVIEW),
+						new AppSectionTabs.TabSpec<>(SECTION_TASKS, SECTION_TASKS),
+						new AppSectionTabs.TabSpec<>(SECTION_MY_CASES, SECTION_MY_CASES)),
+				this::onSectionSelected));
 	}
 
 	private void onSectionSelected(String section) {
@@ -435,8 +431,8 @@ public final class MyShaleController {
 			return;
 		}
 		activeSection = section;
-		Button activeButton = sectionButtons.get(section);
-		NavButtonStyler.setActive(activeButton, sectionButtons.values());
+		Button activeButton = sectionTabs.get(section);
+		AppSectionTabs.setActive(activeButton, sectionTabs.values());
 		boolean showOverview = SECTION_OVERVIEW.equals(section);
 		boolean showTasks = SECTION_TASKS.equals(section);
 		boolean showMyCases = SECTION_MY_CASES.equals(section);
