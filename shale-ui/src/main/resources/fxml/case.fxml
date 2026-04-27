@@ -39,25 +39,15 @@
 		</VBox>
 	</top>
 
-	<!-- LEFT: Case navigation -->
-	<left>
-		<VBox spacing="8.0" BorderPane.alignment="TOP_LEFT"
-			styleClass="case-nav-pane nav-rail">
-			<padding>
-				<Insets top="10" right="10" bottom="10" left="12" />
-			</padding>
-
-			<Label text="Sections" styleClass="sidebar-header" />
-			<VBox fx:id="sectionButtonsBox" spacing="6.0" minWidth="100.0" prefWidth="100.0" maxWidth="100.0" />
-		</VBox>
-	</left>
 
 	<!-- CENTER: Content area (we switch panes by showing/hiding) -->
 	<center>
-		<StackPane fx:id="contentHost" BorderPane.alignment="CENTER">
+		<VBox spacing="8.0" BorderPane.alignment="CENTER">
 			<padding>
 				<Insets top="10" right="12" bottom="12" left="12" />
 			</padding>
+			<HBox fx:id="sectionTabsBar" spacing="8.0" alignment="CENTER_LEFT" />
+			<StackPane fx:id="contentHost" VBox.vgrow="ALWAYS">
 
 			<!-- OVERVIEW PANE -->
 			<ScrollPane fx:id="overviewScrollPane" fitToWidth="true"
@@ -758,7 +748,8 @@
 					promptText="Placeholder notes / testing area" prefRowCount="12" />
 			</VBox>
 
-		</StackPane>
+			</StackPane>
+		</VBox>
 	</center>
 
 	<right>
