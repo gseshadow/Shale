@@ -1,5 +1,7 @@
 package com.shale.ui.controller;
 
+import com.google.gson.Gson;
+import com.shale.core.platform.AppPaths;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.dialog.AppDialogs;
@@ -33,6 +35,9 @@ import javafx.stage.Window;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +51,9 @@ public final class NewIntakeController {
 
 	private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 	private static final DateTimeFormatter TIME_PARSE_FORMAT = DateTimeFormatter.ofPattern("H:mm");
+	private static final Gson GSON = new Gson();
+	private static final String DRAFTS_DIR = "drafts";
+	private static final String INTAKE_DRAFT_PREFIX = "new-intake";
 
 	@FXML private Label validationLabel;
 
@@ -149,6 +157,7 @@ public final class NewIntakeController {
 		}
 		Platform.runLater(this::preselectDefaultStatusIfAvailable);
 		Platform.runLater(this::initializePartyMetadata);
+		Platform.runLater(this::offerDraftRestoreIfPresent);
 	}
 
 	@FXML
@@ -608,6 +617,7 @@ public final class NewIntakeController {
 
 			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
 			captureInitialSnapshot();
+			deleteLocalDraftIfPresent();
 			System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
 			showSuccess("Intake created successfully.");
 			if (stage != null)
@@ -618,6 +628,7 @@ public final class NewIntakeController {
 			System.err.println("[NewIntakeController] DAO create failed tenant=" + tenantId + " error=" + ex.getMessage());
 			ex.printStackTrace(System.err);
 			showValidation("Unable to save intake. Your information has not been discarded. Please try again.");
+			offerCreateFailureActions();
 		} finally {
 			setSaving(false);
 		}
@@ -663,16 +674,201 @@ public final class NewIntakeController {
 	private void showOfflinePreflightBlockedDialog() {
 		String message = "Shale could not confirm the connection, so the intake was not saved. Your information is still here. Reconnect and click Try Again, or keep editing.";
 		showValidation(message);
-		Optional<Boolean> decision = AppDialogs.showChoice(
+		Optional<SaveBlockedAction> decision = AppDialogs.showChoice(
 				stage,
 				"Connection Check Required",
 				"Connection Check Required",
 				message,
 				List.of(
-						AppDialogs.DialogAction.of("Try Again", true, AppDialogs.DialogActionKind.PRIMARY, true, false),
-						AppDialogs.DialogAction.cancel("Keep Editing", false)));
-		if (decision.orElse(false)) {
+						AppDialogs.DialogAction.of("Try Again", SaveBlockedAction.TRY_AGAIN, AppDialogs.DialogActionKind.PRIMARY, true, false),
+						AppDialogs.DialogAction.of("Save Draft Locally", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)));
+		SaveBlockedAction action = decision.orElse(SaveBlockedAction.KEEP_EDITING);
+		if (action == SaveBlockedAction.TRY_AGAIN) {
 			attemptCreateIntake(true);
+		} else if (action == SaveBlockedAction.SAVE_DRAFT) {
+			saveDraftLocally();
+		}
+	}
+
+	private void offerCreateFailureActions() {
+		Optional<SaveBlockedAction> decision = AppDialogs.showChoice(
+				stage,
+				"Save Intake Failed",
+				"Save Intake Failed",
+				"Shale could not save the intake right now. Your information is still here.",
+				List.of(
+						AppDialogs.DialogAction.of("Try Again", SaveBlockedAction.TRY_AGAIN, AppDialogs.DialogActionKind.PRIMARY, true, false),
+						AppDialogs.DialogAction.of("Save Draft Locally", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)));
+		SaveBlockedAction action = decision.orElse(SaveBlockedAction.KEEP_EDITING);
+		if (action == SaveBlockedAction.TRY_AGAIN) {
+			attemptCreateIntake(true);
+		} else if (action == SaveBlockedAction.SAVE_DRAFT) {
+			saveDraftLocally();
+		}
+	}
+
+	private void offerDraftRestoreIfPresent() {
+		try {
+			Path draftPath = resolveDraftPath();
+			if (!Files.exists(draftPath)) {
+				return;
+			}
+			Optional<Boolean> decision = AppDialogs.showChoice(
+					stage,
+					"Local Draft Found",
+					"Restore local New Intake draft?",
+					"Shale found a local draft for New Intake on this device.",
+					List.of(
+							AppDialogs.DialogAction.of("Restore Draft", true, AppDialogs.DialogActionKind.PRIMARY, true, false),
+							AppDialogs.DialogAction.of("Discard Draft", false, AppDialogs.DialogActionKind.DANGER, false, false)));
+			if (decision.isEmpty()) {
+				return;
+			}
+			if (decision.get()) {
+				restoreDraft(draftPath);
+			} else {
+				deleteDraftFile(draftPath);
+			}
+		} catch (RuntimeException ex) {
+			System.err.println("[NewIntakeController] draft restore prompt failed: " + ex.getMessage());
+		}
+	}
+
+	private void saveDraftLocally() {
+		try {
+			Path draftPath = resolveDraftPath();
+			Files.createDirectories(draftPath.getParent());
+			String payload = GSON.toJson(new DraftPayload(1, captureCurrentSnapshot()));
+			Files.writeString(draftPath, payload, StandardCharsets.UTF_8);
+			showSuccess("Draft saved locally. You can restore it next time New Intake is opened.");
+			System.out.println("[NewIntakeController] local draft saved path=" + draftPath);
+		} catch (Exception ex) {
+			System.err.println("[NewIntakeController] local draft save failed: " + ex.getMessage());
+			showValidation("Unable to save a local draft right now. Your form is still open.");
+		}
+	}
+
+	private void restoreDraft(Path draftPath) {
+		try {
+			String payload = Files.readString(draftPath, StandardCharsets.UTF_8);
+			DraftPayload parsed = GSON.fromJson(payload, DraftPayload.class);
+			if (parsed == null || parsed.snapshot() == null) {
+				showValidation("The local draft could not be restored.");
+				return;
+			}
+			applySnapshot(parsed.snapshot());
+			showSuccess("Local draft restored.");
+			System.out.println("[NewIntakeController] local draft restored path=" + draftPath);
+		} catch (Exception ex) {
+			System.err.println("[NewIntakeController] local draft restore failed: " + ex.getMessage());
+			showValidation("Unable to restore the local draft.");
+		}
+	}
+
+	private void applySnapshot(IntakeFormSnapshot snapshot) {
+		if (snapshot == null) return;
+		caseNameField.setText(snapshot.caseName());
+		dateOfIntakePicker.setValue(snapshot.dateOfIntake());
+		timeOfIntakeField.setText(snapshot.timeOfIntake());
+		estateCaseCheckBox.setSelected(snapshot.estateCase());
+		clientFirstNameField.setText(snapshot.clientFirstName());
+		clientLastNameField.setText(snapshot.clientLastName());
+		clientAddressField.setText(snapshot.clientAddress());
+		clientPhoneField.setText(snapshot.clientPhone());
+		clientEmailField.setText(snapshot.clientEmail());
+		clientDateOfBirthPicker.setValue(snapshot.clientDateOfBirth());
+		clientDeceasedCheckBox.setSelected(snapshot.clientDeceased());
+		clientConditionArea.setText(snapshot.clientCondition());
+		callerIsClientCheckBox.setSelected(snapshot.callerIsClient());
+		applyCallerMode(snapshot.callerIsClient());
+		callerFirstNameField.setText(snapshot.callerFirstName());
+		callerLastNameField.setText(snapshot.callerLastName());
+		callerPhoneField.setText(snapshot.callerPhone());
+		callerAddressField.setText(snapshot.callerAddress());
+		callerEmailField.setText(snapshot.callerEmail());
+		descriptionArea.setText(snapshot.description());
+		summaryArea.setText(snapshot.summary());
+		dateMedicalNegligencePicker.setValue(snapshot.medicalNegligenceDate());
+		dateMedicalNegligenceDiscoveredPicker.setValue(snapshot.medicalNegligenceDiscoveredDate());
+		dateOfInjuryPicker.setValue(snapshot.injuryDate());
+		statuteOfLimitationsPicker.setValue(snapshot.statuteOfLimitationsDate());
+		tortClaimsNoticePicker.setValue(snapshot.tortClaimsNoticeDate());
+		resolveAndApplyPracticeArea(snapshot.practiceAreaId());
+		resolveAndApplyStatus(snapshot.statusId());
+		pendingParties = snapshot.pendingParties() == null ? new ArrayList<>() : new ArrayList<>(snapshot.pendingParties());
+		renderPendingParties();
+		hideValidation();
+	}
+
+	private void resolveAndApplyPracticeArea(Integer practiceAreaId) {
+		selectedPracticeArea = null;
+		if (practiceAreaId == null || caseDao == null || appState == null) {
+			renderPracticeAreaMini(null, "—", null);
+			return;
+		}
+		try {
+			for (CaseDao.PracticeAreaRow row : caseDao.listPracticeAreasForTenant(requireClientId())) {
+				if (row != null && row.id() == practiceAreaId) {
+					selectedPracticeArea = row;
+					break;
+				}
+			}
+		} catch (RuntimeException ignored) {
+			selectedPracticeArea = null;
+		}
+		if (selectedPracticeArea == null) {
+			renderPracticeAreaMini(null, "—", null);
+			return;
+		}
+		renderPracticeAreaMini(selectedPracticeArea.id(), selectedPracticeArea.name(), selectedPracticeArea.color());
+	}
+
+	private void resolveAndApplyStatus(Integer statusId) {
+		selectedStatus = null;
+		if (statusId == null || caseDao == null || appState == null) {
+			renderStatusMini(null, "—", null);
+			return;
+		}
+		try {
+			for (CaseDao.StatusRow row : caseDao.listStatusesForTenant(requireClientId())) {
+				if (row != null && row.id() == statusId) {
+					selectedStatus = row;
+					break;
+				}
+			}
+		} catch (RuntimeException ignored) {
+			selectedStatus = null;
+		}
+		if (selectedStatus == null) {
+			renderStatusMini(null, "—", null);
+			return;
+		}
+		renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
+	}
+
+	private Path resolveDraftPath() {
+		int tenantId = appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId();
+		int userId = appState == null || appState.getUserId() == null ? 0 : appState.getUserId();
+		String fileName = INTAKE_DRAFT_PREFIX + "-" + tenantId + "-" + userId + ".json";
+		return AppPaths.appSupportDir("Shale").resolve(DRAFTS_DIR).resolve(fileName);
+	}
+
+	private void deleteLocalDraftIfPresent() {
+		try {
+			deleteDraftFile(resolveDraftPath());
+		} catch (RuntimeException ex) {
+			System.err.println("[NewIntakeController] local draft delete failed: " + ex.getMessage());
+		}
+	}
+
+	private void deleteDraftFile(Path draftPath) {
+		if (draftPath == null) return;
+		try {
+			Files.deleteIfExists(draftPath);
+		} catch (Exception ex) {
+			System.err.println("[NewIntakeController] local draft delete failed path=" + draftPath + " error=" + ex.getMessage());
 		}
 	}
 
@@ -892,5 +1088,16 @@ public final class NewIntakeController {
 			LocalDate statuteOfLimitationsDate,
 			LocalDate tortClaimsNoticeDate,
 			List<PartyAddWorkflowDialog.AddPartyDraft> pendingParties) {
+	}
+
+	private record DraftPayload(
+			int version,
+			IntakeFormSnapshot snapshot) {
+	}
+
+	private enum SaveBlockedAction {
+		TRY_AGAIN,
+		SAVE_DRAFT,
+		KEEP_EDITING
 	}
 }
