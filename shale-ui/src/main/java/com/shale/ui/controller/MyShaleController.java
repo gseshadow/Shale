@@ -217,9 +217,6 @@ public final class MyShaleController {
 	private CheckBox overviewOverdueOnlyCheckControl;
 	private ChoiceBox<String> overviewSortChoiceControl;
 	private boolean suppressOverviewControlEvents;
-	private boolean loadingOverview;
-	private boolean loadingMyTasks;
-	private boolean loadingMyCases;
 	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
