@@ -225,6 +225,31 @@
     -fx-font-weight: 800;
 }
 
+.app-section-tab {
+    -fx-padding: 6 10 6 10;
+    -fx-min-height: 30;
+    -fx-background-radius: 8 8 0 0;
+    -fx-border-radius: 8 8 0 0;
+    -fx-background-color: rgba(18, 38, 69, 0.18);
+    -fx-border-color: rgba(232, 242, 255, 0.26);
+    -fx-border-width: 0 0 2 0;
+    -fx-text-fill: rgba(232, 242, 255, 0.88);
+    -fx-font-weight: 600;
+    -fx-cursor: hand;
+}
+
+.app-section-tab:hover {
+    -fx-background-color: rgba(34, 66, 109, 0.26);
+    -fx-border-color: rgba(232, 242, 255, 0.42);
+}
+
+.app-section-tab-active {
+    -fx-background-color: rgba(84, 130, 195, 0.28);
+    -fx-border-color: #9fc4ff;
+    -fx-text-fill: #f8fbff;
+    -fx-font-weight: 800;
+}
+
 
 .app-pill-button {
     -fx-padding: 10 16 10 16;

@@ -17,20 +17,15 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
 	fx:controller="com.shale.ui.controller.MyShaleController" styleClass="app-shell">
-	<left>
-		<VBox spacing="8.0" BorderPane.alignment="TOP_LEFT" styleClass="case-nav-pane nav-rail">
-			<padding>
-				<Insets top="10" right="10" bottom="10" left="12" />
-			</padding>
-			<Label text="Sections" styleClass="sidebar-header" />
-			<VBox fx:id="sectionButtonsBox" spacing="6.0" minWidth="100.0" prefWidth="100.0" maxWidth="100.0" />
-		</VBox>
-	</left>
 		<center>
-			<StackPane fx:id="sectionContentStack" BorderPane.alignment="CENTER" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+			<VBox spacing="8" BorderPane.alignment="CENTER" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 				<padding>
 					<Insets top="10" right="12" bottom="12" left="12" />
 				</padding>
+
+				<HBox fx:id="sectionTabsBar" spacing="8" alignment="CENTER_LEFT" />
+
+			<StackPane fx:id="sectionContentStack" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308" VBox.vgrow="ALWAYS">
 
 				<VBox fx:id="overviewSectionPane" spacing="10" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 					<Label fx:id="overviewLoadingLabel" text="Loading your overview..." managed="false" visible="false" styleClass="lane-empty-state" />
@@ -180,5 +175,6 @@
 					</VBox>
 				</VBox>
 		</StackPane>
+			</VBox>
 	</center>
 </BorderPane>

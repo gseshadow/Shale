@@ -64,7 +64,7 @@ import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
-import com.shale.ui.util.NavButtonStyler;
+import com.shale.ui.util.AppSectionTabs;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
@@ -151,7 +151,7 @@ public class CaseController {
 	private Button backToCasesButton;
 
 	@FXML
-	private VBox sectionButtonsBox;
+	private HBox sectionTabsBar;
 	@FXML
 	private BorderPane caseRootPane;
 	@FXML
@@ -574,7 +574,7 @@ public class CaseController {
 	private String editingCaseUpdateDraftText = "";
 	private boolean savingCaseUpdateEdit = false;
 
-	private final Map<String, Button> sectionButtons = new LinkedHashMap<>();
+	private final Map<String, Button> sectionTabs = new LinkedHashMap<>();
 	private String activeSectionName = "Overview";
 	private String initialSectionName = "Overview";
 	private Consumer<String> onSectionNavigation;
@@ -1027,28 +1027,18 @@ public class CaseController {
 	// ----------------------------
 
 	private void setupSections() {
-		if (sectionButtonsBox == null)
+		if (sectionTabsBar == null)
 			return;
 
-		sectionButtons.clear();
-		sectionButtonsBox.getChildren().clear();
-
-		for (String section : SECTIONS) {
-			Button button = createSectionButton(section);
-			button.setOnAction(e -> onSectionSelected(section, true));
-			sectionButtons.put(section, button);
-			sectionButtonsBox.getChildren().add(button);
-		}
+		sectionTabs.clear();
+		sectionTabs.putAll(AppSectionTabs.buildTabs(
+				sectionTabsBar,
+				SECTIONS.stream()
+						.map(section -> new AppSectionTabs.TabSpec<>(section, section))
+						.toList(),
+				section -> onSectionSelected(section, true)));
 
 		onSectionSelected(initialSectionName, false);
-	}
-
-	private Button createSectionButton(String section) {
-		Button button = new Button(section);
-		button.setMaxWidth(Double.MAX_VALUE);
-		button.setAlignment(Pos.CENTER_LEFT);
-		NavButtonStyler.applyBaseStyle(button);
-		return button;
 	}
 
 	private void refreshHeader() {
@@ -1162,14 +1152,14 @@ public class CaseController {
 
 	private void setActiveSectionButton(String activeSection) {
 		Button activeButton = null;
-		for (Map.Entry<String, Button> entry : sectionButtons.entrySet()) {
+		for (Map.Entry<String, Button> entry : sectionTabs.entrySet()) {
 			if (Objects.equals(entry.getKey(), activeSection)) {
 				activeButton = entry.getValue();
 				break;
 			}
 		}
 
-		NavButtonStyler.setActive(activeButton, sectionButtons.values());
+		AppSectionTabs.setActive(activeButton, sectionTabs.values());
 	}
 
 	private void showOverview() {
