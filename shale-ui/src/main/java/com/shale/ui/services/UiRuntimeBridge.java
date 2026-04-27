@@ -2,6 +2,7 @@ package com.shale.ui.services;
 
 import java.util.Map;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 public interface UiRuntimeBridge {
@@ -50,6 +51,14 @@ public interface UiRuntimeBridge {
 	}
 
 	default void unsubscribeConnectivity(Consumer<ConnectivityEvent> handler) {
+	}
+
+	/**
+	 * Performs a fresh, best-effort connectivity verification using runtime infrastructure.
+	 * Optional.empty() means the runtime does not support an active recheck.
+	 */
+	default Optional<Boolean> recheckConnectivity() {
+		return Optional.empty();
 	}
 
 	// --- Case-specific subscriptions (kept for now)
