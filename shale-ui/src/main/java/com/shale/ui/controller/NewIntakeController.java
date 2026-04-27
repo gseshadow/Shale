@@ -538,22 +538,29 @@ public final class NewIntakeController {
 
 	@FXML
 	private void onCreateIntake() {
+		attemptCreateIntake(false);
+	}
+
+	private void attemptCreateIntake(boolean invokedFromOfflineRetry) {
 		if (saving)
 			return;
-		if (Boolean.FALSE.equals(knownOnlineState)) {
-			showValidation("Unable to save intake while offline. Please reconnect and try again.");
-			return;
-		}
-
+		System.out.println("[NewIntakeController] save clicked cachedOnlineState=" + knownOnlineState + " offlineRetry=" + invokedFromOfflineRetry);
 		List<String> errors = validate();
 		if (!errors.isEmpty()) {
 			showValidation(errors.stream().collect(Collectors.joining("\n")));
 			return;
 		}
 
+		boolean shouldBlockForOffline = shouldBlockCreateForOfflinePreflight();
+		if (shouldBlockForOffline) {
+			System.out.println("[NewIntakeController] create blocked by offline preflight.");
+			showOfflinePreflightBlockedDialog();
+			return;
+		}
+
 		setSaving(true);
 		int tenantId = requireClientId();
-		System.out.println("[NewIntakeController] submit started tenant=" + tenantId + " userId=" + (appState == null ? null : appState.getUserId()));
+		System.out.println("[NewIntakeController] create attempt started tenant=" + tenantId + " userId=" + (appState == null ? null : appState.getUserId()));
 		try {
 			CaseDao.NewIntakeCreateRequest request = new CaseDao.NewIntakeCreateRequest(
 				requireClientId(),
@@ -601,18 +608,71 @@ public final class NewIntakeController {
 
 			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
 			captureInitialSnapshot();
-			System.out.println("[NewIntakeController] submit succeeded tenant=" + tenantId + " caseId=" + result.caseId());
+			System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
 			showSuccess("Intake created successfully.");
 			if (stage != null)
 				stage.close();
 			if (onCaseCreated != null)
 				onCaseCreated.accept(Math.toIntExact(result.caseId()));
 		} catch (RuntimeException ex) {
-			System.err.println("[NewIntakeController] submit failed tenant=" + tenantId + " error=" + ex.getMessage());
+			System.err.println("[NewIntakeController] DAO create failed tenant=" + tenantId + " error=" + ex.getMessage());
 			ex.printStackTrace(System.err);
 			showValidation("Unable to save intake. Your information has not been discarded. Please try again.");
 		} finally {
 			setSaving(false);
+		}
+	}
+
+	private boolean shouldBlockCreateForOfflinePreflight() {
+		if (!Boolean.FALSE.equals(knownOnlineState)) {
+			System.out.println("[NewIntakeController] create allowed; cached connectivity is not offline.");
+			return false;
+		}
+
+		Optional<Boolean> freshConnectivity = tryFreshConnectivityCheck();
+		if (freshConnectivity.isPresent()) {
+			boolean onlineNow = freshConnectivity.get();
+			if (onlineNow) {
+				knownOnlineState = true;
+				System.out.println("[NewIntakeController] fresh connectivity check confirmed online; proceeding with create.");
+				return false;
+			}
+			System.out.println("[NewIntakeController] fresh connectivity check confirmed offline; create blocked.");
+			return true;
+		}
+
+		System.out.println("[NewIntakeController] fresh connectivity check unavailable; cached offline state treated as non-authoritative.");
+		return false;
+	}
+
+	private Optional<Boolean> tryFreshConnectivityCheck() {
+		if (runtimeBridge == null) {
+			System.out.println("[NewIntakeController] fresh connectivity check skipped: runtime bridge unavailable.");
+			return Optional.empty();
+		}
+		try {
+			Optional<Boolean> result = runtimeBridge.recheckConnectivity();
+			System.out.println("[NewIntakeController] fresh connectivity check result=" + result);
+			return result;
+		} catch (RuntimeException ex) {
+			System.err.println("[NewIntakeController] fresh connectivity check failed: " + ex.getMessage());
+			return Optional.empty();
+		}
+	}
+
+	private void showOfflinePreflightBlockedDialog() {
+		String message = "Shale could not confirm the connection, so the intake was not saved. Your information is still here. Reconnect and click Try Again, or keep editing.";
+		showValidation(message);
+		Optional<Boolean> decision = AppDialogs.showChoice(
+				stage,
+				"Connection Check Required",
+				"Connection Check Required",
+				message,
+				List.of(
+						AppDialogs.DialogAction.of("Try Again", true, AppDialogs.DialogActionKind.PRIMARY, true, false),
+						AppDialogs.DialogAction.cancel("Keep Editing", false)));
+		if (decision.orElse(false)) {
+			attemptCreateIntake(true);
 		}
 	}
 
