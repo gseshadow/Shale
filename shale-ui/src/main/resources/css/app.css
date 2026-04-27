@@ -681,6 +681,25 @@
     -fx-text-fill: rgba(17, 37, 66, 0.88);
 }
 
+.my-tasks-view-toggle-group {
+    -fx-padding: 0 0 0 8;
+}
+
+.button.my-tasks-view-toggle-selected {
+    -fx-background-color: linear-gradient(to bottom, rgba(53, 120, 198, 0.95), rgba(30, 76, 142, 0.95));
+    -fx-border-color: rgba(228, 243, 255, 0.72);
+    -fx-text-fill: #ffffff;
+}
+
+.button.my-tasks-view-toggle-unselected {
+    -fx-opacity: 0.9;
+}
+
+.flow-pane.my-tasks-grid-container {
+    -fx-padding: 10 10 18 10;
+    -fx-alignment: top-left;
+}
+
 .combo-box.app-toolbar-select > .arrow-button > .arrow {
     -fx-background-color: -app-toolbar-select-text;
 }
