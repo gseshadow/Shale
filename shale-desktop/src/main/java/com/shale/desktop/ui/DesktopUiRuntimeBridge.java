@@ -2,6 +2,8 @@ package com.shale.desktop.ui;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import com.shale.data.runtime.RuntimeSessionService;
@@ -23,6 +25,8 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	private RuntimeSessionService runtimeSessionService;
 	private volatile LiveBus liveBus;
+	private volatile Integer lastUserId;
+	private volatile Integer lastShaleClientId;
 
 	public DesktopUiRuntimeBridge(
 			LiveEventDispatcher dispatcher,
@@ -44,6 +48,8 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 		runtimeSessionService.initialize(shaleClientId, userId);
 		dbProvider.setRuntime(runtimeSessionService);
+		lastUserId = userId;
+		lastShaleClientId = shaleClientId;
 
 		tryConnectLiveBus(shaleClientId, userId);
 	}
@@ -89,6 +95,8 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			bus.shutdown();
 		}
 		dispatcher.dispatchConnectivity(false, "Signed out");
+		lastUserId = null;
+		lastShaleClientId = null;
 
 		dbProvider.clear();
 		if (runtimeSessionService != null) {
@@ -194,5 +202,37 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	@Override
 	public void unsubscribeConnectivity(Consumer<ConnectivityEvent> handler) {
 		dispatcher.unsubscribeConnectivity(handler);
+	}
+
+	@Override
+	public Optional<Boolean> recheckConnectivity() {
+		Integer shaleClientId = lastShaleClientId;
+		Integer userId = lastUserId;
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return Optional.empty();
+		}
+		if (negotiateEndpointUrl == null || negotiateEndpointUrl.isBlank()) {
+			return Optional.empty();
+		}
+
+		LiveBus reconnectBus = new LiveBus(new NegotiateClient(negotiateEndpointUrl.trim()), shaleClientId, userId);
+		reconnectBus.onEvent(dispatcher::dispatch);
+		reconnectBus.onConnectivityChange(dispatcher::dispatchConnectivity);
+		try {
+			reconnectBus.connectAndJoin().orTimeout(8, TimeUnit.SECONDS).join();
+			LiveBus previous = liveBus;
+			liveBus = reconnectBus;
+			if (previous != null && previous != reconnectBus) {
+				previous.shutdown();
+			}
+			dispatcher.dispatchConnectivity(true, "Reconnected");
+			System.out.println("LiveBus connectivity recheck succeeded.");
+			return Optional.of(true);
+		} catch (RuntimeException ex) {
+			reconnectBus.shutdown();
+			dispatcher.dispatchConnectivity(false, "Reconnect failed");
+			System.out.println("LiveBus connectivity recheck failed: " + ex.getMessage());
+			return Optional.of(false);
+		}
 	}
 }
