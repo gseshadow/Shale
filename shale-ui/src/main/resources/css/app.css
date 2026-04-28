@@ -997,6 +997,7 @@
     -fx-background-radius: 999;
     -fx-padding: 6 12 6 12;
     -fx-font-weight: 700;
+    -fx-cursor: hand;
 }
 
 .notification-bell-button-unread {
