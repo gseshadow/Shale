@@ -498,6 +498,7 @@ public final class MyShaleController {
 		if (!myCasesLoadedOnce && !loadingMyCases) {
 			loadingMyCases = true;
 		}
+		PerfLog.logDone("RENDER", "panel=my_shale_sections section=" + section, switchStartNanos);
 	}
 
 	private void attachTasksPanel(Pane host) {
