@@ -476,12 +476,16 @@ public final class MyShaleController {
 		if (showTasks) {
 			primeTasksLoadingStateForFirstLoad();
 			attachTasksPanel(tasksSectionContentHost);
-			renderMyTasks();
+			if (myTasksLoadedOnce || loadingMyTasks) {
+				renderMyTasks();
+			}
 			ensureMyTasksFresh(false);
 		}
 		if (showMyCases) {
 			primeMyCasesLoadingStateForFirstLoad();
-			renderMyCasesBoard();
+			if (myCasesLoadedOnce || loadingMyCases) {
+				renderMyCasesBoard();
+			}
 			ensureMyCasesFresh(false);
 		}
 		PerfLog.logDone("RENDER", "panel=my_shale_sections section=" + section, switchStartNanos);
@@ -490,15 +494,12 @@ public final class MyShaleController {
 	private void primeTasksLoadingStateForFirstLoad() {
 		if (!myTasksLoadedOnce && !loadingMyTasks) {
 			loadingOverview = true;
-			loadingMyTasks = true;
 		}
 	}
 
 	private void primeMyCasesLoadingStateForFirstLoad() {
-		if (!myCasesLoadedOnce && !loadingMyCases) {
-			loadingMyCases = true;
-		}
-		PerfLog.logDone("RENDER", "panel=my_shale_sections section=" + section, switchStartNanos);
+		// Intentionally left blank: loadingMyCases should only be controlled
+		// by refreshMyCasesBoard(...), which owns in-flight state.
 	}
 
 	private void attachTasksPanel(Pane host) {
