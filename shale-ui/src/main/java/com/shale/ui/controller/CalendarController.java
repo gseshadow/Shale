@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import com.shale.core.model.CalendarFeedItem;
+import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.services.CalendarService;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
@@ -32,7 +33,6 @@ import java.util.concurrent.Executors;
 public final class CalendarController {
     private static final DateTimeFormatter WEEK_RANGE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter DAY_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d");
-    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("h:mm a");
     private static final String VIEW_WEEK = "Week";
 
     @FXML private Button todayButton;
@@ -48,6 +48,8 @@ public final class CalendarController {
     private CalendarService calendarService;
     private int loadGeneration;
     private LocalDate selectedWeekStart;
+
+    private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "calendar-feed-loader");
@@ -165,17 +167,7 @@ public final class CalendarController {
                 dayItemsContainer.getChildren().add(empty);
             } else {
                 for (CalendarFeedItem item : dayItems) {
-                    VBox card = new VBox(2);
-                    card.getStyleClass().add("calendar-event-card");
-                    Label time = new Label(item.allDay() ? "All day" : TIME_FORMAT.format(item.startsAt()));
-                    time.getStyleClass().add("calendar-event-time");
-                    Label type = new Label(item.displayTypeName());
-                    type.getStyleClass().add("calendar-event-type");
-                    Label title = new Label(item.title());
-                    title.setWrapText(true);
-                    card.getChildren().addAll(time, type, title);
-                    if (item.startsAt() != null && item.startsAt().isBefore(now)) card.getStyleClass().add("calendar-event-card-past");
-                    dayItemsContainer.getChildren().add(card);
+                    dayItemsContainer.getChildren().add(calendarEventCardFactory.create(item, today, now));
                 }
             }
             ScrollPane laneScroll = new ScrollPane(dayItemsContainer);
