@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import com.shale.core.model.CalendarFeedItem;
 import com.shale.data.dao.CalendarFeedDao;
+import com.shale.ui.component.dialog.NewCalendarEventDialog;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
@@ -46,6 +47,7 @@ public final class CalendarController {
     @FXML private Button prevWeekButton;
     @FXML private Button nextWeekButton;
     @FXML private ChoiceBox<String> viewModeChoice;
+    @FXML private Button newEventButton;
     @FXML private Label weekRangeLabel;
     @FXML private Label calendarLoadingLabel;
     @FXML private Label calendarErrorLabel;
@@ -99,6 +101,78 @@ public final class CalendarController {
     private void onPreviousWeek() {
         selectedWeekStart = selectedWeekStart.minusWeeks(1);
         loadSelectedWeek();
+    }
+
+
+    @FXML
+    private void onNewEvent() {
+        Integer tenantId = appState == null ? null : appState.getShaleClientId();
+        if (tenantId == null || tenantId <= 0 || calendarService == null) {
+            showError("Calendar is unavailable because no tenant is selected.");
+            return;
+        }
+
+        LocalDate defaultDate = LocalDate.now();
+        if (selectedWeekStart != null) {
+            LocalDate weekEnd = selectedWeekStart.plusDays(6);
+            if (defaultDate.isBefore(selectedWeekStart) || defaultDate.isAfter(weekEnd)) {
+                defaultDate = selectedWeekStart;
+            }
+        }
+
+        var result = NewCalendarEventDialog.showAndWait(
+                weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(),
+                calendarService.listEffectiveEventTypes(tenantId),
+                defaultDate);
+
+        if (result.isEmpty()) return;
+
+        var input = result.get();
+        LocalDateTime startsAt;
+        LocalDateTime endsAt = null;
+        if (input.allDay()) {
+            startsAt = input.date().atStartOfDay();
+        } else {
+            if (input.startTime() == null) {
+                showError("Start time is required for timed events.");
+                return;
+            }
+            startsAt = input.date().atTime(input.startTime());
+            if (input.endTime() != null) {
+                endsAt = input.date().atTime(input.endTime());
+                if (!endsAt.isAfter(startsAt)) {
+                    showError("End time must be after start time.");
+                    return;
+                }
+            }
+        }
+
+        try {
+            calendarService.createEvent(new com.shale.core.model.CalendarEvent(
+                    null,
+                    tenantId,
+                    input.calendarEventTypeId(),
+                    null,
+                    null,
+                    input.title(),
+                    input.description(),
+                    startsAt,
+                    endsAt,
+                    input.allDay(),
+                    "MANUAL",
+                    null,
+                    null,
+                    null,
+                    false,
+                    false,
+                    appState == null ? null : appState.getUserId(),
+                    null,
+                    null));
+            showError(null);
+            loadSelectedWeek();
+        } catch (RuntimeException ex) {
+            showError("Could not save event. Please check values and try again.");
+        }
     }
 
     @FXML

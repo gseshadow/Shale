@@ -22,6 +22,7 @@
                 <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="app-toolbar-button app-toolbar-button-compact" />
                 <Label fx:id="weekRangeLabel" styleClass="search-section-title" />
                 <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" styleClass="app-toolbar-button app-toolbar-button-compact" />
                 <ChoiceBox fx:id="viewModeChoice" styleClass="app-toolbar-select" />
             </children>
         </HBox>
