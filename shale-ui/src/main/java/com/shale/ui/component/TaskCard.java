@@ -239,13 +239,12 @@ public final class TaskCard extends VBox {
 
 	public void applyMini() {
 		currentVariant = Variant.MINI;
-		getChildren().setAll(titleLabel, relatedCaseHost);
+		getChildren().setAll(titleLabel);
 		setSpacing(2);
 		setPadding(new Insets(4, 10, 4, 10));
 		setMaxWidth(Region.USE_COMPUTED_SIZE);
 		setPrefWidth(Region.USE_COMPUTED_SIZE);
 		titleLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600;");
-		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
 		refreshSurfaceStyle();
 	}
 
