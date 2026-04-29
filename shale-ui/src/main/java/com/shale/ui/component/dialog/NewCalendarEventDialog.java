@@ -93,10 +93,21 @@ public final class NewCalendarEventDialog {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox actions = leftAction == null ? new HBox(10, spacer, cancelButton, saveButton) : new HBox(10, leftAction, spacer, cancelButton, saveButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        VBox body = new VBox(16, heading, message, content, actions);
+        ScrollPane formScroll = new ScrollPane(content);
+        formScroll.setFitToWidth(true);
+        formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        formScroll.setMinViewportHeight(300);
+        formScroll.setPrefViewportHeight(380);
+        formScroll.getStyleClass().add("calendar-day-scroll");
+
+        VBox body = new VBox(16, heading, message, formScroll, actions);
+        VBox.setVgrow(formScroll, Priority.ALWAYS);
         body.setPadding(new Insets(22, 24, 22, 24));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
         root.setMinWidth(460);
+        root.setPrefHeight(640);
+        root.setMaxHeight(680);
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
@@ -142,12 +153,21 @@ public final class NewCalendarEventDialog {
             amPmCombo.getItems().setAll("AM", "PM");
             amPmCombo.setMaxWidth(Double.MAX_VALUE);
 
+            HBox startRow = new HBox(8);
+            VBox startTimeCol = new VBox(4, startLabel, startTimeCombo);
+            VBox amPmCol = new VBox(4, amPmLabel, amPmCombo);
+            startTimeCol.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(startTimeCol, Priority.ALWAYS);
+            amPmCol.setMinWidth(100);
+            startRow.getChildren().addAll(startTimeCol, amPmCol);
+
             Label durationLabel = new Label("Duration");
             ComboBox<Integer> durationCombo = new ComboBox<>();
             durationCombo.getItems().setAll(DURATION_OPTIONS_MINUTES);
             durationCombo.setCellFactory(cb -> new ListCell<>() { protected void updateItem(Integer item, boolean empty){ super.updateItem(item, empty); setText(empty||item==null?null:formatDuration(item)); }});
             durationCombo.setButtonCell(new ListCell<>() { protected void updateItem(Integer item, boolean empty){ super.updateItem(item, empty); setText(empty||item==null?null:formatDuration(item)); }});
             durationCombo.setMaxWidth(Double.MAX_VALUE);
+            VBox durationSection = new VBox(4, durationLabel, durationCombo);
 
             if (initial != null && !initial.allDay() && initial.startTime() != null) {
                 String[] t = toTwelveHour(initial.startTime());
@@ -167,15 +187,15 @@ public final class NewCalendarEventDialog {
 
             Runnable refresh = () -> {
                 boolean timed = !allDayCheckBox.isSelected();
-                startLabel.setDisable(!timed); startTimeCombo.setDisable(!timed); amPmLabel.setDisable(!timed); amPmCombo.setDisable(!timed); durationLabel.setDisable(!timed); durationCombo.setDisable(!timed);
-                startLabel.setManaged(timed); startTimeCombo.setManaged(timed); amPmLabel.setManaged(timed); amPmCombo.setManaged(timed); durationLabel.setManaged(timed); durationCombo.setManaged(timed);
-                startLabel.setVisible(timed); startTimeCombo.setVisible(timed); amPmLabel.setVisible(timed); amPmCombo.setVisible(timed); durationLabel.setVisible(timed); durationCombo.setVisible(timed);
+                startRow.setDisable(!timed); durationSection.setDisable(!timed);
+                startRow.setManaged(timed); durationSection.setManaged(timed);
+                startRow.setVisible(timed); durationSection.setVisible(timed);
             };
             allDayCheckBox.selectedProperty().addListener((obs,o,n)->refresh.run());
             refresh.run();
 
             Label errorLabel = new Label(); errorLabel.setStyle("-fx-text-fill: #b42318;"); errorLabel.setVisible(false); errorLabel.setManaged(false);
-            VBox content = new VBox(8, titleLabel,titleField,eventTypeLabel,eventTypeComboBox,dateLabel,datePicker,allDayCheckBox,startLabel,startTimeCombo,amPmLabel,amPmCombo,durationLabel,durationCombo,descriptionLabel,descriptionArea,errorLabel);
+            VBox content = new VBox(8, titleLabel,titleField,eventTypeLabel,eventTypeComboBox,dateLabel,datePicker,allDayCheckBox,startRow,durationSection,descriptionLabel,descriptionArea,errorLabel);
             content.setPadding(new Insets(6,2,2,2));
 
             Supplier<Optional<CreateCalendarEventInput>> readInput = () -> {
