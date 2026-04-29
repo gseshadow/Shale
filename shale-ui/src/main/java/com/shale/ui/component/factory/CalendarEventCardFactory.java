@@ -15,7 +15,7 @@ import java.util.Objects;
 public final class CalendarEventCardFactory {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("h:mm a");
 
-    public Node create(CalendarFeedItem item, LocalDate today, LocalDateTime now) {
+    public Node create(CalendarFeedItem item, LocalDate today, LocalDateTime now, Node relatedNode) {
         Objects.requireNonNull(item, "item");
 
         VBox card = new VBox(3);
@@ -49,11 +49,9 @@ public final class CalendarEventCardFactory {
 
         card.getChildren().addAll(badges, time, title);
 
-        String relatedHint = resolveRelatedHint(item);
-        if (!relatedHint.isBlank()) {
-            Label related = new Label(relatedHint);
-            related.getStyleClass().add("calendar-event-related");
-            card.getChildren().add(related);
+        if (relatedNode != null) {
+            relatedNode.getStyleClass().add("calendar-event-related");
+            card.getChildren().add(relatedNode);
         }
 
         return card;
@@ -89,11 +87,6 @@ public final class CalendarEventCardFactory {
         return TIME_FORMAT.format(item.startsAt());
     }
 
-    private static String resolveRelatedHint(CalendarFeedItem item) {
-        if (item.caseId() != null) return "Case #" + item.caseId();
-        if (item.taskId() != null) return "Task #" + item.taskId();
-        return "";
-    }
 
 
     private static String normalize(String value) {
