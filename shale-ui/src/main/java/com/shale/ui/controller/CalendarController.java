@@ -19,6 +19,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.Node;
+import javafx.scene.Cursor;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -128,24 +129,8 @@ public final class CalendarController {
         if (result.isEmpty()) return;
 
         var input = result.get();
-        LocalDateTime startsAt;
-        LocalDateTime endsAt = null;
-        if (input.allDay()) {
-            startsAt = input.date().atStartOfDay();
-        } else {
-            if (input.startTime() == null) {
-                showError("Start time is required for timed events.");
-                return;
-            }
-            startsAt = input.date().atTime(input.startTime());
-            if (input.endTime() != null) {
-                endsAt = input.date().atTime(input.endTime());
-                if (!endsAt.isAfter(startsAt)) {
-                    showError("End time must be after start time.");
-                    return;
-                }
-            }
-        }
+        LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
+        LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
 
         try {
             calendarService.createEvent(new com.shale.core.model.CalendarEvent(
@@ -265,12 +250,16 @@ public final class CalendarController {
                                 + " type=" + item.calendarEventTypeSystemKey()
                                 + " colorHex=" + item.colorHex());
                     }
-                    dayItemsContainer.getChildren().add(calendarEventCardFactory.create(
+                    Node relatedCaseCard = buildRelatedCaseCard(item, caseModels, taskModels);
+                    Node relatedTaskCard = buildRelatedTaskCard(item, taskModels);
+                    Node card = calendarEventCardFactory.create(
                             item,
                             today,
                             now,
-                            buildRelatedCaseCard(item, caseModels, taskModels),
-                            buildRelatedTaskCard(item, taskModels)));
+                            relatedCaseCard,
+                            relatedTaskCard);
+                    configureManualEventEditClick(card, item, relatedCaseCard, relatedTaskCard);
+                    dayItemsContainer.getChildren().add(card);
                 }
             }
             ScrollPane laneScroll = new ScrollPane(dayItemsContainer);
@@ -363,6 +352,91 @@ public final class CalendarController {
     }
 
     private static String safe(String value) { return value == null ? "" : value; }
+
+    private void configureManualEventEditClick(Node card, CalendarFeedItem item, Node relatedCaseCard, Node relatedTaskCard) {
+        if (!isManualEvent(item)) return;
+        Integer eventId = parseEventId(item.key());
+        if (eventId == null || eventId <= 0) return;
+        card.setCursor(Cursor.HAND);
+        card.setOnMouseClicked(evt -> {
+            Object target = evt.getTarget();
+            if (target instanceof Node targetNode) {
+                if (isWithin(targetNode, relatedCaseCard) || isWithin(targetNode, relatedTaskCard)) return;
+            }
+            openEditEventDialog(eventId);
+        });
+    }
+
+    private void openEditEventDialog(int eventId) {
+        Integer tenantId = appState == null ? null : appState.getShaleClientId();
+        if (tenantId == null || tenantId <= 0 || calendarService == null) return;
+        var event = calendarService.getEventById(eventId, tenantId);
+        if (event == null) { showError("Could not load event for editing."); return; }
+        var initial = new NewCalendarEventDialog.CreateCalendarEventInput(
+                event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(),
+                event.allDay() ? null : event.startsAt().toLocalTime(),
+resolveDurationMinutes(event), event.description());
+        NewCalendarEventDialog.showEditDialog(
+                weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(),
+                calendarService.listEffectiveEventTypes(tenantId),
+                initial,
+                input -> saveEditedEvent(event, input),
+                () -> deleteEvent(event.calendarEventId(), tenantId)
+        );
+    }
+
+    private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) {
+        LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
+        LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
+        try {
+            calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), existing.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), existing.assignedToUserId(), existing.completed(), existing.cancelled(), existing.createdByUserId(), existing.createdAt(), existing.updatedAt()));
+            showError(null);
+            loadSelectedWeek();
+            return null;
+        } catch (RuntimeException ex) {
+            return "Could not save event. Please check values and try again.";
+        }
+    }
+
+
+    private int resolveDurationMinutes(com.shale.core.model.CalendarEvent event) {
+        if (event == null || event.endsAt() == null || event.startsAt() == null || !event.endsAt().isAfter(event.startsAt())) {
+            return 60;
+        }
+        long minutes = java.time.Duration.between(event.startsAt(), event.endsAt()).toMinutes();
+        long roundedUp = ((minutes + 29) / 30) * 30;
+        if (roundedUp < 30) roundedUp = 30;
+        if (roundedUp > 8 * 60) roundedUp = 8 * 60;
+        return (int) roundedUp;
+    }
+
+    private String deleteEvent(Integer calendarEventId, int tenantId) {
+        try {
+            calendarService.deleteCalendarEvent(calendarEventId, tenantId);
+            showError(null);
+            loadSelectedWeek();
+            return null;
+        } catch (RuntimeException ex) {
+            return "Could not delete event. Please try again.";
+        }
+    }
+    private static boolean isManualEvent(CalendarFeedItem item) {
+        String sourceType = safe(item.sourceType()).trim().toUpperCase(Locale.ROOT);
+        return "MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType);
+    }
+    private static Integer parseEventId(String key) {
+        if (key == null || !key.startsWith("EVENT:")) return null;
+        try { return Integer.parseInt(key.substring("EVENT:".length())); } catch (NumberFormatException ex) { return null; }
+    }
+    private static boolean isWithin(Node target, Node ancestor) {
+        if (target == null || ancestor == null) return false;
+        Node cur = target;
+        while (cur != null) {
+            if (cur == ancestor) return true;
+            cur = cur.getParent();
+        }
+        return false;
+    }
 
     private static LocalDate weekStartFor(LocalDate date) {
         return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
