@@ -1073,3 +1073,63 @@
     -fx-font-size: 11px;
     -fx-font-weight: 600;
 }
+
+.calendar-week-board {
+    -fx-alignment: top-left;
+}
+
+.calendar-day-lane {
+    -fx-background-color: rgba(245, 249, 253, 0.92);
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: rgba(15, 35, 66, 0.18);
+    -fx-border-width: 1;
+}
+
+.calendar-day-lane-today {
+    -fx-border-color: rgba(72, 122, 193, 0.95);
+    -fx-border-width: 2;
+}
+
+.calendar-day-lane-past {
+    -fx-opacity: 0.8;
+}
+
+.calendar-day-header .label {
+    -fx-text-fill: #112542;
+}
+
+.calendar-day-header .label:first-child {
+    -fx-font-weight: 800;
+}
+
+.calendar-day-header .label:last-child {
+    -fx-font-size: 12px;
+    -fx-text-fill: rgba(17, 37, 66, 0.72);
+}
+
+.calendar-event-card {
+    -fx-background-color: rgba(232, 241, 251, 0.8);
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: rgba(20, 42, 74, 0.18);
+    -fx-border-width: 1;
+    -fx-padding: 8;
+}
+
+.calendar-event-card .label {
+    -fx-text-fill: #112542;
+}
+
+.calendar-event-card-past {
+    -fx-opacity: 0.65;
+}
+
+.label.calendar-event-time {
+    -fx-font-weight: 800;
+}
+
+.label.calendar-event-type {
+    -fx-font-size: 12px;
+    -fx-text-fill: rgba(17, 37, 66, 0.78);
+}
