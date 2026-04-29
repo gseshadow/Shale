@@ -7,7 +7,7 @@ public record CalendarEvent(
         int shaleClientId,
         int calendarEventTypeId,
         Integer caseId,
-        Long taskId,
+        Integer taskId,
         String title,
         String description,
         LocalDateTime startsAt,

@@ -146,7 +146,7 @@ public final class CalendarEventDao {
                 rs.getInt("ShaleClientId"),
                 rs.getInt("CalendarEventTypeId"),
                 (Integer) rs.getObject("CaseId"),
-                rs.getObject("TaskId") == null ? null : rs.getLong("TaskId"),
+                (Integer) rs.getObject("TaskId"),
                 rs.getString("Title"),
                 rs.getString("Description"),
                 rs.getTimestamp("StartsAt").toLocalDateTime(),
