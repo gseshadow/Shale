@@ -153,8 +153,8 @@ public final class CalendarController {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
         Map<LocalDate, List<CalendarFeedItem>> grouped = groupAndSort(items);
-        Map<Integer, CaseCardFactory.CaseCardModel> caseModels = loadCaseModels(items);
         Map<Long, TaskCardFactory.TaskCardModel> taskModels = loadTaskModels(items);
+        Map<Integer, CaseCardFactory.CaseCardModel> caseModels = loadCaseModels(items, taskModels);
 
         for (int i = 0; i < 7; i++) {
             LocalDate day = selectedWeekStart.plusDays(i);
@@ -191,7 +191,12 @@ public final class CalendarController {
                                 + " type=" + item.calendarEventTypeSystemKey()
                                 + " colorHex=" + item.colorHex());
                     }
-                    dayItemsContainer.getChildren().add(calendarEventCardFactory.create(item, today, now, buildRelatedCard(item, caseModels, taskModels)));
+                    dayItemsContainer.getChildren().add(calendarEventCardFactory.create(
+                            item,
+                            today,
+                            now,
+                            buildRelatedCaseCard(item, caseModels, taskModels),
+                            buildRelatedTaskCard(item, taskModels)));
                 }
             }
             ScrollPane laneScroll = new ScrollPane(dayItemsContainer);
@@ -208,23 +213,47 @@ public final class CalendarController {
 
 
 
-    private Node buildRelatedCard(CalendarFeedItem item, Map<Integer, CaseCardFactory.CaseCardModel> caseModels, Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
-        if (item.taskId() != null) {
-            TaskCardFactory.TaskCardModel model = taskModels.get(item.taskId().longValue());
-            if (model != null) return taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
+    private Node buildRelatedCaseCard(CalendarFeedItem item,
+                                      Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
+                                      Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+        Integer caseId = item.caseId();
+        if (caseId == null && item.taskId() != null) {
+            TaskCardFactory.TaskCardModel taskModel = taskModels.get(item.taskId().longValue());
+            if (taskModel != null && taskModel.caseId() != null) {
+                caseId = taskModel.caseId().intValue();
+            }
         }
-        if (item.caseId() != null) {
-            CaseCardFactory.CaseCardModel model = caseModels.get(item.caseId());
+        if (caseId != null) {
+            CaseCardFactory.CaseCardModel model = caseModels.get(caseId);
             if (model != null) return caseCardFactory.create(model, CaseCardFactory.Variant.MINI);
         }
         return null;
     }
 
-    private Map<Integer, CaseCardFactory.CaseCardModel> loadCaseModels(List<CalendarFeedItem> items) {
+    private Node buildRelatedTaskCard(CalendarFeedItem item, Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+        if (item.taskId() != null) {
+            TaskCardFactory.TaskCardModel model = taskModels.get(item.taskId().longValue());
+            if (model != null) return taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
+        }
+        return null;
+    }
+
+    private Map<Integer, CaseCardFactory.CaseCardModel> loadCaseModels(List<CalendarFeedItem> items,
+                                                                        Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
         Map<Integer, CaseCardFactory.CaseCardModel> out = new HashMap<>();
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
         if (tenantId == null || tenantId <= 0 || calendarFeedDao == null) return out;
-        List<Integer> caseIds = items.stream().map(CalendarFeedItem::caseId).filter(Objects::nonNull).distinct().toList();
+        List<Integer> caseIds = new ArrayList<>(items.stream()
+                .map(CalendarFeedItem::caseId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList());
+        taskModels.values().stream()
+                .map(TaskCardFactory.TaskCardModel::caseId)
+                .filter(Objects::nonNull)
+                .map(Long::intValue)
+                .forEach(caseIds::add);
+        caseIds = caseIds.stream().distinct().toList();
         for (CalendarFeedDao.CalendarCaseCardRow row : calendarFeedDao.listCaseCardRows(tenantId, caseIds)) {
             out.put(row.caseId(), new CaseCardFactory.CaseCardModel(row.caseId(), row.caseName(), null, null, row.responsibleAttorney(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()));
         }
@@ -241,6 +270,7 @@ public final class CalendarController {
         }
         return out;
     }
+
     private Map<LocalDate, List<CalendarFeedItem>> groupAndSort(List<CalendarFeedItem> items) {
         Map<LocalDate, List<CalendarFeedItem>> grouped = new LinkedHashMap<>();
         for (int i = 0; i < 7; i++) grouped.put(selectedWeekStart.plusDays(i), new ArrayList<>());
