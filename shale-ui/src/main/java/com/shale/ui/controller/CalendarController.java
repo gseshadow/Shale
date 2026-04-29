@@ -186,6 +186,11 @@ public final class CalendarController {
                 dayItemsContainer.getChildren().add(empty);
             } else {
                 for (CalendarFeedItem item : dayItems) {
+                    if (Boolean.getBoolean("shale.debug.calendar.colors")) {
+                        System.out.println("[CALENDAR COLOR] key=" + item.key()
+                                + " type=" + item.calendarEventTypeSystemKey()
+                                + " colorHex=" + item.colorHex());
+                    }
                     dayItemsContainer.getChildren().add(calendarEventCardFactory.create(item, today, now, buildRelatedCard(item, caseModels, taskModels)));
                 }
             }
