@@ -17,7 +17,7 @@ import java.util.Objects;
 public final class CalendarEventCardFactory {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("h:mm a");
 
-    public Node create(CalendarFeedItem item, LocalDate today, LocalDateTime now, Node relatedNode) {
+    public Node create(CalendarFeedItem item, LocalDate today, LocalDateTime now, Node relatedCaseNode, Node relatedTaskNode) {
         Objects.requireNonNull(item, "item");
 
         HBox card = new HBox(0);
@@ -55,12 +55,15 @@ public final class CalendarEventCardFactory {
         title.getStyleClass().add("calendar-event-title");
         title.setWrapText(true);
 
-        content.getChildren().addAll(badges, time, title);
-
-        if (relatedNode != null) {
-            relatedNode.getStyleClass().add("calendar-event-related");
-            content.getChildren().add(relatedNode);
+        if (relatedCaseNode != null) {
+            relatedCaseNode.getStyleClass().add("calendar-event-related");
+            content.getChildren().add(relatedCaseNode);
         }
+        if (relatedTaskNode != null) {
+            relatedTaskNode.getStyleClass().add("calendar-event-related");
+            content.getChildren().add(relatedTaskNode);
+        }
+        content.getChildren().addAll(time, title, badges);
         card.getChildren().add(content);
 
         return card;
