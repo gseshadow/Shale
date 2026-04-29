@@ -11,6 +11,7 @@ public record AppRoute(RouteType type, Integer entityId, String sectionKey, Stri
         CONTACTS_LIST,
         ORGANIZATIONS_LIST,
         TEAM_LIST,
+        CALENDAR,
         SETTINGS,
         SEARCH,
         CASE_PROFILE,
@@ -43,6 +44,10 @@ public record AppRoute(RouteType type, Integer entityId, String sectionKey, Stri
 
     public static AppRoute teamList() {
         return new AppRoute(RouteType.TEAM_LIST, null, null, null);
+    }
+
+    public static AppRoute calendar() {
+        return new AppRoute(RouteType.CALENDAR, null, null, null);
     }
 
     public static AppRoute settings() {
