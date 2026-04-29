@@ -25,7 +25,15 @@ public final class CalendarFeedDao {
         if (shaleClientId <= 0 || caseIds == null || caseIds.isEmpty()) return List.of();
         String placeholders = String.join(",", java.util.Collections.nCopies(caseIds.size(), "?"));
         String sql = """
-                SELECT c.Id, c.Name, ra.DisplayName AS ResponsibleAttorney, ra.Color AS ResponsibleAttorneyColor, c.NonEngagementLetterSent
+                SELECT c.Id,
+                       c.Name,
+                       LTRIM(RTRIM(
+                         COALESCE(ra.name_first, '') +
+                         CASE WHEN COALESCE(ra.name_first, '') = '' OR COALESCE(ra.name_last, '') = '' THEN '' ELSE ' ' END +
+                         COALESCE(ra.name_last, '')
+                       )) AS ResponsibleAttorney,
+                       ra.color AS ResponsibleAttorneyColor,
+                       c.NonEngagementLetterSent
                 FROM dbo.Cases c
                 LEFT JOIN dbo.CaseUsers cu ON cu.CaseId = c.Id AND cu.RoleId = 1
                 LEFT JOIN dbo.Users ra ON ra.Id = cu.UserId
