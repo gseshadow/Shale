@@ -72,6 +72,9 @@ public final class MainController {
 	private Button navSettingsButton;
 
 	@FXML
+	private Button navCalendarButton;
+
+	@FXML
 	private Button logoutButton;
 
 	// Content shell
@@ -163,6 +166,11 @@ public final class MainController {
 	@FXML
 	private void onNavTeam() {
 		sceneManager.openTeamListView();
+	}
+
+	@FXML
+	private void onNavCalendar() {
+		sceneManager.openCalendarView();
 	}
 
 	@FXML
@@ -286,6 +294,13 @@ public final class MainController {
 		sectionContent.getChildren().setAll(teamRoot);
 	}
 
+	public void showCalendarView() {
+		highlightNav(navCalendarButton);
+		setSectionHeader("Calendar", "Calendar events and case/task deadlines will appear here.", true);
+		Node calendarRoot = sceneManager.createCalendarView();
+		sectionContent.getChildren().setAll(calendarRoot);
+	}
+
 	public void showSettingsView() {
 		highlightNav(navSettingsButton);
 		setSectionHeader("Settings", "Configure Shale preferences and system settings.", true);
@@ -362,6 +377,7 @@ public final class MainController {
 				navContactsButton,
 				navOrganizationsButton,
 				navTeamButton,
+				navCalendarButton,
 				navSettingsButton
 		);
 	}
@@ -384,6 +400,7 @@ public final class MainController {
 		navContactsButton.setDisable(false);
 		navOrganizationsButton.setDisable(false);
 		navTeamButton.setDisable(false);
+		navCalendarButton.setDisable(false);
 		navSettingsButton.setDisable(false);
 
 		NavButtonStyler.setActive(active, getNavigationButtons());

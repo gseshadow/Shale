@@ -13,8 +13,13 @@ import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.data.dao.UserPreferencesDao;
 import com.shale.data.dao.AuditLogDao;
+import com.shale.ui.services.CalendarService;
+import com.shale.data.dao.CalendarFeedDao;
+import com.shale.data.dao.CalendarEventTypeDao;
+import com.shale.data.dao.CalendarEventDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
+import com.shale.ui.controller.CalendarController;
 import com.shale.ui.controller.ContactViewController;
 import com.shale.ui.controller.ContactsController;
 import com.shale.ui.controller.AuditLogViewerController;
@@ -292,6 +297,10 @@ public final class SceneManager {
 		navigateTo(AppRoute.teamList(), true);
 	}
 
+	public void openCalendarView() {
+		navigateTo(AppRoute.calendar(), true);
+	}
+
 	public void openSettingsView() {
 		navigateTo(AppRoute.settings(), true);
 	}
@@ -383,6 +392,7 @@ public final class SceneManager {
 			case CONTACTS_LIST -> mainController.showContactsListView();
 			case ORGANIZATIONS_LIST -> mainController.showOrganizationsListView();
 			case TEAM_LIST -> mainController.showTeamListView();
+			case CALENDAR -> mainController.showCalendarView();
 			case SETTINGS -> mainController.showSettingsView();
 			case SEARCH -> mainController.showSearchResultsView(route.searchQuery() == null ? "" : route.searchQuery());
 			case CASE_PROFILE -> mainController.showCaseProfileView(route.entityId(), route.sectionKey());
@@ -493,6 +503,18 @@ public final class SceneManager {
 			TeamController c = (TeamController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			c.init(appState, userDao, onOpenUser);
+			return c;
+		});
+	}
+
+	public Parent createCalendarView() {
+		return load("/fxml/calendar.fxml", controller -> {
+			CalendarController c = (CalendarController) controller;
+			CalendarService calendarService = new CalendarService(
+					new CalendarEventTypeDao(dbSessionProvider),
+					new CalendarEventDao(dbSessionProvider),
+					new CalendarFeedDao(dbSessionProvider));
+			c.init(appState, calendarService);
 			return c;
 		});
 	}
