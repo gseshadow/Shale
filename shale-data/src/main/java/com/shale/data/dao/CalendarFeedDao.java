@@ -88,7 +88,7 @@ public final class CalendarFeedDao {
             return List.of();
         }
         String sql = """
-                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, TaskId, CalendarEventTypeSystemKey, DisplayTypeName
+                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, TaskId, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex
                 FROM (
                     SELECT CONCAT('EVENT:', CAST(e.CalendarEventId AS varchar(20))) AS KeyValue,
                            e.Title,
@@ -100,7 +100,8 @@ public final class CalendarFeedDao {
                            e.CaseId,
                            e.TaskId,
                            et.SystemKey AS CalendarEventTypeSystemKey,
-                           COALESCE(et.Name, 'Event') AS DisplayTypeName
+                           COALESCE(et.Name, 'Event') AS DisplayTypeName,
+                           et.ColorHex AS ColorHex
                     FROM dbo.CalendarEvents e
                     LEFT JOIN dbo.CalendarEventTypes et ON et.CalendarEventTypeId = e.CalendarEventTypeId
                     WHERE e.ShaleClientId = ?
@@ -119,8 +120,18 @@ public final class CalendarFeedDao {
                            t.CaseId,
                            t.Id,
                            'TASK_DUE',
-                           'Task Due'
+                           'Task Due',
+                           projectedType.ColorHex
                     FROM dbo.Tasks t
+                    OUTER APPLY (
+                      SELECT TOP (1) cet.ColorHex
+                      FROM dbo.CalendarEventTypes cet
+                      WHERE cet.SystemKey = 'TASK_DUE'
+                        AND cet.IsActive = 1
+                        AND (cet.ShaleClientId = t.ShaleClientId OR cet.ShaleClientId IS NULL)
+                      ORDER BY CASE WHEN cet.ShaleClientId = t.ShaleClientId THEN 0 ELSE 1 END,
+                               cet.CalendarEventTypeId DESC
+                    ) projectedType
                     WHERE t.ShaleClientId = ?
                       AND t.DueAt IS NOT NULL
                       AND t.DueAt >= ?
@@ -139,8 +150,18 @@ public final class CalendarFeedDao {
                            c.Id,
                            NULL,
                            'STATUTE_OF_LIMITATIONS',
-                           'Statute of Limitations'
+                           'Statute of Limitations',
+                           projectedType.ColorHex
                     FROM dbo.Cases c
+                    OUTER APPLY (
+                      SELECT TOP (1) cet.ColorHex
+                      FROM dbo.CalendarEventTypes cet
+                      WHERE cet.SystemKey = 'STATUTE_OF_LIMITATIONS'
+                        AND cet.IsActive = 1
+                        AND (cet.ShaleClientId = c.ShaleClientId OR cet.ShaleClientId IS NULL)
+                      ORDER BY CASE WHEN cet.ShaleClientId = c.ShaleClientId THEN 0 ELSE 1 END,
+                               cet.CalendarEventTypeId DESC
+                    ) projectedType
                     WHERE c.ShaleClientId = ?
                       AND c.StatuteOfLimitations IS NOT NULL
                       AND c.StatuteOfLimitations >= CAST(? AS date)
@@ -159,8 +180,18 @@ public final class CalendarFeedDao {
                            c.Id,
                            NULL,
                            'TORT_NOTICE_DEADLINE',
-                           'Tort Notice Deadline'
+                           'Tort Notice Deadline',
+                           projectedType.ColorHex
                     FROM dbo.Cases c
+                    OUTER APPLY (
+                      SELECT TOP (1) cet.ColorHex
+                      FROM dbo.CalendarEventTypes cet
+                      WHERE cet.SystemKey = 'TORT_NOTICE_DEADLINE'
+                        AND cet.IsActive = 1
+                        AND (cet.ShaleClientId = c.ShaleClientId OR cet.ShaleClientId IS NULL)
+                      ORDER BY CASE WHEN cet.ShaleClientId = c.ShaleClientId THEN 0 ELSE 1 END,
+                               cet.CalendarEventTypeId DESC
+                    ) projectedType
                     WHERE c.ShaleClientId = ?
                       AND c.TortNoticeDeadline IS NOT NULL
                       AND c.TortNoticeDeadline >= CAST(? AS date)
@@ -179,8 +210,18 @@ public final class CalendarFeedDao {
                            c.Id,
                            NULL,
                            'DISCOVERY_DEADLINE',
-                           'Discovery Deadline'
+                           'Discovery Deadline',
+                           projectedType.ColorHex
                     FROM dbo.Cases c
+                    OUTER APPLY (
+                      SELECT TOP (1) cet.ColorHex
+                      FROM dbo.CalendarEventTypes cet
+                      WHERE cet.SystemKey = 'DISCOVERY_DEADLINE'
+                        AND cet.IsActive = 1
+                        AND (cet.ShaleClientId = c.ShaleClientId OR cet.ShaleClientId IS NULL)
+                      ORDER BY CASE WHEN cet.ShaleClientId = c.ShaleClientId THEN 0 ELSE 1 END,
+                               cet.CalendarEventTypeId DESC
+                    ) projectedType
                     WHERE c.ShaleClientId = ?
                       AND c.DiscoveryDeadline IS NOT NULL
                       AND c.DiscoveryDeadline >= CAST(? AS date)
@@ -212,7 +253,8 @@ public final class CalendarFeedDao {
                             (Integer) rs.getObject("CaseId"),
                             (Integer) rs.getObject("TaskId"),
                             rs.getString("CalendarEventTypeSystemKey"),
-                            rs.getString("DisplayTypeName")));
+                            rs.getString("DisplayTypeName"),
+                            rs.getString("ColorHex")));
                 }
                 return rows;
             }

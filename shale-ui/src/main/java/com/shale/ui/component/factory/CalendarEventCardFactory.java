@@ -1,6 +1,7 @@
 package com.shale.ui.component.factory;
 
 import com.shale.core.model.CalendarFeedItem;
+import com.shale.ui.util.ColorUtil;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -20,6 +21,7 @@ public final class CalendarEventCardFactory {
 
         VBox card = new VBox(3);
         card.getStyleClass().add("calendar-event-card");
+        applyTypeAccent(card, item.colorHex());
 
         LocalDate itemDate = item.startsAt() == null ? null : item.startsAt().toLocalDate();
         if (item.startsAt() != null && item.startsAt().isBefore(now)) {
@@ -55,6 +57,15 @@ public final class CalendarEventCardFactory {
         }
 
         return card;
+    }
+
+    private static void applyTypeAccent(VBox card, String colorHex) {
+        String normalized = ColorUtil.normalizeStoredColor(colorHex);
+        if (normalized == null) {
+            return;
+        }
+        String accent = "#" + normalized.substring(0, 6);
+        card.setStyle("-fx-border-width: 1 1 1 4; -fx-border-color: rgba(20, 42, 74, 0.12) rgba(20, 42, 74, 0.12) rgba(20, 42, 74, 0.12) " + accent + ";");
     }
 
     private static String resolveType(CalendarFeedItem item) {
