@@ -9,6 +9,7 @@ import javafx.scene.layout.VBox;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.Objects;
 
 public final class CalendarEventCardFactory {
@@ -59,9 +60,18 @@ public final class CalendarEventCardFactory {
     }
 
     private static String resolveType(CalendarFeedItem item) {
-        if ("CASE_FIELD".equalsIgnoreCase(safe(item.sourceType()))) return "Case";
-        if ("TASK_FIELD".equalsIgnoreCase(safe(item.sourceType()))) return "Task";
-        if ("MANUAL".equalsIgnoreCase(safe(item.sourceType()))) return "Event";
+        String sourceType = normalize(item.sourceType());
+        String sourceField = normalize(item.sourceField());
+
+        if ("CASE".equals(sourceType) || "CASE_FIELD".equals(sourceType)) return "Case";
+        if ("TASK".equals(sourceType) || "TASK_FIELD".equals(sourceType)) return "Task";
+
+        if ("PROJECTED".equals(sourceType)) {
+            if ("DUEAT".equals(sourceField) || item.taskId() != null) return "Task";
+            if (item.caseId() != null) return "Case";
+        }
+
+        if ("MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType)) return "Event";
         return "Other";
     }
 
@@ -83,6 +93,11 @@ public final class CalendarEventCardFactory {
         if (item.caseId() != null) return "Case #" + item.caseId();
         if (item.taskId() != null) return "Task #" + item.taskId();
         return "";
+    }
+
+
+    private static String normalize(String value) {
+        return safe(value).trim().toUpperCase(Locale.ROOT);
     }
 
     private static String safe(String value) {
