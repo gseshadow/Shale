@@ -200,6 +200,14 @@ public final class MyShaleController {
 	private boolean loadingOverview;
 	private boolean loadingMyTasks;
 	private boolean loadingMyCases;
+	private boolean myTasksLoadedOnce;
+	private boolean myTasksDirty = true;
+	private boolean myCasesLoadedOnce;
+	private boolean myCasesDirty = true;
+	private Integer cachedTasksUserId;
+	private Integer cachedTasksTenantId;
+	private Integer cachedCasesUserId;
+	private Integer cachedCasesTenantId;
 	private boolean myCasesLoadFailed;
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
@@ -450,6 +458,7 @@ public final class MyShaleController {
 		if (section == null) {
 			return;
 		}
+		long switchStartNanos = PerfLog.start();
 		activeSection = section;
 		Button activeButton = sectionTabs.get(section);
 		AppSectionTabs.setActive(activeButton, sectionTabs.values());
@@ -460,18 +469,37 @@ public final class MyShaleController {
 		setVisibleManaged(tasksSectionPane, showTasks);
 		setVisibleManaged(myCasesSectionPane, showMyCases);
 		if (showOverview) {
+			primeTasksLoadingStateForFirstLoad();
 			renderMyOverview();
-			refreshMyTasks();
+			ensureMyTasksFresh(false);
 		}
 		if (showTasks) {
+			primeTasksLoadingStateForFirstLoad();
 			attachTasksPanel(tasksSectionContentHost);
-			renderMyTasks();
-			refreshMyTasks();
+			if (myTasksLoadedOnce || loadingMyTasks) {
+				renderMyTasks();
+			}
+			ensureMyTasksFresh(false);
 		}
 		if (showMyCases) {
-			renderMyCasesBoard();
-			refreshMyCasesBoard();
+			primeMyCasesLoadingStateForFirstLoad();
+			if (myCasesLoadedOnce || loadingMyCases) {
+				renderMyCasesBoard();
+			}
+			ensureMyCasesFresh(false);
 		}
+		PerfLog.logDone("RENDER", "panel=my_shale_sections section=" + section, switchStartNanos);
+	}
+
+	private void primeTasksLoadingStateForFirstLoad() {
+		if (!myTasksLoadedOnce && !loadingMyTasks) {
+			loadingOverview = true;
+		}
+	}
+
+	private void primeMyCasesLoadingStateForFirstLoad() {
+		// Intentionally left blank: loadingMyCases should only be controlled
+		// by refreshMyCasesBoard(...), which owns in-flight state.
 	}
 
 	private void attachTasksPanel(Pane host) {
@@ -607,14 +635,19 @@ public final class MyShaleController {
 					}
 
 					if (changed) {
+						myCasesDirty = false;
+						myCasesLoadedOnce = true;
 						rerender();
-						refreshMyCasesBoard();
+						renderMyCasesBoard();
 					}
 				});
-			} catch (Exception ex) {
-				System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh failed caseId=" + caseId + " message=" + ex.getMessage());
-				runOnFx(this::loadFirstPage);
-			}
+				} catch (Exception ex) {
+					System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh failed caseId=" + caseId + " message=" + ex.getMessage());
+					runOnFx(() -> {
+						myCasesDirty = true;
+						refreshMyCasesBoard(true);
+					});
+				}
 		});
 	}
 
@@ -835,7 +868,32 @@ public final class MyShaleController {
 	}
 
 	private void refreshMyTasks() {
+		refreshMyTasks(true);
+	}
+
+	private void ensureMyTasksFresh(boolean force) {
+		invalidateTaskCacheIfContextChanged();
+		if (!force && myTasksLoadedOnce && !myTasksDirty && !loadingMyTasks) {
+			PerfLog.log("CTRL", "cache_hit", "panel=my_tasks page=my_shale");
+			return;
+		}
+		refreshMyTasks(force);
+	}
+
+	private void invalidateTaskCacheIfContextChanged() {
+		Integer currentUserId = appState == null ? null : appState.getUserId();
+		Integer currentTenantId = appState == null ? null : appState.getShaleClientId();
+		if (!Objects.equals(cachedTasksUserId, currentUserId) || !Objects.equals(cachedTasksTenantId, currentTenantId)) {
+			myTasksLoadedOnce = false;
+			myTasksDirty = true;
+		}
+	}
+
+	private void refreshMyTasks(boolean force) {
 		if (caseTaskService == null || appState == null) {
+			return;
+		}
+		if (!force && loadingMyTasks) {
 			return;
 		}
 		loadingOverview = true;
@@ -844,9 +902,14 @@ public final class MyShaleController {
 		renderMyTasks();
 		Integer shaleClientId = appState.getShaleClientId();
 		Integer userId = appState.getUserId();
-		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
-			myTasks = List.of();
-			myTaskAssignedUsers = java.util.Map.of();
+			if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+				myTasks = List.of();
+				myTaskAssignedUsers = java.util.Map.of();
+				myTaskPrioritiesById = java.util.Map.of();
+				cachedTasksUserId = userId;
+				cachedTasksTenantId = shaleClientId;
+				myTasksLoadedOnce = true;
+				myTasksDirty = false;
 			loadingOverview = false;
 			loadingMyTasks = false;
 			renderMyOverview();
@@ -902,8 +965,12 @@ public final class MyShaleController {
 						pinnedTaskLaneCaseIds.addAll(pinnedLaneCaseIds);
 						collapsedTaskLaneCaseIds.clear();
 						collapsedTaskLaneCaseIds.addAll(collapsedLaneCaseIds);
-						myTaskAssignedUsers = assignedByTask;
-						myTaskPrioritiesById = prioritiesById;
+							myTaskAssignedUsers = assignedByTask;
+							myTaskPrioritiesById = prioritiesById;
+							cachedTasksUserId = userIdValue;
+							cachedTasksTenantId = shaleClientIdValue;
+							myTasksLoadedOnce = true;
+							myTasksDirty = false;
 						syncMyTaskPriorityFilterOptions();
 						syncMyTaskCaseFilterOptions();
 						renderMyOverview();
@@ -915,6 +982,7 @@ public final class MyShaleController {
 				runOnFx(() -> {
 					loadingOverview = false;
 					loadingMyTasks = false;
+					myTasksDirty = true;
 					renderMyOverview();
 					renderMyTasks();
 					showTaskActionError("Failed to load your tasks.");
@@ -924,7 +992,32 @@ public final class MyShaleController {
 	}
 
 	private void refreshMyCasesBoard() {
+		refreshMyCasesBoard(true);
+	}
+
+	private void ensureMyCasesFresh(boolean force) {
+		invalidateMyCasesCacheIfContextChanged();
+		if (!force && myCasesLoadedOnce && !myCasesDirty && !loadingMyCases) {
+			PerfLog.log("CTRL", "cache_hit", "panel=my_cases_board page=my_shale");
+			return;
+		}
+		refreshMyCasesBoard(force);
+	}
+
+	private void invalidateMyCasesCacheIfContextChanged() {
+		Integer currentUserId = appState == null ? null : appState.getUserId();
+		Integer currentTenantId = appState == null ? null : appState.getShaleClientId();
+		if (!Objects.equals(cachedCasesUserId, currentUserId) || !Objects.equals(cachedCasesTenantId, currentTenantId)) {
+			myCasesLoadedOnce = false;
+			myCasesDirty = true;
+		}
+	}
+
+	private void refreshMyCasesBoard(boolean force) {
 		if (caseDao == null || appState == null) {
+			return;
+		}
+		if (!force && loadingMyCases) {
 			return;
 		}
 		loadingMyCases = true;
@@ -936,10 +1029,14 @@ public final class MyShaleController {
 		loadingMyCases = true;
 		myCasesLoadFailed = false;
 		renderMyCasesBoard();
-		if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
-			myAssignedCasesBoard = List.of();
-			loadingMyCases = false;
-			myCasesLoadFailed = false;
+			if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
+				myAssignedCasesBoard = List.of();
+				loadingMyCases = false;
+				myCasesLoadFailed = false;
+				cachedCasesUserId = userId;
+				cachedCasesTenantId = shaleClientId;
+				myCasesLoadedOnce = true;
+				myCasesDirty = false;
 			renderMyCasesBoard();
 			return;
 		}
@@ -955,9 +1052,13 @@ public final class MyShaleController {
 						.map(this::toVm)
 						.toList();
 				runOnFx(() -> {
-					loadingMyCases = false;
-					myCasesLoadFailed = false;
-					myAssignedCasesBoard = cases;
+						loadingMyCases = false;
+						myCasesLoadFailed = false;
+						myAssignedCasesBoard = cases;
+						cachedCasesUserId = userIdValue;
+						cachedCasesTenantId = shaleClientId;
+						myCasesLoadedOnce = true;
+						myCasesDirty = false;
 					renderMyCasesBoard();
 				});
 			} catch (Exception ex) {
@@ -966,6 +1067,7 @@ public final class MyShaleController {
 				runOnFx(() -> {
 					loadingMyCases = false;
 					myCasesLoadFailed = true;
+					myCasesDirty = true;
 					myAssignedCasesBoard = List.of();
 					renderMyCasesBoard();
 				});
@@ -982,16 +1084,10 @@ public final class MyShaleController {
 			myCasesBoardEmptyLabel.setText("Loading your cases...");
 			setVisibleManaged(myCasesBoardEmptyLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
+			setVisibleManaged(myCasesLoadingLabel, false);
 			return;
 		}
 		myCasesBoardList.getChildren().clear();
-		if (loadingMyCases) {
-			myCasesLoadingLabel.setText("Loading cases…");
-			setVisibleManaged(myCasesLoadingLabel, true);
-			setVisibleManaged(myCasesBoardEmptyLabel, false);
-			setVisibleManaged(myCasesBoardScroll, false);
-			return;
-		}
 		setVisibleManaged(myCasesLoadingLabel, false);
 		if (myCasesLoadFailed) {
 			myCasesBoardEmptyLabel.setText("Unable to load assigned cases.");
@@ -2359,7 +2455,10 @@ public final class MyShaleController {
 				} else {
 					caseTaskService.completeTask(taskId, shaleClientId, appState.getUserId());
 				}
-				runOnFx(this::refreshMyTasks);
+				runOnFx(() -> {
+					myTasksDirty = true;
+					refreshMyTasks(true);
+				});
 			} catch (Exception ex) {
 				runOnFx(() -> showTaskActionError("Failed to update task completion. " + rootCauseMessage(ex)));
 			}
@@ -2396,6 +2495,7 @@ public final class MyShaleController {
 			return;
 		}
 		Optional<CaseTaskListItemDto> summary = findMyTaskById(taskId);
+		final AtomicBoolean dialogMutatedAssignments = new AtomicBoolean(false);
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 				taskId,
 				summary.map(CaseTaskListItemDto::caseId).orElse(0L),
@@ -2462,6 +2562,7 @@ public final class MyShaleController {
 						@Override
 						public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
 							caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+							dialogMutatedAssignments.set(true);
 							return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
 									.map(member -> new TaskDetailDialog.AssignedTeamMember(
 											member.userId(),
@@ -2473,6 +2574,7 @@ public final class MyShaleController {
 						@Override
 						public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
 							caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+							dialogMutatedAssignments.set(true);
 							return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
 									.map(member -> new TaskDetailDialog.AssignedTeamMember(
 											member.userId(),
@@ -2515,6 +2617,10 @@ public final class MyShaleController {
 					onOpenUser,
 					onOpenCase);
 			if (result.isEmpty()) {
+				if (dialogMutatedAssignments.get()) {
+					myTasksDirty = true;
+					refreshMyTasks(true);
+				}
 				return;
 			}
 			TaskDetailDialog.TaskDetailResult action = result.get();
@@ -2561,7 +2667,10 @@ public final class MyShaleController {
 		{
 			try {
 				caseTaskService.updateTask(request);
-				runOnFx(this::refreshMyTasks);
+				runOnFx(() -> {
+					myTasksDirty = true;
+					refreshMyTasks(true);
+				});
 			} catch (Exception ex) {
 				runOnFx(() -> showTaskActionError("Failed to save task. " + rootCauseMessage(ex)));
 			}
@@ -2573,7 +2682,10 @@ public final class MyShaleController {
 		{
 			try {
 				caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
-				runOnFx(this::refreshMyTasks);
+				runOnFx(() -> {
+					myTasksDirty = true;
+					refreshMyTasks(true);
+				});
 			} catch (Exception ex) {
 				runOnFx(() -> showTaskActionError("Failed to delete task. " + rootCauseMessage(ex)));
 			}

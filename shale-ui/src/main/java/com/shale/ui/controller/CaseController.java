@@ -1249,7 +1249,7 @@ public class CaseController {
 		setVisibleManaged(organizationsEmptyLabel, false);
 		setVisibleManaged(timelineScrollPane, true);
 		setVisibleManaged(timelineListBox, true);
-		setVisibleManaged(timelineEmptyLabel, false);
+		showTimelineLoadingState();
 		auditCaseRead("Case.Timeline.Read", "Case.Timeline");
 		loadCaseTimelineEventsAsync();
 	}
@@ -1289,6 +1289,19 @@ public class CaseController {
 		phiReadAuditService.auditRead(fieldName, screenName, "Case", caseId.longValue());
 	}
 
+	private void showTimelineLoadingState() {
+		if (timelineListBox != null) {
+			timelineListBox.getChildren().clear();
+		}
+		if (timelineEmptyLabel != null) {
+			timelineEmptyLabel.setText("Loading timeline…");
+		}
+		setVisibleManaged(timelineEmptyLabel, true);
+		if (timelineScrollPane != null) {
+			timelineScrollPane.setVvalue(0.0);
+		}
+	}
+
 	private void loadCaseTimelineEventsAsync() {
 		if (caseDao == null || caseId == null) {
 			renderTimelineEvents(List.of());
@@ -1319,6 +1332,9 @@ public class CaseController {
 		timelineListBox.getChildren().clear();
 		List<CaseTimelineEventDto> safeEvents = events == null ? List.of() : events;
 		if (safeEvents.isEmpty()) {
+			if (timelineEmptyLabel != null) {
+				timelineEmptyLabel.setText("No timeline events yet.");
+			}
 			setVisibleManaged(timelineEmptyLabel, true);
 			if (timelineScrollPane != null)
 				timelineScrollPane.setVvalue(0.0);
@@ -1371,21 +1387,20 @@ public class CaseController {
 		if (timelineListBox == null)
 			return;
 
-		boolean partiesSectionActive = isSectionActive("Parties");
-		timelineListBox.getChildren().clear();
-		List<CasePartyDto> safeParties = caseParties == null ? List.of() : caseParties;
-		if (safeParties.isEmpty()) {
-			if (partiesSectionActive) {
-				if (timelineEmptyLabel != null)
-					timelineEmptyLabel.setText("No parties yet.");
-				setVisibleManaged(timelineEmptyLabel, true);
-			}
+		if (!isSectionActive("Parties")) {
 			return;
 		}
 
-		if (partiesSectionActive) {
-			setVisibleManaged(timelineEmptyLabel, false);
+		timelineListBox.getChildren().clear();
+		List<CasePartyDto> safeParties = caseParties == null ? List.of() : caseParties;
+		if (safeParties.isEmpty()) {
+			if (timelineEmptyLabel != null)
+				timelineEmptyLabel.setText("No parties yet.");
+			setVisibleManaged(timelineEmptyLabel, true);
+			return;
 		}
+
+		setVisibleManaged(timelineEmptyLabel, false);
 
 		renderPartyGroups(timelineListBox, safeParties, PartyRenderMode.MANAGE, 300, false);
 	}
