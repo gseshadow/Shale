@@ -69,6 +69,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import javafx.stage.Window;
 
@@ -84,6 +85,7 @@ import com.shale.ui.notification.AssignedUserTaskDueNotificationRecipientResolve
 import com.shale.ui.notification.TaskDueDateNotificationGenerator;
 
 public final class SceneManager {
+	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 
 	private final Stage stage;
 	private final AppState appState;
@@ -773,9 +775,13 @@ public final class SceneManager {
 			System.err.println("Ignoring task navigation for invalid taskId: " + taskId);
 			return;
 		}
+		if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
+			return;
+		}
 		Integer shaleClientId = appState.getShaleClientId();
 		Integer currentUserId = appState.getUserId();
 		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			taskDetailDialogInFlight.set(false);
 			AppDialogs.showError(stage, "Tasks", "You must be signed in to view task details.");
 			return;
 		}
@@ -793,9 +799,18 @@ public final class SceneManager {
 			TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 			List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
 			List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, statuses, priorities));
+			Platform.runLater(() -> {
+			try {
+				showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, statuses, priorities);
+			} finally {
+				taskDetailDialogInFlight.set(false);
+			}
+		});
 		} catch (Exception ex) {
-			Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
+			Platform.runLater(() -> {
+			taskDetailDialogInFlight.set(false);
+			AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex));
+		});
 		}
 	}
 
