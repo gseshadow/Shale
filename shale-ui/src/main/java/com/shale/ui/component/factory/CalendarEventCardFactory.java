@@ -1,9 +1,11 @@
 package com.shale.ui.component.factory;
 
 import com.shale.core.model.CalendarFeedItem;
+import com.shale.ui.util.ColorUtil;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.time.LocalDate;
@@ -18,8 +20,14 @@ public final class CalendarEventCardFactory {
     public Node create(CalendarFeedItem item, LocalDate today, LocalDateTime now, Node relatedNode) {
         Objects.requireNonNull(item, "item");
 
-        VBox card = new VBox(3);
+        HBox card = new HBox(0);
         card.getStyleClass().add("calendar-event-card");
+        Region accentBar = buildAccentBar(item.colorHex());
+        if (accentBar != null) {
+            card.getChildren().add(accentBar);
+        }
+
+        VBox content = new VBox(3);
 
         LocalDate itemDate = item.startsAt() == null ? null : item.startsAt().toLocalDate();
         if (item.startsAt() != null && item.startsAt().isBefore(now)) {
@@ -47,14 +55,29 @@ public final class CalendarEventCardFactory {
         title.getStyleClass().add("calendar-event-title");
         title.setWrapText(true);
 
-        card.getChildren().addAll(badges, time, title);
+        content.getChildren().addAll(badges, time, title);
 
         if (relatedNode != null) {
             relatedNode.getStyleClass().add("calendar-event-related");
-            card.getChildren().add(relatedNode);
+            content.getChildren().add(relatedNode);
         }
+        card.getChildren().add(content);
 
         return card;
+    }
+
+    private static Region buildAccentBar(String colorHex) {
+        String normalized = ColorUtil.normalizeStoredColor(colorHex);
+        if (normalized == null) {
+            return null;
+        }
+        String accent = "#" + normalized.substring(0, 6);
+        Region accentBar = new Region();
+        accentBar.setMinWidth(5);
+        accentBar.setPrefWidth(5);
+        accentBar.setMaxWidth(5);
+        accentBar.setStyle("-fx-background-color: " + accent + "; -fx-background-radius: 6 0 0 6;");
+        return accentBar;
     }
 
     private static String resolveType(CalendarFeedItem item) {
