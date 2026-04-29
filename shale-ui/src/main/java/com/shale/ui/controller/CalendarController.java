@@ -129,24 +129,8 @@ public final class CalendarController {
         if (result.isEmpty()) return;
 
         var input = result.get();
-        LocalDateTime startsAt;
-        LocalDateTime endsAt = null;
-        if (input.allDay()) {
-            startsAt = input.date().atStartOfDay();
-        } else {
-            if (input.startTime() == null) {
-                showError("Start time is required for timed events.");
-                return;
-            }
-            startsAt = input.date().atTime(input.startTime());
-            if (input.endTime() != null) {
-                endsAt = input.date().atTime(input.endTime());
-                if (!endsAt.isAfter(startsAt)) {
-                    showError("End time must be after start time.");
-                    return;
-                }
-            }
-        }
+        LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
+        LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
 
         try {
             calendarService.createEvent(new com.shale.core.model.CalendarEvent(
@@ -391,7 +375,7 @@ public final class CalendarController {
         var initial = new NewCalendarEventDialog.CreateCalendarEventInput(
                 event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(),
                 event.allDay() ? null : event.startsAt().toLocalTime(),
-                event.endsAt() == null ? null : event.endsAt().toLocalTime(), event.description());
+resolveDurationMinutes(event), event.description());
         NewCalendarEventDialog.showEditDialog(
                 weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(),
                 calendarService.listEffectiveEventTypes(tenantId),
@@ -403,7 +387,7 @@ public final class CalendarController {
 
     private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) {
         LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
-        LocalDateTime endsAt = (input.allDay() || input.endTime() == null) ? null : input.date().atTime(input.endTime());
+        LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
         try {
             calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), existing.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), existing.assignedToUserId(), existing.completed(), existing.cancelled(), existing.createdByUserId(), existing.createdAt(), existing.updatedAt()));
             showError(null);
@@ -412,6 +396,18 @@ public final class CalendarController {
         } catch (RuntimeException ex) {
             return "Could not save event. Please check values and try again.";
         }
+    }
+
+
+    private int resolveDurationMinutes(com.shale.core.model.CalendarEvent event) {
+        if (event == null || event.endsAt() == null || event.startsAt() == null || !event.endsAt().isAfter(event.startsAt())) {
+            return 60;
+        }
+        long minutes = java.time.Duration.between(event.startsAt(), event.endsAt()).toMinutes();
+        long roundedUp = ((minutes + 29) / 30) * 30;
+        if (roundedUp < 30) roundedUp = 30;
+        if (roundedUp > 8 * 60) roundedUp = 8 * 60;
+        return (int) roundedUp;
     }
 
     private String deleteEvent(Integer calendarEventId, int tenantId) {
