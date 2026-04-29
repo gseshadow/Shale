@@ -13,11 +13,12 @@
         <Label fx:id="calendarSubtitleLabel" text="Calendar events and case/task deadlines will appear here." wrapText="true" style="-fx-opacity: 0.85;" />
         <VBox spacing="8" styleClass="strong-panel" maxWidth="1.7976931348623157E308">
             <children>
-                <Label fx:id="calendarEmptyStateLabel" text="No calendar items to display yet." styleClass="lane-empty-state" wrapText="true" />
+                <Label text="Upcoming" styleClass="page-heading" />
+                <Label fx:id="calendarLoadingLabel" text="Loading upcoming items..." styleClass="lane-empty-state" />
+                <Label fx:id="calendarEmptyStateLabel" text="No upcoming calendar items." styleClass="lane-empty-state" visible="false" managed="false" />
+                <VBox fx:id="upcomingListContainer" spacing="6" maxWidth="1.7976931348623157E308" />
             </children>
-            <padding>
-                <Insets top="18" right="18" bottom="18" left="18" />
-            </padding>
+            <padding><Insets top="18" right="18" bottom="18" left="18" /></padding>
         </VBox>
     </children>
 </VBox>

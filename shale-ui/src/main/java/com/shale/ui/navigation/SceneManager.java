@@ -13,6 +13,10 @@ import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.data.dao.UserPreferencesDao;
 import com.shale.data.dao.AuditLogDao;
+import com.shale.ui.services.CalendarService;
+import com.shale.data.dao.CalendarFeedDao;
+import com.shale.data.dao.CalendarEventTypeDao;
+import com.shale.data.dao.CalendarEventDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
 import com.shale.ui.controller.CalendarController;
@@ -504,7 +508,15 @@ public final class SceneManager {
 	}
 
 	public Parent createCalendarView() {
-		return load("/fxml/calendar.fxml", controller -> (CalendarController) controller);
+		return load("/fxml/calendar.fxml", controller -> {
+			CalendarController c = (CalendarController) controller;
+			CalendarService calendarService = new CalendarService(
+					new CalendarEventTypeDao(dbSessionProvider),
+					new CalendarEventDao(dbSessionProvider),
+					new CalendarFeedDao(dbSessionProvider));
+			c.init(appState, calendarService);
+			return c;
+		});
 	}
 
 	public Parent createSettingsView() {
