@@ -1076,13 +1076,14 @@
 
 .calendar-week-board {
     -fx-alignment: top-left;
+    -fx-fill-height: true;
 }
 
 .calendar-day-lane {
     -fx-background-color: rgba(245, 249, 253, 0.92);
-    -fx-background-radius: 10;
-    -fx-border-radius: 10;
-    -fx-border-color: rgba(15, 35, 66, 0.18);
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: rgba(15, 35, 66, 0.12);
     -fx-border-width: 1;
 }
 
@@ -1101,20 +1102,35 @@
 
 .calendar-day-header .label:first-child {
     -fx-font-weight: 800;
+    -fx-font-size: 12px;
 }
 
 .calendar-day-header .label:last-child {
-    -fx-font-size: 12px;
+    -fx-font-size: 11px;
     -fx-text-fill: rgba(17, 37, 66, 0.72);
+}
+
+.calendar-day-scroll {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.calendar-day-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.calendar-day-items {
+    -fx-padding: 2 0 0 0;
 }
 
 .calendar-event-card {
     -fx-background-color: rgba(232, 241, 251, 0.8);
-    -fx-background-radius: 8;
-    -fx-border-radius: 8;
-    -fx-border-color: rgba(20, 42, 74, 0.18);
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: rgba(20, 42, 74, 0.12);
     -fx-border-width: 1;
-    -fx-padding: 8;
+    -fx-padding: 5 6 5 6;
 }
 
 .calendar-event-card .label {
@@ -1127,9 +1143,10 @@
 
 .label.calendar-event-time {
     -fx-font-weight: 800;
+    -fx-font-size: 11px;
 }
 
 .label.calendar-event-type {
-    -fx-font-size: 12px;
+    -fx-font-size: 11px;
     -fx-text-fill: rgba(17, 37, 66, 0.78);
 }

@@ -9,9 +9,9 @@ import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.time.DayOfWeek;
@@ -138,11 +138,13 @@ public final class CalendarController {
         for (int i = 0; i < 7; i++) {
             LocalDate day = selectedWeekStart.plusDays(i);
             List<CalendarFeedItem> dayItems = grouped.getOrDefault(day, List.of());
-            VBox lane = new VBox(8);
+            VBox lane = new VBox(6);
             lane.getStyleClass().add("calendar-day-lane");
-            lane.setPadding(new Insets(10));
+            lane.setPadding(new Insets(8));
             lane.setFillWidth(true);
-            lane.setMinWidth(220);
+            lane.setMinWidth(0);
+            lane.setPrefWidth(0);
+            lane.setMaxWidth(Double.MAX_VALUE);
 
             if (day.equals(today)) lane.getStyleClass().add("calendar-day-lane-today");
             if (day.isBefore(today)) lane.getStyleClass().add("calendar-day-lane-past");
@@ -154,14 +156,16 @@ public final class CalendarController {
             Label count = new Label(dayItems.size() + (dayItems.size() == 1 ? " item" : " items"));
             header.getChildren().addAll(dayName, date, count);
 
-            lane.getChildren().add(header);
+            VBox dayItemsContainer = new VBox(4);
+            dayItemsContainer.getStyleClass().add("calendar-day-items");
+
             if (dayItems.isEmpty()) {
                 Label empty = new Label("No items");
                 empty.getStyleClass().add("lane-empty-state");
-                lane.getChildren().add(empty);
+                dayItemsContainer.getChildren().add(empty);
             } else {
                 for (CalendarFeedItem item : dayItems) {
-                    VBox card = new VBox(3);
+                    VBox card = new VBox(2);
                     card.getStyleClass().add("calendar-event-card");
                     Label time = new Label(item.allDay() ? "All day" : TIME_FORMAT.format(item.startsAt()));
                     time.getStyleClass().add("calendar-event-time");
@@ -171,9 +175,16 @@ public final class CalendarController {
                     title.setWrapText(true);
                     card.getChildren().addAll(time, type, title);
                     if (item.startsAt() != null && item.startsAt().isBefore(now)) card.getStyleClass().add("calendar-event-card-past");
-                    lane.getChildren().add(card);
+                    dayItemsContainer.getChildren().add(card);
                 }
             }
+            ScrollPane laneScroll = new ScrollPane(dayItemsContainer);
+            laneScroll.getStyleClass().add("calendar-day-scroll");
+            laneScroll.setFitToWidth(true);
+            laneScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+            laneScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+            lane.getChildren().addAll(header, laneScroll);
+            VBox.setVgrow(laneScroll, Priority.ALWAYS);
             HBox.setHgrow(lane, Priority.ALWAYS);
             weekBoard.getChildren().add(lane);
         }
