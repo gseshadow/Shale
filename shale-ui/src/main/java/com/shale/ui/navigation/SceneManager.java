@@ -510,11 +510,12 @@ public final class SceneManager {
 	public Parent createCalendarView() {
 		return load("/fxml/calendar.fxml", controller -> {
 			CalendarController c = (CalendarController) controller;
+			CalendarFeedDao calendarFeedDao = new CalendarFeedDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(
 					new CalendarEventTypeDao(dbSessionProvider),
 					new CalendarEventDao(dbSessionProvider),
-					new CalendarFeedDao(dbSessionProvider));
-			c.init(appState, calendarService);
+					calendarFeedDao);
+			c.init(appState, calendarService, calendarFeedDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openTaskProfile);
 			return c;
 		});
 	}

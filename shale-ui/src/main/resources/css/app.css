@@ -1141,12 +1141,41 @@
     -fx-opacity: 0.65;
 }
 
+.calendar-event-card-today {
+    -fx-border-color: rgba(72, 122, 193, 0.6);
+}
+
+.calendar-event-card-badges {
+    -fx-alignment: center-left;
+}
+
+.calendar-event-badge {
+    -fx-background-color: rgba(16, 36, 66, 0.1);
+    -fx-background-radius: 8;
+    -fx-padding: 1 6 1 6;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
+.calendar-event-type-badge {
+    -fx-background-color: rgba(49, 106, 180, 0.18);
+}
+
+.calendar-event-category-badge {
+    -fx-background-color: rgba(16, 36, 66, 0.12);
+}
+
 .label.calendar-event-time {
     -fx-font-weight: 800;
     -fx-font-size: 11px;
 }
 
-.label.calendar-event-type {
-    -fx-font-size: 11px;
-    -fx-text-fill: rgba(17, 37, 66, 0.78);
+.label.calendar-event-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+.label.calendar-event-related {
+    -fx-font-size: 10px;
+    -fx-text-fill: rgba(17, 37, 66, 0.75);
 }

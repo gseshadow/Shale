@@ -17,6 +17,56 @@ public final class CalendarFeedDao {
         this.db = Objects.requireNonNull(db, "db");
     }
 
+
+    public record CalendarCaseCardRow(int caseId, String caseName, String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {}
+    public record CalendarTaskCardRow(long taskId, Integer caseId, String caseName, String caseResponsibleAttorney, String caseResponsibleAttorneyColor, Boolean caseNonEngagementLetterSent, String title, LocalDateTime dueAt, LocalDateTime completedAt, String createdByDisplayName, String priorityColorHex) {}
+
+    public List<CalendarCaseCardRow> listCaseCardRows(int shaleClientId, List<Integer> caseIds) {
+        if (shaleClientId <= 0 || caseIds == null || caseIds.isEmpty()) return List.of();
+        String placeholders = String.join(",", java.util.Collections.nCopies(caseIds.size(), "?"));
+        String sql = """
+                SELECT c.Id, c.Name, ra.DisplayName AS ResponsibleAttorney, ra.Color AS ResponsibleAttorneyColor, c.NonEngagementLetterSent
+                FROM dbo.Cases c
+                LEFT JOIN dbo.CaseUsers cu ON cu.CaseId = c.Id AND cu.RoleId = 1
+                LEFT JOIN dbo.Users ra ON ra.Id = cu.UserId
+                WHERE c.ShaleClientId = ? AND c.Id IN (""" + placeholders + ") AND ISNULL(c.IsDeleted,0)=0";
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            int i = 1;
+            ps.setInt(i++, shaleClientId);
+            for (Integer id : caseIds) ps.setInt(i++, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<CalendarCaseCardRow> rows = new ArrayList<>();
+                while (rs.next()) rows.add(new CalendarCaseCardRow(rs.getInt("Id"), rs.getString("Name"), rs.getString("ResponsibleAttorney"), rs.getString("ResponsibleAttorneyColor"), (Boolean) rs.getObject("NonEngagementLetterSent")));
+                return rows;
+            }
+        } catch (SQLException e) { throw new RuntimeException("Failed to load calendar case card rows", e); }
+    }
+
+    public List<CalendarTaskCardRow> listTaskCardRows(int shaleClientId, List<Integer> taskIds) {
+        if (shaleClientId <= 0 || taskIds == null || taskIds.isEmpty()) return List.of();
+        String placeholders = String.join(",", java.util.Collections.nCopies(taskIds.size(), "?"));
+        String sql = """
+                SELECT t.Id, t.CaseId, c.Name AS CaseName, ra.DisplayName AS CaseResponsibleAttorney, ra.Color AS CaseResponsibleAttorneyColor,
+                       c.NonEngagementLetterSent AS CaseNonEngagementLetterSent, t.Title, t.DueAt, t.CompletedAt, p.ColorHex AS PriorityColorHex,
+                       LTRIM(RTRIM(COALESCE(u.name_first,'') + CASE WHEN COALESCE(u.name_first,'')='' OR COALESCE(u.name_last,'')='' THEN '' ELSE ' ' END + COALESCE(u.name_last,''))) AS CreatedByDisplayName
+                FROM dbo.Tasks t
+                LEFT JOIN dbo.Cases c ON c.Id = t.CaseId
+                LEFT JOIN dbo.CaseUsers cu ON cu.CaseId = c.Id AND cu.RoleId = 1
+                LEFT JOIN dbo.Users ra ON ra.Id = cu.UserId
+                LEFT JOIN dbo.Users u ON u.Id = t.CreatedByUserId
+                LEFT JOIN dbo.Priorities p ON p.Id = t.PriorityId
+                WHERE t.ShaleClientId = ? AND t.Id IN (""" + placeholders + ") AND ISNULL(t.IsDeleted,0)=0";
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            int i = 1;
+            ps.setInt(i++, shaleClientId);
+            for (Integer id : taskIds) ps.setInt(i++, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<CalendarTaskCardRow> rows = new ArrayList<>();
+                while (rs.next()) rows.add(new CalendarTaskCardRow(rs.getLong("Id"), (Integer) rs.getObject("CaseId"), rs.getString("CaseName"), rs.getString("CaseResponsibleAttorney"), rs.getString("CaseResponsibleAttorneyColor"), (Boolean) rs.getObject("CaseNonEngagementLetterSent"), rs.getString("Title"), rs.getTimestamp("DueAt") == null ? null : rs.getTimestamp("DueAt").toLocalDateTime(), rs.getTimestamp("CompletedAt") == null ? null : rs.getTimestamp("CompletedAt").toLocalDateTime(), rs.getString("CreatedByDisplayName"), rs.getString("PriorityColorHex")));
+                return rows;
+            }
+        } catch (SQLException e) { throw new RuntimeException("Failed to load calendar task card rows", e); }
+    }
     public List<CalendarFeedItem> listCalendarFeed(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive) {
         if (shaleClientId <= 0 || startInclusive == null || endExclusive == null) {
             return List.of();
