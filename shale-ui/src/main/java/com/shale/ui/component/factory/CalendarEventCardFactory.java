@@ -150,8 +150,7 @@ public final class CalendarEventCardFactory {
             return item.relatedDisplayName();
         }
         if ("PROJECTED".equals(sourceType) && item.taskId() != null) {
-            String category = resolveCategory(item);
-            return category.toLowerCase(Locale.ROOT).contains("due") ? "Due" : "";
+            return "Task due";
         }
         if (("MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType)) && !safe(item.displayTypeName()).isBlank()) {
             return item.displayTypeName();
