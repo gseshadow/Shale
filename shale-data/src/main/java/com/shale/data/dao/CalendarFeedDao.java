@@ -88,7 +88,7 @@ public final class CalendarFeedDao {
             return List.of();
         }
         String sql = """
-                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, TaskId, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex
+                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex
                 FROM (
                     SELECT CONCAT('EVENT:', CAST(e.CalendarEventId AS varchar(20))) AS KeyValue,
                            e.Title,
@@ -99,6 +99,7 @@ public final class CalendarFeedDao {
                            e.SourceField,
                            e.CaseId,
                            e.TaskId,
+                           NULL AS RelatedDisplayName,
                            et.SystemKey AS CalendarEventTypeSystemKey,
                            COALESCE(et.Name, 'Event') AS DisplayTypeName,
                            et.ColorHex AS ColorHex
@@ -111,7 +112,7 @@ public final class CalendarFeedDao {
                     UNION ALL
 
                     SELECT CONCAT('TASK:', CAST(t.Id AS varchar(20))),
-                           'Task due',
+                           t.Title,
                            t.DueAt,
                            NULL,
                            CASE WHEN CONVERT(time(0), t.DueAt) = '00:00:00' THEN 1 ELSE 0 END,
@@ -119,6 +120,7 @@ public final class CalendarFeedDao {
                            'DueAt',
                            t.CaseId,
                            t.Id,
+                           t.Title,
                            'TASK_DUE',
                            'Task Due',
                            projectedType.ColorHex
@@ -149,6 +151,7 @@ public final class CalendarFeedDao {
                            'StatuteOfLimitations',
                            c.Id,
                            NULL,
+                           c.Name,
                            'STATUTE_OF_LIMITATIONS',
                            'Statute of Limitations',
                            projectedType.ColorHex
@@ -179,6 +182,7 @@ public final class CalendarFeedDao {
                            'TortNoticeDeadline',
                            c.Id,
                            NULL,
+                           c.Name,
                            'TORT_NOTICE_DEADLINE',
                            'Tort Notice Deadline',
                            projectedType.ColorHex
@@ -209,6 +213,7 @@ public final class CalendarFeedDao {
                            'DiscoveryDeadline',
                            c.Id,
                            NULL,
+                           c.Name,
                            'DISCOVERY_DEADLINE',
                            'Discovery Deadline',
                            projectedType.ColorHex
@@ -252,6 +257,7 @@ public final class CalendarFeedDao {
                             rs.getString("SourceField"),
                             (Integer) rs.getObject("CaseId"),
                             (Integer) rs.getObject("TaskId"),
+                            rs.getString("RelatedDisplayName"),
                             rs.getString("CalendarEventTypeSystemKey"),
                             rs.getString("DisplayTypeName"),
                             rs.getString("ColorHex")));

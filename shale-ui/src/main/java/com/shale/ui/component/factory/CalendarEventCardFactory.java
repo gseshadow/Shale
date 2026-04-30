@@ -75,9 +75,15 @@ public final class CalendarEventCardFactory {
         Label title = new Label(safe(item.title()));
         title.getStyleClass().add("calendar-all-day-title");
         title.setMaxWidth(Double.MAX_VALUE);
+        VBox textCol = new VBox(1);
+        Label subtitle = new Label(resolveRelatedSubtitle(item));
+        subtitle.getStyleClass().add("calendar-all-day-meta");
         Label badge = new Label(resolveType(item) + " · " + resolveCategory(item));
         badge.getStyleClass().add("calendar-all-day-meta");
-        card.getChildren().addAll(title, badge);
+        textCol.getChildren().add(title);
+        if (!subtitle.getText().isBlank()) textCol.getChildren().add(subtitle);
+        textCol.getChildren().add(badge);
+        card.getChildren().add(textCol);
         HBox.setHgrow(title, Priority.ALWAYS);
         return card;
     }
@@ -126,8 +132,13 @@ public final class CalendarEventCardFactory {
         return TIME_FORMAT.format(item.startsAt());
     }
     private static String resolveRelatedSummary(CalendarFeedItem item) {
+        if (!safe(item.relatedDisplayName()).isBlank() && item.caseId() != null) return item.relatedDisplayName();
         if (item.taskId() != null) return "Task #" + item.taskId();
         if (item.caseId() != null) return "Case #" + item.caseId();
+        return "";
+    }
+    private static String resolveRelatedSubtitle(CalendarFeedItem item) {
+        if (item.caseId() != null && !safe(item.relatedDisplayName()).isBlank()) return item.relatedDisplayName();
         return "";
     }
 
