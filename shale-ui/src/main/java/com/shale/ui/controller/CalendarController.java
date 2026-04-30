@@ -19,7 +19,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.Node;
 import javafx.scene.Cursor;
@@ -283,58 +282,46 @@ public final class CalendarController {
             }
         }
 
-        double fullDayHeight = (DAY_END_HOUR - DAY_START_HOUR) * 2 * HALF_HOUR_HEIGHT;
-        Pane hourGrid = new Pane();
-        hourGrid.getStyleClass().add("calendar-time-grid");
-        hourGrid.setMinHeight(fullDayHeight);
-        hourGrid.setPrefHeight(fullDayHeight);
-
-        for (int hour = DAY_START_HOUR; hour <= DAY_END_HOUR; hour++) {
-            double y = (hour - DAY_START_HOUR) * 2 * HALF_HOUR_HEIGHT;
-            Region line = new Region();
-            line.getStyleClass().add("calendar-hour-line");
-            line.setLayoutY(y);
-            line.prefWidthProperty().bind(hourGrid.widthProperty());
-            line.setMinHeight(1);
-            hourGrid.getChildren().add(line);
-            if (hour < DAY_END_HOUR) {
-                Label hourLabel = new Label(formatHourLabel(hour));
-                hourLabel.getStyleClass().add("calendar-hour-label");
-                hourLabel.setLayoutX(6);
-                hourLabel.setLayoutY(y + 2);
-                hourGrid.getChildren().add(hourLabel);
-            }
-        }
-
-        Pane eventLayer = new Pane();
-        eventLayer.getStyleClass().add("calendar-timed-events-layer");
-        eventLayer.setMinHeight(fullDayHeight);
-        eventLayer.setPrefHeight(fullDayHeight);
+        Map<Integer, List<CalendarFeedItem>> timedBySlot = new HashMap<>();
         for (CalendarFeedItem item : timedItems) {
-            Node card = buildEventCardNode(item, today, now, caseModels, taskModels);
             LocalDateTime start = item.startsAt() == null ? day.atStartOfDay() : item.startsAt();
             double startMinutes = Math.max(0, Math.min(24 * 60, start.getHour() * 60.0 + start.getMinute()));
             double snappedStart = Math.floor(startMinutes / 30.0) * 30.0;
-            double y = (snappedStart / 30.0) * HALF_HOUR_HEIGHT;
-            long durationMinutes = 30;
-            if (item.endsAt() != null && item.endsAt().isAfter(start)) {
-                durationMinutes = java.time.Duration.between(start, item.endsAt()).toMinutes();
-            }
-            long snappedDuration = Math.max(30, ((durationMinutes + 29) / 30) * 30);
-            double height = (snappedDuration / 30.0) * HALF_HOUR_HEIGHT;
-            card.setLayoutX(72);
-            card.setLayoutY(y + 2);
-            if (card instanceof Region regionCard) {
-                regionCard.setPrefWidth(190);
-                regionCard.setMinHeight(28);
-                regionCard.setPrefHeight(Math.max(30, height - 4));
-            }
-            eventLayer.getChildren().add(card);
+            int slot = Math.max(0, Math.min(47, (int) (snappedStart / 30.0)));
+            timedBySlot.computeIfAbsent(slot, k -> new ArrayList<>()).add(item);
         }
 
-        StackPane timedStack = new StackPane(hourGrid, eventLayer);
-        timedStack.getStyleClass().add("calendar-timed-stack");
-        root.getChildren().addAll(allDaySection, timedStack);
+        VBox timedGrid = new VBox(0);
+        timedGrid.getStyleClass().add("calendar-timed-stack");
+        for (int slot = 0; slot < 48; slot++) {
+            int hour = slot / 2;
+            boolean hourStart = slot % 2 == 0;
+            HBox row = new HBox(6);
+            row.getStyleClass().add("calendar-time-row");
+            Label hourLabel = new Label(hourStart ? formatHourLabel(hour) : "");
+            hourLabel.getStyleClass().add("calendar-hour-label");
+            hourLabel.setMinWidth(62);
+            hourLabel.setPrefWidth(62);
+            hourLabel.setMaxWidth(62);
+            VBox slotBox = new VBox(4);
+            slotBox.getStyleClass().add("calendar-time-slot");
+            slotBox.setMinHeight(HALF_HOUR_HEIGHT);
+            slotBox.setPrefHeight(HALF_HOUR_HEIGHT);
+            HBox.setHgrow(slotBox, Priority.ALWAYS);
+            List<CalendarFeedItem> slotItems = timedBySlot.getOrDefault(slot, List.of());
+            for (CalendarFeedItem item : slotItems) {
+                Node card = buildEventCardNode(item, today, now, caseModels, taskModels);
+                if (card instanceof Region regionCard) {
+                    regionCard.setMinHeight(28);
+                    regionCard.setPrefHeight(34);
+                    regionCard.setMaxWidth(Double.MAX_VALUE);
+                }
+                slotBox.getChildren().add(card);
+            }
+            row.getChildren().addAll(hourLabel, slotBox);
+            timedGrid.getChildren().add(row);
+        }
+        root.getChildren().addAll(allDaySection, timedGrid);
         return root;
     }
 
