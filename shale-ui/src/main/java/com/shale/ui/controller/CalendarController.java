@@ -16,7 +16,10 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.Node;
 import javafx.scene.Cursor;
@@ -43,6 +46,9 @@ public final class CalendarController {
     private static final DateTimeFormatter WEEK_RANGE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter DAY_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d");
     private static final String VIEW_WEEK = "Week";
+    private static final int DAY_START_HOUR = 0;
+    private static final int DAY_END_HOUR = 24;
+    private static final double HALF_HOUR_HEIGHT = 34.0;
 
     @FXML private Button todayButton;
     @FXML private Button prevWeekButton;
@@ -236,32 +242,7 @@ public final class CalendarController {
             Label count = new Label(dayItems.size() + (dayItems.size() == 1 ? " item" : " items"));
             header.getChildren().addAll(dayName, date, count);
 
-            VBox dayItemsContainer = new VBox(4);
-            dayItemsContainer.getStyleClass().add("calendar-day-items");
-
-            if (dayItems.isEmpty()) {
-                Label empty = new Label("No items");
-                empty.getStyleClass().add("lane-empty-state");
-                dayItemsContainer.getChildren().add(empty);
-            } else {
-                for (CalendarFeedItem item : dayItems) {
-                    if (Boolean.getBoolean("shale.debug.calendar.colors")) {
-                        System.out.println("[CALENDAR COLOR] key=" + item.key()
-                                + " type=" + item.calendarEventTypeSystemKey()
-                                + " colorHex=" + item.colorHex());
-                    }
-                    Node relatedCaseCard = buildRelatedCaseCard(item, caseModels, taskModels);
-                    Node relatedTaskCard = buildRelatedTaskCard(item, taskModels);
-                    Node card = calendarEventCardFactory.create(
-                            item,
-                            today,
-                            now,
-                            relatedCaseCard,
-                            relatedTaskCard);
-                    configureManualEventEditClick(card, item, relatedCaseCard, relatedTaskCard);
-                    dayItemsContainer.getChildren().add(card);
-                }
-            }
+            VBox dayItemsContainer = buildDayTimeline(dayItems, today, now, day, caseModels, taskModels);
             ScrollPane laneScroll = new ScrollPane(dayItemsContainer);
             laneScroll.getStyleClass().add("calendar-day-scroll");
             laneScroll.setFitToWidth(true);
@@ -272,6 +253,112 @@ public final class CalendarController {
             HBox.setHgrow(lane, Priority.ALWAYS);
             weekBoard.getChildren().add(lane);
         }
+    }
+
+    private VBox buildDayTimeline(List<CalendarFeedItem> dayItems,
+                                  LocalDate today,
+                                  LocalDateTime now,
+                                  LocalDate day,
+                                  Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
+                                  Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+        VBox root = new VBox(8);
+        root.getStyleClass().add("calendar-day-items");
+
+        List<CalendarFeedItem> allDayItems = dayItems.stream().filter(CalendarFeedItem::allDay).toList();
+        List<CalendarFeedItem> timedItems = dayItems.stream().filter(i -> !i.allDay()).toList();
+
+        VBox allDaySection = new VBox(4);
+        allDaySection.getStyleClass().add("calendar-all-day-section");
+        Label allDayLabel = new Label("All day");
+        allDayLabel.getStyleClass().add("calendar-all-day-label");
+        allDaySection.getChildren().add(allDayLabel);
+        if (allDayItems.isEmpty()) {
+            Label none = new Label("No all-day items");
+            none.getStyleClass().add("lane-empty-state");
+            allDaySection.getChildren().add(none);
+        } else {
+            for (CalendarFeedItem item : allDayItems) {
+                Node card = buildEventCardNode(item, today, now, caseModels, taskModels);
+                allDaySection.getChildren().add(card);
+            }
+        }
+
+        double fullDayHeight = (DAY_END_HOUR - DAY_START_HOUR) * 2 * HALF_HOUR_HEIGHT;
+        Pane hourGrid = new Pane();
+        hourGrid.getStyleClass().add("calendar-time-grid");
+        hourGrid.setMinHeight(fullDayHeight);
+        hourGrid.setPrefHeight(fullDayHeight);
+
+        for (int hour = DAY_START_HOUR; hour <= DAY_END_HOUR; hour++) {
+            double y = (hour - DAY_START_HOUR) * 2 * HALF_HOUR_HEIGHT;
+            Region line = new Region();
+            line.getStyleClass().add("calendar-hour-line");
+            line.setLayoutY(y);
+            line.prefWidthProperty().bind(hourGrid.widthProperty());
+            line.setMinHeight(1);
+            hourGrid.getChildren().add(line);
+            if (hour < DAY_END_HOUR) {
+                Label hourLabel = new Label(formatHourLabel(hour));
+                hourLabel.getStyleClass().add("calendar-hour-label");
+                hourLabel.setLayoutX(6);
+                hourLabel.setLayoutY(y + 2);
+                hourGrid.getChildren().add(hourLabel);
+            }
+        }
+
+        Pane eventLayer = new Pane();
+        eventLayer.getStyleClass().add("calendar-timed-events-layer");
+        eventLayer.setMinHeight(fullDayHeight);
+        eventLayer.setPrefHeight(fullDayHeight);
+        for (CalendarFeedItem item : timedItems) {
+            Node card = buildEventCardNode(item, today, now, caseModels, taskModels);
+            LocalDateTime start = item.startsAt() == null ? day.atStartOfDay() : item.startsAt();
+            double startMinutes = Math.max(0, Math.min(24 * 60, start.getHour() * 60.0 + start.getMinute()));
+            double snappedStart = Math.floor(startMinutes / 30.0) * 30.0;
+            double y = (snappedStart / 30.0) * HALF_HOUR_HEIGHT;
+            long durationMinutes = 30;
+            if (item.endsAt() != null && item.endsAt().isAfter(start)) {
+                durationMinutes = java.time.Duration.between(start, item.endsAt()).toMinutes();
+            }
+            long snappedDuration = Math.max(30, ((durationMinutes + 29) / 30) * 30);
+            double height = (snappedDuration / 30.0) * HALF_HOUR_HEIGHT;
+            card.setLayoutX(64);
+            card.setLayoutY(y + 2);
+            if (card instanceof Region regionCard) {
+                regionCard.setPrefWidth(190);
+                regionCard.setMinHeight(28);
+                regionCard.setPrefHeight(Math.max(30, height - 4));
+            }
+            eventLayer.getChildren().add(card);
+        }
+
+        StackPane timedStack = new StackPane(hourGrid, eventLayer);
+        timedStack.getStyleClass().add("calendar-timed-stack");
+        root.getChildren().addAll(allDaySection, timedStack);
+        return root;
+    }
+
+    private Node buildEventCardNode(CalendarFeedItem item,
+                                    LocalDate today,
+                                    LocalDateTime now,
+                                    Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
+                                    Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+        if (Boolean.getBoolean("shale.debug.calendar.colors")) {
+            System.out.println("[CALENDAR COLOR] key=" + item.key()
+                    + " type=" + item.calendarEventTypeSystemKey()
+                    + " colorHex=" + item.colorHex());
+        }
+        Node relatedCaseCard = buildRelatedCaseCard(item, caseModels, taskModels);
+        Node relatedTaskCard = buildRelatedTaskCard(item, taskModels);
+        Node card = calendarEventCardFactory.create(item, today, now, relatedCaseCard, relatedTaskCard);
+        configureManualEventEditClick(card, item, relatedCaseCard, relatedTaskCard);
+        return card;
+    }
+
+    private static String formatHourLabel(int hour24) {
+        int hour12 = hour24 % 12;
+        if (hour12 == 0) hour12 = 12;
+        return hour12 + (hour24 < 12 ? " AM" : " PM");
     }
 
 
