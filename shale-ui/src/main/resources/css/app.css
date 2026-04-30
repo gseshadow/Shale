@@ -1179,3 +1179,45 @@
     -fx-font-size: 10px;
     -fx-text-fill: rgba(17, 37, 66, 0.75);
 }
+
+.calendar-all-day-bubble {
+    -fx-padding: 4 6 4 0;
+    -fx-min-height: 24;
+    -fx-pref-height: 24;
+    -fx-max-height: 24;
+    -fx-alignment: center-left;
+    -fx-spacing: 4;
+}
+
+.label.calendar-all-day-title {
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-overrun: ellipsis;
+    -fx-wrap-text: false;
+}
+
+.label.calendar-all-day-meta {
+    -fx-font-size: 10px;
+    -fx-text-fill: #4b5565;
+    -fx-text-overrun: ellipsis;
+    -fx-wrap-text: false;
+}
+
+.calendar-hour-line {
+    -fx-background-color: #e6eaef;
+}
+
+.label.calendar-hour-label {
+    -fx-font-size: 10px;
+    -fx-text-fill: #6b7280;
+}
+
+.calendar-time-row {
+    -fx-alignment: top-left;
+}
+
+.calendar-time-slot {
+    -fx-border-color: #e6eaef;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 2 2 2 2;
+}
