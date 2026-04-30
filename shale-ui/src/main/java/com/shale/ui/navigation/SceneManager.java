@@ -517,7 +517,11 @@ public final class SceneManager {
 					new CalendarEventTypeDao(dbSessionProvider),
 					new CalendarEventDao(dbSessionProvider),
 					calendarFeedDao);
-			c.init(appState, calendarService, calendarFeedDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openTaskProfile);
+			TaskDao taskDao = new TaskDao(dbSessionProvider);
+			UserDao userDao = new UserDao(dbSessionProvider);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
+			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openTaskProfile);
 			return c;
 		});
 	}
