@@ -5,6 +5,7 @@ import com.shale.ui.util.ColorUtil;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
@@ -66,6 +67,21 @@ public final class CalendarEventCardFactory {
         content.getChildren().addAll(time, title, badges);
         card.getChildren().add(content);
 
+        return card;
+    }
+
+    public Node createAllDayBubble(CalendarFeedItem item) {
+        HBox card = new HBox(6);
+        card.getStyleClass().addAll("calendar-event-card", "calendar-all-day-bubble");
+        Region accentBar = buildAccentBar(item.colorHex());
+        if (accentBar != null) card.getChildren().add(accentBar);
+        Label title = new Label(safe(item.title()));
+        title.getStyleClass().add("calendar-all-day-title");
+        title.setMaxWidth(Double.MAX_VALUE);
+        Label badge = new Label(resolveType(item) + " · " + resolveCategory(item));
+        badge.getStyleClass().add("calendar-all-day-meta");
+        card.getChildren().addAll(title, badge);
+        HBox.setHgrow(title, Priority.ALWAYS);
         return card;
     }
 
