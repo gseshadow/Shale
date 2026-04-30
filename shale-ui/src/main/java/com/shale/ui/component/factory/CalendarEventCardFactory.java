@@ -79,25 +79,18 @@ public final class CalendarEventCardFactory {
         title.setWrapText(false);
         title.setMaxWidth(170);
 
-        Label subtitle = new Label(resolveRelatedSubtitle(item));
+        Label subtitle = new Label(resolveAllDaySecondary(item));
         subtitle.getStyleClass().add("calendar-all-day-meta");
         subtitle.setTextOverrun(OverrunStyle.ELLIPSIS);
         subtitle.setWrapText(false);
         subtitle.setMaxWidth(120);
 
-        Label separator = new Label("·");
-        separator.getStyleClass().add("calendar-all-day-meta");
-        Label badge = new Label(resolveType(item) + " · " + resolveCategory(item));
-        badge.getStyleClass().add("calendar-all-day-meta");
-        badge.setTextOverrun(OverrunStyle.ELLIPSIS);
-        badge.setWrapText(false);
-        badge.setMaxWidth(130);
-
         card.getChildren().add(title);
         if (!subtitle.getText().isBlank()) {
+            Label separator = new Label("·");
+            separator.getStyleClass().add("calendar-all-day-meta");
             card.getChildren().addAll(separator, subtitle);
         }
-        card.getChildren().add(badge);
         HBox.setHgrow(title, Priority.ALWAYS);
         return card;
     }
@@ -151,8 +144,18 @@ public final class CalendarEventCardFactory {
         if (item.caseId() != null) return "Case #" + item.caseId();
         return "";
     }
-    private static String resolveRelatedSubtitle(CalendarFeedItem item) {
-        if (item.caseId() != null && !safe(item.relatedDisplayName()).isBlank()) return item.relatedDisplayName();
+    private static String resolveAllDaySecondary(CalendarFeedItem item) {
+        String sourceType = normalize(item.sourceType());
+        if ("PROJECTED".equals(sourceType) && item.caseId() != null && !safe(item.relatedDisplayName()).isBlank()) {
+            return item.relatedDisplayName();
+        }
+        if ("PROJECTED".equals(sourceType) && item.taskId() != null) {
+            String category = resolveCategory(item);
+            return category.toLowerCase(Locale.ROOT).contains("due") ? "Due" : "";
+        }
+        if (("MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType)) && !safe(item.displayTypeName()).isBlank()) {
+            return item.displayTypeName();
+        }
         return "";
     }
 
