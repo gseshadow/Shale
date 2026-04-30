@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import com.shale.core.model.CalendarFeedItem;
 import com.shale.data.dao.CalendarFeedDao;
+import com.shale.data.dao.CaseDao;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -55,6 +56,7 @@ public final class CalendarController {
     private Consumer<Integer> onOpenCase;
     private Consumer<Long> onOpenTask;
     private CaseTaskService caseTaskService;
+    private CaseDao caseDao;
     private int loadGeneration;
     private LocalDate selectedDate;
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(300));
@@ -68,9 +70,10 @@ public final class CalendarController {
     private TaskCardFactory taskCardFactory = new TaskCardFactory(id -> {}, id -> {}, id -> {}, id -> {});
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "calendar-feed-loader"); t.setDaemon(true); return t; });
 
-    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
+    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseDao caseDao, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
         this.appState = appState; this.calendarService = calendarService; this.calendarFeedDao = calendarFeedDao;
         this.caseTaskService = caseTaskService;
+        this.caseDao = caseDao;
         this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase; this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
         this.caseCardFactory = new CaseCardFactory(this.onOpenCase);
         this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id -> {}, this.onOpenCase, id -> {});
@@ -271,7 +274,10 @@ public final class CalendarController {
         Map<Integer, String> names = new LinkedHashMap<>();
         for (CalendarFeedItem i : loadedItems) if (i != null && i.caseId() != null && i.caseId() > 0) names.putIfAbsent(i.caseId(), safe(i.relatedDisplayName()).isBlank() ? ("Case #" + i.caseId()) : i.relatedDisplayName());
         if (selectedCaseId != null && selectedCaseId > 0) names.putIfAbsent(selectedCaseId, "Case #" + selectedCaseId);
-        return names.entrySet().stream().map(e -> new NewCalendarEventDialog.CaseOption(e.getKey(), e.getValue())).toList();
+        if (caseDao != null) {
+            caseDao.searchCasesByName("").forEach(c -> names.putIfAbsent(Math.toIntExact(c.id()), c.name()));
+        }
+        return names.entrySet().stream().map(e -> new NewCalendarEventDialog.CaseOption(e.getKey(), e.getValue())).sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT))).toList();
     }
     private List<NewCalendarEventDialog.AssignedUserOption> assignedUserOptionsForPicker(int tenantId, Integer selectedUserId) {
         if (caseTaskService == null) return List.of();

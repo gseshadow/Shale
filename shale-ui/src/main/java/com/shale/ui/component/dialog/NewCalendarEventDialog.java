@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -201,32 +202,42 @@ public final class NewCalendarEventDialog {
             descriptionArea.setPrefRowCount(4);
             descriptionArea.setWrapText(true);
             Label caseLabel = new Label("Case");
-            Button addCaseButton = new Button("Add to Case");
-            ComboBox<CaseOption> caseCombo = new ComboBox<>();
-            caseCombo.getItems().setAll(caseOptions == null ? List.of() : caseOptions);
-            caseCombo.setCellFactory(cb -> new ListCell<>() { @Override protected void updateItem(CaseOption item, boolean empty){ super.updateItem(item, empty); setText(empty || item == null ? null : item.displayName()); }});
-            caseCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(CaseOption item, boolean empty){ super.updateItem(item, empty); setText(empty || item == null ? null : item.displayName()); }});
-            caseCombo.setMaxWidth(Double.MAX_VALUE);
-            if (initial != null && initial.caseId() != null) caseCombo.getItems().stream().filter(c -> Objects.equals(c.caseId(), initial.caseId())).findFirst().ifPresent(caseCombo::setValue);
-            addCaseButton.setOnAction(e -> caseCombo.requestFocus());
+            List<CaseOption> sortedCases = (caseOptions == null ? List.<CaseOption>of() : caseOptions).stream().sorted(Comparator.comparing(c -> safe(c.displayName()).toLowerCase())).toList();
+            Label selectedCaseLabel = new Label("No case selected");
+            final CaseOption[] selectedCase = new CaseOption[1];
+            if (initial != null && initial.caseId() != null) sortedCases.stream().filter(c -> Objects.equals(c.caseId(), initial.caseId())).findFirst().ifPresent(v -> { selectedCase[0] = v; selectedCaseLabel.setText(v.displayName()); });
+            Button addCaseButton = new Button(selectedCase[0] == null ? "Add to Case" : "Change Case");
+            addCaseButton.setOnAction(e -> CasePickerDialog.show(addCaseButton.getScene().getWindow(), sortedCases).ifPresent(v -> { selectedCase[0] = v; selectedCaseLabel.setText(v.displayName()); addCaseButton.setText("Change Case"); }));
             Button clearCaseButton = new Button("Clear");
             clearCaseButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-            clearCaseButton.setOnAction(e -> caseCombo.setValue(null));
-            HBox caseRow = new HBox(8, addCaseButton, caseCombo, clearCaseButton);
-            HBox.setHgrow(caseCombo, Priority.ALWAYS);
+            clearCaseButton.setOnAction(e -> { selectedCase[0] = null; selectedCaseLabel.setText("No case selected"); addCaseButton.setText("Add to Case"); });
+            HBox caseRow = new HBox(8, addCaseButton, selectedCaseLabel, clearCaseButton);
+            HBox.setHgrow(selectedCaseLabel, Priority.ALWAYS);
 
             Label assignedUserLabel = new Label("Assigned User");
-            ComboBox<AssignedUserOption> assignedUserCombo = new ComboBox<>();
-            assignedUserCombo.getItems().setAll(assignedUserOptions == null ? List.of() : assignedUserOptions);
-            assignedUserCombo.setCellFactory(cb -> new ListCell<>() { @Override protected void updateItem(AssignedUserOption item, boolean empty){ super.updateItem(item, empty); setText(empty || item == null ? null : item.displayName()); }});
-            assignedUserCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(AssignedUserOption item, boolean empty){ super.updateItem(item, empty); setText(empty || item == null ? null : item.displayName()); }});
-            assignedUserCombo.setMaxWidth(Double.MAX_VALUE);
-            if (initial != null && initial.assignedToUserId() != null) assignedUserCombo.getItems().stream().filter(u -> Objects.equals(u.userId(), initial.assignedToUserId())).findFirst().ifPresent(assignedUserCombo::setValue);
+            Label selectedUserLabel = new Label("No assigned user");
+            final AssignedUserOption[] selectedUser = new AssignedUserOption[1];
+            List<AssignedUserOption> sortedUsers = (assignedUserOptions == null ? List.<AssignedUserOption>of() : assignedUserOptions).stream().sorted(Comparator.comparing(u -> safe(u.displayName()).toLowerCase())).toList();
+            if (initial != null && initial.assignedToUserId() != null) sortedUsers.stream().filter(u -> Objects.equals(u.userId(), initial.assignedToUserId())).findFirst().ifPresent(v -> { selectedUser[0] = v; selectedUserLabel.setText(v.displayName()); });
+            Button assignUserButton = new Button(selectedUser[0] == null ? "Assign User" : "Change User");
+            assignUserButton.setOnAction(e -> {
+                List<com.shale.ui.services.CaseTaskService.AssignableUserOption> candidates = sortedUsers.stream().map(u -> new com.shale.ui.services.CaseTaskService.AssignableUserOption(u.userId(), u.displayName(), null)).toList();
+                AssignedUserPickerDialog.show(assignUserButton.getScene().getWindow(), candidates, NewCalendarEventDialog.class).ifPresent(v -> {
+                    selectedUser[0] = new AssignedUserOption(v.id(), v.displayName());
+                    selectedUserLabel.setText(v.displayName());
+                    assignUserButton.setText("Change User");
+                });
+            });
             Button clearAssignedButton = new Button("Clear");
             clearAssignedButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-            clearAssignedButton.setOnAction(e -> assignedUserCombo.setValue(null));
-            HBox assignedRow = new HBox(8, assignedUserCombo, clearAssignedButton);
-            HBox.setHgrow(assignedUserCombo, Priority.ALWAYS);
+            clearAssignedButton.setOnAction(e -> { selectedUser[0] = null; selectedUserLabel.setText("No assigned user"); assignUserButton.setText("Assign User"); });
+            HBox assignedRow = new HBox(8, assignUserButton, selectedUserLabel, clearAssignedButton);
+            HBox.setHgrow(selectedUserLabel, Priority.ALWAYS);
+            HBox typeDateRow = new HBox(8, new VBox(4, eventTypeLabel, eventTypeComboBox), new VBox(4, dateLabel, datePicker));
+            HBox.setHgrow(typeDateRow.getChildren().getFirst(), Priority.ALWAYS);
+            HBox peopleRow = new HBox(12, new VBox(4, caseLabel, caseRow), new VBox(4, assignedUserLabel, assignedRow));
+            HBox.setHgrow(peopleRow.getChildren().getFirst(), Priority.ALWAYS);
+            HBox.setHgrow(peopleRow.getChildren().get(1), Priority.ALWAYS);
 
             Runnable refresh = () -> {
                 boolean timed = !allDayCheckBox.isSelected();
@@ -246,7 +257,7 @@ public final class NewCalendarEventDialog {
                 if (relatedCaseNode != null) content.getChildren().add(relatedCaseNode);
                 if (relatedTaskNode != null) content.getChildren().add(relatedTaskNode);
             }
-            content.getChildren().addAll(titleLabel,titleField,eventTypeLabel,eventTypeComboBox,dateLabel,datePicker,allDayCheckBox,startRow,durationSection,descriptionLabel,descriptionArea,caseLabel,caseRow,assignedUserLabel,assignedRow,errorLabel);
+            content.getChildren().addAll(titleLabel,titleField,typeDateRow,allDayCheckBox,startRow,durationSection,descriptionLabel,descriptionArea,peopleRow,errorLabel);
             content.setPadding(new Insets(6,2,2,2));
 
             Supplier<Optional<CreateCalendarEventInput>> readInput = () -> {
@@ -264,8 +275,8 @@ public final class NewCalendarEventDialog {
                     startTime = fromTwelveHour(startTimeCombo.getValue(), amPmCombo.getValue());
                     durationMinutes = durationCombo.getValue();
                 }
-                Integer caseId = caseCombo.getValue() == null ? null : caseCombo.getValue().caseId();
-                Integer assignedToUserId = assignedUserCombo.getValue() == null ? null : assignedUserCombo.getValue().userId();
+                Integer caseId = selectedCase[0] == null ? null : selectedCase[0].caseId();
+                Integer assignedToUserId = selectedUser[0] == null ? null : selectedUser[0].userId();
                 return Optional.of(new CreateCalendarEventInput(title, t.calendarEventTypeId(), d, allDayCheckBox.isSelected(), startTime, durationMinutes, descriptionArea.getText(), caseId, assignedToUserId));
             };
             return new DialogParts(content, errorLabel, readInput);
@@ -287,6 +298,7 @@ public final class NewCalendarEventDialog {
         for (int minutes = 30; minutes <= 8 * 60; minutes += 30) out.add(minutes);
         return out;
     }
+    private static String safe(String value) { return value == null ? "" : value; }
 
     private static Integer normalizeDurationSelection(int rawMinutes) {
         int candidate = rawMinutes <= 0 ? DEFAULT_DURATION_MINUTES : rawMinutes;

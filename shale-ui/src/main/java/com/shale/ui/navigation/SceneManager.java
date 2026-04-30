@@ -520,8 +520,9 @@ public final class SceneManager {
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openTaskProfile);
+			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openTaskProfile);
 			return c;
 		});
 	}
