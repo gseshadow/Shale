@@ -121,6 +121,46 @@ public final class CalendarEventDao {
         }
     }
 
+    public CalendarEvent getById(int calendarEventId, int shaleClientId) {
+        if (calendarEventId <= 0 || shaleClientId <= 0) return null;
+        String sql = """
+                SELECT CalendarEventId, ShaleClientId, CalendarEventTypeId, CaseId, TaskId,
+                       Title, Description, StartsAt, EndsAt, AllDay, SourceType, SourceField,
+                       SourceId, AssignedToUserId, IsCompleted, IsCancelled, CreatedByUserId,
+                       CreatedAt, UpdatedAt
+                FROM dbo.CalendarEvents
+                WHERE CalendarEventId = ?
+                  AND ShaleClientId = ?;
+                """;
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, calendarEventId);
+            ps.setInt(2, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? mapRow(rs) : null;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load calendar event", e);
+        }
+    }
+
+    public void deleteCalendarEvent(int calendarEventId, int shaleClientId) {
+        if (calendarEventId <= 0 || shaleClientId <= 0) return;
+        String sql = """
+                DELETE FROM dbo.CalendarEvents
+                WHERE CalendarEventId = ?
+                  AND ShaleClientId = ?;
+                """;
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, calendarEventId);
+            ps.setInt(2, shaleClientId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete calendar event", e);
+        }
+    }
+
     private void bindUpsert(PreparedStatement ps, CalendarEvent event) throws SQLException {
         ps.setInt(1, event.shaleClientId());
         ps.setInt(2, event.calendarEventTypeId());

@@ -16,9 +16,13 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.Node;
+import javafx.scene.Cursor;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -42,6 +46,9 @@ public final class CalendarController {
     private static final DateTimeFormatter WEEK_RANGE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter DAY_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d");
     private static final String VIEW_WEEK = "Week";
+    private static final int DAY_START_HOUR = 0;
+    private static final int DAY_END_HOUR = 24;
+    private static final double HALF_HOUR_HEIGHT = 34.0;
 
     @FXML private Button todayButton;
     @FXML private Button prevWeekButton;
@@ -128,24 +135,8 @@ public final class CalendarController {
         if (result.isEmpty()) return;
 
         var input = result.get();
-        LocalDateTime startsAt;
-        LocalDateTime endsAt = null;
-        if (input.allDay()) {
-            startsAt = input.date().atStartOfDay();
-        } else {
-            if (input.startTime() == null) {
-                showError("Start time is required for timed events.");
-                return;
-            }
-            startsAt = input.date().atTime(input.startTime());
-            if (input.endTime() != null) {
-                endsAt = input.date().atTime(input.endTime());
-                if (!endsAt.isAfter(startsAt)) {
-                    showError("End time must be after start time.");
-                    return;
-                }
-            }
-        }
+        LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
+        LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
 
         try {
             calendarService.createEvent(new com.shale.core.model.CalendarEvent(
@@ -251,28 +242,7 @@ public final class CalendarController {
             Label count = new Label(dayItems.size() + (dayItems.size() == 1 ? " item" : " items"));
             header.getChildren().addAll(dayName, date, count);
 
-            VBox dayItemsContainer = new VBox(4);
-            dayItemsContainer.getStyleClass().add("calendar-day-items");
-
-            if (dayItems.isEmpty()) {
-                Label empty = new Label("No items");
-                empty.getStyleClass().add("lane-empty-state");
-                dayItemsContainer.getChildren().add(empty);
-            } else {
-                for (CalendarFeedItem item : dayItems) {
-                    if (Boolean.getBoolean("shale.debug.calendar.colors")) {
-                        System.out.println("[CALENDAR COLOR] key=" + item.key()
-                                + " type=" + item.calendarEventTypeSystemKey()
-                                + " colorHex=" + item.colorHex());
-                    }
-                    dayItemsContainer.getChildren().add(calendarEventCardFactory.create(
-                            item,
-                            today,
-                            now,
-                            buildRelatedCaseCard(item, caseModels, taskModels),
-                            buildRelatedTaskCard(item, taskModels)));
-                }
-            }
+            VBox dayItemsContainer = buildDayTimeline(dayItems, today, now, day, caseModels, taskModels);
             ScrollPane laneScroll = new ScrollPane(dayItemsContainer);
             laneScroll.getStyleClass().add("calendar-day-scroll");
             laneScroll.setFitToWidth(true);
@@ -283,6 +253,112 @@ public final class CalendarController {
             HBox.setHgrow(lane, Priority.ALWAYS);
             weekBoard.getChildren().add(lane);
         }
+    }
+
+    private VBox buildDayTimeline(List<CalendarFeedItem> dayItems,
+                                  LocalDate today,
+                                  LocalDateTime now,
+                                  LocalDate day,
+                                  Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
+                                  Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+        VBox root = new VBox(8);
+        root.getStyleClass().add("calendar-day-items");
+
+        List<CalendarFeedItem> allDayItems = dayItems.stream().filter(CalendarFeedItem::allDay).toList();
+        List<CalendarFeedItem> timedItems = dayItems.stream().filter(i -> !i.allDay()).toList();
+
+        VBox allDaySection = new VBox(4);
+        allDaySection.getStyleClass().add("calendar-all-day-section");
+        Label allDayLabel = new Label("All day");
+        allDayLabel.getStyleClass().add("calendar-all-day-label");
+        allDaySection.getChildren().add(allDayLabel);
+        if (allDayItems.isEmpty()) {
+            Label none = new Label("No all-day items");
+            none.getStyleClass().add("lane-empty-state");
+            allDaySection.getChildren().add(none);
+        } else {
+            for (CalendarFeedItem item : allDayItems) {
+                Node card = buildEventCardNode(item, today, now, caseModels, taskModels);
+                allDaySection.getChildren().add(card);
+            }
+        }
+
+        double fullDayHeight = (DAY_END_HOUR - DAY_START_HOUR) * 2 * HALF_HOUR_HEIGHT;
+        Pane hourGrid = new Pane();
+        hourGrid.getStyleClass().add("calendar-time-grid");
+        hourGrid.setMinHeight(fullDayHeight);
+        hourGrid.setPrefHeight(fullDayHeight);
+
+        for (int hour = DAY_START_HOUR; hour <= DAY_END_HOUR; hour++) {
+            double y = (hour - DAY_START_HOUR) * 2 * HALF_HOUR_HEIGHT;
+            Region line = new Region();
+            line.getStyleClass().add("calendar-hour-line");
+            line.setLayoutY(y);
+            line.prefWidthProperty().bind(hourGrid.widthProperty());
+            line.setMinHeight(1);
+            hourGrid.getChildren().add(line);
+            if (hour < DAY_END_HOUR) {
+                Label hourLabel = new Label(formatHourLabel(hour));
+                hourLabel.getStyleClass().add("calendar-hour-label");
+                hourLabel.setLayoutX(6);
+                hourLabel.setLayoutY(y + 2);
+                hourGrid.getChildren().add(hourLabel);
+            }
+        }
+
+        Pane eventLayer = new Pane();
+        eventLayer.getStyleClass().add("calendar-timed-events-layer");
+        eventLayer.setMinHeight(fullDayHeight);
+        eventLayer.setPrefHeight(fullDayHeight);
+        for (CalendarFeedItem item : timedItems) {
+            Node card = buildEventCardNode(item, today, now, caseModels, taskModels);
+            LocalDateTime start = item.startsAt() == null ? day.atStartOfDay() : item.startsAt();
+            double startMinutes = Math.max(0, Math.min(24 * 60, start.getHour() * 60.0 + start.getMinute()));
+            double snappedStart = Math.floor(startMinutes / 30.0) * 30.0;
+            double y = (snappedStart / 30.0) * HALF_HOUR_HEIGHT;
+            long durationMinutes = 30;
+            if (item.endsAt() != null && item.endsAt().isAfter(start)) {
+                durationMinutes = java.time.Duration.between(start, item.endsAt()).toMinutes();
+            }
+            long snappedDuration = Math.max(30, ((durationMinutes + 29) / 30) * 30);
+            double height = (snappedDuration / 30.0) * HALF_HOUR_HEIGHT;
+            card.setLayoutX(64);
+            card.setLayoutY(y + 2);
+            if (card instanceof Region regionCard) {
+                regionCard.setPrefWidth(190);
+                regionCard.setMinHeight(28);
+                regionCard.setPrefHeight(Math.max(30, height - 4));
+            }
+            eventLayer.getChildren().add(card);
+        }
+
+        StackPane timedStack = new StackPane(hourGrid, eventLayer);
+        timedStack.getStyleClass().add("calendar-timed-stack");
+        root.getChildren().addAll(allDaySection, timedStack);
+        return root;
+    }
+
+    private Node buildEventCardNode(CalendarFeedItem item,
+                                    LocalDate today,
+                                    LocalDateTime now,
+                                    Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
+                                    Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+        if (Boolean.getBoolean("shale.debug.calendar.colors")) {
+            System.out.println("[CALENDAR COLOR] key=" + item.key()
+                    + " type=" + item.calendarEventTypeSystemKey()
+                    + " colorHex=" + item.colorHex());
+        }
+        Node relatedCaseCard = buildRelatedCaseCard(item, caseModels, taskModels);
+        Node relatedTaskCard = buildRelatedTaskCard(item, taskModels);
+        Node card = calendarEventCardFactory.create(item, today, now, relatedCaseCard, relatedTaskCard);
+        configureManualEventEditClick(card, item, relatedCaseCard, relatedTaskCard);
+        return card;
+    }
+
+    private static String formatHourLabel(int hour24) {
+        int hour12 = hour24 % 12;
+        if (hour12 == 0) hour12 = 12;
+        return hour12 + (hour24 < 12 ? " AM" : " PM");
     }
 
 
@@ -363,6 +439,91 @@ public final class CalendarController {
     }
 
     private static String safe(String value) { return value == null ? "" : value; }
+
+    private void configureManualEventEditClick(Node card, CalendarFeedItem item, Node relatedCaseCard, Node relatedTaskCard) {
+        if (!isManualEvent(item)) return;
+        Integer eventId = parseEventId(item.key());
+        if (eventId == null || eventId <= 0) return;
+        card.setCursor(Cursor.HAND);
+        card.setOnMouseClicked(evt -> {
+            Object target = evt.getTarget();
+            if (target instanceof Node targetNode) {
+                if (isWithin(targetNode, relatedCaseCard) || isWithin(targetNode, relatedTaskCard)) return;
+            }
+            openEditEventDialog(eventId);
+        });
+    }
+
+    private void openEditEventDialog(int eventId) {
+        Integer tenantId = appState == null ? null : appState.getShaleClientId();
+        if (tenantId == null || tenantId <= 0 || calendarService == null) return;
+        var event = calendarService.getEventById(eventId, tenantId);
+        if (event == null) { showError("Could not load event for editing."); return; }
+        var initial = new NewCalendarEventDialog.CreateCalendarEventInput(
+                event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(),
+                event.allDay() ? null : event.startsAt().toLocalTime(),
+resolveDurationMinutes(event), event.description());
+        NewCalendarEventDialog.showEditDialog(
+                weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(),
+                calendarService.listEffectiveEventTypes(tenantId),
+                initial,
+                input -> saveEditedEvent(event, input),
+                () -> deleteEvent(event.calendarEventId(), tenantId)
+        );
+    }
+
+    private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) {
+        LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
+        LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
+        try {
+            calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), existing.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), existing.assignedToUserId(), existing.completed(), existing.cancelled(), existing.createdByUserId(), existing.createdAt(), existing.updatedAt()));
+            showError(null);
+            loadSelectedWeek();
+            return null;
+        } catch (RuntimeException ex) {
+            return "Could not save event. Please check values and try again.";
+        }
+    }
+
+
+    private int resolveDurationMinutes(com.shale.core.model.CalendarEvent event) {
+        if (event == null || event.endsAt() == null || event.startsAt() == null || !event.endsAt().isAfter(event.startsAt())) {
+            return 60;
+        }
+        long minutes = java.time.Duration.between(event.startsAt(), event.endsAt()).toMinutes();
+        long roundedUp = ((minutes + 29) / 30) * 30;
+        if (roundedUp < 30) roundedUp = 30;
+        if (roundedUp > 8 * 60) roundedUp = 8 * 60;
+        return (int) roundedUp;
+    }
+
+    private String deleteEvent(Integer calendarEventId, int tenantId) {
+        try {
+            calendarService.deleteCalendarEvent(calendarEventId, tenantId);
+            showError(null);
+            loadSelectedWeek();
+            return null;
+        } catch (RuntimeException ex) {
+            return "Could not delete event. Please try again.";
+        }
+    }
+    private static boolean isManualEvent(CalendarFeedItem item) {
+        String sourceType = safe(item.sourceType()).trim().toUpperCase(Locale.ROOT);
+        return "MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType);
+    }
+    private static Integer parseEventId(String key) {
+        if (key == null || !key.startsWith("EVENT:")) return null;
+        try { return Integer.parseInt(key.substring("EVENT:".length())); } catch (NumberFormatException ex) { return null; }
+    }
+    private static boolean isWithin(Node target, Node ancestor) {
+        if (target == null || ancestor == null) return false;
+        Node cur = target;
+        while (cur != null) {
+            if (cur == ancestor) return true;
+            cur = cur.getParent();
+        }
+        return false;
+    }
 
     private static LocalDate weekStartFor(LocalDate date) {
         return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
