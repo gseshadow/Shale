@@ -8,6 +8,7 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.services.CalendarService;
 import com.shale.ui.state.AppState;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
@@ -15,6 +16,7 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.util.Duration;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -40,6 +42,9 @@ public final class CalendarController {
     @FXML private Label calendarLoadingLabel;
     @FXML private Label calendarErrorLabel;
     @FXML private HBox weekBoard;
+    @FXML private TextField searchTextField;
+    @FXML private ComboBox<CaseFilterOption> caseFilterCombo;
+    @FXML private ComboBox<EventTypeFilterOption> eventTypeFilterCombo;
 
     private AppState appState;
     private CalendarService calendarService;
@@ -48,6 +53,11 @@ public final class CalendarController {
     private Consumer<Long> onOpenTask;
     private int loadGeneration;
     private LocalDate selectedDate;
+    private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(300));
+    private List<CalendarFeedItem> loadedItems = List.of();
+    private String searchText = "";
+    private Integer selectedCaseId;
+    private String selectedEventTypeKey = "";
 
     private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
     private CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
@@ -66,13 +76,31 @@ public final class CalendarController {
         viewModeChoice.setValue(VIEW_WEEK);
         selectedDate = LocalDate.now();
         viewModeChoice.valueProperty().addListener((obs, o, n) -> { if (!Objects.equals(o, n)) loadCurrentRange(); });
+        configureFilters();
         renderCurrentShell();
         Platform.runLater(this::loadCurrentRange);
+    }
+    private void configureFilters() {
+        caseFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(CaseFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All cases" : item.displayName()); }});
+        caseFilterCombo.setCellFactory(v -> new ListCell<>() { @Override protected void updateItem(CaseFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "" : item.displayName()); }});
+        caseFilterCombo.valueProperty().addListener((obs, o, n) -> { selectedCaseId = n == null ? null : n.caseId(); applyFiltersAndRender(); });
+        eventTypeFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(EventTypeFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All types" : item.displayName()); }});
+        eventTypeFilterCombo.setCellFactory(v -> new ListCell<>() { @Override protected void updateItem(EventTypeFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "" : item.displayName()); }});
+        eventTypeFilterCombo.valueProperty().addListener((obs, o, n) -> { selectedEventTypeKey = n == null ? "" : safe(n.matchKey()); applyFiltersAndRender(); });
+        searchTextField.textProperty().addListener((obs, o, n) -> { searchDebounce.stop(); searchDebounce.setOnFinished(evt -> { searchText = safe(n).trim(); applyFiltersAndRender(); }); searchDebounce.playFromStart(); });
     }
 
     @FXML private void onToday() { selectedDate = LocalDate.now(); loadCurrentRange(); }
     @FXML private void onPreviousWeek() { selectedDate = shiftSelectedDate(-1); loadCurrentRange(); }
     @FXML private void onNextWeek() { selectedDate = shiftSelectedDate(1); loadCurrentRange(); }
+    @FXML private void onClearFilters() {
+        searchTextField.clear();
+        selectedCaseId = null;
+        selectedEventTypeKey = "";
+        caseFilterCombo.getSelectionModel().clearSelection();
+        eventTypeFilterCombo.getSelectionModel().clearSelection();
+        applyFiltersAndRender();
+    }
 
     @FXML private void onNewEvent() {
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
@@ -97,7 +125,7 @@ public final class CalendarController {
         dbExec.submit(() -> {
             try {
                 List<CalendarFeedItem> items = calendarService.listCalendarFeed(tenantId, start, end);
-                Platform.runLater(() -> { if (current != loadGeneration) return; setLoading(false); renderCurrent(items == null ? List.of() : items); });
+                Platform.runLater(() -> { if (current != loadGeneration) return; setLoading(false); loadedItems = items == null ? List.of() : items; refreshFilterOptions(); applyFiltersAndRender(); });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> { if (current != loadGeneration) return; setLoading(false); showError("Could not load calendar for this period."); renderCurrent(List.of()); });
             }
@@ -105,6 +133,38 @@ public final class CalendarController {
     }
 
     private void renderCurrentShell() { weekRangeLabel.setText(currentRangeLabel()); renderCurrent(List.of()); }
+    private void applyFiltersAndRender() {
+        renderCurrent(filterItems(loadedItems));
+    }
+    private List<CalendarFeedItem> filterItems(List<CalendarFeedItem> items) {
+        String search = safe(searchText).toLowerCase(Locale.ROOT);
+        return items.stream().filter(Objects::nonNull).filter(item -> {
+            if (selectedCaseId != null && !Objects.equals(item.caseId(), selectedCaseId)) return false;
+            if (!selectedEventTypeKey.isBlank() && !eventTypeMatches(item, selectedEventTypeKey)) return false;
+            if (search.isBlank()) return true;
+            return containsIgnoreCase(item.title(), search) || containsIgnoreCase(item.relatedDisplayName(), search)
+                    || containsIgnoreCase(item.displayTypeName(), search) || containsIgnoreCase(item.calendarEventTypeSystemKey(), search);
+        }).toList();
+    }
+    private static boolean eventTypeMatches(CalendarFeedItem item, String matchKey) {
+        return safe(item.calendarEventTypeSystemKey()).equalsIgnoreCase(matchKey) || safe(item.displayTypeName()).equalsIgnoreCase(matchKey);
+    }
+    private static boolean containsIgnoreCase(String value, String loweredNeedle) { return safe(value).toLowerCase(Locale.ROOT).contains(loweredNeedle); }
+    private void refreshFilterOptions() {
+        Map<Integer, String> cases = new TreeMap<>();
+        for (CalendarFeedItem i : loadedItems) if (i != null && i.caseId() != null) cases.putIfAbsent(i.caseId(), safe(i.relatedDisplayName()).isBlank() ? ("Case #" + i.caseId()) : i.relatedDisplayName());
+        List<CaseFilterOption> caseOptions = cases.entrySet().stream().map(e -> new CaseFilterOption(e.getKey(), e.getValue())).toList();
+        caseFilterCombo.getItems().setAll(caseOptions);
+        if (selectedCaseId != null) caseOptions.stream().filter(o -> Objects.equals(o.caseId(), selectedCaseId)).findFirst().ifPresentOrElse(caseFilterCombo::setValue, () -> { selectedCaseId = null; caseFilterCombo.getSelectionModel().clearSelection(); });
+
+        Integer tenantId = appState == null ? null : appState.getShaleClientId();
+        List<EventTypeFilterOption> typeOptions = new ArrayList<>();
+        if (tenantId != null && tenantId > 0 && calendarService != null) {
+            calendarService.listEffectiveEventTypes(tenantId).forEach(t -> typeOptions.add(new EventTypeFilterOption(safe(t.systemKey()).isBlank() ? t.name() : t.systemKey(), t.name())));
+        }
+        eventTypeFilterCombo.getItems().setAll(typeOptions);
+        if (!selectedEventTypeKey.isBlank()) typeOptions.stream().filter(o -> safe(o.matchKey()).equalsIgnoreCase(selectedEventTypeKey)).findFirst().ifPresentOrElse(eventTypeFilterCombo::setValue, () -> { selectedEventTypeKey = ""; eventTypeFilterCombo.getSelectionModel().clearSelection(); });
+    }
     private void renderCurrent(List<CalendarFeedItem> items) {
         switch (safe(viewModeChoice.getValue())) {
             case VIEW_DAY -> renderDay(items);
@@ -145,6 +205,7 @@ public final class CalendarController {
     }
 
     private VBox buildDayTimeline(List<CalendarFeedItem> dayItems, LocalDate today, LocalDateTime now, LocalDate day) {
+        if (dayItems.isEmpty()) { VBox empty = new VBox(); empty.getChildren().add(new Label("No items match filters.")); return empty; }
         VBox root = new VBox(8); List<CalendarFeedItem> allDayItems = dayItems.stream().filter(CalendarFeedItem::allDay).toList(); List<CalendarFeedItem> timedItems = dayItems.stream().filter(i -> !i.allDay()).toList();
         VBox allDaySection = new VBox(4); allDaySection.getChildren().add(new Label("All day")); if (allDayItems.isEmpty()) allDaySection.getChildren().add(new Label("No all-day items")); else for (CalendarFeedItem i : allDayItems) { Node b = calendarEventCardFactory.createAllDayBubble(i); configureCalendarCardClick(b, i); allDaySection.getChildren().add(b); }
         GridPane timedGrid = new GridPane();
@@ -172,7 +233,7 @@ public final class CalendarController {
     private Node buildRelatedCaseNodeForEvent(com.shale.core.model.CalendarEvent event) { Integer tenantId = appState == null ? null : appState.getShaleClientId(); if (event == null || tenantId == null || event.caseId() == null) return null; List<CalendarFeedDao.CalendarCaseCardRow> rows = calendarFeedDao.listCaseCardRows(tenantId, List.of(event.caseId())); if (rows.isEmpty()) return null; var row = rows.getFirst(); return caseCardFactory.create(new CaseCardFactory.CaseCardModel(row.caseId(), row.caseName(), null, null, row.responsibleAttorney(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI); }
     private Node buildRelatedTaskNodeForEvent(com.shale.core.model.CalendarEvent event) { Integer tenantId = appState == null ? null : appState.getShaleClientId(); if (event == null || tenantId == null || event.taskId() == null) return null; List<CalendarFeedDao.CalendarTaskCardRow> rows = calendarFeedDao.listTaskCardRows(tenantId, List.of(event.taskId())); if (rows.isEmpty()) return null; var row = rows.getFirst(); return taskCardFactory.create(new TaskCardFactory.TaskCardModel(row.taskId(), row.caseId() == null ? null : row.caseId().longValue(), row.caseName(), row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.title(), null, row.createdByDisplayName(), row.priorityColorHex(), row.dueAt(), row.completedAt(), List.of()), TaskCardFactory.Variant.MINI); }
     private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) { LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime()); LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes()); try { calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), existing.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), existing.assignedToUserId(), existing.completed(), existing.cancelled(), existing.createdByUserId(), existing.createdAt(), existing.updatedAt())); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; } }
-    private int resolveDurationMinutes(com.shale.core.model.CalendarEvent event) { if (event == null || event.endsAt() == null || event.startsAt() == null || !event.endsAt().isAfter(event.startsAt())) return 60; long minutes = Duration.between(event.startsAt(), event.endsAt()).toMinutes(); long roundedUp = ((minutes + 29) / 30) * 30; if (roundedUp < 30) roundedUp = 30; if (roundedUp > 8 * 60) roundedUp = 8 * 60; return (int) roundedUp; }
+    private int resolveDurationMinutes(com.shale.core.model.CalendarEvent event) { if (event == null || event.endsAt() == null || event.startsAt() == null || !event.endsAt().isAfter(event.startsAt())) return 60; long minutes = java.time.Duration.between(event.startsAt(), event.endsAt()).toMinutes(); long roundedUp = ((minutes + 29) / 30) * 30; if (roundedUp < 30) roundedUp = 30; if (roundedUp > 8 * 60) roundedUp = 8 * 60; return (int) roundedUp; }
     private String deleteEvent(Integer calendarEventId, int tenantId) { try { calendarService.deleteCalendarEvent(calendarEventId, tenantId); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not delete event. Please try again."; } }
     private static boolean isManualEvent(CalendarFeedItem item) { String sourceType = safe(item.sourceType()).trim().toUpperCase(Locale.ROOT); return "MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType); }
     private static Integer parseEventId(String key) { if (key == null || !key.startsWith("EVENT:")) return null; try { return Integer.parseInt(key.substring("EVENT:".length())); } catch (NumberFormatException ex) { return null; } }
@@ -186,4 +247,6 @@ public final class CalendarController {
     private static String formatHourLabel(int hour24) { int hour12 = hour24 % 12; if (hour12 == 0) hour12 = 12; return hour12 + (hour24 < 12 ? " AM" : " PM"); }
     private void setLoading(boolean loading) { calendarLoadingLabel.setVisible(loading); calendarLoadingLabel.setManaged(loading); }
     private void showError(String text) { boolean has = text != null && !text.isBlank(); calendarErrorLabel.setText(has ? text : ""); calendarErrorLabel.setVisible(has); calendarErrorLabel.setManaged(has); }
+    private record CaseFilterOption(Integer caseId, String displayName) {}
+    private record EventTypeFilterOption(String matchKey, String displayName) {}
 }
