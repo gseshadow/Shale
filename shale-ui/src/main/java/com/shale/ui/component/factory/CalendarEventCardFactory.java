@@ -4,6 +4,7 @@ import com.shale.core.model.CalendarFeedItem;
 import com.shale.ui.util.ColorUtil;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -74,16 +75,29 @@ public final class CalendarEventCardFactory {
         if (accentBar != null) card.getChildren().add(accentBar);
         Label title = new Label(safe(item.title()));
         title.getStyleClass().add("calendar-all-day-title");
-        title.setMaxWidth(Double.MAX_VALUE);
-        VBox textCol = new VBox(1);
+        title.setTextOverrun(OverrunStyle.ELLIPSIS);
+        title.setWrapText(false);
+        title.setMaxWidth(170);
+
         Label subtitle = new Label(resolveRelatedSubtitle(item));
         subtitle.getStyleClass().add("calendar-all-day-meta");
+        subtitle.setTextOverrun(OverrunStyle.ELLIPSIS);
+        subtitle.setWrapText(false);
+        subtitle.setMaxWidth(120);
+
+        Label separator = new Label("·");
+        separator.getStyleClass().add("calendar-all-day-meta");
         Label badge = new Label(resolveType(item) + " · " + resolveCategory(item));
         badge.getStyleClass().add("calendar-all-day-meta");
-        textCol.getChildren().add(title);
-        if (!subtitle.getText().isBlank()) textCol.getChildren().add(subtitle);
-        textCol.getChildren().add(badge);
-        card.getChildren().add(textCol);
+        badge.setTextOverrun(OverrunStyle.ELLIPSIS);
+        badge.setWrapText(false);
+        badge.setMaxWidth(130);
+
+        card.getChildren().add(title);
+        if (!subtitle.getText().isBlank()) {
+            card.getChildren().addAll(separator, subtitle);
+        }
+        card.getChildren().add(badge);
         HBox.setHgrow(title, Priority.ALWAYS);
         return card;
     }
