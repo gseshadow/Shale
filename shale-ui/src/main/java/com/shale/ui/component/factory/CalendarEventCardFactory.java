@@ -146,11 +146,11 @@ public final class CalendarEventCardFactory {
     }
     private static String resolveAllDaySecondary(CalendarFeedItem item) {
         String sourceType = normalize(item.sourceType());
-        if ("PROJECTED".equals(sourceType) && item.caseId() != null && !safe(item.relatedDisplayName()).isBlank()) {
-            return item.relatedDisplayName();
-        }
         if ("PROJECTED".equals(sourceType) && item.taskId() != null) {
             return "Task due";
+        }
+        if ("PROJECTED".equals(sourceType) && item.caseId() != null && !safe(item.relatedDisplayName()).isBlank()) {
+            return item.relatedDisplayName();
         }
         if (("MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType)) && !safe(item.displayTypeName()).isBlank()) {
             return item.displayTypeName();
