@@ -18,7 +18,7 @@ import java.util.Objects;
 public final class CalendarEventCardFactory {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("h:mm a");
 
-    public Node create(CalendarFeedItem item, LocalDate today, LocalDateTime now, Node relatedCaseNode, Node relatedTaskNode) {
+    public Node create(CalendarFeedItem item, LocalDate today, LocalDateTime now) {
         Objects.requireNonNull(item, "item");
 
         HBox card = new HBox(0);
@@ -56,13 +56,10 @@ public final class CalendarEventCardFactory {
         title.getStyleClass().add("calendar-event-title");
         title.setWrapText(true);
 
-        if (relatedCaseNode != null) {
-            relatedCaseNode.getStyleClass().add("calendar-event-related");
-            content.getChildren().add(relatedCaseNode);
-        }
-        if (relatedTaskNode != null) {
-            relatedTaskNode.getStyleClass().add("calendar-event-related");
-            content.getChildren().add(relatedTaskNode);
+        Label relatedSummary = new Label(resolveRelatedSummary(item));
+        relatedSummary.getStyleClass().add("calendar-event-related");
+        if (!relatedSummary.getText().isBlank()) {
+            content.getChildren().add(relatedSummary);
         }
         content.getChildren().addAll(time, title, badges);
         card.getChildren().add(content);
@@ -127,6 +124,11 @@ public final class CalendarEventCardFactory {
         if (item.allDay()) return "All day";
         if (item.startsAt() == null) return "Time TBD";
         return TIME_FORMAT.format(item.startsAt());
+    }
+    private static String resolveRelatedSummary(CalendarFeedItem item) {
+        if (item.taskId() != null) return "Task #" + item.taskId();
+        if (item.caseId() != null) return "Case #" + item.caseId();
+        return "";
     }
 
 

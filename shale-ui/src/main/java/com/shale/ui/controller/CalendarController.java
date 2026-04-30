@@ -217,8 +217,6 @@ public final class CalendarController {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
         Map<LocalDate, List<CalendarFeedItem>> grouped = groupAndSort(items);
-        Map<Long, TaskCardFactory.TaskCardModel> taskModels = loadTaskModels(items);
-        Map<Integer, CaseCardFactory.CaseCardModel> caseModels = loadCaseModels(items, taskModels);
 
         for (int i = 0; i < 7; i++) {
             LocalDate day = selectedWeekStart.plusDays(i);
@@ -241,7 +239,7 @@ public final class CalendarController {
             Label count = new Label(dayItems.size() + (dayItems.size() == 1 ? " item" : " items"));
             header.getChildren().addAll(dayName, date, count);
 
-            VBox dayItemsContainer = buildDayTimeline(dayItems, today, now, day, caseModels, taskModels);
+            VBox dayItemsContainer = buildDayTimeline(dayItems, today, now, day);
             ScrollPane laneScroll = new ScrollPane(dayItemsContainer);
             laneScroll.getStyleClass().add("calendar-day-scroll");
             laneScroll.setFitToWidth(true);
@@ -257,9 +255,7 @@ public final class CalendarController {
     private VBox buildDayTimeline(List<CalendarFeedItem> dayItems,
                                   LocalDate today,
                                   LocalDateTime now,
-                                  LocalDate day,
-                                  Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
-                                  Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+                                  LocalDate day) {
         VBox root = new VBox(8);
         root.getStyleClass().add("calendar-day-items");
 
@@ -277,7 +273,7 @@ public final class CalendarController {
             allDaySection.getChildren().add(none);
         } else {
             for (CalendarFeedItem item : allDayItems) {
-                Node card = buildAllDayBubbleNode(item, today, now, caseModels, taskModels);
+                Node card = buildAllDayBubbleNode(item, today, now);
                 allDaySection.getChildren().add(card);
             }
         }
@@ -310,7 +306,7 @@ public final class CalendarController {
             HBox.setHgrow(slotBox, Priority.ALWAYS);
             List<CalendarFeedItem> slotItems = timedBySlot.getOrDefault(slot, List.of());
             for (CalendarFeedItem item : slotItems) {
-                Node card = buildEventCardNode(item, today, now, caseModels, taskModels);
+                Node card = buildEventCardNode(item, today, now);
                 if (card instanceof Region regionCard) {
                     regionCard.setMinHeight(28);
                     regionCard.setPrefHeight(34);
@@ -325,32 +321,20 @@ public final class CalendarController {
         return root;
     }
 
-    private Node buildEventCardNode(CalendarFeedItem item,
-                                    LocalDate today,
-                                    LocalDateTime now,
-                                    Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
-                                    Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+    private Node buildEventCardNode(CalendarFeedItem item, LocalDate today, LocalDateTime now) {
         if (Boolean.getBoolean("shale.debug.calendar.colors")) {
             System.out.println("[CALENDAR COLOR] key=" + item.key()
                     + " type=" + item.calendarEventTypeSystemKey()
                     + " colorHex=" + item.colorHex());
         }
-        Node relatedCaseCard = buildRelatedCaseCard(item, caseModels, taskModels);
-        Node relatedTaskCard = buildRelatedTaskCard(item, taskModels);
-        Node card = calendarEventCardFactory.create(item, today, now, relatedCaseCard, relatedTaskCard);
-        configureManualEventEditClick(card, item, relatedCaseCard, relatedTaskCard);
+        Node card = calendarEventCardFactory.create(item, today, now);
+        configureCalendarCardClick(card, item);
         return card;
     }
 
-    private Node buildAllDayBubbleNode(CalendarFeedItem item,
-                                       LocalDate today,
-                                       LocalDateTime now,
-                                       Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
-                                       Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+    private Node buildAllDayBubbleNode(CalendarFeedItem item, LocalDate today, LocalDateTime now) {
         Node bubble = calendarEventCardFactory.createAllDayBubble(item);
-        Node relatedCaseCard = buildRelatedCaseCard(item, caseModels, taskModels);
-        Node relatedTaskCard = buildRelatedTaskCard(item, taskModels);
-        configureManualEventEditClick(bubble, item, relatedCaseCard, relatedTaskCard);
+        configureCalendarCardClick(bubble, item);
         return bubble;
     }
 
@@ -362,63 +346,6 @@ public final class CalendarController {
 
 
 
-    private Node buildRelatedCaseCard(CalendarFeedItem item,
-                                      Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
-                                      Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
-        Integer caseId = item.caseId();
-        if (caseId == null && item.taskId() != null) {
-            TaskCardFactory.TaskCardModel taskModel = taskModels.get(item.taskId().longValue());
-            if (taskModel != null && taskModel.caseId() != null) {
-                caseId = taskModel.caseId().intValue();
-            }
-        }
-        if (caseId != null) {
-            CaseCardFactory.CaseCardModel model = caseModels.get(caseId);
-            if (model != null) return caseCardFactory.create(model, CaseCardFactory.Variant.MINI);
-        }
-        return null;
-    }
-
-    private Node buildRelatedTaskCard(CalendarFeedItem item, Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
-        if (item.taskId() != null) {
-            TaskCardFactory.TaskCardModel model = taskModels.get(item.taskId().longValue());
-            if (model != null) return taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
-        }
-        return null;
-    }
-
-    private Map<Integer, CaseCardFactory.CaseCardModel> loadCaseModels(List<CalendarFeedItem> items,
-                                                                        Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
-        Map<Integer, CaseCardFactory.CaseCardModel> out = new HashMap<>();
-        Integer tenantId = appState == null ? null : appState.getShaleClientId();
-        if (tenantId == null || tenantId <= 0 || calendarFeedDao == null) return out;
-        List<Integer> caseIds = new ArrayList<>(items.stream()
-                .map(CalendarFeedItem::caseId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList());
-        taskModels.values().stream()
-                .map(TaskCardFactory.TaskCardModel::caseId)
-                .filter(Objects::nonNull)
-                .map(Long::intValue)
-                .forEach(caseIds::add);
-        caseIds = caseIds.stream().distinct().toList();
-        for (CalendarFeedDao.CalendarCaseCardRow row : calendarFeedDao.listCaseCardRows(tenantId, caseIds)) {
-            out.put(row.caseId(), new CaseCardFactory.CaseCardModel(row.caseId(), row.caseName(), null, null, row.responsibleAttorney(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()));
-        }
-        return out;
-    }
-
-    private Map<Long, TaskCardFactory.TaskCardModel> loadTaskModels(List<CalendarFeedItem> items) {
-        Map<Long, TaskCardFactory.TaskCardModel> out = new HashMap<>();
-        Integer tenantId = appState == null ? null : appState.getShaleClientId();
-        if (tenantId == null || tenantId <= 0 || calendarFeedDao == null) return out;
-        List<Integer> taskIds = items.stream().map(CalendarFeedItem::taskId).filter(Objects::nonNull).distinct().toList();
-        for (CalendarFeedDao.CalendarTaskCardRow row : calendarFeedDao.listTaskCardRows(tenantId, taskIds)) {
-            out.put(row.taskId(), new TaskCardFactory.TaskCardModel(row.taskId(), row.caseId() == null ? null : row.caseId().longValue(), row.caseName(), row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.title(), null, row.createdByDisplayName(), row.priorityColorHex(), row.dueAt(), row.completedAt(), List.of()));
-        }
-        return out;
-    }
 
     private Map<LocalDate, List<CalendarFeedItem>> groupAndSort(List<CalendarFeedItem> items) {
         Map<LocalDate, List<CalendarFeedItem>> grouped = new LinkedHashMap<>();
@@ -439,18 +366,24 @@ public final class CalendarController {
 
     private static String safe(String value) { return value == null ? "" : value; }
 
-    private void configureManualEventEditClick(Node card, CalendarFeedItem item, Node relatedCaseCard, Node relatedTaskCard) {
-        if (!isManualEvent(item)) return;
-        Integer eventId = parseEventId(item.key());
-        if (eventId == null || eventId <= 0) return;
-        card.setCursor(Cursor.HAND);
-        card.setOnMouseClicked(evt -> {
-            Object target = evt.getTarget();
-            if (target instanceof Node targetNode) {
-                if (isWithin(targetNode, relatedCaseCard) || isWithin(targetNode, relatedTaskCard)) return;
-            }
-            openEditEventDialog(eventId);
-        });
+    private void configureCalendarCardClick(Node card, CalendarFeedItem item) {
+        if (item == null || card == null) return;
+        if (isManualEvent(item)) {
+            Integer eventId = parseEventId(item.key());
+            if (eventId == null || eventId <= 0) return;
+            card.setCursor(Cursor.HAND);
+            card.setOnMouseClicked(evt -> openEditEventDialog(eventId));
+            return;
+        }
+        if (item.taskId() != null) {
+            card.setCursor(Cursor.HAND);
+            card.setOnMouseClicked(evt -> onOpenTask.accept(item.taskId().longValue()));
+            return;
+        }
+        if (item.caseId() != null) {
+            card.setCursor(Cursor.HAND);
+            card.setOnMouseClicked(evt -> onOpenCase.accept(item.caseId()));
+        }
     }
 
     private void openEditEventDialog(int eventId) {
@@ -534,15 +467,6 @@ public final class CalendarController {
     private static Integer parseEventId(String key) {
         if (key == null || !key.startsWith("EVENT:")) return null;
         try { return Integer.parseInt(key.substring("EVENT:".length())); } catch (NumberFormatException ex) { return null; }
-    }
-    private static boolean isWithin(Node target, Node ancestor) {
-        if (target == null || ancestor == null) return false;
-        Node cur = target;
-        while (cur != null) {
-            if (cur == ancestor) return true;
-            cur = cur.getParent();
-        }
-        return false;
     }
 
     private static LocalDate weekStartFor(LocalDate date) {
