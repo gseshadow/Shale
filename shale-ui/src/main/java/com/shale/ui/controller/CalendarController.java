@@ -36,6 +36,8 @@ public final class CalendarController {
     private static final String VIEW_DAY = "Day";
     private static final String VIEW_MONTH = "Month";
     private static final double HALF_HOUR_HEIGHT = 34.0;
+    private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All cases");
+    private static final EventTypeFilterOption ALL_TYPES_OPTION = new EventTypeFilterOption("", "All types");
 
     @FXML private ChoiceBox<String> viewModeChoice;
     @FXML private Label weekRangeLabel;
@@ -83,11 +85,15 @@ public final class CalendarController {
     private void configureFilters() {
         caseFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(CaseFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All cases" : item.displayName()); }});
         caseFilterCombo.setCellFactory(v -> new ListCell<>() { @Override protected void updateItem(CaseFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "" : item.displayName()); }});
-        caseFilterCombo.valueProperty().addListener((obs, o, n) -> { selectedCaseId = n == null ? null : n.caseId(); applyFiltersAndRender(); });
+        caseFilterCombo.valueProperty().addListener((obs, o, n) -> { selectedCaseId = (n == null || n.isAll()) ? null : n.caseId(); applyFiltersAndRender(); });
         eventTypeFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(EventTypeFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All types" : item.displayName()); }});
         eventTypeFilterCombo.setCellFactory(v -> new ListCell<>() { @Override protected void updateItem(EventTypeFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "" : item.displayName()); }});
-        eventTypeFilterCombo.valueProperty().addListener((obs, o, n) -> { selectedEventTypeKey = n == null ? "" : safe(n.matchKey()); applyFiltersAndRender(); });
+        eventTypeFilterCombo.valueProperty().addListener((obs, o, n) -> { selectedEventTypeKey = (n == null || n.isAll()) ? "" : safe(n.matchKey()); applyFiltersAndRender(); });
         searchTextField.textProperty().addListener((obs, o, n) -> { searchDebounce.stop(); searchDebounce.setOnFinished(evt -> { searchText = safe(n).trim(); applyFiltersAndRender(); }); searchDebounce.playFromStart(); });
+        caseFilterCombo.getItems().setAll(ALL_CASES_OPTION);
+        caseFilterCombo.setValue(ALL_CASES_OPTION);
+        eventTypeFilterCombo.getItems().setAll(ALL_TYPES_OPTION);
+        eventTypeFilterCombo.setValue(ALL_TYPES_OPTION);
     }
 
     @FXML private void onToday() { selectedDate = LocalDate.now(); loadCurrentRange(); }
@@ -97,8 +103,8 @@ public final class CalendarController {
         searchTextField.clear();
         selectedCaseId = null;
         selectedEventTypeKey = "";
-        caseFilterCombo.getSelectionModel().clearSelection();
-        eventTypeFilterCombo.getSelectionModel().clearSelection();
+        caseFilterCombo.setValue(ALL_CASES_OPTION);
+        eventTypeFilterCombo.setValue(ALL_TYPES_OPTION);
         applyFiltersAndRender();
     }
 
@@ -151,19 +157,34 @@ public final class CalendarController {
     }
     private static boolean containsIgnoreCase(String value, String loweredNeedle) { return safe(value).toLowerCase(Locale.ROOT).contains(loweredNeedle); }
     private void refreshFilterOptions() {
-        Map<Integer, String> cases = new TreeMap<>();
+        Map<Integer, String> cases = new HashMap<>();
         for (CalendarFeedItem i : loadedItems) if (i != null && i.caseId() != null) cases.putIfAbsent(i.caseId(), safe(i.relatedDisplayName()).isBlank() ? ("Case #" + i.caseId()) : i.relatedDisplayName());
-        List<CaseFilterOption> caseOptions = cases.entrySet().stream().map(e -> new CaseFilterOption(e.getKey(), e.getValue())).toList();
-        caseFilterCombo.getItems().setAll(caseOptions);
-        if (selectedCaseId != null) caseOptions.stream().filter(o -> Objects.equals(o.caseId(), selectedCaseId)).findFirst().ifPresentOrElse(caseFilterCombo::setValue, () -> { selectedCaseId = null; caseFilterCombo.getSelectionModel().clearSelection(); });
+        List<CaseFilterOption> caseOptions = cases.entrySet().stream()
+                .map(e -> new CaseFilterOption(e.getKey(), e.getValue()))
+                .sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT)))
+                .toList();
+        List<CaseFilterOption> allCaseOptions = new ArrayList<>();
+        allCaseOptions.add(ALL_CASES_OPTION);
+        allCaseOptions.addAll(caseOptions);
+        caseFilterCombo.getItems().setAll(allCaseOptions);
+        if (selectedCaseId == null) caseFilterCombo.setValue(ALL_CASES_OPTION);
+        else caseOptions.stream().filter(o -> Objects.equals(o.caseId(), selectedCaseId)).findFirst().ifPresentOrElse(caseFilterCombo::setValue, () -> { selectedCaseId = null; caseFilterCombo.setValue(ALL_CASES_OPTION); });
 
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
         List<EventTypeFilterOption> typeOptions = new ArrayList<>();
         if (tenantId != null && tenantId > 0 && calendarService != null) {
-            calendarService.listEffectiveEventTypes(tenantId).forEach(t -> typeOptions.add(new EventTypeFilterOption(safe(t.systemKey()).isBlank() ? t.name() : t.systemKey(), t.name())));
+            calendarService.listEffectiveEventTypes(tenantId).forEach(t -> {
+                String matchKey = safe(t.systemKey()).isBlank() ? t.name() : t.systemKey();
+                typeOptions.add(new EventTypeFilterOption(matchKey, t.name()));
+            });
         }
-        eventTypeFilterCombo.getItems().setAll(typeOptions);
-        if (!selectedEventTypeKey.isBlank()) typeOptions.stream().filter(o -> safe(o.matchKey()).equalsIgnoreCase(selectedEventTypeKey)).findFirst().ifPresentOrElse(eventTypeFilterCombo::setValue, () -> { selectedEventTypeKey = ""; eventTypeFilterCombo.getSelectionModel().clearSelection(); });
+        List<EventTypeFilterOption> sortedTypeOptions = typeOptions.stream().sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT))).toList();
+        List<EventTypeFilterOption> allTypeOptions = new ArrayList<>();
+        allTypeOptions.add(ALL_TYPES_OPTION);
+        allTypeOptions.addAll(sortedTypeOptions);
+        eventTypeFilterCombo.getItems().setAll(allTypeOptions);
+        if (selectedEventTypeKey.isBlank()) eventTypeFilterCombo.setValue(ALL_TYPES_OPTION);
+        else sortedTypeOptions.stream().filter(o -> safe(o.matchKey()).equalsIgnoreCase(selectedEventTypeKey)).findFirst().ifPresentOrElse(eventTypeFilterCombo::setValue, () -> { selectedEventTypeKey = ""; eventTypeFilterCombo.setValue(ALL_TYPES_OPTION); });
     }
     private void renderCurrent(List<CalendarFeedItem> items) {
         switch (safe(viewModeChoice.getValue())) {
@@ -247,6 +268,6 @@ public final class CalendarController {
     private static String formatHourLabel(int hour24) { int hour12 = hour24 % 12; if (hour12 == 0) hour12 = 12; return hour12 + (hour24 < 12 ? " AM" : " PM"); }
     private void setLoading(boolean loading) { calendarLoadingLabel.setVisible(loading); calendarLoadingLabel.setManaged(loading); }
     private void showError(String text) { boolean has = text != null && !text.isBlank(); calendarErrorLabel.setText(has ? text : ""); calendarErrorLabel.setVisible(has); calendarErrorLabel.setManaged(has); }
-    private record CaseFilterOption(Integer caseId, String displayName) {}
-    private record EventTypeFilterOption(String matchKey, String displayName) {}
+    private record CaseFilterOption(Integer caseId, String displayName) { boolean isAll() { return caseId == null; } }
+    private record EventTypeFilterOption(String matchKey, String displayName) { boolean isAll() { return safe(matchKey).isBlank(); } }
 }
