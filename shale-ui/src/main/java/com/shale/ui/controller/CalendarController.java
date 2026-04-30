@@ -88,10 +88,16 @@ public final class CalendarController {
     private void configureFilters() {
         caseFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(CaseFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All cases" : item.displayName()); }});
         caseFilterCombo.setCellFactory(v -> new ListCell<>() { @Override protected void updateItem(CaseFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "" : item.displayName()); }});
-        caseFilterCombo.valueProperty().addListener((obs, o, n) -> { selectedCaseId = (n == null || n.isAll()) ? null : n.caseId(); applyFiltersAndRender(); });
+        caseFilterCombo.valueProperty().addListener((obs, o, n) -> {
+            selectedCaseId = (n == null || n.isAll()) ? null : n.caseId();
+            applyFiltersAndRender();
+        });
         eventTypeFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(EventTypeFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All types" : item.displayName()); }});
         eventTypeFilterCombo.setCellFactory(v -> new ListCell<>() { @Override protected void updateItem(EventTypeFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "" : item.displayName()); }});
-        eventTypeFilterCombo.valueProperty().addListener((obs, o, n) -> { selectedEventTypeKey = (n == null || n.isAll()) ? "" : safe(n.matchKey()); applyFiltersAndRender(); });
+        eventTypeFilterCombo.valueProperty().addListener((obs, o, n) -> {
+            selectedEventTypeKey = (n == null || n.isAll()) ? "" : safe(n.matchKey());
+            applyFiltersAndRender();
+        });
         searchTextField.textProperty().addListener((obs, o, n) -> { searchDebounce.stop(); searchDebounce.setOnFinished(evt -> { searchText = safe(n).trim(); applyFiltersAndRender(); }); searchDebounce.playFromStart(); });
         caseFilterCombo.getItems().setAll(ALL_CASES_OPTION);
         caseFilterCombo.setValue(ALL_CASES_OPTION);
@@ -147,9 +153,13 @@ public final class CalendarController {
     }
     private List<CalendarFeedItem> filterItems(List<CalendarFeedItem> items) {
         String search = safe(searchText).toLowerCase(Locale.ROOT);
+        CaseFilterOption activeCaseFilter = caseFilterCombo == null ? null : caseFilterCombo.getValue();
+        EventTypeFilterOption activeTypeFilter = eventTypeFilterCombo == null ? null : eventTypeFilterCombo.getValue();
+        Integer activeCaseId = (activeCaseFilter == null || activeCaseFilter.isAll()) ? null : activeCaseFilter.caseId();
+        String activeTypeKey = (activeTypeFilter == null || activeTypeFilter.isAll()) ? "" : safe(activeTypeFilter.matchKey());
         return items.stream().filter(Objects::nonNull).filter(item -> {
-            if (selectedCaseId != null && !Objects.equals(item.caseId(), selectedCaseId)) return false;
-            if (!selectedEventTypeKey.isBlank() && !eventTypeMatches(item, selectedEventTypeKey)) return false;
+            if (activeCaseId != null && !Objects.equals(item.caseId(), activeCaseId)) return false;
+            if (!activeTypeKey.isBlank() && !eventTypeMatches(item, activeTypeKey)) return false;
             if (search.isBlank()) return true;
             return containsIgnoreCase(item.title(), search) || containsIgnoreCase(item.relatedDisplayName(), search)
                     || containsIgnoreCase(item.displayTypeName(), search) || containsIgnoreCase(item.calendarEventTypeSystemKey(), search);
