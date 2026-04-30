@@ -278,7 +278,7 @@ public final class CalendarController {
             allDaySection.getChildren().add(none);
         } else {
             for (CalendarFeedItem item : allDayItems) {
-                Node card = buildEventCardNode(item, today, now, caseModels, taskModels);
+                Node card = buildAllDayBubbleNode(item, today, now, caseModels, taskModels);
                 allDaySection.getChildren().add(card);
             }
         }
@@ -322,7 +322,7 @@ public final class CalendarController {
             }
             long snappedDuration = Math.max(30, ((durationMinutes + 29) / 30) * 30);
             double height = (snappedDuration / 30.0) * HALF_HOUR_HEIGHT;
-            card.setLayoutX(64);
+            card.setLayoutX(72);
             card.setLayoutY(y + 2);
             if (card instanceof Region regionCard) {
                 regionCard.setPrefWidth(190);
@@ -353,6 +353,18 @@ public final class CalendarController {
         Node card = calendarEventCardFactory.create(item, today, now, relatedCaseCard, relatedTaskCard);
         configureManualEventEditClick(card, item, relatedCaseCard, relatedTaskCard);
         return card;
+    }
+
+    private Node buildAllDayBubbleNode(CalendarFeedItem item,
+                                       LocalDate today,
+                                       LocalDateTime now,
+                                       Map<Integer, CaseCardFactory.CaseCardModel> caseModels,
+                                       Map<Long, TaskCardFactory.TaskCardModel> taskModels) {
+        Node bubble = calendarEventCardFactory.createAllDayBubble(item);
+        Node relatedCaseCard = buildRelatedCaseCard(item, caseModels, taskModels);
+        Node relatedTaskCard = buildRelatedTaskCard(item, taskModels);
+        configureManualEventEditClick(bubble, item, relatedCaseCard, relatedTaskCard);
+        return bubble;
     }
 
     private static String formatHourLabel(int hour24) {
@@ -462,14 +474,35 @@ public final class CalendarController {
         var initial = new NewCalendarEventDialog.CreateCalendarEventInput(
                 event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(),
                 event.allDay() ? null : event.startsAt().toLocalTime(),
-resolveDurationMinutes(event), event.description());
+	resolveDurationMinutes(event), event.description());
+        Node relatedCaseNode = buildRelatedCaseNodeForEvent(event);
+        Node relatedTaskNode = buildRelatedTaskNodeForEvent(event);
         NewCalendarEventDialog.showEditDialog(
                 weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(),
                 calendarService.listEffectiveEventTypes(tenantId),
                 initial,
                 input -> saveEditedEvent(event, input),
-                () -> deleteEvent(event.calendarEventId(), tenantId)
+                () -> deleteEvent(event.calendarEventId(), tenantId),
+                relatedCaseNode,
+                relatedTaskNode
         );
+    }
+
+    private Node buildRelatedCaseNodeForEvent(com.shale.core.model.CalendarEvent event) {
+        Integer tenantId = appState == null ? null : appState.getShaleClientId();
+        if (event == null || tenantId == null || event.caseId() == null) return null;
+        List<CalendarFeedDao.CalendarCaseCardRow> rows = calendarFeedDao.listCaseCardRows(tenantId, List.of(event.caseId()));
+        if (rows.isEmpty()) return null;
+        CalendarFeedDao.CalendarCaseCardRow row = rows.getFirst();
+        return caseCardFactory.create(new CaseCardFactory.CaseCardModel(row.caseId(), row.caseName(), null, null, row.responsibleAttorney(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI);
+    }
+    private Node buildRelatedTaskNodeForEvent(com.shale.core.model.CalendarEvent event) {
+        Integer tenantId = appState == null ? null : appState.getShaleClientId();
+        if (event == null || tenantId == null || event.taskId() == null) return null;
+        List<CalendarFeedDao.CalendarTaskCardRow> rows = calendarFeedDao.listTaskCardRows(tenantId, List.of(event.taskId()));
+        if (rows.isEmpty()) return null;
+        CalendarFeedDao.CalendarTaskCardRow row = rows.getFirst();
+        return taskCardFactory.create(new TaskCardFactory.TaskCardModel(row.taskId(), row.caseId() == null ? null : row.caseId().longValue(), row.caseName(), row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.title(), null, row.createdByDisplayName(), row.priorityColorHex(), row.dueAt(), row.completedAt(), List.of()), TaskCardFactory.Variant.MINI);
     }
 
     private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) {

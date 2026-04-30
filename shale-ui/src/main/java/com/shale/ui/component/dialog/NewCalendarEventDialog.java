@@ -3,6 +3,7 @@ package com.shale.ui.component.dialog;
 import com.shale.core.model.CalendarEventType;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
@@ -54,8 +55,12 @@ public final class NewCalendarEventDialog {
     }
 
     public static void showEditDialog(Window owner, List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Function<CreateCalendarEventInput, String> onSave, Supplier<String> onDelete) {
+        showEditDialog(owner, eventTypes, initial, onSave, onDelete, null, null);
+    }
+
+    public static void showEditDialog(Window owner, List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Function<CreateCalendarEventInput, String> onSave, Supplier<String> onDelete, Node relatedCaseNode, Node relatedTaskNode) {
         Stage stage = AppDialogs.createModalStage(owner, "Edit Event");
-        DialogParts p = DialogParts.build(eventTypes, initial);
+        DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode);
 
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -126,6 +131,9 @@ public final class NewCalendarEventDialog {
 
     private record DialogParts(VBox content, Label errorLabel, Supplier<Optional<CreateCalendarEventInput>> readInput) {
         static DialogParts build(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial) {
+            return build(eventTypes, initial, null, null);
+        }
+        static DialogParts build(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Node relatedCaseNode, Node relatedTaskNode) {
             Label titleLabel = new Label("Title");
             TextField titleField = new TextField(initial == null ? "" : initial.title());
             Label eventTypeLabel = new Label("Type");
@@ -195,7 +203,15 @@ public final class NewCalendarEventDialog {
             refresh.run();
 
             Label errorLabel = new Label(); errorLabel.setStyle("-fx-text-fill: #b42318;"); errorLabel.setVisible(false); errorLabel.setManaged(false);
-            VBox content = new VBox(8, titleLabel,titleField,eventTypeLabel,eventTypeComboBox,dateLabel,datePicker,allDayCheckBox,startRow,durationSection,descriptionLabel,descriptionArea,errorLabel);
+            VBox content = new VBox(8);
+            if (relatedCaseNode != null || relatedTaskNode != null) {
+                Label relatedLabel = new Label("Related");
+                relatedLabel.getStyleClass().add("calendar-all-day-meta");
+                content.getChildren().add(relatedLabel);
+                if (relatedCaseNode != null) content.getChildren().add(relatedCaseNode);
+                if (relatedTaskNode != null) content.getChildren().add(relatedTaskNode);
+            }
+            content.getChildren().addAll(titleLabel,titleField,eventTypeLabel,eventTypeComboBox,dateLabel,datePicker,allDayCheckBox,startRow,durationSection,descriptionLabel,descriptionArea,errorLabel);
             content.setPadding(new Insets(6,2,2,2));
 
             Supplier<Optional<CreateCalendarEventInput>> readInput = () -> {
