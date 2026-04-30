@@ -4,7 +4,9 @@ import com.shale.core.model.CalendarFeedItem;
 import com.shale.ui.util.ColorUtil;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
@@ -17,7 +19,7 @@ import java.util.Objects;
 public final class CalendarEventCardFactory {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("h:mm a");
 
-    public Node create(CalendarFeedItem item, LocalDate today, LocalDateTime now, Node relatedCaseNode, Node relatedTaskNode) {
+    public Node create(CalendarFeedItem item, LocalDate today, LocalDateTime now) {
         Objects.requireNonNull(item, "item");
 
         HBox card = new HBox(0);
@@ -55,17 +57,41 @@ public final class CalendarEventCardFactory {
         title.getStyleClass().add("calendar-event-title");
         title.setWrapText(true);
 
-        if (relatedCaseNode != null) {
-            relatedCaseNode.getStyleClass().add("calendar-event-related");
-            content.getChildren().add(relatedCaseNode);
-        }
-        if (relatedTaskNode != null) {
-            relatedTaskNode.getStyleClass().add("calendar-event-related");
-            content.getChildren().add(relatedTaskNode);
+        Label relatedSummary = new Label(resolveRelatedSummary(item));
+        relatedSummary.getStyleClass().add("calendar-event-related");
+        if (!relatedSummary.getText().isBlank()) {
+            content.getChildren().add(relatedSummary);
         }
         content.getChildren().addAll(time, title, badges);
         card.getChildren().add(content);
 
+        return card;
+    }
+
+    public Node createAllDayBubble(CalendarFeedItem item) {
+        HBox card = new HBox(6);
+        card.getStyleClass().addAll("calendar-event-card", "calendar-all-day-bubble");
+        Region accentBar = buildAccentBar(item.colorHex());
+        if (accentBar != null) card.getChildren().add(accentBar);
+        Label title = new Label(safe(item.title()));
+        title.getStyleClass().add("calendar-all-day-title");
+        title.setTextOverrun(OverrunStyle.ELLIPSIS);
+        title.setWrapText(false);
+        title.setMaxWidth(170);
+
+        Label subtitle = new Label(resolveAllDaySecondary(item));
+        subtitle.getStyleClass().add("calendar-all-day-meta");
+        subtitle.setTextOverrun(OverrunStyle.ELLIPSIS);
+        subtitle.setWrapText(false);
+        subtitle.setMaxWidth(120);
+
+        card.getChildren().add(title);
+        if (!subtitle.getText().isBlank()) {
+            Label separator = new Label("·");
+            separator.getStyleClass().add("calendar-all-day-meta");
+            card.getChildren().addAll(separator, subtitle);
+        }
+        HBox.setHgrow(title, Priority.ALWAYS);
         return card;
     }
 
@@ -111,6 +137,26 @@ public final class CalendarEventCardFactory {
         if (item.allDay()) return "All day";
         if (item.startsAt() == null) return "Time TBD";
         return TIME_FORMAT.format(item.startsAt());
+    }
+    private static String resolveRelatedSummary(CalendarFeedItem item) {
+        if (!safe(item.relatedDisplayName()).isBlank() && item.caseId() != null) return item.relatedDisplayName();
+        if (item.taskId() != null) return "Task #" + item.taskId();
+        if (item.caseId() != null) return "Case #" + item.caseId();
+        return "";
+    }
+    private static String resolveAllDaySecondary(CalendarFeedItem item) {
+        String sourceType = normalize(item.sourceType());
+        if ("PROJECTED".equals(sourceType) && item.caseId() != null && !safe(item.relatedDisplayName()).isBlank()) {
+            return item.relatedDisplayName();
+        }
+        if ("PROJECTED".equals(sourceType) && item.taskId() != null) {
+            String category = resolveCategory(item);
+            return category.toLowerCase(Locale.ROOT).contains("due") ? "Due" : "";
+        }
+        if (("MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType)) && !safe(item.displayTypeName()).isBlank()) {
+            return item.displayTypeName();
+        }
+        return "";
     }
 
 
