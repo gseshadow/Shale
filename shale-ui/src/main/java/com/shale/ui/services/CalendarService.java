@@ -41,4 +41,12 @@ public final class CalendarService {
     public List<CalendarFeedItem> listCalendarFeed(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive) {
         return calendarFeedDao.listCalendarFeed(shaleClientId, startInclusive, endExclusive);
     }
+
+    public CalendarEvent getEventById(int calendarEventId, int shaleClientId) {
+        return calendarEventDao.getById(calendarEventId, shaleClientId);
+    }
+
+    public void deleteCalendarEvent(int calendarEventId, int shaleClientId) {
+        calendarEventDao.deleteCalendarEvent(calendarEventId, shaleClientId);
+    }
 }
