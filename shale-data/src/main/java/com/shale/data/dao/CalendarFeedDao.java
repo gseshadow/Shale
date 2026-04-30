@@ -114,7 +114,7 @@ public final class CalendarFeedDao {
                            'Task due',
                            t.DueAt,
                            NULL,
-                           0,
+                           CASE WHEN CONVERT(time(0), t.DueAt) = '00:00:00' THEN 1 ELSE 0 END,
                            'PROJECTED',
                            'DueAt',
                            t.CaseId,
