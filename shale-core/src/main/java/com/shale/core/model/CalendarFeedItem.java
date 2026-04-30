@@ -12,6 +12,7 @@ public record CalendarFeedItem(
         String sourceField,
         Integer caseId,
         Integer taskId,
+        String relatedDisplayName,
         String calendarEventTypeSystemKey,
         String displayTypeName,
         String colorHex) {
