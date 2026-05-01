@@ -134,7 +134,7 @@ public final class NewCalendarEventDialog {
 
     public record CreateCalendarEventInput(String title, int calendarEventTypeId, LocalDate date, boolean allDay, LocalTime startTime, int durationMinutes, String description, Integer caseId, Integer assignedToUserId) {}
     public record CaseOption(Integer caseId, String displayName) {}
-    public record AssignedUserOption(Integer userId, String displayName) {}
+    public record AssignedUserOption(Integer userId, String displayName, String color) {}
 
     private static final class ResultHolder { private CreateCalendarEventInput value; }
 
@@ -207,12 +207,14 @@ public final class NewCalendarEventDialog {
             final CaseOption[] selectedCase = new CaseOption[1];
             if (initial != null && initial.caseId() != null) sortedCases.stream().filter(c -> Objects.equals(c.caseId(), initial.caseId())).findFirst().ifPresent(v -> { selectedCase[0] = v; selectedCaseLabel.setText(v.displayName()); });
             Button addCaseButton = new Button(selectedCase[0] == null ? "Add to Case" : "Change Case");
-            addCaseButton.setOnAction(e -> CasePickerDialog.show(addCaseButton.getScene().getWindow(), sortedCases).ifPresent(v -> { selectedCase[0] = v; selectedCaseLabel.setText(v.displayName()); addCaseButton.setText("Change Case"); }));
             Button clearCaseButton = new Button("Clear");
             clearCaseButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-            clearCaseButton.setOnAction(e -> { selectedCase[0] = null; selectedCaseLabel.setText("No case selected"); addCaseButton.setText("Add to Case"); });
+            addCaseButton.setOnAction(e -> CasePickerDialog.show(addCaseButton.getScene().getWindow(), sortedCases).ifPresent(v -> { selectedCase[0] = v; selectedCaseLabel.setText(v.displayName()); addCaseButton.setText("Change Case"); clearCaseButton.setVisible(true); clearCaseButton.setManaged(true); }));
+            clearCaseButton.setOnAction(e -> { selectedCase[0] = null; selectedCaseLabel.setText("No case selected"); addCaseButton.setText("Add to Case"); clearCaseButton.setVisible(false); clearCaseButton.setManaged(false); });
             HBox caseRow = new HBox(8, addCaseButton, selectedCaseLabel, clearCaseButton);
             HBox.setHgrow(selectedCaseLabel, Priority.ALWAYS);
+            clearCaseButton.setVisible(selectedCase[0] != null);
+            clearCaseButton.setManaged(selectedCase[0] != null);
 
             Label assignedUserLabel = new Label("Assigned User");
             Label selectedUserLabel = new Label("No assigned user");
@@ -220,19 +222,23 @@ public final class NewCalendarEventDialog {
             List<AssignedUserOption> sortedUsers = (assignedUserOptions == null ? List.<AssignedUserOption>of() : assignedUserOptions).stream().sorted(Comparator.comparing(u -> safe(u.displayName()).toLowerCase())).toList();
             if (initial != null && initial.assignedToUserId() != null) sortedUsers.stream().filter(u -> Objects.equals(u.userId(), initial.assignedToUserId())).findFirst().ifPresent(v -> { selectedUser[0] = v; selectedUserLabel.setText(v.displayName()); });
             Button assignUserButton = new Button(selectedUser[0] == null ? "Assign User" : "Change User");
-            assignUserButton.setOnAction(e -> {
-                List<com.shale.ui.services.CaseTaskService.AssignableUserOption> candidates = sortedUsers.stream().map(u -> new com.shale.ui.services.CaseTaskService.AssignableUserOption(u.userId(), u.displayName(), null)).toList();
-                AssignedUserPickerDialog.show(assignUserButton.getScene().getWindow(), candidates, NewCalendarEventDialog.class).ifPresent(v -> {
-                    selectedUser[0] = new AssignedUserOption(v.id(), v.displayName());
-                    selectedUserLabel.setText(v.displayName());
-                    assignUserButton.setText("Change User");
-                });
-            });
             Button clearAssignedButton = new Button("Clear");
             clearAssignedButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-            clearAssignedButton.setOnAction(e -> { selectedUser[0] = null; selectedUserLabel.setText("No assigned user"); assignUserButton.setText("Assign User"); });
+            assignUserButton.setOnAction(e -> {
+                List<com.shale.ui.services.CaseTaskService.AssignableUserOption> candidates = sortedUsers.stream().map(u -> new com.shale.ui.services.CaseTaskService.AssignableUserOption(u.userId(), u.displayName(), u.color())).toList();
+                AssignedUserPickerDialog.show(assignUserButton.getScene().getWindow(), candidates, NewCalendarEventDialog.class).ifPresent(v -> {
+                    selectedUser[0] = new AssignedUserOption(v.id(), v.displayName(), v.color());
+                    selectedUserLabel.setText(v.displayName());
+                    assignUserButton.setText("Change User");
+                    clearAssignedButton.setVisible(true);
+                    clearAssignedButton.setManaged(true);
+                });
+            });
+            clearAssignedButton.setOnAction(e -> { selectedUser[0] = null; selectedUserLabel.setText("No assigned user"); assignUserButton.setText("Assign User"); clearAssignedButton.setVisible(false); clearAssignedButton.setManaged(false); });
             HBox assignedRow = new HBox(8, assignUserButton, selectedUserLabel, clearAssignedButton);
             HBox.setHgrow(selectedUserLabel, Priority.ALWAYS);
+            clearAssignedButton.setVisible(selectedUser[0] != null);
+            clearAssignedButton.setManaged(selectedUser[0] != null);
             HBox typeDateRow = new HBox(8, new VBox(4, eventTypeLabel, eventTypeComboBox), new VBox(4, dateLabel, datePicker));
             HBox.setHgrow(typeDateRow.getChildren().getFirst(), Priority.ALWAYS);
             HBox peopleRow = new HBox(12, new VBox(4, caseLabel, caseRow), new VBox(4, assignedUserLabel, assignedRow));

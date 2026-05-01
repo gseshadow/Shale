@@ -272,19 +272,22 @@ public final class CalendarController {
     private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) { LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime()); LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes()); try { calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), input.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), input.assignedToUserId(), existing.completed(), existing.cancelled(), existing.createdByUserId(), existing.createdAt(), existing.updatedAt())); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; } }
     private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker(Integer selectedCaseId) {
         Map<Integer, String> names = new LinkedHashMap<>();
-        for (CalendarFeedItem i : loadedItems) if (i != null && i.caseId() != null && i.caseId() > 0) names.putIfAbsent(i.caseId(), safe(i.relatedDisplayName()).isBlank() ? ("Case #" + i.caseId()) : i.relatedDisplayName());
-        if (selectedCaseId != null && selectedCaseId > 0) names.putIfAbsent(selectedCaseId, "Case #" + selectedCaseId);
         if (caseDao != null) {
             caseDao.searchCasesByName("").forEach(c -> names.putIfAbsent(Math.toIntExact(c.id()), c.name()));
+            if (selectedCaseId != null && selectedCaseId > 0 && !names.containsKey(selectedCaseId)) {
+                var row = caseDao.getCaseRow(selectedCaseId.longValue());
+                if (row != null) names.put(selectedCaseId, row.name());
+            }
         }
         return names.entrySet().stream().map(e -> new NewCalendarEventDialog.CaseOption(e.getKey(), e.getValue())).sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT))).toList();
     }
     private List<NewCalendarEventDialog.AssignedUserOption> assignedUserOptionsForPicker(int tenantId, Integer selectedUserId) {
         if (caseTaskService == null) return List.of();
         Map<Integer, String> names = new LinkedHashMap<>();
-        caseTaskService.loadAssignableUsers(tenantId).forEach(u -> names.putIfAbsent(u.id(), safe(u.displayName())));
+        java.util.Map<Integer, String> colors = new LinkedHashMap<>();
+        caseTaskService.loadAssignableUsers(tenantId).forEach(u -> { names.putIfAbsent(u.id(), safe(u.displayName())); colors.putIfAbsent(u.id(), u.color()); });
         if (selectedUserId != null && selectedUserId > 0) names.putIfAbsent(selectedUserId, "User #" + selectedUserId);
-        return names.entrySet().stream().map(e -> new NewCalendarEventDialog.AssignedUserOption(e.getKey(), e.getValue())).toList();
+        return names.entrySet().stream().map(e -> new NewCalendarEventDialog.AssignedUserOption(e.getKey(), e.getValue(), colors.get(e.getKey()))).toList();
     }
     private int resolveDurationMinutes(com.shale.core.model.CalendarEvent event) { if (event == null || event.endsAt() == null || event.startsAt() == null || !event.endsAt().isAfter(event.startsAt())) return 60; long minutes = java.time.Duration.between(event.startsAt(), event.endsAt()).toMinutes(); long roundedUp = ((minutes + 29) / 30) * 30; if (roundedUp < 30) roundedUp = 30; if (roundedUp > 8 * 60) roundedUp = 8 * 60; return (int) roundedUp; }
     private String deleteEvent(Integer calendarEventId, int tenantId) { try { calendarService.deleteCalendarEvent(calendarEventId, tenantId); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not delete event. Please try again."; } }
