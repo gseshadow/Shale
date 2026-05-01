@@ -273,7 +273,15 @@ public final class CalendarController {
     private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker(Integer selectedCaseId) {
         Map<Integer, String> names = new LinkedHashMap<>();
         if (caseDao != null) {
-            caseDao.searchCasesByName("").forEach(c -> names.putIfAbsent(Math.toIntExact(c.id()), c.name()));
+            int page = 1;
+            int pageSize = 250;
+            while (true) {
+                CaseDao.PagedResult<CaseDao.CaseRow> result = caseDao.findPage(page, pageSize, CaseDao.CaseSort.INTAKE_NEWEST, false);
+                if (result == null || result.items() == null || result.items().isEmpty()) break;
+                result.items().forEach(c -> names.putIfAbsent(Math.toIntExact(c.id()), safe(c.name())));
+                if (result.items().size() < pageSize) break;
+                page++;
+            }
             if (selectedCaseId != null && selectedCaseId > 0 && !names.containsKey(selectedCaseId)) {
                 var row = caseDao.getCaseRow(selectedCaseId.longValue());
                 if (row != null) names.put(selectedCaseId, row.name());
