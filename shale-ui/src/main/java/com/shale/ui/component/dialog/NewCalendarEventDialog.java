@@ -6,6 +6,7 @@ import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -100,6 +101,80 @@ public final class NewCalendarEventDialog {
         showStage(stage, "Edit Event", "Edit event", p.content, deleteButton, cancelButton, saveButton);
     }
 
+    public static EditDialogHandle showEditDialogAsyncShell(Window owner) {
+        Stage stage = AppDialogs.createModalStage(owner, "Edit Event");
+        Label loadingLabel = new Label("Loading event…");
+        loadingLabel.getStyleClass().add("app-dialog-message");
+        Label errorLabel = new Label();
+        errorLabel.setStyle("-fx-text-fill: #b42318;");
+        errorLabel.setVisible(false);
+        errorLabel.setManaged(false);
+        VBox content = new VBox(8, loadingLabel, errorLabel);
+        content.setPadding(new Insets(6,2,2,2));
+
+        Button cancelButton = new Button("Cancel");
+        cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        cancelButton.setCancelButton(true);
+        cancelButton.setOnAction(e -> stage.close());
+
+        Button deleteButton = new Button("Delete");
+        deleteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        deleteButton.setDisable(true);
+
+        Button saveButton = new Button("Save");
+        saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+        saveButton.setDefaultButton(true);
+        saveButton.setDisable(true);
+
+        showStageNonBlocking(stage, "Edit Event", "Edit event", content, deleteButton, cancelButton, saveButton);
+        return new EditDialogHandle(stage, content, errorLabel, loadingLabel, saveButton, deleteButton, cancelButton);
+    }
+
+    public static final class EditDialogHandle {
+        private final Stage stage;
+        private final VBox content;
+        private final Label errorLabel;
+        private final Label loadingLabel;
+        private final Button saveButton;
+        private final Button deleteButton;
+        private final Button cancelButton;
+
+        private EditDialogHandle(Stage stage, VBox content, Label errorLabel, Label loadingLabel, Button saveButton, Button deleteButton, Button cancelButton) {
+            this.stage = stage;
+            this.content = content;
+            this.errorLabel = errorLabel;
+            this.loadingLabel = loadingLabel;
+            this.saveButton = saveButton;
+            this.deleteButton = deleteButton;
+            this.cancelButton = cancelButton;
+        }
+
+        public boolean isShowing() { return stage.isShowing(); }
+
+        public void showLoadError(String message) { showError(errorLabel, message); }
+
+        public void populate(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Function<CreateCalendarEventInput, String> onSave, Supplier<String> onDelete, Node relatedCaseNode, Node relatedTaskNode, List<CaseOption> caseOptions, List<AssignedUserOption> assignedUserOptions) {
+            DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode, caseOptions, assignedUserOptions);
+            content.getChildren().setAll(p.content());
+            deleteButton.setDisable(false);
+            saveButton.setDisable(false);
+            deleteButton.setOnAction(e -> {
+                boolean confirmed = AppDialogs.showConfirmation(stage.getOwner(), "Delete Event", "Delete event", "Delete this event?", "Delete", AppDialogs.DialogActionKind.DANGER);
+                if (!confirmed) return;
+                String err = onDelete == null ? "Delete is unavailable." : onDelete.get();
+                if (err == null || err.isBlank()) stage.close(); else showError(p.errorLabel, err);
+            });
+            saveButton.setOnAction(e -> {
+                Optional<CreateCalendarEventInput> input = p.readInput().get();
+                if (input.isEmpty()) return;
+                String err = onSave == null ? "Save is unavailable." : onSave.apply(input.get());
+                if (err == null || err.isBlank()) stage.close(); else showError(p.errorLabel, err);
+            });
+            loadingLabel.setVisible(false);
+            loadingLabel.setManaged(false);
+        }
+    }
+
     private static void showStage(Stage stage, String shellTitle, String headingText, VBox content, Button leftAction, Button cancelButton, Button saveButton) {
         Label heading = new Label(headingText);
         heading.getStyleClass().add("app-dialog-title");
@@ -128,6 +203,35 @@ public final class NewCalendarEventDialog {
         scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
         stage.showAndWait();
+    }
+
+    private static void showStageNonBlocking(Stage stage, String shellTitle, String headingText, VBox content, Button leftAction, Button cancelButton, Button saveButton) {
+        Label heading = new Label(headingText);
+        heading.getStyleClass().add("app-dialog-title");
+        Label message = new Label("Title, type, and date are required.");
+        message.getStyleClass().add("app-dialog-message");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox actions = leftAction == null ? new HBox(10, spacer, cancelButton, saveButton) : new HBox(10, leftAction, spacer, cancelButton, saveButton);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        ScrollPane formScroll = new ScrollPane(content);
+        formScroll.setFitToWidth(true);
+        formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        formScroll.setMinViewportHeight(300);
+        formScroll.setPrefViewportHeight(380);
+        formScroll.getStyleClass().add("calendar-day-scroll");
+        VBox body = new VBox(16, heading, message, formScroll, actions);
+        VBox.setVgrow(formScroll, Priority.ALWAYS);
+        body.setPadding(new Insets(22, 24, 22, 24));
+        VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
+        root.setMinWidth(460);
+        root.setPrefHeight(640);
+        root.setMaxHeight(680);
+        Scene scene = new Scene(root);
+        scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
+        stage.setScene(scene);
+        stage.show();
     }
 
     private static void showError(Label errorLabel, String message) {
