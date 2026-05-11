@@ -10,7 +10,10 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public final class CalendarEventTypeDao {
@@ -74,5 +77,23 @@ public final class CalendarEventTypeDao {
 
     private static LocalDateTime toLocalDateTime(Timestamp ts) {
         return ts == null ? null : ts.toLocalDateTime();
+    }
+
+    static List<CalendarEventType> resolveEffectiveForTenant(List<CalendarEventType> rows, int shaleClientId) {
+        if (rows == null || rows.isEmpty() || shaleClientId <= 0) return List.of();
+        Map<String, CalendarEventType> resolved = new LinkedHashMap<>();
+        rows.stream()
+                .filter(Objects::nonNull)
+                .filter(row -> row.shaleClientId() == null || row.shaleClientId() == shaleClientId)
+                .sorted(Comparator
+                        .comparing((CalendarEventType row) -> row.shaleClientId() == null ? 1 : 0)
+                        .thenComparing(CalendarEventType::calendarEventTypeId, Comparator.reverseOrder()))
+                .forEach(row -> {
+                    String key = row.systemKey() == null || row.systemKey().isBlank() ? "CUSTOM_" + row.calendarEventTypeId() : row.systemKey();
+                    resolved.putIfAbsent(key, row);
+                });
+        return resolved.values().stream()
+                .sorted(Comparator.comparingInt(CalendarEventType::sortOrder).thenComparing(CalendarEventType::name).thenComparingInt(CalendarEventType::calendarEventTypeId))
+                .toList();
     }
 }

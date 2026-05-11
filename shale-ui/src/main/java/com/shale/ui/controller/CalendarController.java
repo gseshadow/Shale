@@ -32,8 +32,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import com.shale.ui.util.PerfLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class CalendarController {
+    private static final Logger log = LoggerFactory.getLogger(CalendarController.class);
     private static final DateTimeFormatter WEEK_RANGE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter DAY_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d");
     private static final DateTimeFormatter MONTH_RANGE_FORMAT = DateTimeFormatter.ofPattern("MMMM yyyy");
@@ -136,7 +139,7 @@ public final class CalendarController {
         if (tenantId == null || tenantId <= 0 || calendarService == null) { showError("Calendar is unavailable because no tenant is selected."); return; }
         long dialogStart = PerfLog.start();
         PerfLog.log("DIALOG", "start", "calendar new-event shell");
-        NewCalendarEventDialog.CreateDialogHandle dialog = NewCalendarEventDialog.showCreateDialogAsyncShell(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), currentRangeStart(), input -> {
+        NewCalendarEventDialog.CreateDialogHandle dialog = NewCalendarEventDialog.showCreateDialogAsyncShell(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), LocalDate.now(), input -> {
             LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
             LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
             try {
@@ -153,7 +156,10 @@ public final class CalendarController {
                 PerfLog.logDone("DAO", "calendar new-event types load", loadStart);
                 Platform.runLater(() -> dialog.populateEventTypes(eventTypes));
             } catch (RuntimeException ex) {
-                Platform.runLater(() -> dialog.showLoadError("Could not load event types."));
+                log.warn("Unable to load calendar event types for tenantId={}", tenantId, ex);
+                Platform.runLater(() -> {
+                    dialog.showLoadError("Unable to load event types.");
+                });
             }
         });
     }
@@ -587,7 +593,7 @@ public final class CalendarController {
     private CalendarFeedDao.CalendarTaskCardRow loadTaskRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { if (event == null || event.taskId() == null) return null; List<CalendarFeedDao.CalendarTaskCardRow> rows = calendarFeedDao.listTaskCardRows(tenantId, List.of(event.taskId())); return rows.isEmpty() ? null : rows.getFirst(); }
     private Node createRelatedCaseNode(CalendarFeedDao.CalendarCaseCardRow row) { if (row == null) return null; return caseCardFactory.create(new CaseCardFactory.CaseCardModel(row.caseId(), row.caseName(), null, null, row.responsibleAttorney(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI); }
     private Node createRelatedTaskNode(CalendarFeedDao.CalendarTaskCardRow row) { if (row == null) return null; return taskCardFactory.create(new TaskCardFactory.TaskCardModel(row.taskId(), row.caseId() == null ? null : row.caseId().longValue(), row.caseName(), row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.title(), null, row.createdByDisplayName(), row.priorityColorHex(), row.dueAt(), row.completedAt(), List.of()), TaskCardFactory.Variant.MINI); }
-    private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) { LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime()); LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes()); try { calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), input.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), input.assignedToUserId(), existing.completed(), existing.cancelled(), existing.createdByUserId(), existing.createdAt(), existing.updatedAt())); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; } }
+    private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) { LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime()); LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes()); try { calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), input.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), input.assignedToUserId(), existing.completed(), existing.cancelled(), appState == null ? null : appState.getUserId(), existing.createdAt(), existing.updatedAt())); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; } }
     private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker(Integer selectedCaseId) {
         Map<Integer, String> names = new LinkedHashMap<>();
         if (caseDao != null) {
