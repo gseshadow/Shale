@@ -513,13 +513,14 @@ public final class SceneManager {
 		return load("/fxml/calendar.fxml", controller -> {
 			CalendarController c = (CalendarController) controller;
 			CalendarFeedDao calendarFeedDao = new CalendarFeedDao(dbSessionProvider);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(
 					new CalendarEventTypeDao(dbSessionProvider),
 					new CalendarEventDao(dbSessionProvider),
-					calendarFeedDao);
+					calendarFeedDao,
+					notificationDao);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openTaskProfile);
