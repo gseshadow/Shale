@@ -202,13 +202,25 @@ public final class NewCalendarEventDialog {
         showStageNonBlocking(stage, "New Event", "Create event", p.content(), null, cancelButton, saveButton);
         PerfLog.logDone("DIALOG", "calendar new-event show", showStart);
         Platform.runLater(() -> PerfLog.log("DIALOG", "tick", "calendar new-event first-runLater-after-show"));
-        return new CreateDialogHandle(stage, p.content(), p.errorLabel(), saveButton);
+        return new CreateDialogHandle(stage, p.content(), p.errorLabel(), saveButton, defaultDate, onSave, caseOptionsSupplier, assignedUserOptionsSupplier);
     }
 
     public static final class CreateDialogHandle {
         private final Stage stage; private final VBox content; private final Label errorLabel; private final Button saveButton;
-        private CreateDialogHandle(Stage stage, VBox content, Label errorLabel, Button saveButton){ this.stage=stage; this.content=content; this.errorLabel=errorLabel; this.saveButton=saveButton; }
-        public void populateEventTypes(List<CalendarEventType> eventTypes){ if(!stage.isShowing()) return; saveButton.setDisable(false); }
+        private final LocalDate defaultDate;
+        private final Function<CreateCalendarEventInput, String> onSave;
+        private final Supplier<List<CaseOption>> caseOptionsSupplier;
+        private final Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier;
+        private CreateDialogHandle(Stage stage, VBox content, Label errorLabel, Button saveButton, LocalDate defaultDate, Function<CreateCalendarEventInput, String> onSave, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier){ this.stage=stage; this.content=content; this.errorLabel=errorLabel; this.saveButton=saveButton; this.defaultDate=defaultDate; this.onSave=onSave; this.caseOptionsSupplier=caseOptionsSupplier; this.assignedUserOptionsSupplier=assignedUserOptionsSupplier; }
+        public void populateEventTypes(List<CalendarEventType> eventTypes){
+            if(!stage.isShowing()) return;
+            List<CalendarEventType> safeTypes = eventTypes == null ? List.of() : eventTypes;
+            CreateCalendarEventInput initial = new CreateCalendarEventInput("", resolveDefaultTypeId(safeTypes), defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, null);
+            DialogParts updated = DialogParts.build(safeTypes, initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, true);
+            content.getChildren().setAll(updated.content());
+            saveButton.setDisable(safeTypes.isEmpty());
+            saveButton.setOnAction(e -> { Optional<CreateCalendarEventInput> input = updated.readInput().get(); if (input.isEmpty()) return; String err = onSave == null ? "Save is unavailable." : onSave.apply(input.get()); if (err == null || err.isBlank()) stage.close(); else showError(updated.errorLabel(), err); });
+        }
         public void showLoadError(String message){ showError(errorLabel, message); }
     }
     private static void showStage(Stage stage, String shellTitle, String headingText, VBox content, Button leftAction, Button cancelButton, Button saveButton) {
@@ -298,6 +310,7 @@ public final class NewCalendarEventDialog {
             eventTypeComboBox.setButtonCell(new CalendarTypeCell());
             if (!typesReady) { eventTypeComboBox.setDisable(true); eventTypeComboBox.setPromptText("Loading types..."); }
             if (initial != null) safeTypes.stream().filter(t -> t.calendarEventTypeId() == initial.calendarEventTypeId()).findFirst().ifPresent(eventTypeComboBox::setValue);
+            if (typesReady && eventTypeComboBox.getValue() == null && !safeTypes.isEmpty()) eventTypeComboBox.setValue(safeTypes.getFirst());
 
             Label dateLabel = new Label("Date");
             DatePicker datePicker = new DatePicker(initial == null || initial.date() == null ? LocalDate.now() : initial.date());
@@ -512,10 +525,17 @@ public final class NewCalendarEventDialog {
     }
 
     private static <T> List<T> safeList(List<T> values) { return values == null ? List.of() : values; }
+    private static int resolveDefaultTypeId(List<CalendarEventType> eventTypes) {
+        if (eventTypes == null || eventTypes.isEmpty()) return 0;
+        if (eventTypes.size() == 1) return eventTypes.getFirst().calendarEventTypeId();
+        return eventTypes.stream()
+                .filter(t -> t != null && "GENERAL".equalsIgnoreCase(safe(t.systemKey())))
+                .map(CalendarEventType::calendarEventTypeId)
+                .findFirst()
+                .orElse(eventTypes.getFirst().calendarEventTypeId());
+    }
 
     private static final class CalendarTypeCell extends ListCell<CalendarEventType> {
         @Override protected void updateItem(CalendarEventType item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); }
     }
 }
-
-

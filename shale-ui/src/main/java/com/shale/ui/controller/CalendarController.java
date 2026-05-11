@@ -32,8 +32,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import com.shale.ui.util.PerfLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class CalendarController {
+    private static final Logger log = LoggerFactory.getLogger(CalendarController.class);
     private static final DateTimeFormatter WEEK_RANGE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter DAY_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d");
     private static final DateTimeFormatter MONTH_RANGE_FORMAT = DateTimeFormatter.ofPattern("MMMM yyyy");
@@ -153,7 +156,10 @@ public final class CalendarController {
                 PerfLog.logDone("DAO", "calendar new-event types load", loadStart);
                 Platform.runLater(() -> dialog.populateEventTypes(eventTypes));
             } catch (RuntimeException ex) {
-                Platform.runLater(() -> dialog.showLoadError("Could not load event types."));
+                log.warn("Unable to load calendar event types for tenantId={}", tenantId, ex);
+                Platform.runLater(() -> {
+                    dialog.showLoadError("Unable to load event types.");
+                });
             }
         });
     }

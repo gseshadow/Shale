@@ -30,7 +30,9 @@ public final class CalendarService {
     }
 
     public List<CalendarEventType> listEffectiveEventTypes(int shaleClientId) {
-        return calendarEventTypeDao.listEffectiveEventTypes(shaleClientId);
+        return calendarEventTypeDao.listEffectiveEventTypes(shaleClientId).stream()
+                .filter(CalendarService::isSelectableManualType)
+                .toList();
     }
 
     public Integer createEvent(CalendarEvent event) {
@@ -63,5 +65,13 @@ public final class CalendarService {
 
     public void deleteCalendarEvent(int calendarEventId, int shaleClientId) {
         calendarEventDao.deleteCalendarEvent(calendarEventId, shaleClientId);
+    }
+
+    static boolean isSelectableManualType(CalendarEventType type) {
+        if (type == null || !type.active()) return false;
+        String key = type.systemKey() == null ? "" : type.systemKey().trim().toUpperCase();
+        return !key.startsWith("PROJECTED_")
+                && !"TASK_DUE_DATE".equals(key)
+                && !"CASE_DEADLINE".equals(key);
     }
 }
