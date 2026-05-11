@@ -517,3 +517,5 @@ public final class NewCalendarEventDialog {
         @Override protected void updateItem(CalendarEventType item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); }
     }
 }
+
+
