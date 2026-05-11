@@ -71,6 +71,7 @@ public final class CalendarController {
     private LocalDate lastLoadedRangeStart;
     private LocalDate lastLoadedRangeEndInclusive;
     private boolean suppressAutoScroll;
+    private ScrollPane timedScrollPane;
 
     private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
     private CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
@@ -273,6 +274,7 @@ public final class CalendarController {
         }
 
         ScrollPane timedScroll = new ScrollPane(timedGrid);
+        timedScrollPane = timedScroll;
         timedScroll.setFitToWidth(true);
         timedScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         timedScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
@@ -296,6 +298,7 @@ public final class CalendarController {
 
         GridPane timedGrid = createTimedGrid(LocalDate.now(), LocalDateTime.now(), List.of(selectedDate), grouped);
         ScrollPane timedScroll = new ScrollPane(timedGrid);
+        timedScrollPane = timedScroll;
         timedScroll.setFitToWidth(true);
         timedScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         timedScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
@@ -405,16 +408,26 @@ public final class CalendarController {
 
         for (int dayIndex = 0; dayIndex < dayCount; dayIndex++) {
             for (int slot = 0; slot < 48; slot++) {
-                VBox box = new VBox(4);
+                StackPane box = new StackPane();
                 box.setPrefHeight(HALF_HOUR_HEIGHT);
                 box.setMaxWidth(Double.MAX_VALUE);
                 box.getStyleClass().add("calendar-timed-day-cell");
                 GridPane.setHgrow(box, Priority.ALWAYS);
                 timedGrid.add(box, dayIndex + 1, slot);
+
+                VBox eventsLayer = new VBox(4);
+                eventsLayer.setFillWidth(true);
+                eventsLayer.setMaxWidth(Double.MAX_VALUE);
+                box.getChildren().add(eventsLayer);
                 for (CalendarFeedItem item : eventsByDayAndSlot.getOrDefault(dayIndex, Map.of()).getOrDefault(slot, List.of())) {
                     Node c = calendarEventCardFactory.create(item, today, now);
                     configureCalendarCardClick(c, item);
-                    box.getChildren().add(c);
+                    eventsLayer.getChildren().add(c);
+                }
+
+                if (nowDayIndex != null && nowDayIndex == dayIndex && slot == nowSlot) {
+                    Node nowLine = createNowIndicator(box, nowSlotOffset);
+                    box.getChildren().add(nowLine);
                 }
 
                 if (nowDayIndex != null && nowDayIndex == dayIndex && slot == nowSlot) {
@@ -428,8 +441,7 @@ public final class CalendarController {
 
 
     private void maybeAutoScrollTimedView(ScrollPane timedScroll, List<LocalDate> visibleDays) {
-        if (suppressAutoScroll || !autoScrollTimedViewsPending || timedScroll == null) return;
-        autoScrollTimedViewsPending = false;
+        if (suppressAutoScroll || !autoScrollTimedViewsPending || timedScroll == null || timedScroll != timedScrollPane) return;
         LocalDate today = LocalDate.now();
         LocalTime targetTime = (visibleDays != null && visibleDays.contains(today)) ? LocalTime.now() : LocalTime.of(8, 0);
         positionTimedScroll(timedScroll, targetTime, 0);
@@ -437,7 +449,7 @@ public final class CalendarController {
 
     private void positionTimedScroll(ScrollPane timedScroll, LocalTime targetTime, int attempt) {
         if (timedScroll == null || attempt > 4) return;
-        Platform.runLater(() -> {
+        Platform.runLater(() -> Platform.runLater(() -> {
             Node content = timedScroll.getContent();
             if (content == null) return;
             double contentHeight = content.getBoundsInLocal().getHeight();
@@ -452,7 +464,8 @@ public final class CalendarController {
             double desiredOffset = targetY - (viewportHeight / 2.0);
             double vvalue = scrollableHeight <= 0 ? 0.0 : desiredOffset / scrollableHeight;
             timedScroll.setVvalue(Math.max(0.0, Math.min(1.0, vvalue)));
-        });
+            autoScrollTimedViewsPending = false;
+        }));
     }
 
     private Node createNowIndicator(Region hostCell, double yOffset) {
@@ -460,10 +473,10 @@ public final class CalendarController {
         line.getStyleClass().add("calendar-now-line");
         line.setManaged(false);
         line.setMouseTransparent(true);
-        line.layoutXProperty().set(8);
-        line.prefWidthProperty().bind(hostCell.widthProperty().subtract(8));
-        line.minWidthProperty().bind(hostCell.widthProperty().subtract(8));
-        line.maxWidthProperty().bind(hostCell.widthProperty().subtract(8));
+        line.setLayoutX(10);
+        line.prefWidthProperty().bind(javafx.beans.binding.Bindings.max(0.0, hostCell.widthProperty().subtract(14)));
+        line.minWidthProperty().bind(javafx.beans.binding.Bindings.max(0.0, hostCell.widthProperty().subtract(14)));
+        line.maxWidthProperty().bind(javafx.beans.binding.Bindings.max(0.0, hostCell.widthProperty().subtract(14)));
         line.setTranslateY(yOffset - 1.0);
 
         Circle dot = new Circle(4);
@@ -479,8 +492,8 @@ public final class CalendarController {
         markerLayer.setManaged(false);
         markerLayer.setMouseTransparent(true);
         markerLayer.prefWidthProperty().bind(hostCell.widthProperty());
+        markerLayer.prefHeightProperty().bind(hostCell.heightProperty());
         markerLayer.setMinHeight(0);
-        markerLayer.setPrefHeight(0);
         return markerLayer;
     }
 
