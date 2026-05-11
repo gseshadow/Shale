@@ -220,16 +220,17 @@ public final class CalendarController {
         LocalDateTime now = LocalDateTime.now();
 
         VBox board = new VBox(6);
-        HBox headerRow = new HBox(6);
-        HBox allDayRow = new HBox(6);
+        GridPane headerRow = new GridPane();
+        GridPane allDayRow = new GridPane();
+        configureSharedColumns(headerRow, dayCount);
+        configureSharedColumns(allDayRow, dayCount);
         GridPane timedGrid = createTimedGrid(today, now, start, dayCount, grouped);
 
-        Label hourSpacer = new Label("");
-        hourSpacer.setMinWidth(64);
-        hourSpacer.setPrefWidth(64);
-        hourSpacer.setMaxWidth(64);
-        headerRow.getChildren().add(hourSpacer);
-        allDayRow.getChildren().add(createAllDayLabelColumn());
+        headerRow.setHgap(6);
+        allDayRow.setHgap(6);
+        Label hourSpacer = createTimeGutterSpacer();
+        headerRow.add(hourSpacer, 0, 0);
+        allDayRow.add(createAllDayLabelColumn(), 0, 0);
 
         for (int i = 0; i < dayCount; i++) {
             LocalDate day = start.plusDays(i);
@@ -238,9 +239,10 @@ public final class CalendarController {
                     new Label(day.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault())),
                     new Label(DAY_DATE_FORMAT.format(day)),
                     new Label(grouped.getOrDefault(day, List.of()).size() + " items"));
-            HBox.setHgrow(header, Priority.ALWAYS);
-            headerRow.getChildren().add(header);
-            allDayRow.getChildren().add(createAllDaySection(grouped.getOrDefault(day, List.of())));
+            GridPane.setHgrow(header, Priority.ALWAYS);
+            header.setMaxWidth(Double.MAX_VALUE);
+            headerRow.add(header, i + 1, 0);
+            allDayRow.add(createAllDaySection(grouped.getOrDefault(day, List.of())), i + 1, 0);
         }
 
         ScrollPane timedScroll = new ScrollPane(timedGrid);
@@ -298,6 +300,29 @@ public final class CalendarController {
         return box;
     }
 
+    private Label createTimeGutterSpacer() {
+        Label spacer = new Label("");
+        spacer.setMinWidth(64);
+        spacer.setPrefWidth(64);
+        spacer.setMaxWidth(64);
+        return spacer;
+    }
+
+    private void configureSharedColumns(GridPane grid, int dayCount) {
+        grid.getColumnConstraints().clear();
+        ColumnConstraints gutter = new ColumnConstraints();
+        gutter.setMinWidth(64);
+        gutter.setPrefWidth(64);
+        gutter.setMaxWidth(64);
+        grid.getColumnConstraints().add(gutter);
+        for (int i = 0; i < dayCount; i++) {
+            ColumnConstraints dayCol = new ColumnConstraints();
+            dayCol.setHgrow(Priority.ALWAYS);
+            dayCol.setFillWidth(true);
+            grid.getColumnConstraints().add(dayCol);
+        }
+    }
+
     private VBox createAllDaySection(List<CalendarFeedItem> dayItems) {
         VBox allDaySection = new VBox(4);
         allDaySection.getStyleClass().add("calendar-day-lane");
@@ -312,6 +337,7 @@ public final class CalendarController {
     private GridPane createTimedGrid(LocalDate today, LocalDateTime now, LocalDate start, int dayCount, Map<LocalDate, List<CalendarFeedItem>> grouped) {
         GridPane timedGrid = new GridPane();
         timedGrid.setHgap(6);
+        configureSharedColumns(timedGrid, dayCount);
         for (int slot = 0; slot < 48; slot++) {
             RowConstraints rc = new RowConstraints();
             rc.setPrefHeight(HALF_HOUR_HEIGHT);
@@ -331,6 +357,8 @@ public final class CalendarController {
             for (int slot = 0; slot < 48; slot++) {
                 VBox box = new VBox(4);
                 box.setPrefHeight(HALF_HOUR_HEIGHT);
+                box.setMaxWidth(Double.MAX_VALUE);
+                GridPane.setHgrow(box, Priority.ALWAYS);
                 timedGrid.add(box, i + 1, slot);
                 for (CalendarFeedItem item : timedBySlot.getOrDefault(slot, List.of())) { Node c = calendarEventCardFactory.create(item, today, now); configureCalendarCardClick(c, item); box.getChildren().add(c); }
             }
