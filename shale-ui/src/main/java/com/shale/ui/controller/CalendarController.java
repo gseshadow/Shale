@@ -18,6 +18,7 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
 import java.time.*;
@@ -380,6 +381,18 @@ public final class CalendarController {
             eventsByDayAndSlot.computeIfAbsent(dayIndex, k -> new HashMap<>()).computeIfAbsent(slot, k -> new ArrayList<>()).add(item);
         }
 
+        Integer nowDayIndex = null;
+        int nowSlot = -1;
+        double nowSlotOffset = 0.0;
+        if (now != null) {
+            nowDayIndex = dayIndexByDate.get(now.toLocalDate());
+            if (nowDayIndex != null) {
+                int minutes = now.getHour() * 60 + now.getMinute();
+                nowSlot = Math.max(0, Math.min(47, minutes / 30));
+                nowSlotOffset = ((minutes % 30) / 30.0) * HALF_HOUR_HEIGHT;
+            }
+        }
+
         for (int slot = 0; slot < 48; slot++) {
             RowConstraints rc = new RowConstraints();
             rc.setPrefHeight(HALF_HOUR_HEIGHT);
@@ -401,6 +414,11 @@ public final class CalendarController {
                     Node c = calendarEventCardFactory.create(item, today, now);
                     configureCalendarCardClick(c, item);
                     box.getChildren().add(c);
+                }
+
+                if (nowDayIndex != null && nowDayIndex == dayIndex && slot == nowSlot) {
+                    Node nowLine = createNowIndicator(nowSlotOffset);
+                    box.getChildren().add(nowLine);
                 }
             }
         }
@@ -435,6 +453,28 @@ public final class CalendarController {
             timedScroll.setVvalue(Math.max(0.0, Math.min(1.0, vvalue)));
         });
     }
+
+    private Node createNowIndicator(double yOffset) {
+        Region line = new Region();
+        line.getStyleClass().add("calendar-now-line");
+        line.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(line, Priority.ALWAYS);
+
+        Circle dot = new Circle(4);
+        dot.getStyleClass().add("calendar-now-dot");
+
+        Label nowLabel = new Label("Now");
+        nowLabel.getStyleClass().add("calendar-now-label");
+
+        HBox markerRow = new HBox(6, dot, line, nowLabel);
+        markerRow.setManaged(false);
+        markerRow.setMouseTransparent(true);
+        markerRow.setFillHeight(false);
+        markerRow.setTranslateY(yOffset - 1.0);
+        markerRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        return markerRow;
+    }
+
     private Map<LocalDate, List<CalendarFeedItem>> groupAndSort(List<CalendarFeedItem> items, LocalDate start, int dayCount) {
         Map<LocalDate, List<CalendarFeedItem>> grouped = new LinkedHashMap<>(); for (int i = 0; i < dayCount; i++) grouped.put(start.plusDays(i), new ArrayList<>());
         for (CalendarFeedItem item : items) { if (item == null || item.startsAt() == null) continue; LocalDate date = item.startsAt().toLocalDate(); if (grouped.containsKey(date)) grouped.get(date).add(item); }
