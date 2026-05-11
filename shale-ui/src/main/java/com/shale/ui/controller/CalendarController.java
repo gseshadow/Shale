@@ -386,15 +386,10 @@ public final class CalendarController {
         }
 
         Integer nowDayIndex = null;
-        int nowSlot = -1;
-        double nowSlotOffset = 0.0;
+        Integer nowMinutesFromMidnight = null;
         if (now != null) {
             nowDayIndex = dayIndexByDate.get(now.toLocalDate());
-            if (nowDayIndex != null) {
-                int minutes = now.getHour() * 60 + now.getMinute();
-                nowSlot = Math.max(0, Math.min(47, minutes / 30));
-                nowSlotOffset = ((minutes % 30) / 30.0) * HALF_HOUR_HEIGHT;
-            }
+            if (nowDayIndex != null) nowMinutesFromMidnight = now.getHour() * 60 + now.getMinute();
         }
 
         for (int slot = 0; slot < 48; slot++) {
@@ -425,16 +420,14 @@ public final class CalendarController {
                     eventsLayer.getChildren().add(c);
                 }
 
-                if (nowDayIndex != null && nowDayIndex == dayIndex && slot == nowSlot) {
-                    Node nowLine = createNowIndicator(box, nowSlotOffset);
-                    box.getChildren().add(nowLine);
-                }
-
-                if (nowDayIndex != null && nowDayIndex == dayIndex && slot == nowSlot) {
-                    Node nowLine = createNowIndicator(box, nowSlotOffset);
-                    box.getChildren().add(nowLine);
-                }
             }
+        }
+
+        if (nowDayIndex != null && nowMinutesFromMidnight != null) {
+            Node nowOverlay = createNowIndicatorOverlay(nowMinutesFromMidnight);
+            GridPane.setHgrow(nowOverlay, Priority.ALWAYS);
+            GridPane.setRowSpan(nowOverlay, 48);
+            timedGrid.add(nowOverlay, nowDayIndex + 1, 0);
         }
         return timedGrid;
     }
@@ -468,16 +461,8 @@ public final class CalendarController {
         }));
     }
 
-    private Node createNowIndicator(Region hostCell, double yOffset) {
-        Region line = new Region();
-        line.getStyleClass().add("calendar-now-line");
-        line.setManaged(false);
-        line.setMouseTransparent(true);
-        line.setLayoutX(10);
-        line.prefWidthProperty().bind(javafx.beans.binding.Bindings.max(0.0, hostCell.widthProperty().subtract(14)));
-        line.minWidthProperty().bind(javafx.beans.binding.Bindings.max(0.0, hostCell.widthProperty().subtract(14)));
-        line.maxWidthProperty().bind(javafx.beans.binding.Bindings.max(0.0, hostCell.widthProperty().subtract(14)));
-        line.setTranslateY(yOffset - 1.0);
+    private Node createNowIndicatorOverlay(int minutesFromMidnight) {
+        double y = (minutesFromMidnight / (24.0 * 60.0)) * (48 * HALF_HOUR_HEIGHT);
 
         Circle dot = new Circle(4);
         dot.getStyleClass().add("calendar-now-dot");
@@ -485,16 +470,32 @@ public final class CalendarController {
         dot.setMouseTransparent(true);
         dot.setCenterX(0);
         dot.setCenterY(0);
-        dot.setTranslateX(2);
-        dot.setTranslateY(yOffset - 1.0);
 
-        Pane markerLayer = new Pane(line, dot);
-        markerLayer.setManaged(false);
-        markerLayer.setMouseTransparent(true);
-        markerLayer.prefWidthProperty().bind(hostCell.widthProperty());
-        markerLayer.prefHeightProperty().bind(hostCell.heightProperty());
-        markerLayer.setMinHeight(0);
-        return markerLayer;
+        Region line = new Region();
+        line.getStyleClass().add("calendar-now-line");
+        line.setManaged(false);
+        line.setMouseTransparent(true);
+
+        Pane overlay = new Pane(dot, line);
+        overlay.setManaged(false);
+        overlay.setMouseTransparent(true);
+        overlay.setPickOnBounds(false);
+
+        overlay.widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            double width = Math.max(0.0, newWidth.doubleValue());
+            dot.setLayoutX(6);
+            line.setLayoutX(12);
+            line.setPrefWidth(Math.max(0.0, width - 12));
+            line.setMinWidth(Math.max(0.0, width - 12));
+            line.setMaxWidth(Math.max(0.0, width - 12));
+        });
+        overlay.heightProperty().addListener((obs, oldHeight, newHeight) -> {
+            double overlayHeight = Math.max(0.0, newHeight.doubleValue());
+            double clampedY = Math.max(0.0, Math.min(overlayHeight, y));
+            dot.setLayoutY(clampedY);
+            line.setLayoutY(clampedY - 1.0);
+        });
+        return overlay;
     }
 
     private Map<LocalDate, List<CalendarFeedItem>> groupAndSort(List<CalendarFeedItem> items, LocalDate start, int dayCount) {
