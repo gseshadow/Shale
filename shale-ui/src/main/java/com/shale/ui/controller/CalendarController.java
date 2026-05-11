@@ -74,6 +74,7 @@ public final class CalendarController {
     private LocalDate lastLoadedRangeEndInclusive;
     private boolean suppressAutoScroll;
     private ScrollPane timedScrollPane;
+    private boolean allDayCollapsed;
 
     private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
     private CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
@@ -272,7 +273,7 @@ public final class CalendarController {
             GridPane.setHgrow(header, Priority.ALWAYS);
             header.setMaxWidth(Double.MAX_VALUE);
             headerRow.add(header, i + 1, 0);
-            allDayRow.add(createAllDaySection(grouped.getOrDefault(day, List.of())), i + 1, 0);
+            allDayRow.add(createAllDaySection(grouped.getOrDefault(day, List.of()), allDayCollapsed), i + 1, 0);
         }
 
         ScrollPane timedScroll = new ScrollPane(timedGrid);
@@ -296,7 +297,7 @@ public final class CalendarController {
         board.setPadding(new Insets(8));
 
         HBox allDayRow = new HBox(6);
-        allDayRow.getChildren().addAll(createAllDayLabelColumn(), createAllDaySection(grouped.getOrDefault(selectedDate, List.of())));
+        allDayRow.getChildren().addAll(createAllDayLabelColumn(), createAllDaySection(grouped.getOrDefault(selectedDate, List.of()), allDayCollapsed));
 
         GridPane timedGrid = createTimedGrid(LocalDate.now(), LocalDateTime.now(), List.of(selectedDate), grouped);
         ScrollPane timedScroll = new ScrollPane(timedGrid);
@@ -330,7 +331,14 @@ public final class CalendarController {
         box.setMinWidth(64);
         box.setPrefWidth(64);
         box.setMaxWidth(64);
-        box.getChildren().add(new Label("All day"));
+
+        Button toggle = new Button(allDayCollapsed ? "All day ▸" : "All day ▾");
+        toggle.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-compact");
+        toggle.setOnAction(evt -> {
+            allDayCollapsed = !allDayCollapsed;
+            renderCurrent(filterItems(loadedItems));
+        });
+        box.getChildren().add(toggle);
         return box;
     }
 
@@ -357,13 +365,26 @@ public final class CalendarController {
         }
     }
 
-    private VBox createAllDaySection(List<CalendarFeedItem> dayItems) {
+    private VBox createAllDaySection(List<CalendarFeedItem> dayItems, boolean collapsed) {
         VBox allDaySection = new VBox(4);
         allDaySection.getStyleClass().add("calendar-day-lane");
         allDaySection.setPadding(new Insets(6));
         List<CalendarFeedItem> allDayItems = dayItems.stream().filter(CalendarFeedItem::allDay).toList();
-        if (allDayItems.isEmpty()) allDaySection.getChildren().add(new Label("No all-day items"));
-        else for (CalendarFeedItem i : allDayItems) { Node b = calendarEventCardFactory.createAllDayBubble(i); configureCalendarCardClick(b, i); allDaySection.getChildren().add(b); }
+
+        if (collapsed) {
+            Label summary = new Label(allDayItems.isEmpty() ? "No all-day" : (allDayItems.size() + " all-day"));
+            summary.getStyleClass().add("calendar-all-day-summary");
+            allDaySection.getChildren().add(summary);
+            allDaySection.setMinHeight(36);
+            allDaySection.setPrefHeight(36);
+            allDaySection.setMaxHeight(36);
+        } else {
+            if (allDayItems.isEmpty()) allDaySection.getChildren().add(new Label("No all-day items"));
+            else for (CalendarFeedItem i : allDayItems) { Node b = calendarEventCardFactory.createAllDayBubble(i); configureCalendarCardClick(b, i); allDaySection.getChildren().add(b); }
+            allDaySection.setMinHeight(Region.USE_COMPUTED_SIZE);
+            allDaySection.setPrefHeight(Region.USE_COMPUTED_SIZE);
+            allDaySection.setMaxHeight(Double.MAX_VALUE);
+        }
         HBox.setHgrow(allDaySection, Priority.ALWAYS);
         return allDaySection;
     }

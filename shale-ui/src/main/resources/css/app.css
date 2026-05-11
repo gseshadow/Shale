@@ -1250,3 +1250,5 @@
     -fx-font-size: 10px;
     -fx-font-weight: 700;
 }
+
+.calendar-all-day-summary { -fx-text-fill: rgba(17, 37, 66, 0.78); -fx-font-size: 11px; -fx-font-weight: 700; }
