@@ -1221,3 +1221,15 @@
     -fx-border-width: 1 0 0 0;
     -fx-padding: 2 2 2 2;
 }
+
+.calendar-timed-grid .calendar-timed-day-cell {
+    -fx-border-color: rgba(15, 35, 66, 0.10);
+    -fx-border-width: 0 0 1 1;
+    -fx-padding: 2 4 2 4;
+}
+
+.calendar-timed-grid .calendar-time-gutter-label {
+    -fx-padding: 0 8 0 0;
+    -fx-text-fill: rgba(17, 37, 66, 0.78);
+    -fx-font-size: 11px;
+}
