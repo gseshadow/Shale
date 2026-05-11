@@ -518,7 +518,8 @@ public final class SceneManager {
 					new CalendarEventTypeDao(dbSessionProvider),
 					new CalendarEventDao(dbSessionProvider),
 					calendarFeedDao,
-					notificationDao);
+					notificationDao,
+					runtimeBridge);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);

@@ -22,11 +22,12 @@ public final class CalendarService {
             CalendarEventTypeDao calendarEventTypeDao,
             CalendarEventDao calendarEventDao,
             CalendarFeedDao calendarFeedDao,
-            NotificationDao notificationDao) {
+            NotificationDao notificationDao,
+            UiRuntimeBridge runtimeBridge) {
         this.calendarEventTypeDao = Objects.requireNonNull(calendarEventTypeDao, "calendarEventTypeDao");
         this.calendarEventDao = Objects.requireNonNull(calendarEventDao, "calendarEventDao");
         this.calendarFeedDao = Objects.requireNonNull(calendarFeedDao, "calendarFeedDao");
-        this.calendarAssignmentNotificationService = new CalendarAssignmentNotificationService(Objects.requireNonNull(notificationDao, "notificationDao"));
+        this.calendarAssignmentNotificationService = new CalendarAssignmentNotificationService(Objects.requireNonNull(notificationDao, "notificationDao"), Objects.requireNonNull(runtimeBridge, "runtimeBridge"));
     }
 
     public List<CalendarEventType> listEffectiveEventTypes(int shaleClientId) {

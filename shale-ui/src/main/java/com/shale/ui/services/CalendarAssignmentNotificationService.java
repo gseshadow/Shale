@@ -2,6 +2,7 @@ package com.shale.ui.services;
 
 import com.shale.core.model.CalendarEvent;
 import com.shale.data.dao.NotificationDao;
+import com.shale.ui.services.UiRuntimeBridge;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -15,9 +16,11 @@ final class CalendarAssignmentNotificationService {
     static final String ACTION_TYPE = "CALENDAR_EVENT_ASSIGNED";
 
     private final NotificationPublisher notificationPublisher;
+    private final UiRuntimeBridge runtimeBridge;
 
-    CalendarAssignmentNotificationService(NotificationDao notificationDao) {
+    CalendarAssignmentNotificationService(NotificationDao notificationDao, UiRuntimeBridge runtimeBridge) {
         Objects.requireNonNull(notificationDao, "notificationDao");
+        this.runtimeBridge = Objects.requireNonNull(runtimeBridge, "runtimeBridge");
         this.notificationPublisher = (event, assignee, actorUserId, eventKey) ->
                 notificationDao.createCalendarEventAssignedNotification(
                         event.shaleClientId(),
@@ -32,6 +35,10 @@ final class CalendarAssignmentNotificationService {
 
     CalendarAssignmentNotificationService(NotificationPublisher notificationPublisher) {
         this.notificationPublisher = Objects.requireNonNull(notificationPublisher, "notificationPublisher");
+        this.runtimeBridge = new UiRuntimeBridge() {
+            @Override public void onLoginSuccess(int userId, int shaleClientId, String email) {}
+            @Override public void onLogout() {}
+        };
     }
 
     void notifyIfNeeded(CalendarEvent previous, CalendarEvent current, Integer actorUserId) {
@@ -64,7 +71,16 @@ final class CalendarAssignmentNotificationService {
         String eventKey = "calendar-event-assigned:" + current.calendarEventId() + ":" + assignee;
         log.info("Calendar assignment notification create eventId={} sourceType={} tenantId={} actorUserId={} assignedUsersCount=1 newlyAssignedUsersCount=1",
                 current.calendarEventId(), current.sourceType(), current.shaleClientId(), actorUserId);
-        notificationPublisher.publish(current, assignee, actorUserId, eventKey);
+        Long durableId = notificationPublisher.publish(current, assignee, actorUserId, eventKey);
+        String patch = "{\"notificationType\":\"CALENDAR_EVENT_ASSIGNED\""
+                + ",\"recipientUserId\":" + assignee
+                + ",\"eventKey\":\"" + eventKey + "\""
+                + ",\"title\":\"" + ASSIGNED_TITLE + "\""
+                + ",\"message\":\"" + ASSIGNED_MESSAGE + "\""
+                + (durableId == null ? "" : ",\"durableNotificationId\":" + durableId)
+                + ",\"calendarEventId\":" + current.calendarEventId()
+                + "}";
+        runtimeBridge.publishEntityUpdated("CalendarEvent", current.calendarEventId(), current.shaleClientId(), actorUserId == null ? 0 : actorUserId, patch);
     }
 
     static boolean isManualSource(String sourceType) {
@@ -73,6 +89,6 @@ final class CalendarAssignmentNotificationService {
     }
 
     interface NotificationPublisher {
-        void publish(CalendarEvent event, int assignee, Integer actorUserId, String eventKey);
+        Long publish(CalendarEvent event, int assignee, Integer actorUserId, String eventKey);
     }
 }

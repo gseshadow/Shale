@@ -14,7 +14,7 @@ class CalendarAssignmentNotificationServiceTest {
     @Test
     void assigningManualEventCreatesNotificationOnce() {
         List<String> eventKeys = new ArrayList<>();
-        CalendarAssignmentNotificationService service = new CalendarAssignmentNotificationService((event, assignee, actorUserId, eventKey) -> eventKeys.add(eventKey));
+        CalendarAssignmentNotificationService service = new CalendarAssignmentNotificationService((event, assignee, actorUserId, eventKey) -> { eventKeys.add(eventKey); return 1L; });
         CalendarEvent current = event(100, 10, "MANUAL", 22);
 
         service.notifyIfNeeded(null, current, 5);
@@ -25,7 +25,7 @@ class CalendarAssignmentNotificationServiceTest {
     @Test
     void assigningSameUserTwiceDoesNotNotifyAgain() {
         List<String> eventKeys = new ArrayList<>();
-        CalendarAssignmentNotificationService service = new CalendarAssignmentNotificationService((event, assignee, actorUserId, eventKey) -> eventKeys.add(eventKey));
+        CalendarAssignmentNotificationService service = new CalendarAssignmentNotificationService((event, assignee, actorUserId, eventKey) -> { eventKeys.add(eventKey); return 1L; });
         CalendarEvent previous = event(100, 10, "MANUAL", 22);
         CalendarEvent current = event(100, 10, "MANUAL", 22);
 
@@ -37,7 +37,7 @@ class CalendarAssignmentNotificationServiceTest {
     @Test
     void projectedItemsDoNotNotify() {
         List<String> eventKeys = new ArrayList<>();
-        CalendarAssignmentNotificationService service = new CalendarAssignmentNotificationService((event, assignee, actorUserId, eventKey) -> eventKeys.add(eventKey));
+        CalendarAssignmentNotificationService service = new CalendarAssignmentNotificationService((event, assignee, actorUserId, eventKey) -> { eventKeys.add(eventKey); return 1L; });
 
         service.notifyIfNeeded(null, event(100, 10, "TASK_DUE_DATE", 22), 5);
         service.notifyIfNeeded(null, event(101, 10, "CASE_DEADLINE", 22), 5);
@@ -48,7 +48,7 @@ class CalendarAssignmentNotificationServiceTest {
     @Test
     void tenantContextUsedFromEvent() {
         List<Integer> tenantIds = new ArrayList<>();
-        CalendarAssignmentNotificationService service = new CalendarAssignmentNotificationService((event, assignee, actorUserId, eventKey) -> tenantIds.add(event.shaleClientId()));
+        CalendarAssignmentNotificationService service = new CalendarAssignmentNotificationService((event, assignee, actorUserId, eventKey) -> { tenantIds.add(event.shaleClientId()); return 1L; });
 
         service.notifyIfNeeded(null, event(200, 77, "MANUAL", 22), 5);
 
@@ -57,5 +57,13 @@ class CalendarAssignmentNotificationServiceTest {
 
     private static CalendarEvent event(int eventId, int tenantId, String sourceType, Integer assignedToUserId) {
         return new CalendarEvent(eventId, tenantId, 1, null, null, "Title", "Description", LocalDateTime.now(), null, true, sourceType, null, null, assignedToUserId, false, false, 5, LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    @Test
+    void selfAssignmentIsSuppressed() {
+        List<String> eventKeys = new ArrayList<>();
+        CalendarAssignmentNotificationService service = new CalendarAssignmentNotificationService((event, assignee, actorUserId, eventKey) -> { eventKeys.add(eventKey); return 1L; });
+        service.notifyIfNeeded(null, event(300, 10, "MANUAL", 22), 22);
+        assertEquals(List.of(), eventKeys);
     }
 }
