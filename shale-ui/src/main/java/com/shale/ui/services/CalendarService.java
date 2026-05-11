@@ -6,6 +6,7 @@ import com.shale.core.model.CalendarFeedItem;
 import com.shale.data.dao.CalendarEventDao;
 import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.CalendarFeedDao;
+import com.shale.data.dao.NotificationDao;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,11 +16,17 @@ public final class CalendarService {
     private final CalendarEventTypeDao calendarEventTypeDao;
     private final CalendarEventDao calendarEventDao;
     private final CalendarFeedDao calendarFeedDao;
+    private final CalendarAssignmentNotificationService calendarAssignmentNotificationService;
 
-    public CalendarService(CalendarEventTypeDao calendarEventTypeDao, CalendarEventDao calendarEventDao, CalendarFeedDao calendarFeedDao) {
+    public CalendarService(
+            CalendarEventTypeDao calendarEventTypeDao,
+            CalendarEventDao calendarEventDao,
+            CalendarFeedDao calendarFeedDao,
+            NotificationDao notificationDao) {
         this.calendarEventTypeDao = Objects.requireNonNull(calendarEventTypeDao, "calendarEventTypeDao");
         this.calendarEventDao = Objects.requireNonNull(calendarEventDao, "calendarEventDao");
         this.calendarFeedDao = Objects.requireNonNull(calendarFeedDao, "calendarFeedDao");
+        this.calendarAssignmentNotificationService = new CalendarAssignmentNotificationService(Objects.requireNonNull(notificationDao, "notificationDao"));
     }
 
     public List<CalendarEventType> listEffectiveEventTypes(int shaleClientId) {
@@ -27,11 +34,19 @@ public final class CalendarService {
     }
 
     public Integer createEvent(CalendarEvent event) {
-        return calendarEventDao.create(event);
+        Integer calendarEventId = calendarEventDao.create(event);
+        if (calendarEventId != null && calendarEventId > 0) {
+            CalendarEvent persisted = calendarEventDao.getById(calendarEventId, event.shaleClientId());
+            calendarAssignmentNotificationService.notifyIfNeeded(null, persisted, event.createdByUserId());
+        }
+        return calendarEventId;
     }
 
     public void updateEvent(CalendarEvent event) {
+        CalendarEvent previous = calendarEventDao.getById(event.calendarEventId(), event.shaleClientId());
         calendarEventDao.update(event);
+        CalendarEvent current = calendarEventDao.getById(event.calendarEventId(), event.shaleClientId());
+        calendarAssignmentNotificationService.notifyIfNeeded(previous, current, event.createdByUserId());
     }
 
     public List<CalendarEvent> listEventsByDateRange(int shaleClientId, LocalDateTime startsAt, LocalDateTime endsAt) {
