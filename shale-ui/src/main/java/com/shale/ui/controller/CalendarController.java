@@ -70,6 +70,7 @@ public final class CalendarController {
     private boolean autoScrollTimedViewsPending = false;
     private LocalDate lastLoadedRangeStart;
     private LocalDate lastLoadedRangeEndInclusive;
+    private boolean suppressAutoScroll;
 
     private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
     private CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
@@ -160,7 +161,7 @@ public final class CalendarController {
         boolean initialLoad = lastLoadedRangeStart == null || lastLoadedRangeEndInclusive == null;
         boolean rangeChanged = !Objects.equals(lastLoadedRangeStart, rangeStart) || !Objects.equals(lastLoadedRangeEndInclusive, rangeEnd);
         autoScrollTimedViewsPending = fromTodayAction || initialLoad || rangeChanged;
-        loadGeneration++; int current = loadGeneration; renderCurrentShell(); setLoading(true); showError(null);
+        loadGeneration++; int current = loadGeneration; suppressAutoScroll = true; renderCurrentShell(); suppressAutoScroll = false; setLoading(true); showError(null);
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
         if (tenantId == null || tenantId <= 0 || calendarService == null) { setLoading(false); showError("Calendar is unavailable because no tenant is selected."); return; }
         LocalDateTime start = rangeStart.atStartOfDay(); LocalDateTime end = rangeEnd.plusDays(1).atStartOfDay();
@@ -417,7 +418,7 @@ public final class CalendarController {
                 }
 
                 if (nowDayIndex != null && nowDayIndex == dayIndex && slot == nowSlot) {
-                    Node nowLine = createNowIndicator(nowSlotOffset);
+                    Node nowLine = createNowIndicator(box, nowSlotOffset);
                     box.getChildren().add(nowLine);
                 }
             }
@@ -427,7 +428,7 @@ public final class CalendarController {
 
 
     private void maybeAutoScrollTimedView(ScrollPane timedScroll, List<LocalDate> visibleDays) {
-        if (!autoScrollTimedViewsPending || timedScroll == null) return;
+        if (suppressAutoScroll || !autoScrollTimedViewsPending || timedScroll == null) return;
         autoScrollTimedViewsPending = false;
         LocalDate today = LocalDate.now();
         LocalTime targetTime = (visibleDays != null && visibleDays.contains(today)) ? LocalTime.now() : LocalTime.of(8, 0);
@@ -454,25 +455,33 @@ public final class CalendarController {
         });
     }
 
-    private Node createNowIndicator(double yOffset) {
+    private Node createNowIndicator(Region hostCell, double yOffset) {
         Region line = new Region();
         line.getStyleClass().add("calendar-now-line");
-        line.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(line, Priority.ALWAYS);
+        line.setManaged(false);
+        line.setMouseTransparent(true);
+        line.layoutXProperty().set(8);
+        line.prefWidthProperty().bind(hostCell.widthProperty().subtract(8));
+        line.minWidthProperty().bind(hostCell.widthProperty().subtract(8));
+        line.maxWidthProperty().bind(hostCell.widthProperty().subtract(8));
+        line.setTranslateY(yOffset - 1.0);
 
         Circle dot = new Circle(4);
         dot.getStyleClass().add("calendar-now-dot");
+        dot.setManaged(false);
+        dot.setMouseTransparent(true);
+        dot.setCenterX(0);
+        dot.setCenterY(0);
+        dot.setTranslateX(2);
+        dot.setTranslateY(yOffset - 1.0);
 
-        Label nowLabel = new Label("Now");
-        nowLabel.getStyleClass().add("calendar-now-label");
-
-        HBox markerRow = new HBox(6, dot, line, nowLabel);
-        markerRow.setManaged(false);
-        markerRow.setMouseTransparent(true);
-        markerRow.setFillHeight(false);
-        markerRow.setTranslateY(yOffset - 1.0);
-        markerRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        return markerRow;
+        Pane markerLayer = new Pane(line, dot);
+        markerLayer.setManaged(false);
+        markerLayer.setMouseTransparent(true);
+        markerLayer.prefWidthProperty().bind(hostCell.widthProperty());
+        markerLayer.setMinHeight(0);
+        markerLayer.setPrefHeight(0);
+        return markerLayer;
     }
 
     private Map<LocalDate, List<CalendarFeedItem>> groupAndSort(List<CalendarFeedItem> items, LocalDate start, int dayCount) {
