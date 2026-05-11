@@ -525,14 +525,22 @@ public final class NewCalendarEventDialog {
     }
 
     private static <T> List<T> safeList(List<T> values) { return values == null ? List.of() : values; }
-    private static int resolveDefaultTypeId(List<CalendarEventType> eventTypes) {
+    static int resolveDefaultTypeId(List<CalendarEventType> eventTypes) {
         if (eventTypes == null || eventTypes.isEmpty()) return 0;
         if (eventTypes.size() == 1) return eventTypes.getFirst().calendarEventTypeId();
-        return eventTypes.stream()
-                .filter(t -> t != null && "GENERAL".equalsIgnoreCase(safe(t.systemKey())))
+        Integer meetingByKey = eventTypes.stream()
+                .filter(t -> t != null && "MEETING".equalsIgnoreCase(safe(t.systemKey())))
                 .map(CalendarEventType::calendarEventTypeId)
                 .findFirst()
-                .orElse(eventTypes.getFirst().calendarEventTypeId());
+                .orElse(null);
+        if (meetingByKey != null) return meetingByKey;
+        Integer meetingByName = eventTypes.stream()
+                .filter(t -> t != null && "MEETING".equalsIgnoreCase(safe(t.name())))
+                .map(CalendarEventType::calendarEventTypeId)
+                .findFirst()
+                .orElse(null);
+        if (meetingByName != null) return meetingByName;
+        return eventTypes.getFirst().calendarEventTypeId();
     }
 
     private static final class CalendarTypeCell extends ListCell<CalendarEventType> {
