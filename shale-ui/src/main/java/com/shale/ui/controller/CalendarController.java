@@ -65,6 +65,7 @@ public final class CalendarController {
     private String searchText = "";
     private Integer selectedCaseId;
     private String selectedEventTypeKey = "";
+    private final Set<Integer> openingEditDialogEventIds = new HashSet<>();
 
     private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
     private CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
@@ -412,27 +413,34 @@ public final class CalendarController {
     private void openEditEventDialog(int eventId) {
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
         if (tenantId == null || tenantId <= 0 || calendarService == null) return;
+        if (!openingEditDialogEventIds.add(eventId)) return;
+        long clickStart = PerfLog.start();
+        PerfLog.log("DIALOG", "start", "calendar edit-event click eventId=" + eventId);
         NewCalendarEventDialog.EditDialogHandle dialog = NewCalendarEventDialog.showEditDialogAsyncShell(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow());
+        PerfLog.logDone("DIALOG", "calendar edit-event shell shown eventId=" + eventId, clickStart);
         dbExec.submit(() -> {
             try {
+                long loadStart = PerfLog.start();
+                PerfLog.log("DAO", "start", "calendar edit-event hydrate eventId=" + eventId);
                 var event = calendarService.getEventById(eventId, tenantId);
                 if (event == null) {
-                    Platform.runLater(() -> dialog.showLoadError("Could not load event for editing."));
+                    Platform.runLater(() -> { openingEditDialogEventIds.remove(eventId); dialog.showLoadError("Could not load event for editing."); });
                     return;
                 }
                 var initial = new NewCalendarEventDialog.CreateCalendarEventInput(event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(), event.allDay() ? null : event.startsAt().toLocalTime(), resolveDurationMinutes(event), event.description(), event.caseId(), event.assignedToUserId());
                 CalendarFeedDao.CalendarCaseCardRow caseRow = loadCaseRowForEvent(event, tenantId);
                 CalendarFeedDao.CalendarTaskCardRow taskRow = loadTaskRowForEvent(event, tenantId);
                 var eventTypes = calendarService.listEffectiveEventTypes(tenantId);
-                
+                PerfLog.logDone("DAO", "calendar edit-event hydrate eventId=" + eventId, loadStart);
                 Platform.runLater(() -> {
                     if (!dialog.isShowing()) return;
                     Node rc = caseRow == null ? null : createRelatedCaseNode(caseRow);
                     Node rt = taskRow == null ? null : createRelatedTaskNode(taskRow);
                     dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()));
+                    openingEditDialogEventIds.remove(eventId);
                 });
             } catch (RuntimeException ex) {
-                Platform.runLater(() -> dialog.showLoadError("Could not load event for editing."));
+                Platform.runLater(() -> { openingEditDialogEventIds.remove(eventId); dialog.showLoadError("Could not load event for editing."); });
             }
         });
     }
