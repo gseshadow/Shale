@@ -216,17 +216,69 @@ public final class CalendarController {
         LocalDate start = fiveDay ? workWeekStartFor(selectedDate) : weekStartFor(selectedDate);
         int dayCount = fiveDay ? 5 : 7;
         Map<LocalDate, List<CalendarFeedItem>> grouped = groupAndSort(items, start, dayCount);
-        LocalDate today = LocalDate.now(); LocalDateTime now = LocalDateTime.now();
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+
+        VBox board = new VBox(6);
+        GridPane headerRow = new GridPane();
+        GridPane allDayRow = new GridPane();
+        configureSharedColumns(headerRow, dayCount);
+        configureSharedColumns(allDayRow, dayCount);
+        List<LocalDate> visibleDays = new ArrayList<>();
+        for (int i = 0; i < dayCount; i++) visibleDays.add(start.plusDays(i));
+        GridPane timedGrid = createTimedGrid(today, now, visibleDays, grouped);
+
+        headerRow.setHgap(6);
+        allDayRow.setHgap(6);
+        Label hourSpacer = createTimeGutterSpacer();
+        headerRow.add(hourSpacer, 0, 0);
+        allDayRow.add(createAllDayLabelColumn(), 0, 0);
+
         for (int i = 0; i < dayCount; i++) {
-            LocalDate day = start.plusDays(i); VBox lane = new VBox(6); lane.getStyleClass().add("calendar-day-lane"); lane.setPadding(new Insets(8));
-            VBox header = new VBox(2); Label dayName = new Label(day.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault())); Label date = new Label(DAY_DATE_FORMAT.format(day));
-            header.getChildren().addAll(dayName, date, new Label(grouped.getOrDefault(day, List.of()).size() + " items"));
-            ScrollPane laneScroll = new ScrollPane(buildDayTimeline(grouped.getOrDefault(day, List.of()), today, now, day)); laneScroll.setFitToWidth(true); laneScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-            lane.getChildren().addAll(header, laneScroll); VBox.setVgrow(laneScroll, Priority.ALWAYS); HBox.setHgrow(lane, Priority.ALWAYS); weekBoard.getChildren().add(lane);
+            LocalDate day = start.plusDays(i);
+            VBox header = new VBox(2);
+            header.getChildren().addAll(
+                    new Label(day.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault())),
+                    new Label(DAY_DATE_FORMAT.format(day)),
+                    new Label(grouped.getOrDefault(day, List.of()).size() + " items"));
+            GridPane.setHgrow(header, Priority.ALWAYS);
+            header.setMaxWidth(Double.MAX_VALUE);
+            headerRow.add(header, i + 1, 0);
+            allDayRow.add(createAllDaySection(grouped.getOrDefault(day, List.of())), i + 1, 0);
         }
+
+        ScrollPane timedScroll = new ScrollPane(timedGrid);
+        timedScroll.setFitToWidth(true);
+        timedScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        timedScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        VBox.setVgrow(timedScroll, Priority.ALWAYS);
+
+        board.getChildren().addAll(headerRow, allDayRow, timedScroll);
+        HBox.setHgrow(board, Priority.ALWAYS);
+        weekBoard.getChildren().add(board);
     }
 
-    private void renderDay(List<CalendarFeedItem> items) { weekBoard.getChildren().clear(); VBox lane = new VBox(8); lane.getStyleClass().add("calendar-day-lane"); lane.setPadding(new Insets(8)); lane.getChildren().add(buildDayTimeline(groupAndSort(items, selectedDate, 1).getOrDefault(selectedDate, List.of()), LocalDate.now(), LocalDateTime.now(), selectedDate)); HBox.setHgrow(lane, Priority.ALWAYS); weekBoard.getChildren().add(lane); }
+    private void renderDay(List<CalendarFeedItem> items) {
+        weekBoard.getChildren().clear();
+        Map<LocalDate, List<CalendarFeedItem>> grouped = groupAndSort(items, selectedDate, 1);
+        VBox board = new VBox(6);
+        board.getStyleClass().add("calendar-day-lane");
+        board.setPadding(new Insets(8));
+
+        HBox allDayRow = new HBox(6);
+        allDayRow.getChildren().addAll(createAllDayLabelColumn(), createAllDaySection(grouped.getOrDefault(selectedDate, List.of())));
+
+        GridPane timedGrid = createTimedGrid(LocalDate.now(), LocalDateTime.now(), List.of(selectedDate), grouped);
+        ScrollPane timedScroll = new ScrollPane(timedGrid);
+        timedScroll.setFitToWidth(true);
+        timedScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        timedScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        VBox.setVgrow(timedScroll, Priority.ALWAYS);
+
+        board.getChildren().addAll(allDayRow, timedScroll);
+        HBox.setHgrow(board, Priority.ALWAYS);
+        weekBoard.getChildren().add(board);
+    }
 
     private void renderMonth(List<CalendarFeedItem> items) {
         weekBoard.getChildren().clear(); LocalDate monthStart = selectedDate.withDayOfMonth(1); LocalDate gridStart = weekStartFor(monthStart);
@@ -241,15 +293,93 @@ public final class CalendarController {
         weekBoard.getChildren().add(grid);
     }
 
-    private VBox buildDayTimeline(List<CalendarFeedItem> dayItems, LocalDate today, LocalDateTime now, LocalDate day) {
-        if (dayItems.isEmpty()) { VBox empty = new VBox(); empty.getChildren().add(new Label("No items match filters.")); return empty; }
-        VBox root = new VBox(8); List<CalendarFeedItem> allDayItems = dayItems.stream().filter(CalendarFeedItem::allDay).toList(); List<CalendarFeedItem> timedItems = dayItems.stream().filter(i -> !i.allDay()).toList();
-        VBox allDaySection = new VBox(4); allDaySection.getChildren().add(new Label("All day")); if (allDayItems.isEmpty()) allDaySection.getChildren().add(new Label("No all-day items")); else for (CalendarFeedItem i : allDayItems) { Node b = calendarEventCardFactory.createAllDayBubble(i); configureCalendarCardClick(b, i); allDaySection.getChildren().add(b); }
+    private VBox createAllDayLabelColumn() {
+        VBox box = new VBox(4);
+        box.setMinWidth(64);
+        box.setPrefWidth(64);
+        box.setMaxWidth(64);
+        box.getChildren().add(new Label("All day"));
+        return box;
+    }
+
+    private Label createTimeGutterSpacer() {
+        Label spacer = new Label("");
+        spacer.setMinWidth(64);
+        spacer.setPrefWidth(64);
+        spacer.setMaxWidth(64);
+        return spacer;
+    }
+
+    private void configureSharedColumns(GridPane grid, int dayCount) {
+        grid.getColumnConstraints().clear();
+        ColumnConstraints gutter = new ColumnConstraints();
+        gutter.setMinWidth(64);
+        gutter.setPrefWidth(64);
+        gutter.setMaxWidth(64);
+        grid.getColumnConstraints().add(gutter);
+        for (int i = 0; i < dayCount; i++) {
+            ColumnConstraints dayCol = new ColumnConstraints();
+            dayCol.setHgrow(Priority.ALWAYS);
+            dayCol.setFillWidth(true);
+            grid.getColumnConstraints().add(dayCol);
+        }
+    }
+
+    private VBox createAllDaySection(List<CalendarFeedItem> dayItems) {
+        VBox allDaySection = new VBox(4);
+        allDaySection.getStyleClass().add("calendar-day-lane");
+        allDaySection.setPadding(new Insets(6));
+        List<CalendarFeedItem> allDayItems = dayItems.stream().filter(CalendarFeedItem::allDay).toList();
+        if (allDayItems.isEmpty()) allDaySection.getChildren().add(new Label("No all-day items"));
+        else for (CalendarFeedItem i : allDayItems) { Node b = calendarEventCardFactory.createAllDayBubble(i); configureCalendarCardClick(b, i); allDaySection.getChildren().add(b); }
+        HBox.setHgrow(allDaySection, Priority.ALWAYS);
+        return allDaySection;
+    }
+
+    private GridPane createTimedGrid(LocalDate today, LocalDateTime now, List<LocalDate> visibleDays, Map<LocalDate, List<CalendarFeedItem>> grouped) {
+        int dayCount = visibleDays == null ? 0 : visibleDays.size();
         GridPane timedGrid = new GridPane();
-        Map<Integer, List<CalendarFeedItem>> timedBySlot = new HashMap<>(); Map<CalendarFeedItem, Integer> spanByItem = new HashMap<>();
-        for (CalendarFeedItem item : timedItems) { LocalDateTime start = item.startsAt() == null ? day.atStartOfDay() : item.startsAt(); int slot = Math.max(0, Math.min(47, (int)((start.getHour()*60.0 + start.getMinute())/30.0))); timedBySlot.computeIfAbsent(slot, k -> new ArrayList<>()).add(item); spanByItem.put(item, 1); }
-        for (int slot = 0; slot < 48; slot++) { RowConstraints rc = new RowConstraints(); rc.setPrefHeight(HALF_HOUR_HEIGHT); timedGrid.getRowConstraints().add(rc); Label hour = new Label(slot % 2 == 0 ? formatHourLabel(slot / 2) : ""); VBox box = new VBox(4); box.setPrefHeight(HALF_HOUR_HEIGHT); timedGrid.add(hour, 0, slot); timedGrid.add(box, 1, slot); for (CalendarFeedItem item : timedBySlot.getOrDefault(slot, List.of())) { Node c = calendarEventCardFactory.create(item, today, now); configureCalendarCardClick(c, item); box.getChildren().add(c); } }
-        root.getChildren().addAll(allDaySection, timedGrid); return root;
+        timedGrid.setHgap(0);
+        timedGrid.getStyleClass().add("calendar-timed-grid");
+        configureSharedColumns(timedGrid, dayCount);
+
+        Map<LocalDate, Integer> dayIndexByDate = new HashMap<>();
+        for (int i = 0; i < dayCount; i++) dayIndexByDate.put(visibleDays.get(i), i);
+        Map<Integer, Map<Integer, List<CalendarFeedItem>>> eventsByDayAndSlot = new HashMap<>();
+        for (CalendarFeedItem item : grouped.values().stream().flatMap(List::stream).toList()) {
+            if (item == null || item.allDay() || item.startsAt() == null) continue;
+            LocalDate eventDate = item.startsAt().toLocalDate();
+            Integer dayIndex = dayIndexByDate.get(eventDate);
+            if (dayIndex == null || dayIndex < 0) continue;
+            int slot = Math.max(0, Math.min(47, (int) ((item.startsAt().getHour() * 60.0 + item.startsAt().getMinute()) / 30.0)));
+            eventsByDayAndSlot.computeIfAbsent(dayIndex, k -> new HashMap<>()).computeIfAbsent(slot, k -> new ArrayList<>()).add(item);
+        }
+
+        for (int slot = 0; slot < 48; slot++) {
+            RowConstraints rc = new RowConstraints();
+            rc.setPrefHeight(HALF_HOUR_HEIGHT);
+            timedGrid.getRowConstraints().add(rc);
+            Label hour = new Label(slot % 2 == 0 ? formatHourLabel(slot / 2) : "");
+            hour.getStyleClass().add("calendar-time-gutter-label");
+            timedGrid.add(hour, 0, slot);
+        }
+
+        for (int dayIndex = 0; dayIndex < dayCount; dayIndex++) {
+            for (int slot = 0; slot < 48; slot++) {
+                VBox box = new VBox(4);
+                box.setPrefHeight(HALF_HOUR_HEIGHT);
+                box.setMaxWidth(Double.MAX_VALUE);
+                box.getStyleClass().add("calendar-timed-day-cell");
+                GridPane.setHgrow(box, Priority.ALWAYS);
+                timedGrid.add(box, dayIndex + 1, slot);
+                for (CalendarFeedItem item : eventsByDayAndSlot.getOrDefault(dayIndex, Map.of()).getOrDefault(slot, List.of())) {
+                    Node c = calendarEventCardFactory.create(item, today, now);
+                    configureCalendarCardClick(c, item);
+                    box.getChildren().add(c);
+                }
+            }
+        }
+        return timedGrid;
     }
 
     private Map<LocalDate, List<CalendarFeedItem>> groupAndSort(List<CalendarFeedItem> items, LocalDate start, int dayCount) {
