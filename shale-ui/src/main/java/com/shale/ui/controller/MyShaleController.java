@@ -113,6 +113,8 @@ public final class MyShaleController {
 	@FXML
 	private ChoiceBox<String> myTasksSortChoice;
 	@FXML
+	private ChoiceBox<MyTasksSource> myTasksSourceChoice;
+	@FXML
 	private ChoiceBox<CaseFilterOption> myTasksCaseFilterChoice;
 	@FXML
 	private ChoiceBox<PriorityFilterOption> myTasksPriorityFilterChoice;
@@ -240,6 +242,24 @@ public final class MyShaleController {
 		GRID
 	}
 
+	private enum MyTasksSource {
+		ASSIGNED_TO_ME("Assigned to Me"),
+		CREATED_BY_ME("Created by Me");
+
+		private final String label;
+
+		MyTasksSource(String label) {
+			this.label = label;
+		}
+
+		@Override
+		public String toString() {
+			return label;
+		}
+	}
+
+	private MyTasksSource myTasksSource = MyTasksSource.ASSIGNED_TO_ME;
+
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
 	{
 		Thread t = new Thread(r, "my-cases-loader");
@@ -299,6 +319,18 @@ public final class MyShaleController {
 						persistMyTasksSortPreference(newV);
 						refreshMyTasks();
 					});
+		}
+		if (myTasksSourceChoice != null) {
+			myTasksSourceChoice.getItems().setAll(MyTasksSource.values());
+			myTasksSourceChoice.getSelectionModel().select(MyTasksSource.ASSIGNED_TO_ME);
+			myTasksSourceChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+				MyTasksSource selected = newV == null ? MyTasksSource.ASSIGNED_TO_ME : newV;
+				if (selected == myTasksSource) {
+					return;
+				}
+				myTasksSource = selected;
+				refreshMyTasks();
+			});
 		}
 		if (myTasksCaseFilterChoice != null) {
 			myTasksCaseFilterChoice.getItems().setAll(ALL_CASES_OPTION);
@@ -925,11 +957,17 @@ public final class MyShaleController {
 			try {
 				long loadStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadMyTasks page=my_shale userId=" + userIdValue);
-				List<CaseTaskListItemDto> tasks = caseTaskService.loadMyTasks(
-						shaleClientIdValue,
-						userIdValue,
-						sortOption,
-						includeCompleted);
+				List<CaseTaskListItemDto> tasks = myTasksSource == MyTasksSource.CREATED_BY_ME
+						? caseTaskService.loadTasksCreatedByUser(
+								shaleClientIdValue,
+								userIdValue,
+								sortOption,
+								includeCompleted)
+						: caseTaskService.loadMyTasks(
+								shaleClientIdValue,
+								userIdValue,
+								sortOption,
+								includeCompleted);
 				Set<Long> pinnedLaneCaseIds = loadPinnedTaskLaneCaseIds(shaleClientIdValue, userIdValue);
 				Set<Long> collapsedLaneCaseIds = loadCollapsedTaskLaneCaseIds(shaleClientIdValue, userIdValue);
 				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
@@ -1281,9 +1319,9 @@ public final class MyShaleController {
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
-			myTasksEmptyLabel.setText(showCompletedMyTasks
-					? "No tasks assigned to you."
-					: "No incomplete tasks assigned to you.");
+			myTasksEmptyLabel.setText(myTasksSource == MyTasksSource.CREATED_BY_ME
+					? "No tasks created by you found."
+					: "No assigned tasks found.");
 			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;

@@ -13,8 +13,13 @@ import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.data.dao.UserPreferencesDao;
 import com.shale.data.dao.AuditLogDao;
+import com.shale.ui.services.CalendarService;
+import com.shale.data.dao.CalendarFeedDao;
+import com.shale.data.dao.CalendarEventTypeDao;
+import com.shale.data.dao.CalendarEventDao;
 import com.shale.ui.controller.CaseController;
 import com.shale.ui.controller.CasesController;
+import com.shale.ui.controller.CalendarController;
 import com.shale.ui.controller.ContactViewController;
 import com.shale.ui.controller.ContactsController;
 import com.shale.ui.controller.AuditLogViewerController;
@@ -64,6 +69,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import javafx.stage.Window;
 
@@ -79,6 +85,7 @@ import com.shale.ui.notification.AssignedUserTaskDueNotificationRecipientResolve
 import com.shale.ui.notification.TaskDueDateNotificationGenerator;
 
 public final class SceneManager {
+	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 
 	private final Stage stage;
 	private final AppState appState;
@@ -292,6 +299,10 @@ public final class SceneManager {
 		navigateTo(AppRoute.teamList(), true);
 	}
 
+	public void openCalendarView() {
+		navigateTo(AppRoute.calendar(), true);
+	}
+
 	public void openSettingsView() {
 		navigateTo(AppRoute.settings(), true);
 	}
@@ -383,6 +394,7 @@ public final class SceneManager {
 			case CONTACTS_LIST -> mainController.showContactsListView();
 			case ORGANIZATIONS_LIST -> mainController.showOrganizationsListView();
 			case TEAM_LIST -> mainController.showTeamListView();
+			case CALENDAR -> mainController.showCalendarView();
 			case SETTINGS -> mainController.showSettingsView();
 			case SEARCH -> mainController.showSearchResultsView(route.searchQuery() == null ? "" : route.searchQuery());
 			case CASE_PROFILE -> mainController.showCaseProfileView(route.entityId(), route.sectionKey());
@@ -493,6 +505,24 @@ public final class SceneManager {
 			TeamController c = (TeamController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			c.init(appState, userDao, onOpenUser);
+			return c;
+		});
+	}
+
+	public Parent createCalendarView() {
+		return load("/fxml/calendar.fxml", controller -> {
+			CalendarController c = (CalendarController) controller;
+			CalendarFeedDao calendarFeedDao = new CalendarFeedDao(dbSessionProvider);
+			CalendarService calendarService = new CalendarService(
+					new CalendarEventTypeDao(dbSessionProvider),
+					new CalendarEventDao(dbSessionProvider),
+					calendarFeedDao);
+			TaskDao taskDao = new TaskDao(dbSessionProvider);
+			UserDao userDao = new UserDao(dbSessionProvider);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
+			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openTaskProfile);
 			return c;
 		});
 	}
@@ -750,9 +780,13 @@ public final class SceneManager {
 			System.err.println("Ignoring task navigation for invalid taskId: " + taskId);
 			return;
 		}
+		if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
+			return;
+		}
 		Integer shaleClientId = appState.getShaleClientId();
 		Integer currentUserId = appState.getUserId();
 		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			taskDetailDialogInFlight.set(false);
 			AppDialogs.showError(stage, "Tasks", "You must be signed in to view task details.");
 			return;
 		}
@@ -761,85 +795,48 @@ public final class SceneManager {
 				new UserDao(dbSessionProvider),
 				runtimeBridge,
 				new NotificationDao(dbSessionProvider));
-		new Thread(() -> loadAndOpenTaskDialog(taskId, shaleClientId, currentUserId, caseTaskService),
-				"scene-manager-open-task-" + taskId).start();
-	}
-
-	private void loadAndOpenTaskDialog(Long taskId, int shaleClientId, int currentUserId, CaseTaskService caseTaskService) {
-		try {
-			TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
-			List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
-			List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-			Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, detail, statuses, priorities));
-		} catch (Exception ex) {
-			Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
-		}
+		Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService));
 	}
 
 	private void showTaskDetailDialog(
 			long taskId,
 			int shaleClientId,
 			int currentUserId,
-			CaseTaskService caseTaskService,
-			TaskDetailDto detail,
-			List<TaskStatusOptionDto> statuses,
-			List<TaskPriorityOptionDto> priorities) {
-		if (detail == null) {
-			AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted.");
-			return;
-		}
-		List<CaseTaskService.AssignedTaskUserOption> assignedTeam =
-				caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
-		List<TaskDetailDialog.TaskActivityEntry> activityEntries = caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
-				.map(item -> new TaskDetailDialog.TaskActivityEntry(
-						item.title(),
-						item.body(),
-						item.actorDisplayName(),
-						item.occurredAt()))
-				.toList();
-		List<TaskDetailDialog.TaskNoteEntry> noteEntries = caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
-				.map(note -> new TaskDetailDialog.TaskNoteEntry(
-						note.id(),
-						note.userId(),
-						note.userDisplayName(),
-						note.body(),
-						note.createdAt(),
-						note.updatedAt(),
-						note.userId() == currentUserId))
-				.toList();
+			CaseTaskService caseTaskService) {
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
-				detail.id(),
-				detail.caseId(),
-				detail.caseName(),
-				detail.caseResponsibleAttorney(),
-				detail.caseResponsibleAttorneyColor(),
-				detail.caseNonEngagementLetterSent(),
-				detail.title(),
-				detail.description(),
-				detail.dueAt(),
-				detail.statusId(),
-				detail.priorityId(),
-					detail.createdByDisplayName(),
-						assignedTeam.stream()
-								.map(member -> new TaskDetailDialog.AssignedTeamMember(
-										member.userId(),
-										member.displayName(),
-										member.color()))
-							.toList(),
-					activityEntries,
-					noteEntries,
-				detail.completedAt() != null);
+				taskId,
+				0L,
+				"",
+				"",
+				"",
+				null,
+				"",
+				"",
+				null,
+				null,
+				null,
+				"",
+				List.of(),
+				List.of(),
+				List.of(),
+				false);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
-		phiReadAuditService.auditRead("Task.Detail.Read", "Task.Detail", "Task", detail.id());
-		phiReadAuditService.auditRead("Task.Activity.Read", "Task.Activity", "Task", detail.id());
+		phiReadAuditService.auditRead("Task.Detail.Read", "Task.Detail", "Task", taskId);
+		phiReadAuditService.auditRead("Task.Activity.Read", "Task.Activity", "Task", taskId);
 		var result = TaskDetailDialog.showAndWait(
 				"SCENE_MANAGER",
 				0L,
 				owner,
 				model,
-				statuses,
-				priorities,
-				null,
+				List.of(),
+				List.of(),
+				id -> {
+					TaskDetailDto detail = caseTaskService.loadTaskDetail(id, shaleClientId);
+					if (detail == null) throw new IllegalStateException("Task was not found or may have been deleted.");
+					List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
+					List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+					return new TaskDetailDialog.CoreTaskHydration(detail, statuses, priorities);
+				},
 				id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
 				id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
 						.map(member -> new TaskDetailDialog.AssignedTeamMember(
@@ -921,8 +918,10 @@ public final class SceneManager {
 				this::openUserProfile,
 				caseId -> openCaseProfile(caseId, "OVERVIEW"));
 		if (result.isEmpty()) {
+			taskDetailDialogInFlight.set(false);
 			return;
 		}
+		taskDetailDialogInFlight.set(false);
 		TaskDetailDialog.TaskDetailResult action = result.get();
 		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
 			new Thread(() -> {

@@ -88,6 +88,23 @@ public final class CaseTaskService {
         return rows;
     }
 
+    public List<CaseTaskListItemDto> loadTasksCreatedByUser(
+            int shaleClientId,
+            int currentUserId,
+            MyTasksSortOption sortOption,
+            boolean includeCompleted) {
+        TaskDao.MyTaskSort daoSort = switch (sortOption == null ? MyTasksSortOption.DEFAULT : sortOption) {
+            case DUE_DATE_ASC -> TaskDao.MyTaskSort.DUE_DATE_ASC;
+            case DUE_DATE_DESC -> TaskDao.MyTaskSort.DUE_DATE_DESC;
+            case DEFAULT -> TaskDao.MyTaskSort.DEFAULT;
+        };
+        long startNanos = PerfLog.start();
+        PerfLog.log("DAO", "start", "method=listTasksCreatedByUserForBoard page=my_shale userId=" + currentUserId + " organizationId=" + shaleClientId);
+        List<CaseTaskListItemDto> rows = taskDao.listTasksCreatedByUserForBoard(shaleClientId, currentUserId, daoSort, includeCompleted);
+        PerfLog.logDone("DAO", "method=listTasksCreatedByUserForBoard page=my_shale userId=" + currentUserId + " organizationId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), startNanos);
+        return rows;
+    }
+
     public TaskDetailDto loadTaskDetail(long taskId, int shaleClientId) {
         return taskDao.findTaskDetail(taskId, shaleClientId);
     }

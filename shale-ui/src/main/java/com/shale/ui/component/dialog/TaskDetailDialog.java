@@ -97,7 +97,7 @@ public final class TaskDetailDialog {
         descriptionArea.setWrapText(true);
 
         DatePicker dueDatePicker = new DatePicker(model.dueAt() == null ? null : model.dueAt().toLocalDate());
-        TextField dueTimeField = new TextField(model.dueAt() == null ? "" : model.dueAt().toLocalTime().toString());
+        TextField dueTimeField = new TextField(displayDueTime(model.dueAt()));
         dueTimeField.setPromptText("HH:mm (optional)");
         dueTimeField.setPrefColumnCount(8);
         HBox dueRow = new HBox(8, dueDatePicker, dueTimeField);
@@ -513,7 +513,7 @@ public final class TaskDetailDialog {
                             titleField.setText(safe(detail.title()));
                             descriptionArea.setText(safe(detail.description()));
                             dueDatePicker.setValue(detail.dueAt() == null ? null : detail.dueAt().toLocalDate());
-                            dueTimeField.setText(detail.dueAt() == null ? "" : detail.dueAt().toLocalTime().toString());
+                            dueTimeField.setText(displayDueTime(detail.dueAt()));
                             createdByLabel.setText("Created by: " + displayCreatedBy(detail.createdByDisplayName()));
                             List<TaskStatusOptionDto> hydratedStatuses = core.statuses() == null ? List.of() : core.statuses();
                             statusCombo.getItems().setAll(hydratedStatuses);
@@ -841,6 +841,13 @@ public final class TaskDetailDialog {
             return dueDate.atStartOfDay();
         }
         return LocalDateTime.of(dueDate, LocalTime.parse(trimmedTime));
+    }
+
+    private static String displayDueTime(LocalDateTime dueAt) {
+        if (dueAt == null) return "";
+        LocalTime time = dueAt.toLocalTime();
+        if (LocalTime.MIDNIGHT.equals(time)) return "";
+        return time.toString();
     }
 
     private static void showError(Label errorLabel, String message) {

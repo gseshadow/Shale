@@ -78,6 +78,9 @@
 				<Button fx:id="navTeamButton" text="Team" maxWidth="Infinity"
 					onAction="#onNavTeam" />
 
+				<Button fx:id="navCalendarButton" text="Calendar"
+					maxWidth="Infinity" onAction="#onNavCalendar" />
+
 				<Button fx:id="navSettingsButton" text="Settings"
 					maxWidth="Infinity" onAction="#onNavSettings" />
 			</children>

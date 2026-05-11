@@ -76,6 +76,12 @@
 										</styleClass>
 									</Label>
 									<HBox spacing="8" alignment="CENTER_LEFT">
+										<Label text="Task View" />
+										<ChoiceBox fx:id="myTasksSourceChoice" prefWidth="170">
+											<styleClass>
+												<String fx:value="app-toolbar-select" />
+											</styleClass>
+										</ChoiceBox>
 										<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170">
 											<styleClass>
 												<String fx:value="app-toolbar-select" />
