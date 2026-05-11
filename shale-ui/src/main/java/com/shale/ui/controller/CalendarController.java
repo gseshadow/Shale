@@ -429,6 +429,11 @@ public final class CalendarController {
                     Node nowLine = createNowIndicator(box, nowSlotOffset);
                     box.getChildren().add(nowLine);
                 }
+
+                if (nowDayIndex != null && nowDayIndex == dayIndex && slot == nowSlot) {
+                    Node nowLine = createNowIndicator(box, nowSlotOffset);
+                    box.getChildren().add(nowLine);
+                }
             }
         }
         return timedGrid;
