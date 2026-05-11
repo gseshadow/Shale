@@ -18,7 +18,9 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
 import javafx.util.Duration;
 
 import java.time.*;
@@ -426,6 +428,8 @@ public final class CalendarController {
         if (nowDayIndex != null && nowMinutesFromMidnight != null) {
             Node nowOverlay = createNowIndicatorOverlay(nowMinutesFromMidnight);
             GridPane.setHgrow(nowOverlay, Priority.ALWAYS);
+            GridPane.setVgrow(nowOverlay, Priority.ALWAYS);
+            GridPane.setFillHeight(nowOverlay, true);
             GridPane.setRowSpan(nowOverlay, 48);
             timedGrid.add(nowOverlay, nowDayIndex + 1, 0);
         }
@@ -462,39 +466,47 @@ public final class CalendarController {
     }
 
     private Node createNowIndicatorOverlay(int minutesFromMidnight) {
-        double y = (minutesFromMidnight / (24.0 * 60.0)) * (48 * HALF_HOUR_HEIGHT);
+        Pane overlay = new Pane();
+        overlay.setMouseTransparent(true);
+        overlay.setPickOnBounds(false);
+        overlay.setManaged(true);
+        overlay.setMaxWidth(Double.MAX_VALUE);
+        overlay.setPrefHeight(48 * HALF_HOUR_HEIGHT);
 
         Circle dot = new Circle(4);
         dot.getStyleClass().add("calendar-now-dot");
-        dot.setManaged(false);
+        dot.setFill(Color.RED);
         dot.setMouseTransparent(true);
-        dot.setCenterX(0);
-        dot.setCenterY(0);
 
-        Region line = new Region();
+        Line line = new Line();
         line.getStyleClass().add("calendar-now-line");
-        line.setManaged(false);
+        line.setStroke(Color.RED);
+        line.setStrokeWidth(2);
         line.setMouseTransparent(true);
 
-        Pane overlay = new Pane(dot, line);
-        overlay.setManaged(false);
-        overlay.setMouseTransparent(true);
-        overlay.setPickOnBounds(false);
+        overlay.getChildren().addAll(line, dot);
 
-        overlay.widthProperty().addListener((obs, oldWidth, newWidth) -> {
-            double width = Math.max(0.0, newWidth.doubleValue());
-            dot.setLayoutX(6);
-            line.setLayoutX(12);
-            line.setPrefWidth(Math.max(0.0, width - 12));
-            line.setMinWidth(Math.max(0.0, width - 12));
-            line.setMaxWidth(Math.max(0.0, width - 12));
-        });
-        overlay.heightProperty().addListener((obs, oldHeight, newHeight) -> {
-            double overlayHeight = Math.max(0.0, newHeight.doubleValue());
-            double clampedY = Math.max(0.0, Math.min(overlayHeight, y));
-            dot.setLayoutY(clampedY);
-            line.setLayoutY(clampedY - 1.0);
-        });
+        Runnable positionMarker = () -> {
+            double width = overlay.getWidth();
+            double height = overlay.getHeight();
+            if (width <= 0 || height <= 0) {
+                PerfLog.log("UI", "calendar-now-overlay-zero", "width=" + width + " height=" + height);
+                return;
+            }
+            double y = (minutesFromMidnight / (24.0 * 60.0)) * height;
+            y = Math.max(0.0, Math.min(height, y));
+            line.setStartX(8);
+            line.setEndX(Math.max(8, width));
+            line.setStartY(y);
+            line.setEndY(y);
+            dot.setCenterX(4);
+            dot.setCenterY(y);
+            PerfLog.log("UI", "calendar-now-overlay", "width=" + width + " height=" + height + " y=" + y);
+        };
+
+        overlay.widthProperty().addListener((obs, oldVal, newVal) -> positionMarker.run());
+        overlay.heightProperty().addListener((obs, oldVal, newVal) -> positionMarker.run());
+        Platform.runLater(() -> Platform.runLater(positionMarker));
         return overlay;
     }
 
