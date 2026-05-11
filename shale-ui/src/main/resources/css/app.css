@@ -1252,3 +1252,32 @@
 }
 
 .calendar-all-day-summary { -fx-text-fill: rgba(17, 37, 66, 0.78); -fx-font-size: 11px; -fx-font-weight: 700; }
+
+.calendar-all-day-label {
+    -fx-text-fill: rgba(17, 37, 66, 0.9);
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.button.calendar-disclosure-toggle {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0 4 0 4;
+    -fx-min-width: 20;
+    -fx-pref-width: 20;
+    -fx-min-height: 20;
+    -fx-pref-height: 20;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-text-fill: rgba(17, 37, 66, 0.82);
+    -fx-cursor: hand;
+    -fx-background-radius: 4;
+}
+
+.button.calendar-disclosure-toggle:hover {
+    -fx-background-color: rgba(17, 37, 66, 0.08);
+}
+
+.button.calendar-disclosure-toggle:pressed {
+    -fx-background-color: rgba(17, 37, 66, 0.14);
+}

@@ -332,13 +332,17 @@ public final class CalendarController {
         box.setPrefWidth(64);
         box.setMaxWidth(64);
 
-        Button toggle = new Button(allDayCollapsed ? "All day ▸" : "All day ▾");
-        toggle.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-compact");
+        HBox inline = new HBox(4);
+        Label label = new Label("All day");
+        label.getStyleClass().add("calendar-all-day-label");
+        Button toggle = new Button(allDayCollapsed ? "▾" : "▸");
+        toggle.getStyleClass().add("calendar-disclosure-toggle");
         toggle.setOnAction(evt -> {
             allDayCollapsed = !allDayCollapsed;
             renderCurrent(filterItems(loadedItems));
         });
-        box.getChildren().add(toggle);
+        inline.getChildren().addAll(label, toggle);
+        box.getChildren().add(inline);
         return box;
     }
 
