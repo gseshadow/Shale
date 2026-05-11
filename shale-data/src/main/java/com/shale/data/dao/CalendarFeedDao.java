@@ -99,12 +99,13 @@ public final class CalendarFeedDao {
                            e.SourceField,
                            e.CaseId,
                            e.TaskId,
-                           NULL AS RelatedDisplayName,
+                           c.Name AS RelatedDisplayName,
                            et.SystemKey AS CalendarEventTypeSystemKey,
                            COALESCE(et.Name, 'Event') AS DisplayTypeName,
                            et.ColorHex AS ColorHex
                     FROM dbo.CalendarEvents e
                     LEFT JOIN dbo.CalendarEventTypes et ON et.CalendarEventTypeId = e.CalendarEventTypeId
+                    LEFT JOIN dbo.Cases c ON c.Id = e.CaseId AND c.ShaleClientId = e.ShaleClientId AND ISNULL(c.IsDeleted, 0) = 0
                     WHERE e.ShaleClientId = ?
                       AND e.StartsAt >= ?
                       AND e.StartsAt < ?
