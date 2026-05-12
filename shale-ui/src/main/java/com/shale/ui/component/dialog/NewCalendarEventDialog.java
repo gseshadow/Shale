@@ -236,13 +236,13 @@ public final class NewCalendarEventDialog {
         formScroll.setFitToWidth(true);
         formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        formScroll.setMinViewportHeight(300);
-        formScroll.setPrefViewportHeight(380);
+        formScroll.setMinViewportHeight(260);
+        formScroll.setPrefViewportHeight(340);
         formScroll.getStyleClass().add("calendar-day-scroll");
 
-        VBox body = new VBox(16, heading, message, formScroll, actions);
+        VBox body = new VBox(12, heading, message, formScroll, actions);
         VBox.setVgrow(formScroll, Priority.ALWAYS);
-        body.setPadding(new Insets(22, 24, 22, 24));
+        body.setPadding(new Insets(20, 24, 16, 24));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
         root.setMinWidth(680);
         root.setPrefWidth(760);
@@ -267,12 +267,12 @@ public final class NewCalendarEventDialog {
         formScroll.setFitToWidth(true);
         formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        formScroll.setMinViewportHeight(300);
-        formScroll.setPrefViewportHeight(380);
+        formScroll.setMinViewportHeight(260);
+        formScroll.setPrefViewportHeight(340);
         formScroll.getStyleClass().add("calendar-day-scroll");
-        VBox body = new VBox(16, heading, message, formScroll, actions);
+        VBox body = new VBox(12, heading, message, formScroll, actions);
         VBox.setVgrow(formScroll, Priority.ALWAYS);
-        body.setPadding(new Insets(22, 24, 22, 24));
+        body.setPadding(new Insets(20, 24, 16, 24));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
         root.setMinWidth(680);
         root.setPrefWidth(760);
@@ -345,6 +345,7 @@ public final class NewCalendarEventDialog {
             durationCombo.setButtonCell(new ListCell<>() { protected void updateItem(Integer item, boolean empty){ super.updateItem(item, empty); setText(empty||item==null?null:formatDuration(item)); }});
             durationCombo.setMaxWidth(Double.MAX_VALUE);
             VBox durationSection = new VBox(4, durationLabel, durationCombo);
+            durationSection.setMinWidth(130);
 
             if (initial != null && !initial.allDay() && initial.startTime() != null) {
                 String[] t = toTwelveHour(initial.startTime());
@@ -361,7 +362,6 @@ public final class NewCalendarEventDialog {
             TextArea descriptionArea = new TextArea(initial == null ? "" : initial.description());
             descriptionArea.setPrefRowCount(4);
             descriptionArea.setWrapText(true);
-            Label caseLabel = new Label("Case");
             Label selectedCaseLabel = new Label("None");
             StackPane selectedCaseHost = new StackPane(selectedCaseLabel);
             selectedCaseHost.setMaxWidth(Double.MAX_VALUE);
@@ -391,7 +391,7 @@ public final class NewCalendarEventDialog {
                 }
             }
             renderCase.run();
-            Button addCaseButton = new Button(selectedCase[0] == null ? "Change" : "Change");
+            Button addCaseButton = new Button(selectedCase[0] == null ? "Add Case" : "Change Case");
             Button clearCaseButton = new Button("Clear");
             clearCaseButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
             addCaseButton.setOnAction(e -> {
@@ -400,13 +400,12 @@ public final class NewCalendarEventDialog {
                         .toList();
                 CasePickerDialog.show(addCaseButton.getScene().getWindow(), sortedCases).ifPresent(v -> { selectedCase[0] = v; renderCase.run(); clearCaseButton.setVisible(true); clearCaseButton.setManaged(true); });
             });
-            clearCaseButton.setOnAction(e -> { selectedCase[0] = null; renderCase.run(); clearCaseButton.setVisible(false); clearCaseButton.setManaged(false); });
+            clearCaseButton.setOnAction(e -> { selectedCase[0] = null; renderCase.run(); addCaseButton.setText("Add Case"); clearCaseButton.setVisible(false); clearCaseButton.setManaged(false); });
             HBox caseActionsRow = new HBox(8, addCaseButton, clearCaseButton);
             caseActionsRow.setAlignment(Pos.CENTER_LEFT);
             clearCaseButton.setVisible(selectedCase[0] != null);
             clearCaseButton.setManaged(selectedCase[0] != null);
 
-            Label assignedUserLabel = new Label("Assigned User");
             Label selectedUserLabel = new Label("None");
             StackPane selectedUserHost = new StackPane(selectedUserLabel);
             selectedUserHost.setMaxWidth(Double.MAX_VALUE);
@@ -436,7 +435,7 @@ public final class NewCalendarEventDialog {
                 }
             }
             renderUser.run();
-            Button assignUserButton = new Button("Change");
+            Button assignUserButton = new Button(selectedUser[0] == null ? "Add User" : "Change User");
             Button clearAssignedButton = new Button("Clear");
             clearAssignedButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
             assignUserButton.setOnAction(e -> {
@@ -451,24 +450,30 @@ public final class NewCalendarEventDialog {
                     clearAssignedButton.setManaged(true);
                 });
             });
-            clearAssignedButton.setOnAction(e -> { selectedUser[0] = null; renderUser.run(); clearAssignedButton.setVisible(false); clearAssignedButton.setManaged(false); });
+            clearAssignedButton.setOnAction(e -> { selectedUser[0] = null; renderUser.run(); assignUserButton.setText("Add User"); clearAssignedButton.setVisible(false); clearAssignedButton.setManaged(false); });
             HBox assignedActionsRow = new HBox(8, assignUserButton, clearAssignedButton);
             assignedActionsRow.setAlignment(Pos.CENTER_LEFT);
             clearAssignedButton.setVisible(selectedUser[0] != null);
             clearAssignedButton.setManaged(selectedUser[0] != null);
-            HBox typeDateRow = new HBox(8, new VBox(4, eventTypeLabel, eventTypeComboBox), new VBox(4, dateLabel, datePicker));
-            HBox.setHgrow(typeDateRow.getChildren().getFirst(), Priority.ALWAYS);
-            VBox caseSection = new VBox(6, caseLabel, selectedCaseHost, caseActionsRow);
-            VBox assignedSection = new VBox(6, assignedUserLabel, selectedUserHost, assignedActionsRow);
+            HBox titleTypeRow = new HBox(8, new VBox(4, titleLabel, titleField), new VBox(4, eventTypeLabel, eventTypeComboBox));
+            HBox.setHgrow(titleTypeRow.getChildren().getFirst(), Priority.ALWAYS);
+            HBox typeDateRow = new HBox(8, new VBox(4, dateLabel, datePicker), allDayCheckBox);
+            typeDateRow.setAlignment(Pos.BOTTOM_LEFT);
+            HBox timeRow = new HBox(8, startTimeCol, amPmCol, durationSection);
+            HBox.setHgrow(startTimeCol, Priority.ALWAYS);
+            VBox caseSection = new VBox(6, caseActionsRow, selectedCaseHost);
+            VBox assignedSection = new VBox(6, assignedActionsRow, selectedUserHost);
             caseSection.setMaxWidth(Double.MAX_VALUE);
             assignedSection.setMaxWidth(Double.MAX_VALUE);
-            VBox peopleSection = new VBox(12, caseSection, assignedSection);
+            HBox peopleSection = new HBox(12, caseSection, assignedSection);
+            HBox.setHgrow(caseSection, Priority.ALWAYS);
+            HBox.setHgrow(assignedSection, Priority.ALWAYS);
 
             Runnable refresh = () -> {
                 boolean timed = !allDayCheckBox.isSelected();
-                startRow.setDisable(!timed); durationSection.setDisable(!timed);
-                startRow.setManaged(timed); durationSection.setManaged(timed);
-                startRow.setVisible(timed); durationSection.setVisible(timed);
+                timeRow.setDisable(!timed);
+                timeRow.setManaged(timed);
+                timeRow.setVisible(timed);
             };
             allDayCheckBox.selectedProperty().addListener((obs,o,n)->refresh.run());
             refresh.run();
@@ -482,7 +487,7 @@ public final class NewCalendarEventDialog {
                 if (relatedCaseNode != null) content.getChildren().add(relatedCaseNode);
                 if (relatedTaskNode != null) content.getChildren().add(relatedTaskNode);
             }
-            content.getChildren().addAll(titleLabel,titleField,typeDateRow,allDayCheckBox,startRow,durationSection,descriptionLabel,descriptionArea,peopleSection,errorLabel);
+            content.getChildren().addAll(titleTypeRow,typeDateRow,timeRow,descriptionLabel,descriptionArea,peopleSection,errorLabel);
             content.setPadding(new Insets(6,2,2,2));
 
             Supplier<Optional<CreateCalendarEventInput>> readInput = () -> {
