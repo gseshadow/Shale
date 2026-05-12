@@ -443,7 +443,6 @@ public final class CalendarController {
                 box.getStyleClass().add("calendar-timed-day-cell");
                 GridPane.setHgrow(box, Priority.ALWAYS);
                 timedGrid.add(box, dayIndex + 1, slot);
-
                 VBox eventsLayer = new VBox(4);
                 eventsLayer.setFillWidth(true);
                 eventsLayer.setMaxWidth(Double.MAX_VALUE);
@@ -453,7 +452,6 @@ public final class CalendarController {
                     configureCalendarCardClick(c, item);
                     eventsLayer.getChildren().add(c);
                 }
-
             }
         }
 
@@ -467,6 +465,7 @@ public final class CalendarController {
         }
         return timedGrid;
     }
+    // TODO: Implement side-by-side overlap layout after timed grid structure is simplified.
 
 
     private void maybeAutoScrollTimedView(ScrollPane timedScroll, List<LocalDate> visibleDays) {
