@@ -398,7 +398,7 @@ public final class NewCalendarEventDialog {
                 List<CaseOption> sortedCases = (caseOptionsSupplier == null ? List.<CaseOption>of() : safeList(caseOptionsSupplier.get())).stream()
                         .sorted(Comparator.comparing(c -> safe(c.displayName()).toLowerCase()))
                         .toList();
-                CasePickerDialog.show(addCaseButton.getScene().getWindow(), sortedCases).ifPresent(v -> { selectedCase[0] = v; renderCase.run(); addCaseButton.setText("Change Case"); clearCaseButton.setVisible(true); clearCaseButton.setManaged(true); });
+                CasePickerDialog.show(addCaseButton.getScene().getWindow(), sortedCases).ifPresent(v -> { selectedCase[0] = v; renderCase.run(); clearCaseButton.setVisible(true); clearCaseButton.setManaged(true); });
             });
             clearCaseButton.setOnAction(e -> { selectedCase[0] = null; renderCase.run(); addCaseButton.setText("Add Case"); clearCaseButton.setVisible(false); clearCaseButton.setManaged(false); });
             HBox caseActionsRow = new HBox(8, addCaseButton, clearCaseButton);
@@ -446,7 +446,6 @@ public final class NewCalendarEventDialog {
                 AssignedUserPickerDialog.show(assignUserButton.getScene().getWindow(), candidates, NewCalendarEventDialog.class).ifPresent(v -> {
                     selectedUser[0] = new AssignedUserOption(v.id(), v.displayName(), v.color());
                     renderUser.run();
-                    assignUserButton.setText("Change User");
                     clearAssignedButton.setVisible(true);
                     clearAssignedButton.setManaged(true);
                 });
