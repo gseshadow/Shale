@@ -684,7 +684,7 @@ public final class CalendarController {
                     if (!dialog.isShowing()) return;
                     Node rc = caseRow == null ? null : createRelatedCaseNode(caseRow);
                     Node rt = taskRow == null ? null : createRelatedTaskNode(taskRow);
-                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()));
+                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()), onOpenCase, caseRow == null ? null : new NewCalendarEventDialog.CaseOption(caseRow.caseId(), caseRow.caseName(), caseRow.responsibleAttorney(), caseRow.responsibleAttorneyColor(), caseRow.nonEngagementLetterSent()));
                     openingEditDialogEventIds.remove(eventId);
                 });
             } catch (RuntimeException ex) {
@@ -708,23 +708,31 @@ public final class CalendarController {
     private Node createRelatedTaskNode(CalendarFeedDao.CalendarTaskCardRow row) { if (row == null) return null; return taskCardFactory.create(new TaskCardFactory.TaskCardModel(row.taskId(), row.caseId() == null ? null : row.caseId().longValue(), row.caseName(), row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.title(), null, row.createdByDisplayName(), row.priorityColorHex(), row.dueAt(), row.completedAt(), List.of()), TaskCardFactory.Variant.MINI); }
     private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) { LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime()); LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes()); try { calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), input.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), input.assignedToUserId(), existing.completed(), existing.cancelled(), appState == null ? null : appState.getUserId(), existing.createdAt(), existing.updatedAt())); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; } }
     private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker(Integer selectedCaseId) {
-        Map<Integer, String> names = new LinkedHashMap<>();
+        Map<Integer, CaseDao.CaseRow> casesById = new LinkedHashMap<>();
         if (caseDao != null) {
             int page = 1;
             int pageSize = 250;
             while (true) {
                 CaseDao.PagedResult<CaseDao.CaseRow> result = caseDao.findPage(page, pageSize, CaseDao.CaseSort.INTAKE_NEWEST, false);
                 if (result == null || result.items() == null || result.items().isEmpty()) break;
-                result.items().forEach(c -> names.putIfAbsent(Math.toIntExact(c.id()), safe(c.name())));
+                result.items().forEach(c -> casesById.putIfAbsent(Math.toIntExact(c.id()), c));
                 if (result.items().size() < pageSize) break;
                 page++;
             }
-            if (selectedCaseId != null && selectedCaseId > 0 && !names.containsKey(selectedCaseId)) {
+            if (selectedCaseId != null && selectedCaseId > 0 && !casesById.containsKey(selectedCaseId)) {
                 var row = caseDao.getCaseRow(selectedCaseId.longValue());
-                if (row != null) names.put(selectedCaseId, row.name());
+                if (row != null) casesById.put(selectedCaseId, row);
             }
         }
-        return names.entrySet().stream().map(e -> new NewCalendarEventDialog.CaseOption(e.getKey(), e.getValue())).sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT))).toList();
+        return casesById.values().stream()
+                .map(row -> new NewCalendarEventDialog.CaseOption(
+                        Math.toIntExact(row.id()),
+                        safe(row.name()),
+                        row.responsibleAttorneyName(),
+                        row.responsibleAttorneyColor(),
+                        row.nonEngagementLetterSent()))
+                .sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT)))
+                .toList();
     }
     private List<NewCalendarEventDialog.AssignedUserOption> assignedUserOptionsForPicker(int tenantId, Integer selectedUserId) {
         if (caseTaskService == null) return List.of();
