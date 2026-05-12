@@ -684,7 +684,7 @@ public final class CalendarController {
                     if (!dialog.isShowing()) return;
                     Node rc = caseRow == null ? null : createRelatedCaseNode(caseRow);
                     Node rt = taskRow == null ? null : createRelatedTaskNode(taskRow);
-                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()), onOpenCase);
+                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()), onOpenCase, caseRow == null ? null : new NewCalendarEventDialog.CaseOption(caseRow.caseId(), caseRow.caseName(), caseRow.responsibleAttorney(), caseRow.responsibleAttorneyColor(), caseRow.nonEngagementLetterSent()));
                     openingEditDialogEventIds.remove(eventId);
                 });
             } catch (RuntimeException ex) {
