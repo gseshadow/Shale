@@ -406,6 +406,7 @@ public final class CalendarController {
         timedGrid.setHgap(0);
         timedGrid.getStyleClass().add("calendar-timed-grid");
         configureSharedColumns(timedGrid, dayCount);
+        StackPane[] dayWidthAnchors = new StackPane[Math.max(0, dayCount)];
 
         Map<LocalDate, Integer> dayIndexByDate = new HashMap<>();
         for (int i = 0; i < dayCount; i++) dayIndexByDate.put(visibleDays.get(i), i);
@@ -442,6 +443,7 @@ public final class CalendarController {
                 box.getStyleClass().add("calendar-timed-day-cell");
                 GridPane.setHgrow(box, Priority.ALWAYS);
                 timedGrid.add(box, dayIndex + 1, slot);
+                if (slot == 0) dayWidthAnchors[dayIndex] = box;
 
             }
             Pane eventsOverlay = new Pane();
@@ -451,8 +453,13 @@ public final class CalendarController {
             GridPane.setRowSpan(eventsOverlay, 48);
             timedGrid.add(eventsOverlay, dayIndex + 1, 0);
             final int dayIndexFinal = dayIndex;
-            Platform.runLater(() -> layoutTimedEvents(eventsOverlay, timedEventsByDay.getOrDefault(dayIndexFinal, List.of()), today, now));
-            eventsOverlay.widthProperty().addListener((obs, oldV, newV) -> layoutTimedEvents(eventsOverlay, timedEventsByDay.getOrDefault(dayIndexFinal, List.of()), today, now));
+            Runnable relayout = () -> {
+                double dayWidth = dayWidthAnchors[dayIndexFinal] == null ? eventsOverlay.getWidth() : dayWidthAnchors[dayIndexFinal].getWidth();
+                layoutTimedEvents(eventsOverlay, timedEventsByDay.getOrDefault(dayIndexFinal, List.of()), today, now, dayWidth);
+            };
+            Platform.runLater(relayout);
+            eventsOverlay.widthProperty().addListener((obs, oldV, newV) -> relayout.run());
+            if (dayWidthAnchors[dayIndexFinal] != null) dayWidthAnchors[dayIndexFinal].widthProperty().addListener((obs, oldV, newV) -> relayout.run());
         }
 
         if (nowDayIndex != null && nowMinutesFromMidnight != null) {
@@ -466,7 +473,7 @@ public final class CalendarController {
         return timedGrid;
     }
 
-    private void layoutTimedEvents(Pane overlay, List<CalendarFeedItem> events, LocalDate today, LocalDateTime now) {
+    private void layoutTimedEvents(Pane overlay, List<CalendarFeedItem> events, LocalDate today, LocalDateTime now, double dayColumnWidth) {
         if (overlay == null) return;
         overlay.getChildren().clear();
         if (events == null || events.isEmpty()) return;
@@ -489,10 +496,10 @@ public final class CalendarController {
             }
         }
         if (!current.isEmpty()) clusters.add(current);
-        for (List<CalendarFeedItem> cluster : clusters) placeCluster(overlay, cluster, today, now);
+        for (List<CalendarFeedItem> cluster : clusters) placeCluster(overlay, cluster, today, now, dayColumnWidth);
     }
 
-    private void placeCluster(Pane overlay, List<CalendarFeedItem> cluster, LocalDate today, LocalDateTime now) {
+    private void placeCluster(Pane overlay, List<CalendarFeedItem> cluster, LocalDate today, LocalDateTime now, double dayColumnWidth) {
         List<CalendarFeedItem> ordered = new ArrayList<>(cluster);
         ordered.sort(Comparator.comparing(CalendarFeedItem::startsAt).thenComparing(CalendarFeedItem::key));
         List<LocalDateTime> columnEndTimes = new ArrayList<>();
@@ -507,7 +514,7 @@ public final class CalendarController {
             eventColumns.put(e, column);
         }
         int columnCount = Math.max(1, columnEndTimes.size());
-        double overlayWidth = Math.max(1, overlay.getWidth());
+        double overlayWidth = Math.max(1, dayColumnWidth);
         double pxPerMinute = (HALF_HOUR_HEIGHT * 48.0) / (24.0 * 60.0);
         for (CalendarFeedItem e : ordered) {
             Node card = calendarEventCardFactory.create(e, today, now);
