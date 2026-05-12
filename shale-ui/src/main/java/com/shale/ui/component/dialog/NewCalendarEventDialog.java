@@ -292,7 +292,7 @@ public final class NewCalendarEventDialog {
     }
 
     public record CreateCalendarEventInput(String title, int calendarEventTypeId, LocalDate date, boolean allDay, LocalTime startTime, int durationMinutes, String description, Integer caseId, Integer assignedToUserId) {}
-    public record CaseOption(Integer caseId, String displayName) {}
+    public record CaseOption(Integer caseId, String displayName, String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {}
     public record AssignedUserOption(Integer userId, String displayName, String color) {}
 
     private static final class ResultHolder { private CreateCalendarEventInput value; }
@@ -538,7 +538,7 @@ public final class NewCalendarEventDialog {
 
 
     private static Node createRelatedCasePreview(CaseCardFactory caseCardFactory, CaseOption selectedCase) {
-        Node casePreview = caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(), selectedCase.displayName(), null, null, null, null, null), CaseCardFactory.Variant.MINI);
+        Node casePreview = caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(), selectedCase.displayName(), null, null, selectedCase.responsibleAttorney(), selectedCase.responsibleAttorneyColor(), selectedCase.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI);
         if (casePreview instanceof Region region) {
             region.setMaxWidth(Double.MAX_VALUE);
         }
