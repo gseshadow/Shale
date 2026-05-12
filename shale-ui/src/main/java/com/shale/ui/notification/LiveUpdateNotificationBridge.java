@@ -12,8 +12,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class LiveUpdateNotificationBridge {
+	private static final Logger log = LoggerFactory.getLogger(LiveUpdateNotificationBridge.class);
 	private static final int DEDUPE_LIMIT = 300;
 	private static final long DEDUPE_WINDOW_SECONDS = 120;
 
@@ -66,6 +69,10 @@ public final class LiveUpdateNotificationBridge {
 	}
 
 	private void handleEntityUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (isCalendarAssignmentEventForCurrentUser(event)) {
+			pushCalendarAssignment(event);
+			return;
+		}
 		if (!isTaskNotificationEventForCurrentUser(event)) {
 			return;
 		}
@@ -113,6 +120,38 @@ public final class LiveUpdateNotificationBridge {
 					"Task",
 					entityId,
 					null));
+	}
+
+	private void pushCalendarAssignment(UiRuntimeBridge.EntityUpdatedEvent event) {
+		Integer currentUserId = appState.getUserId();
+		Integer targetUserId = recipientUserId(event.patch());
+		if (currentUserId == null || currentUserId <= 0 || targetUserId == null || !currentUserId.equals(targetUserId)) {
+			log.info("Live notification skipped type=CALENDAR_EVENT_ASSIGNED targetUserId={} currentUserId={} deliveredLive=false reason=user_mismatch_or_missing",
+					targetUserId, currentUserId);
+			return;
+		}
+		Integer durableIdInt = intValue(event.patch().get("durableNotificationId"));
+		Long durableNotificationId = durableIdInt == null ? null : Long.valueOf(durableIdInt.longValue());
+		Object eventKeyValue = event.patch().get("eventKey");
+		String eventKey = eventKeyValue == null ? null : String.valueOf(eventKeyValue);
+		Instant createdAt = parseTimestamp(event.timestamp());
+		notificationCenterService.pushNotification(new AppNotification(
+				event.eventId() == null || event.eventId().isBlank() ? "calendar-" + event.entityId() + "-" + createdAt.toEpochMilli() : event.eventId(),
+				NotificationCategory.TASK,
+				NotificationSeverity.INFO,
+				"Calendar event assigned",
+				"You were assigned to a calendar event.",
+				createdAt,
+				true,
+				true,
+				NotificationTargetScope.USER_SCOPED,
+				durableNotificationId,
+				eventKey,
+				"CalendarEvent",
+				event.entityId() > 0 ? event.entityId() : null,
+				null));
+		log.info("Live notification type=CALENDAR_EVENT_ASSIGNED targetUserId={} currentUserId={} deliveredLive=true",
+				targetUserId, currentUserId);
 	}
 
 	private boolean isTaskNotificationEventForCurrentUser(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -287,6 +326,13 @@ public final class LiveUpdateNotificationBridge {
 		}
 		Object actionType = event.patch().get("actionType");
 		return actionType != null && "NOTE_ADDED".equalsIgnoreCase(String.valueOf(actionType));
+	}
+
+	private static boolean isCalendarAssignmentEventForCurrentUser(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (event == null || event.patch() == null || event.entityType() == null) return false;
+		if (!"CalendarEvent".equalsIgnoreCase(event.entityType())) return false;
+		Object notificationType = event.patch().get("notificationType");
+		return notificationType != null && "CALENDAR_EVENT_ASSIGNED".equalsIgnoreCase(String.valueOf(notificationType));
 	}
 
 	private static boolean isTaskTimelineNotificationEvent(UiRuntimeBridge.EntityUpdatedEvent event) {

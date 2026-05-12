@@ -39,6 +39,8 @@ public final class NotificationDao {
 					message,
 					entityId,
 					createdByUserId,
+					"TASK",
+					"Task",
 					"ASSIGNED",
 					"INFO",
 					eventKey);
@@ -67,6 +69,8 @@ public final class NotificationDao {
 					message,
 					entityId,
 					createdByUserId,
+					"TASK",
+					"Task",
 					"NOTE_ADDED",
 					"INFO",
 					eventKey);
@@ -97,6 +101,8 @@ public final class NotificationDao {
 					message,
 					entityId,
 					createdByUserId,
+					"TASK",
+					"Task",
 					actionType,
 					severity,
 					eventKey);
@@ -126,11 +132,44 @@ public final class NotificationDao {
 					message,
 					entityId,
 					createdByUserId,
+					"TASK",
+					"Task",
 					actionType,
 					"INFO",
 					eventKey);
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to create task-action notification", e);
+		}
+	}
+
+	public Long createCalendarEventAssignedNotification(
+			int shaleClientId,
+			int userId,
+			String title,
+			String message,
+			long entityId,
+			int createdByUserId,
+			String actionType,
+			String eventKey) {
+		if (eventKey == null || eventKey.isBlank()) {
+			return null;
+		}
+		try (Connection con = db.requireConnection()) {
+			return createIfAbsent(
+					con,
+					shaleClientId,
+					userId,
+					title,
+					message,
+					entityId,
+					createdByUserId,
+					"CALENDAR",
+					"CalendarEvent",
+					actionType,
+					"INFO",
+					eventKey);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create calendar assignment notification", e);
 		}
 	}
 
@@ -347,6 +386,8 @@ public final class NotificationDao {
 			String message,
 			long entityId,
 			int createdByUserId,
+			String category,
+			String entityType,
 			String actionType,
 			String severity,
 			String eventKey) throws SQLException {
@@ -366,11 +407,11 @@ public final class NotificationDao {
 		try (PreparedStatement ps = con.prepareStatement(insertSql)) {
 			ps.setInt(1, shaleClientId);
 			ps.setInt(2, userId);
-			ps.setString(3, "TASK");
+			ps.setString(3, category == null || category.isBlank() ? "TASK" : category);
 			ps.setString(4, severity == null || severity.isBlank() ? "INFO" : severity);
 			ps.setString(5, title);
 			ps.setString(6, message);
-			ps.setString(7, "Task");
+			ps.setString(7, entityType == null || entityType.isBlank() ? "Task" : entityType);
 			ps.setLong(8, entityId);
 			ps.setString(9, actionType);
 			ps.setInt(10, createdByUserId);
