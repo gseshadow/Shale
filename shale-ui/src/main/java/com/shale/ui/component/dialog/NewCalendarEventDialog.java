@@ -363,8 +363,7 @@ public final class NewCalendarEventDialog {
             TextArea descriptionArea = new TextArea(initial == null ? "" : initial.description());
             descriptionArea.setPrefRowCount(4);
             descriptionArea.setWrapText(true);
-            Label selectedCaseLabel = new Label("None");
-            VBox selectedCaseHost = new VBox(selectedCaseLabel);
+            VBox selectedCaseHost = new VBox();
             selectedCaseHost.setAlignment(Pos.CENTER_LEFT);
             selectedCaseHost.setFillWidth(true);
             selectedCaseHost.setMaxWidth(Double.MAX_VALUE);
@@ -374,8 +373,7 @@ public final class NewCalendarEventDialog {
             CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
             Runnable renderCase = () -> {
                 selectedCaseHost.getChildren().clear();
-                if (selectedCase[0] == null) selectedCaseHost.getChildren().add(selectedCaseLabel);
-                else selectedCaseHost.getChildren().add(createRelatedCasePreview(caseCardFactory, selectedCase[0]));
+                if (selectedCase[0] != null) selectedCaseHost.getChildren().add(createRelatedCasePreview(caseCardFactory, selectedCase[0]));
             };
             Button addCaseButton = new Button();
             Button clearCaseButton = new Button("Clear");
@@ -387,7 +385,6 @@ public final class NewCalendarEventDialog {
                 clearCaseButton.setManaged(hasAssigned);
             };
             if (initial != null && initial.caseId() != null) {
-                selectedCaseLabel.setText("Loading...");
                 renderCase.run();
                 Integer selectedCaseId = initial.caseId();
                 long caseResolveStart = System.nanoTime();
@@ -404,7 +401,7 @@ public final class NewCalendarEventDialog {
                         })
                         .thenAccept(resolved -> Platform.runLater(() -> {
                             if (resolved != null) selectedCase[0] = resolved;
-                            else { selectedCaseLabel.setText("Case unavailable"); hasCaseAssignment[0] = false; }
+                            else { hasCaseAssignment[0] = false; }
                             renderCase.run();
                             refreshCaseControls.run();
                             long elapsedMs = (System.nanoTime() - caseResolveStart) / 1_000_000;
