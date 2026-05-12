@@ -19,6 +19,7 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
@@ -529,12 +530,33 @@ public final class CalendarController {
             double colWidth = overlayWidth / columnCount;
             double localX = col * colWidth + 1;
             double localWidth = Math.max(20, colWidth - 2);
+            applyTimedCardSizing(card, localWidth, h);
             if (log.isDebugEnabled()) {
                 log.debug("Calendar timed layout event='{}' date={} start={} end={} dayWidth={} columns={} columnIndex={} localX={} localWidth={}",
                         safe(e.title()), e.startsAt() == null ? null : e.startsAt().toLocalDate(), e.startsAt(), eventEnd(e), overlayWidth, columnCount, col, localX, localWidth);
             }
             card.resizeRelocate(localX, y + 1, localWidth, h);
             overlay.getChildren().add(card);
+        }
+    }
+
+    private void applyTimedCardSizing(Node card, double width, double height) {
+        if (card == null) return;
+        card.getStyleClass().removeAll("calendar-event-card-compact", "calendar-event-card-normal", "calendar-event-card-tall");
+        if (height <= HALF_HOUR_HEIGHT + 4) card.getStyleClass().add("calendar-event-card-compact");
+        else if (height < HALF_HOUR_HEIGHT * 3) card.getStyleClass().add("calendar-event-card-normal");
+        else card.getStyleClass().add("calendar-event-card-tall");
+        if (card instanceof Region region) {
+            region.setMinHeight(height);
+            region.setPrefHeight(height);
+            region.setMaxHeight(height);
+            region.setMinWidth(width);
+            region.setPrefWidth(width);
+            region.setMaxWidth(width);
+            Rectangle clip = new Rectangle(width, height);
+            clip.widthProperty().bind(region.widthProperty());
+            clip.heightProperty().bind(region.heightProperty());
+            region.setClip(clip);
         }
     }
 

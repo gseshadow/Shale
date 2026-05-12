@@ -24,6 +24,7 @@ public final class CalendarEventCardFactory {
 
         HBox card = new HBox(0);
         card.getStyleClass().add("calendar-event-card");
+        card.setFillHeight(true);
         applyAssignedUserTint(card, item);
         Region accentBar = buildAccentBar(item.colorHex());
         if (accentBar != null) {
@@ -31,6 +32,10 @@ public final class CalendarEventCardFactory {
         }
 
         VBox content = new VBox(3);
+        content.setFillWidth(true);
+        content.setMinHeight(0);
+        content.setPrefHeight(Region.USE_COMPUTED_SIZE);
+        content.setMaxHeight(Double.MAX_VALUE);
 
         LocalDate itemDate = item.startsAt() == null ? null : item.startsAt().toLocalDate();
         if (item.startsAt() != null && item.startsAt().isBefore(now)) {
@@ -53,17 +58,29 @@ public final class CalendarEventCardFactory {
 
         Label time = new Label(resolveTime(item));
         time.getStyleClass().add("calendar-event-time");
+        time.setWrapText(false);
+        time.setTextOverrun(OverrunStyle.ELLIPSIS);
+        time.setMaxWidth(Double.MAX_VALUE);
 
         Label title = new Label(safe(item.title()));
         title.getStyleClass().add("calendar-event-title");
-        title.setWrapText(true);
+        title.setWrapText(false);
+        title.setTextOverrun(OverrunStyle.ELLIPSIS);
+        title.setMaxWidth(Double.MAX_VALUE);
 
         Label relatedSummary = new Label(resolveRelatedSummary(item));
         relatedSummary.getStyleClass().add("calendar-event-related");
-        if (!relatedSummary.getText().isBlank()) {
-            content.getChildren().add(relatedSummary);
-        }
-        content.getChildren().addAll(time, title, badges);
+        relatedSummary.setWrapText(false);
+        relatedSummary.setTextOverrun(OverrunStyle.ELLIPSIS);
+        relatedSummary.setMaxWidth(Double.MAX_VALUE);
+        content.getChildren().addAll(time, title);
+        if (!relatedSummary.getText().isBlank()) content.getChildren().add(relatedSummary);
+        content.getChildren().add(badges);
+        relatedSummary.managedProperty().bind(relatedSummary.visibleProperty());
+        badges.managedProperty().bind(badges.visibleProperty());
+        card.heightProperty().addListener((obs, oldH, newH) -> applyTimedContentDensity(newH == null ? 0 : newH.doubleValue(), relatedSummary, badges));
+        applyTimedContentDensity(card.getHeight(), relatedSummary, badges);
+        HBox.setHgrow(content, Priority.ALWAYS);
         card.getChildren().add(content);
 
         return card;
@@ -181,5 +198,18 @@ public final class CalendarEventCardFactory {
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private static void applyTimedContentDensity(double height, Label relatedSummary, HBox badges) {
+        if (height < 42) {
+            relatedSummary.setVisible(false);
+            badges.setVisible(false);
+        } else if (height < 64) {
+            relatedSummary.setVisible(false);
+            badges.setVisible(true);
+        } else {
+            relatedSummary.setVisible(true);
+            badges.setVisible(true);
+        }
     }
 }
