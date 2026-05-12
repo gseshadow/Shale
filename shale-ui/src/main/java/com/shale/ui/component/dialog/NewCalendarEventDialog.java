@@ -292,7 +292,7 @@ public final class NewCalendarEventDialog {
     }
 
     public record CreateCalendarEventInput(String title, int calendarEventTypeId, LocalDate date, boolean allDay, LocalTime startTime, int durationMinutes, String description, Integer caseId, Integer assignedToUserId) {}
-    public record CaseOption(Integer caseId, String displayName) {}
+    public record CaseOption(Integer caseId, String displayName, String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {}
     public record AssignedUserOption(Integer userId, String displayName, String color) {}
 
     private static final class ResultHolder { private CreateCalendarEventInput value; }
@@ -363,8 +363,9 @@ public final class NewCalendarEventDialog {
             TextArea descriptionArea = new TextArea(initial == null ? "" : initial.description());
             descriptionArea.setPrefRowCount(4);
             descriptionArea.setWrapText(true);
-            Label selectedCaseLabel = new Label("None");
-            StackPane selectedCaseHost = new StackPane(selectedCaseLabel);
+            VBox selectedCaseHost = new VBox();
+            selectedCaseHost.setAlignment(Pos.CENTER_LEFT);
+            selectedCaseHost.setFillWidth(true);
             selectedCaseHost.setMaxWidth(Double.MAX_VALUE);
             HBox.setHgrow(selectedCaseHost, Priority.ALWAYS);
             final CaseOption[] selectedCase = new CaseOption[1];
@@ -372,8 +373,7 @@ public final class NewCalendarEventDialog {
             CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
             Runnable renderCase = () -> {
                 selectedCaseHost.getChildren().clear();
-                if (selectedCase[0] == null) selectedCaseHost.getChildren().add(selectedCaseLabel);
-                else selectedCaseHost.getChildren().add(caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase[0].caseId(), selectedCase[0].displayName(), null, null, null, null, null), CaseCardFactory.Variant.MINI));
+                if (selectedCase[0] != null) selectedCaseHost.getChildren().add(createRelatedCasePreview(caseCardFactory, selectedCase[0]));
             };
             Button addCaseButton = new Button();
             Button clearCaseButton = new Button("Clear");
@@ -385,7 +385,6 @@ public final class NewCalendarEventDialog {
                 clearCaseButton.setManaged(hasAssigned);
             };
             if (initial != null && initial.caseId() != null) {
-                selectedCaseLabel.setText("Loading...");
                 renderCase.run();
                 Integer selectedCaseId = initial.caseId();
                 long caseResolveStart = System.nanoTime();
@@ -402,7 +401,7 @@ public final class NewCalendarEventDialog {
                         })
                         .thenAccept(resolved -> Platform.runLater(() -> {
                             if (resolved != null) selectedCase[0] = resolved;
-                            else { selectedCaseLabel.setText("Case unavailable"); hasCaseAssignment[0] = false; }
+                            else { hasCaseAssignment[0] = false; }
                             renderCase.run();
                             refreshCaseControls.run();
                             long elapsedMs = (System.nanoTime() - caseResolveStart) / 1_000_000;
@@ -532,6 +531,15 @@ public final class NewCalendarEventDialog {
             };
             return new DialogParts(content, errorLabel, readInput);
         }
+    }
+
+
+    private static Node createRelatedCasePreview(CaseCardFactory caseCardFactory, CaseOption selectedCase) {
+        Node casePreview = caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(), selectedCase.displayName(), null, null, selectedCase.responsibleAttorney(), selectedCase.responsibleAttorneyColor(), selectedCase.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI);
+        if (casePreview instanceof Region region) {
+            region.setMaxWidth(Double.MAX_VALUE);
+        }
+        return casePreview;
     }
 
     private static List<String> buildTimeOptions() {
