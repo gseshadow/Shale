@@ -364,7 +364,9 @@ public final class NewCalendarEventDialog {
             descriptionArea.setPrefRowCount(4);
             descriptionArea.setWrapText(true);
             Label selectedCaseLabel = new Label("None");
-            StackPane selectedCaseHost = new StackPane(selectedCaseLabel);
+            VBox selectedCaseHost = new VBox(selectedCaseLabel);
+            selectedCaseHost.setAlignment(Pos.CENTER_LEFT);
+            selectedCaseHost.setFillWidth(true);
             selectedCaseHost.setMaxWidth(Double.MAX_VALUE);
             HBox.setHgrow(selectedCaseHost, Priority.ALWAYS);
             final CaseOption[] selectedCase = new CaseOption[1];
@@ -373,7 +375,7 @@ public final class NewCalendarEventDialog {
             Runnable renderCase = () -> {
                 selectedCaseHost.getChildren().clear();
                 if (selectedCase[0] == null) selectedCaseHost.getChildren().add(selectedCaseLabel);
-                else selectedCaseHost.getChildren().add(caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase[0].caseId(), selectedCase[0].displayName(), null, null, null, null, null), CaseCardFactory.Variant.MINI));
+                else selectedCaseHost.getChildren().add(createRelatedCasePreview(caseCardFactory, selectedCase[0]));
             };
             Button addCaseButton = new Button();
             Button clearCaseButton = new Button("Clear");
@@ -532,6 +534,15 @@ public final class NewCalendarEventDialog {
             };
             return new DialogParts(content, errorLabel, readInput);
         }
+    }
+
+
+    private static Node createRelatedCasePreview(CaseCardFactory caseCardFactory, CaseOption selectedCase) {
+        Node casePreview = caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(), selectedCase.displayName(), null, null, null, null, null), CaseCardFactory.Variant.MINI);
+        if (casePreview instanceof Region region) {
+            region.setMaxWidth(Double.MAX_VALUE);
+        }
+        return casePreview;
     }
 
     private static List<String> buildTimeOptions() {
