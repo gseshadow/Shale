@@ -15,5 +15,6 @@ public record CalendarFeedItem(
         String relatedDisplayName,
         String calendarEventTypeSystemKey,
         String displayTypeName,
-        String colorHex) {
+        String colorHex,
+        String assignedUserColor) {
 }

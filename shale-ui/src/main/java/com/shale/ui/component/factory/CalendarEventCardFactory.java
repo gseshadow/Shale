@@ -24,6 +24,7 @@ public final class CalendarEventCardFactory {
 
         HBox card = new HBox(0);
         card.getStyleClass().add("calendar-event-card");
+        applyAssignedUserTint(card, item);
         Region accentBar = buildAccentBar(item.colorHex());
         if (accentBar != null) {
             card.getChildren().add(accentBar);
@@ -107,6 +108,20 @@ public final class CalendarEventCardFactory {
         accentBar.setMaxWidth(5);
         accentBar.setStyle("-fx-background-color: " + accent + "; -fx-background-radius: 6 0 0 6;");
         return accentBar;
+    }
+
+    private static void applyAssignedUserTint(HBox card, CalendarFeedItem item) {
+        if (card == null || item == null) return;
+        if (!"MANUAL".equals(normalize(item.sourceType())) && !"CALENDAR_EVENT".equals(normalize(item.sourceType()))) return;
+        String normalized = ColorUtil.normalizeStoredColor(item.assignedUserColor());
+        if (normalized == null) return;
+        String rgb = normalized.substring(0, 6);
+        card.setStyle("-fx-background-color: #ffffff, rgba(" +
+                Integer.parseInt(rgb.substring(0, 2), 16) + "," +
+                Integer.parseInt(rgb.substring(2, 4), 16) + "," +
+                Integer.parseInt(rgb.substring(4, 6), 16) + ",0.12);" +
+                " -fx-background-insets: 0, 0;" +
+                " -fx-background-radius: 8, 8;");
     }
 
     private static String resolveType(CalendarFeedItem item) {
