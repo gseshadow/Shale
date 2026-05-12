@@ -525,7 +525,13 @@ public final class CalendarController {
             double h = Math.max(HALF_HOUR_HEIGHT - 2, durationMinutes * pxPerMinute - 2);
             int col = eventColumns.getOrDefault(e, 0);
             double colWidth = overlayWidth / columnCount;
-            card.resizeRelocate(col * colWidth + 1, y + 1, Math.max(20, colWidth - 2), h);
+            double localX = col * colWidth + 1;
+            double localWidth = Math.max(20, colWidth - 2);
+            if (log.isDebugEnabled()) {
+                log.debug("Calendar timed layout event='{}' date={} start={} end={} dayWidth={} columns={} columnIndex={} localX={} localWidth={}",
+                        safe(e.title()), e.startsAt() == null ? null : e.startsAt().toLocalDate(), e.startsAt(), eventEnd(e), overlayWidth, columnCount, col, localX, localWidth);
+            }
+            card.resizeRelocate(localX, y + 1, localWidth, h);
             overlay.getChildren().add(card);
         }
     }
