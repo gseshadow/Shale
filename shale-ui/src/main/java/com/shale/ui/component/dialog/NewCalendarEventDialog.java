@@ -292,7 +292,7 @@ public final class NewCalendarEventDialog {
     }
 
     public record CreateCalendarEventInput(String title, int calendarEventTypeId, LocalDate date, boolean allDay, LocalTime startTime, int durationMinutes, String description, Integer caseId, Integer assignedToUserId) {}
-    public record CaseOption(Integer caseId, String displayName) {}
+    public record CaseOption(Integer caseId, String displayName, String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {}
     public record AssignedUserOption(Integer userId, String displayName, String color) {}
 
     private static final class ResultHolder { private CreateCalendarEventInput value; }
@@ -364,7 +364,9 @@ public final class NewCalendarEventDialog {
             descriptionArea.setPrefRowCount(4);
             descriptionArea.setWrapText(true);
             Label selectedCaseLabel = new Label("None");
-            StackPane selectedCaseHost = new StackPane(selectedCaseLabel);
+            VBox selectedCaseHost = new VBox(selectedCaseLabel);
+            selectedCaseHost.setAlignment(Pos.CENTER_LEFT);
+            selectedCaseHost.setFillWidth(true);
             selectedCaseHost.setMaxWidth(Double.MAX_VALUE);
             HBox.setHgrow(selectedCaseHost, Priority.ALWAYS);
             final CaseOption[] selectedCase = new CaseOption[1];
@@ -373,7 +375,7 @@ public final class NewCalendarEventDialog {
             Runnable renderCase = () -> {
                 selectedCaseHost.getChildren().clear();
                 if (selectedCase[0] == null) selectedCaseHost.getChildren().add(selectedCaseLabel);
-                else selectedCaseHost.getChildren().add(caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase[0].caseId(), selectedCase[0].displayName(), null, null, null, null, null), CaseCardFactory.Variant.MINI));
+                else selectedCaseHost.getChildren().add(createRelatedCasePreview(caseCardFactory, selectedCase[0]));
             };
             Button addCaseButton = new Button();
             Button clearCaseButton = new Button("Clear");
@@ -532,6 +534,15 @@ public final class NewCalendarEventDialog {
             };
             return new DialogParts(content, errorLabel, readInput);
         }
+    }
+
+
+    private static Node createRelatedCasePreview(CaseCardFactory caseCardFactory, CaseOption selectedCase) {
+        Node casePreview = caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(), selectedCase.displayName(), null, null, selectedCase.responsibleAttorney(), selectedCase.responsibleAttorneyColor(), selectedCase.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI);
+        if (casePreview instanceof Region region) {
+            region.setMaxWidth(Double.MAX_VALUE);
+        }
+        return casePreview;
     }
 
     private static List<String> buildTimeOptions() {
