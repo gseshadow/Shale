@@ -237,8 +237,8 @@ public final class NewCalendarEventDialog {
         formScroll.setFitToWidth(true);
         formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        formScroll.setMinViewportHeight(260);
-        formScroll.setPrefViewportHeight(340);
+        formScroll.setMinViewportHeight(300);
+        formScroll.setPrefViewportHeight(410);
         formScroll.getStyleClass().add("calendar-day-scroll");
 
         VBox body = new VBox(12, heading, message, formScroll, actions);
@@ -268,8 +268,8 @@ public final class NewCalendarEventDialog {
         formScroll.setFitToWidth(true);
         formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        formScroll.setMinViewportHeight(260);
-        formScroll.setPrefViewportHeight(340);
+        formScroll.setMinViewportHeight(300);
+        formScroll.setPrefViewportHeight(410);
         formScroll.getStyleClass().add("calendar-day-scroll");
         VBox body = new VBox(12, heading, message, formScroll, actions);
         VBox.setVgrow(formScroll, Priority.ALWAYS);
