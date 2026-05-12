@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -376,19 +377,26 @@ public final class NewCalendarEventDialog {
             if (initial != null && initial.caseId() != null) {
                 selectedCaseLabel.setText("Loading...");
                 renderCase.run();
-                try {
-                    CaseOption resolved = safeList(caseOptionsSupplier == null ? List.<CaseOption>of() : caseOptionsSupplier.get()).stream()
-                            .filter(v -> v != null && Objects.equals(v.caseId(), initial.caseId()))
-                            .findFirst()
-                            .orElse(null);
-                    if (resolved != null) {
-                        selectedCase[0] = resolved;
-                    } else {
-                        selectedCaseLabel.setText("Case unavailable");
-                    }
-                } catch (RuntimeException ex) {
-                    selectedCaseLabel.setText("Case unavailable");
-                }
+                Integer selectedCaseId = initial.caseId();
+                long caseResolveStart = System.nanoTime();
+                CompletableFuture
+                        .supplyAsync(() -> {
+                            try {
+                                return safeList(caseOptionsSupplier == null ? List.<CaseOption>of() : caseOptionsSupplier.get()).stream()
+                                        .filter(v -> v != null && Objects.equals(v.caseId(), selectedCaseId))
+                                        .findFirst()
+                                        .orElse(null);
+                            } catch (RuntimeException ex) {
+                                return null;
+                            }
+                        })
+                        .thenAccept(resolved -> Platform.runLater(() -> {
+                            if (resolved != null) selectedCase[0] = resolved;
+                            else selectedCaseLabel.setText("Case unavailable");
+                            renderCase.run();
+                            long elapsedMs = (System.nanoTime() - caseResolveStart) / 1_000_000;
+                            PerfLog.log("DIALOG", "related-case-resolve", "caseId=" + selectedCaseId + " elapsedMs=" + elapsedMs + " resolved=" + (resolved != null));
+                        }));
             }
             renderCase.run();
             Button addCaseButton = new Button(selectedCase[0] == null ? "Add Case" : "Change Case");
