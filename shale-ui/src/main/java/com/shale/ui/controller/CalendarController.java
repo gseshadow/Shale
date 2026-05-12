@@ -443,15 +443,6 @@ public final class CalendarController {
                 box.getStyleClass().add("calendar-timed-day-cell");
                 GridPane.setHgrow(box, Priority.ALWAYS);
                 timedGrid.add(box, dayIndex + 1, slot);
-                VBox eventsLayer = new VBox(4);
-                eventsLayer.setFillWidth(true);
-                eventsLayer.setMaxWidth(Double.MAX_VALUE);
-                box.getChildren().add(eventsLayer);
-                for (CalendarFeedItem item : eventsByDayAndSlot.getOrDefault(dayIndex, Map.of()).getOrDefault(slot, List.of())) {
-                    Node c = calendarEventCardFactory.create(item, today, now);
-                    configureCalendarCardClick(c, item);
-                    eventsLayer.getChildren().add(c);
-                }
             }
             Pane eventsOverlay = new Pane();
             eventsOverlay.setPickOnBounds(false);
