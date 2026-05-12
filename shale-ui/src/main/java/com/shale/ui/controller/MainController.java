@@ -233,10 +233,32 @@ public final class MainController {
 
 
 	private void onNotificationActivated(AppNotification notification) {
-		if (notification == null || updateFlowCoordinator == null || !isAvailableUpdateNotification(notification)) {
+		if (notification == null) {
+			return;
+		}
+		if (isCalendarAssignmentNotification(notification)) {
+			Long calendarEventId = notification.getEntityId();
+			if (calendarEventId != null && calendarEventId > 0) {
+				sceneManager.openCalendarEventFromNotification(calendarEventId);
+			}
+			return;
+		}
+		if (updateFlowCoordinator == null || !isAvailableUpdateNotification(notification)) {
 			return;
 		}
 		updateFlowCoordinator.presentAvailableUpdate(isMandatoryUpdateNotification(notification), () -> {});
+	}
+
+	private static boolean isCalendarAssignmentNotification(AppNotification notification) {
+		if (notification == null) {
+			return false;
+		}
+		String entityType = notification.getEntityType();
+		if (entityType == null || !"CalendarEvent".equalsIgnoreCase(entityType.trim())) {
+			return false;
+		}
+		Long entityId = notification.getEntityId();
+		return entityId != null && entityId > 0;
 	}
 
 	private static boolean isAvailableUpdateNotification(AppNotification notification) {

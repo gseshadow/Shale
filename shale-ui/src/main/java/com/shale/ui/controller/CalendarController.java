@@ -4,6 +4,7 @@ import com.shale.core.model.CalendarFeedItem;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseDao;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
+import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
@@ -569,7 +570,11 @@ public final class CalendarController {
                 PerfLog.log("DAO", "start", "calendar edit-event hydrate eventId=" + eventId);
                 var event = calendarService.getEventById(eventId, tenantId);
                 if (event == null) {
-                    Platform.runLater(() -> { openingEditDialogEventIds.remove(eventId); dialog.showLoadError("Could not load event for editing."); });
+                    log.info("Calendar event open failed reason=not_found eventId={} tenantId={}", eventId, tenantId);
+                    Platform.runLater(() -> {
+                        openingEditDialogEventIds.remove(eventId);
+                        dialog.showLoadError("Calendar event could not be opened.");
+                    });
                     return;
                 }
                 var initial = new NewCalendarEventDialog.CreateCalendarEventInput(event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(), event.allDay() ? null : event.startsAt().toLocalTime(), resolveDurationMinutes(event), event.description(), event.caseId(), event.assignedToUserId());
@@ -585,9 +590,19 @@ public final class CalendarController {
                     openingEditDialogEventIds.remove(eventId);
                 });
             } catch (RuntimeException ex) {
-                Platform.runLater(() -> { openingEditDialogEventIds.remove(eventId); dialog.showLoadError("Could not load event for editing."); });
+                log.warn("Calendar event open failed reason=exception eventId={} tenantId={}", eventId, tenantId, ex);
+                Platform.runLater(() -> { openingEditDialogEventIds.remove(eventId); dialog.showLoadError("Calendar event could not be opened."); });
             }
         });
+    }
+
+    public void openCalendarEventFromNotification(long eventId) {
+        if (eventId <= 0 || eventId > Integer.MAX_VALUE) {
+            log.info("Calendar notification open skipped reason=invalid_event_id eventId={} tenantId={}", eventId, appState == null ? null : appState.getShaleClientId());
+            AppDialogs.showError(weekBoard == null || weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), "Calendar", "Calendar event could not be opened.");
+            return;
+        }
+        openEditEventDialog((int) eventId);
     }
     private CalendarFeedDao.CalendarCaseCardRow loadCaseRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { if (event == null || event.caseId() == null) return null; List<CalendarFeedDao.CalendarCaseCardRow> rows = calendarFeedDao.listCaseCardRows(tenantId, List.of(event.caseId())); return rows.isEmpty() ? null : rows.getFirst(); }
     private CalendarFeedDao.CalendarTaskCardRow loadTaskRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { if (event == null || event.taskId() == null) return null; List<CalendarFeedDao.CalendarTaskCardRow> rows = calendarFeedDao.listTaskCardRows(tenantId, List.of(event.taskId())); return rows.isEmpty() ? null : rows.getFirst(); }
