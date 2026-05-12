@@ -246,8 +246,8 @@ public final class NewCalendarEventDialog {
         VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
         root.setMinWidth(680);
         root.setPrefWidth(760);
-        root.setPrefHeight(640);
-        root.setMaxHeight(680);
+        root.setPrefHeight(Region.USE_COMPUTED_SIZE);
+        root.setMaxHeight(Region.USE_COMPUTED_SIZE);
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
@@ -276,8 +276,8 @@ public final class NewCalendarEventDialog {
         VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
         root.setMinWidth(680);
         root.setPrefWidth(760);
-        root.setPrefHeight(640);
-        root.setMaxHeight(680);
+        root.setPrefHeight(Region.USE_COMPUTED_SIZE);
+        root.setMaxHeight(Region.USE_COMPUTED_SIZE);
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
