@@ -368,10 +368,12 @@ public final class CalendarController {
         gutter.setPrefWidth(64);
         gutter.setMaxWidth(64);
         grid.getColumnConstraints().add(gutter);
+        double dayPercent = dayCount <= 0 ? 0 : 100.0 / dayCount;
         for (int i = 0; i < dayCount; i++) {
             ColumnConstraints dayCol = new ColumnConstraints();
             dayCol.setHgrow(Priority.ALWAYS);
             dayCol.setFillWidth(true);
+            dayCol.setPercentWidth(dayPercent);
             grid.getColumnConstraints().add(dayCol);
         }
     }
@@ -403,7 +405,7 @@ public final class CalendarController {
     private GridPane createTimedGrid(LocalDate today, LocalDateTime now, List<LocalDate> visibleDays, Map<LocalDate, List<CalendarFeedItem>> grouped) {
         int dayCount = visibleDays == null ? 0 : visibleDays.size();
         GridPane timedGrid = new GridPane();
-        timedGrid.setHgap(0);
+        timedGrid.setHgap(6);
         timedGrid.getStyleClass().add("calendar-timed-grid");
         configureSharedColumns(timedGrid, dayCount);
         StackPane[] dayWidthAnchors = new StackPane[Math.max(0, dayCount)];
@@ -443,6 +445,7 @@ public final class CalendarController {
                 box.getStyleClass().add("calendar-timed-day-cell");
                 GridPane.setHgrow(box, Priority.ALWAYS);
                 timedGrid.add(box, dayIndex + 1, slot);
+                if (slot == 0) dayWidthAnchors[dayIndex] = box;
             }
             Pane eventsOverlay = new Pane();
             eventsOverlay.setPickOnBounds(false);
