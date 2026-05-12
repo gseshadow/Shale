@@ -373,7 +373,23 @@ public final class NewCalendarEventDialog {
                 if (selectedCase[0] == null) selectedCaseHost.getChildren().add(selectedCaseLabel);
                 else selectedCaseHost.getChildren().add(caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase[0].caseId(), selectedCase[0].displayName(), null, null, null, null, null), CaseCardFactory.Variant.MINI));
             };
-            if (initial != null && initial.caseId() != null) selectedCase[0] = new CaseOption(initial.caseId(), "Case #" + initial.caseId());
+            if (initial != null && initial.caseId() != null) {
+                selectedCaseLabel.setText("Loading...");
+                renderCase.run();
+                try {
+                    CaseOption resolved = safeList(caseOptionsSupplier == null ? List.<CaseOption>of() : caseOptionsSupplier.get()).stream()
+                            .filter(v -> v != null && Objects.equals(v.caseId(), initial.caseId()))
+                            .findFirst()
+                            .orElse(null);
+                    if (resolved != null) {
+                        selectedCase[0] = resolved;
+                    } else {
+                        selectedCaseLabel.setText("Case unavailable");
+                    }
+                } catch (RuntimeException ex) {
+                    selectedCaseLabel.setText("Case unavailable");
+                }
+            }
             renderCase.run();
             Button addCaseButton = new Button(selectedCase[0] == null ? "Change" : "Change");
             Button clearCaseButton = new Button("Clear");
@@ -402,7 +418,23 @@ public final class NewCalendarEventDialog {
                 if (selectedUser[0] == null) selectedUserHost.getChildren().add(selectedUserLabel);
                 else selectedUserHost.getChildren().add(userCardFactory.create(new UserCardModel(selectedUser[0].userId(), selectedUser[0].displayName(), selectedUser[0].color(), null), UserCardFactory.Variant.MINI));
             };
-            if (initial != null && initial.assignedToUserId() != null) selectedUser[0] = new AssignedUserOption(initial.assignedToUserId(), "User #" + initial.assignedToUserId(), null);
+            if (initial != null && initial.assignedToUserId() != null) {
+                selectedUserLabel.setText("Loading...");
+                renderUser.run();
+                try {
+                    AssignedUserOption resolved = safeList(assignedUserOptionsSupplier == null ? List.<AssignedUserOption>of() : assignedUserOptionsSupplier.get()).stream()
+                            .filter(v -> v != null && Objects.equals(v.userId(), initial.assignedToUserId()))
+                            .findFirst()
+                            .orElse(null);
+                    if (resolved != null) {
+                        selectedUser[0] = resolved;
+                    } else {
+                        selectedUserLabel.setText("User unavailable");
+                    }
+                } catch (RuntimeException ex) {
+                    selectedUserLabel.setText("User unavailable");
+                }
+            }
             renderUser.run();
             Button assignUserButton = new Button("Change");
             Button clearAssignedButton = new Button("Clear");
