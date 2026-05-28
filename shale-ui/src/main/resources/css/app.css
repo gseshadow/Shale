@@ -1017,6 +1017,27 @@
     -fx-background-radius: 16 16 0 0;
 }
 
+.notification-filter-row {
+    -fx-padding: 2 0 4 0;
+}
+
+.notification-filter-check {
+    -fx-text-fill: #112542;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+.notification-filter-check .box {
+    -fx-background-color: rgba(255, 255, 255, 0.95);
+    -fx-border-color: rgba(17, 37, 66, 0.18);
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+.notification-filter-check:selected .mark {
+    -fx-background-color: #2e6fb6;
+}
+
 .notification-list {
     -fx-background-color: transparent;
 }
