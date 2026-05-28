@@ -4,6 +4,7 @@ import com.shale.ui.component.NotificationCard;
 import com.shale.ui.component.factory.NotificationCardFactory;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCenterService;
+import com.shale.ui.notification.NotificationCategory;
 import com.shale.ui.notification.NotificationGroup;
 
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -21,9 +23,12 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.TextField;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
@@ -87,11 +92,46 @@ public final class NotificationCenterDialog {
 				item -> dismissNotification(notificationService, item),
 				onOpenCase);
 
+		ChoiceBox<CategoryFilter> categoryFilter = new ChoiceBox<>();
+		categoryFilter.getStyleClass().add("app-toolbar-select");
+		categoryFilter.setMinWidth(132);
+		categoryFilter.setMaxWidth(150);
+
+		CheckBox unreadOnlyFilter = new CheckBox("Unread only");
+		unreadOnlyFilter.getStyleClass().add("notification-filter-check");
+
+		TextField searchField = new TextField();
+		searchField.setPromptText("Search notifications");
+		searchField.getStyleClass().add("app-dialog-search-field");
+		searchField.setMinWidth(0);
+		searchField.setPrefWidth(220);
+		searchField.setMaxWidth(Double.MAX_VALUE);
+
+		HBox filterRow = new HBox(10, categoryFilter, unreadOnlyFilter, searchField);
+		filterRow.getStyleClass().add("notification-filter-row");
+		filterRow.setAlignment(Pos.CENTER_LEFT);
+		filterRow.setMinWidth(0);
+		filterRow.setMaxWidth(Double.MAX_VALUE);
+		HBox.setHgrow(searchField, Priority.ALWAYS);
+
 		ObservableList<NotificationGroup> notificationGroups = FXCollections.observableArrayList();
-		rebuildNotificationGroups(notificationService, notificationGroups);
-		ListChangeListener<AppNotification> groupRebuildListener = change ->
-				rebuildNotificationGroups(notificationService, notificationGroups);
+		Runnable rebuildGroups = () -> rebuildNotificationGroups(
+				notificationService,
+				notificationGroups,
+				categoryFilter.getValue(),
+				unreadOnlyFilter.isSelected(),
+				searchField.getText());
+		rebuildCategoryOptions(notificationService, categoryFilter);
+		rebuildGroups.run();
+		ListChangeListener<AppNotification> groupRebuildListener = change -> {
+			rebuildCategoryOptions(notificationService, categoryFilter);
+			rebuildGroups.run();
+		};
 		notificationService.getNotificationsNewestFirst().addListener(groupRebuildListener);
+		ChangeListener<Object> filterChangeListener = (obs, oldValue, newValue) -> rebuildGroups.run();
+		categoryFilter.getSelectionModel().selectedItemProperty().addListener(filterChangeListener);
+		unreadOnlyFilter.selectedProperty().addListener(filterChangeListener);
+		searchField.textProperty().addListener(filterChangeListener);
 
 		ListView<NotificationGroup> listView = new ListView<>();
 		listView.setMinWidth(0);
@@ -99,7 +139,10 @@ public final class NotificationCenterDialog {
 		listView.setItems(notificationGroups);
 		listView.getStyleClass().add("notification-list");
 		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification, cardFactory));
-		ChangeListener<Number> unreadRefreshListener = (obs, oldValue, newValue) -> listView.refresh();
+		ChangeListener<Number> unreadRefreshListener = (obs, oldValue, newValue) -> {
+			rebuildGroups.run();
+			listView.refresh();
+		};
 		notificationService.unreadCountProperty().addListener(unreadRefreshListener);
 		stage.setOnHidden(event -> {
 			notificationService.getNotificationsNewestFirst().removeListener(groupRebuildListener);
@@ -124,7 +167,7 @@ public final class NotificationCenterDialog {
 		actions.setAlignment(Pos.CENTER_RIGHT);
 
 		VBox.setVgrow(listView, Priority.ALWAYS);
-		VBox body = new VBox(10, heading, subtitle, listView, actions);
+		VBox body = new VBox(10, heading, subtitle, filterRow, listView, actions);
 		body.setFillWidth(true);
 		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		body.setPadding(new Insets(18, 20, 18, 20));
@@ -258,9 +301,17 @@ public final class NotificationCenterDialog {
 
 	private static void rebuildNotificationGroups(
 			NotificationCenterService notificationService,
-			ObservableList<NotificationGroup> notificationGroups) {
+			ObservableList<NotificationGroup> notificationGroups,
+			CategoryFilter categoryFilter,
+			boolean unreadOnly,
+			String searchText) {
+		CategoryFilter effectiveCategory = categoryFilter == null ? CategoryFilter.ALL : categoryFilter;
+		String normalizedSearch = normalizeSearch(searchText);
 		Map<String, List<AppNotification>> grouped = new LinkedHashMap<>();
 		for (AppNotification notification : notificationService.getNotificationsNewestFirst()) {
+			if (!matchesFilters(notification, effectiveCategory, unreadOnly, normalizedSearch)) {
+				continue;
+			}
 			String groupKey = NotificationGroup.groupKeyFor(notification);
 			grouped.computeIfAbsent(groupKey, ignored -> new ArrayList<>()).add(notification);
 		}
@@ -269,6 +320,58 @@ public final class NotificationCenterDialog {
 				.sorted(Comparator.comparing(NotificationGroup::getLatestCreatedAt).reversed())
 				.toList();
 		notificationGroups.setAll(groups);
+	}
+
+	private static void rebuildCategoryOptions(
+			NotificationCenterService notificationService,
+			ChoiceBox<CategoryFilter> categoryFilter) {
+		if (categoryFilter == null) {
+			return;
+		}
+		CategoryFilter selected = categoryFilter.getValue();
+		List<CategoryFilter> options = CategoryFilter.optionsFor(notificationService.getNotificationsNewestFirst());
+		categoryFilter.getItems().setAll(options);
+		if (selected != null && options.contains(selected)) {
+			categoryFilter.getSelectionModel().select(selected);
+		} else {
+			categoryFilter.getSelectionModel().select(CategoryFilter.ALL);
+		}
+	}
+
+	private static boolean matchesFilters(
+			AppNotification notification,
+			CategoryFilter categoryFilter,
+			boolean unreadOnly,
+			String normalizedSearch) {
+		if (notification == null) {
+			return false;
+		}
+		if (!categoryFilter.matches(notification.getCategory())) {
+			return false;
+		}
+		if (unreadOnly && !notification.isUnread()) {
+			return false;
+		}
+		return matchesSearch(notification, normalizedSearch);
+	}
+
+	private static boolean matchesSearch(AppNotification notification, String normalizedSearch) {
+		if (normalizedSearch == null || normalizedSearch.isEmpty()) {
+			return true;
+		}
+		return containsSearch(notification.getTitle(), normalizedSearch)
+				|| containsSearch(notification.getMessage(), normalizedSearch)
+				|| containsSearch(notification.getEntityTitle(), normalizedSearch)
+				|| containsSearch(notification.getCaseName(), normalizedSearch)
+				|| containsSearch(notification.getActorDisplayName(), normalizedSearch);
+	}
+
+	private static boolean containsSearch(String value, String normalizedSearch) {
+		return value != null && value.toLowerCase(Locale.ROOT).contains(normalizedSearch);
+	}
+
+	private static String normalizeSearch(String searchText) {
+		return searchText == null ? "" : searchText.trim().toLowerCase(Locale.ROOT);
 	}
 
 	private static void dismissNotification(NotificationCenterService notificationService, AppNotification item) {
@@ -281,6 +384,49 @@ public final class NotificationCenterDialog {
 			System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
 			ex.printStackTrace(System.err);
 			throw ex;
+		}
+	}
+
+	private enum CategoryFilter {
+		ALL("All"),
+		TASKS("Tasks", NotificationCategory.TASK),
+		CALENDAR("Calendar", NotificationCategory.CALENDAR),
+		CASES("Cases", NotificationCategory.CASE),
+		SYSTEM("System", NotificationCategory.SYSTEM),
+		APP("App", NotificationCategory.APP_UPDATE),
+		NETWORK("Network", NotificationCategory.NETWORK, NotificationCategory.CONNECTIVITY);
+
+		private final String label;
+		private final List<NotificationCategory> categories;
+
+		CategoryFilter(String label, NotificationCategory... categories) {
+			this.label = label;
+			this.categories = List.of(categories);
+		}
+
+		private boolean matches(NotificationCategory category) {
+			return this == ALL || categories.contains(category);
+		}
+
+		private boolean isAvailableFor(List<AppNotification> notifications) {
+			if (this == ALL || this == TASKS || this == CALENDAR) {
+				return true;
+			}
+			return notifications.stream()
+					.map(AppNotification::getCategory)
+					.anyMatch(categories::contains);
+		}
+
+		private static List<CategoryFilter> optionsFor(List<AppNotification> notifications) {
+			List<AppNotification> safeNotifications = notifications == null ? List.of() : notifications;
+			return List.of(values()).stream()
+					.filter(option -> option.isAvailableFor(safeNotifications))
+					.toList();
+		}
+
+		@Override
+		public String toString() {
+			return label;
 		}
 	}
 
