@@ -110,6 +110,9 @@ public final class LiveUpdateNotificationBridge {
 				stringValue(event.patch().get("title")));
 		Long caseId = longValue(event.patch().get("caseId"));
 		String caseName = stringValue(event.patch().get("caseName"));
+		String caseResponsibleAttorney = stringValue(event.patch().get("caseResponsibleAttorney"));
+		String caseResponsibleAttorneyColor = stringValue(event.patch().get("caseResponsibleAttorneyColor"));
+		Boolean caseNonEngagementLetterSent = booleanValue(event.patch().get("caseNonEngagementLetterSent"));
 		notificationCenterService.pushNotification(new AppNotification(
 				event.eventId() == null || event.eventId().isBlank()
 						? "task-" + event.entityId() + "-" + createdAt.toEpochMilli()
@@ -129,7 +132,10 @@ public final class LiveUpdateNotificationBridge {
 					entityTitle,
 					actionType,
 					caseId,
-					caseName));
+					caseName,
+					caseResponsibleAttorney,
+					caseResponsibleAttorneyColor,
+					caseNonEngagementLetterSent));
 	}
 
 	private void pushCalendarAssignment(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -271,6 +277,20 @@ public final class LiveUpdateNotificationBridge {
 			}
 		}
 		return null;
+	}
+
+	private static Boolean booleanValue(Object value) {
+		if (value instanceof Boolean bool) {
+			return bool;
+		}
+		if (value instanceof Number number) {
+			return number.intValue() != 0;
+		}
+		String text = stringValue(value);
+		if (text == null) {
+			return null;
+		}
+		return Boolean.parseBoolean(text);
 	}
 
 	private static String stringValue(Object value) {

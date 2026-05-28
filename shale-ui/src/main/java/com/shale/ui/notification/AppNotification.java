@@ -23,6 +23,9 @@ public final class AppNotification {
 	private final String actionType;
 	private final Long caseId;
 	private final String caseName;
+	private final String caseResponsibleAttorney;
+	private final String caseResponsibleAttorneyColor;
+	private final Boolean caseNonEngagementLetterSent;
 	private final BooleanProperty unread;
 
 	public AppNotification(
@@ -108,6 +111,30 @@ public final class AppNotification {
 			String actionType,
 			Long caseId,
 			String caseName) {
+		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId, eventKey, entityType, entityId, entityTitle, actionType, caseId, caseName, null, null, null);
+	}
+
+	public AppNotification(
+			String id,
+			NotificationCategory category,
+			NotificationSeverity severity,
+			String title,
+			String message,
+			Instant createdAt,
+			boolean unread,
+			boolean showAsBanner,
+			NotificationTargetScope targetScope,
+			Long durableNotificationId,
+			String eventKey,
+			String entityType,
+			Long entityId,
+			String entityTitle,
+			String actionType,
+			Long caseId,
+			String caseName,
+			String caseResponsibleAttorney,
+			String caseResponsibleAttorneyColor,
+			Boolean caseNonEngagementLetterSent) {
 		this.id = Objects.requireNonNull(id, "id");
 		this.category = Objects.requireNonNull(category, "category");
 		this.severity = Objects.requireNonNull(severity, "severity");
@@ -125,6 +152,9 @@ public final class AppNotification {
 		this.actionType = actionType;
 		this.caseId = caseId;
 		this.caseName = caseName;
+		this.caseResponsibleAttorney = caseResponsibleAttorney;
+		this.caseResponsibleAttorneyColor = caseResponsibleAttorneyColor;
+		this.caseNonEngagementLetterSent = caseNonEngagementLetterSent;
 	}
 
 	public String getId() {
@@ -186,6 +216,18 @@ public final class AppNotification {
 
 	public String getCaseName() {
 		return caseName;
+	}
+
+	public String getCaseResponsibleAttorney() {
+		return caseResponsibleAttorney;
+	}
+
+	public String getCaseResponsibleAttorneyColor() {
+		return caseResponsibleAttorneyColor;
+	}
+
+	public Boolean getCaseNonEngagementLetterSent() {
+		return caseNonEngagementLetterSent;
 	}
 
 	public boolean isShowAsBanner() {

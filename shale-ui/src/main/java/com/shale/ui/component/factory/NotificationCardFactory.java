@@ -9,6 +9,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -28,6 +29,9 @@ import javafx.scene.layout.VBox;
 public final class NotificationCardFactory {
 	private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter
 			.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+			.withZone(ZoneId.systemDefault());
+	private static final DateTimeFormatter EXPANDED_TIME_FORMATTER = DateTimeFormatter
+			.ofLocalizedDateTime(FormatStyle.FULL, FormatStyle.MEDIUM)
 			.withZone(ZoneId.systemDefault());
 
 	public enum Variant {
@@ -62,6 +66,18 @@ public final class NotificationCardFactory {
 		card.setUnread(item.isUnread());
 		card.setExpanded(expandedNotificationIds.contains(item.getId()));
 
+		Region unreadDot = new Region();
+		unreadDot.getStyleClass().add("notification-card-unread-dot");
+		if (!item.isUnread()) {
+			unreadDot.getStyleClass().add("notification-card-unread-dot-read");
+		}
+
+		Label typeIcon = new Label(resolveIcon(item));
+		typeIcon.getStyleClass().add("notification-card-icon");
+		VBox iconRail = new VBox(7, unreadDot, typeIcon);
+		iconRail.getStyleClass().add("notification-card-icon-rail");
+		iconRail.setAlignment(Pos.TOP_CENTER);
+
 		Label category = new Label(resolveCategory(item));
 		category.getStyleClass().add("notification-row-category");
 		category.setTextOverrun(OverrunStyle.ELLIPSIS);
@@ -76,10 +92,10 @@ public final class NotificationCardFactory {
 		message.getStyleClass().add("notification-row-message");
 		message.setWrapText(true);
 		message.setMaxWidth(Double.MAX_VALUE);
-		message.setMaxHeight(34);
+		message.setMaxHeight(48);
 		message.setTextOverrun(OverrunStyle.ELLIPSIS);
 
-		VBox mainArea = new VBox(2, category, title, message);
+		VBox mainArea = new VBox(5, category, title, message);
 		mainArea.getStyleClass().add("notification-row-main");
 		mainArea.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(mainArea, Priority.ALWAYS);
@@ -99,48 +115,54 @@ public final class NotificationCardFactory {
 		timestamp.setTextOverrun(OverrunStyle.ELLIPSIS);
 
 		Button dismissButton = createDismissButton(item);
-		Button expandButton = createExpandButton(item, card);
-		HBox controlRow = new HBox(4, timestamp, dismissButton, expandButton);
-		controlRow.getStyleClass().add("notification-row-controls");
-		controlRow.setAlignment(Pos.CENTER_RIGHT);
+		HBox topControls = new HBox(6, timestamp, dismissButton);
+		topControls.getStyleClass().add("notification-row-controls");
+		topControls.setAlignment(Pos.CENTER_RIGHT);
 
-		VBox rightArea = new VBox(5, controlRow);
+		Button expandButton = createExpandButton(item, card);
+		Node caseCard = createCaseMiniCard(item);
+		VBox rightArea = new VBox(8, topControls);
 		rightArea.getStyleClass().add("notification-row-right");
 		rightArea.setAlignment(Pos.TOP_RIGHT);
-		Node caseCard = createCaseMiniCard(item);
 		if (caseCard != null) {
 			rightArea.getChildren().add(caseCard);
 		}
+		rightArea.getChildren().add(expandButton);
 
-		HBox collapsedRow = new HBox(10, mainArea, rightArea);
+		HBox collapsedRow = new HBox(14, iconRail, mainArea, rightArea);
 		collapsedRow.getStyleClass().add("notification-row-collapsed");
 		collapsedRow.setAlignment(Pos.TOP_LEFT);
 		card.getChildren().add(collapsedRow);
 
-		VBox expandedContent = createExpandedContent(item);
+		VBox expandedContent = createExpandedContent(item, entityContext != null);
 		expandedContent.visibleProperty().bind(card.expandedProperty());
 		expandedContent.managedProperty().bind(card.expandedProperty());
 		card.getChildren().add(expandedContent);
 		return card;
 	}
 
-	private VBox createExpandedContent(AppNotification item) {
-		VBox expanded = new VBox(3);
+	private VBox createExpandedContent(AppNotification item, boolean entityContextVisible) {
+		VBox expanded = new VBox(5);
 		expanded.getStyleClass().add("notification-row-expanded");
 
 		String actionType = normalize(item.getActionType());
 		if (actionType != null) {
 			expanded.getChildren().add(createExpandedLine("Action", actionType));
 		}
+		expanded.getChildren().add(createExpandedLine("Created", EXPANDED_TIME_FORMATTER.format(item.getCreatedAt())));
+		Long entityId = item.getEntityId();
+		if (entityId != null && entityId > 0) {
+			expanded.getChildren().add(createExpandedLine("Entity ID", String.valueOf(entityId)));
+		}
+		if (!entityContextVisible) {
+			String entityTitle = normalize(item.getEntityTitle());
+			if (entityTitle != null) {
+				expanded.getChildren().add(createExpandedLine("Entity", entityTitle));
+			}
+		}
 		String eventKey = normalize(item.getEventKey());
 		if (eventKey != null) {
 			expanded.getChildren().add(createExpandedLine("Event", eventKey));
-		}
-		if (item.getDurableNotificationId() != null) {
-			expanded.getChildren().add(createExpandedLine("Notification", "#" + item.getDurableNotificationId()));
-		}
-		if (expanded.getChildren().isEmpty()) {
-			expanded.getChildren().add(createExpandedLine("Details", item.getSeverity().name()));
 		}
 		return expanded;
 	}
@@ -198,12 +220,19 @@ public final class NotificationCardFactory {
 		}
 		String caseName = resolveCaseContext(item);
 		Node miniCard = caseCardFactory.create(
-				new CaseCardModel(caseId, caseName == null ? "Case #" + caseId : caseName, null, null, null, null, false),
+				new CaseCardModel(
+						caseId,
+						caseName == null ? "Case #" + caseId : caseName,
+						null,
+						null,
+						item.getCaseResponsibleAttorney(),
+						item.getCaseResponsibleAttorneyColor(),
+						item.getCaseNonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
 		miniCard.getStyleClass().add("notification-row-case-mini-card");
 		StackPane wrapper = new StackPane(miniCard);
 		wrapper.getStyleClass().add("notification-row-case-mini");
-		wrapper.setMaxWidth(180);
+		wrapper.setMaxWidth(210);
 		wrapper.setOnMouseClicked(event -> event.consume());
 		return wrapper;
 	}
@@ -211,6 +240,34 @@ public final class NotificationCardFactory {
 	private static String resolveCategory(AppNotification item) {
 		NotificationCategory category = item.getCategory();
 		return category == null ? "NOTIFICATION" : category.name();
+	}
+
+	private static String resolveIcon(AppNotification item) {
+		String action = normalize(item.getActionType());
+		String normalizedAction = action == null ? "" : action.toUpperCase(Locale.ROOT);
+		NotificationCategory category = item.getCategory();
+		if (category == NotificationCategory.CALENDAR) {
+			return "📅";
+		}
+		if (normalizedAction.contains("ASSIGN")) {
+			return "👤";
+		}
+		if (normalizedAction.contains("NOTE")) {
+			return "💬";
+		}
+		if (normalizedAction.contains("DUE") || normalizedAction.contains("OVERDUE")) {
+			return "⏰";
+		}
+		if (category == NotificationCategory.NETWORK || category == NotificationCategory.CONNECTIVITY) {
+			return "⚠";
+		}
+		if (category == NotificationCategory.APP_UPDATE || category == NotificationCategory.SYSTEM) {
+			return "ⓘ";
+		}
+		if (category == NotificationCategory.TASK) {
+			return "✎";
+		}
+		return "•";
 	}
 
 	private static String resolveEntityContext(AppNotification item) {
