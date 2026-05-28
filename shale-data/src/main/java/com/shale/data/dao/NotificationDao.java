@@ -1,6 +1,7 @@
 package com.shale.data.dao;
 
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.semantics.RoleSemantics;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -13,6 +14,8 @@ import java.util.List;
 import java.util.Objects;
 
 public final class NotificationDao {
+	private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
+
 	private final DbSessionProvider db;
 
 	public NotificationDao(DbSessionProvider db) {
@@ -186,19 +189,69 @@ public final class NotificationDao {
 				       n.EntityType,
 				       n.EntityId,
 				       n.ActionType,
+				       n.CreatedByUserId,
+				       LTRIM(RTRIM(
+				         COALESCE(actor.name_first, '') +
+				         CASE WHEN COALESCE(actor.name_first, '') = '' OR COALESCE(actor.name_last, '') = '' THEN '' ELSE ' ' END +
+				         COALESCE(actor.name_last, '')
+				       )) AS ActorDisplayName,
 				       CASE
 				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.Title
 				         ELSE NULL
 				       END AS EntityTitle,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.CaseId
+				         ELSE NULL
+				       END AS CaseId,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN c.Name
+				         ELSE NULL
+				       END AS CaseName,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN caseAttorney.DisplayName
+				         ELSE NULL
+				       END AS CaseResponsibleAttorney,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN caseAttorney.Color
+				         ELSE NULL
+				       END AS CaseResponsibleAttorneyColor,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN c.NonEngagementLetterSent
+				         ELSE NULL
+				       END AS CaseNonEngagementLetterSent,
 				       n.IsRead AS IsRead,
 				       n.CreatedAt AS CreatedAt,
 				       n.EventKey AS EventKey
 				FROM dbo.Notifications n
+				LEFT JOIN dbo.Users actor
+				  ON actor.id = n.CreatedByUserId
+				 AND actor.ShaleClientId = n.ShaleClientId
 				LEFT JOIN dbo.Tasks t
 				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'
 				 AND t.Id = n.EntityId
 				 AND t.ShaleClientId = n.ShaleClientId
 				 AND ISNULL(t.IsDeleted, 0) = 0
+				LEFT JOIN dbo.Cases c
+				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'
+				 AND c.Id = t.CaseId
+				 AND c.ShaleClientId = n.ShaleClientId
+				OUTER APPLY (
+				  SELECT TOP (1)
+				    LTRIM(RTRIM(
+				      COALESCE(u.name_first, '') +
+				      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+				      COALESCE(u.name_last, '')
+				    )) AS DisplayName,
+				    u.Color
+				  FROM dbo.CaseUsers cu
+				  INNER JOIN dbo.Users u
+				    ON u.id = cu.UserId
+				   AND u.ShaleClientId = c.ShaleClientId
+				  WHERE cu.CaseId = c.Id
+				    AND cu.RoleId = ?
+				    AND cu.IsPrimary = 1
+				  ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+				) caseAttorney
 				WHERE n.ShaleClientId = ?
 				  AND n.UserId = ?
 				  AND ISNULL(n.IsDismissed, 0) = 0
@@ -207,8 +260,9 @@ public final class NotificationDao {
 				""";
 		try (Connection con = db.requireConnection();
 		     PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, shaleClientId);
-			ps.setInt(2, userId);
+			ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setInt(2, shaleClientId);
+			ps.setInt(3, userId);
 			try (ResultSet rs = ps.executeQuery()) {
 				List<NotificationRow> rows = new ArrayList<>();
 				while (rs.next()) {
@@ -221,7 +275,13 @@ public final class NotificationDao {
 							rs.getString("EntityType"),
 							rs.getObject("EntityId") == null ? null : rs.getLong("EntityId"),
 							rs.getString("ActionType"),
+							safeUserDisplayName(rs.getString("ActorDisplayName")),
 							rs.getString("EntityTitle"),
+							rs.getObject("CaseId") == null ? null : rs.getLong("CaseId"),
+							rs.getString("CaseName"),
+							rs.getString("CaseResponsibleAttorney"),
+							rs.getString("CaseResponsibleAttorneyColor"),
+							rs.getObject("CaseNonEngagementLetterSent") == null ? null : rs.getBoolean("CaseNonEngagementLetterSent"),
 							rs.getBoolean("IsRead"),
 							toInstant(rs.getTimestamp("CreatedAt")),
 							rs.getString("EventKey")));
@@ -421,6 +481,14 @@ public final class NotificationDao {
 		return findByEventKey(con, shaleClientId, userId, eventKey);
 	}
 
+	private static String safeUserDisplayName(String displayName) {
+		String trimmed = displayName == null ? "" : displayName.trim();
+		if (!trimmed.isBlank()) {
+			return trimmed;
+		}
+		return null;
+	}
+
 	public record NotificationRow(
 			long id,
 			String category,
@@ -430,7 +498,13 @@ public final class NotificationDao {
 			String entityType,
 			Long entityId,
 			String actionType,
+			String actorDisplayName,
 			String entityTitle,
+			Long caseId,
+			String caseName,
+			String caseResponsibleAttorney,
+			String caseResponsibleAttorneyColor,
+			Boolean caseNonEngagementLetterSent,
 			boolean isRead,
 			Instant createdAt,
 			String eventKey) {

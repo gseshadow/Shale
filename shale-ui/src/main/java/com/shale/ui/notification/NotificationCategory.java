@@ -6,5 +6,6 @@ public enum NotificationCategory {
 	NETWORK,
 	CONNECTIVITY,
 	TASK,
-	CASE
+	CASE,
+	CALENDAR
 }
