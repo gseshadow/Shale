@@ -20,6 +20,12 @@ public final class AppNotification {
 	private final String entityType;
 	private final Long entityId;
 	private final String entityTitle;
+	private final String actionType;
+	private final Long caseId;
+	private final String caseName;
+	private final String caseResponsibleAttorney;
+	private final String caseResponsibleAttorneyColor;
+	private final Boolean caseNonEngagementLetterSent;
 	private final BooleanProperty unread;
 
 	public AppNotification(
@@ -47,7 +53,7 @@ public final class AppNotification {
 			NotificationTargetScope targetScope,
 			Long durableNotificationId,
 			String eventKey) {
-		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId, eventKey, null, null, null);
+		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId, eventKey, null, null, null, null);
 	}
 
 	public AppNotification(
@@ -65,6 +71,70 @@ public final class AppNotification {
 			String entityType,
 			Long entityId,
 			String entityTitle) {
+		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId, eventKey, entityType, entityId, entityTitle, null);
+	}
+
+	public AppNotification(
+			String id,
+			NotificationCategory category,
+			NotificationSeverity severity,
+			String title,
+			String message,
+			Instant createdAt,
+			boolean unread,
+			boolean showAsBanner,
+			NotificationTargetScope targetScope,
+			Long durableNotificationId,
+			String eventKey,
+			String entityType,
+			Long entityId,
+			String entityTitle,
+			String actionType) {
+		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId, eventKey, entityType, entityId, entityTitle, actionType, null, null);
+	}
+
+	public AppNotification(
+			String id,
+			NotificationCategory category,
+			NotificationSeverity severity,
+			String title,
+			String message,
+			Instant createdAt,
+			boolean unread,
+			boolean showAsBanner,
+			NotificationTargetScope targetScope,
+			Long durableNotificationId,
+			String eventKey,
+			String entityType,
+			Long entityId,
+			String entityTitle,
+			String actionType,
+			Long caseId,
+			String caseName) {
+		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId, eventKey, entityType, entityId, entityTitle, actionType, caseId, caseName, null, null, null);
+	}
+
+	public AppNotification(
+			String id,
+			NotificationCategory category,
+			NotificationSeverity severity,
+			String title,
+			String message,
+			Instant createdAt,
+			boolean unread,
+			boolean showAsBanner,
+			NotificationTargetScope targetScope,
+			Long durableNotificationId,
+			String eventKey,
+			String entityType,
+			Long entityId,
+			String entityTitle,
+			String actionType,
+			Long caseId,
+			String caseName,
+			String caseResponsibleAttorney,
+			String caseResponsibleAttorneyColor,
+			Boolean caseNonEngagementLetterSent) {
 		this.id = Objects.requireNonNull(id, "id");
 		this.category = Objects.requireNonNull(category, "category");
 		this.severity = Objects.requireNonNull(severity, "severity");
@@ -79,6 +149,12 @@ public final class AppNotification {
 		this.entityType = entityType;
 		this.entityId = entityId;
 		this.entityTitle = entityTitle;
+		this.actionType = actionType;
+		this.caseId = caseId;
+		this.caseName = caseName;
+		this.caseResponsibleAttorney = caseResponsibleAttorney;
+		this.caseResponsibleAttorneyColor = caseResponsibleAttorneyColor;
+		this.caseNonEngagementLetterSent = caseNonEngagementLetterSent;
 	}
 
 	public String getId() {
@@ -129,6 +205,31 @@ public final class AppNotification {
 	public String getEntityTitle() {
 		return entityTitle;
 	}
+
+	public String getActionType() {
+		return actionType;
+	}
+
+	public Long getCaseId() {
+		return caseId;
+	}
+
+	public String getCaseName() {
+		return caseName;
+	}
+
+	public String getCaseResponsibleAttorney() {
+		return caseResponsibleAttorney;
+	}
+
+	public String getCaseResponsibleAttorneyColor() {
+		return caseResponsibleAttorneyColor;
+	}
+
+	public Boolean getCaseNonEngagementLetterSent() {
+		return caseNonEngagementLetterSent;
+	}
+
 	public boolean isShowAsBanner() {
 		return showAsBanner;
 	}

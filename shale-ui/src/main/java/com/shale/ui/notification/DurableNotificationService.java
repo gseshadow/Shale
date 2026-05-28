@@ -112,7 +112,13 @@ public final class DurableNotificationService {
 				row.eventKey(),
 				row.entityType(),
 				row.entityId(),
-				entityTitle);
+				entityTitle,
+				row.actionType(),
+				row.caseId(),
+				row.caseName(),
+				row.caseResponsibleAttorney(),
+				row.caseResponsibleAttorneyColor(),
+				row.caseNonEngagementLetterSent());
 	}
 
 	private static String safeTaskNotificationTitle(String actionType) {
