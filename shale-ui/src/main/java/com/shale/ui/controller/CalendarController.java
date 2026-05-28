@@ -4,6 +4,7 @@ import com.shale.core.model.CalendarFeedItem;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseDao;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
+import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
@@ -18,6 +19,10 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
 import javafx.util.Duration;
 
 import java.time.*;
@@ -29,8 +34,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import com.shale.ui.util.PerfLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class CalendarController {
+    private static final Logger log = LoggerFactory.getLogger(CalendarController.class);
     private static final DateTimeFormatter WEEK_RANGE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter DAY_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d");
     private static final DateTimeFormatter MONTH_RANGE_FORMAT = DateTimeFormatter.ofPattern("MMMM yyyy");
@@ -66,6 +74,12 @@ public final class CalendarController {
     private Integer selectedCaseId;
     private String selectedEventTypeKey = "";
     private final Set<Integer> openingEditDialogEventIds = new HashSet<>();
+    private boolean autoScrollTimedViewsPending = false;
+    private LocalDate lastLoadedRangeStart;
+    private LocalDate lastLoadedRangeEndInclusive;
+    private boolean suppressAutoScroll;
+    private ScrollPane timedScrollPane;
+    private boolean allDayCollapsed;
 
     private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
     private CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
@@ -85,10 +99,10 @@ public final class CalendarController {
         viewModeChoice.getItems().setAll(VIEW_WEEK, VIEW_FIVE_DAY, VIEW_DAY, VIEW_MONTH);
         viewModeChoice.setValue(VIEW_WEEK);
         selectedDate = LocalDate.now();
-        viewModeChoice.valueProperty().addListener((obs, o, n) -> { if (!Objects.equals(o, n)) loadCurrentRange(); });
+        viewModeChoice.valueProperty().addListener((obs, o, n) -> { if (!Objects.equals(o, n)) loadCurrentRange(false); });
         configureFilters();
         renderCurrentShell();
-        Platform.runLater(this::loadCurrentRange);
+        Platform.runLater(() -> loadCurrentRange(false));
     }
     private void configureFilters() {
         caseFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(CaseFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All cases" : item.displayName()); }});
@@ -110,9 +124,9 @@ public final class CalendarController {
         eventTypeFilterCombo.setValue(ALL_TYPES_OPTION);
     }
 
-    @FXML private void onToday() { selectedDate = LocalDate.now(); loadCurrentRange(); }
-    @FXML private void onPreviousWeek() { selectedDate = shiftSelectedDate(-1); loadCurrentRange(); }
-    @FXML private void onNextWeek() { selectedDate = shiftSelectedDate(1); loadCurrentRange(); }
+    @FXML private void onToday() { selectedDate = LocalDate.now(); loadCurrentRange(true); }
+    @FXML private void onPreviousWeek() { selectedDate = shiftSelectedDate(-1); loadCurrentRange(false); }
+    @FXML private void onNextWeek() { selectedDate = shiftSelectedDate(1); loadCurrentRange(false); }
     @FXML private void onClearFilters() {
         searchTextField.clear();
         selectedCaseId = null;
@@ -127,12 +141,12 @@ public final class CalendarController {
         if (tenantId == null || tenantId <= 0 || calendarService == null) { showError("Calendar is unavailable because no tenant is selected."); return; }
         long dialogStart = PerfLog.start();
         PerfLog.log("DIALOG", "start", "calendar new-event shell");
-        NewCalendarEventDialog.CreateDialogHandle dialog = NewCalendarEventDialog.showCreateDialogAsyncShell(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), currentRangeStart(), input -> {
+        NewCalendarEventDialog.CreateDialogHandle dialog = NewCalendarEventDialog.showCreateDialogAsyncShell(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), LocalDate.now(), input -> {
             LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
             LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
             try {
                 calendarService.createEvent(new com.shale.core.model.CalendarEvent(null, tenantId, input.calendarEventTypeId(), input.caseId(), null, input.title(), input.description(), startsAt, endsAt, input.allDay(), "MANUAL", null, null, input.assignedToUserId(), false, false, appState == null ? null : appState.getUserId(), null, null));
-                showError(null); loadCurrentRange(); return null;
+                showError(null); loadCurrentRange(false); return null;
             } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; }
         }, () -> caseOptionsForPicker(null), () -> assignedUserOptionsForPicker(tenantId, null));
         PerfLog.logDone("DIALOG", "calendar new-event shell shown", dialogStart);
@@ -144,20 +158,29 @@ public final class CalendarController {
                 PerfLog.logDone("DAO", "calendar new-event types load", loadStart);
                 Platform.runLater(() -> dialog.populateEventTypes(eventTypes));
             } catch (RuntimeException ex) {
-                Platform.runLater(() -> dialog.showLoadError("Could not load event types."));
+                log.warn("Unable to load calendar event types for tenantId={}", tenantId, ex);
+                Platform.runLater(() -> {
+                    dialog.showLoadError("Unable to load event types.");
+                });
             }
         });
     }
 
-    private void loadCurrentRange() {
-        loadGeneration++; int current = loadGeneration; renderCurrentShell(); setLoading(true); showError(null);
+    private void loadCurrentRange() { loadCurrentRange(false); }
+    private void loadCurrentRange(boolean fromTodayAction) {
+        LocalDate rangeStart = currentRangeStart();
+        LocalDate rangeEnd = currentRangeEndInclusive();
+        boolean initialLoad = lastLoadedRangeStart == null || lastLoadedRangeEndInclusive == null;
+        boolean rangeChanged = !Objects.equals(lastLoadedRangeStart, rangeStart) || !Objects.equals(lastLoadedRangeEndInclusive, rangeEnd);
+        autoScrollTimedViewsPending = fromTodayAction || initialLoad || rangeChanged;
+        loadGeneration++; int current = loadGeneration; suppressAutoScroll = true; renderCurrentShell(); suppressAutoScroll = false; setLoading(true); showError(null);
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
         if (tenantId == null || tenantId <= 0 || calendarService == null) { setLoading(false); showError("Calendar is unavailable because no tenant is selected."); return; }
-        LocalDateTime start = currentRangeStart().atStartOfDay(); LocalDateTime end = currentRangeEndInclusive().plusDays(1).atStartOfDay();
+        LocalDateTime start = rangeStart.atStartOfDay(); LocalDateTime end = rangeEnd.plusDays(1).atStartOfDay();
         dbExec.submit(() -> {
             try {
                 List<CalendarFeedItem> items = calendarService.listCalendarFeed(tenantId, start, end);
-                Platform.runLater(() -> { if (current != loadGeneration) return; setLoading(false); loadedItems = items == null ? List.of() : items; refreshFilterOptions(); applyFiltersAndRender(); });
+                Platform.runLater(() -> { if (current != loadGeneration) return; setLoading(false); loadedItems = items == null ? List.of() : items; refreshFilterOptions(); applyFiltersAndRender(); lastLoadedRangeStart = rangeStart; lastLoadedRangeEndInclusive = rangeEnd; });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> { if (current != loadGeneration) return; setLoading(false); showError("Could not load calendar for this period."); renderCurrent(List.of()); });
             }
@@ -258,16 +281,18 @@ public final class CalendarController {
             GridPane.setHgrow(header, Priority.ALWAYS);
             header.setMaxWidth(Double.MAX_VALUE);
             headerRow.add(header, i + 1, 0);
-            allDayRow.add(createAllDaySection(grouped.getOrDefault(day, List.of())), i + 1, 0);
+            allDayRow.add(createAllDaySection(grouped.getOrDefault(day, List.of()), allDayCollapsed), i + 1, 0);
         }
 
         ScrollPane timedScroll = new ScrollPane(timedGrid);
+        timedScrollPane = timedScroll;
         timedScroll.setFitToWidth(true);
         timedScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         timedScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         VBox.setVgrow(timedScroll, Priority.ALWAYS);
 
         board.getChildren().addAll(headerRow, allDayRow, timedScroll);
+        maybeAutoScrollTimedView(timedScroll, visibleDays);
         HBox.setHgrow(board, Priority.ALWAYS);
         weekBoard.getChildren().add(board);
     }
@@ -280,16 +305,18 @@ public final class CalendarController {
         board.setPadding(new Insets(8));
 
         HBox allDayRow = new HBox(6);
-        allDayRow.getChildren().addAll(createAllDayLabelColumn(), createAllDaySection(grouped.getOrDefault(selectedDate, List.of())));
+        allDayRow.getChildren().addAll(createAllDayLabelColumn(), createAllDaySection(grouped.getOrDefault(selectedDate, List.of()), allDayCollapsed));
 
         GridPane timedGrid = createTimedGrid(LocalDate.now(), LocalDateTime.now(), List.of(selectedDate), grouped);
         ScrollPane timedScroll = new ScrollPane(timedGrid);
+        timedScrollPane = timedScroll;
         timedScroll.setFitToWidth(true);
         timedScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         timedScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         VBox.setVgrow(timedScroll, Priority.ALWAYS);
 
         board.getChildren().addAll(allDayRow, timedScroll);
+        maybeAutoScrollTimedView(timedScroll, List.of(selectedDate));
         HBox.setHgrow(board, Priority.ALWAYS);
         weekBoard.getChildren().add(board);
     }
@@ -312,7 +339,18 @@ public final class CalendarController {
         box.setMinWidth(64);
         box.setPrefWidth(64);
         box.setMaxWidth(64);
-        box.getChildren().add(new Label("All day"));
+
+        HBox inline = new HBox(4);
+        Label label = new Label("All day");
+        label.getStyleClass().add("calendar-all-day-label");
+        Button toggle = new Button(allDayCollapsed ? "▾" : "▸");
+        toggle.getStyleClass().add("calendar-disclosure-toggle");
+        toggle.setOnAction(evt -> {
+            allDayCollapsed = !allDayCollapsed;
+            renderCurrent(filterItems(loadedItems));
+        });
+        inline.getChildren().addAll(label, toggle);
+        box.getChildren().add(inline);
         return box;
     }
 
@@ -331,21 +369,36 @@ public final class CalendarController {
         gutter.setPrefWidth(64);
         gutter.setMaxWidth(64);
         grid.getColumnConstraints().add(gutter);
+        double dayPercent = dayCount <= 0 ? 0 : 100.0 / dayCount;
         for (int i = 0; i < dayCount; i++) {
             ColumnConstraints dayCol = new ColumnConstraints();
             dayCol.setHgrow(Priority.ALWAYS);
             dayCol.setFillWidth(true);
+            dayCol.setPercentWidth(dayPercent);
             grid.getColumnConstraints().add(dayCol);
         }
     }
 
-    private VBox createAllDaySection(List<CalendarFeedItem> dayItems) {
+    private VBox createAllDaySection(List<CalendarFeedItem> dayItems, boolean collapsed) {
         VBox allDaySection = new VBox(4);
         allDaySection.getStyleClass().add("calendar-day-lane");
         allDaySection.setPadding(new Insets(6));
         List<CalendarFeedItem> allDayItems = dayItems.stream().filter(CalendarFeedItem::allDay).toList();
-        if (allDayItems.isEmpty()) allDaySection.getChildren().add(new Label("No all-day items"));
-        else for (CalendarFeedItem i : allDayItems) { Node b = calendarEventCardFactory.createAllDayBubble(i); configureCalendarCardClick(b, i); allDaySection.getChildren().add(b); }
+
+        if (collapsed) {
+            Label summary = new Label(allDayItems.isEmpty() ? "No all-day" : (allDayItems.size() + " all-day"));
+            summary.getStyleClass().add("calendar-all-day-summary");
+            allDaySection.getChildren().add(summary);
+            allDaySection.setMinHeight(36);
+            allDaySection.setPrefHeight(36);
+            allDaySection.setMaxHeight(36);
+        } else {
+            if (allDayItems.isEmpty()) allDaySection.getChildren().add(new Label("No all-day items"));
+            else for (CalendarFeedItem i : allDayItems) { Node b = calendarEventCardFactory.createAllDayBubble(i); configureCalendarCardClick(b, i); allDaySection.getChildren().add(b); }
+            allDaySection.setMinHeight(Region.USE_COMPUTED_SIZE);
+            allDaySection.setPrefHeight(Region.USE_COMPUTED_SIZE);
+            allDaySection.setMaxHeight(Double.MAX_VALUE);
+        }
         HBox.setHgrow(allDaySection, Priority.ALWAYS);
         return allDaySection;
     }
@@ -353,20 +406,27 @@ public final class CalendarController {
     private GridPane createTimedGrid(LocalDate today, LocalDateTime now, List<LocalDate> visibleDays, Map<LocalDate, List<CalendarFeedItem>> grouped) {
         int dayCount = visibleDays == null ? 0 : visibleDays.size();
         GridPane timedGrid = new GridPane();
-        timedGrid.setHgap(0);
+        timedGrid.setHgap(6);
         timedGrid.getStyleClass().add("calendar-timed-grid");
         configureSharedColumns(timedGrid, dayCount);
+        StackPane[] dayWidthAnchors = new StackPane[Math.max(0, dayCount)];
 
         Map<LocalDate, Integer> dayIndexByDate = new HashMap<>();
         for (int i = 0; i < dayCount; i++) dayIndexByDate.put(visibleDays.get(i), i);
-        Map<Integer, Map<Integer, List<CalendarFeedItem>>> eventsByDayAndSlot = new HashMap<>();
+        Map<Integer, List<CalendarFeedItem>> timedEventsByDay = new HashMap<>();
         for (CalendarFeedItem item : grouped.values().stream().flatMap(List::stream).toList()) {
             if (item == null || item.allDay() || item.startsAt() == null) continue;
             LocalDate eventDate = item.startsAt().toLocalDate();
             Integer dayIndex = dayIndexByDate.get(eventDate);
             if (dayIndex == null || dayIndex < 0) continue;
-            int slot = Math.max(0, Math.min(47, (int) ((item.startsAt().getHour() * 60.0 + item.startsAt().getMinute()) / 30.0)));
-            eventsByDayAndSlot.computeIfAbsent(dayIndex, k -> new HashMap<>()).computeIfAbsent(slot, k -> new ArrayList<>()).add(item);
+            timedEventsByDay.computeIfAbsent(dayIndex, k -> new ArrayList<>()).add(item);
+        }
+
+        Integer nowDayIndex = null;
+        Integer nowMinutesFromMidnight = null;
+        if (now != null) {
+            nowDayIndex = dayIndexByDate.get(now.toLocalDate());
+            if (nowDayIndex != null) nowMinutesFromMidnight = now.getHour() * 60 + now.getMinute();
         }
 
         for (int slot = 0; slot < 48; slot++) {
@@ -380,20 +440,204 @@ public final class CalendarController {
 
         for (int dayIndex = 0; dayIndex < dayCount; dayIndex++) {
             for (int slot = 0; slot < 48; slot++) {
-                VBox box = new VBox(4);
+                StackPane box = new StackPane();
                 box.setPrefHeight(HALF_HOUR_HEIGHT);
                 box.setMaxWidth(Double.MAX_VALUE);
                 box.getStyleClass().add("calendar-timed-day-cell");
                 GridPane.setHgrow(box, Priority.ALWAYS);
                 timedGrid.add(box, dayIndex + 1, slot);
-                for (CalendarFeedItem item : eventsByDayAndSlot.getOrDefault(dayIndex, Map.of()).getOrDefault(slot, List.of())) {
-                    Node c = calendarEventCardFactory.create(item, today, now);
-                    configureCalendarCardClick(c, item);
-                    box.getChildren().add(c);
-                }
+                if (slot == 0) dayWidthAnchors[dayIndex] = box;
             }
+            Pane eventsOverlay = new Pane();
+            eventsOverlay.setPickOnBounds(false);
+            GridPane.setHgrow(eventsOverlay, Priority.ALWAYS);
+            GridPane.setVgrow(eventsOverlay, Priority.ALWAYS);
+            GridPane.setRowSpan(eventsOverlay, 48);
+            timedGrid.add(eventsOverlay, dayIndex + 1, 0);
+            final int dayIndexFinal = dayIndex;
+            Runnable relayout = () -> {
+                double dayWidth = dayWidthAnchors[dayIndexFinal] == null ? eventsOverlay.getWidth() : dayWidthAnchors[dayIndexFinal].getWidth();
+                layoutTimedEvents(eventsOverlay, timedEventsByDay.getOrDefault(dayIndexFinal, List.of()), today, now, dayWidth);
+            };
+            Platform.runLater(relayout);
+            eventsOverlay.widthProperty().addListener((obs, oldV, newV) -> relayout.run());
+            if (dayWidthAnchors[dayIndexFinal] != null) dayWidthAnchors[dayIndexFinal].widthProperty().addListener((obs, oldV, newV) -> relayout.run());
+        }
+
+        if (nowDayIndex != null && nowMinutesFromMidnight != null) {
+            Node nowOverlay = createNowIndicatorOverlay(nowMinutesFromMidnight);
+            GridPane.setHgrow(nowOverlay, Priority.ALWAYS);
+            GridPane.setVgrow(nowOverlay, Priority.ALWAYS);
+            GridPane.setFillHeight(nowOverlay, true);
+            GridPane.setRowSpan(nowOverlay, 48);
+            timedGrid.add(nowOverlay, nowDayIndex + 1, 0);
         }
         return timedGrid;
+    }
+    // TODO: Implement side-by-side overlap layout after timed grid structure is simplified.
+
+    private void layoutTimedEvents(Pane overlay, List<CalendarFeedItem> events, LocalDate today, LocalDateTime now, double dayColumnWidth) {
+        if (overlay == null) return;
+        overlay.getChildren().clear();
+        if (events == null || events.isEmpty()) return;
+        List<CalendarFeedItem> sorted = new ArrayList<>(events);
+        sorted.sort(Comparator.comparing(CalendarFeedItem::startsAt).thenComparing(CalendarFeedItem::key));
+        List<List<CalendarFeedItem>> clusters = new ArrayList<>();
+        List<CalendarFeedItem> current = new ArrayList<>();
+        LocalDateTime clusterEnd = null;
+        for (CalendarFeedItem e : sorted) {
+            LocalDateTime start = e.startsAt();
+            LocalDateTime end = eventEnd(e);
+            if (current.isEmpty() || (clusterEnd != null && start.isBefore(clusterEnd))) {
+                current.add(e);
+                if (clusterEnd == null || end.isAfter(clusterEnd)) clusterEnd = end;
+            } else {
+                clusters.add(current);
+                current = new ArrayList<>();
+                current.add(e);
+                clusterEnd = end;
+            }
+        }
+        if (!current.isEmpty()) clusters.add(current);
+        for (List<CalendarFeedItem> cluster : clusters) placeCluster(overlay, cluster, today, now, dayColumnWidth);
+    }
+
+    private void placeCluster(Pane overlay, List<CalendarFeedItem> cluster, LocalDate today, LocalDateTime now, double dayColumnWidth) {
+        List<CalendarFeedItem> ordered = new ArrayList<>(cluster);
+        ordered.sort(Comparator.comparing(CalendarFeedItem::startsAt).thenComparing(CalendarFeedItem::key));
+        List<LocalDateTime> columnEndTimes = new ArrayList<>();
+        Map<CalendarFeedItem, Integer> eventColumns = new HashMap<>();
+        for (CalendarFeedItem e : ordered) {
+            int column = -1;
+            for (int i = 0; i < columnEndTimes.size(); i++) {
+                if (!e.startsAt().isBefore(columnEndTimes.get(i))) { column = i; break; }
+            }
+            if (column == -1) { column = columnEndTimes.size(); columnEndTimes.add(eventEnd(e)); }
+            else columnEndTimes.set(column, eventEnd(e));
+            eventColumns.put(e, column);
+        }
+        int columnCount = Math.max(1, columnEndTimes.size());
+        double overlayWidth = Math.max(1, dayColumnWidth);
+        double pxPerMinute = (HALF_HOUR_HEIGHT * 48.0) / (24.0 * 60.0);
+        for (CalendarFeedItem e : ordered) {
+            Node card = calendarEventCardFactory.create(e, today, now);
+            configureCalendarCardClick(card, e);
+            int startMinutes = e.startsAt().getHour() * 60 + e.startsAt().getMinute();
+            long durationMinutes = Math.max(30, java.time.Duration.between(e.startsAt(), eventEnd(e)).toMinutes());
+            double y = startMinutes * pxPerMinute;
+            double h = Math.max(HALF_HOUR_HEIGHT - 2, durationMinutes * pxPerMinute - 2);
+            int col = eventColumns.getOrDefault(e, 0);
+            double colWidth = overlayWidth / columnCount;
+            double localX = col * colWidth + 1;
+            double localWidth = Math.max(20, colWidth - 2);
+            applyTimedCardSizing(card, localWidth, h);
+            if (log.isDebugEnabled()) {
+                log.debug("Calendar timed layout event='{}' date={} start={} end={} dayWidth={} columns={} columnIndex={} localX={} localWidth={}",
+                        safe(e.title()), e.startsAt() == null ? null : e.startsAt().toLocalDate(), e.startsAt(), eventEnd(e), overlayWidth, columnCount, col, localX, localWidth);
+            }
+            card.resizeRelocate(localX, y + 1, localWidth, h);
+            overlay.getChildren().add(card);
+        }
+    }
+
+    private void applyTimedCardSizing(Node card, double width, double height) {
+        if (card == null) return;
+        card.getStyleClass().removeAll("calendar-event-card-compact", "calendar-event-card-normal", "calendar-event-card-tall");
+        if (height <= HALF_HOUR_HEIGHT + 4) card.getStyleClass().add("calendar-event-card-compact");
+        else if (height < HALF_HOUR_HEIGHT * 3) card.getStyleClass().add("calendar-event-card-normal");
+        else card.getStyleClass().add("calendar-event-card-tall");
+        if (card instanceof Region region) {
+            region.setMinHeight(height);
+            region.setPrefHeight(height);
+            region.setMaxHeight(height);
+            region.setMinWidth(width);
+            region.setPrefWidth(width);
+            region.setMaxWidth(width);
+            Rectangle clip = new Rectangle(width, height);
+            clip.widthProperty().bind(region.widthProperty());
+            clip.heightProperty().bind(region.heightProperty());
+            region.setClip(clip);
+        }
+    }
+
+    private static LocalDateTime eventEnd(CalendarFeedItem e) {
+        if (e == null || e.startsAt() == null) return LocalDateTime.MIN;
+        if (e.endsAt() != null && e.endsAt().isAfter(e.startsAt())) return e.endsAt();
+        return e.startsAt().plusMinutes(30);
+    }
+
+
+    private void maybeAutoScrollTimedView(ScrollPane timedScroll, List<LocalDate> visibleDays) {
+        if (suppressAutoScroll || !autoScrollTimedViewsPending || timedScroll == null || timedScroll != timedScrollPane) return;
+        LocalDate today = LocalDate.now();
+        LocalTime targetTime = (visibleDays != null && visibleDays.contains(today)) ? LocalTime.now() : LocalTime.of(8, 0);
+        positionTimedScroll(timedScroll, targetTime, 0);
+    }
+
+    private void positionTimedScroll(ScrollPane timedScroll, LocalTime targetTime, int attempt) {
+        if (timedScroll == null || attempt > 4) return;
+        Platform.runLater(() -> Platform.runLater(() -> {
+            Node content = timedScroll.getContent();
+            if (content == null) return;
+            double contentHeight = content.getBoundsInLocal().getHeight();
+            double viewportHeight = timedScroll.getViewportBounds().getHeight();
+            if (contentHeight <= 0 || viewportHeight <= 0) {
+                positionTimedScroll(timedScroll, targetTime, attempt + 1);
+                return;
+            }
+            int minutesFromMidnight = targetTime.getHour() * 60 + targetTime.getMinute();
+            double targetY = (minutesFromMidnight / (24.0 * 60.0)) * contentHeight;
+            double scrollableHeight = contentHeight - viewportHeight;
+            double desiredOffset = targetY - (viewportHeight / 2.0);
+            double vvalue = scrollableHeight <= 0 ? 0.0 : desiredOffset / scrollableHeight;
+            timedScroll.setVvalue(Math.max(0.0, Math.min(1.0, vvalue)));
+            autoScrollTimedViewsPending = false;
+        }));
+    }
+
+    private Node createNowIndicatorOverlay(int minutesFromMidnight) {
+        Pane overlay = new Pane();
+        overlay.setMouseTransparent(true);
+        overlay.setPickOnBounds(false);
+        overlay.setManaged(true);
+        overlay.setMaxWidth(Double.MAX_VALUE);
+        overlay.setPrefHeight(48 * HALF_HOUR_HEIGHT);
+
+        Circle dot = new Circle(4);
+        dot.getStyleClass().add("calendar-now-dot");
+        dot.setFill(Color.RED);
+        dot.setMouseTransparent(true);
+
+        Line line = new Line();
+        line.getStyleClass().add("calendar-now-line");
+        line.setStroke(Color.RED);
+        line.setStrokeWidth(2);
+        line.setMouseTransparent(true);
+
+        overlay.getChildren().addAll(line, dot);
+
+        Runnable positionMarker = () -> {
+            double width = overlay.getWidth();
+            double height = overlay.getHeight();
+            if (width <= 0 || height <= 0) {
+                PerfLog.log("UI", "calendar-now-overlay-zero", "width=" + width + " height=" + height);
+                return;
+            }
+            double y = (minutesFromMidnight / (24.0 * 60.0)) * height;
+            y = Math.max(0.0, Math.min(height, y));
+            line.setStartX(8);
+            line.setEndX(Math.max(8, width));
+            line.setStartY(y);
+            line.setEndY(y);
+            dot.setCenterX(4);
+            dot.setCenterY(y);
+            PerfLog.log("UI", "calendar-now-overlay", "width=" + width + " height=" + height + " y=" + y);
+        };
+
+        overlay.widthProperty().addListener((obs, oldVal, newVal) -> positionMarker.run());
+        overlay.heightProperty().addListener((obs, oldVal, newVal) -> positionMarker.run());
+        Platform.runLater(() -> Platform.runLater(positionMarker));
+        return overlay;
     }
 
     private Map<LocalDate, List<CalendarFeedItem>> groupAndSort(List<CalendarFeedItem> items, LocalDate start, int dayCount) {
@@ -424,7 +668,11 @@ public final class CalendarController {
                 PerfLog.log("DAO", "start", "calendar edit-event hydrate eventId=" + eventId);
                 var event = calendarService.getEventById(eventId, tenantId);
                 if (event == null) {
-                    Platform.runLater(() -> { openingEditDialogEventIds.remove(eventId); dialog.showLoadError("Could not load event for editing."); });
+                    log.info("Calendar event open failed reason=not_found eventId={} tenantId={}", eventId, tenantId);
+                    Platform.runLater(() -> {
+                        openingEditDialogEventIds.remove(eventId);
+                        dialog.showLoadError("Calendar event could not be opened.");
+                    });
                     return;
                 }
                 var initial = new NewCalendarEventDialog.CreateCalendarEventInput(event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(), event.allDay() ? null : event.startsAt().toLocalTime(), resolveDurationMinutes(event), event.description(), event.caseId(), event.assignedToUserId());
@@ -436,37 +684,55 @@ public final class CalendarController {
                     if (!dialog.isShowing()) return;
                     Node rc = caseRow == null ? null : createRelatedCaseNode(caseRow);
                     Node rt = taskRow == null ? null : createRelatedTaskNode(taskRow);
-                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()));
+                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()), onOpenCase, caseRow == null ? null : new NewCalendarEventDialog.CaseOption(caseRow.caseId(), caseRow.caseName(), caseRow.responsibleAttorney(), caseRow.responsibleAttorneyColor(), caseRow.nonEngagementLetterSent()));
                     openingEditDialogEventIds.remove(eventId);
                 });
             } catch (RuntimeException ex) {
-                Platform.runLater(() -> { openingEditDialogEventIds.remove(eventId); dialog.showLoadError("Could not load event for editing."); });
+                log.warn("Calendar event open failed reason=exception eventId={} tenantId={}", eventId, tenantId, ex);
+                Platform.runLater(() -> { openingEditDialogEventIds.remove(eventId); dialog.showLoadError("Calendar event could not be opened."); });
             }
         });
+    }
+
+    public void openCalendarEventFromNotification(long eventId) {
+        if (eventId <= 0 || eventId > Integer.MAX_VALUE) {
+            log.info("Calendar notification open skipped reason=invalid_event_id eventId={} tenantId={}", eventId, appState == null ? null : appState.getShaleClientId());
+            AppDialogs.showError(weekBoard == null || weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), "Calendar", "Calendar event could not be opened.");
+            return;
+        }
+        openEditEventDialog((int) eventId);
     }
     private CalendarFeedDao.CalendarCaseCardRow loadCaseRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { if (event == null || event.caseId() == null) return null; List<CalendarFeedDao.CalendarCaseCardRow> rows = calendarFeedDao.listCaseCardRows(tenantId, List.of(event.caseId())); return rows.isEmpty() ? null : rows.getFirst(); }
     private CalendarFeedDao.CalendarTaskCardRow loadTaskRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { if (event == null || event.taskId() == null) return null; List<CalendarFeedDao.CalendarTaskCardRow> rows = calendarFeedDao.listTaskCardRows(tenantId, List.of(event.taskId())); return rows.isEmpty() ? null : rows.getFirst(); }
     private Node createRelatedCaseNode(CalendarFeedDao.CalendarCaseCardRow row) { if (row == null) return null; return caseCardFactory.create(new CaseCardFactory.CaseCardModel(row.caseId(), row.caseName(), null, null, row.responsibleAttorney(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI); }
     private Node createRelatedTaskNode(CalendarFeedDao.CalendarTaskCardRow row) { if (row == null) return null; return taskCardFactory.create(new TaskCardFactory.TaskCardModel(row.taskId(), row.caseId() == null ? null : row.caseId().longValue(), row.caseName(), row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.title(), null, row.createdByDisplayName(), row.priorityColorHex(), row.dueAt(), row.completedAt(), List.of()), TaskCardFactory.Variant.MINI); }
-    private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) { LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime()); LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes()); try { calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), input.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), input.assignedToUserId(), existing.completed(), existing.cancelled(), existing.createdByUserId(), existing.createdAt(), existing.updatedAt())); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; } }
+    private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) { LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime()); LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes()); try { calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), input.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), input.assignedToUserId(), existing.completed(), existing.cancelled(), appState == null ? null : appState.getUserId(), existing.createdAt(), existing.updatedAt())); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; } }
     private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker(Integer selectedCaseId) {
-        Map<Integer, String> names = new LinkedHashMap<>();
+        Map<Integer, CaseDao.CaseRow> casesById = new LinkedHashMap<>();
         if (caseDao != null) {
             int page = 1;
             int pageSize = 250;
             while (true) {
                 CaseDao.PagedResult<CaseDao.CaseRow> result = caseDao.findPage(page, pageSize, CaseDao.CaseSort.INTAKE_NEWEST, false);
                 if (result == null || result.items() == null || result.items().isEmpty()) break;
-                result.items().forEach(c -> names.putIfAbsent(Math.toIntExact(c.id()), safe(c.name())));
+                result.items().forEach(c -> casesById.putIfAbsent(Math.toIntExact(c.id()), c));
                 if (result.items().size() < pageSize) break;
                 page++;
             }
-            if (selectedCaseId != null && selectedCaseId > 0 && !names.containsKey(selectedCaseId)) {
+            if (selectedCaseId != null && selectedCaseId > 0 && !casesById.containsKey(selectedCaseId)) {
                 var row = caseDao.getCaseRow(selectedCaseId.longValue());
-                if (row != null) names.put(selectedCaseId, row.name());
+                if (row != null) casesById.put(selectedCaseId, row);
             }
         }
-        return names.entrySet().stream().map(e -> new NewCalendarEventDialog.CaseOption(e.getKey(), e.getValue())).sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT))).toList();
+        return casesById.values().stream()
+                .map(row -> new NewCalendarEventDialog.CaseOption(
+                        Math.toIntExact(row.id()),
+                        safe(row.name()),
+                        row.responsibleAttorneyName(),
+                        row.responsibleAttorneyColor(),
+                        row.nonEngagementLetterSent()))
+                .sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT)))
+                .toList();
     }
     private List<NewCalendarEventDialog.AssignedUserOption> assignedUserOptionsForPicker(int tenantId, Integer selectedUserId) {
         if (caseTaskService == null) return List.of();

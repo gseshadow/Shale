@@ -24,12 +24,18 @@ public final class CalendarEventCardFactory {
 
         HBox card = new HBox(0);
         card.getStyleClass().add("calendar-event-card");
+        card.setFillHeight(true);
+        applyAssignedUserTint(card, item);
         Region accentBar = buildAccentBar(item.colorHex());
         if (accentBar != null) {
             card.getChildren().add(accentBar);
         }
 
         VBox content = new VBox(3);
+        content.setFillWidth(true);
+        content.setMinHeight(0);
+        content.setPrefHeight(Region.USE_COMPUTED_SIZE);
+        content.setMaxHeight(Double.MAX_VALUE);
 
         LocalDate itemDate = item.startsAt() == null ? null : item.startsAt().toLocalDate();
         if (item.startsAt() != null && item.startsAt().isBefore(now)) {
@@ -52,17 +58,29 @@ public final class CalendarEventCardFactory {
 
         Label time = new Label(resolveTime(item));
         time.getStyleClass().add("calendar-event-time");
+        time.setWrapText(false);
+        time.setTextOverrun(OverrunStyle.ELLIPSIS);
+        time.setMaxWidth(Double.MAX_VALUE);
 
         Label title = new Label(safe(item.title()));
         title.getStyleClass().add("calendar-event-title");
-        title.setWrapText(true);
+        title.setWrapText(false);
+        title.setTextOverrun(OverrunStyle.ELLIPSIS);
+        title.setMaxWidth(Double.MAX_VALUE);
 
         Label relatedSummary = new Label(resolveRelatedSummary(item));
         relatedSummary.getStyleClass().add("calendar-event-related");
-        if (!relatedSummary.getText().isBlank()) {
-            content.getChildren().add(relatedSummary);
-        }
-        content.getChildren().addAll(time, title, badges);
+        relatedSummary.setWrapText(false);
+        relatedSummary.setTextOverrun(OverrunStyle.ELLIPSIS);
+        relatedSummary.setMaxWidth(Double.MAX_VALUE);
+        content.getChildren().addAll(time, title);
+        if (!relatedSummary.getText().isBlank()) content.getChildren().add(relatedSummary);
+        content.getChildren().add(badges);
+        relatedSummary.managedProperty().bind(relatedSummary.visibleProperty());
+        badges.managedProperty().bind(badges.visibleProperty());
+        card.heightProperty().addListener((obs, oldH, newH) -> applyTimedContentDensity(newH == null ? 0 : newH.doubleValue(), relatedSummary, badges));
+        applyTimedContentDensity(card.getHeight(), relatedSummary, badges);
+        HBox.setHgrow(content, Priority.ALWAYS);
         card.getChildren().add(content);
 
         return card;
@@ -107,6 +125,20 @@ public final class CalendarEventCardFactory {
         accentBar.setMaxWidth(5);
         accentBar.setStyle("-fx-background-color: " + accent + "; -fx-background-radius: 6 0 0 6;");
         return accentBar;
+    }
+
+    private static void applyAssignedUserTint(HBox card, CalendarFeedItem item) {
+        if (card == null || item == null) return;
+        if (!"MANUAL".equals(normalize(item.sourceType())) && !"CALENDAR_EVENT".equals(normalize(item.sourceType()))) return;
+        String normalized = ColorUtil.normalizeStoredColor(item.assignedUserColor());
+        if (normalized == null) return;
+        String rgb = normalized.substring(0, 6);
+        card.setStyle("-fx-background-color: #ffffff, rgba(" +
+                Integer.parseInt(rgb.substring(0, 2), 16) + "," +
+                Integer.parseInt(rgb.substring(2, 4), 16) + "," +
+                Integer.parseInt(rgb.substring(4, 6), 16) + ",0.12);" +
+                " -fx-background-insets: 0, 0;" +
+                " -fx-background-radius: 8, 8;");
     }
 
     private static String resolveType(CalendarFeedItem item) {
@@ -166,5 +198,18 @@ public final class CalendarEventCardFactory {
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private static void applyTimedContentDensity(double height, Label relatedSummary, HBox badges) {
+        if (height < 42) {
+            relatedSummary.setVisible(false);
+            badges.setVisible(false);
+        } else if (height < 64) {
+            relatedSummary.setVisible(false);
+            badges.setVisible(true);
+        } else {
+            relatedSummary.setVisible(true);
+            badges.setVisible(true);
+        }
     }
 }

@@ -99,6 +99,8 @@ public final class SceneManager {
 	private final ConnectivityNotificationProducer connectivityNotificationProducer;
 	private final SystemUpdateNotificationProducer systemUpdateNotificationProducer;
 	private final NotificationPreferencesService notificationPreferencesService;
+	private CalendarController calendarController;
+	private Integer pendingCalendarNotificationEventId;
 	private final DurableNotificationService durableNotificationService;
 	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
 	private final UpdatePollingService updatePollingService;
@@ -301,6 +303,18 @@ public final class SceneManager {
 
 	public void openCalendarView() {
 		navigateTo(AppRoute.calendar(), true);
+	}
+
+	public void openCalendarEventFromNotification(long calendarEventId) {
+		if (calendarEventId <= 0 || calendarEventId > Integer.MAX_VALUE) {
+			return;
+		}
+		if (calendarController != null) {
+			calendarController.openCalendarEventFromNotification(calendarEventId);
+			return;
+		}
+		pendingCalendarNotificationEventId = (int) calendarEventId;
+		openCalendarView();
 	}
 
 	public void openSettingsView() {
@@ -512,17 +526,25 @@ public final class SceneManager {
 	public Parent createCalendarView() {
 		return load("/fxml/calendar.fxml", controller -> {
 			CalendarController c = (CalendarController) controller;
+			this.calendarController = c;
 			CalendarFeedDao calendarFeedDao = new CalendarFeedDao(dbSessionProvider);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(
 					new CalendarEventTypeDao(dbSessionProvider),
 					new CalendarEventDao(dbSessionProvider),
-					calendarFeedDao);
+					calendarFeedDao,
+					notificationDao,
+					runtimeBridge);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
-			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openTaskProfile);
+			Integer pendingEventId = pendingCalendarNotificationEventId;
+			if (pendingEventId != null && pendingEventId > 0) {
+				pendingCalendarNotificationEventId = null;
+				Platform.runLater(() -> c.openCalendarEventFromNotification(pendingEventId.longValue()));
+			}
 			return c;
 		});
 	}

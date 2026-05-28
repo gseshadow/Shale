@@ -88,7 +88,7 @@ public final class CalendarFeedDao {
             return List.of();
         }
         String sql = """
-                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex
+                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex, AssignedUserColor
                 FROM (
                     SELECT CONCAT('EVENT:', CAST(e.CalendarEventId AS varchar(20))) AS KeyValue,
                            e.Title,
@@ -99,12 +99,15 @@ public final class CalendarFeedDao {
                            e.SourceField,
                            e.CaseId,
                            e.TaskId,
-                           NULL AS RelatedDisplayName,
+                           c.Name AS RelatedDisplayName,
                            et.SystemKey AS CalendarEventTypeSystemKey,
                            COALESCE(et.Name, 'Event') AS DisplayTypeName,
-                           et.ColorHex AS ColorHex
+                           COALESCE(assignedUser.color, et.ColorHex) AS ColorHex,
+                           assignedUser.color AS AssignedUserColor
                     FROM dbo.CalendarEvents e
                     LEFT JOIN dbo.CalendarEventTypes et ON et.CalendarEventTypeId = e.CalendarEventTypeId
+                    LEFT JOIN dbo.Cases c ON c.Id = e.CaseId AND c.ShaleClientId = e.ShaleClientId AND ISNULL(c.IsDeleted, 0) = 0
+                    LEFT JOIN dbo.Users assignedUser ON assignedUser.Id = e.AssignedToUserId AND assignedUser.ShaleClientId = e.ShaleClientId AND ISNULL(assignedUser.is_deleted, 0) = 0
                     WHERE e.ShaleClientId = ?
                       AND e.StartsAt >= ?
                       AND e.StartsAt < ?
@@ -123,7 +126,8 @@ public final class CalendarFeedDao {
                            t.Title,
                            'TASK_DUE',
                            'Task Due',
-                           projectedType.ColorHex
+                           projectedType.ColorHex,
+                           NULL AS AssignedUserColor
                     FROM dbo.Tasks t
                     OUTER APPLY (
                       SELECT TOP (1) cet.ColorHex
@@ -154,7 +158,8 @@ public final class CalendarFeedDao {
                            c.Name,
                            'STATUTE_OF_LIMITATIONS',
                            'Statute of Limitations',
-                           projectedType.ColorHex
+                           projectedType.ColorHex,
+                           NULL AS AssignedUserColor
                     FROM dbo.Cases c
                     OUTER APPLY (
                       SELECT TOP (1) cet.ColorHex
@@ -185,7 +190,8 @@ public final class CalendarFeedDao {
                            c.Name,
                            'TORT_NOTICE_DEADLINE',
                            'Tort Notice Deadline',
-                           projectedType.ColorHex
+                           projectedType.ColorHex,
+                           NULL AS AssignedUserColor
                     FROM dbo.Cases c
                     OUTER APPLY (
                       SELECT TOP (1) cet.ColorHex
@@ -216,7 +222,8 @@ public final class CalendarFeedDao {
                            c.Name,
                            'DISCOVERY_DEADLINE',
                            'Discovery Deadline',
-                           projectedType.ColorHex
+                           projectedType.ColorHex,
+                           NULL AS AssignedUserColor
                     FROM dbo.Cases c
                     OUTER APPLY (
                       SELECT TOP (1) cet.ColorHex
@@ -260,7 +267,8 @@ public final class CalendarFeedDao {
                             rs.getString("RelatedDisplayName"),
                             rs.getString("CalendarEventTypeSystemKey"),
                             rs.getString("DisplayTypeName"),
-                            rs.getString("ColorHex")));
+                            rs.getString("ColorHex"),
+                            rs.getString("AssignedUserColor")));
                 }
                 return rows;
             }

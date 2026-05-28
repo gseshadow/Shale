@@ -27,6 +27,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -44,7 +46,7 @@ public final class NewCalendarEventDialog {
     public static Optional<CreateCalendarEventInput> showAndWait(Window owner, List<CalendarEventType> eventTypes, LocalDate defaultDate, List<CaseOption> caseOptions, List<AssignedUserOption> assignedUserOptions) {
         Stage stage = AppDialogs.createModalStage(owner, "New Event");
         ResultHolder holder = new ResultHolder();
-        DialogParts p = DialogParts.build(eventTypes, new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, null), null, null, () -> caseOptions, () -> assignedUserOptions, true);
+        DialogParts p = DialogParts.build(eventTypes, new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, null), null, null, () -> caseOptions, () -> assignedUserOptions, id -> {}, null, true);
 
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -74,7 +76,7 @@ public final class NewCalendarEventDialog {
     }
     public static void showEditDialog(Window owner, List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Function<CreateCalendarEventInput, String> onSave, Supplier<String> onDelete, Node relatedCaseNode, Node relatedTaskNode, List<CaseOption> caseOptions, List<AssignedUserOption> assignedUserOptions) {
         Stage stage = AppDialogs.createModalStage(owner, "Edit Event");
-        DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode, () -> caseOptions, () -> assignedUserOptions, true);
+        DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode, () -> caseOptions, () -> assignedUserOptions, id -> {}, null, true);
 
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -161,8 +163,8 @@ public final class NewCalendarEventDialog {
 
         public void showLoadError(String message) { showError(errorLabel, message); }
 
-        public void populate(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Function<CreateCalendarEventInput, String> onSave, Supplier<String> onDelete, Node relatedCaseNode, Node relatedTaskNode, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier) {
-            DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode, caseOptionsSupplier, assignedUserOptionsSupplier, true);
+        public void populate(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Function<CreateCalendarEventInput, String> onSave, Supplier<String> onDelete, Node relatedCaseNode, Node relatedTaskNode, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier, Consumer<Integer> onOpenCase, CaseOption initialSelectedCase) {
+            DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode, caseOptionsSupplier, assignedUserOptionsSupplier, onOpenCase, initialSelectedCase, true);
             content.getChildren().setAll(p.content());
             deleteButton.setDisable(false);
             saveButton.setDisable(false);
@@ -190,7 +192,7 @@ public final class NewCalendarEventDialog {
         Stage stage = AppDialogs.createModalStage(owner, "New Event");
         PerfLog.logDone("DIALOG", "calendar new-event stage create", stageCreateStart);
         CreateCalendarEventInput initial = new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, null);
-        DialogParts p = DialogParts.build(List.of(), initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, false);
+        DialogParts p = DialogParts.build(List.of(), initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, id -> {}, null, false);
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
         cancelButton.setOnAction(e -> stage.close());
@@ -202,13 +204,25 @@ public final class NewCalendarEventDialog {
         showStageNonBlocking(stage, "New Event", "Create event", p.content(), null, cancelButton, saveButton);
         PerfLog.logDone("DIALOG", "calendar new-event show", showStart);
         Platform.runLater(() -> PerfLog.log("DIALOG", "tick", "calendar new-event first-runLater-after-show"));
-        return new CreateDialogHandle(stage, p.content(), p.errorLabel(), saveButton);
+        return new CreateDialogHandle(stage, p.content(), p.errorLabel(), saveButton, defaultDate, onSave, caseOptionsSupplier, assignedUserOptionsSupplier);
     }
 
     public static final class CreateDialogHandle {
         private final Stage stage; private final VBox content; private final Label errorLabel; private final Button saveButton;
-        private CreateDialogHandle(Stage stage, VBox content, Label errorLabel, Button saveButton){ this.stage=stage; this.content=content; this.errorLabel=errorLabel; this.saveButton=saveButton; }
-        public void populateEventTypes(List<CalendarEventType> eventTypes){ if(!stage.isShowing()) return; saveButton.setDisable(false); }
+        private final LocalDate defaultDate;
+        private final Function<CreateCalendarEventInput, String> onSave;
+        private final Supplier<List<CaseOption>> caseOptionsSupplier;
+        private final Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier;
+        private CreateDialogHandle(Stage stage, VBox content, Label errorLabel, Button saveButton, LocalDate defaultDate, Function<CreateCalendarEventInput, String> onSave, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier){ this.stage=stage; this.content=content; this.errorLabel=errorLabel; this.saveButton=saveButton; this.defaultDate=defaultDate; this.onSave=onSave; this.caseOptionsSupplier=caseOptionsSupplier; this.assignedUserOptionsSupplier=assignedUserOptionsSupplier; }
+        public void populateEventTypes(List<CalendarEventType> eventTypes){
+            if(!stage.isShowing()) return;
+            List<CalendarEventType> safeTypes = eventTypes == null ? List.of() : eventTypes;
+            CreateCalendarEventInput initial = new CreateCalendarEventInput("", resolveDefaultTypeId(safeTypes), defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, null);
+            DialogParts updated = DialogParts.build(safeTypes, initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, id -> {}, null, true);
+            content.getChildren().setAll(updated.content());
+            saveButton.setDisable(safeTypes.isEmpty());
+            saveButton.setOnAction(e -> { Optional<CreateCalendarEventInput> input = updated.readInput().get(); if (input.isEmpty()) return; String err = onSave == null ? "Save is unavailable." : onSave.apply(input.get()); if (err == null || err.isBlank()) stage.close(); else showError(updated.errorLabel(), err); });
+        }
         public void showLoadError(String message){ showError(errorLabel, message); }
     }
     private static void showStage(Stage stage, String shellTitle, String headingText, VBox content, Button leftAction, Button cancelButton, Button saveButton) {
@@ -224,17 +238,18 @@ public final class NewCalendarEventDialog {
         formScroll.setFitToWidth(true);
         formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        formScroll.setMinViewportHeight(300);
-        formScroll.setPrefViewportHeight(380);
+        formScroll.setMinViewportHeight(360);
+        formScroll.setPrefViewportHeight(500);
         formScroll.getStyleClass().add("calendar-day-scroll");
 
-        VBox body = new VBox(16, heading, message, formScroll, actions);
+        VBox body = new VBox(12, heading, message, formScroll, actions);
         VBox.setVgrow(formScroll, Priority.ALWAYS);
-        body.setPadding(new Insets(22, 24, 22, 24));
+        body.setPadding(new Insets(20, 24, 16, 24));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
-        root.setMinWidth(460);
-        root.setPrefHeight(640);
-        root.setMaxHeight(680);
+        root.setMinWidth(680);
+        root.setPrefWidth(760);
+        root.setPrefHeight(Region.USE_COMPUTED_SIZE);
+        root.setMaxHeight(Region.USE_COMPUTED_SIZE);
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
@@ -254,16 +269,17 @@ public final class NewCalendarEventDialog {
         formScroll.setFitToWidth(true);
         formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        formScroll.setMinViewportHeight(300);
-        formScroll.setPrefViewportHeight(380);
+        formScroll.setMinViewportHeight(360);
+        formScroll.setPrefViewportHeight(500);
         formScroll.getStyleClass().add("calendar-day-scroll");
-        VBox body = new VBox(16, heading, message, formScroll, actions);
+        VBox body = new VBox(12, heading, message, formScroll, actions);
         VBox.setVgrow(formScroll, Priority.ALWAYS);
-        body.setPadding(new Insets(22, 24, 22, 24));
+        body.setPadding(new Insets(20, 24, 16, 24));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
-        root.setMinWidth(460);
-        root.setPrefHeight(640);
-        root.setMaxHeight(680);
+        root.setMinWidth(680);
+        root.setPrefWidth(760);
+        root.setPrefHeight(Region.USE_COMPUTED_SIZE);
+        root.setMaxHeight(Region.USE_COMPUTED_SIZE);
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
@@ -277,16 +293,16 @@ public final class NewCalendarEventDialog {
     }
 
     public record CreateCalendarEventInput(String title, int calendarEventTypeId, LocalDate date, boolean allDay, LocalTime startTime, int durationMinutes, String description, Integer caseId, Integer assignedToUserId) {}
-    public record CaseOption(Integer caseId, String displayName) {}
+    public record CaseOption(Integer caseId, String displayName, String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {}
     public record AssignedUserOption(Integer userId, String displayName, String color) {}
 
     private static final class ResultHolder { private CreateCalendarEventInput value; }
 
     private record DialogParts(VBox content, Label errorLabel, Supplier<Optional<CreateCalendarEventInput>> readInput) {
         static DialogParts build(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial) {
-            return build(eventTypes, initial, null, null, () -> List.of(), () -> List.of(), true);
+            return build(eventTypes, initial, null, null, () -> List.of(), () -> List.of(), id -> {}, null, true);
         }
-        static DialogParts build(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Node relatedCaseNode, Node relatedTaskNode, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier, boolean typesReady) {
+        static DialogParts build(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Node relatedCaseNode, Node relatedTaskNode, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier, Consumer<Integer> onOpenCase, CaseOption initialSelectedCase, boolean typesReady) {
             Label titleLabel = new Label("Title");
             TextField titleField = new TextField(initial == null ? "" : initial.title());
             Label eventTypeLabel = new Label("Type");
@@ -298,6 +314,7 @@ public final class NewCalendarEventDialog {
             eventTypeComboBox.setButtonCell(new CalendarTypeCell());
             if (!typesReady) { eventTypeComboBox.setDisable(true); eventTypeComboBox.setPromptText("Loading types..."); }
             if (initial != null) safeTypes.stream().filter(t -> t.calendarEventTypeId() == initial.calendarEventTypeId()).findFirst().ifPresent(eventTypeComboBox::setValue);
+            if (typesReady && eventTypeComboBox.getValue() == null && !safeTypes.isEmpty()) eventTypeComboBox.setValue(safeTypes.getFirst());
 
             Label dateLabel = new Label("Date");
             DatePicker datePicker = new DatePicker(initial == null || initial.date() == null ? LocalDate.now() : initial.date());
@@ -330,6 +347,7 @@ public final class NewCalendarEventDialog {
             durationCombo.setButtonCell(new ListCell<>() { protected void updateItem(Integer item, boolean empty){ super.updateItem(item, empty); setText(empty||item==null?null:formatDuration(item)); }});
             durationCombo.setMaxWidth(Double.MAX_VALUE);
             VBox durationSection = new VBox(4, durationLabel, durationCombo);
+            durationSection.setMinWidth(130);
 
             if (initial != null && !initial.allDay() && initial.startTime() != null) {
                 String[] t = toTwelveHour(initial.startTime());
@@ -346,48 +364,102 @@ public final class NewCalendarEventDialog {
             TextArea descriptionArea = new TextArea(initial == null ? "" : initial.description());
             descriptionArea.setPrefRowCount(4);
             descriptionArea.setWrapText(true);
-            Label caseLabel = new Label("Case");
-            Label selectedCaseLabel = new Label("No case selected");
-            StackPane selectedCaseHost = new StackPane(selectedCaseLabel);
-            final CaseOption[] selectedCase = new CaseOption[1];
-            CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
+            VBox selectedCaseHost = new VBox();
+            selectedCaseHost.setAlignment(Pos.CENTER_LEFT);
+            selectedCaseHost.setFillWidth(true);
+            selectedCaseHost.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(selectedCaseHost, Priority.ALWAYS);
+            final CaseOption[] selectedCase = new CaseOption[]{initialSelectedCase};
+            final boolean[] hasCaseAssignment = new boolean[]{initial != null && initial.caseId() != null};
+            CaseCardFactory caseCardFactory = new CaseCardFactory(onOpenCase == null ? id -> {} : onOpenCase);
             Runnable renderCase = () -> {
                 selectedCaseHost.getChildren().clear();
-                if (selectedCase[0] == null) selectedCaseHost.getChildren().add(selectedCaseLabel);
-                else selectedCaseHost.getChildren().add(caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase[0].caseId(), selectedCase[0].displayName(), null, null, null, null, null), CaseCardFactory.Variant.MINI));
+                if (selectedCase[0] != null) selectedCaseHost.getChildren().add(createRelatedCasePreview(caseCardFactory, selectedCase[0]));
             };
-            if (initial != null && initial.caseId() != null) selectedCase[0] = new CaseOption(initial.caseId(), "Case #" + initial.caseId());
-            renderCase.run();
-            Button addCaseButton = new Button(selectedCase[0] == null ? "Add to Case" : "Change Case");
+            Button addCaseButton = new Button();
             Button clearCaseButton = new Button("Clear");
             clearCaseButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            Runnable refreshCaseControls = () -> {
+                boolean hasAssigned = selectedCase[0] != null || hasCaseAssignment[0];
+                addCaseButton.setText(hasAssigned ? "Change Case" : "Add Case");
+                clearCaseButton.setVisible(hasAssigned);
+                clearCaseButton.setManaged(hasAssigned);
+            };
+            if (selectedCase[0] == null && initial != null && initial.caseId() != null) {
+                renderCase.run();
+                Integer selectedCaseId = initial.caseId();
+                long caseResolveStart = System.nanoTime();
+                CompletableFuture
+                        .supplyAsync(() -> {
+                            try {
+                                return safeList(caseOptionsSupplier == null ? List.<CaseOption>of() : caseOptionsSupplier.get()).stream()
+                                        .filter(v -> v != null && Objects.equals(v.caseId(), selectedCaseId))
+                                        .findFirst()
+                                        .orElse(null);
+                            } catch (RuntimeException ex) {
+                                return null;
+                            }
+                        })
+                        .thenAccept(resolved -> Platform.runLater(() -> {
+                            if (resolved != null) selectedCase[0] = resolved;
+                            else { hasCaseAssignment[0] = false; }
+                            renderCase.run();
+                            refreshCaseControls.run();
+                            long elapsedMs = (System.nanoTime() - caseResolveStart) / 1_000_000;
+                            PerfLog.log("DIALOG", "related-case-resolve", "caseId=" + selectedCaseId + " elapsedMs=" + elapsedMs + " resolved=" + (resolved != null));
+                        }));
+            }
+            renderCase.run();
             addCaseButton.setOnAction(e -> {
                 List<CaseOption> sortedCases = (caseOptionsSupplier == null ? List.<CaseOption>of() : safeList(caseOptionsSupplier.get())).stream()
                         .sorted(Comparator.comparing(c -> safe(c.displayName()).toLowerCase()))
                         .toList();
-                CasePickerDialog.show(addCaseButton.getScene().getWindow(), sortedCases).ifPresent(v -> { selectedCase[0] = v; renderCase.run(); addCaseButton.setText("Change Case"); clearCaseButton.setVisible(true); clearCaseButton.setManaged(true); });
+                CasePickerDialog.show(addCaseButton.getScene().getWindow(), sortedCases).ifPresent(v -> { selectedCase[0] = v; hasCaseAssignment[0] = true; renderCase.run(); refreshCaseControls.run(); });
             });
-            clearCaseButton.setOnAction(e -> { selectedCase[0] = null; renderCase.run(); addCaseButton.setText("Add to Case"); clearCaseButton.setVisible(false); clearCaseButton.setManaged(false); });
-            HBox caseRow = new HBox(8, addCaseButton, selectedCaseHost, clearCaseButton);
-            HBox.setHgrow(selectedCaseHost, Priority.ALWAYS);
-            clearCaseButton.setVisible(selectedCase[0] != null);
-            clearCaseButton.setManaged(selectedCase[0] != null);
+            clearCaseButton.setOnAction(e -> { selectedCase[0] = null; hasCaseAssignment[0] = false; renderCase.run(); refreshCaseControls.run(); });
+            HBox caseActionsRow = new HBox(8, addCaseButton, clearCaseButton);
+            caseActionsRow.setAlignment(Pos.CENTER_LEFT);
+            refreshCaseControls.run();
 
-            Label assignedUserLabel = new Label("Assigned User");
-            Label selectedUserLabel = new Label("No assigned user");
+            Label selectedUserLabel = new Label("None");
             StackPane selectedUserHost = new StackPane(selectedUserLabel);
+            selectedUserHost.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(selectedUserHost, Priority.ALWAYS);
             final AssignedUserOption[] selectedUser = new AssignedUserOption[1];
+            final boolean[] hasUserAssignment = new boolean[]{initial != null && initial.assignedToUserId() != null};
             UserCardFactory userCardFactory = new UserCardFactory(id -> {});
             Runnable renderUser = () -> {
                 selectedUserHost.getChildren().clear();
                 if (selectedUser[0] == null) selectedUserHost.getChildren().add(selectedUserLabel);
                 else selectedUserHost.getChildren().add(userCardFactory.create(new UserCardModel(selectedUser[0].userId(), selectedUser[0].displayName(), selectedUser[0].color(), null), UserCardFactory.Variant.MINI));
             };
-            if (initial != null && initial.assignedToUserId() != null) selectedUser[0] = new AssignedUserOption(initial.assignedToUserId(), "User #" + initial.assignedToUserId(), null);
+            if (initial != null && initial.assignedToUserId() != null) {
+                selectedUserLabel.setText("Loading...");
+                renderUser.run();
+                try {
+                    AssignedUserOption resolved = safeList(assignedUserOptionsSupplier == null ? List.<AssignedUserOption>of() : assignedUserOptionsSupplier.get()).stream()
+                            .filter(v -> v != null && Objects.equals(v.userId(), initial.assignedToUserId()))
+                            .findFirst()
+                            .orElse(null);
+                    if (resolved != null) {
+                        selectedUser[0] = resolved;
+                    } else {
+                        selectedUserLabel.setText("User unavailable");
+                    }
+                } catch (RuntimeException ex) {
+                    selectedUserLabel.setText("User unavailable");
+                }
+            }
             renderUser.run();
-            Button assignUserButton = new Button(selectedUser[0] == null ? "Assign User" : "Change User");
+            Button assignUserButton = new Button();
             Button clearAssignedButton = new Button("Clear");
             clearAssignedButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            Runnable refreshUserControls = () -> {
+                boolean hasAssigned = selectedUser[0] != null || hasUserAssignment[0];
+                assignUserButton.setText(hasAssigned ? "Change User" : "Add User");
+                clearAssignedButton.setVisible(hasAssigned);
+                clearAssignedButton.setManaged(hasAssigned);
+            };
             assignUserButton.setOnAction(e -> {
                 List<AssignedUserOption> sortedUsers = (assignedUserOptionsSupplier == null ? List.<AssignedUserOption>of() : safeList(assignedUserOptionsSupplier.get())).stream()
                         .sorted(Comparator.comparing(u -> safe(u.displayName()).toLowerCase()))
@@ -395,28 +467,34 @@ public final class NewCalendarEventDialog {
                 List<com.shale.ui.services.CaseTaskService.AssignableUserOption> candidates = sortedUsers.stream().map(u -> new com.shale.ui.services.CaseTaskService.AssignableUserOption(u.userId(), u.displayName(), u.color())).toList();
                 AssignedUserPickerDialog.show(assignUserButton.getScene().getWindow(), candidates, NewCalendarEventDialog.class).ifPresent(v -> {
                     selectedUser[0] = new AssignedUserOption(v.id(), v.displayName(), v.color());
+                    hasUserAssignment[0] = true;
                     renderUser.run();
-                    assignUserButton.setText("Change User");
-                    clearAssignedButton.setVisible(true);
-                    clearAssignedButton.setManaged(true);
+                    refreshUserControls.run();
                 });
             });
-            clearAssignedButton.setOnAction(e -> { selectedUser[0] = null; renderUser.run(); assignUserButton.setText("Assign User"); clearAssignedButton.setVisible(false); clearAssignedButton.setManaged(false); });
-            HBox assignedRow = new HBox(8, assignUserButton, selectedUserHost, clearAssignedButton);
-            HBox.setHgrow(selectedUserHost, Priority.ALWAYS);
-            clearAssignedButton.setVisible(selectedUser[0] != null);
-            clearAssignedButton.setManaged(selectedUser[0] != null);
-            HBox typeDateRow = new HBox(8, new VBox(4, eventTypeLabel, eventTypeComboBox), new VBox(4, dateLabel, datePicker));
-            HBox.setHgrow(typeDateRow.getChildren().getFirst(), Priority.ALWAYS);
-            HBox peopleRow = new HBox(12, new VBox(4, caseLabel, caseRow), new VBox(4, assignedUserLabel, assignedRow));
-            HBox.setHgrow(peopleRow.getChildren().getFirst(), Priority.ALWAYS);
-            HBox.setHgrow(peopleRow.getChildren().get(1), Priority.ALWAYS);
+            clearAssignedButton.setOnAction(e -> { selectedUser[0] = null; hasUserAssignment[0] = false; renderUser.run(); refreshUserControls.run(); });
+            HBox assignedActionsRow = new HBox(8, assignUserButton, clearAssignedButton);
+            assignedActionsRow.setAlignment(Pos.CENTER_LEFT);
+            refreshUserControls.run();
+            HBox titleTypeRow = new HBox(8, new VBox(4, titleLabel, titleField), new VBox(4, eventTypeLabel, eventTypeComboBox));
+            HBox.setHgrow(titleTypeRow.getChildren().getFirst(), Priority.ALWAYS);
+            HBox typeDateRow = new HBox(8, new VBox(4, dateLabel, datePicker), allDayCheckBox);
+            typeDateRow.setAlignment(Pos.BOTTOM_LEFT);
+            HBox timeRow = new HBox(8, startTimeCol, amPmCol, durationSection);
+            HBox.setHgrow(startTimeCol, Priority.ALWAYS);
+            VBox caseSection = new VBox(6, caseActionsRow, selectedCaseHost);
+            VBox assignedSection = new VBox(6, assignedActionsRow, selectedUserHost);
+            caseSection.setMaxWidth(Double.MAX_VALUE);
+            assignedSection.setMaxWidth(Double.MAX_VALUE);
+            HBox peopleSection = new HBox(12, caseSection, assignedSection);
+            HBox.setHgrow(caseSection, Priority.ALWAYS);
+            HBox.setHgrow(assignedSection, Priority.ALWAYS);
 
             Runnable refresh = () -> {
                 boolean timed = !allDayCheckBox.isSelected();
-                startRow.setDisable(!timed); durationSection.setDisable(!timed);
-                startRow.setManaged(timed); durationSection.setManaged(timed);
-                startRow.setVisible(timed); durationSection.setVisible(timed);
+                timeRow.setDisable(!timed);
+                timeRow.setManaged(timed);
+                timeRow.setVisible(timed);
             };
             allDayCheckBox.selectedProperty().addListener((obs,o,n)->refresh.run());
             refresh.run();
@@ -430,7 +508,7 @@ public final class NewCalendarEventDialog {
                 if (relatedCaseNode != null) content.getChildren().add(relatedCaseNode);
                 if (relatedTaskNode != null) content.getChildren().add(relatedTaskNode);
             }
-            content.getChildren().addAll(titleLabel,titleField,typeDateRow,allDayCheckBox,startRow,durationSection,descriptionLabel,descriptionArea,peopleRow,errorLabel);
+            content.getChildren().addAll(titleTypeRow,typeDateRow,timeRow,descriptionLabel,descriptionArea,peopleSection,errorLabel);
             content.setPadding(new Insets(6,2,2,2));
 
             Supplier<Optional<CreateCalendarEventInput>> readInput = () -> {
@@ -454,6 +532,15 @@ public final class NewCalendarEventDialog {
             };
             return new DialogParts(content, errorLabel, readInput);
         }
+    }
+
+
+    private static Node createRelatedCasePreview(CaseCardFactory caseCardFactory, CaseOption selectedCase) {
+        Node casePreview = caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(), selectedCase.displayName(), null, null, selectedCase.responsibleAttorney(), selectedCase.responsibleAttorneyColor(), selectedCase.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI);
+        if (casePreview instanceof Region region) {
+            region.setMaxWidth(Double.MAX_VALUE);
+        }
+        return casePreview;
     }
 
     private static List<String> buildTimeOptions() {
@@ -512,10 +599,25 @@ public final class NewCalendarEventDialog {
     }
 
     private static <T> List<T> safeList(List<T> values) { return values == null ? List.of() : values; }
+    static int resolveDefaultTypeId(List<CalendarEventType> eventTypes) {
+        if (eventTypes == null || eventTypes.isEmpty()) return 0;
+        if (eventTypes.size() == 1) return eventTypes.getFirst().calendarEventTypeId();
+        Integer meetingByKey = eventTypes.stream()
+                .filter(t -> t != null && "MEETING".equalsIgnoreCase(safe(t.systemKey())))
+                .map(CalendarEventType::calendarEventTypeId)
+                .findFirst()
+                .orElse(null);
+        if (meetingByKey != null) return meetingByKey;
+        Integer meetingByName = eventTypes.stream()
+                .filter(t -> t != null && "MEETING".equalsIgnoreCase(safe(t.name())))
+                .map(CalendarEventType::calendarEventTypeId)
+                .findFirst()
+                .orElse(null);
+        if (meetingByName != null) return meetingByName;
+        return eventTypes.getFirst().calendarEventTypeId();
+    }
 
     private static final class CalendarTypeCell extends ListCell<CalendarEventType> {
         @Override protected void updateItem(CalendarEventType item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); }
     }
 }
-
-
