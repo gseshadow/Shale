@@ -81,6 +81,10 @@ public final class NotificationCenterDialog {
 				item -> dismissNotification(notificationService, item),
 				onOpenCase);
 
+		NotificationCardFactory cardFactory = new NotificationCardFactory(
+				item -> dismissNotification(notificationService, item),
+				onOpenCase);
+
 		ListView<AppNotification> listView = new ListView<>();
 		listView.setItems(notificationService.getNotificationsNewestFirst());
 		listView.getStyleClass().add("notification-list");

@@ -224,7 +224,7 @@ public final class NotificationDao {
 				       n.EventKey AS EventKey
 				FROM dbo.Notifications n
 				LEFT JOIN dbo.Users actor
-				  ON actor.Id = n.CreatedByUserId
+				  ON actor.id = n.CreatedByUserId
 				 AND actor.ShaleClientId = n.ShaleClientId
 				LEFT JOIN dbo.Tasks t
 				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'
@@ -245,7 +245,7 @@ public final class NotificationDao {
 				    u.Color
 				  FROM dbo.CaseUsers cu
 				  INNER JOIN dbo.Users u
-				    ON u.Id = cu.UserId
+				    ON u.id = cu.UserId
 				   AND u.ShaleClientId = c.ShaleClientId
 				  WHERE cu.CaseId = c.Id
 				    AND cu.RoleId = ?
