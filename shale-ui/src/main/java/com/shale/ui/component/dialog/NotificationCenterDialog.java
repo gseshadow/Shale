@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -52,15 +53,28 @@ public final class NotificationCenterDialog {
 		stage.setMinHeight(MIN_HEIGHT);
 
 		Label heading = new Label("Notifications");
-		heading.getStyleClass().add("app-dialog-title");
+		heading.getStyleClass().addAll("secondary-window-title", "notification-window-title");
 
 		Label subtitle = new Label("Newest first. Unread items are highlighted.");
-		subtitle.getStyleClass().add("app-dialog-message");
+		subtitle.getStyleClass().add("notification-window-subtitle");
+
+		Button headerCloseButton = new Button("×");
+		headerCloseButton.getStyleClass().addAll("secondary-window-close", "notification-window-close");
+		headerCloseButton.setOnAction(event -> stage.close());
+
+		VBox headerText = new VBox(1, heading, subtitle);
+		headerText.setAlignment(Pos.CENTER_LEFT);
+		HBox.setHgrow(headerText, Priority.ALWAYS);
+		HBox header = new HBox(8, headerText, headerCloseButton);
+		header.getStyleClass().addAll("secondary-window-header", "notification-window-header");
+		header.setAlignment(Pos.CENTER_LEFT);
+
+		NotificationCardFactory cardFactory = new NotificationCardFactory(item -> dismissNotification(notificationService, item));
 
 		ListView<AppNotification> listView = new ListView<>();
 		listView.setItems(notificationService.getNotificationsNewestFirst());
 		listView.getStyleClass().add("notification-list");
-		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification));
+		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification, cardFactory));
 		notificationService.unreadCountProperty().addListener((obs, oldValue, newValue) -> listView.refresh());
 
 		Button markAllReadButton = new Button("Mark all read");
@@ -77,19 +91,39 @@ public final class NotificationCenterDialog {
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		HBox actions = new HBox(10, markAllReadButton, spacer, closeButton);
+		actions.getStyleClass().add("app-dialog-actions");
+		actions.setAlignment(Pos.CENTER_RIGHT);
 
 		VBox.setVgrow(listView, Priority.ALWAYS);
-		VBox body = new VBox(8, heading, subtitle, listView, actions);
-		body.getStyleClass().add("app-dialog-root");
+		VBox content = new VBox(8, listView, actions);
+		content.setFillWidth(true);
+		content.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		content.setPadding(new Insets(10, 12, 12, 12));
+		VBox.setVgrow(content, Priority.ALWAYS);
+
+		VBox body = new VBox(header, content);
+		body.getStyleClass().addAll("app-dialog-root", "notification-window-root");
 		body.setFillWidth(true);
 		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-		body.setPadding(new Insets(12));
 
 		Scene scene = new Scene(body, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 		scene.getStylesheets().add(Objects.requireNonNull(
 				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
 		stage.showAndWait();
+	}
+
+	private static void dismissNotification(NotificationCenterService notificationService, AppNotification item) {
+		if (item == null) {
+			return;
+		}
+		try {
+			notificationService.dismiss(item);
+		} catch (RuntimeException ex) {
+			System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
+			ex.printStackTrace(System.err);
+			throw ex;
+		}
 	}
 
 	private static final class NotificationCell extends ListCell<AppNotification> {
@@ -103,11 +137,12 @@ public final class NotificationCenterDialog {
 		private NotificationCell(
 				NotificationCenterService notificationService,
 				Consumer<Long> onOpenTask,
-				Consumer<AppNotification> onActivateNotification) {
+				Consumer<AppNotification> onActivateNotification,
+				NotificationCardFactory notificationCardFactory) {
 			this.notificationService = notificationService;
 			this.onActivateNotification = onActivateNotification;
 			this.onOpenTask = onOpenTask;
-			this.notificationCardFactory = new NotificationCardFactory(this::dismissNotification);
+			this.notificationCardFactory = Objects.requireNonNull(notificationCardFactory, "notificationCardFactory");
 			setOnMouseClicked(event -> {
 				if (isFromInteractiveChild(event)) {
 					return;
@@ -153,24 +188,12 @@ public final class NotificationCenterDialog {
 			}
 		}
 
-		private void dismissNotification(AppNotification item) {
-			if (item == null) {
-				return;
-			}
-			try {
-				notificationService.dismiss(item);
-			} catch (RuntimeException ex) {
-				System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
-				ex.printStackTrace(System.err);
-				throw ex;
-			}
-		}
-
 		private static boolean isFromInteractiveChild(MouseEvent event) {
 			if (event == null || !(event.getTarget() instanceof Node node)) {
 				return false;
 			}
-			return hasStyleClassInAncestorChain(node, "notification-row-dismiss");
+			return hasStyleClassInAncestorChain(node, "notification-row-dismiss")
+					|| hasStyleClassInAncestorChain(node, "notification-row-expand");
 		}
 
 		private static boolean hasStyleClassInAncestorChain(Node node, String styleClass) {

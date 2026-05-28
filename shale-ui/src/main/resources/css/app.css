@@ -1005,6 +1005,35 @@
     -fx-text-fill: white;
 }
 
+.notification-window-root {
+    -fx-background-color: rgba(243, 248, 253, 0.98);
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+}
+
+.notification-window-header {
+    -fx-padding: 10 12 10 14;
+    -fx-background-radius: 0;
+}
+
+.notification-window-title {
+    -fx-font-size: 15px;
+}
+
+.notification-window-subtitle {
+    -fx-text-fill: rgba(255, 255, 255, 0.86);
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+}
+
+.notification-window-close {
+    -fx-min-width: 24px;
+    -fx-min-height: 24px;
+    -fx-pref-width: 24px;
+    -fx-pref-height: 24px;
+    -fx-padding: 0;
+}
+
 .notification-list {
     -fx-background-color: transparent;
 }
@@ -1026,7 +1055,7 @@
     -fx-border-radius: 6;
     -fx-border-color: rgba(18, 41, 74, 0.12);
     -fx-border-width: 1;
-    -fx-padding: 4 6 4 6;
+    -fx-padding: 4 6 4 4;
 }
 
 .notification-row-unread {
@@ -1049,13 +1078,25 @@
     -fx-font-size: 9px;
 }
 
+.notification-row-expand,
 .notification-row-dismiss {
     -fx-font-size: 10px;
     -fx-font-weight: 800;
-    -fx-padding: 0 5 0 5;
+    -fx-padding: 0 4 0 4;
+    -fx-min-width: 18px;
     -fx-min-height: 18px;
     -fx-pref-height: 18px;
     -fx-background-radius: 999;
+}
+
+.notification-row-expand {
+    -fx-background-color: transparent;
+    -fx-text-fill: rgba(17, 37, 66, 0.70);
+}
+
+.notification-row-dismiss {
+    -fx-background-color: rgba(255, 255, 255, 0.62);
+    -fx-text-fill: rgba(17, 37, 66, 0.70);
 }
 
 .notification-row-title {
@@ -1070,8 +1111,39 @@
     -fx-line-spacing: -2;
 }
 
+.notification-row-context-line {
+    -fx-spacing: 6;
+}
+
 .notification-row-context {
     -fx-text-fill: rgba(16, 36, 66, 0.55);
+    -fx-font-size: 10px;
+    -fx-font-weight: 600;
+}
+
+.notification-row-case-chip {
+    -fx-background-color: rgba(79, 127, 191, 0.12);
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(79, 127, 191, 0.22);
+    -fx-border-radius: 999;
+    -fx-padding: 1 7 1 7;
+    -fx-text-fill: #234c84;
+    -fx-font-size: 9px;
+    -fx-font-weight: 800;
+}
+
+.notification-row-expanded {
+    -fx-padding: 4 4 1 22;
+    -fx-spacing: 3;
+}
+
+.notification-row-expanded-message {
+    -fx-text-fill: rgba(16, 36, 66, 0.86);
+    -fx-font-size: 11px;
+}
+
+.notification-row-expanded-line {
+    -fx-text-fill: rgba(16, 36, 66, 0.62);
     -fx-font-size: 10px;
     -fx-font-weight: 600;
 }

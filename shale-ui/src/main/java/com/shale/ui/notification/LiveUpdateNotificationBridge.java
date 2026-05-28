@@ -104,6 +104,12 @@ public final class LiveUpdateNotificationBridge {
 		Object eventKeyValue = event.patch().get("eventKey");
 		String eventKey = eventKeyValue == null ? null : String.valueOf(eventKeyValue);
 		String actionType = taskNotificationActionType(event, noteAdded, timelineEvent);
+		String entityTitle = firstNonBlank(
+				stringValue(event.patch().get("entityTitle")),
+				stringValue(event.patch().get("taskTitle")),
+				stringValue(event.patch().get("title")));
+		Long caseId = longValue(event.patch().get("caseId"));
+		String caseName = stringValue(event.patch().get("caseName"));
 		notificationCenterService.pushNotification(new AppNotification(
 				event.eventId() == null || event.eventId().isBlank()
 						? "task-" + event.entityId() + "-" + createdAt.toEpochMilli()
@@ -120,8 +126,10 @@ public final class LiveUpdateNotificationBridge {
 					eventKey,
 					"Task",
 					entityId,
-					null,
-					actionType));
+					entityTitle,
+					actionType,
+					caseId,
+					caseName));
 	}
 
 	private void pushCalendarAssignment(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -260,6 +268,27 @@ public final class LiveUpdateNotificationBridge {
 				return Long.parseLong(text.trim());
 			} catch (NumberFormatException ignored) {
 				return null;
+			}
+		}
+		return null;
+	}
+
+	private static String stringValue(Object value) {
+		if (value == null) {
+			return null;
+		}
+		String text = String.valueOf(value).trim();
+		return text.isBlank() ? null : text;
+	}
+
+	private static String firstNonBlank(String... values) {
+		if (values == null) {
+			return null;
+		}
+		for (String value : values) {
+			String normalized = stringValue(value);
+			if (normalized != null) {
+				return normalized;
 			}
 		}
 		return null;
