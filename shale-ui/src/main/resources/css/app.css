@@ -1011,7 +1011,7 @@
 
 .notification-list .list-cell {
     -fx-background-color: transparent;
-    -fx-padding: 3 4 3 4;
+    -fx-padding: 1 2 1 2;
 }
 
 .notification-list .list-cell:filled:selected,
@@ -1020,13 +1020,13 @@
 }
 
 .notification-row {
-    -fx-spacing: 3;
-    -fx-background-color: rgba(235, 244, 253, 0.68);
-    -fx-background-radius: 8;
-    -fx-border-radius: 8;
-    -fx-border-color: rgba(18, 41, 74, 0.14);
+    -fx-spacing: 1;
+    -fx-background-color: rgba(235, 244, 253, 0.62);
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: rgba(18, 41, 74, 0.12);
     -fx-border-width: 1;
-    -fx-padding: 6 8 6 8;
+    -fx-padding: 4 6 4 6;
 }
 
 .notification-row-unread {
@@ -1035,63 +1035,47 @@
 }
 
 .notification-row-meta {
-    -fx-spacing: 6;
+    -fx-spacing: 5;
 }
 
 .notification-row-category {
     -fx-text-fill: #234c84;
-    -fx-font-size: 10px;
+    -fx-font-size: 9px;
     -fx-font-weight: 800;
 }
 
 .notification-row-time {
-    -fx-text-fill: rgba(17, 37, 66, 0.66);
-    -fx-font-size: 10px;
+    -fx-text-fill: rgba(17, 37, 66, 0.62);
+    -fx-font-size: 9px;
 }
 
 .notification-row-dismiss {
     -fx-font-size: 10px;
-    -fx-padding: 1 6 1 6;
+    -fx-font-weight: 800;
+    -fx-padding: 0 5 0 5;
+    -fx-min-height: 18px;
+    -fx-pref-height: 18px;
+    -fx-background-radius: 999;
 }
 
 .notification-row-title {
-    -fx-text-fill: #102442;
-    -fx-font-size: 13px;
-    -fx-font-weight: 800;
-}
-
-.notification-row-message {
-    -fx-text-fill: rgba(16, 36, 66, 0.78);
-    -fx-font-size: 11px;
-    -fx-line-spacing: -1;
-}
-
-.notification-task-preview {
-    -fx-background-color: rgba(222, 236, 252, 0.58);
-    -fx-background-radius: 7;
-    -fx-border-radius: 7;
-    -fx-border-color: rgba(47, 94, 162, 0.32);
-    -fx-border-width: 1;
-    -fx-padding: 4 6 4 6;
-    -fx-opacity: 0.88;
-}
-
-.notification-task-preview:hover {
-    -fx-background-color: rgba(208, 228, 250, 0.96);
-    -fx-border-color: rgba(41, 84, 146, 0.85);
-}
-
-.notification-task-preview-title {
     -fx-text-fill: #102442;
     -fx-font-size: 12px;
     -fx-font-weight: 800;
 }
 
-.notification-task-preview-meta {
+.notification-row-message {
     -fx-text-fill: rgba(16, 36, 66, 0.76);
-    -fx-font-size: 11px;
+    -fx-font-size: 10px;
+    -fx-line-spacing: -2;
+}
+
+.notification-row-context {
+    -fx-text-fill: rgba(16, 36, 66, 0.55);
+    -fx-font-size: 10px;
     -fx-font-weight: 600;
 }
+
 
 .calendar-week-board {
     -fx-alignment: top-left;

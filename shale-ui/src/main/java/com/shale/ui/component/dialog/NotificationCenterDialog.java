@@ -21,6 +21,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -40,7 +41,12 @@ public final class NotificationCenterDialog {
 			Consumer<AppNotification> onActivateNotification) {
 		Objects.requireNonNull(notificationService, "notificationService");
 
-		Stage stage = AppDialogs.createModalStage(owner, "Notifications");
+		Stage stage = new Stage();
+		if (owner != null) {
+			stage.initOwner(owner);
+		}
+		stage.initModality(Modality.WINDOW_MODAL);
+		stage.setTitle("Notifications");
 		stage.setResizable(true);
 		stage.setMinWidth(MIN_WIDTH);
 		stage.setMinHeight(MIN_HEIGHT);
@@ -73,11 +79,13 @@ public final class NotificationCenterDialog {
 		HBox actions = new HBox(10, markAllReadButton, spacer, closeButton);
 
 		VBox.setVgrow(listView, Priority.ALWAYS);
-		VBox body = new VBox(10, heading, subtitle, listView, actions);
-		body.setPadding(new Insets(14));
-		VBox root = AppDialogs.createSecondaryWindowShell(stage, "Notifications", stage::close, body);
+		VBox body = new VBox(8, heading, subtitle, listView, actions);
+		body.getStyleClass().add("app-dialog-root");
+		body.setFillWidth(true);
+		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		body.setPadding(new Insets(12));
 
-		Scene scene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+		Scene scene = new Scene(body, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 		scene.getStylesheets().add(Objects.requireNonNull(
 				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
@@ -87,6 +95,7 @@ public final class NotificationCenterDialog {
 	private static final class NotificationCell extends ListCell<AppNotification> {
 		private final NotificationCenterService notificationService;
 		private final Consumer<AppNotification> onActivateNotification;
+		private final Consumer<Long> onOpenTask;
 		private final NotificationCardFactory notificationCardFactory;
 		private final ChangeListener<Boolean> unreadListener = (obs, oldValue, newValue) -> updateUnreadStyle();
 		private AppNotification observedItem;
@@ -97,10 +106,8 @@ public final class NotificationCenterDialog {
 				Consumer<AppNotification> onActivateNotification) {
 			this.notificationService = notificationService;
 			this.onActivateNotification = onActivateNotification;
-			this.notificationCardFactory = new NotificationCardFactory(
-					this::dismissNotification,
-					notificationService::markRead,
-					onOpenTask);
+			this.onOpenTask = onOpenTask;
+			this.notificationCardFactory = new NotificationCardFactory(this::dismissNotification);
 			setOnMouseClicked(event -> {
 				if (isFromInteractiveChild(event)) {
 					return;
@@ -108,7 +115,10 @@ public final class NotificationCenterDialog {
 				AppNotification selected = getItem();
 				if (selected != null) {
 					notificationService.markRead(selected);
-					if (this.onActivateNotification != null) {
+					Long taskId = resolveTaskId(selected);
+					if (taskId != null && onOpenTask != null) {
+						onOpenTask.accept(taskId);
+					} else if (this.onActivateNotification != null) {
 						this.onActivateNotification.accept(selected);
 					}
 				}
@@ -160,8 +170,7 @@ public final class NotificationCenterDialog {
 			if (event == null || !(event.getTarget() instanceof Node node)) {
 				return false;
 			}
-			return hasStyleClassInAncestorChain(node, "notification-row-dismiss")
-					|| hasStyleClassInAncestorChain(node, "notification-task-preview");
+			return hasStyleClassInAncestorChain(node, "notification-row-dismiss");
 		}
 
 		private static boolean hasStyleClassInAncestorChain(Node node, String styleClass) {
@@ -173,6 +182,17 @@ public final class NotificationCenterDialog {
 				current = current.getParent();
 			}
 			return false;
+		}
+
+		private static Long resolveTaskId(AppNotification item) {
+			if (item == null || item.getEntityId() == null || item.getEntityId() <= 0) {
+				return null;
+			}
+			String entityType = item.getEntityType();
+			if (entityType == null || !"TASK".equalsIgnoreCase(entityType.trim())) {
+				return null;
+			}
+			return item.getEntityId();
 		}
 	}
 }
