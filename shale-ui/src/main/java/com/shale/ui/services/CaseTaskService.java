@@ -377,7 +377,7 @@ public final class CaseTaskService {
         Integer actorUserId = normalizeActorUserId(request.changedByUserId());
         int caseId = Math.toIntExact(after.caseId());
         if (!Objects.equals(normalizeTitle(before.title()), normalizeTitle(after.title()))) {
-            long timelineEventId = taskDao.addTaskTimelineEvent(
+            taskDao.addTaskTimelineEvent(
                     request.taskId(),
                     caseId,
                     request.shaleClientId(),
@@ -385,35 +385,15 @@ public final class CaseTaskService {
                     actorUserId,
                     "Title changed",
                     "Title changed from " + quoteForBody(before.title()) + " to " + quoteForBody(after.title()));
-            publishTimelineEventNotifications(
-                    TaskDao.TaskTimelineEventTypes.TASK_TITLE_CHANGED,
-                    timelineEventId,
-                    request.taskId(),
-                    request.shaleClientId(),
-                    actorUserId,
-                    after.title(),
-                    after.caseId(),
-                    after.caseName(),
-                    "Title changed");
         }
         if (!Objects.equals(normalizeText(before.description()), normalizeText(after.description()))) {
-            long timelineEventId = taskDao.addTaskTimelineEvent(
+            taskDao.addTaskTimelineEvent(
                     request.taskId(),
                     caseId,
                     request.shaleClientId(),
                     TaskDao.TaskTimelineEventTypes.TASK_DESCRIPTION_CHANGED,
                     actorUserId,
                     "Description changed",
-                    "Description changed");
-            publishTimelineEventNotifications(
-                    TaskDao.TaskTimelineEventTypes.TASK_DESCRIPTION_CHANGED,
-                    timelineEventId,
-                    request.taskId(),
-                    request.shaleClientId(),
-                    actorUserId,
-                    after.title(),
-                    after.caseId(),
-                    after.caseName(),
                     "Description changed");
         }
         if (!Objects.equals(before.dueAt(), after.dueAt())) {
