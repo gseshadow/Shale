@@ -203,6 +203,46 @@ public final class NotificationCenterService {
 		}
 	}
 
+	public void dismissAll(List<AppNotification> notificationsToDismiss) {
+		if (notificationsToDismiss == null || notificationsToDismiss.isEmpty()) {
+			return;
+		}
+		List<AppNotification> snapshot = notificationsToDismiss.stream()
+				.filter(Objects::nonNull)
+				.distinct()
+				.toList();
+		if (snapshot.isEmpty()) {
+			return;
+		}
+		if (Platform.isFxApplicationThread()) {
+			dismissAllInternal(snapshot);
+		} else {
+			Platform.runLater(() -> dismissAllInternal(snapshot));
+		}
+	}
+
+	public void dismissMatching(Predicate<AppNotification> predicate) {
+		if (predicate == null) {
+			return;
+		}
+		if (Platform.isFxApplicationThread()) {
+			dismissMatchingInternal(predicate);
+		} else {
+			Platform.runLater(() -> dismissMatchingInternal(predicate));
+		}
+	}
+
+	public void dismissRead() {
+		dismissMatching(notification -> notification != null && !notification.isUnread());
+	}
+
+	public void dismissOlderThan(Instant cutoff) {
+		if (cutoff == null) {
+			return;
+		}
+		dismissMatching(notification -> notification != null && notification.getCreatedAt().isBefore(cutoff));
+	}
+
 	public void dismissById(String notificationId) {
 		if (notificationId == null || notificationId.isBlank()) {
 			return;
@@ -222,12 +262,31 @@ public final class NotificationCenterService {
 		if (notification == null) {
 			return;
 		}
-		boolean removed = notifications.remove(notification);
-		if (!removed) {
+		dismissAllInternal(List.of(notification));
+	}
+
+	private void dismissMatchingInternal(Predicate<AppNotification> predicate) {
+		List<AppNotification> matched = notifications.stream()
+				.filter(predicate)
+				.toList();
+		dismissAllInternal(matched);
+	}
+
+	private void dismissAllInternal(List<AppNotification> notificationsToDismiss) {
+		if (notificationsToDismiss == null || notificationsToDismiss.isEmpty()) {
 			return;
 		}
+		List<AppNotification> removed = notificationsToDismiss.stream()
+				.filter(Objects::nonNull)
+				.distinct()
+				.filter(notifications::contains)
+				.toList();
+		if (removed.isEmpty()) {
+			return;
+		}
+		notifications.removeAll(removed);
 		recomputeDerivedState();
-		dismissListener.accept(List.of(notification));
+		dismissListener.accept(removed);
 	}
 
 	private void seed(Clock clock) {
