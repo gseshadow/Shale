@@ -190,6 +190,14 @@ public final class NotificationDao {
 				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.Title
 				         ELSE NULL
 				       END AS EntityTitle,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.CaseId
+				         ELSE NULL
+				       END AS CaseId,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN c.Name
+				         ELSE NULL
+				       END AS CaseName,
 				       n.IsRead AS IsRead,
 				       n.CreatedAt AS CreatedAt,
 				       n.EventKey AS EventKey
@@ -199,6 +207,10 @@ public final class NotificationDao {
 				 AND t.Id = n.EntityId
 				 AND t.ShaleClientId = n.ShaleClientId
 				 AND ISNULL(t.IsDeleted, 0) = 0
+				LEFT JOIN dbo.Cases c
+				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'
+				 AND c.Id = t.CaseId
+				 AND c.ShaleClientId = n.ShaleClientId
 				WHERE n.ShaleClientId = ?
 				  AND n.UserId = ?
 				  AND ISNULL(n.IsDismissed, 0) = 0
@@ -222,6 +234,8 @@ public final class NotificationDao {
 							rs.getObject("EntityId") == null ? null : rs.getLong("EntityId"),
 							rs.getString("ActionType"),
 							rs.getString("EntityTitle"),
+							rs.getObject("CaseId") == null ? null : rs.getLong("CaseId"),
+							rs.getString("CaseName"),
 							rs.getBoolean("IsRead"),
 							toInstant(rs.getTimestamp("CreatedAt")),
 							rs.getString("EventKey")));
@@ -431,6 +445,8 @@ public final class NotificationDao {
 			Long entityId,
 			String actionType,
 			String entityTitle,
+			Long caseId,
+			String caseName,
 			boolean isRead,
 			Instant createdAt,
 			String eventKey) {

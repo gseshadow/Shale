@@ -1,41 +1,36 @@
 package com.shale.ui.component.dialog;
 
+import com.shale.ui.component.NotificationCard;
+import com.shale.ui.component.factory.NotificationCardFactory;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCenterService;
-import com.shale.ui.notification.NotificationCategory;
-import com.shale.ui.component.factory.TaskCardFactory;
-import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.FormatStyle;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
-import javafx.scene.Cursor;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.Node;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
 public final class NotificationCenterDialog {
-	private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter
-			.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
-			.withZone(ZoneId.systemDefault());
+	private static final double DEFAULT_WIDTH = 720;
+	private static final double DEFAULT_HEIGHT = 520;
+	private static final double MIN_WIDTH = 640;
+	private static final double MIN_HEIGHT = 420;
 
 	private NotificationCenterDialog() {
 	}
@@ -47,21 +42,39 @@ public final class NotificationCenterDialog {
 			Consumer<AppNotification> onActivateNotification) {
 		Objects.requireNonNull(notificationService, "notificationService");
 
-		Stage stage = AppDialogs.createModalStage(owner, "Notifications");
+		Stage stage = new Stage();
+		if (owner != null) {
+			stage.initOwner(owner);
+		}
+		stage.initModality(Modality.WINDOW_MODAL);
+		stage.setTitle("Notifications");
 		stage.setResizable(true);
-		stage.setMinWidth(680);
-		stage.setMinHeight(440);
+		stage.setMinWidth(MIN_WIDTH);
+		stage.setMinHeight(MIN_HEIGHT);
 
 		Label heading = new Label("Notifications");
-		heading.getStyleClass().add("app-dialog-title");
+		heading.getStyleClass().addAll("secondary-window-title", "notification-window-title");
 
 		Label subtitle = new Label("Newest first. Unread items are highlighted.");
-		subtitle.getStyleClass().add("app-dialog-message");
+		subtitle.getStyleClass().add("notification-window-subtitle");
+
+		Button headerCloseButton = new Button("×");
+		headerCloseButton.getStyleClass().addAll("secondary-window-close", "notification-window-close");
+		headerCloseButton.setOnAction(event -> stage.close());
+
+		VBox headerText = new VBox(1, heading, subtitle);
+		headerText.setAlignment(Pos.CENTER_LEFT);
+		HBox.setHgrow(headerText, Priority.ALWAYS);
+		HBox header = new HBox(8, headerText, headerCloseButton);
+		header.getStyleClass().addAll("secondary-window-header", "notification-window-header");
+		header.setAlignment(Pos.CENTER_LEFT);
+
+		NotificationCardFactory cardFactory = new NotificationCardFactory(item -> dismissNotification(notificationService, item));
 
 		ListView<AppNotification> listView = new ListView<>();
 		listView.setItems(notificationService.getNotificationsNewestFirst());
 		listView.getStyleClass().add("notification-list");
-		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification));
+		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification, cardFactory));
 		notificationService.unreadCountProperty().addListener((obs, oldValue, newValue) -> listView.refresh());
 
 		Button markAllReadButton = new Button("Mark all read");
@@ -78,39 +91,58 @@ public final class NotificationCenterDialog {
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		HBox actions = new HBox(10, markAllReadButton, spacer, closeButton);
+		actions.getStyleClass().add("app-dialog-actions");
+		actions.setAlignment(Pos.CENTER_RIGHT);
 
 		VBox.setVgrow(listView, Priority.ALWAYS);
-		VBox body = new VBox(12, heading, subtitle, listView, actions);
-		body.setPadding(new Insets(16));
-		VBox root = AppDialogs.createSecondaryWindowShell(stage, "Notifications", stage::close, body);
+		VBox content = new VBox(8, listView, actions);
+		content.setFillWidth(true);
+		content.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		content.setPadding(new Insets(10, 12, 12, 12));
+		VBox.setVgrow(content, Priority.ALWAYS);
 
-		Scene scene = new Scene(root);
+		VBox body = new VBox(header, content);
+		body.getStyleClass().addAll("app-dialog-root", "notification-window-root");
+		body.setFillWidth(true);
+		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+		Scene scene = new Scene(body, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 		scene.getStylesheets().add(Objects.requireNonNull(
 				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
 		stage.showAndWait();
 	}
 
+	private static void dismissNotification(NotificationCenterService notificationService, AppNotification item) {
+		if (item == null) {
+			return;
+		}
+		try {
+			notificationService.dismiss(item);
+		} catch (RuntimeException ex) {
+			System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
+			ex.printStackTrace(System.err);
+			throw ex;
+		}
+	}
+
 	private static final class NotificationCell extends ListCell<AppNotification> {
 		private final NotificationCenterService notificationService;
-		private final Consumer<Long> onOpenTask;
-		private final TaskCardFactory taskCardFactory;
 		private final Consumer<AppNotification> onActivateNotification;
+		private final Consumer<Long> onOpenTask;
+		private final NotificationCardFactory notificationCardFactory;
 		private final ChangeListener<Boolean> unreadListener = (obs, oldValue, newValue) -> updateUnreadStyle();
 		private AppNotification observedItem;
 
 		private NotificationCell(
 				NotificationCenterService notificationService,
 				Consumer<Long> onOpenTask,
-				Consumer<AppNotification> onActivateNotification) {
+				Consumer<AppNotification> onActivateNotification,
+				NotificationCardFactory notificationCardFactory) {
 			this.notificationService = notificationService;
-			this.onOpenTask = onOpenTask;
-			this.taskCardFactory = new TaskCardFactory(
-					ignored -> {},
-					ignored -> {},
-					ignored -> {},
-					ignored -> {});
 			this.onActivateNotification = onActivateNotification;
+			this.onOpenTask = onOpenTask;
+			this.notificationCardFactory = Objects.requireNonNull(notificationCardFactory, "notificationCardFactory");
 			setOnMouseClicked(event -> {
 				if (isFromInteractiveChild(event)) {
 					return;
@@ -118,7 +150,10 @@ public final class NotificationCenterDialog {
 				AppNotification selected = getItem();
 				if (selected != null) {
 					notificationService.markRead(selected);
-					if (this.onActivateNotification != null) {
+					Long taskId = resolveTaskId(selected);
+					if (taskId != null && onOpenTask != null) {
+						onOpenTask.accept(taskId);
+					} else if (this.onActivateNotification != null) {
 						this.onActivateNotification.accept(selected);
 					}
 				}
@@ -139,125 +174,26 @@ public final class NotificationCenterDialog {
 			}
 			observedItem = item;
 			observedItem.unreadProperty().addListener(unreadListener);
-
-			Label category = new Label(item.getCategory().name());
-			category.getStyleClass().add("notification-row-category");
-
-			Label timestamp = new Label(TIME_FORMATTER.format(item.getCreatedAt()));
-			timestamp.getStyleClass().add("notification-row-time");
-
-			Button dismissButton = createDismissButton(item);
-			Region spacer = new Region();
-			HBox.setHgrow(spacer, Priority.ALWAYS);
-			HBox topRow = new HBox(8, category, spacer, timestamp, dismissButton);
-
-			Label title = new Label(item.getTitle());
-			title.getStyleClass().add("notification-row-title");
-
-			TextArea message = new TextArea(item.getMessage());
-			message.setWrapText(true);
-			message.setEditable(false);
-			message.setPrefRowCount(2);
-			message.setMaxWidth(Double.MAX_VALUE);
-			ReadOnlyTextDisplaySupport.apply(message, false);
-			message.getStyleClass().add("notification-row-message");
-
-			VBox wrapper = new VBox(6, topRow, title, message);
-			Region taskPreview = createTaskPreview(item);
-			if (taskPreview != null) {
-				wrapper.getChildren().add(taskPreview);
-			}
-			wrapper.getStyleClass().add("notification-row");
-
-			setGraphic(wrapper);
+			setText(null);
+			setGraphic(notificationCardFactory.create(
+					new NotificationCardFactory.NotificationCardModel(item),
+					NotificationCardFactory.Variant.CENTER_ROW));
 			updateUnreadStyle();
 		}
 
 		private void updateUnreadStyle() {
-			if (!(getGraphic() instanceof VBox wrapper)) {
-				return;
-			}
-			wrapper.getStyleClass().remove("notification-row-unread");
-			AppNotification item = getItem();
-			if (item != null && item.isUnread()) {
-				wrapper.getStyleClass().add("notification-row-unread");
+			if (getGraphic() instanceof NotificationCard card) {
+				AppNotification item = getItem();
+				card.setUnread(item != null && item.isUnread());
 			}
 		}
-
-		private Region createTaskPreview(AppNotification item) {
-			Long taskId = resolveTaskId(item);
-			if (taskId == null || taskId <= 0) {
-				return null;
-			}
-			String previewTitle = resolveTaskPreviewTitle(item, taskId);
-
-			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
-					taskId,
-					null,
-					null,
-					null,
-					null,
-					null,
-					previewTitle,
-					null,
-					null,
-					null,
-					null,
-					null,
-					List.of());
-			Region previewCard = taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
-			previewCard.getStyleClass().add("notification-task-preview");
-			previewCard.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> onTaskPreviewPressed(item, taskId, event));
-			previewCard.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
-			return previewCard;
-		}
-
-		private static String resolveTaskPreviewTitle(AppNotification item, long taskId) {
-			if (item != null && item.getEntityTitle() != null && !item.getEntityTitle().isBlank()) {
-				return item.getEntityTitle().trim();
-			}
-			return "Task #" + taskId;
-		}
-
-		private void onTaskPreviewPressed(AppNotification item, Long taskId, MouseEvent event) {
-			event.consume();
-			if (item != null) {
-				notificationService.markRead(item);
-			}
-			if (onOpenTask != null && taskId != null && taskId > 0) {
-				onOpenTask.accept(taskId);
-			}
-		}
-
-		private Button createDismissButton(AppNotification item) {
-			Button button = new Button("Dismiss");
-			button.getStyleClass().add("notification-row-dismiss");
-			if (item == null || item.getDurableNotificationId() == null) {
-				button.setText("Dismiss (session)");
-				button.setTooltip(new Tooltip("This notification will be hidden for the current session only."));
-			}
-			button.setOnAction(event -> {
-				event.consume();
-				if (item != null) {
-					try {
-						notificationService.dismiss(item);
-					} catch (RuntimeException ex) {
-						System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
-						ex.printStackTrace(System.err);
-						throw ex;
-					}
-				}
-			});
-			return button;
-		}
-
 
 		private static boolean isFromInteractiveChild(MouseEvent event) {
 			if (event == null || !(event.getTarget() instanceof Node node)) {
 				return false;
 			}
 			return hasStyleClassInAncestorChain(node, "notification-row-dismiss")
-					|| hasStyleClassInAncestorChain(node, "notification-task-preview");
+					|| hasStyleClassInAncestorChain(node, "notification-row-expand");
 		}
 
 		private static boolean hasStyleClassInAncestorChain(Node node, String styleClass) {
@@ -272,18 +208,14 @@ public final class NotificationCenterDialog {
 		}
 
 		private static Long resolveTaskId(AppNotification item) {
-			if (item == null || item.getCategory() == null || item.getCategory() != NotificationCategory.TASK) {
-				return null;
-			}
-			Long entityId = item.getEntityId();
-			if (entityId == null || entityId <= 0) {
+			if (item == null || item.getEntityId() == null || item.getEntityId() <= 0) {
 				return null;
 			}
 			String entityType = item.getEntityType();
-			if (entityType != null && !entityType.isBlank() && !"TASK".equalsIgnoreCase(entityType.trim())) {
+			if (entityType == null || !"TASK".equalsIgnoreCase(entityType.trim())) {
 				return null;
 			}
-			return entityId;
+			return item.getEntityId();
 		}
 	}
 }
