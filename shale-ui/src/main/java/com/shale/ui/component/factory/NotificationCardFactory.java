@@ -1,6 +1,7 @@
 package com.shale.ui.component.factory;
 
 import com.shale.ui.component.NotificationCard;
+import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCategory;
 
@@ -13,6 +14,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
@@ -20,6 +22,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 public final class NotificationCardFactory {
@@ -38,10 +41,16 @@ public final class NotificationCardFactory {
 	}
 
 	private final Consumer<AppNotification> onDismiss;
+	private final CaseCardFactory caseCardFactory;
 	private final Set<String> expandedNotificationIds = new HashSet<>();
 
 	public NotificationCardFactory(Consumer<AppNotification> onDismiss) {
+		this(onDismiss, null);
+	}
+
+	public NotificationCardFactory(Consumer<AppNotification> onDismiss, Consumer<Integer> onOpenCase) {
 		this.onDismiss = onDismiss;
+		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 	}
 
 	public NotificationCard create(NotificationCardModel model, Variant variant) {
@@ -53,8 +62,6 @@ public final class NotificationCardFactory {
 		card.setUnread(item.isUnread());
 		card.setExpanded(expandedNotificationIds.contains(item.getId()));
 
-		Button expandButton = createExpandButton(item, card);
-
 		Label category = new Label(resolveCategory(item));
 		category.getStyleClass().add("notification-row-category");
 		category.setTextOverrun(OverrunStyle.ELLIPSIS);
@@ -64,29 +71,51 @@ public final class NotificationCardFactory {
 		title.setWrapText(false);
 		title.setTextOverrun(OverrunStyle.ELLIPSIS);
 		title.setMaxWidth(Double.MAX_VALUE);
-		HBox.setHgrow(title, Priority.ALWAYS);
+
+		Label message = new Label(item.getMessage());
+		message.getStyleClass().add("notification-row-message");
+		message.setWrapText(true);
+		message.setMaxWidth(Double.MAX_VALUE);
+		message.setMaxHeight(34);
+		message.setTextOverrun(OverrunStyle.ELLIPSIS);
+
+		VBox mainArea = new VBox(2, category, title, message);
+		mainArea.getStyleClass().add("notification-row-main");
+		mainArea.setMaxWidth(Double.MAX_VALUE);
+		HBox.setHgrow(mainArea, Priority.ALWAYS);
+
+		String entityContext = resolveEntityContext(item);
+		if (entityContext != null) {
+			Label contextLabel = new Label(entityContext);
+			contextLabel.getStyleClass().add("notification-row-context");
+			contextLabel.setWrapText(false);
+			contextLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+			contextLabel.setMaxWidth(Double.MAX_VALUE);
+			mainArea.getChildren().add(contextLabel);
+		}
 
 		Label timestamp = new Label(TIME_FORMATTER.format(item.getCreatedAt()));
 		timestamp.getStyleClass().add("notification-row-time");
 		timestamp.setTextOverrun(OverrunStyle.ELLIPSIS);
 
 		Button dismissButton = createDismissButton(item);
-		HBox topRow = new HBox(5, expandButton, category, title, timestamp, dismissButton);
-		topRow.setAlignment(Pos.CENTER_LEFT);
-		topRow.getStyleClass().add("notification-row-meta");
+		Button expandButton = createExpandButton(item, card);
+		HBox controlRow = new HBox(4, timestamp, dismissButton, expandButton);
+		controlRow.getStyleClass().add("notification-row-controls");
+		controlRow.setAlignment(Pos.CENTER_RIGHT);
 
-		Label message = new Label(item.getMessage());
-		message.getStyleClass().add("notification-row-message");
-		message.setWrapText(true);
-		message.setMaxWidth(Double.MAX_VALUE);
-		message.setMaxHeight(26);
-		message.setTextOverrun(OverrunStyle.ELLIPSIS);
-
-		card.getChildren().addAll(topRow, message);
-		HBox contextRow = createCollapsedContextRow(item);
-		if (!contextRow.getChildren().isEmpty()) {
-			card.getChildren().add(contextRow);
+		VBox rightArea = new VBox(5, controlRow);
+		rightArea.getStyleClass().add("notification-row-right");
+		rightArea.setAlignment(Pos.TOP_RIGHT);
+		Node caseCard = createCaseMiniCard(item);
+		if (caseCard != null) {
+			rightArea.getChildren().add(caseCard);
 		}
+
+		HBox collapsedRow = new HBox(10, mainArea, rightArea);
+		collapsedRow.getStyleClass().add("notification-row-collapsed");
+		collapsedRow.setAlignment(Pos.TOP_LEFT);
+		card.getChildren().add(collapsedRow);
 
 		VBox expandedContent = createExpandedContent(item);
 		expandedContent.visibleProperty().bind(card.expandedProperty());
@@ -95,53 +124,23 @@ public final class NotificationCardFactory {
 		return card;
 	}
 
-	private HBox createCollapsedContextRow(AppNotification item) {
-		HBox contextRow = new HBox(6);
-		contextRow.setAlignment(Pos.CENTER_LEFT);
-		contextRow.getStyleClass().add("notification-row-context-line");
-
-		String entityContext = resolveEntityContext(item);
-		Label caseChip = createCaseChip(item);
-		if (entityContext != null) {
-			Label contextLabel = new Label(entityContext);
-			contextLabel.getStyleClass().add("notification-row-context");
-			contextLabel.setWrapText(false);
-			contextLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
-			contextLabel.setMaxWidth(Double.MAX_VALUE);
-			HBox.setHgrow(contextLabel, Priority.ALWAYS);
-			contextRow.getChildren().add(contextLabel);
-		} else if (caseChip != null) {
-			Region spacer = new Region();
-			HBox.setHgrow(spacer, Priority.ALWAYS);
-			contextRow.getChildren().add(spacer);
-		}
-		if (caseChip != null) {
-			contextRow.getChildren().add(caseChip);
-		}
-		return contextRow;
-	}
-
 	private VBox createExpandedContent(AppNotification item) {
 		VBox expanded = new VBox(3);
 		expanded.getStyleClass().add("notification-row-expanded");
 
-		Label fullMessage = new Label(item.getMessage());
-		fullMessage.getStyleClass().add("notification-row-expanded-message");
-		fullMessage.setWrapText(true);
-		fullMessage.setMaxWidth(Double.MAX_VALUE);
-		expanded.getChildren().add(fullMessage);
-
-		String entityContext = resolveEntityContext(item);
-		if (entityContext != null) {
-			expanded.getChildren().add(createExpandedLine("Related", entityContext));
-		}
-		String caseContext = resolveCaseContext(item);
-		if (caseContext != null) {
-			expanded.getChildren().add(createExpandedLine("Case", caseContext));
-		}
 		String actionType = normalize(item.getActionType());
 		if (actionType != null) {
 			expanded.getChildren().add(createExpandedLine("Action", actionType));
+		}
+		String eventKey = normalize(item.getEventKey());
+		if (eventKey != null) {
+			expanded.getChildren().add(createExpandedLine("Event", eventKey));
+		}
+		if (item.getDurableNotificationId() != null) {
+			expanded.getChildren().add(createExpandedLine("Notification", "#" + item.getDurableNotificationId()));
+		}
+		if (expanded.getChildren().isEmpty()) {
+			expanded.getChildren().add(createExpandedLine("Details", item.getSeverity().name()));
 		}
 		return expanded;
 	}
@@ -157,10 +156,11 @@ public final class NotificationCardFactory {
 	private Button createExpandButton(AppNotification item, NotificationCard card) {
 		Button button = new Button(card.isExpanded() ? "▾" : "▸");
 		button.getStyleClass().add("notification-row-expand");
-		button.setTooltip(new Tooltip("Expand notification"));
+		button.setTooltip(new Tooltip(card.isExpanded() ? "Collapse notification" : "Expand notification"));
 		card.expandedProperty().addListener((obs, wasExpanded, isExpanded) -> {
-			button.setText(Boolean.TRUE.equals(isExpanded) ? "▾" : "▸");
-			button.setTooltip(new Tooltip(Boolean.TRUE.equals(isExpanded) ? "Collapse notification" : "Expand notification"));
+			boolean expanded = Boolean.TRUE.equals(isExpanded);
+			button.setText(expanded ? "▾" : "▸");
+			button.setTooltip(new Tooltip(expanded ? "Collapse notification" : "Expand notification"));
 		});
 		button.setOnAction(event -> {
 			event.consume();
@@ -191,17 +191,21 @@ public final class NotificationCardFactory {
 		return button;
 	}
 
-	private static Label createCaseChip(AppNotification item) {
-		String caseContext = resolveCaseContext(item);
-		if (caseContext == null) {
+	private Node createCaseMiniCard(AppNotification item) {
+		Long caseId = item.getCaseId();
+		if (caseId == null || caseId <= 0 || caseId > Integer.MAX_VALUE) {
 			return null;
 		}
-		Label chip = new Label(caseContext);
-		chip.getStyleClass().add("notification-row-case-chip");
-		chip.setWrapText(false);
-		chip.setTextOverrun(OverrunStyle.ELLIPSIS);
-		chip.setMaxWidth(180);
-		return chip;
+		String caseName = resolveCaseContext(item);
+		Node miniCard = caseCardFactory.create(
+				new CaseCardModel(caseId, caseName == null ? "Case #" + caseId : caseName, null, null, null, null, false),
+				CaseCardFactory.Variant.MINI);
+		miniCard.getStyleClass().add("notification-row-case-mini-card");
+		StackPane wrapper = new StackPane(miniCard);
+		wrapper.getStyleClass().add("notification-row-case-mini");
+		wrapper.setMaxWidth(180);
+		wrapper.setOnMouseClicked(event -> event.consume());
+		return wrapper;
 	}
 
 	private static String resolveCategory(AppNotification item) {

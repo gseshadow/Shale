@@ -1007,31 +1007,14 @@
 
 .notification-window-root {
     -fx-background-color: rgba(243, 248, 253, 0.98);
-    -fx-background-radius: 0;
-    -fx-border-radius: 0;
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-border-color: rgba(13, 33, 64, 0.18);
+    -fx-border-width: 1;
 }
 
-.notification-window-header {
-    -fx-padding: 10 12 10 14;
-    -fx-background-radius: 0;
-}
-
-.notification-window-title {
-    -fx-font-size: 15px;
-}
-
-.notification-window-subtitle {
-    -fx-text-fill: rgba(255, 255, 255, 0.86);
-    -fx-font-size: 11px;
-    -fx-font-weight: 600;
-}
-
-.notification-window-close {
-    -fx-min-width: 24px;
-    -fx-min-height: 24px;
-    -fx-pref-width: 24px;
-    -fx-pref-height: 24px;
-    -fx-padding: 0;
+.notification-window-root .secondary-window-header {
+    -fx-background-radius: 16 16 0 0;
 }
 
 .notification-list {
@@ -1040,7 +1023,7 @@
 
 .notification-list .list-cell {
     -fx-background-color: transparent;
-    -fx-padding: 1 2 1 2;
+    -fx-padding: 2 2 2 2;
 }
 
 .notification-list .list-cell:filled:selected,
@@ -1049,26 +1032,42 @@
 }
 
 .notification-row {
-    -fx-spacing: 1;
-    -fx-background-color: rgba(235, 244, 253, 0.62);
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
-    -fx-border-color: rgba(18, 41, 74, 0.12);
+    -fx-spacing: 2;
+    -fx-background-color: rgba(255, 255, 255, 0.70);
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: rgba(18, 41, 74, 0.13);
     -fx-border-width: 1;
-    -fx-padding: 4 6 4 4;
+    -fx-padding: 7 8 7 8;
 }
 
 .notification-row-unread {
-    -fx-background-color: rgba(223, 238, 253, 0.92);
-    -fx-border-color: rgba(57, 106, 178, 0.66);
+    -fx-background-color: rgba(223, 238, 253, 0.94);
+    -fx-border-color: rgba(57, 106, 178, 0.64);
+    -fx-border-width: 1 1 1 3;
 }
 
-.notification-row-meta {
+.notification-row-collapsed {
+    -fx-spacing: 10;
+}
+
+.notification-row-main {
+    -fx-spacing: 2;
+}
+
+.notification-row-right {
     -fx-spacing: 5;
+    -fx-min-width: 170px;
+    -fx-pref-width: 190px;
+    -fx-max-width: 210px;
+}
+
+.notification-row-controls {
+    -fx-spacing: 4;
 }
 
 .notification-row-category {
-    -fx-text-fill: #234c84;
+    -fx-text-fill: #2d5d99;
     -fx-font-size: 9px;
     -fx-font-weight: 800;
 }
@@ -1085,18 +1084,19 @@
     -fx-padding: 0 4 0 4;
     -fx-min-width: 18px;
     -fx-min-height: 18px;
+    -fx-pref-width: 18px;
     -fx-pref-height: 18px;
     -fx-background-radius: 999;
 }
 
 .notification-row-expand {
-    -fx-background-color: transparent;
-    -fx-text-fill: rgba(17, 37, 66, 0.70);
+    -fx-background-color: rgba(79, 127, 191, 0.12);
+    -fx-text-fill: rgba(17, 37, 66, 0.74);
 }
 
 .notification-row-dismiss {
-    -fx-background-color: rgba(255, 255, 255, 0.62);
-    -fx-text-fill: rgba(17, 37, 66, 0.70);
+    -fx-background-color: rgba(17, 37, 66, 0.07);
+    -fx-text-fill: rgba(17, 37, 66, 0.68);
 }
 
 .notification-row-title {
@@ -1106,44 +1106,35 @@
 }
 
 .notification-row-message {
-    -fx-text-fill: rgba(16, 36, 66, 0.76);
+    -fx-text-fill: rgba(16, 36, 66, 0.78);
     -fx-font-size: 10px;
-    -fx-line-spacing: -2;
-}
-
-.notification-row-context-line {
-    -fx-spacing: 6;
+    -fx-line-spacing: -1;
 }
 
 .notification-row-context {
-    -fx-text-fill: rgba(16, 36, 66, 0.55);
+    -fx-text-fill: rgba(16, 36, 66, 0.58);
     -fx-font-size: 10px;
-    -fx-font-weight: 600;
+    -fx-font-weight: 700;
 }
 
-.notification-row-case-chip {
-    -fx-background-color: rgba(79, 127, 191, 0.12);
-    -fx-background-radius: 999;
-    -fx-border-color: rgba(79, 127, 191, 0.22);
-    -fx-border-radius: 999;
-    -fx-padding: 1 7 1 7;
-    -fx-text-fill: #234c84;
-    -fx-font-size: 9px;
-    -fx-font-weight: 800;
+.notification-row-case-mini {
+    -fx-alignment: center-right;
+    -fx-max-width: 180px;
+}
+
+.notification-row-case-mini-card {
+    -fx-effect: null;
 }
 
 .notification-row-expanded {
-    -fx-padding: 4 4 1 22;
+    -fx-padding: 5 2 0 12;
     -fx-spacing: 3;
-}
-
-.notification-row-expanded-message {
-    -fx-text-fill: rgba(16, 36, 66, 0.86);
-    -fx-font-size: 11px;
+    -fx-border-color: rgba(18, 41, 74, 0.10) transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
 }
 
 .notification-row-expanded-line {
-    -fx-text-fill: rgba(16, 36, 66, 0.62);
+    -fx-text-fill: rgba(16, 36, 66, 0.64);
     -fx-font-size: 10px;
     -fx-font-weight: 600;
 }

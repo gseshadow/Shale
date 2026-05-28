@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -27,10 +28,11 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 
 public final class NotificationCenterDialog {
-	private static final double DEFAULT_WIDTH = 720;
-	private static final double DEFAULT_HEIGHT = 520;
+	private static final double DEFAULT_WIDTH = 760;
+	private static final double DEFAULT_HEIGHT = 560;
 	private static final double MIN_WIDTH = 640;
 	private static final double MIN_HEIGHT = 420;
+	private static final double RESIZE_MARGIN = 8;
 
 	private NotificationCenterDialog() {
 	}
@@ -39,10 +41,12 @@ public final class NotificationCenterDialog {
 			Window owner,
 			NotificationCenterService notificationService,
 			Consumer<Long> onOpenTask,
+			Consumer<Integer> onOpenCase,
 			Consumer<AppNotification> onActivateNotification) {
 		Objects.requireNonNull(notificationService, "notificationService");
 
 		Stage stage = new Stage();
+		AppDialogs.applySecondaryWindowChrome(stage);
 		if (owner != null) {
 			stage.initOwner(owner);
 		}
@@ -53,8 +57,7 @@ public final class NotificationCenterDialog {
 		stage.setMinHeight(MIN_HEIGHT);
 
 		Label heading = new Label("Notifications");
-		heading.getStyleClass().addAll("secondary-window-title", "notification-window-title");
-
+		heading.getStyleClass().add("app-dialog-title");
 		Label subtitle = new Label("Newest first. Unread items are highlighted.");
 		subtitle.getStyleClass().add("notification-window-subtitle");
 
@@ -70,6 +73,10 @@ public final class NotificationCenterDialog {
 		header.setAlignment(Pos.CENTER_LEFT);
 
 		NotificationCardFactory cardFactory = new NotificationCardFactory(item -> dismissNotification(notificationService, item));
+
+		NotificationCardFactory cardFactory = new NotificationCardFactory(
+				item -> dismissNotification(notificationService, item),
+				onOpenCase);
 
 		ListView<AppNotification> listView = new ListView<>();
 		listView.setItems(notificationService.getNotificationsNewestFirst());
@@ -95,22 +102,123 @@ public final class NotificationCenterDialog {
 		actions.setAlignment(Pos.CENTER_RIGHT);
 
 		VBox.setVgrow(listView, Priority.ALWAYS);
-		VBox content = new VBox(8, listView, actions);
-		content.setFillWidth(true);
-		content.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-		content.setPadding(new Insets(10, 12, 12, 12));
-		VBox.setVgrow(content, Priority.ALWAYS);
-
-		VBox body = new VBox(header, content);
-		body.getStyleClass().addAll("app-dialog-root", "notification-window-root");
+		VBox body = new VBox(10, heading, subtitle, listView, actions);
 		body.setFillWidth(true);
 		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		body.setPadding(new Insets(18, 20, 18, 20));
+		VBox.setVgrow(body, Priority.ALWAYS);
 
-		Scene scene = new Scene(body, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+		VBox root = AppDialogs.createSecondaryWindowShell(stage, "Notifications", stage::close, body);
+		root.getStyleClass().add("notification-window-root");
+		root.setMinWidth(MIN_WIDTH);
+		root.setMinHeight(MIN_HEIGHT);
+		root.setPrefWidth(DEFAULT_WIDTH);
+		root.setPrefHeight(DEFAULT_HEIGHT);
+		installResizeHandlers(stage, root);
+
+		Scene scene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 		scene.getStylesheets().add(Objects.requireNonNull(
 				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
 		stage.showAndWait();
+	}
+
+	public static void show(
+			Window owner,
+			NotificationCenterService notificationService,
+			Consumer<Long> onOpenTask,
+			Consumer<AppNotification> onActivateNotification) {
+		show(owner, notificationService, onOpenTask, null, onActivateNotification);
+	}
+
+	private static void installResizeHandlers(Stage stage, Node root) {
+		ResizeState state = new ResizeState();
+		root.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
+			if (state.edge == ResizeEdge.NONE) {
+				root.setCursor(cursorFor(edgeFor(event, root)));
+			}
+		});
+		root.addEventHandler(MouseEvent.MOUSE_EXITED, event -> {
+			if (state.edge == ResizeEdge.NONE) {
+				root.setCursor(Cursor.DEFAULT);
+			}
+		});
+		root.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+			ResizeEdge edge = edgeFor(event, root);
+			if (edge == ResizeEdge.NONE) {
+				return;
+			}
+			state.edge = edge;
+			state.startScreenX = event.getScreenX();
+			state.startScreenY = event.getScreenY();
+			state.startX = stage.getX();
+			state.startY = stage.getY();
+			state.startWidth = stage.getWidth();
+			state.startHeight = stage.getHeight();
+			event.consume();
+		});
+		root.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> {
+			if (state.edge == ResizeEdge.NONE) {
+				return;
+			}
+			resizeStage(stage, state, event);
+			event.consume();
+		});
+		root.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> {
+			state.edge = ResizeEdge.NONE;
+			root.setCursor(cursorFor(edgeFor(event, root)));
+		});
+	}
+
+	private static ResizeEdge edgeFor(MouseEvent event, Node root) {
+		double x = event.getX();
+		double y = event.getY();
+		double width = root.getBoundsInLocal().getWidth();
+		double height = root.getBoundsInLocal().getHeight();
+		boolean left = x >= 0 && x <= RESIZE_MARGIN;
+		boolean right = x >= width - RESIZE_MARGIN && x <= width;
+		boolean top = y >= 0 && y <= RESIZE_MARGIN;
+		boolean bottom = y >= height - RESIZE_MARGIN && y <= height;
+		if (top && left) return ResizeEdge.TOP_LEFT;
+		if (top && right) return ResizeEdge.TOP_RIGHT;
+		if (bottom && left) return ResizeEdge.BOTTOM_LEFT;
+		if (bottom && right) return ResizeEdge.BOTTOM_RIGHT;
+		if (left) return ResizeEdge.LEFT;
+		if (right) return ResizeEdge.RIGHT;
+		if (top) return ResizeEdge.TOP;
+		if (bottom) return ResizeEdge.BOTTOM;
+		return ResizeEdge.NONE;
+	}
+
+	private static Cursor cursorFor(ResizeEdge edge) {
+		return switch (edge) {
+			case TOP_LEFT, BOTTOM_RIGHT -> Cursor.NW_RESIZE;
+			case TOP_RIGHT, BOTTOM_LEFT -> Cursor.NE_RESIZE;
+			case LEFT, RIGHT -> Cursor.E_RESIZE;
+			case TOP, BOTTOM -> Cursor.N_RESIZE;
+			case NONE -> Cursor.DEFAULT;
+		};
+	}
+
+	private static void resizeStage(Stage stage, ResizeState state, MouseEvent event) {
+		double deltaX = event.getScreenX() - state.startScreenX;
+		double deltaY = event.getScreenY() - state.startScreenY;
+		if (state.edge.resizesRight()) {
+			stage.setWidth(Math.max(stage.getMinWidth(), state.startWidth + deltaX));
+		}
+		if (state.edge.resizesBottom()) {
+			stage.setHeight(Math.max(stage.getMinHeight(), state.startHeight + deltaY));
+		}
+		if (state.edge.resizesLeft()) {
+			double newWidth = Math.max(stage.getMinWidth(), state.startWidth - deltaX);
+			stage.setX(state.startX + state.startWidth - newWidth);
+			stage.setWidth(newWidth);
+		}
+		if (state.edge.resizesTop()) {
+			double newHeight = Math.max(stage.getMinHeight(), state.startHeight - deltaY);
+			stage.setY(state.startY + state.startHeight - newHeight);
+			stage.setHeight(newHeight);
+		}
 	}
 
 	private static void dismissNotification(NotificationCenterService notificationService, AppNotification item) {
@@ -124,6 +232,44 @@ public final class NotificationCenterDialog {
 			ex.printStackTrace(System.err);
 			throw ex;
 		}
+	}
+
+	private enum ResizeEdge {
+		NONE,
+		LEFT,
+		RIGHT,
+		TOP,
+		BOTTOM,
+		TOP_LEFT,
+		TOP_RIGHT,
+		BOTTOM_LEFT,
+		BOTTOM_RIGHT;
+
+		private boolean resizesLeft() {
+			return this == LEFT || this == TOP_LEFT || this == BOTTOM_LEFT;
+		}
+
+		private boolean resizesRight() {
+			return this == RIGHT || this == TOP_RIGHT || this == BOTTOM_RIGHT;
+		}
+
+		private boolean resizesTop() {
+			return this == TOP || this == TOP_LEFT || this == TOP_RIGHT;
+		}
+
+		private boolean resizesBottom() {
+			return this == BOTTOM || this == BOTTOM_LEFT || this == BOTTOM_RIGHT;
+		}
+	}
+
+	private static final class ResizeState {
+		private ResizeEdge edge = ResizeEdge.NONE;
+		private double startScreenX;
+		private double startScreenY;
+		private double startX;
+		private double startY;
+		private double startWidth;
+		private double startHeight;
 	}
 
 	private static final class NotificationCell extends ListCell<AppNotification> {
@@ -193,7 +339,8 @@ public final class NotificationCenterDialog {
 				return false;
 			}
 			return hasStyleClassInAncestorChain(node, "notification-row-dismiss")
-					|| hasStyleClassInAncestorChain(node, "notification-row-expand");
+					|| hasStyleClassInAncestorChain(node, "notification-row-expand")
+					|| hasStyleClassInAncestorChain(node, "notification-row-case-mini");
 		}
 
 		private static boolean hasStyleClassInAncestorChain(Node node, String styleClass) {
