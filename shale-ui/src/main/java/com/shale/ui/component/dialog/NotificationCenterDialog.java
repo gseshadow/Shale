@@ -76,10 +76,6 @@ public final class NotificationCenterDialog {
 				item -> dismissNotification(notificationService, item),
 				onOpenCase);
 
-		NotificationCardFactory cardFactory = new NotificationCardFactory(
-				item -> dismissNotification(notificationService, item),
-				onOpenCase);
-
 		ListView<AppNotification> listView = new ListView<>();
 		listView.setItems(notificationService.getNotificationsNewestFirst());
 		listView.getStyleClass().add("notification-list");
@@ -135,17 +131,20 @@ public final class NotificationCenterDialog {
 
 	private static void installResizeHandlers(Stage stage, Node root) {
 		ResizeState state = new ResizeState();
-		root.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
+		root.addEventHandler(MouseEvent.MOUSE_MOVED, event ->
+		{
 			if (state.edge == ResizeEdge.NONE) {
 				root.setCursor(cursorFor(edgeFor(event, root)));
 			}
 		});
-		root.addEventHandler(MouseEvent.MOUSE_EXITED, event -> {
+		root.addEventHandler(MouseEvent.MOUSE_EXITED, event ->
+		{
 			if (state.edge == ResizeEdge.NONE) {
 				root.setCursor(Cursor.DEFAULT);
 			}
 		});
-		root.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+		root.addEventFilter(MouseEvent.MOUSE_PRESSED, event ->
+		{
 			ResizeEdge edge = edgeFor(event, root);
 			if (edge == ResizeEdge.NONE) {
 				return;
@@ -159,14 +158,16 @@ public final class NotificationCenterDialog {
 			state.startHeight = stage.getHeight();
 			event.consume();
 		});
-		root.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> {
+		root.addEventFilter(MouseEvent.MOUSE_DRAGGED, event ->
+		{
 			if (state.edge == ResizeEdge.NONE) {
 				return;
 			}
 			resizeStage(stage, state, event);
 			event.consume();
 		});
-		root.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> {
+		root.addEventFilter(MouseEvent.MOUSE_RELEASED, event ->
+		{
 			state.edge = ResizeEdge.NONE;
 			root.setCursor(cursorFor(edgeFor(event, root)));
 		});
@@ -181,24 +182,32 @@ public final class NotificationCenterDialog {
 		boolean right = x >= width - RESIZE_MARGIN && x <= width;
 		boolean top = y >= 0 && y <= RESIZE_MARGIN;
 		boolean bottom = y >= height - RESIZE_MARGIN && y <= height;
-		if (top && left) return ResizeEdge.TOP_LEFT;
-		if (top && right) return ResizeEdge.TOP_RIGHT;
-		if (bottom && left) return ResizeEdge.BOTTOM_LEFT;
-		if (bottom && right) return ResizeEdge.BOTTOM_RIGHT;
-		if (left) return ResizeEdge.LEFT;
-		if (right) return ResizeEdge.RIGHT;
-		if (top) return ResizeEdge.TOP;
-		if (bottom) return ResizeEdge.BOTTOM;
+		if (top && left)
+			return ResizeEdge.TOP_LEFT;
+		if (top && right)
+			return ResizeEdge.TOP_RIGHT;
+		if (bottom && left)
+			return ResizeEdge.BOTTOM_LEFT;
+		if (bottom && right)
+			return ResizeEdge.BOTTOM_RIGHT;
+		if (left)
+			return ResizeEdge.LEFT;
+		if (right)
+			return ResizeEdge.RIGHT;
+		if (top)
+			return ResizeEdge.TOP;
+		if (bottom)
+			return ResizeEdge.BOTTOM;
 		return ResizeEdge.NONE;
 	}
 
 	private static Cursor cursorFor(ResizeEdge edge) {
 		return switch (edge) {
-			case TOP_LEFT, BOTTOM_RIGHT -> Cursor.NW_RESIZE;
-			case TOP_RIGHT, BOTTOM_LEFT -> Cursor.NE_RESIZE;
-			case LEFT, RIGHT -> Cursor.E_RESIZE;
-			case TOP, BOTTOM -> Cursor.N_RESIZE;
-			case NONE -> Cursor.DEFAULT;
+		case TOP_LEFT, BOTTOM_RIGHT -> Cursor.NW_RESIZE;
+		case TOP_RIGHT, BOTTOM_LEFT -> Cursor.NE_RESIZE;
+		case LEFT, RIGHT -> Cursor.E_RESIZE;
+		case TOP, BOTTOM -> Cursor.N_RESIZE;
+		case NONE -> Cursor.DEFAULT;
 		};
 	}
 
@@ -291,7 +300,8 @@ public final class NotificationCenterDialog {
 			this.onActivateNotification = onActivateNotification;
 			this.onOpenTask = onOpenTask;
 			this.notificationCardFactory = Objects.requireNonNull(notificationCardFactory, "notificationCardFactory");
-			setOnMouseClicked(event -> {
+			setOnMouseClicked(event ->
+			{
 				if (isFromInteractiveChild(event)) {
 					return;
 				}
