@@ -4,7 +4,13 @@ import com.shale.ui.component.NotificationCard;
 import com.shale.ui.component.factory.NotificationCardFactory;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCenterService;
+import com.shale.ui.notification.NotificationGroup;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -18,6 +24,9 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
@@ -77,11 +86,22 @@ public final class NotificationCenterDialog {
 				item -> dismissNotification(notificationService, item),
 				onOpenCase);
 
-		ListView<AppNotification> listView = new ListView<>();
-		listView.setItems(notificationService.getNotificationsNewestFirst());
+		ObservableList<NotificationGroup> notificationGroups = FXCollections.observableArrayList();
+		rebuildNotificationGroups(notificationService, notificationGroups);
+		ListChangeListener<AppNotification> groupRebuildListener = change ->
+				rebuildNotificationGroups(notificationService, notificationGroups);
+		notificationService.getNotificationsNewestFirst().addListener(groupRebuildListener);
+
+		ListView<NotificationGroup> listView = new ListView<>();
+		listView.setItems(notificationGroups);
 		listView.getStyleClass().add("notification-list");
 		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification, cardFactory));
-		notificationService.unreadCountProperty().addListener((obs, oldValue, newValue) -> listView.refresh());
+		ChangeListener<Number> unreadRefreshListener = (obs, oldValue, newValue) -> listView.refresh();
+		notificationService.unreadCountProperty().addListener(unreadRefreshListener);
+		stage.setOnHidden(event -> {
+			notificationService.getNotificationsNewestFirst().removeListener(groupRebuildListener);
+			notificationService.unreadCountProperty().removeListener(unreadRefreshListener);
+		});
 
 		Button markAllReadButton = new Button("Mark all read");
 		markAllReadButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -233,6 +253,21 @@ public final class NotificationCenterDialog {
 		}
 	}
 
+	private static void rebuildNotificationGroups(
+			NotificationCenterService notificationService,
+			ObservableList<NotificationGroup> notificationGroups) {
+		Map<String, List<AppNotification>> grouped = new LinkedHashMap<>();
+		for (AppNotification notification : notificationService.getNotificationsNewestFirst()) {
+			String groupKey = NotificationGroup.groupKeyFor(notification);
+			grouped.computeIfAbsent(groupKey, ignored -> new ArrayList<>()).add(notification);
+		}
+		List<NotificationGroup> groups = grouped.entrySet().stream()
+				.map(entry -> new NotificationGroup(entry.getKey(), entry.getValue()))
+				.sorted(Comparator.comparing(NotificationGroup::getLatestCreatedAt).reversed())
+				.toList();
+		notificationGroups.setAll(groups);
+	}
+
 	private static void dismissNotification(NotificationCenterService notificationService, AppNotification item) {
 		if (item == null) {
 			return;
@@ -284,13 +319,11 @@ public final class NotificationCenterDialog {
 		private double startHeight;
 	}
 
-	private static final class NotificationCell extends ListCell<AppNotification> {
+	private static final class NotificationCell extends ListCell<NotificationGroup> {
 		private final NotificationCenterService notificationService;
 		private final Consumer<AppNotification> onActivateNotification;
 		private final Consumer<Long> onOpenTask;
 		private final NotificationCardFactory notificationCardFactory;
-		private final ChangeListener<Boolean> unreadListener = (obs, oldValue, newValue) -> updateUnreadStyle();
-		private AppNotification observedItem;
 
 		private NotificationCell(
 				NotificationCenterService notificationService,
@@ -306,45 +339,31 @@ public final class NotificationCenterDialog {
 				if (event.getButton() != MouseButton.PRIMARY || isFromInteractiveChild(event)) {
 					return;
 				}
-				AppNotification selected = getItem();
+				NotificationGroup selected = getItem();
 				if (selected != null) {
-					notificationService.markRead(selected);
-					Long taskId = resolveTaskId(selected);
+					notificationService.markReadMatching(selected.getNotificationsNewestFirst()::contains);
+					Long taskId = selected.getTaskId();
 					if (taskId != null && onOpenTask != null) {
 						onOpenTask.accept(taskId);
 					} else if (this.onActivateNotification != null) {
-						this.onActivateNotification.accept(selected);
+						this.onActivateNotification.accept(selected.getLatestNotification());
 					}
 				}
 			});
 		}
 
 		@Override
-		protected void updateItem(AppNotification item, boolean empty) {
+		protected void updateItem(NotificationGroup item, boolean empty) {
 			super.updateItem(item, empty);
-			if (observedItem != null) {
-				observedItem.unreadProperty().removeListener(unreadListener);
-				observedItem = null;
-			}
 			if (empty || item == null) {
 				setText(null);
 				setGraphic(null);
 				return;
 			}
-			observedItem = item;
-			observedItem.unreadProperty().addListener(unreadListener);
 			setText(null);
 			setGraphic(notificationCardFactory.create(
 					new NotificationCardFactory.NotificationCardModel(item),
 					NotificationCardFactory.Variant.CENTER_ROW));
-			updateUnreadStyle();
-		}
-
-		private void updateUnreadStyle() {
-			if (getGraphic() instanceof NotificationCard card) {
-				AppNotification item = getItem();
-				card.setUnread(item != null && item.isUnread());
-			}
 		}
 
 		private static boolean isFromInteractiveChild(MouseEvent event) {
@@ -367,15 +386,5 @@ public final class NotificationCenterDialog {
 			return false;
 		}
 
-		private static Long resolveTaskId(AppNotification item) {
-			if (item == null || item.getEntityId() == null || item.getEntityId() <= 0) {
-				return null;
-			}
-			String entityType = item.getEntityType();
-			if (entityType == null || !"TASK".equalsIgnoreCase(entityType.trim())) {
-				return null;
-			}
-			return item.getEntityId();
-		}
 	}
 }
