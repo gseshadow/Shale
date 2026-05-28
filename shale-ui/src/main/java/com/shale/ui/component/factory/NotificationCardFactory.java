@@ -5,6 +5,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCategory;
 import com.shale.ui.notification.NotificationGroup;
+import com.shale.ui.notification.NotificationSeverity;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -69,8 +70,10 @@ public final class NotificationCardFactory {
 		Objects.requireNonNull(variant, "variant");
 		NotificationGroup group = model.group();
 		AppNotification item = group.getLatestNotification();
+		NotificationSeverity groupSeverity = group.getSeverity();
 
 		NotificationCard card = new NotificationCard();
+		card.setSeverity(groupSeverity);
 		card.setUnread(group.isUnread());
 		card.setExpanded(expandedGroupKeys.contains(group.getGroupKey()));
 
@@ -81,7 +84,7 @@ public final class NotificationCardFactory {
 		}
 
 		Label typeIcon = new Label(resolveIcon(item));
-		typeIcon.getStyleClass().add("notification-card-icon");
+		typeIcon.getStyleClass().addAll("notification-card-icon", iconStyleClass(groupSeverity));
 		VBox iconRail = new VBox(7, unreadDot, typeIcon);
 		iconRail.getStyleClass().add("notification-card-icon-rail");
 		iconRail.setAlignment(Pos.TOP_CENTER);
@@ -89,6 +92,7 @@ public final class NotificationCardFactory {
 		Label category = new Label(resolveCategory(item));
 		category.getStyleClass().add("notification-row-category");
 		category.setTextOverrun(OverrunStyle.ELLIPSIS);
+		Label severityLabel = createSeverityLabel(groupSeverity);
 
 		Label title = new Label(item.getTitle());
 		title.getStyleClass().add("notification-row-title");
@@ -128,7 +132,11 @@ public final class NotificationCardFactory {
 		timestamp.setMinWidth(0);
 		timestamp.setMaxWidth(120);
 
-		HBox topControls = new HBox(6, timestamp);
+		HBox topControls = new HBox(6);
+		if (severityLabel != null) {
+			topControls.getChildren().add(severityLabel);
+		}
+		topControls.getChildren().add(timestamp);
 		if (group.getCount() > 1) {
 			Label count = new Label(group.getCount() + " updates");
 			count.getStyleClass().add("notification-row-category");
@@ -246,6 +254,29 @@ public final class NotificationCardFactory {
 			}
 		});
 		return button;
+	}
+
+	private static String iconStyleClass(NotificationSeverity severity) {
+		return switch (severity == null ? NotificationSeverity.INFO : severity) {
+		case CRITICAL -> "notification-icon-critical";
+		case WARNING -> "notification-icon-warning";
+		case INFO -> "notification-icon-info";
+		};
+	}
+
+	private static Label createSeverityLabel(NotificationSeverity severity) {
+		return switch (severity == null ? NotificationSeverity.INFO : severity) {
+		case CRITICAL -> createSeverityLabel("Critical", "notification-row-severity-critical");
+		case WARNING -> createSeverityLabel("Warning", "notification-row-severity-warning");
+		case INFO -> null;
+		};
+	}
+
+	private static Label createSeverityLabel(String text, String styleClass) {
+		Label label = new Label(text);
+		label.getStyleClass().addAll("notification-row-severity", styleClass);
+		label.setTextOverrun(OverrunStyle.ELLIPSIS);
+		return label;
 	}
 
 	private Button createDismissButton(NotificationGroup group) {
