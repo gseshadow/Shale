@@ -114,6 +114,7 @@ public final class DurableNotificationService {
 				row.entityId(),
 				entityTitle,
 				row.actionType(),
+				row.actorDisplayName(),
 				row.caseId(),
 				row.caseName(),
 				row.caseResponsibleAttorney(),

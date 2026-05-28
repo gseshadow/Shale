@@ -21,6 +21,7 @@ public final class AppNotification {
 	private final Long entityId;
 	private final String entityTitle;
 	private final String actionType;
+	private final String actorDisplayName;
 	private final Long caseId;
 	private final String caseName;
 	private final String caseResponsibleAttorney;
@@ -111,7 +112,7 @@ public final class AppNotification {
 			String actionType,
 			Long caseId,
 			String caseName) {
-		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId, eventKey, entityType, entityId, entityTitle, actionType, caseId, caseName, null, null, null);
+		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId, eventKey, entityType, entityId, entityTitle, actionType, null, caseId, caseName, null, null, null);
 	}
 
 	public AppNotification(
@@ -130,6 +131,7 @@ public final class AppNotification {
 			Long entityId,
 			String entityTitle,
 			String actionType,
+			String actorDisplayName,
 			Long caseId,
 			String caseName,
 			String caseResponsibleAttorney,
@@ -150,6 +152,7 @@ public final class AppNotification {
 		this.entityId = entityId;
 		this.entityTitle = entityTitle;
 		this.actionType = actionType;
+		this.actorDisplayName = actorDisplayName;
 		this.caseId = caseId;
 		this.caseName = caseName;
 		this.caseResponsibleAttorney = caseResponsibleAttorney;
@@ -208,6 +211,10 @@ public final class AppNotification {
 
 	public String getActionType() {
 		return actionType;
+	}
+
+	public String getActorDisplayName() {
+		return actorDisplayName;
 	}
 
 	public Long getCaseId() {

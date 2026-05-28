@@ -104,6 +104,11 @@ public final class LiveUpdateNotificationBridge {
 		Object eventKeyValue = event.patch().get("eventKey");
 		String eventKey = eventKeyValue == null ? null : String.valueOf(eventKeyValue);
 		String actionType = taskNotificationActionType(event, noteAdded, timelineEvent);
+		String actorDisplayName = firstNonBlank(
+				stringValue(event.patch().get("actorDisplayName")),
+				stringValue(event.patch().get("updatedByDisplayName")),
+				stringValue(event.patch().get("createdByDisplayName")),
+				userDisplayName(event.updatedByUserId()));
 		String entityTitle = firstNonBlank(
 				stringValue(event.patch().get("entityTitle")),
 				stringValue(event.patch().get("taskTitle")),
@@ -131,6 +136,7 @@ public final class LiveUpdateNotificationBridge {
 					entityId,
 					entityTitle,
 					actionType,
+					actorDisplayName,
 					caseId,
 					caseName,
 					caseResponsibleAttorney,
@@ -277,6 +283,10 @@ public final class LiveUpdateNotificationBridge {
 			}
 		}
 		return null;
+	}
+
+	private static String userDisplayName(Integer userId) {
+		return userId == null || userId <= 0 ? null : "User #" + userId;
 	}
 
 	private static Boolean booleanValue(Object value) {

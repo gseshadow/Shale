@@ -150,19 +150,15 @@ public final class NotificationCardFactory {
 			expanded.getChildren().add(createExpandedLine("Action", actionType));
 		}
 		expanded.getChildren().add(createExpandedLine("Created", EXPANDED_TIME_FORMATTER.format(item.getCreatedAt())));
-		Long entityId = item.getEntityId();
-		if (entityId != null && entityId > 0) {
-			expanded.getChildren().add(createExpandedLine("Entity ID", String.valueOf(entityId)));
+		String actorDisplayName = normalize(item.getActorDisplayName());
+		if (actorDisplayName != null) {
+			expanded.getChildren().add(createExpandedLine("By", actorDisplayName));
 		}
 		if (!entityContextVisible) {
 			String entityTitle = normalize(item.getEntityTitle());
 			if (entityTitle != null) {
 				expanded.getChildren().add(createExpandedLine("Entity", entityTitle));
 			}
-		}
-		String eventKey = normalize(item.getEventKey());
-		if (eventKey != null) {
-			expanded.getChildren().add(createExpandedLine("Event", eventKey));
 		}
 		return expanded;
 	}

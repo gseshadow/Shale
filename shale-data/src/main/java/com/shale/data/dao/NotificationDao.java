@@ -189,6 +189,12 @@ public final class NotificationDao {
 				       n.EntityType,
 				       n.EntityId,
 				       n.ActionType,
+				       n.CreatedByUserId,
+				       LTRIM(RTRIM(
+				         COALESCE(actor.name_first, '') +
+				         CASE WHEN COALESCE(actor.name_first, '') = '' OR COALESCE(actor.name_last, '') = '' THEN '' ELSE ' ' END +
+				         COALESCE(actor.name_last, '')
+				       )) AS ActorDisplayName,
 				       CASE
 				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.Title
 				         ELSE NULL
@@ -217,6 +223,9 @@ public final class NotificationDao {
 				       n.CreatedAt AS CreatedAt,
 				       n.EventKey AS EventKey
 				FROM dbo.Notifications n
+				LEFT JOIN dbo.Users actor
+				  ON actor.Id = n.CreatedByUserId
+				 AND actor.ShaleClientId = n.ShaleClientId
 				LEFT JOIN dbo.Tasks t
 				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'
 				 AND t.Id = n.EntityId
@@ -266,6 +275,9 @@ public final class NotificationDao {
 							rs.getString("EntityType"),
 							rs.getObject("EntityId") == null ? null : rs.getLong("EntityId"),
 							rs.getString("ActionType"),
+							safeUserDisplayName(
+									rs.getString("ActorDisplayName"),
+									rs.getObject("CreatedByUserId") == null ? null : rs.getInt("CreatedByUserId")),
 							rs.getString("EntityTitle"),
 							rs.getObject("CaseId") == null ? null : rs.getLong("CaseId"),
 							rs.getString("CaseName"),
@@ -471,6 +483,17 @@ public final class NotificationDao {
 		return findByEventKey(con, shaleClientId, userId, eventKey);
 	}
 
+	private static String safeUserDisplayName(String displayName, Integer userId) {
+		String trimmed = displayName == null ? "" : displayName.trim();
+		if (!trimmed.isBlank()) {
+			return trimmed;
+		}
+		if (userId != null && userId > 0) {
+			return "User #" + userId;
+		}
+		return null;
+	}
+
 	public record NotificationRow(
 			long id,
 			String category,
@@ -480,6 +503,7 @@ public final class NotificationDao {
 			String entityType,
 			Long entityId,
 			String actionType,
+			String actorDisplayName,
 			String entityTitle,
 			Long caseId,
 			String caseName,
