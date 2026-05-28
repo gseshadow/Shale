@@ -228,6 +228,7 @@ public final class MainController {
 				notificationBellButton.getScene().getWindow(),
 				notificationCenterService,
 				sceneManager::openTaskProfile,
+				caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"),
 				this::onNotificationActivated);
 	}
 

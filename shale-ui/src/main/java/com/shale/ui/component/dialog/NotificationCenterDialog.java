@@ -1,41 +1,38 @@
 package com.shale.ui.component.dialog;
 
+import com.shale.ui.component.NotificationCard;
+import com.shale.ui.component.factory.NotificationCardFactory;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCenterService;
-import com.shale.ui.notification.NotificationCategory;
-import com.shale.ui.component.factory.TaskCardFactory;
-import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.FormatStyle;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.Node;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
 public final class NotificationCenterDialog {
-	private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter
-			.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
-			.withZone(ZoneId.systemDefault());
+	private static final double DEFAULT_WIDTH = 760;
+	private static final double DEFAULT_HEIGHT = 560;
+	private static final double MIN_WIDTH = 640;
+	private static final double MIN_HEIGHT = 420;
+	private static final double RESIZE_MARGIN = 8;
 
 	private NotificationCenterDialog() {
 	}
@@ -44,24 +41,34 @@ public final class NotificationCenterDialog {
 			Window owner,
 			NotificationCenterService notificationService,
 			Consumer<Long> onOpenTask,
+			Consumer<Integer> onOpenCase,
 			Consumer<AppNotification> onActivateNotification) {
 		Objects.requireNonNull(notificationService, "notificationService");
 
-		Stage stage = AppDialogs.createModalStage(owner, "Notifications");
+		Stage stage = new Stage();
+		AppDialogs.applySecondaryWindowChrome(stage);
+		if (owner != null) {
+			stage.initOwner(owner);
+		}
+		stage.initModality(Modality.WINDOW_MODAL);
+		stage.setTitle("Notifications");
 		stage.setResizable(true);
-		stage.setMinWidth(680);
-		stage.setMinHeight(440);
+		stage.setMinWidth(MIN_WIDTH);
+		stage.setMinHeight(MIN_HEIGHT);
 
 		Label heading = new Label("Notifications");
 		heading.getStyleClass().add("app-dialog-title");
-
 		Label subtitle = new Label("Newest first. Unread items are highlighted.");
 		subtitle.getStyleClass().add("app-dialog-message");
+
+		NotificationCardFactory cardFactory = new NotificationCardFactory(
+				item -> dismissNotification(notificationService, item),
+				onOpenCase);
 
 		ListView<AppNotification> listView = new ListView<>();
 		listView.setItems(notificationService.getNotificationsNewestFirst());
 		listView.getStyleClass().add("notification-list");
-		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification));
+		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification, cardFactory));
 		notificationService.unreadCountProperty().addListener((obs, oldValue, newValue) -> listView.refresh());
 
 		Button markAllReadButton = new Button("Mark all read");
@@ -78,39 +85,197 @@ public final class NotificationCenterDialog {
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		HBox actions = new HBox(10, markAllReadButton, spacer, closeButton);
+		actions.getStyleClass().add("app-dialog-actions");
+		actions.setAlignment(Pos.CENTER_RIGHT);
 
 		VBox.setVgrow(listView, Priority.ALWAYS);
-		VBox body = new VBox(12, heading, subtitle, listView, actions);
-		body.setPadding(new Insets(16));
-		VBox root = AppDialogs.createSecondaryWindowShell(stage, "Notifications", stage::close, body);
+		VBox body = new VBox(10, heading, subtitle, listView, actions);
+		body.setFillWidth(true);
+		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+		body.setPadding(new Insets(18, 20, 18, 20));
+		VBox.setVgrow(body, Priority.ALWAYS);
 
-		Scene scene = new Scene(root);
+		VBox root = AppDialogs.createSecondaryWindowShell(stage, "Notifications", stage::close, body);
+		root.getStyleClass().add("notification-window-root");
+		root.setMinWidth(MIN_WIDTH);
+		root.setMinHeight(MIN_HEIGHT);
+		root.setPrefWidth(DEFAULT_WIDTH);
+		root.setPrefHeight(DEFAULT_HEIGHT);
+		installResizeHandlers(stage, root);
+
+		Scene scene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 		scene.getStylesheets().add(Objects.requireNonNull(
 				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
 		stage.showAndWait();
 	}
 
+	public static void show(
+			Window owner,
+			NotificationCenterService notificationService,
+			Consumer<Long> onOpenTask,
+			Consumer<AppNotification> onActivateNotification) {
+		show(owner, notificationService, onOpenTask, null, onActivateNotification);
+	}
+
+	private static void installResizeHandlers(Stage stage, Node root) {
+		ResizeState state = new ResizeState();
+		root.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
+			if (state.edge == ResizeEdge.NONE) {
+				root.setCursor(cursorFor(edgeFor(event, root)));
+			}
+		});
+		root.addEventHandler(MouseEvent.MOUSE_EXITED, event -> {
+			if (state.edge == ResizeEdge.NONE) {
+				root.setCursor(Cursor.DEFAULT);
+			}
+		});
+		root.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+			ResizeEdge edge = edgeFor(event, root);
+			if (edge == ResizeEdge.NONE) {
+				return;
+			}
+			state.edge = edge;
+			state.startScreenX = event.getScreenX();
+			state.startScreenY = event.getScreenY();
+			state.startX = stage.getX();
+			state.startY = stage.getY();
+			state.startWidth = stage.getWidth();
+			state.startHeight = stage.getHeight();
+			event.consume();
+		});
+		root.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> {
+			if (state.edge == ResizeEdge.NONE) {
+				return;
+			}
+			resizeStage(stage, state, event);
+			event.consume();
+		});
+		root.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> {
+			state.edge = ResizeEdge.NONE;
+			root.setCursor(cursorFor(edgeFor(event, root)));
+		});
+	}
+
+	private static ResizeEdge edgeFor(MouseEvent event, Node root) {
+		double x = event.getX();
+		double y = event.getY();
+		double width = root.getBoundsInLocal().getWidth();
+		double height = root.getBoundsInLocal().getHeight();
+		boolean left = x >= 0 && x <= RESIZE_MARGIN;
+		boolean right = x >= width - RESIZE_MARGIN && x <= width;
+		boolean top = y >= 0 && y <= RESIZE_MARGIN;
+		boolean bottom = y >= height - RESIZE_MARGIN && y <= height;
+		if (top && left) return ResizeEdge.TOP_LEFT;
+		if (top && right) return ResizeEdge.TOP_RIGHT;
+		if (bottom && left) return ResizeEdge.BOTTOM_LEFT;
+		if (bottom && right) return ResizeEdge.BOTTOM_RIGHT;
+		if (left) return ResizeEdge.LEFT;
+		if (right) return ResizeEdge.RIGHT;
+		if (top) return ResizeEdge.TOP;
+		if (bottom) return ResizeEdge.BOTTOM;
+		return ResizeEdge.NONE;
+	}
+
+	private static Cursor cursorFor(ResizeEdge edge) {
+		return switch (edge) {
+			case TOP_LEFT, BOTTOM_RIGHT -> Cursor.NW_RESIZE;
+			case TOP_RIGHT, BOTTOM_LEFT -> Cursor.NE_RESIZE;
+			case LEFT, RIGHT -> Cursor.E_RESIZE;
+			case TOP, BOTTOM -> Cursor.N_RESIZE;
+			case NONE -> Cursor.DEFAULT;
+		};
+	}
+
+	private static void resizeStage(Stage stage, ResizeState state, MouseEvent event) {
+		double deltaX = event.getScreenX() - state.startScreenX;
+		double deltaY = event.getScreenY() - state.startScreenY;
+		if (state.edge.resizesRight()) {
+			stage.setWidth(Math.max(stage.getMinWidth(), state.startWidth + deltaX));
+		}
+		if (state.edge.resizesBottom()) {
+			stage.setHeight(Math.max(stage.getMinHeight(), state.startHeight + deltaY));
+		}
+		if (state.edge.resizesLeft()) {
+			double newWidth = Math.max(stage.getMinWidth(), state.startWidth - deltaX);
+			stage.setX(state.startX + state.startWidth - newWidth);
+			stage.setWidth(newWidth);
+		}
+		if (state.edge.resizesTop()) {
+			double newHeight = Math.max(stage.getMinHeight(), state.startHeight - deltaY);
+			stage.setY(state.startY + state.startHeight - newHeight);
+			stage.setHeight(newHeight);
+		}
+	}
+
+	private static void dismissNotification(NotificationCenterService notificationService, AppNotification item) {
+		if (item == null) {
+			return;
+		}
+		try {
+			notificationService.dismiss(item);
+		} catch (RuntimeException ex) {
+			System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
+			ex.printStackTrace(System.err);
+			throw ex;
+		}
+	}
+
+	private enum ResizeEdge {
+		NONE,
+		LEFT,
+		RIGHT,
+		TOP,
+		BOTTOM,
+		TOP_LEFT,
+		TOP_RIGHT,
+		BOTTOM_LEFT,
+		BOTTOM_RIGHT;
+
+		private boolean resizesLeft() {
+			return this == LEFT || this == TOP_LEFT || this == BOTTOM_LEFT;
+		}
+
+		private boolean resizesRight() {
+			return this == RIGHT || this == TOP_RIGHT || this == BOTTOM_RIGHT;
+		}
+
+		private boolean resizesTop() {
+			return this == TOP || this == TOP_LEFT || this == TOP_RIGHT;
+		}
+
+		private boolean resizesBottom() {
+			return this == BOTTOM || this == BOTTOM_LEFT || this == BOTTOM_RIGHT;
+		}
+	}
+
+	private static final class ResizeState {
+		private ResizeEdge edge = ResizeEdge.NONE;
+		private double startScreenX;
+		private double startScreenY;
+		private double startX;
+		private double startY;
+		private double startWidth;
+		private double startHeight;
+	}
+
 	private static final class NotificationCell extends ListCell<AppNotification> {
 		private final NotificationCenterService notificationService;
-		private final Consumer<Long> onOpenTask;
-		private final TaskCardFactory taskCardFactory;
 		private final Consumer<AppNotification> onActivateNotification;
+		private final Consumer<Long> onOpenTask;
+		private final NotificationCardFactory notificationCardFactory;
 		private final ChangeListener<Boolean> unreadListener = (obs, oldValue, newValue) -> updateUnreadStyle();
 		private AppNotification observedItem;
 
 		private NotificationCell(
 				NotificationCenterService notificationService,
 				Consumer<Long> onOpenTask,
-				Consumer<AppNotification> onActivateNotification) {
+				Consumer<AppNotification> onActivateNotification,
+				NotificationCardFactory notificationCardFactory) {
 			this.notificationService = notificationService;
-			this.onOpenTask = onOpenTask;
-			this.taskCardFactory = new TaskCardFactory(
-					ignored -> {},
-					ignored -> {},
-					ignored -> {},
-					ignored -> {});
 			this.onActivateNotification = onActivateNotification;
+			this.onOpenTask = onOpenTask;
+			this.notificationCardFactory = Objects.requireNonNull(notificationCardFactory, "notificationCardFactory");
 			setOnMouseClicked(event -> {
 				if (isFromInteractiveChild(event)) {
 					return;
@@ -118,7 +283,10 @@ public final class NotificationCenterDialog {
 				AppNotification selected = getItem();
 				if (selected != null) {
 					notificationService.markRead(selected);
-					if (this.onActivateNotification != null) {
+					Long taskId = resolveTaskId(selected);
+					if (taskId != null && onOpenTask != null) {
+						onOpenTask.accept(taskId);
+					} else if (this.onActivateNotification != null) {
 						this.onActivateNotification.accept(selected);
 					}
 				}
@@ -139,125 +307,27 @@ public final class NotificationCenterDialog {
 			}
 			observedItem = item;
 			observedItem.unreadProperty().addListener(unreadListener);
-
-			Label category = new Label(item.getCategory().name());
-			category.getStyleClass().add("notification-row-category");
-
-			Label timestamp = new Label(TIME_FORMATTER.format(item.getCreatedAt()));
-			timestamp.getStyleClass().add("notification-row-time");
-
-			Button dismissButton = createDismissButton(item);
-			Region spacer = new Region();
-			HBox.setHgrow(spacer, Priority.ALWAYS);
-			HBox topRow = new HBox(8, category, spacer, timestamp, dismissButton);
-
-			Label title = new Label(item.getTitle());
-			title.getStyleClass().add("notification-row-title");
-
-			TextArea message = new TextArea(item.getMessage());
-			message.setWrapText(true);
-			message.setEditable(false);
-			message.setPrefRowCount(2);
-			message.setMaxWidth(Double.MAX_VALUE);
-			ReadOnlyTextDisplaySupport.apply(message, false);
-			message.getStyleClass().add("notification-row-message");
-
-			VBox wrapper = new VBox(6, topRow, title, message);
-			Region taskPreview = createTaskPreview(item);
-			if (taskPreview != null) {
-				wrapper.getChildren().add(taskPreview);
-			}
-			wrapper.getStyleClass().add("notification-row");
-
-			setGraphic(wrapper);
+			setText(null);
+			setGraphic(notificationCardFactory.create(
+					new NotificationCardFactory.NotificationCardModel(item),
+					NotificationCardFactory.Variant.CENTER_ROW));
 			updateUnreadStyle();
 		}
 
 		private void updateUnreadStyle() {
-			if (!(getGraphic() instanceof VBox wrapper)) {
-				return;
-			}
-			wrapper.getStyleClass().remove("notification-row-unread");
-			AppNotification item = getItem();
-			if (item != null && item.isUnread()) {
-				wrapper.getStyleClass().add("notification-row-unread");
+			if (getGraphic() instanceof NotificationCard card) {
+				AppNotification item = getItem();
+				card.setUnread(item != null && item.isUnread());
 			}
 		}
-
-		private Region createTaskPreview(AppNotification item) {
-			Long taskId = resolveTaskId(item);
-			if (taskId == null || taskId <= 0) {
-				return null;
-			}
-			String previewTitle = resolveTaskPreviewTitle(item, taskId);
-
-			TaskCardFactory.TaskCardModel model = new TaskCardFactory.TaskCardModel(
-					taskId,
-					null,
-					null,
-					null,
-					null,
-					null,
-					previewTitle,
-					null,
-					null,
-					null,
-					null,
-					null,
-					List.of());
-			Region previewCard = taskCardFactory.create(model, TaskCardFactory.Variant.MINI);
-			previewCard.getStyleClass().add("notification-task-preview");
-			previewCard.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> onTaskPreviewPressed(item, taskId, event));
-			previewCard.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
-			return previewCard;
-		}
-
-		private static String resolveTaskPreviewTitle(AppNotification item, long taskId) {
-			if (item != null && item.getEntityTitle() != null && !item.getEntityTitle().isBlank()) {
-				return item.getEntityTitle().trim();
-			}
-			return "Task #" + taskId;
-		}
-
-		private void onTaskPreviewPressed(AppNotification item, Long taskId, MouseEvent event) {
-			event.consume();
-			if (item != null) {
-				notificationService.markRead(item);
-			}
-			if (onOpenTask != null && taskId != null && taskId > 0) {
-				onOpenTask.accept(taskId);
-			}
-		}
-
-		private Button createDismissButton(AppNotification item) {
-			Button button = new Button("Dismiss");
-			button.getStyleClass().add("notification-row-dismiss");
-			if (item == null || item.getDurableNotificationId() == null) {
-				button.setText("Dismiss (session)");
-				button.setTooltip(new Tooltip("This notification will be hidden for the current session only."));
-			}
-			button.setOnAction(event -> {
-				event.consume();
-				if (item != null) {
-					try {
-						notificationService.dismiss(item);
-					} catch (RuntimeException ex) {
-						System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
-						ex.printStackTrace(System.err);
-						throw ex;
-					}
-				}
-			});
-			return button;
-		}
-
 
 		private static boolean isFromInteractiveChild(MouseEvent event) {
 			if (event == null || !(event.getTarget() instanceof Node node)) {
 				return false;
 			}
 			return hasStyleClassInAncestorChain(node, "notification-row-dismiss")
-					|| hasStyleClassInAncestorChain(node, "notification-task-preview");
+					|| hasStyleClassInAncestorChain(node, "notification-row-expand")
+					|| hasStyleClassInAncestorChain(node, "notification-row-case-mini");
 		}
 
 		private static boolean hasStyleClassInAncestorChain(Node node, String styleClass) {
@@ -272,18 +342,14 @@ public final class NotificationCenterDialog {
 		}
 
 		private static Long resolveTaskId(AppNotification item) {
-			if (item == null || item.getCategory() == null || item.getCategory() != NotificationCategory.TASK) {
-				return null;
-			}
-			Long entityId = item.getEntityId();
-			if (entityId == null || entityId <= 0) {
+			if (item == null || item.getEntityId() == null || item.getEntityId() <= 0) {
 				return null;
 			}
 			String entityType = item.getEntityType();
-			if (entityType != null && !entityType.isBlank() && !"TASK".equalsIgnoreCase(entityType.trim())) {
+			if (entityType == null || !"TASK".equalsIgnoreCase(entityType.trim())) {
 				return null;
 			}
-			return entityId;
+			return item.getEntityId();
 		}
 	}
 }
