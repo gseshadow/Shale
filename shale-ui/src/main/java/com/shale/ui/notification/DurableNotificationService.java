@@ -112,7 +112,8 @@ public final class DurableNotificationService {
 				row.eventKey(),
 				row.entityType(),
 				row.entityId(),
-				entityTitle);
+				entityTitle,
+				row.actionType());
 	}
 
 	private static String safeTaskNotificationTitle(String actionType) {
