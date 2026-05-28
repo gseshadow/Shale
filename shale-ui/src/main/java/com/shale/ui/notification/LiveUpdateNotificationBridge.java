@@ -103,6 +103,21 @@ public final class LiveUpdateNotificationBridge {
 		}
 		Object eventKeyValue = event.patch().get("eventKey");
 		String eventKey = eventKeyValue == null ? null : String.valueOf(eventKeyValue);
+		String actionType = taskNotificationActionType(event, noteAdded, timelineEvent);
+		String actorDisplayName = firstNonBlank(
+				stringValue(event.patch().get("actorDisplayName")),
+				stringValue(event.patch().get("updatedByDisplayName")),
+				stringValue(event.patch().get("createdByDisplayName")),
+				userDisplayName(event.updatedByUserId()));
+		String entityTitle = firstNonBlank(
+				stringValue(event.patch().get("entityTitle")),
+				stringValue(event.patch().get("taskTitle")),
+				stringValue(event.patch().get("title")));
+		Long caseId = longValue(event.patch().get("caseId"));
+		String caseName = stringValue(event.patch().get("caseName"));
+		String caseResponsibleAttorney = stringValue(event.patch().get("caseResponsibleAttorney"));
+		String caseResponsibleAttorneyColor = stringValue(event.patch().get("caseResponsibleAttorneyColor"));
+		Boolean caseNonEngagementLetterSent = booleanValue(event.patch().get("caseNonEngagementLetterSent"));
 		notificationCenterService.pushNotification(new AppNotification(
 				event.eventId() == null || event.eventId().isBlank()
 						? "task-" + event.entityId() + "-" + createdAt.toEpochMilli()
@@ -119,7 +134,14 @@ public final class LiveUpdateNotificationBridge {
 					eventKey,
 					"Task",
 					entityId,
-					null));
+					entityTitle,
+					actionType,
+					actorDisplayName,
+					caseId,
+					caseName,
+					caseResponsibleAttorney,
+					caseResponsibleAttorneyColor,
+					caseNonEngagementLetterSent));
 	}
 
 	private void pushCalendarAssignment(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -137,7 +159,7 @@ public final class LiveUpdateNotificationBridge {
 		Instant createdAt = parseTimestamp(event.timestamp());
 		notificationCenterService.pushNotification(new AppNotification(
 				event.eventId() == null || event.eventId().isBlank() ? "calendar-" + event.entityId() + "-" + createdAt.toEpochMilli() : event.eventId(),
-				NotificationCategory.TASK,
+				NotificationCategory.CALENDAR,
 				NotificationSeverity.INFO,
 				"Calendar event assigned",
 				"You were assigned to a calendar event.",
@@ -149,7 +171,8 @@ public final class LiveUpdateNotificationBridge {
 				eventKey,
 				"CalendarEvent",
 				event.entityId() > 0 ? event.entityId() : null,
-				null));
+				null,
+				"CALENDAR_EVENT_ASSIGNED"));
 		log.info("Live notification type=CALENDAR_EVENT_ASSIGNED targetUserId={} currentUserId={} deliveredLive=true",
 				targetUserId, currentUserId);
 	}
@@ -260,6 +283,60 @@ public final class LiveUpdateNotificationBridge {
 			}
 		}
 		return null;
+	}
+
+	private static String userDisplayName(Integer userId) {
+		return userId == null || userId <= 0 ? null : "User #" + userId;
+	}
+
+	private static Boolean booleanValue(Object value) {
+		if (value instanceof Boolean bool) {
+			return bool;
+		}
+		if (value instanceof Number number) {
+			return number.intValue() != 0;
+		}
+		String text = stringValue(value);
+		if (text == null) {
+			return null;
+		}
+		return Boolean.parseBoolean(text);
+	}
+
+	private static String stringValue(Object value) {
+		if (value == null) {
+			return null;
+		}
+		String text = String.valueOf(value).trim();
+		return text.isBlank() ? null : text;
+	}
+
+	private static String firstNonBlank(String... values) {
+		if (values == null) {
+			return null;
+		}
+		for (String value : values) {
+			String normalized = stringValue(value);
+			if (normalized != null) {
+				return normalized;
+			}
+		}
+		return null;
+	}
+
+	private static String taskNotificationActionType(UiRuntimeBridge.EntityUpdatedEvent event, boolean noteAdded, boolean timelineEvent) {
+		if (timelineEvent) {
+			Object eventType = event.patch().get("eventType");
+			if (eventType == null) {
+				eventType = event.patch().get("actionType");
+			}
+			return eventType == null ? null : String.valueOf(eventType);
+		}
+		if (noteAdded) {
+			return "NOTE_ADDED";
+		}
+		Object actionType = event.patch().get("actionType");
+		return actionType == null ? "ASSIGNED" : String.valueOf(actionType);
 	}
 
 	private static Instant parseTimestamp(String raw) {
