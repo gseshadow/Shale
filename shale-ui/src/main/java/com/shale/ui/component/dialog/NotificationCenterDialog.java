@@ -143,7 +143,7 @@ public final class NotificationCenterDialog {
 
 		MenuItem dismissReadItem = new MenuItem("Read");
 		MenuItem dismissOlderItem = new MenuItem("Older than 30 days");
-		MenuButton cleanupMenuButton = new MenuButton("Dismiss ▼", null, dismissReadItem, dismissOlderItem);
+		MenuButton cleanupMenuButton = new MenuButton("Dismiss", null, dismissReadItem, dismissOlderItem);
 		cleanupMenuButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
 		Runnable updateCleanupMenuState = () -> updateCleanupMenuState(
 				notificationService,
