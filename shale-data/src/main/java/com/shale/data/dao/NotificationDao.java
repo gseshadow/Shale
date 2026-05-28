@@ -275,9 +275,7 @@ public final class NotificationDao {
 							rs.getString("EntityType"),
 							rs.getObject("EntityId") == null ? null : rs.getLong("EntityId"),
 							rs.getString("ActionType"),
-							safeUserDisplayName(
-									rs.getString("ActorDisplayName"),
-									rs.getObject("CreatedByUserId") == null ? null : rs.getInt("CreatedByUserId")),
+							safeUserDisplayName(rs.getString("ActorDisplayName")),
 							rs.getString("EntityTitle"),
 							rs.getObject("CaseId") == null ? null : rs.getLong("CaseId"),
 							rs.getString("CaseName"),
@@ -483,13 +481,10 @@ public final class NotificationDao {
 		return findByEventKey(con, shaleClientId, userId, eventKey);
 	}
 
-	private static String safeUserDisplayName(String displayName, Integer userId) {
+	private static String safeUserDisplayName(String displayName) {
 		String trimmed = displayName == null ? "" : displayName.trim();
 		if (!trimmed.isBlank()) {
 			return trimmed;
-		}
-		if (userId != null && userId > 0) {
-			return "User #" + userId;
 		}
 		return null;
 	}

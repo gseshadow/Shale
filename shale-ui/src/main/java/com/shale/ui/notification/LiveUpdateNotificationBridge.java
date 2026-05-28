@@ -107,8 +107,7 @@ public final class LiveUpdateNotificationBridge {
 		String actorDisplayName = firstNonBlank(
 				stringValue(event.patch().get("actorDisplayName")),
 				stringValue(event.patch().get("updatedByDisplayName")),
-				stringValue(event.patch().get("createdByDisplayName")),
-				userDisplayName(event.updatedByUserId()));
+				stringValue(event.patch().get("createdByDisplayName")));
 		String entityTitle = firstNonBlank(
 				stringValue(event.patch().get("entityTitle")),
 				stringValue(event.patch().get("taskTitle")),
@@ -283,10 +282,6 @@ public final class LiveUpdateNotificationBridge {
 			}
 		}
 		return null;
-	}
-
-	private static String userDisplayName(Integer userId) {
-		return userId == null || userId <= 0 ? null : "User #" + userId;
 	}
 
 	private static Boolean booleanValue(Object value) {
