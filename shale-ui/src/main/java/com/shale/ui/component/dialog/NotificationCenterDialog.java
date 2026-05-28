@@ -59,7 +59,20 @@ public final class NotificationCenterDialog {
 		Label heading = new Label("Notifications");
 		heading.getStyleClass().add("app-dialog-title");
 		Label subtitle = new Label("Newest first. Unread items are highlighted.");
-		subtitle.getStyleClass().add("app-dialog-message");
+		subtitle.getStyleClass().add("notification-window-subtitle");
+
+		Button headerCloseButton = new Button("×");
+		headerCloseButton.getStyleClass().addAll("secondary-window-close", "notification-window-close");
+		headerCloseButton.setOnAction(event -> stage.close());
+
+		VBox headerText = new VBox(1, heading, subtitle);
+		headerText.setAlignment(Pos.CENTER_LEFT);
+		HBox.setHgrow(headerText, Priority.ALWAYS);
+		HBox header = new HBox(8, headerText, headerCloseButton);
+		header.getStyleClass().addAll("secondary-window-header", "notification-window-header");
+		header.setAlignment(Pos.CENTER_LEFT);
+
+		NotificationCardFactory cardFactory = new NotificationCardFactory(item -> dismissNotification(notificationService, item));
 
 		NotificationCardFactory cardFactory = new NotificationCardFactory(
 				item -> dismissNotification(notificationService, item),
