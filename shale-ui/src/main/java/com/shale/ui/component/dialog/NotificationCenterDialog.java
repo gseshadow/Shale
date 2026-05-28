@@ -141,16 +141,13 @@ public final class NotificationCenterDialog {
 		unreadOnlyFilter.selectedProperty().addListener(filterChangeListener);
 		searchField.textProperty().addListener(filterChangeListener);
 
-		MenuItem dismissReadItem = new MenuItem("Dismiss all read");
-		MenuItem dismissVisibleItem = new MenuItem("Dismiss all visible");
-		MenuItem dismissOlderItem = new MenuItem("Dismiss older than 30 days");
-		MenuButton cleanupMenuButton = new MenuButton("Clean up", null, dismissReadItem, dismissVisibleItem, dismissOlderItem);
-		cleanupMenuButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+		MenuItem dismissReadItem = new MenuItem("Read");
+		MenuItem dismissOlderItem = new MenuItem("Older than 30 days");
+		MenuButton cleanupMenuButton = new MenuButton("Dismiss ▼", null, dismissReadItem, dismissOlderItem);
+		cleanupMenuButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
 		Runnable updateCleanupMenuState = () -> updateCleanupMenuState(
 				notificationService,
-				notificationGroups,
 				dismissReadItem,
-				dismissVisibleItem,
 				dismissOlderItem,
 				cleanupMenuButton);
 		notificationGroups.addListener((ListChangeListener<NotificationGroup>) change -> updateCleanupMenuState.run());
@@ -179,7 +176,6 @@ public final class NotificationCenterDialog {
 		markAllReadButton.setOnAction(event -> notificationService.markAllRead());
 
 		dismissReadItem.setOnAction(event -> dismissReadNotifications(stage, notificationService));
-		dismissVisibleItem.setOnAction(event -> dismissVisibleNotifications(stage, notificationService, notificationGroups));
 		dismissOlderItem.setOnAction(event -> dismissOlderNotifications(stage, notificationService));
 
 		Button closeButton = new Button("Close");
@@ -404,18 +400,14 @@ public final class NotificationCenterDialog {
 
 	private static void updateCleanupMenuState(
 			NotificationCenterService notificationService,
-			List<NotificationGroup> visibleGroups,
 			MenuItem dismissReadItem,
-			MenuItem dismissVisibleItem,
 			MenuItem dismissOlderItem,
 			MenuButton cleanupMenuButton) {
 		int readCount = readNotifications(notificationService).size();
-		int visibleCount = visibleNotifications(visibleGroups).size();
 		int olderCount = olderNotifications(notificationService).size();
 		dismissReadItem.setDisable(readCount == 0);
-		dismissVisibleItem.setDisable(visibleCount == 0);
 		dismissOlderItem.setDisable(olderCount == 0);
-		cleanupMenuButton.setDisable(readCount == 0 && visibleCount == 0 && olderCount == 0);
+		cleanupMenuButton.setDisable(readCount == 0 && olderCount == 0);
 	}
 
 	private static void dismissReadNotifications(Stage owner, NotificationCenterService notificationService) {
@@ -427,20 +419,6 @@ public final class NotificationCenterDialog {
 			return;
 		}
 		dismissNotifications(notificationService, read, "dismiss all read");
-	}
-
-	private static void dismissVisibleNotifications(
-			Stage owner,
-			NotificationCenterService notificationService,
-			List<NotificationGroup> visibleGroups) {
-		List<AppNotification> visible = visibleNotifications(visibleGroups);
-		if (visible.isEmpty()) {
-			return;
-		}
-		if (!confirmDismiss(owner, "Dismiss all visible?", visible.size())) {
-			return;
-		}
-		dismissNotifications(notificationService, visible, "dismiss all visible");
 	}
 
 	private static void dismissOlderNotifications(Stage owner, NotificationCenterService notificationService) {
@@ -458,19 +436,6 @@ public final class NotificationCenterDialog {
 		return notificationService.getNotificationsNewestFirst().stream()
 				.filter(notification -> notification != null && !notification.isUnread())
 				.toList();
-	}
-
-	private static List<AppNotification> visibleNotifications(List<NotificationGroup> visibleGroups) {
-		if (visibleGroups == null || visibleGroups.isEmpty()) {
-			return List.of();
-		}
-		LinkedHashSet<AppNotification> notifications = new LinkedHashSet<>();
-		for (NotificationGroup group : visibleGroups) {
-			if (group != null) {
-				notifications.addAll(group.getNotificationsNewestFirst());
-			}
-		}
-		return List.copyOf(notifications);
 	}
 
 	private static List<AppNotification> olderNotifications(NotificationCenterService notificationService) {
