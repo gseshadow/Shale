@@ -10,6 +10,7 @@ public final class NotificationCard extends VBox {
 	public NotificationCard() {
 		getStyleClass().add("notification-row");
 		setFillWidth(true);
+		setMinWidth(0);
 		setMaxWidth(Double.MAX_VALUE);
 	}
 

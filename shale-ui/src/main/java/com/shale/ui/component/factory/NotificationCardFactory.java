@@ -94,17 +94,20 @@ public final class NotificationCardFactory {
 		title.getStyleClass().add("notification-row-title");
 		title.setWrapText(false);
 		title.setTextOverrun(OverrunStyle.ELLIPSIS);
+		title.setMinWidth(0);
 		title.setMaxWidth(Double.MAX_VALUE);
 
 		Label message = new Label(item.getMessage());
 		message.getStyleClass().add("notification-row-message");
 		message.setWrapText(true);
+		message.setMinWidth(0);
 		message.setMaxWidth(Double.MAX_VALUE);
 		message.setMaxHeight(48);
 		message.setTextOverrun(OverrunStyle.ELLIPSIS);
 
 		VBox mainArea = new VBox(5, category, title, message);
 		mainArea.getStyleClass().add("notification-row-main");
+		mainArea.setMinWidth(0);
 		mainArea.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(mainArea, Priority.ALWAYS);
 
@@ -114,6 +117,7 @@ public final class NotificationCardFactory {
 			contextLabel.getStyleClass().add("notification-row-context");
 			contextLabel.setWrapText(false);
 			contextLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+			contextLabel.setMinWidth(0);
 			contextLabel.setMaxWidth(Double.MAX_VALUE);
 			mainArea.getChildren().add(contextLabel);
 		}
@@ -121,6 +125,8 @@ public final class NotificationCardFactory {
 		Label timestamp = new Label(TIME_FORMATTER.format(group.getLatestCreatedAt()));
 		timestamp.getStyleClass().add("notification-row-time");
 		timestamp.setTextOverrun(OverrunStyle.ELLIPSIS);
+		timestamp.setMinWidth(0);
+		timestamp.setMaxWidth(120);
 
 		HBox topControls = new HBox(6, timestamp);
 		if (group.getCount() > 1) {
@@ -137,6 +143,7 @@ public final class NotificationCardFactory {
 		Node caseCard = createCaseMiniCard(item);
 		VBox rightArea = new VBox(8, topControls);
 		rightArea.getStyleClass().add("notification-row-right");
+		rightArea.setMinWidth(0);
 		rightArea.setAlignment(Pos.TOP_RIGHT);
 		if (caseCard != null) {
 			rightArea.getChildren().add(caseCard);
@@ -145,6 +152,8 @@ public final class NotificationCardFactory {
 
 		HBox collapsedRow = new HBox(14, iconRail, mainArea, rightArea);
 		collapsedRow.getStyleClass().add("notification-row-collapsed");
+		collapsedRow.setMinWidth(0);
+		collapsedRow.setMaxWidth(Double.MAX_VALUE);
 		collapsedRow.setAlignment(Pos.TOP_LEFT);
 		card.getChildren().add(collapsedRow);
 
@@ -158,6 +167,8 @@ public final class NotificationCardFactory {
 	private VBox createExpandedContent(NotificationGroup group, boolean entityContextVisible) {
 		VBox expanded = new VBox(5);
 		expanded.getStyleClass().add("notification-row-expanded");
+		expanded.setMinWidth(0);
+		expanded.setMaxWidth(Double.MAX_VALUE);
 
 		if (group.getCount() == 1) {
 			AppNotification item = group.getLatestNotification();
@@ -188,6 +199,8 @@ public final class NotificationCardFactory {
 	private VBox createChildActivityRow(AppNotification item) {
 		VBox row = new VBox(3);
 		row.getStyleClass().add("notification-row-expanded-line");
+		row.setMinWidth(0);
+		row.setMaxWidth(Double.MAX_VALUE);
 
 		String action = normalize(item.getActionType());
 		String title = normalize(item.getTitle());
@@ -208,6 +221,7 @@ public final class NotificationCardFactory {
 		Label line = new Label(label + ": " + value);
 		line.getStyleClass().add("notification-row-expanded-line");
 		line.setWrapText(true);
+		line.setMinWidth(0);
 		line.setMaxWidth(Double.MAX_VALUE);
 		return line;
 	}
@@ -266,9 +280,16 @@ public final class NotificationCardFactory {
 						item.getCaseNonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
 		miniCard.getStyleClass().add("notification-row-case-mini-card");
+		if (miniCard instanceof Region region) {
+			region.setMinWidth(0);
+			region.setPrefWidth(190);
+			region.setMaxWidth(190);
+		}
 		StackPane wrapper = new StackPane(miniCard);
 		wrapper.getStyleClass().add("notification-row-case-mini");
-		wrapper.setMaxWidth(210);
+		wrapper.setMinWidth(0);
+		wrapper.setPrefWidth(190);
+		wrapper.setMaxWidth(190);
 		wrapper.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
 		return wrapper;
 	}

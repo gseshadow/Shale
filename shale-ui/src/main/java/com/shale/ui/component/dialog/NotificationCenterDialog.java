@@ -27,6 +27,7 @@ import javafx.scene.control.ListView;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
+import javafx.beans.binding.Bindings;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
@@ -93,6 +94,8 @@ public final class NotificationCenterDialog {
 		notificationService.getNotificationsNewestFirst().addListener(groupRebuildListener);
 
 		ListView<NotificationGroup> listView = new ListView<>();
+		listView.setMinWidth(0);
+		listView.setMaxWidth(Double.MAX_VALUE);
 		listView.setItems(notificationGroups);
 		listView.getStyleClass().add("notification-list");
 		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification, cardFactory));
@@ -320,10 +323,13 @@ public final class NotificationCenterDialog {
 	}
 
 	private static final class NotificationCell extends ListCell<NotificationGroup> {
+		private static final double LIST_VIEW_WIDTH_GUTTER = 34;
+
 		private final NotificationCenterService notificationService;
 		private final Consumer<AppNotification> onActivateNotification;
 		private final Consumer<Long> onOpenTask;
 		private final NotificationCardFactory notificationCardFactory;
+		private NotificationCard boundCard;
 
 		private NotificationCell(
 				NotificationCenterService notificationService,
@@ -355,15 +361,29 @@ public final class NotificationCenterDialog {
 		@Override
 		protected void updateItem(NotificationGroup item, boolean empty) {
 			super.updateItem(item, empty);
+			clearBoundGraphic();
 			if (empty || item == null) {
 				setText(null);
-				setGraphic(null);
 				return;
 			}
 			setText(null);
-			setGraphic(notificationCardFactory.create(
+			NotificationCard card = notificationCardFactory.create(
 					new NotificationCardFactory.NotificationCardModel(item),
-					NotificationCardFactory.Variant.CENTER_ROW));
+					NotificationCardFactory.Variant.CENTER_ROW);
+			card.setMinWidth(0);
+			card.prefWidthProperty().bind(Bindings.max(0, getListView().widthProperty().subtract(LIST_VIEW_WIDTH_GUTTER)));
+			card.maxWidthProperty().bind(card.prefWidthProperty());
+			boundCard = card;
+			setGraphic(card);
+		}
+
+		private void clearBoundGraphic() {
+			if (boundCard != null) {
+				boundCard.prefWidthProperty().unbind();
+				boundCard.maxWidthProperty().unbind();
+				boundCard = null;
+			}
+			setGraphic(null);
 		}
 
 		private static boolean isFromInteractiveChild(MouseEvent event) {
