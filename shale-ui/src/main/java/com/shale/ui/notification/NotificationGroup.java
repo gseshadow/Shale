@@ -45,6 +45,22 @@ public final class NotificationGroup {
 		return notificationsNewestFirst.stream().anyMatch(AppNotification::isUnread);
 	}
 
+	public NotificationSeverity getSeverity() {
+		return notificationsNewestFirst.stream()
+				.map(AppNotification::getSeverity)
+				.filter(Objects::nonNull)
+				.max(Comparator.comparingInt(NotificationGroup::severityRank))
+				.orElse(NotificationSeverity.INFO);
+	}
+
+	private static int severityRank(NotificationSeverity severity) {
+		return switch (severity == null ? NotificationSeverity.INFO : severity) {
+		case CRITICAL -> 2;
+		case WARNING -> 1;
+		case INFO -> 0;
+		};
+	}
+
 	public int getCount() {
 		return notificationsNewestFirst.size();
 	}
