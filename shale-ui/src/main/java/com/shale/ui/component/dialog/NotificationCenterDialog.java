@@ -12,6 +12,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
@@ -24,7 +25,10 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
@@ -139,7 +143,11 @@ public final class NotificationCenterDialog {
 
 		MenuItem dismissReadItem = new MenuItem("Read");
 		MenuItem dismissOlderItem = new MenuItem("Older than 30 days");
+<<<<<<< codex/add-notification-cleanup-tools
 		MenuButton cleanupMenuButton = new MenuButton("Dismiss ▼", null, dismissReadItem, dismissOlderItem);
+=======
+		MenuButton cleanupMenuButton = new MenuButton("Dismiss", null, dismissReadItem, dismissOlderItem);
+>>>>>>> codex/latest
 		cleanupMenuButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
 		Runnable updateCleanupMenuState = () -> updateCleanupMenuState(
 				notificationService,
@@ -442,6 +450,7 @@ public final class NotificationCenterDialog {
 	}
 
 	private static boolean confirmDismiss(Stage owner, String title, int count) {
+<<<<<<< codex/add-notification-cleanup-tools
 		Stage dialogStage = AppDialogs.createModalStage(owner, "Confirm notification cleanup");
 		boolean[] confirmed = {false};
 
@@ -494,6 +503,20 @@ public final class NotificationCenterDialog {
 		dialogStage.setScene(scene);
 		dialogStage.showAndWait();
 		return confirmed[0];
+=======
+		ButtonType dismissType = new ButtonType("Dismiss", ButtonBar.ButtonData.OK_DONE);
+		Alert alert = new Alert(
+				Alert.AlertType.CONFIRMATION,
+				"This will dismiss " + count + " notification" + (count == 1 ? "" : "s") + ". This does not delete them.",
+				dismissType,
+				ButtonType.CANCEL);
+		alert.setTitle("Confirm notification cleanup");
+		alert.setHeaderText(title);
+		if (owner != null) {
+			alert.initOwner(owner);
+		}
+		return alert.showAndWait().filter(dismissType::equals).isPresent();
+>>>>>>> codex/latest
 	}
 
 	private static void dismissNotifications(
