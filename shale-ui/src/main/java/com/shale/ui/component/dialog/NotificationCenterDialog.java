@@ -131,7 +131,8 @@ public final class NotificationCenterDialog {
 				searchField.getText());
 		rebuildCategoryOptions(notificationService, categoryFilter);
 		rebuildGroups.run();
-		ListChangeListener<AppNotification> groupRebuildListener = change -> {
+		ListChangeListener<AppNotification> groupRebuildListener = change ->
+		{
 			rebuildCategoryOptions(notificationService, categoryFilter);
 			rebuildGroups.run();
 		};
@@ -143,11 +144,7 @@ public final class NotificationCenterDialog {
 
 		MenuItem dismissReadItem = new MenuItem("Read");
 		MenuItem dismissOlderItem = new MenuItem("Older than 30 days");
-<<<<<<< codex/add-notification-cleanup-tools
-		MenuButton cleanupMenuButton = new MenuButton("Dismiss ▼", null, dismissReadItem, dismissOlderItem);
-=======
 		MenuButton cleanupMenuButton = new MenuButton("Dismiss", null, dismissReadItem, dismissOlderItem);
->>>>>>> codex/latest
 		cleanupMenuButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
 		Runnable updateCleanupMenuState = () -> updateCleanupMenuState(
 				notificationService,
@@ -163,13 +160,15 @@ public final class NotificationCenterDialog {
 		listView.setItems(notificationGroups);
 		listView.getStyleClass().add("notification-list");
 		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification, cardFactory));
-		ChangeListener<Number> unreadRefreshListener = (obs, oldValue, newValue) -> {
+		ChangeListener<Number> unreadRefreshListener = (obs, oldValue, newValue) ->
+		{
 			rebuildGroups.run();
 			updateCleanupMenuState.run();
 			listView.refresh();
 		};
 		notificationService.unreadCountProperty().addListener(unreadRefreshListener);
-		stage.setOnHidden(event -> {
+		stage.setOnHidden(event ->
+		{
 			notificationService.getNotificationsNewestFirst().removeListener(groupRebuildListener);
 			notificationService.unreadCountProperty().removeListener(unreadRefreshListener);
 		});
@@ -450,9 +449,8 @@ public final class NotificationCenterDialog {
 	}
 
 	private static boolean confirmDismiss(Stage owner, String title, int count) {
-<<<<<<< codex/add-notification-cleanup-tools
 		Stage dialogStage = AppDialogs.createModalStage(owner, "Confirm notification cleanup");
-		boolean[] confirmed = {false};
+		boolean[] confirmed = { false };
 
 		Label headingLabel = new Label(title);
 		headingLabel.getStyleClass().add("app-dialog-title");
@@ -476,7 +474,8 @@ public final class NotificationCenterDialog {
 		Button dismissButton = new Button("Dismiss");
 		dismissButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
 		dismissButton.setDefaultButton(true);
-		dismissButton.setOnAction(event -> {
+		dismissButton.setOnAction(event ->
+		{
 			confirmed[0] = true;
 			dialogStage.close();
 		});
@@ -503,20 +502,6 @@ public final class NotificationCenterDialog {
 		dialogStage.setScene(scene);
 		dialogStage.showAndWait();
 		return confirmed[0];
-=======
-		ButtonType dismissType = new ButtonType("Dismiss", ButtonBar.ButtonData.OK_DONE);
-		Alert alert = new Alert(
-				Alert.AlertType.CONFIRMATION,
-				"This will dismiss " + count + " notification" + (count == 1 ? "" : "s") + ". This does not delete them.",
-				dismissType,
-				ButtonType.CANCEL);
-		alert.setTitle("Confirm notification cleanup");
-		alert.setHeaderText(title);
-		if (owner != null) {
-			alert.initOwner(owner);
-		}
-		return alert.showAndWait().filter(dismissType::equals).isPresent();
->>>>>>> codex/latest
 	}
 
 	private static void dismissNotifications(
