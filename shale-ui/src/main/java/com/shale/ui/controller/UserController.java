@@ -82,6 +82,7 @@ public final class UserController {
 	@FXML private Label assignedTasksEmptyLabel;
 	@FXML private TextField assignedTasksSearchField;
 	@FXML private ChoiceBox<String> assignedTasksSortChoice;
+	@FXML private Button assignedTasksCompletedToggleButton;
 	@FXML private ScrollPane assignedTasksScroll;
 	@FXML private ScrollPane pageScroll;
 	@FXML private FlowPane sectionsFlow;
@@ -126,6 +127,7 @@ public final class UserController {
 	private List<CaseRow> assignedCases = List.of();
 	private List<AssignedUserTaskRow> assignedTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedTaskUsers = java.util.Map.of();
+	private boolean showCompletedTasks;
 	private long assignedCasesRefreshSequence;
 	private long assignedTasksRefreshSequence;
 	private boolean editMode;
@@ -786,6 +788,13 @@ public final class UserController {
 		if (assignedTasksSearchField != null) {
 			assignedTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderAssignedTasks());
 		}
+		if (assignedTasksCompletedToggleButton != null) {
+			assignedTasksCompletedToggleButton.setOnAction(e -> {
+				showCompletedTasks = !showCompletedTasks;
+				renderAssignedTasks();
+			});
+			updateAssignedTasksCompletedToggleText();
+		}
 	}
 
 	private void resetAssignedTaskControls() {
@@ -795,6 +804,8 @@ public final class UserController {
 		if (assignedTasksSortChoice != null) {
 			assignedTasksSortChoice.getSelectionModel().select(TASK_SORT_RECENT);
 		}
+		showCompletedTasks = false;
+		updateAssignedTasksCompletedToggleText();
 	}
 
 	private void renderAssignedTasks() {
@@ -807,12 +818,10 @@ public final class UserController {
 			taskCardFactory = new TaskCardFactory(this::openTask, this::onToggleAssignedTaskComplete, onOpenCase, this::onOpenUserFromTask);
 		}
 		String query = normalizedAssignedTaskQuery();
-		Comparator<AssignedUserTaskRow> comparator = assignedTasksComparator();
-		List<Node> taskCards = assignedTasks.stream()
-				.filter(task -> matchesAssignedTaskQuery(task, query))
-				.sorted(comparator)
+		List<Node> taskCards = filteredAssignedTasks(query).stream()
 				.map(this::createAssignedTaskCard)
 				.toList();
+		updateAssignedTasksCompletedToggleText();
 		assignedTasksContainer.getChildren().setAll(taskCards);
 		boolean empty = taskCards.isEmpty();
 		if (assignedTasksEmptyLabel != null) {
@@ -827,6 +836,25 @@ public final class UserController {
 			}
 		}
 		PerfLog.logDone("RENDER", "panel=assigned_tasks page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " childCount=" + assignedTasksContainer.getChildren().size(), renderStartNanos);
+	}
+
+	private List<AssignedUserTaskRow> filteredAssignedTasks(String query) {
+		Comparator<AssignedUserTaskRow> comparator = assignedTasksComparator();
+		return assignedTasks.stream()
+				.filter(task -> showCompletedTasks || !isAssignedTaskCompleted(task))
+				.filter(task -> matchesAssignedTaskQuery(task, query))
+				.sorted(comparator)
+				.toList();
+	}
+
+	private void updateAssignedTasksCompletedToggleText() {
+		if (assignedTasksCompletedToggleButton != null) {
+			assignedTasksCompletedToggleButton.setText(showCompletedTasks ? "Hide Completed" : "Show Completed");
+		}
+	}
+
+	private boolean isAssignedTaskCompleted(AssignedUserTaskRow task) {
+		return task != null && task.completedAt() != null;
 	}
 
 	private Node createAssignedTaskCard(AssignedUserTaskRow row) {
