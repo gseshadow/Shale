@@ -7,6 +7,8 @@ import com.shale.ui.notification.NotificationCenterService;
 import com.shale.ui.notification.NotificationCategory;
 import com.shale.ui.notification.NotificationGroup;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -28,6 +30,8 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -133,6 +137,18 @@ public final class NotificationCenterDialog {
 		unreadOnlyFilter.selectedProperty().addListener(filterChangeListener);
 		searchField.textProperty().addListener(filterChangeListener);
 
+		MenuItem dismissReadItem = new MenuItem("Read");
+		MenuItem dismissOlderItem = new MenuItem("Older than 30 days");
+		MenuButton cleanupMenuButton = new MenuButton("Dismiss ▼", null, dismissReadItem, dismissOlderItem);
+		cleanupMenuButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
+		Runnable updateCleanupMenuState = () -> updateCleanupMenuState(
+				notificationService,
+				dismissReadItem,
+				dismissOlderItem,
+				cleanupMenuButton);
+		notificationGroups.addListener((ListChangeListener<NotificationGroup>) change -> updateCleanupMenuState.run());
+		updateCleanupMenuState.run();
+
 		ListView<NotificationGroup> listView = new ListView<>();
 		listView.setMinWidth(0);
 		listView.setMaxWidth(Double.MAX_VALUE);
@@ -141,6 +157,7 @@ public final class NotificationCenterDialog {
 		listView.setCellFactory(view -> new NotificationCell(notificationService, onOpenTask, onActivateNotification, cardFactory));
 		ChangeListener<Number> unreadRefreshListener = (obs, oldValue, newValue) -> {
 			rebuildGroups.run();
+			updateCleanupMenuState.run();
 			listView.refresh();
 		};
 		notificationService.unreadCountProperty().addListener(unreadRefreshListener);
@@ -154,6 +171,9 @@ public final class NotificationCenterDialog {
 		markAllReadButton.disableProperty().bind(notificationService.unreadCountProperty().lessThanOrEqualTo(0));
 		markAllReadButton.setOnAction(event -> notificationService.markAllRead());
 
+		dismissReadItem.setOnAction(event -> dismissReadNotifications(stage, notificationService));
+		dismissOlderItem.setOnAction(event -> dismissOlderNotifications(stage, notificationService));
+
 		Button closeButton = new Button("Close");
 		closeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
 		closeButton.setOnAction(event -> stage.close());
@@ -162,7 +182,7 @@ public final class NotificationCenterDialog {
 
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox actions = new HBox(10, markAllReadButton, spacer, closeButton);
+		HBox actions = new HBox(10, markAllReadButton, cleanupMenuButton, spacer, closeButton);
 		actions.getStyleClass().add("app-dialog-actions");
 		actions.setAlignment(Pos.CENTER_RIGHT);
 
@@ -372,6 +392,121 @@ public final class NotificationCenterDialog {
 
 	private static String normalizeSearch(String searchText) {
 		return searchText == null ? "" : searchText.trim().toLowerCase(Locale.ROOT);
+	}
+
+	private static void updateCleanupMenuState(
+			NotificationCenterService notificationService,
+			MenuItem dismissReadItem,
+			MenuItem dismissOlderItem,
+			MenuButton cleanupMenuButton) {
+		int readCount = readNotifications(notificationService).size();
+		int olderCount = olderNotifications(notificationService).size();
+		dismissReadItem.setDisable(readCount == 0);
+		dismissOlderItem.setDisable(olderCount == 0);
+		cleanupMenuButton.setDisable(readCount == 0 && olderCount == 0);
+	}
+
+	private static void dismissReadNotifications(Stage owner, NotificationCenterService notificationService) {
+		List<AppNotification> read = readNotifications(notificationService);
+		if (read.isEmpty()) {
+			return;
+		}
+		if (read.size() > 1 && !confirmDismiss(owner, "Dismiss all read?", read.size())) {
+			return;
+		}
+		dismissNotifications(notificationService, read, "dismiss all read");
+	}
+
+	private static void dismissOlderNotifications(Stage owner, NotificationCenterService notificationService) {
+		List<AppNotification> older = olderNotifications(notificationService);
+		if (older.isEmpty()) {
+			return;
+		}
+		if (older.size() > 1 && !confirmDismiss(owner, "Dismiss notifications older than 30 days?", older.size())) {
+			return;
+		}
+		dismissNotifications(notificationService, older, "dismiss older than 30 days");
+	}
+
+	private static List<AppNotification> readNotifications(NotificationCenterService notificationService) {
+		return notificationService.getNotificationsNewestFirst().stream()
+				.filter(notification -> notification != null && !notification.isUnread())
+				.toList();
+	}
+
+	private static List<AppNotification> olderNotifications(NotificationCenterService notificationService) {
+		Instant cutoff = Instant.now().minus(30, ChronoUnit.DAYS);
+		return notificationService.getNotificationsNewestFirst().stream()
+				.filter(notification -> notification != null && notification.getCreatedAt().isBefore(cutoff))
+				.toList();
+	}
+
+	private static boolean confirmDismiss(Stage owner, String title, int count) {
+		Stage dialogStage = AppDialogs.createModalStage(owner, "Confirm notification cleanup");
+		boolean[] confirmed = {false};
+
+		Label headingLabel = new Label(title);
+		headingLabel.getStyleClass().add("app-dialog-title");
+		headingLabel.setWrapText(true);
+
+		Label messageLabel = new Label(
+				"This will dismiss " + count + " notification" + (count == 1 ? "" : "s") + ". This does not delete them.");
+		messageLabel.getStyleClass().add("app-dialog-message");
+		messageLabel.setWrapText(true);
+
+		VBox content = new VBox(8, headingLabel, messageLabel);
+		content.getStyleClass().add("app-dialog-header");
+		content.setMinWidth(360);
+		content.setMaxWidth(420);
+
+		Button cancelButton = new Button("Cancel");
+		cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+		cancelButton.setCancelButton(true);
+		cancelButton.setOnAction(event -> dialogStage.close());
+
+		Button dismissButton = new Button("Dismiss");
+		dismissButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+		dismissButton.setDefaultButton(true);
+		dismissButton.setOnAction(event -> {
+			confirmed[0] = true;
+			dialogStage.close();
+		});
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox actions = new HBox(10, spacer, cancelButton, dismissButton);
+		actions.getStyleClass().add("app-dialog-actions");
+		actions.setAlignment(Pos.CENTER_RIGHT);
+
+		VBox body = new VBox(16, content, actions);
+		body.setPadding(new Insets(18));
+		body.setMinWidth(420);
+		body.setMaxWidth(420);
+
+		VBox root = AppDialogs.createSecondaryWindowShell(
+				dialogStage,
+				"Confirm notification cleanup",
+				dialogStage::close,
+				body);
+		Scene scene = new Scene(root);
+		scene.getStylesheets().add(Objects.requireNonNull(
+				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
+		dialogStage.setScene(scene);
+		dialogStage.showAndWait();
+		return confirmed[0];
+	}
+
+	private static void dismissNotifications(
+			NotificationCenterService notificationService,
+			List<AppNotification> notifications,
+			String actionDescription) {
+		try {
+			notificationService.dismissAll(notifications);
+		} catch (RuntimeException ex) {
+			System.err.println("[NotificationCenterDialog] " + actionDescription + " failed for count=" + notifications.size());
+			ex.printStackTrace(System.err);
+			throw ex;
+		}
 	}
 
 	private static void dismissNotification(NotificationCenterService notificationService, AppNotification item) {

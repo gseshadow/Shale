@@ -1074,6 +1074,30 @@
     -fx-border-color: rgba(57, 106, 178, 0.66);
 }
 
+.notification-card-info {
+    -fx-border-width: 1;
+}
+
+.notification-card-warning {
+    -fx-border-color: rgba(18, 41, 74, 0.14) rgba(18, 41, 74, 0.14) rgba(18, 41, 74, 0.14) rgba(214, 143, 36, 0.86);
+    -fx-border-width: 1 1 1 4;
+    -fx-padding: 13 14 12 9;
+}
+
+.notification-card-critical {
+    -fx-border-color: rgba(18, 41, 74, 0.14) rgba(18, 41, 74, 0.14) rgba(18, 41, 74, 0.14) rgba(195, 56, 56, 0.92);
+    -fx-border-width: 1 1 1 4;
+    -fx-padding: 13 14 12 9;
+}
+
+.notification-row-unread.notification-card-warning {
+    -fx-border-color: rgba(57, 106, 178, 0.66) rgba(57, 106, 178, 0.66) rgba(57, 106, 178, 0.66) rgba(214, 143, 36, 0.92);
+}
+
+.notification-row-unread.notification-card-critical {
+    -fx-border-color: rgba(57, 106, 178, 0.66) rgba(57, 106, 178, 0.66) rgba(57, 106, 178, 0.66) rgba(195, 56, 56, 0.96);
+}
+
 .notification-row-collapsed {
     -fx-spacing: 14;
 }
@@ -1111,6 +1135,24 @@
     -fx-text-fill: #244d82;
 }
 
+.notification-icon-info {
+    -fx-background-color: rgba(79, 127, 191, 0.15);
+    -fx-border-color: rgba(79, 127, 191, 0.24);
+    -fx-text-fill: #244d82;
+}
+
+.notification-icon-warning {
+    -fx-background-color: rgba(214, 143, 36, 0.16);
+    -fx-border-color: rgba(214, 143, 36, 0.32);
+    -fx-text-fill: #7a4f12;
+}
+
+.notification-icon-critical {
+    -fx-background-color: rgba(195, 56, 56, 0.17);
+    -fx-border-color: rgba(195, 56, 56, 0.34);
+    -fx-text-fill: #8d2727;
+}
+
 .notification-row-main {
     -fx-spacing: 5;
 }
@@ -1136,6 +1178,26 @@
     -fx-text-fill: rgba(17, 37, 66, 0.62);
     -fx-font-size: 10px;
     -fx-font-weight: 700;
+}
+
+.notification-row-severity {
+    -fx-font-size: 9px;
+    -fx-font-weight: 900;
+    -fx-padding: 2 6 2 6;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+}
+
+.notification-row-severity-warning {
+    -fx-background-color: rgba(214, 143, 36, 0.14);
+    -fx-border-color: rgba(214, 143, 36, 0.30);
+    -fx-text-fill: #7a4f12;
+}
+
+.notification-row-severity-critical {
+    -fx-background-color: rgba(195, 56, 56, 0.15);
+    -fx-border-color: rgba(195, 56, 56, 0.34);
+    -fx-text-fill: #8d2727;
 }
 
 .notification-row-expand,
