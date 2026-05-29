@@ -163,6 +163,14 @@
                                         <String fx:value="app-toolbar-select" />
                                     </styleClass>
                                 </ChoiceBox>
+                                <Button fx:id="assignedTasksCompletedToggleButton" text="Show Completed" minWidth="118" maxWidth="138">
+                                    <styleClass>
+                                        <String fx:value="button" />
+                                        <String fx:value="app-toolbar-button" />
+                                        <String fx:value="app-toolbar-button-neutral" />
+                                        <String fx:value="app-toolbar-button-compact" />
+                                    </styleClass>
+                                </Button>
                             </HBox>
                             <ScrollPane fx:id="assignedTasksScroll" fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
                                 <javafx.scene.layout.StackPane>
