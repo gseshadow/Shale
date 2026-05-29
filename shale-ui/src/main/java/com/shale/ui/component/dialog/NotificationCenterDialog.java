@@ -143,7 +143,11 @@ public final class NotificationCenterDialog {
 
 		MenuItem dismissReadItem = new MenuItem("Read");
 		MenuItem dismissOlderItem = new MenuItem("Older than 30 days");
+<<<<<<< codex/add-notification-cleanup-tools
+		MenuButton cleanupMenuButton = new MenuButton("Dismiss ▼", null, dismissReadItem, dismissOlderItem);
+=======
 		MenuButton cleanupMenuButton = new MenuButton("Dismiss", null, dismissReadItem, dismissOlderItem);
+>>>>>>> codex/latest
 		cleanupMenuButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
 		Runnable updateCleanupMenuState = () -> updateCleanupMenuState(
 				notificationService,
@@ -446,6 +450,60 @@ public final class NotificationCenterDialog {
 	}
 
 	private static boolean confirmDismiss(Stage owner, String title, int count) {
+<<<<<<< codex/add-notification-cleanup-tools
+		Stage dialogStage = AppDialogs.createModalStage(owner, "Confirm notification cleanup");
+		boolean[] confirmed = {false};
+
+		Label headingLabel = new Label(title);
+		headingLabel.getStyleClass().add("app-dialog-title");
+		headingLabel.setWrapText(true);
+
+		Label messageLabel = new Label(
+				"This will dismiss " + count + " notification" + (count == 1 ? "" : "s") + ". This does not delete them.");
+		messageLabel.getStyleClass().add("app-dialog-message");
+		messageLabel.setWrapText(true);
+
+		VBox content = new VBox(8, headingLabel, messageLabel);
+		content.getStyleClass().add("app-dialog-header");
+		content.setMinWidth(360);
+		content.setMaxWidth(420);
+
+		Button cancelButton = new Button("Cancel");
+		cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+		cancelButton.setCancelButton(true);
+		cancelButton.setOnAction(event -> dialogStage.close());
+
+		Button dismissButton = new Button("Dismiss");
+		dismissButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+		dismissButton.setDefaultButton(true);
+		dismissButton.setOnAction(event -> {
+			confirmed[0] = true;
+			dialogStage.close();
+		});
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox actions = new HBox(10, spacer, cancelButton, dismissButton);
+		actions.getStyleClass().add("app-dialog-actions");
+		actions.setAlignment(Pos.CENTER_RIGHT);
+
+		VBox body = new VBox(16, content, actions);
+		body.setPadding(new Insets(18));
+		body.setMinWidth(420);
+		body.setMaxWidth(420);
+
+		VBox root = AppDialogs.createSecondaryWindowShell(
+				dialogStage,
+				"Confirm notification cleanup",
+				dialogStage::close,
+				body);
+		Scene scene = new Scene(root);
+		scene.getStylesheets().add(Objects.requireNonNull(
+				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
+		dialogStage.setScene(scene);
+		dialogStage.showAndWait();
+		return confirmed[0];
+=======
 		ButtonType dismissType = new ButtonType("Dismiss", ButtonBar.ButtonData.OK_DONE);
 		Alert alert = new Alert(
 				Alert.AlertType.CONFIRMATION,
@@ -458,6 +516,7 @@ public final class NotificationCenterDialog {
 			alert.initOwner(owner);
 		}
 		return alert.showAndWait().filter(dismissType::equals).isPresent();
+>>>>>>> codex/latest
 	}
 
 	private static void dismissNotifications(
