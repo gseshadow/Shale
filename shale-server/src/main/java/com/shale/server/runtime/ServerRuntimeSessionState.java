@@ -1,7 +1,10 @@
 package com.shale.server.runtime;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Temporary server runtime/session placeholder for Step 3.
@@ -15,17 +18,55 @@ public final class ServerRuntimeSessionState {
     public static final String NOT_IMPLEMENTED_MESSAGE =
             "TODO: server auth/session context is not wired yet; this endpoint cannot safely access tenant-scoped data without RLS session context.";
 
-    public void requireTenantSession() {
-        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, NOT_IMPLEMENTED_MESSAGE);
+    private final ServerSessionResolver sessionResolver;
+    private final ObjectProvider<HttpServletRequest> currentRequest;
+
+    public ServerRuntimeSessionState() {
+        this(new UnauthenticatedServerSessionResolver(), new EmptyHttpServletRequestProvider());
+    }
+
+    public ServerRuntimeSessionState(
+            ServerSessionResolver sessionResolver,
+            ObjectProvider<HttpServletRequest> currentRequest) {
+        this.sessionResolver = java.util.Objects.requireNonNull(sessionResolver, "sessionResolver");
+        this.currentRequest = java.util.Objects.requireNonNull(currentRequest, "currentRequest");
+    }
+
+    public ServerPrincipal requirePrincipal() {
+        ServerSessionContext context = sessionResolver.resolve(currentRequest.getIfAvailable());
+        if (context == null || context.principal().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, NOT_IMPLEMENTED_MESSAGE);
+        }
+        return context.principal().orElseThrow();
     }
 
     public int requireShaleClientId() {
-        requireTenantSession();
-        throw new IllegalStateException("unreachable");
+        return requirePrincipal().shaleClientId();
     }
 
     public int requireUserId() {
-        requireTenantSession();
-        throw new IllegalStateException("unreachable");
+        return requirePrincipal().userId();
+    }
+
+    private static final class EmptyHttpServletRequestProvider implements ObjectProvider<HttpServletRequest> {
+        @Override
+        public HttpServletRequest getObject(Object... args) {
+            return null;
+        }
+
+        @Override
+        public HttpServletRequest getIfAvailable() {
+            return null;
+        }
+
+        @Override
+        public HttpServletRequest getIfUnique() {
+            return null;
+        }
+
+        @Override
+        public HttpServletRequest getObject() {
+            return null;
+        }
     }
 }

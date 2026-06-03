@@ -1,7 +1,6 @@
 package com.shale.server.config;
 
-import java.sql.Connection;
-
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,19 +21,33 @@ import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
+import com.shale.server.runtime.RequestScopedDbSessionProvider;
 import com.shale.server.runtime.ServerRuntimeSessionState;
+import com.shale.server.runtime.ServerSessionResolver;
+import com.shale.server.runtime.UnauthenticatedServerSessionResolver;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @Configuration
 public class ShaleServerServiceConfiguration {
 
     @Bean
-    ServerRuntimeSessionState serverRuntimeSessionState() {
-        return new ServerRuntimeSessionState();
+    ServerSessionResolver serverSessionResolver() {
+        return new UnauthenticatedServerSessionResolver();
     }
 
     @Bean
-    DbSessionProvider serverDbSessionProvider() {
-        return new DisabledServerDbSessionProvider();
+    ServerRuntimeSessionState serverRuntimeSessionState(
+            ServerSessionResolver serverSessionResolver,
+            ObjectProvider<HttpServletRequest> currentRequest) {
+        return new ServerRuntimeSessionState(serverSessionResolver, currentRequest);
+    }
+
+    @Bean
+    DbSessionProvider serverDbSessionProvider(
+            ServerSessionResolver serverSessionResolver,
+            ObjectProvider<HttpServletRequest> currentRequest) {
+        return new RequestScopedDbSessionProvider(serverSessionResolver, currentRequest);
     }
 
     @Bean
@@ -67,12 +80,5 @@ public class ShaleServerServiceConfiguration {
     @Bean
     NotificationServicePort notificationServicePort(DbSessionProvider serverDbSessionProvider) {
         return new NotificationServiceAdapter(new NotificationDao(serverDbSessionProvider));
-    }
-
-    private static final class DisabledServerDbSessionProvider implements DbSessionProvider {
-        @Override
-        public Connection requireConnection() {
-            throw new UnsupportedOperationException(ServerRuntimeSessionState.NOT_IMPLEMENTED_MESSAGE);
-        }
     }
 }
