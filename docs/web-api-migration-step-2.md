@@ -37,6 +37,29 @@ This note identifies the auth, session, case, task, contact, and notification lo
   - `RoleSemantics` for role IDs/meaning used by DAOs and future authorization/service decisions.
   - `Result`, `Preconditions`, and app constants where they are independent of JavaFX/desktop runtime.
 
+
+## Shared service ports added in Step 2
+
+The first concrete setup for shared services is a set of JavaFX-free interfaces in `shale-core` under `com.shale.core.service`. These are ports only; no implementations were moved and desktop wiring continues to use the current DAO/UI-service path.
+
+- `AuthServicePort`
+  - Minimal login boundary returning the shared `User` identity in a `Result`.
+  - Intended first adapter: wrap existing `shale-data` `AuthService` / `AuthServiceImpl` and map `AuthException` to `Result.fail(...)`.
+- `CaseServicePort`
+  - Read/detail/search/note/update shaped boundary based on `CaseDao` and current `CaseDetailService` capabilities.
+  - Includes TODO placeholder command records for future write endpoint DTOs.
+- `TaskServicePort`
+  - Boundary for case task lists, assigned task lists, task detail, priorities/statuses, create/update, and assignment operations.
+  - Intended first adapter: extract the business portions of `CaseTaskService` without copying JavaFX notification or live-update presentation code.
+- `ContactServicePort`
+  - Boundary for contact search/detail/create/update/soft-delete operations.
+  - Defines minimal shared records because contact API DTOs do not yet exist in `shale-core` and server code should not depend on `ContactDao` row classes directly.
+- `NotificationServicePort`
+  - Durable notification boundary for unread/read/dismiss/create operations.
+  - Explicitly avoids `shale-ui` notification classes such as `NotificationCenterService`, JavaFX properties, and observable lists.
+
+Next intended adapter step: create thin adapter implementations outside `shale-ui` that delegate to `shale-data` DAOs/services, then switch desktop UI services to consume those adapters only after parity is proven. `shale-server` can then wire the same ports with request-scoped session context.
+
 ## Logic `shale-server` will likely need from `shale-data`
 
 - Authentication and password verification:
