@@ -60,6 +60,19 @@ The first concrete setup for shared services is a set of JavaFX-free interfaces 
 
 Next intended adapter step: create thin adapter implementations outside `shale-ui` that delegate to `shale-data` DAOs/services, then switch desktop UI services to consume those adapters only after parity is proven. `shale-server` can then wire the same ports with request-scoped session context.
 
+
+## Thin data adapters added in Step 2
+
+A first set of implementation adapters now lives in `shale-data` under `com.shale.data.service.adapter`. These classes implement the `shale-core` service ports without changing desktop wiring and without adding Spring or JavaFX dependencies.
+
+- `AuthServiceAdapter` delegates `AuthServicePort.authenticate(...)` to the existing `shale-data` `AuthService` and maps `AuthException` to `Result.fail(...)`.
+- `CaseServiceAdapter` delegates safe read/search methods to `CaseDao` (`getDetail`, `getOverview`, `searchCasesByName`, and `listCaseUpdates`). Placeholder write methods still throw `UnsupportedOperationException` because the port commands do not yet model the full existing note/update return and row-version contracts.
+- `TaskServiceAdapter` delegates task list/detail/priority/status/assignment methods to `TaskDao`. `createTask(...)` delegates only when no explicit status is requested; explicit status creation remains a TODO because the current DAO create method resolves the default status internally.
+- `ContactServiceAdapter` delegates search/detail/create/update/delete operations to `ContactDao` and maps between the port records and existing contact DAO request/row types.
+- `NotificationServiceAdapter` delegates unread/read/dismiss operations to `NotificationDao`. Generic notification creation remains a TODO and throws `UnsupportedOperationException` until the port is split into entity/action-specific creation commands matching existing DAO methods.
+
+Next intended adapter step: add focused tests around these adapters with fake/stub DAOs or a test `DbSessionProvider`, then decide whether the placeholder port methods should be narrowed, split, or given richer command/response records before `shale-server` endpoints consume them.
+
 ## Logic `shale-server` will likely need from `shale-data`
 
 - Authentication and password verification:
