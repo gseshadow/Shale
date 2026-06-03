@@ -12,16 +12,20 @@ import com.shale.data.dao.ContactDao;
  */
 public final class ContactServiceAdapter implements ContactServicePort {
 
-	private final ContactDao contactDao;
+	private final ContactGateway contactGateway;
 
 	public ContactServiceAdapter(ContactDao contactDao) {
-		this.contactDao = Objects.requireNonNull(contactDao, "contactDao");
+		this(new DaoContactGateway(contactDao));
+	}
+
+	ContactServiceAdapter(ContactGateway contactGateway) {
+		this.contactGateway = Objects.requireNonNull(contactGateway, "contactGateway");
 	}
 
 	@Override
 	public List<ContactSummary> searchContacts(int shaleClientId, String query, int limit) {
 		int resolvedLimit = limit <= 0 ? 25 : limit;
-		return contactDao.searchContacts(shaleClientId, query).stream()
+		return contactGateway.searchContacts(shaleClientId, query).stream()
 				.limit(resolvedLimit)
 				.map(row -> new ContactSummary(row.id(), row.displayName(), row.email(), row.phone()))
 				.toList();
@@ -29,7 +33,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 
 	@Override
 	public Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId) {
-		return Optional.ofNullable(contactDao.findById(contactId, shaleClientId))
+		return Optional.ofNullable(contactGateway.findById(contactId, shaleClientId))
 				.map(row -> new ContactDetail(
 						row.id(),
 						row.shaleClientId(),
@@ -43,7 +47,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	@Override
 	public int createContact(CreateContactCommand command) {
 		Objects.requireNonNull(command, "command");
-		return contactDao.createContact(new ContactDao.CreateContactRequest(
+		return contactGateway.createContact(new ContactDao.CreateContactRequest(
 				command.shaleClientId(),
 				command.firstName(),
 				command.lastName(),
@@ -55,11 +59,11 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	@Override
 	public boolean updateContact(UpdateContactCommand command) {
 		Objects.requireNonNull(command, "command");
-		ContactDao.ContactDetailRow current = contactDao.findById(command.contactId(), command.shaleClientId());
+		ContactDao.ContactDetailRow current = contactGateway.findById(command.contactId(), command.shaleClientId());
 		if (current == null) {
 			return false;
 		}
-		return contactDao.updateBasicProfile(new ContactDao.ContactProfileUpdateRequest(
+		return contactGateway.updateBasicProfile(new ContactDao.ContactProfileUpdateRequest(
 				command.contactId(),
 				command.shaleClientId(),
 				command.actorUserId(),
@@ -77,6 +81,49 @@ public final class ContactServiceAdapter implements ContactServicePort {
 
 	@Override
 	public boolean softDeleteContact(int contactId, int shaleClientId, int actorUserId) {
-		return contactDao.softDeleteContact(contactId, shaleClientId);
+		return contactGateway.softDeleteContact(contactId, shaleClientId);
+	}
+
+	interface ContactGateway {
+		List<ContactDao.DirectoryContactRow> searchContacts(int shaleClientId, String query);
+
+		ContactDao.ContactDetailRow findById(int contactId, int shaleClientId);
+
+		int createContact(ContactDao.CreateContactRequest request);
+
+		boolean updateBasicProfile(ContactDao.ContactProfileUpdateRequest request);
+
+		boolean softDeleteContact(int contactId, int shaleClientId);
+	}
+
+	private record DaoContactGateway(ContactDao contactDao) implements ContactGateway {
+		private DaoContactGateway {
+			Objects.requireNonNull(contactDao, "contactDao");
+		}
+
+		@Override
+		public List<ContactDao.DirectoryContactRow> searchContacts(int shaleClientId, String query) {
+			return contactDao.searchContacts(shaleClientId, query);
+		}
+
+		@Override
+		public ContactDao.ContactDetailRow findById(int contactId, int shaleClientId) {
+			return contactDao.findById(contactId, shaleClientId);
+		}
+
+		@Override
+		public int createContact(ContactDao.CreateContactRequest request) {
+			return contactDao.createContact(request);
+		}
+
+		@Override
+		public boolean updateBasicProfile(ContactDao.ContactProfileUpdateRequest request) {
+			return contactDao.updateBasicProfile(request);
+		}
+
+		@Override
+		public boolean softDeleteContact(int contactId, int shaleClientId) {
+			return contactDao.softDeleteContact(contactId, shaleClientId);
+		}
 	}
 }

@@ -15,36 +15,40 @@ import com.shale.data.dao.CaseDao;
  */
 public final class CaseServiceAdapter implements CaseServicePort {
 
-	private final CaseDao caseDao;
+	private final CaseGateway caseGateway;
 
 	public CaseServiceAdapter(CaseDao caseDao) {
-		this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
+		this(new DaoCaseGateway(caseDao));
+	}
+
+	CaseServiceAdapter(CaseGateway caseGateway) {
+		this.caseGateway = Objects.requireNonNull(caseGateway, "caseGateway");
 	}
 
 	@Override
 	public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
-		return Optional.ofNullable(caseDao.getDetail(caseId));
+		return Optional.ofNullable(caseGateway.getDetail(caseId));
 	}
 
 	@Override
 	public Optional<CaseOverviewDto> getCaseOverview(long caseId, int shaleClientId) {
-		return Optional.ofNullable(caseDao.getOverview(caseId));
+		return Optional.ofNullable(caseGateway.getOverview(caseId));
 	}
 
 	@Override
 	public List<CaseOverviewDto> searchCases(String query, int shaleClientId, int limit) {
 		int resolvedLimit = limit <= 0 ? 25 : limit;
-		return caseDao.searchCasesByName(query).stream()
+		return caseGateway.searchCasesByName(query).stream()
 				.limit(resolvedLimit)
 				.map(CaseDao.CaseRow::id)
-				.map(caseDao::getOverview)
+				.map(caseGateway::getOverview)
 				.filter(Objects::nonNull)
 				.toList();
 	}
 
 	@Override
 	public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
-		return caseDao.listCaseUpdates(caseId);
+		return caseGateway.listCaseUpdates(caseId);
 	}
 
 	@Override
@@ -57,5 +61,41 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	public CaseDetailDto updateCaseDetails(UpdateCaseDetailsCommand command) {
 		throw new UnsupportedOperationException(
 				"TODO: CaseServiceAdapter.updateCaseDetails requires the full CaseDao update command/row-version contract.");
+	}
+
+	interface CaseGateway {
+		CaseDetailDto getDetail(long caseId);
+
+		CaseOverviewDto getOverview(long caseId);
+
+		List<CaseDao.CaseRow> searchCasesByName(String query);
+
+		List<CaseUpdateDto> listCaseUpdates(long caseId);
+	}
+
+	private record DaoCaseGateway(CaseDao caseDao) implements CaseGateway {
+		private DaoCaseGateway {
+			Objects.requireNonNull(caseDao, "caseDao");
+		}
+
+		@Override
+		public CaseDetailDto getDetail(long caseId) {
+			return caseDao.getDetail(caseId);
+		}
+
+		@Override
+		public CaseOverviewDto getOverview(long caseId) {
+			return caseDao.getOverview(caseId);
+		}
+
+		@Override
+		public List<CaseDao.CaseRow> searchCasesByName(String query) {
+			return caseDao.searchCasesByName(query);
+		}
+
+		@Override
+		public List<CaseUpdateDto> listCaseUpdates(long caseId) {
+			return caseDao.listCaseUpdates(caseId);
+		}
 	}
 }

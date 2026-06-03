@@ -71,7 +71,20 @@ A first set of implementation adapters now lives in `shale-data` under `com.shal
 - `ContactServiceAdapter` delegates search/detail/create/update/delete operations to `ContactDao` and maps between the port records and existing contact DAO request/row types.
 - `NotificationServiceAdapter` delegates unread/read/dismiss operations to `NotificationDao`. Generic notification creation remains a TODO and throws `UnsupportedOperationException` until the port is split into entity/action-specific creation commands matching existing DAO methods.
 
-Next intended adapter step: add focused tests around these adapters with fake/stub DAOs or a test `DbSessionProvider`, then decide whether the placeholder port methods should be narrowed, split, or given richer command/response records before `shale-server` endpoints consume them.
+The adapter tests below cover these seams; the next adapter step is to decide whether placeholder port methods should be narrowed, split, or given richer command/response records before `shale-server` endpoints consume them.
+
+
+## Adapter unit test coverage added in Step 2
+
+Focused `shale-data` unit tests now cover the service adapters without a real database, Spring test context, or JavaFX. Because the existing DAO classes are concrete/final and not trivial to subclass, the adapters expose package-private gateway seams used only by tests while the public constructors still accept the existing DAO/service classes. This keeps production wiring unchanged and documents the current adapter-contract friction.
+
+- `AuthServiceAdapterTest` verifies successful auth delegation and `AuthException` to `Result.fail(...)` mapping.
+- `CaseServiceAdapterTest` verifies case update-list delegation and TODO `UnsupportedOperationException` placeholders for case note/detail writes.
+- `TaskServiceAdapterTest` verifies case-task list delegation, missing-task update failure behavior, and the TODO placeholder for explicit-status task creation.
+- `ContactServiceAdapterTest` verifies contact search row-to-port mapping and empty detail behavior when a contact is not found.
+- `NotificationServiceAdapterTest` verifies unread notification row-to-port mapping and the TODO placeholder for generic notification creation.
+
+The main friction found is that adapter tests need a seam around final DAO classes. The next refactor should either keep these small gateway seams, introduce DAO interfaces for adapter-level mocking, or narrow the port methods so each adapter can be tested through stable, explicit contracts without a database.
 
 ## Logic `shale-server` will likely need from `shale-data`
 
