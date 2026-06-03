@@ -29,13 +29,12 @@ public interface TaskServicePort {
 	List<TaskStatusOptionDto> listStatuses(int shaleClientId);
 
 	/**
-	 * TODO: expand this command as server write endpoints are defined.
+	 * Creates a task with the tenant's default open status, matching the existing
+	 * TaskDao.createTask behavior. Explicit status creation is intentionally not
+	 * exposed until the DAO has a safe create contract for it.
 	 */
-	long createTask(CreateTaskCommand command);
+	long createTaskWithDefaultStatus(CreateTaskCommand command);
 
-	/**
-	 * TODO: expand this command as server write endpoints are defined.
-	 */
 	void updateTask(UpdateTaskCommand command);
 
 	void assignTask(long taskId, int shaleClientId, int userId, int assignedByUserId);
@@ -49,7 +48,6 @@ public interface TaskServicePort {
 			String title,
 			String description,
 			LocalDateTime dueAt,
-			Integer statusId,
 			Integer priorityId,
 			Integer assignedUserId) {
 	}

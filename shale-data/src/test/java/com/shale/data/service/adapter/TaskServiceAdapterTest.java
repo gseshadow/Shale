@@ -2,7 +2,6 @@ package com.shale.data.service.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,13 +32,23 @@ class TaskServiceAdapterTest {
 	}
 
 	@Test
-	void createTaskThrowsTodoWhenExplicitStatusRequested() {
-		TaskServiceAdapter adapter = new TaskServiceAdapter(new FakeTaskGateway(List.of()));
+	void createTaskWithDefaultStatusDelegatesAndAssignsUser() {
+		FakeTaskGateway gateway = new FakeTaskGateway(List.of());
+		gateway.createdTaskId = 700;
+		TaskServiceAdapter adapter = new TaskServiceAdapter(gateway);
 
-		UnsupportedOperationException error = assertThrows(UnsupportedOperationException.class,
-				() -> adapter.createTask(new CreateTaskCommand(123, 42, 7, "Title", "Description", null, 3, 4, null)));
+		long taskId = adapter.createTaskWithDefaultStatus(
+				new CreateTaskCommand(123, 42, 7, "Title", "Description", null, 3, 4));
 
-		assertTrue(error.getMessage().contains("TODO: TaskServiceAdapter.createTask"));
+		assertEquals(700, taskId);
+		assertEquals(42, gateway.lastCreateShaleClientId);
+		assertEquals(123, gateway.lastCreateCaseId);
+		assertEquals("Title", gateway.lastCreateTitle);
+		assertEquals("Description", gateway.lastCreateDescription);
+		assertEquals(3, gateway.lastCreatePriorityId);
+		assertEquals(7, gateway.lastCreateCreatedByUserId);
+		assertEquals(700, gateway.lastAssignedTaskId);
+		assertEquals(4, gateway.lastAssignedUserId);
 	}
 
 	@Test
@@ -64,6 +73,15 @@ class TaskServiceAdapterTest {
 		private long lastCaseId;
 		private int lastShaleClientId;
 		private TaskDao.CaseTaskSort lastCaseTaskSort;
+		private long createdTaskId;
+		private int lastCreateShaleClientId;
+		private long lastCreateCaseId;
+		private String lastCreateTitle;
+		private String lastCreateDescription;
+		private Integer lastCreatePriorityId;
+		private int lastCreateCreatedByUserId;
+		private long lastAssignedTaskId;
+		private int lastAssignedUserId;
 
 		private FakeTaskGateway(List<CaseTaskListItemDto> caseTasks) {
 			this.caseTasks = caseTasks;
@@ -100,12 +118,20 @@ class TaskServiceAdapterTest {
 		@Override
 		public long createTask(int shaleClientId, long caseId, String title, String description,
 				LocalDateTime dueAt, Integer priorityId, int createdByUserId) {
-			return 0;
+			lastCreateShaleClientId = shaleClientId;
+			lastCreateCaseId = caseId;
+			lastCreateTitle = title;
+			lastCreateDescription = description;
+			lastCreatePriorityId = priorityId;
+			lastCreateCreatedByUserId = createdByUserId;
+			return createdTaskId;
 		}
 
 		@Override
 		public boolean addTaskAssignment(long taskId, int shaleClientId, int userId, int assignedByUserId) {
-			return false;
+			lastAssignedTaskId = taskId;
+			lastAssignedUserId = userId;
+			return true;
 		}
 
 		@Override

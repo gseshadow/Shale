@@ -52,12 +52,8 @@ public final class TaskServiceAdapter implements TaskServicePort {
 	}
 
 	@Override
-	public long createTask(CreateTaskCommand command) {
+	public long createTaskWithDefaultStatus(CreateTaskCommand command) {
 		Objects.requireNonNull(command, "command");
-		if (command.statusId() != null) {
-			throw new UnsupportedOperationException(
-					"TODO: TaskServiceAdapter.createTask needs a TaskDao create contract that accepts explicit statusId.");
-		}
 		long taskId = taskGateway.createTask(
 				command.shaleClientId(),
 				command.caseId(),

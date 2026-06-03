@@ -55,10 +55,10 @@ The first concrete setup for shared services is a set of JavaFX-free interfaces 
   - Boundary for contact search/detail/create/update/soft-delete operations.
   - Defines minimal shared records because contact API DTOs do not yet exist in `shale-core` and server code should not depend on `ContactDao` row classes directly.
 - `NotificationServicePort`
-  - Durable notification boundary for unread/read/dismiss/create operations.
+  - Durable notification boundary for unread/read/dismiss operations and specific task/calendar notification creation operations already modeled by `NotificationDao`.
   - Explicitly avoids `shale-ui` notification classes such as `NotificationCenterService`, JavaFX properties, and observable lists.
 
-Next intended adapter step: create thin adapter implementations outside `shale-ui` that delegate to `shale-data` DAOs/services, then switch desktop UI services to consume those adapters only after parity is proven. `shale-server` can then wire the same ports with request-scoped session context.
+Next intended adapter step: keep the thin adapter implementations outside `shale-ui`, then switch desktop UI services to consume those adapters only after parity is proven. `shale-server` can then wire the same ports with request-scoped session context.
 
 
 ## Thin data adapters added in Step 2
@@ -66,12 +66,12 @@ Next intended adapter step: create thin adapter implementations outside `shale-u
 A first set of implementation adapters now lives in `shale-data` under `com.shale.data.service.adapter`. These classes implement the `shale-core` service ports without changing desktop wiring and without adding Spring or JavaFX dependencies.
 
 - `AuthServiceAdapter` delegates `AuthServicePort.authenticate(...)` to the existing `shale-data` `AuthService` and maps `AuthException` to `Result.fail(...)`.
-- `CaseServiceAdapter` delegates safe read/search methods to `CaseDao` (`getDetail`, `getOverview`, `searchCasesByName`, and `listCaseUpdates`). Placeholder write methods still throw `UnsupportedOperationException` because the port commands do not yet model the full existing note/update return and row-version contracts.
-- `TaskServiceAdapter` delegates task list/detail/priority/status/assignment methods to `TaskDao`. `createTask(...)` delegates only when no explicit status is requested; explicit status creation remains a TODO because the current DAO create method resolves the default status internally.
+- `CaseServiceAdapter` delegates safe read/search methods to `CaseDao` (`getDetail`, `getOverview`, `searchCasesByName`, and `listCaseUpdates`). Case note writes are narrowed to `addCaseNote(...)`, matching the existing DAO contract that persists the note without returning the inserted id. Case detail writes are narrowed to `updateCaseCoreDetails(...)`, which delegates to `CaseDao.updateCase(...)` for name, number, description, injury date, statute of limitations, and expected row-version. Broader intake/status/practice-area updates are intentionally not exposed until the API contract can cover `CaseDao.updateCaseDetails(...)` completely.
+- `TaskServiceAdapter` delegates task list/detail/priority/status/assignment methods to `TaskDao`. Task creation is narrowed to `createTaskWithDefaultStatus(...)`, matching `TaskDao.createTask(...)`; explicit-status task creation remains unsupported at the port level because the current DAO create method resolves the tenant default status internally.
 - `ContactServiceAdapter` delegates search/detail/create/update/delete operations to `ContactDao` and maps between the port records and existing contact DAO request/row types.
-- `NotificationServiceAdapter` delegates unread/read/dismiss operations to `NotificationDao`. Generic notification creation remains a TODO and throws `UnsupportedOperationException` until the port is split into entity/action-specific creation commands matching existing DAO methods.
+- `NotificationServiceAdapter` delegates unread/read/dismiss operations to `NotificationDao`. The prior generic notification creation placeholder has been split into task-assigned, task-note-added, task-due-date, task-action, and calendar-event-assigned creation methods that map directly to existing DAO methods and return `Optional<Long>` because `NotificationDao` returns `null` for skipped/idempotent creation cases such as blank event keys.
 
-The adapter tests below cover these seams; the next adapter step is to decide whether placeholder port methods should be narrowed, split, or given richer command/response records before `shale-server` endpoints consume them.
+The adapter tests below cover these seams; the next adapter step is to decide whether the intentionally omitted broad case-detail and explicit task-status creation operations should be added to DAOs or modeled as separate, endpoint-specific service commands before `shale-server` consumes them.
 
 
 ## Adapter unit test coverage added in Step 2
@@ -79,12 +79,19 @@ The adapter tests below cover these seams; the next adapter step is to decide wh
 Focused `shale-data` unit tests now cover the service adapters without a real database, Spring test context, or JavaFX. Because the existing DAO classes are concrete/final and not trivial to subclass, the adapters expose package-private gateway seams used only by tests while the public constructors still accept the existing DAO/service classes. This keeps production wiring unchanged and documents the current adapter-contract friction.
 
 - `AuthServiceAdapterTest` verifies successful auth delegation and `AuthException` to `Result.fail(...)` mapping.
-- `CaseServiceAdapterTest` verifies case update-list delegation and TODO `UnsupportedOperationException` placeholders for case note/detail writes.
-- `TaskServiceAdapterTest` verifies case-task list delegation, missing-task update failure behavior, and the TODO placeholder for explicit-status task creation.
+- `CaseServiceAdapterTest` verifies case update-list delegation plus narrowed case-note and optimistic core-detail update delegation.
+- `TaskServiceAdapterTest` verifies case-task list delegation, default-status task creation/assignment delegation, and missing-task update failure behavior.
 - `ContactServiceAdapterTest` verifies contact search row-to-port mapping and empty detail behavior when a contact is not found.
-- `NotificationServiceAdapterTest` verifies unread notification row-to-port mapping and the TODO placeholder for generic notification creation.
+- `NotificationServiceAdapterTest` verifies unread notification row-to-port mapping, specific task-assignment notification creation delegation, and `null` DAO results mapped to `Optional.empty()`.
 
-The main friction found is that adapter tests need a seam around final DAO classes. The next refactor should either keep these small gateway seams, introduce DAO interfaces for adapter-level mocking, or narrow the port methods so each adapter can be tested through stable, explicit contracts without a database.
+The main friction found is that adapter tests need a seam around final DAO classes. The next refactor should either keep these small gateway seams, introduce DAO interfaces for adapter-level mocking, or continue narrowing port methods so each adapter can be tested through stable, explicit contracts without a database.
+
+## Placeholder contract decisions in Step 2
+
+- Case note writes: replaced the vague `long addCaseNote(...)` placeholder with a `void addCaseNote(...)` contract because `CaseDao.addCaseNote(...)` already performs the insert/touch behavior but does not expose the inserted note id. If server endpoints need the id, `CaseDao` needs a deliberate return-value contract first.
+- Case detail writes: replaced the broad `updateCaseDetails(...)` placeholder with `updateCaseCoreDetails(...)` for the exact fields supported by `CaseDao.updateCase(...)` and its required `expectedRowVer`. Full intake/status/practice-area writes remain intentionally omitted until `CaseDao.updateCaseDetails(...)` can be represented without a lossy partial command.
+- Task creation: replaced `createTask(...)` with `createTaskWithDefaultStatus(...)` and removed `statusId` from the command so the port reflects the current DAO behavior. Explicit-status create is not exposed until `TaskDao.createTask(...)` has a safe status-aware overload or the API adopts a create-then-update flow explicitly.
+- Notification creation: replaced generic `createNotification(...)` with specific task/calendar methods matching the existing `NotificationDao` creation methods. These return `Optional<Long>` to preserve the DAO behavior where invalid or duplicate/skipped notification requests can return `null`.
 
 ## Logic `shale-server` will likely need from `shale-data`
 

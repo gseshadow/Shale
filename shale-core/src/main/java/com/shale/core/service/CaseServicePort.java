@@ -1,5 +1,6 @@
 package com.shale.core.service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -10,8 +11,9 @@ import com.shale.core.dto.CaseUpdateDto;
 /**
  * Shared case application boundary for future desktop/server adapters.
  *
- * <p>These signatures mirror the current CaseDao/CaseDetailService read and
- * note capabilities without moving implementations or exposing JavaFX types.</p>
+ * <p>These signatures mirror the current CaseDao/CaseDetailService read,
+ * note, and optimistic core-detail update capabilities without moving
+ * implementations or exposing JavaFX types.</p>
  */
 public interface CaseServicePort {
 
@@ -24,16 +26,18 @@ public interface CaseServicePort {
 	List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
 	/**
-	 * TODO: align this command with existing case update/note behavior before
-	 * exposing server write endpoints.
+	 * Adds a user-authored case note using the existing CaseDao.addCaseNote
+	 * behavior, which persists the note and touches the case but does not expose
+	 * the inserted note id as part of the public DAO contract.
 	 */
-	long addCaseNote(AddCaseNoteCommand command);
+	void addCaseNote(AddCaseNoteCommand command);
 
 	/**
-	 * TODO: replace this placeholder command with a complete shared update DTO
-	 * before wiring shale-server write endpoints.
+	 * Updates only the core case fields currently supported by CaseDao.updateCase.
+	 * Broader intake/status/practice-area writes require a later, complete
+	 * contract around CaseDao.updateCaseDetails and its row-version semantics.
 	 */
-	CaseDetailDto updateCaseDetails(UpdateCaseDetailsCommand command);
+	CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command);
 
 	record AddCaseNoteCommand(
 			long caseId,
@@ -42,13 +46,15 @@ public interface CaseServicePort {
 			String noteText) {
 	}
 
-	record UpdateCaseDetailsCommand(
+	record UpdateCaseCoreDetailsCommand(
 			long caseId,
 			int shaleClientId,
 			int actorUserId,
 			String caseName,
+			String caseNumber,
 			String description,
-			Integer statusId,
-			Integer practiceAreaId) {
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			byte[] expectedRowVer) {
 	}
 }

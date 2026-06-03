@@ -1,5 +1,6 @@
 package com.shale.data.service.adapter;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,15 +53,23 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
-	public long addCaseNote(AddCaseNoteCommand command) {
-		throw new UnsupportedOperationException(
-				"TODO: CaseServiceAdapter.addCaseNote requires a port return type aligned with CaseDao.addCaseNote/addCaseUpdate.");
+	public void addCaseNote(AddCaseNoteCommand command) {
+		Objects.requireNonNull(command, "command");
+		caseGateway.addCaseNote(command.caseId(), command.shaleClientId(), command.noteText(), command.actorUserId());
 	}
 
 	@Override
-	public CaseDetailDto updateCaseDetails(UpdateCaseDetailsCommand command) {
-		throw new UnsupportedOperationException(
-				"TODO: CaseServiceAdapter.updateCaseDetails requires the full CaseDao update command/row-version contract.");
+	public CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command) {
+		Objects.requireNonNull(command, "command");
+		return caseGateway.updateCase(
+				command.caseId(),
+				command.caseName(),
+				command.caseNumber(),
+				command.description(),
+				command.dateOfInjury(),
+				command.statuteOfLimitations(),
+				command.expectedRowVer(),
+				command.actorUserId());
 	}
 
 	interface CaseGateway {
@@ -71,6 +80,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		List<CaseDao.CaseRow> searchCasesByName(String query);
 
 		List<CaseUpdateDto> listCaseUpdates(long caseId);
+
+		void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId);
+
+		CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
+				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId);
 	}
 
 	private record DaoCaseGateway(CaseDao caseDao) implements CaseGateway {
@@ -96,6 +110,17 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public List<CaseUpdateDto> listCaseUpdates(long caseId) {
 			return caseDao.listCaseUpdates(caseId);
+		}
+
+		@Override
+		public void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId) {
+			caseDao.addCaseNote(caseId, shaleClientId, noteText, createdByUserId);
+		}
+
+		@Override
+		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
+				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId) {
+			return caseDao.updateCase(caseId, name, caseNumber, description, incidentDate, solDate, expectedRowVer, actorUserId);
 		}
 	}
 }

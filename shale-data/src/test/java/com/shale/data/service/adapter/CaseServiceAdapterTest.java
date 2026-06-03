@@ -1,9 +1,10 @@
 package com.shale.data.service.adapter;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -13,7 +14,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
-import com.shale.core.service.CaseServicePort.UpdateCaseDetailsCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
 import com.shale.data.dao.CaseDao;
 
 class CaseServiceAdapterTest {
@@ -31,21 +32,64 @@ class CaseServiceAdapterTest {
 	}
 
 	@Test
-	void unsupportedWriteMethodsKeepClearTodoText() {
-		CaseServiceAdapter adapter = new CaseServiceAdapter(new FakeCaseGateway(List.of()));
+	void addCaseNoteDelegatesToExistingDaoContract() {
+		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
+		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
 
-		UnsupportedOperationException noteError = assertThrows(UnsupportedOperationException.class,
-				() -> adapter.addCaseNote(new AddCaseNoteCommand(99, 42, 5, "note")));
-		UnsupportedOperationException updateError = assertThrows(UnsupportedOperationException.class,
-				() -> adapter.updateCaseDetails(new UpdateCaseDetailsCommand(99, 42, 5, "name", "description", 1, 2)));
+		adapter.addCaseNote(new AddCaseNoteCommand(99, 42, 5, " note "));
 
-		assertTrue(noteError.getMessage().contains("TODO: CaseServiceAdapter.addCaseNote"));
-		assertTrue(updateError.getMessage().contains("TODO: CaseServiceAdapter.updateCaseDetails"));
+		assertEquals(99, gateway.lastNoteCaseId);
+		assertEquals(42, gateway.lastNoteShaleClientId);
+		assertEquals(5, gateway.lastNoteCreatedByUserId);
+		assertEquals(" note ", gateway.lastNoteText);
+	}
+
+	@Test
+	void updateCaseCoreDetailsDelegatesWithRowVersion() {
+		CaseDetailDto updated = detail(99, "Updated");
+		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
+		gateway.updatedCase = updated;
+		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
+		byte[] rowVer = new byte[] {1, 2, 3};
+
+		CaseDetailDto actual = adapter.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
+				99, 42, 5, "Updated", "C-1", "description", LocalDate.of(2026, 1, 2),
+				LocalDate.of(2026, 2, 3), rowVer));
+
+		assertSame(updated, actual);
+		assertEquals(99, gateway.lastUpdateCaseId);
+		assertEquals("Updated", gateway.lastUpdateName);
+		assertEquals("C-1", gateway.lastUpdateCaseNumber);
+		assertEquals("description", gateway.lastUpdateDescription);
+		assertEquals(LocalDate.of(2026, 1, 2), gateway.lastUpdateIncidentDate);
+		assertEquals(LocalDate.of(2026, 2, 3), gateway.lastUpdateSolDate);
+		assertArrayEquals(rowVer, gateway.lastUpdateRowVer);
+		assertEquals(5, gateway.lastUpdateActorUserId);
+	}
+
+	private static CaseDetailDto detail(long caseId, String caseName) {
+		return new CaseDetailDto(caseId, "C-1", caseName, "description", "open", null,
+				null, null, null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, LocalDateTime.now(), new byte[] {1});
 	}
 
 	private static final class FakeCaseGateway implements CaseServiceAdapter.CaseGateway {
 		private final List<CaseUpdateDto> caseUpdates;
 		private long lastCaseUpdatesCaseId;
+		private long lastNoteCaseId;
+		private int lastNoteShaleClientId;
+		private String lastNoteText;
+		private Integer lastNoteCreatedByUserId;
+		private CaseDetailDto updatedCase;
+		private long lastUpdateCaseId;
+		private String lastUpdateName;
+		private String lastUpdateCaseNumber;
+		private String lastUpdateDescription;
+		private LocalDate lastUpdateIncidentDate;
+		private LocalDate lastUpdateSolDate;
+		private byte[] lastUpdateRowVer;
+		private Integer lastUpdateActorUserId;
 
 		private FakeCaseGateway(List<CaseUpdateDto> caseUpdates) {
 			this.caseUpdates = caseUpdates;
@@ -70,6 +114,28 @@ class CaseServiceAdapterTest {
 		public List<CaseUpdateDto> listCaseUpdates(long caseId) {
 			lastCaseUpdatesCaseId = caseId;
 			return caseUpdates;
+		}
+
+		@Override
+		public void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId) {
+			lastNoteCaseId = caseId;
+			lastNoteShaleClientId = shaleClientId;
+			lastNoteText = noteText;
+			lastNoteCreatedByUserId = createdByUserId;
+		}
+
+		@Override
+		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
+				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId) {
+			lastUpdateCaseId = caseId;
+			lastUpdateName = name;
+			lastUpdateCaseNumber = caseNumber;
+			lastUpdateDescription = description;
+			lastUpdateIncidentDate = incidentDate;
+			lastUpdateSolDate = solDate;
+			lastUpdateRowVer = expectedRowVer;
+			lastUpdateActorUserId = actorUserId;
+			return updatedCase;
 		}
 	}
 }
