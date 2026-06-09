@@ -25,6 +25,50 @@ The server now models the future request identity flow with JavaFX-free runtime 
 - `ServerRuntimeSessionState` is the controller-facing guard used by DB-backed routes. It fails closed with `501 Not Implemented` when no principal is available.
 - `RequestScopedDbSessionProvider` is the planned DAO-facing provider. It does not open connections today; future work should make it borrow a runtime connection and set SQL Server `SESSION_CONTEXT` before DAO calls.
 
+
+## Login route skeleton
+
+Step 3 now defines the initial browser/mobile credential-validation route shape:
+
+- `POST /api/auth/login`
+- Request JSON:
+
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "plain-text password supplied by the client"
+  }
+  ```
+
+- The controller calls `AuthServicePort.authenticate(email, password)` and does not log or echo the password.
+- On successful credential validation, the route returns a temporary response with non-sensitive identity fields only:
+
+  ```json
+  {
+    "authenticated": true,
+    "userId": 123,
+    "shaleClientId": 456,
+    "displayName": "Example User",
+    "nameFirst": "Example",
+    "nameLast": "User",
+    "todo": "TODO: token/session issuance is not implemented yet; this route only validates credentials."
+  }
+  ```
+
+  `displayName`, `nameFirst`, and `nameLast` are derived from the authenticated `User` when those name fields are available. The response intentionally does **not** include password hashes, JWTs, session ids, cookie values, or other sensitive fields.
+
+- On credential failure, the route returns `401 Unauthorized` with a safe response that does not disclose whether the email exists or expose adapter/database-specific failure details:
+
+  ```json
+  {
+    "authenticated": false,
+    "error": "invalid_credentials",
+    "message": "Invalid email or password."
+  }
+  ```
+
+The route is only a local server API skeleton. It validates credentials through the existing auth port, but it does **not** create browser session cookies, issue JWTs, or mark future DB-backed read requests as authenticated.
+
 ## Intended future flow
 
 1. Browser/mobile authenticates with a server endpoint.
@@ -55,7 +99,9 @@ Until that server runtime context exists, DB-backed endpoints must fail closed i
 
 ## Remaining blockers before enabling DB-backed reads
 
-- Define browser/mobile authentication and session issuance.
+- Decide and implement browser/mobile session/token issuance after credential validation.
+- Persist/verify issued browser/mobile sessions or tokens and map them back to a Shale user and tenant.
+- Add cookie/JWT security decisions, including expiration, rotation, revocation, CSRF posture for cookies, and secure transport requirements.
 - Resolve tenant and principal user from each authenticated HTTP request.
 - Implement request-scoped runtime datasource access in `RequestScopedDbSessionProvider`.
 - Set SQL Server `SESSION_CONTEXT` before DAO/service-port calls and clear/close the scoped connection safely afterward.
@@ -64,6 +110,7 @@ Until that server runtime context exists, DB-backed endpoints must fail closed i
 
 ## Test coverage added
 
+- Controller tests verify `POST /api/auth/login` calls `AuthServicePort.authenticate(email, password)`, returns the temporary non-sensitive success shape, returns safe `401 Unauthorized` failures, and does not create browser session cookies.
 - Controller routing tests verify `/api/health` still returns `{ "status": "ok" }`.
 - Controller routing tests verify each DB-backed route returns `501 Not Implemented` with a clear TODO message while server auth/session context is unavailable.
 - Configuration tests verify the Spring configuration constructs the shared service port adapter beans and request/session skeleton beans without opening a database connection.
