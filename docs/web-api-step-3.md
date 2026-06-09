@@ -102,55 +102,19 @@ Step 3 also includes a temporary development-only request-context simulation so 
 
 Without valid development headers, the endpoint returns the same fail-closed `501 Not Implemented` response as other guarded endpoints.
 
-### First read endpoint enabled through the context path
+### Read endpoints enabled through the context path
 
-`GET /api/notifications/unread` now uses the resolved `ServerRuntimeSessionState` principal for `userId` and `shaleClientId`. In the default profile it remains blocked because no principal is resolved. In the `dev` profile, valid temporary headers allow the controller to call `NotificationServicePort.listUnreadNotifications(shaleClientId, userId)`, and the DAO-backed adapter obtains a runtime connection with SQL `SESSION_CONTEXT` initialized before executing the query.
+The existing read-only API endpoints now use the resolved `ServerRuntimeSessionState` principal before routing to service ports:
+
+- `GET /api/cases/search?query=` calls `CaseServicePort.searchCases(query, shaleClientId, 25)`.
+- `GET /api/cases/{caseId}` calls `CaseServicePort.getCaseDetail(caseId, shaleClientId)`.
+- `GET /api/cases/{caseId}/tasks` calls `TaskServicePort.listCaseTasks(caseId, shaleClientId)`.
+- `GET /api/contacts/search?query=` calls `ContactServicePort.searchContacts(shaleClientId, query, 25)`.
+- `GET /api/notifications/unread` calls `NotificationServicePort.listUnreadNotifications(shaleClientId, userId)`.
+
+In the default profile these endpoints remain blocked because no principal is resolved. In the `dev` profile, valid temporary headers allow the controller to route to the service port, and DAO-backed adapters obtain a runtime connection with SQL `SESSION_CONTEXT` initialized before executing read queries.
 
 This is still not browser/mobile authentication: no JWTs, browser session cookies, Azure auth, durable sessions, or token validation have been implemented.
-
-
-## Login route skeleton
-
-Step 3 now defines the initial browser/mobile credential-validation route shape:
-
-- `POST /api/auth/login`
-- Request JSON:
-
-  ```json
-  {
-    "email": "user@example.com",
-    "password": "plain-text password supplied by the client"
-  }
-  ```
-
-- The controller calls `AuthServicePort.authenticate(email, password)` and does not log or echo the password.
-- On successful credential validation, the route returns a temporary response with non-sensitive identity fields only:
-
-  ```json
-  {
-    "authenticated": true,
-    "userId": 123,
-    "shaleClientId": 456,
-    "displayName": "Example User",
-    "nameFirst": "Example",
-    "nameLast": "User",
-    "todo": "TODO: token/session issuance is not implemented yet; this route only validates credentials."
-  }
-  ```
-
-  `displayName`, `nameFirst`, and `nameLast` are derived from the authenticated `User` when those name fields are available. The response intentionally does **not** include password hashes, JWTs, session ids, cookie values, or other sensitive fields.
-
-- On credential failure, the route returns `401 Unauthorized` with a safe response that does not disclose whether the email exists or expose adapter/database-specific failure details:
-
-  ```json
-  {
-    "authenticated": false,
-    "error": "invalid_credentials",
-    "message": "Invalid email or password."
-  }
-  ```
-
-The route is only a local server API skeleton. It validates credentials through the existing auth port, but it does **not** create browser session cookies, issue JWTs, or mark future DB-backed read requests as authenticated.
 
 ## Intended future flow
 
@@ -172,7 +136,7 @@ The server has route handlers for the first safe read surface:
 - `GET /api/contacts/search?query=`
 - `GET /api/notifications/unread`
 
-Only `/api/health` returns live data in the default profile. The DB-backed read routes currently return `501 Not Implemented` with a TODO message because `UnauthenticatedServerSessionResolver` does not provide authenticated tenant/user context. Under the temporary `dev` profile, `GET /api/notifications/unread` can be exercised with development headers to prove the authenticated request-context and runtime `SESSION_CONTEXT` path.
+Only `/api/health` returns live data in the default profile. The DB-backed read routes currently return `501 Not Implemented` with a TODO message because `UnauthenticatedServerSessionResolver` does not provide authenticated tenant/user context. Under the temporary `dev` profile, the read-only case search, case detail, case task list, contact search, and unread notification endpoints can be exercised with development headers to prove the authenticated request-context and runtime `SESSION_CONTEXT` path.
 
 ## Why DB-backed endpoints fail closed
 
@@ -196,7 +160,7 @@ Until that server runtime context exists, DB-backed endpoints must fail closed i
 - Controller tests verify `POST /api/auth/login` calls `AuthServicePort.authenticate(email, password)`, returns the temporary non-sensitive success shape, returns safe `401 Unauthorized` failures, and does not create browser session cookies.
 - Development resolver tests verify missing headers remain blocked and valid `X-Shale-UserId` / `X-Shale-TenantId` headers create a `ServerPrincipal`.
 - Request-scoped DB provider tests verify missing principals block DB access, valid development principals invoke the runtime connection provider, and `RuntimeSessionServiceConnectionProvider` uses the desktop `SESSION_CONTEXT` initialization SQL for `ShaleClientId` and `PrincipalUserId`.
-- Controller tests verify `GET /api/dev/whoami` returns the resolved development principal and `GET /api/notifications/unread` reaches the service layer under authenticated development request context.
+- Controller tests verify `GET /api/dev/whoami` returns the resolved development principal and every read-only DB-backed route reaches its service port under authenticated development request context: case search, case detail, case tasks, contact search, and unread notifications.
 - Controller routing tests verify `/api/health` still returns `{ "status": "ok" }`.
 - Controller routing tests verify each DB-backed route returns `501 Not Implemented` with a clear TODO message while server auth/session context is unavailable.
 - Configuration tests verify the Spring configuration constructs the shared service port adapter beans and request/session skeleton beans without opening a database connection.
