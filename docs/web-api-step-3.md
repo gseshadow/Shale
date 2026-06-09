@@ -108,6 +108,50 @@ Without valid development headers, the endpoint returns the same fail-closed `50
 
 This is still not browser/mobile authentication: no JWTs, browser session cookies, Azure auth, durable sessions, or token validation have been implemented.
 
+
+## Login route skeleton
+
+Step 3 now defines the initial browser/mobile credential-validation route shape:
+
+- `POST /api/auth/login`
+- Request JSON:
+
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "plain-text password supplied by the client"
+  }
+  ```
+
+- The controller calls `AuthServicePort.authenticate(email, password)` and does not log or echo the password.
+- On successful credential validation, the route returns a temporary response with non-sensitive identity fields only:
+
+  ```json
+  {
+    "authenticated": true,
+    "userId": 123,
+    "shaleClientId": 456,
+    "displayName": "Example User",
+    "nameFirst": "Example",
+    "nameLast": "User",
+    "todo": "TODO: token/session issuance is not implemented yet; this route only validates credentials."
+  }
+  ```
+
+  `displayName`, `nameFirst`, and `nameLast` are derived from the authenticated `User` when those name fields are available. The response intentionally does **not** include password hashes, JWTs, session ids, cookie values, or other sensitive fields.
+
+- On credential failure, the route returns `401 Unauthorized` with a safe response that does not disclose whether the email exists or expose adapter/database-specific failure details:
+
+  ```json
+  {
+    "authenticated": false,
+    "error": "invalid_credentials",
+    "message": "Invalid email or password."
+  }
+  ```
+
+The route is only a local server API skeleton. It validates credentials through the existing auth port, but it does **not** create browser session cookies, issue JWTs, or mark future DB-backed read requests as authenticated.
+
 ## Intended future flow
 
 1. Browser/mobile authenticates with a server endpoint.
