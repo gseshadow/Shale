@@ -6,7 +6,7 @@
 
     <groupId>com.shale</groupId>
     <artifactId>shale-parent</artifactId>
-    <version>1.0.87</version>
+    <version>1.0.89</version>
     <packaging>pom</packaging>
 
     <name>Shale</name>
@@ -42,6 +42,7 @@
         <module>shale-ui</module>
         <module>shale-desktop</module>
         <module>shale-updater</module>
+        <module>shale-server</module>
     </modules>
 
     <dependencyManagement>

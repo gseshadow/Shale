@@ -72,6 +72,8 @@ import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import javafx.stage.Window;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.services.UiUpdateLauncher.UpdateCheckResult;
@@ -85,6 +87,8 @@ import com.shale.ui.notification.AssignedUserTaskDueNotificationRecipientResolve
 import com.shale.ui.notification.TaskDueDateNotificationGenerator;
 
 public final class SceneManager {
+	private static final Logger log = LoggerFactory.getLogger(SceneManager.class);
+
 	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 
 	private final Stage stage;
@@ -105,8 +109,11 @@ public final class SceneManager {
 	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
 	private final UpdatePollingService updatePollingService;
 	private final PhiReadAuditService phiReadAuditService;
+	private final ExecutorService notificationBadgeCountExecutor;
 	private final ExecutorService notificationStartupExecutor;
 	private final AtomicLong notificationStartupGeneration = new AtomicLong(0);
+	private final AtomicLong notificationBadgeCountGeneration = new AtomicLong(0);
+	private volatile Future<?> notificationBadgeCountFuture;
 	private volatile Future<?> notificationStartupFuture;
 
 	public SceneManager(Stage stage,
@@ -131,6 +138,11 @@ public final class SceneManager {
 				appState,
 				notificationPreferencesService,
 				new AssignedUserTaskDueNotificationRecipientResolver());
+		this.notificationBadgeCountExecutor = Executors.newSingleThreadExecutor(r -> {
+			Thread t = new Thread(r, "notification-badge-count-worker");
+			t.setDaemon(true);
+			return t;
+		});
 		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r -> {
 			Thread t = new Thread(r, "notification-startup-worker");
 			t.setDaemon(true);
@@ -155,6 +167,12 @@ public final class SceneManager {
 
 	public void showLogin() {
 		notificationStartupGeneration.incrementAndGet();
+		notificationBadgeCountGeneration.incrementAndGet();
+		Future<?> badgeCountFuture = notificationBadgeCountFuture;
+		if (badgeCountFuture != null) {
+			badgeCountFuture.cancel(true);
+			notificationBadgeCountFuture = null;
+		}
 		Future<?> startupFuture = notificationStartupFuture;
 		if (startupFuture != null) {
 			startupFuture.cancel(true);
@@ -186,6 +204,7 @@ public final class SceneManager {
 		});
 		setScene(root, "Shale");
 		Platform.runLater(() -> System.out.println("[StartupTiming] main shell visible"));
+		startNotificationBadgeCountAsync();
 		notificationPreferencesService.refreshActivePreferences();
 		liveUpdateNotificationBridge.start();
 		connectivityNotificationProducer.start();
@@ -200,6 +219,45 @@ public final class SceneManager {
 		System.out.println("[StartupTiming] showMain critical path complete in " + showMainEndMs + " ms");
 	}
 
+	private void startNotificationBadgeCountAsync() {
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
+			return;
+		}
+		long generation = notificationBadgeCountGeneration.incrementAndGet();
+		Future<?> existingFuture = notificationBadgeCountFuture;
+		if (existingFuture != null) {
+			existingFuture.cancel(true);
+		}
+		notificationBadgeCountFuture = notificationBadgeCountExecutor.submit(() -> {
+			long startNanos = System.nanoTime();
+			log.info("PERF notifications.badge.count.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
+			try {
+				int unreadCount = durableNotificationService.countUnread(shaleClientId, userId);
+				long queryElapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+				if (!isActiveBadgeSession(generation, shaleClientId, userId)) {
+					log.info("PERF notifications.badge.count.discard tenantId={} userId={} generation={} unreadCount={} elapsedMs={}",
+							shaleClientId, userId, generation, unreadCount, queryElapsedMs);
+					return;
+				}
+				Platform.runLater(() -> {
+					if (!isActiveBadgeSession(generation, shaleClientId, userId)) {
+						log.info("PERF notifications.badge.count.applySkipped tenantId={} userId={} generation={} unreadCount={}",
+								shaleClientId, userId, generation, unreadCount);
+						return;
+					}
+					notificationCenterService.applyServerUnreadCount(unreadCount);
+					long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+					log.info("PERF notifications.badge.count.done tenantId={} userId={} generation={} unreadCount={} elapsedMs={}",
+							shaleClientId, userId, generation, unreadCount, elapsedMs);
+				});
+			} catch (RuntimeException ex) {
+				log.error("Notification badge count load failed tenantId={} userId={} generation={}", shaleClientId, userId, generation, ex);
+			}
+		});
+	}
+
 	private void startNotificationBootstrapAsync() {
 		Integer shaleClientId = appState.getShaleClientId();
 		Integer userId = appState.getUserId();
@@ -209,36 +267,52 @@ public final class SceneManager {
 		long generation = notificationStartupGeneration.incrementAndGet();
 		notificationStartupFuture = notificationStartupExecutor.submit(() -> {
 			long bootstrapStartNanos = System.nanoTime();
-			System.out.println("[StartupTiming] notification bootstrap start");
+			log.info("PERF notifications.bootstrap.full.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
 			try {
 				long dueStartNanos = System.nanoTime();
 				taskDueDateNotificationGenerator.runOnce();
 				long dueElapsedMs = (System.nanoTime() - dueStartNanos) / 1_000_000;
-				System.out.println("[StartupTiming] due-date initial pass complete in " + dueElapsedMs + " ms");
+				log.info("PERF notifications.bootstrap.dueDate.done tenantId={} userId={} generation={} elapsedMs={}",
+						shaleClientId, userId, generation, dueElapsedMs);
 
 				long hydrateStartNanos = System.nanoTime();
 				var unread = durableNotificationService.listUnread(shaleClientId, userId);
 				long hydrateElapsedMs = (System.nanoTime() - hydrateStartNanos) / 1_000_000;
-				System.out.println("[StartupTiming] durable notification load complete in " + hydrateElapsedMs + " ms");
+				log.info("PERF notifications.bootstrap.hydrate.done tenantId={} userId={} generation={} count={} elapsedMs={}",
+						shaleClientId, userId, generation, unread.size(), hydrateElapsedMs);
 
 				if (!isActiveSession(generation, shaleClientId, userId)) {
-					System.out.println("[StartupTiming] notification bootstrap discarded (session changed)");
+					log.info("PERF notifications.bootstrap.full.discard tenantId={} userId={} generation={} reason=session_changed",
+							shaleClientId, userId, generation);
 					return;
 				}
 				Platform.runLater(() -> {
 					if (!isActiveSession(generation, shaleClientId, userId)) {
-						System.out.println("[StartupTiming] notification UI apply skipped (session changed)");
+						log.info("PERF notifications.bootstrap.full.applySkipped tenantId={} userId={} generation={} reason=session_changed",
+								shaleClientId, userId, generation);
 						return;
 					}
 					durableNotificationService.pushLoaded(notificationCenterService, unread);
+					notificationCenterService.completeInitialHydration();
+					notificationBadgeCountGeneration.incrementAndGet();
 					long bootstrapElapsedMs = (System.nanoTime() - bootstrapStartNanos) / 1_000_000;
-					System.out.println("[StartupTiming] notification bootstrap applied in " + bootstrapElapsedMs + " ms");
+					log.info("PERF notifications.bootstrap.full.done tenantId={} userId={} generation={} hydratedCount={} elapsedMs={}",
+							shaleClientId, userId, generation, unread.size(), bootstrapElapsedMs);
 				});
 			} catch (RuntimeException ex) {
-				System.err.println("[StartupTiming] notification bootstrap failed: " + ex.getMessage());
-				ex.printStackTrace(System.err);
+				log.error("Notification full bootstrap failed tenantId={} userId={} generation={}", shaleClientId, userId, generation, ex);
 			}
 		});
+	}
+
+	private boolean isActiveBadgeSession(long generation, int expectedShaleClientId, int expectedUserId) {
+		Integer currentShaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		return generation == notificationBadgeCountGeneration.get()
+				&& currentShaleClientId != null
+				&& currentUserId != null
+				&& currentShaleClientId == expectedShaleClientId
+				&& currentUserId == expectedUserId;
 	}
 
 	private boolean isActiveSession(long generation, int expectedShaleClientId, int expectedUserId) {
@@ -488,7 +562,11 @@ public final class SceneManager {
 			CasesController c = (CasesController) controller;
 
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			c.init(appState, runtimeBridge, caseDao, onOpenCase);
+			TaskDao taskDao = new TaskDao(dbSessionProvider);
+			UserDao userDao = new UserDao(dbSessionProvider);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
+			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase);
 			return c;
 		});
 	}
@@ -593,9 +671,11 @@ public final class SceneManager {
 					caseDao,
 					new ContactDao(dbSessionProvider),
 					new OrganizationDao(dbSessionProvider),
-					new UserDao(dbSessionProvider));
+					new UserDao(dbSessionProvider),
+					new TaskDao(dbSessionProvider),
+					new CalendarEventDao(dbSessionProvider));
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
-			c.init(appState, searchService, caseDetailService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
+			c.init(appState, searchService, caseDetailService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser, this::openTaskProfile, this::openCalendarEventFromNotification);
 			return c;
 		});
 	}

@@ -1,9 +1,12 @@
 package com.shale.ui.controller;
 
 import com.shale.core.model.Organization;
+import com.shale.core.model.CalendarFeedItem;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.UserDao;
+import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.CalendarEventDao;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.ContactCardFactory;
@@ -11,6 +14,8 @@ import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
+import com.shale.ui.component.factory.TaskCardFactory;
+import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.SearchService;
@@ -39,6 +44,8 @@ public final class SearchController {
 	private static final double CONTACT_CARD_WIDTH = 340;
 	private static final double ORGANIZATION_CARD_WIDTH = 340;
 	private static final double USER_CARD_WIDTH = 280;
+	private static final double TASK_CARD_WIDTH = 340;
+	private static final double EVENT_CARD_WIDTH = 340;
 
 	@FXML
 	private Label searchSummaryLabel;
@@ -66,6 +73,14 @@ public final class SearchController {
 	private FlowPane usersFlow;
 	@FXML
 	private Label usersEmptyLabel;
+	@FXML
+	private FlowPane tasksFlow;
+	@FXML
+	private Label tasksEmptyLabel;
+	@FXML
+	private FlowPane calendarEventsFlow;
+	@FXML
+	private Label calendarEventsEmptyLabel;
 
 	private AppState appState;
 	private SearchService searchService;
@@ -76,6 +91,10 @@ public final class SearchController {
 	private ContactCardFactory contactCardFactory;
 	private OrganizationCardFactory organizationCardFactory;
 	private UserCardFactory userCardFactory;
+	private TaskCardFactory taskCardFactory;
+	private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
+	private Consumer<Long> onOpenTask = id -> {};
+	private Consumer<Long> onOpenCalendarEvent = id -> {};
 	private int loadGeneration = 0;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
@@ -94,7 +113,9 @@ public final class SearchController {
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenContact,
 			Consumer<Integer> onOpenOrganization,
-			Consumer<Integer> onOpenUser) {
+			Consumer<Integer> onOpenUser,
+			Consumer<Long> onOpenTask,
+			Consumer<Long> onOpenCalendarEvent) {
 		this.appState = appState;
 		this.searchService = searchService;
 		this.caseDetailService = caseDetailService;
@@ -108,6 +129,9 @@ public final class SearchController {
 		} : onOpenOrganization);
 		this.userCardFactory = new UserCardFactory(onOpenUser == null ? id -> {
 		} : onOpenUser);
+		this.onOpenTask = onOpenTask == null ? id -> { } : onOpenTask;
+		this.onOpenCalendarEvent = onOpenCalendarEvent == null ? id -> { } : onOpenCalendarEvent;
+		this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id -> { }, onOpenCase == null ? id -> { } : onOpenCase, id -> { });
 	}
 
 	@FXML
@@ -117,6 +141,8 @@ public final class SearchController {
 		configureFlow(contactsFlow, 16, 16, 1040);
 		configureFlow(organizationsFlow, 16, 16, 1040);
 		configureFlow(usersFlow, 16, 16, 1040);
+		configureFlow(tasksFlow, 16, 16, 1040);
+		configureFlow(calendarEventsFlow, 16, 16, 1040);
 		Platform.runLater(this::loadResults);
 		if (casesFlow != null) {
 			casesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -180,7 +206,7 @@ public final class SearchController {
 		updateLoadingState(true);
 		dbExec.submit(() -> {
 			try {
-				SearchService.SearchResults results = searchService.searchAll(tenantId, trimmedQuery, canViewDeletedCasesInSearch());
+				SearchService.SearchResults results = searchService.searchAll(tenantId, appState == null ? null : appState.getUserId(), trimmedQuery, canViewDeletedCasesInSearch());
 				Platform.runLater(() -> {
 					if (generationAtSubmit != loadGeneration) {
 						return;
@@ -209,6 +235,11 @@ public final class SearchController {
 		renderContacts(results.contacts());
 		renderOrganizations(results.organizations());
 		renderUsers(results.users());
+		renderTasks(results.tasks());
+		renderCalendarEvents(results.calendarEvents());
+		if (searchSummaryLabel != null && results.hasFailures()) {
+			searchSummaryLabel.setText(results.hasAnyResults() ? "Some search result sections could not be loaded." : "Unable to load search results right now.");
+		}
 	}
 
 	private void renderDeletedCases(List<CaseDao.CaseRow> deletedCases) {
@@ -328,6 +359,69 @@ public final class SearchController {
 				.toList();
 		usersFlow.getChildren().setAll(cards);
 		updateSectionState(usersFlow, usersEmptyLabel, cards.isEmpty());
+	}
+
+	private void renderTasks(List<TaskDao.GlobalSearchTaskRow> tasks) {
+		if (tasksFlow == null) return;
+		List<Node> cards = tasks.stream().map(row -> {
+			var assignedUsers = row.assignedUserId() == null
+					? List.<TaskCardFactory.AssignedUserModel>of()
+					: List.of(new TaskCardFactory.AssignedUserModel(row.assignedUserId(), row.assignedUserDisplayName(), null));
+			String description = "Status: " + safe(row.statusName()) + (safe(row.description()).equals("—") ? "" : "\n" + row.description());
+			var card = taskCardFactory.create(new TaskCardFactory.TaskCardModel(
+					row.taskId(),
+					row.caseId() <= 0 ? null : row.caseId(),
+					row.caseName(),
+					null,
+					null,
+					null,
+					row.title(),
+					description,
+					null,
+					null,
+					row.dueAt(),
+					row.completedAt(),
+					assignedUsers), TaskCardFactory.Variant.FULL, true);
+			card.setPrefWidth(TASK_CARD_WIDTH); card.setMaxWidth(TASK_CARD_WIDTH);
+			return (Node) card;
+		}).toList();
+		tasksFlow.getChildren().setAll(cards);
+		updateSectionState(tasksFlow, tasksEmptyLabel, cards.isEmpty());
+	}
+
+	private void renderCalendarEvents(List<CalendarEventDao.GlobalSearchCalendarEventRow> events) {
+		if (calendarEventsFlow == null) return;
+		List<Node> cards = events.stream().map(row -> {
+			CalendarFeedItem item = new CalendarFeedItem(
+					"EVENT:" + safe(row.calendarEventId()),
+					row.title(),
+					row.startsAt(),
+					row.endsAt(),
+					false,
+					"MANUAL",
+					null,
+					row.caseId(),
+					null,
+					row.caseName(),
+					null,
+					"Event",
+					null,
+					null);
+			Node eventCard = calendarEventCardFactory.create(item, java.time.LocalDate.now(), java.time.LocalDateTime.now());
+			VBox container = new VBox(4, eventCard);
+			container.getStyleClass().add("search-calendar-event-result");
+			if (!safe(row.location()).equals("—")) container.getChildren().add(new Label("Location: " + row.location()));
+			container.setOnMouseClicked(e -> onOpenCalendarEvent.accept(row.calendarEventId() == null ? 0L : row.calendarEventId().longValue()));
+			container.setPrefWidth(EVENT_CARD_WIDTH); container.setMaxWidth(EVENT_CARD_WIDTH);
+			return (Node) container;
+		}).toList();
+		calendarEventsFlow.getChildren().setAll(cards);
+		updateSectionState(calendarEventsFlow, calendarEventsEmptyLabel, cards.isEmpty());
+	}
+
+	private static String safe(Object value) {
+		String text = value == null ? "" : value.toString().trim();
+		return text.isBlank() ? "—" : text;
 	}
 
 	private void onRestoreCase(CaseDao.CaseRow row) {

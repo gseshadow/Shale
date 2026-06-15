@@ -47,9 +47,12 @@ echo
 
 echo "Step 0: Force sync repo to origin/$BRANCH"
 git fetch origin
-git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"
 git clean -fd
+git checkout -B "$BRANCH" "origin/$BRANCH"
+git reset --hard "origin/$BRANCH"
+git clean -fd
+PREVIOUS_VERSION=$(python3 "$ROOT/build/scripts/preflight-version.py" "$ROOT" --print-root-version)
 
 echo
 echo "Step 2: Update root pom version"
@@ -91,6 +94,7 @@ child_poms = [
     root / "shale-ui" / "pom.xml",
     root / "shale-desktop" / "pom.xml",
     root / "shale-updater" / "pom.xml",
+    root / "shale-server" / "pom.xml",
 ]
 
 pattern = re.compile(
@@ -114,12 +118,14 @@ for pom in \
   "$ROOT/shale-data/pom.xml" \
   "$ROOT/shale-ui/pom.xml" \
   "$ROOT/shale-desktop/pom.xml" \
-  "$ROOT/shale-updater/pom.xml"; do
+  "$ROOT/shale-updater/pom.xml" \
+  "$ROOT/shale-server/pom.xml"; do
   grep -n "<version>$VERSION</version>" "$pom" >/dev/null || {
     echo "Version verification failed for $pom" >&2
     exit 1
   }
 done
+python3 "$ROOT/build/scripts/preflight-version.py" "$ROOT" "$PREVIOUS_VERSION"
 
 echo
 echo "Step 5: Clean old mac outputs"

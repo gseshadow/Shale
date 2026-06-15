@@ -12,11 +12,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.component.dialog.NewTaskDialog;
 import com.shale.ui.controller.support.CaseListUiSupport;
+import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
@@ -24,14 +27,43 @@ import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.control.Alert;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.CheckMenuItem;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TableRow;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.animation.PauseTransition;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.FXCollections;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
+import javafx.util.Duration;
 
 public final class CasesController {
+
+	private static final int LATEST_CASE_UPDATE_PREVIEW_LIMIT = 100;
+	private static final int DESCRIPTION_PREVIEW_LIMIT = 100;
+	private static final int OPPOSING_PARTIES_PREVIEW_LIMIT = 80;
+	private static final double FULL_VALUE_TOOLTIP_MAX_WIDTH = 600.0;
 
 	// Existing controls (keep these IDs in FXML)
 	@FXML
@@ -42,6 +74,14 @@ public final class CasesController {
 	private MenuButton statusFilterMenuButton;
 	@FXML
 	private Label resultsCountLabel;
+	@FXML
+	private ToggleButton cardsViewToggle;
+	@FXML
+	private ToggleButton gridViewToggle;
+	@FXML
+	private MenuButton columnMenuButton;
+	@FXML
+	private TableView<CaseCardVm> casesTable;
 
 	// NEW: FlowPane layout (add these IDs in FXML)
 	@FXML
@@ -50,6 +90,7 @@ public final class CasesController {
 	private FlowPane casesFlow;
 
 	private CaseDao caseDao;
+	private CaseTaskService caseTaskService;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 
@@ -62,11 +103,14 @@ public final class CasesController {
 	private int resultsCountGeneration = 0;
 	private String lastCountQuery;
 	private Set<Integer> lastCountStatuses;
+	private long lastCountTotal = -1;
+	private PauseTransition searchDebounce;
 
 	// Loaded items (we keep these so search/sort can re-render)
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 
 	private CaseCardFactory caseCardFactory;
+	private Consumer<Integer> onOpenCase;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
 
@@ -88,10 +132,13 @@ public final class CasesController {
 	public void init(AppState appState,
 			UiRuntimeBridge runtimeBridge,
 			CaseDao caseDao,
+			CaseTaskService caseTaskService,
 			Consumer<Integer> onOpenCase) {
 		System.out.println("CasesController.init()");
 		PerfLog.log("CTRL", "start", "controller=CasesController page=cases_list");
 		this.caseDao = caseDao;
+		this.caseTaskService = caseTaskService;
+		this.onOpenCase = onOpenCase;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
@@ -112,17 +159,33 @@ public final class CasesController {
 					"Case name (A–Z)",
 					"Case name (Z–A)",
 					"Responsible attorney (A–Z)",
-					"Responsible attorney (Z–A)"
+					"Responsible attorney (Z–A)",
+					"Case Status (A–Z)",
+					"Case Status (Z–A)"
 			);
 			casesSortChoice.getSelectionModel().select(0);
 			casesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> loadFirstPage());
 		}
 
-		// search filter
+		// search filter: debounce and restart the SQL-backed query instead of filtering loaded pages.
 		if (casesSearchField != null) {
-			casesSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
+			searchDebounce = new PauseTransition(Duration.millis(300));
+			searchDebounce.setOnFinished(event -> loadFirstPage());
+			casesSearchField.textProperty().addListener((obs, oldV, newV) -> {
+				if (Objects.equals(oldV, newV)) {
+					return;
+				}
+				loadGeneration++;
+				loading = false;
+				if (searchDebounce != null) {
+					searchDebounce.playFromStart();
+				}
+			});
 		}
 
+		initializeViewToggle();
+		initializeGridColumns();
+		initializeGridRowActions();
 		initializeStatusFilter();
 
 		Platform.runLater(() ->
@@ -145,6 +208,247 @@ public final class CasesController {
 		}
 
 		subscribeLiveCaseUpdates();
+	}
+
+	private void initializeViewToggle() {
+		if (cardsViewToggle == null || gridViewToggle == null) return;
+		ToggleGroup group = new ToggleGroup();
+		cardsViewToggle.setToggleGroup(group);
+		gridViewToggle.setToggleGroup(group);
+		group.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+			if (newToggle == null) { cardsViewToggle.setSelected(true); return; }
+			boolean grid = newToggle == gridViewToggle;
+			if (casesScroll != null) { casesScroll.setVisible(!grid); casesScroll.setManaged(!grid); }
+			if (casesTable != null) { casesTable.setVisible(grid); casesTable.setManaged(grid); }
+			if (grid) {
+				loadRemainingPagesForGrid();
+			} else {
+				rerender();
+			}
+		});
+	}
+
+	private void initializeGridColumns() {
+		if (casesTable == null) return;
+		casesTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+		addGridColumn("Case Name", vm -> vm.name, 180);
+		addGridColumn("Client", vm -> vm.clientName, 160);
+		addGridColumn("Intake Date / Caller Date", vm -> formatDate(vm.intakeDate), 150);
+		addGridColumn("Case Status", vm -> vm.primaryStatusName, 130);
+		addPreviewGridColumn("Opposing Parties", vm -> vm.opposingPartiesName, 160, OPPOSING_PARTIES_PREVIEW_LIMIT);
+		addPreviewGridColumn("Latest Case Update", vm -> vm.latestCaseUpdate, 220, LATEST_CASE_UPDATE_PREVIEW_LIMIT);
+		addPreviewGridColumn("Description", vm -> vm.description, 240, DESCRIPTION_PREVIEW_LIMIT);
+		addGridColumn("Date of Incident", vm -> formatDate(vm.dateOfIncident), 130);
+		addGridColumn("Statute of Limitations", vm -> formatDate(vm.solDate), 150);
+		addGridColumn("Tort Claims Notice Deadline", vm -> formatDate(vm.tortClaimsNoticeDeadline), 190);
+		addGridColumn("Responsible Attorney", vm -> vm.responsibleAttorney, 170);
+		if (columnMenuButton != null) {
+			columnMenuButton.getItems().clear();
+			for (TableColumn<CaseCardVm, ?> column : casesTable.getColumns()) {
+				CheckMenuItem item = new CheckMenuItem(column.getText());
+				item.setSelected(column.isVisible());
+				column.visibleProperty().bind(item.selectedProperty());
+				columnMenuButton.getItems().add(item);
+			}
+		}
+	}
+
+	private void addGridColumn(String title, java.util.function.Function<CaseCardVm, String> valueFactory, double width) {
+		TableColumn<CaseCardVm, String> column = new TableColumn<>(title);
+		column.setPrefWidth(width);
+		column.setCellValueFactory(data -> new ReadOnlyStringWrapper(valueFactory.apply(data.getValue())));
+		casesTable.getColumns().add(column);
+	}
+
+	private void addPreviewGridColumn(String title, java.util.function.Function<CaseCardVm, String> valueFactory, double width, int previewLimit) {
+		TableColumn<CaseCardVm, String> column = new TableColumn<>(title);
+		column.setPrefWidth(width);
+		column.setCellValueFactory(data -> new ReadOnlyStringWrapper(valueFactory.apply(data.getValue())));
+		column.setCellFactory(col -> new FullValueTooltipCell(previewLimit));
+		casesTable.getColumns().add(column);
+	}
+
+	private static Tooltip createWrappedFullValueTooltip(String fullText) {
+		Label content = new Label(fullText);
+		content.setWrapText(true);
+		content.setMaxWidth(FULL_VALUE_TOOLTIP_MAX_WIDTH);
+
+		Tooltip tooltip = new Tooltip();
+		tooltip.setGraphic(content);
+		tooltip.setText(null);
+		return tooltip;
+	}
+
+	private static final class FullValueTooltipCell extends TableCell<CaseCardVm, String> {
+		private final int previewLimit;
+
+		private FullValueTooltipCell(int previewLimit) {
+			this.previewLimit = previewLimit;
+		}
+
+		@Override
+		protected void updateItem(String fullText, boolean empty) {
+			super.updateItem(fullText, empty);
+			if (empty || fullText == null || fullText.isBlank()) {
+				setText(null);
+				setTooltip(null);
+				return;
+			}
+
+			setText(previewText(fullText, previewLimit));
+			setTooltip(createWrappedFullValueTooltip(fullText));
+		}
+	}
+
+	private void initializeGridRowActions() {
+		if (casesTable == null) return;
+		casesTable.setOnKeyPressed(event -> {
+			if (event.getCode() == KeyCode.ENTER) {
+				openSelectedCase();
+				event.consume();
+			}
+		});
+		casesTable.setRowFactory(table -> {
+			TableRow<CaseCardVm> row = new TableRow<>();
+			row.setOnMouseClicked(event -> {
+				if (!row.isEmpty() && event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+					openCase(row.getItem());
+					event.consume();
+				}
+			});
+			row.contextMenuProperty().bind(javafx.beans.binding.Bindings.when(row.emptyProperty())
+					.then((ContextMenu) null)
+					.otherwise(createCaseRowContextMenu(row)));
+			row.setStyle("-fx-cursor: hand;");
+			return row;
+		});
+	}
+
+	private ContextMenu createCaseRowContextMenu(TableRow<CaseCardVm> row) {
+		MenuItem open = new MenuItem("Open Case");
+		open.setOnAction(e -> openCase(row.getItem()));
+
+		MenuItem copyName = new MenuItem("Copy Case Name");
+		copyName.setOnAction(e -> copyToClipboard(row.getItem() == null ? "" : row.getItem().name));
+
+		MenuItem copyNumber = new MenuItem("Copy Case Number");
+		copyNumber.setOnAction(e -> copyCaseNumber(row.getItem()));
+
+		MenuItem createTask = new MenuItem("Create Task");
+		createTask.setOnAction(e -> createTaskForCase(row.getItem()));
+
+		MenuItem addUpdate = new MenuItem("Add Case Update");
+		addUpdate.setOnAction(e -> addCaseUpdate(row.getItem()));
+
+		return new ContextMenu(open, new SeparatorMenuItem(), copyName, copyNumber,
+				new SeparatorMenuItem(), createTask, addUpdate);
+	}
+
+	private void openSelectedCase() {
+		openCase(casesTable == null ? null : casesTable.getSelectionModel().getSelectedItem());
+	}
+
+	private void openCase(CaseCardVm vm) {
+		if (vm != null && onOpenCase != null && vm.id > 0 && vm.id <= Integer.MAX_VALUE) {
+			onOpenCase.accept((int) vm.id);
+		}
+	}
+
+	private void copyToClipboard(String value) {
+		ClipboardContent content = new ClipboardContent();
+		content.putString(safe(value));
+		Clipboard.getSystemClipboard().setContent(content);
+	}
+
+	private void copyCaseNumber(CaseCardVm vm) {
+		if (vm == null || caseDao == null) return;
+		dbExec.submit(() -> {
+			try {
+				var detail = caseDao.getDetail(vm.id);
+				String caseNumber = detail == null ? "" : safe(detail.getCaseNumber());
+				Platform.runLater(() -> copyToClipboard(caseNumber));
+			} catch (Exception ex) {
+				Platform.runLater(() -> showActionError("Unable to copy the case number right now."));
+			}
+		});
+	}
+
+	private void createTaskForCase(CaseCardVm vm) {
+		if (vm == null || caseTaskService == null || appState == null) return;
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showActionError("You must be signed in to create tasks.");
+			return;
+		}
+		dbExec.submit(() -> {
+			try {
+				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
+				Platform.runLater(() -> NewTaskDialog.showAndWait(dialogOwner(), priorities, users).ifPresent(input ->
+					dbExec.submit(() -> caseTaskService.createTask(new CaseTaskService.CreateTaskRequest(
+						shaleClientId, vm.id, input.title(), input.description(), input.dueAt(),
+						input.priorityId(), input.assignedUserIds(), currentUserId)))));
+			} catch (Exception ex) {
+				Platform.runLater(() -> showActionError("Unable to create a task for this case right now."));
+			}
+		});
+	}
+
+	private void addCaseUpdate(CaseCardVm vm) {
+		if (vm == null || caseDao == null || appState == null) return;
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showActionError("You must be signed in to add case updates.");
+			return;
+		}
+		TextArea updateArea = new TextArea();
+		updateArea.setPromptText("Add an update for " + vm.name);
+		updateArea.setPrefRowCount(6);
+		updateArea.setWrapText(true);
+		VBox content = new VBox(8, new Label("Case update"), updateArea);
+		VBox.setVgrow(updateArea, Priority.ALWAYS);
+		Alert dialog = new Alert(Alert.AlertType.CONFIRMATION);
+		dialog.initOwner(dialogOwner());
+		dialog.setTitle("Add Case Update");
+		dialog.setHeaderText(vm.name);
+		dialog.getDialogPane().setContent(content);
+		dialog.showAndWait().ifPresent(button -> {
+			if (button != javafx.scene.control.ButtonType.OK) return;
+			String text = safe(updateArea.getText()).trim();
+			if (text.isBlank()) return;
+			dbExec.submit(() -> {
+				try {
+					caseDao.addCaseNote(vm.id, shaleClientId, text, currentUserId);
+					refreshCaseRowFromDb(vm.id);
+				} catch (Exception ex) {
+					Platform.runLater(() -> showActionError("Unable to add the case update right now."));
+				}
+			});
+		});
+	}
+
+	private Window dialogOwner() {
+		return casesTable == null || casesTable.getScene() == null ? null : casesTable.getScene().getWindow();
+	}
+
+	private void showActionError(String message) {
+		Alert alert = new Alert(Alert.AlertType.ERROR, message);
+		alert.initOwner(dialogOwner());
+		alert.showAndWait();
+	}
+
+	private static String previewText(String fullText, int previewLimit) {
+		String safeText = safe(fullText);
+		if (safeText.length() <= previewLimit) {
+			return safeText;
+		}
+		return safeText.substring(0, previewLimit) + "...";
+	}
+
+	private static String formatDate(LocalDate date) {
+		return date == null ? "" : date.toString();
 	}
 
 	private void subscribeLiveCaseUpdates() {
@@ -250,7 +554,7 @@ public final class CasesController {
 					if (safeVal.equals(vm.name)) {
 						return false; // no change
 					}
-					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent));
+					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.clientName, vm.opposingPartiesName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
 					return true;
 				}
 
@@ -296,7 +600,7 @@ public final class CasesController {
 		for (int i = 0; i < loaded.size(); i++) {
 			CaseCardVm vm = loaded.get(i);
 			if (vm.id == caseId) {
-				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent));
+				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.clientName, vm.opposingPartiesName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
 				rerender();
 				return;
 			}
@@ -310,7 +614,7 @@ public final class CasesController {
 		// vvalue is 0..1
 		casesScroll.vvalueProperty().addListener((obs, oldV, newV) ->
 		{
-			if (newV != null && newV.doubleValue() >= 0.95 && !isSearchActive()) {
+			if (newV != null && newV.doubleValue() >= 0.95 && !isGridViewActive()) {
 				loadNextPage();
 			}
 		});
@@ -340,16 +644,24 @@ public final class CasesController {
 		loading = true;
 		final int pageToLoad = currentPage;
 		final int generationAtSubmit = loadGeneration;
+		final String queryAtSubmit = normalizedSearchQuery();
+		final Set<Integer> statusesAtSubmit = new LinkedHashSet<>(selectedStatusIds);
+		final Long knownTotalAtSubmit = knownResultsTotal(queryAtSubmit, statusesAtSubmit);
+		final boolean gridAtSubmit = isGridViewActive();
+		final CaseSort sortAtSubmit = selectedSort();
+		final boolean includeClosedDeniedAtSubmit = includeClosedDeniedInQuery();
 
 		dbExec.submit(() ->
 		{
 			try {
 				long daoStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=findPage page=cases_list pageIndex=" + pageToLoad);
-				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort(), includeClosedDeniedInQuery());
-				PerfLog.logDone("DAO", "method=findPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
+				PerfLog.log("DAO", "start", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " grid=" + gridAtSubmit);
+				var page = caseDao.findCasesViewPage(pageToLoad, pageSize, sortAtSubmit, includeClosedDeniedAtSubmit, queryAtSubmit, statusesAtSubmit, knownTotalAtSubmit);
+				PerfLog.logDone("DAO", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
 
 				// map DAO rows into UI VM
+				long mapStartNanos = PerfLog.start();
+				PerfLog.log("DAO_MAP", "start", "method=findPage page=cases_list rows=" + (page == null || page.items() == null ? 0 : page.items().size()));
 				List<CaseCardVm> newItems = page.items().stream()
 						.map(r -> new CaseCardVm(
 								r.id(),
@@ -359,9 +671,17 @@ public final class CasesController {
 								r.primaryStatusId(),
 								safe(r.responsibleAttorneyName()),
 								safe(r.responsibleAttorneyColor()),
-								r.nonEngagementLetterSent()
+								r.nonEngagementLetterSent(),
+								safe(r.primaryStatusName()),
+								safe(r.clientName()),
+								safe(r.opposingPartiesName()),
+								safe(r.latestCaseUpdate()),
+								safe(r.description()),
+								r.dateOfIncident(),
+								r.tortClaimsNoticeDeadline()
 						))
 						.toList();
+				PerfLog.logDone("DAO_MAP", "method=findPage page=cases_list rows=" + newItems.size(), mapStartNanos);
 
 				Platform.runLater(() ->
 				{
@@ -374,6 +694,8 @@ public final class CasesController {
 
 					currentPage++;
 					hasMore = loaded.size() < page.total();
+					cacheResultsCount(queryAtSubmit, statusesAtSubmit, page.total());
+					updateResultsCountLabel(page.total());
 					loading = false;
 
 					// Render according to current search/sort
@@ -396,6 +718,17 @@ public final class CasesController {
 		});
 	}
 
+	private boolean isGridViewActive() {
+		return gridViewToggle != null && gridViewToggle.isSelected();
+	}
+
+	private void loadRemainingPagesForGrid() {
+		if (loading || !hasMore || caseDao == null || !isGridViewActive()) {
+			return;
+		}
+		loadNextPage();
+	}
+
 	private void rerender() {
 		if (casesFlow == null)
 			return;
@@ -403,27 +736,48 @@ public final class CasesController {
 		PerfLog.log("RENDER", "start", "panel=cases_list page=cases_list");
 
 		String q = normalizedSearchQuery();
-		String sort = casesSortChoice == null ? "Intake date (newest first)" : casesSortChoice.getValue();
-
-		Comparator<CaseCardVm> comp = comparatorFor(sort);
-
-		List<CaseCardVm> filtered = loaded.stream()
-				.filter(vm -> matchesQuery(vm, q) && matchesSelectedStatus(vm))
-				.sorted(comp)
-				.toList();
 		if (shouldRefreshResultsCount(q, selectedStatusIds)) {
 			refreshResultsCountAsync(q, selectedStatusIds);
 		}
 
-		boolean statusFilterActive = selectedStatusIds.size() < statusFilterOptions.size();
-		if (( !q.isEmpty() || statusFilterActive ) && filtered.size() < pageSize && hasMore && !loading) {
-			loadNextPage();
+		boolean grid = isGridViewActive();
+		List<CaseCardVm> view = List.copyOf(loaded);
+
+		long uiModelStartNanos = PerfLog.start();
+		PerfLog.log("UI_MODEL", "start", "panel=cases_list grid=" + grid + " rows=" + view.size());
+		var tableItems = FXCollections.observableArrayList(view);
+		PerfLog.logDone("UI_MODEL", "panel=cases_list grid=" + grid + " rows=" + tableItems.size(), uiModelStartNanos);
+
+		long tableRenderStartNanos = PerfLog.start();
+		if (casesTable != null) {
+			casesTable.setItems(tableItems);
 		}
+		PerfLog.logDone("RENDER", "component=cases_table page=cases_list rowCount=" + tableItems.size(), tableRenderStartNanos);
 
-		List<CaseCardVm> view = q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList();
+		long cardRenderStartNanos = PerfLog.start();
+		if (!grid) {
+			casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
+		}
+		PerfLog.logDone("RENDER", "component=cases_cards page=cases_list childCount=" + casesFlow.getChildren().size() + " skipped=" + grid, cardRenderStartNanos);
+		if (grid && hasMore && !loading) {
+			loadRemainingPagesForGrid();
+		}
+		PerfLog.logDone("RENDER", "panel=cases_list page=cases_list rowCount=" + view.size(), renderStartNanos);
+	}
 
-		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
-		PerfLog.logDone("RENDER", "panel=cases_list page=cases_list childCount=" + casesFlow.getChildren().size(), renderStartNanos);
+	private Long knownResultsTotal(String normalizedQuery, Set<Integer> selectedStatuses) {
+		String query = normalizedQuery == null ? "" : normalizedQuery;
+		Set<Integer> statuses = new LinkedHashSet<>(selectedStatuses == null ? Set.of() : selectedStatuses);
+		if (lastCountTotal >= 0 && Objects.equals(lastCountQuery, query) && Objects.equals(lastCountStatuses, statuses)) {
+			return lastCountTotal;
+		}
+		return null;
+	}
+
+	private void cacheResultsCount(String normalizedQuery, Set<Integer> selectedStatuses, long total) {
+		lastCountQuery = normalizedQuery == null ? "" : normalizedQuery;
+		lastCountStatuses = new LinkedHashSet<>(selectedStatuses == null ? Set.of() : selectedStatuses);
+		lastCountTotal = total;
 	}
 
 	private void refreshResultsCountAsync(String normalizedQuery, Set<Integer> selectedStatuses) {
@@ -448,6 +802,7 @@ public final class CasesController {
 					if (generationAtSubmit != resultsCountGeneration) {
 						return;
 					}
+					cacheResultsCount(query, statusesSnapshot, total);
 					updateResultsCountLabel(total);
 				});
 			} catch (Exception ex) {
@@ -460,6 +815,9 @@ public final class CasesController {
 		String nextQuery = normalizedQuery == null ? "" : normalizedQuery;
 		Set<Integer> nextStatuses = new LinkedHashSet<>(selectedStatuses == null ? Set.of() : selectedStatuses);
 		if (Objects.equals(lastCountQuery, nextQuery) && Objects.equals(lastCountStatuses, nextStatuses)) {
+			if (lastCountTotal >= 0) {
+				updateResultsCountLabel(lastCountTotal);
+			}
 			return false;
 		}
 		lastCountQuery = nextQuery;
@@ -565,6 +923,8 @@ public final class CasesController {
 		case "Case name (Z–A)" -> CaseSort.CASE_NAME_DESC;
 		case "Responsible attorney (A–Z)" -> CaseSort.RESPONSIBLE_ATTORNEY_ASC;
 		case "Responsible attorney (Z–A)" -> CaseSort.RESPONSIBLE_ATTORNEY_DESC;
+		case "Case Status (A–Z)" -> CaseSort.CASE_STATUS_ASC;
+		case "Case Status (Z–A)" -> CaseSort.CASE_STATUS_DESC;
 		default -> CaseSort.INTAKE_NEWEST;
 		};
 	}
@@ -594,6 +954,12 @@ public final class CasesController {
 
 		case "Responsible attorney (Z–A)" ->
 			Comparator.comparing((CaseCardVm v) -> v.responsibleAttorney, this::nullsLastString).reversed();
+
+		case "Case Status (A–Z)" ->
+			Comparator.comparing((CaseCardVm v) -> v.primaryStatusName, this::nullsLastString);
+
+		case "Case Status (Z–A)" ->
+			Comparator.comparing((CaseCardVm v) -> v.primaryStatusName, this::nullsLastString).reversed();
 
 		// default: newest first
 		default ->
@@ -655,9 +1021,18 @@ public final class CasesController {
 		final String responsibleAttorney;
 		final String responsibleAttorneyColor;
 		final Boolean nonEngagementLetterSent;
+		final String primaryStatusName;
+		final String clientName;
+		final String opposingPartiesName;
+		final String latestCaseUpdate;
+		final String description;
+		final LocalDate dateOfIncident;
+		final LocalDate tortClaimsNoticeDeadline;
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId, String responsibleAttorney,
-				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
+				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String clientName,
+				String opposingPartiesName, String latestCaseUpdate, String description, LocalDate dateOfIncident,
+				LocalDate tortClaimsNoticeDeadline) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
@@ -666,6 +1041,13 @@ public final class CasesController {
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
 			this.nonEngagementLetterSent = nonEngagementLetterSent;
+			this.primaryStatusName = Objects.requireNonNullElse(primaryStatusName, "");
+			this.clientName = Objects.requireNonNullElse(clientName, "");
+			this.opposingPartiesName = Objects.requireNonNullElse(opposingPartiesName, "");
+			this.latestCaseUpdate = Objects.requireNonNullElse(latestCaseUpdate, "");
+			this.description = Objects.requireNonNullElse(description, "");
+			this.dateOfIncident = dateOfIncident;
+			this.tortClaimsNoticeDeadline = tortClaimsNoticeDeadline;
 		}
 	}
 
@@ -754,9 +1136,19 @@ public final class CasesController {
 				String newColor = safe(r.responsibleAttorneyColor());
 
 				boolean same = newName.equals(vm.name)
+						&& Objects.equals(r.intakeDate(), vm.intakeDate)
+						&& Objects.equals(r.statuteOfLimitationsDate(), vm.solDate)
+						&& Objects.equals(r.primaryStatusId(), vm.primaryStatusId)
 						&& newAtty.equals(vm.responsibleAttorney)
 						&& newColor.equals(vm.responsibleAttorneyColor)
-						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent);
+						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent)
+						&& safe(r.primaryStatusName()).equals(vm.primaryStatusName)
+						&& safe(r.clientName()).equals(vm.clientName)
+						&& safe(r.opposingPartiesName()).equals(vm.opposingPartiesName)
+						&& safe(r.latestCaseUpdate()).equals(vm.latestCaseUpdate)
+						&& safe(r.description()).equals(vm.description)
+						&& Objects.equals(r.dateOfIncident(), vm.dateOfIncident)
+						&& Objects.equals(r.tortClaimsNoticeDeadline(), vm.tortClaimsNoticeDeadline);
 
 				if (same)
 					return false;
@@ -769,7 +1161,14 @@ public final class CasesController {
 						r.primaryStatusId(),
 						newAtty,
 						newColor,
-						r.nonEngagementLetterSent()
+						r.nonEngagementLetterSent(),
+						safe(r.primaryStatusName()),
+						safe(r.clientName()),
+						safe(r.opposingPartiesName()),
+						safe(r.latestCaseUpdate()),
+						safe(r.description()),
+						r.dateOfIncident(),
+						r.tortClaimsNoticeDeadline()
 				));
 				return true;
 			}

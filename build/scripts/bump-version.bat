@@ -14,6 +14,7 @@ if "%~1"=="" (
 )
 
 set NEW_VERSION=%~1
+for /f "usebackq delims=" %%V in (`python "%SCRIPT_DIR%preflight-version.py" "%ROOT%" --print-root-version`) do set "PREVIOUS_VERSION=%%V"
 
 echo ====================================
 echo Bumping Shale version to %NEW_VERSION%
@@ -21,6 +22,7 @@ echo ====================================
 
 call mvn -f "%ROOT%\pom.xml" versions:set -DnewVersion=%NEW_VERSION% || goto :fail
 call mvn -f "%ROOT%\pom.xml" versions:commit || goto :fail
+call python "%SCRIPT_DIR%preflight-version.py" "%ROOT%" "%PREVIOUS_VERSION%" || goto :fail
 
 echo Version updated to %NEW_VERSION%
 exit /b 0
