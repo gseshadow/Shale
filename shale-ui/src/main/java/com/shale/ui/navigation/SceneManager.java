@@ -488,7 +488,11 @@ public final class SceneManager {
 			CasesController c = (CasesController) controller;
 
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			c.init(appState, runtimeBridge, caseDao, onOpenCase);
+			TaskDao taskDao = new TaskDao(dbSessionProvider);
+			UserDao userDao = new UserDao(dbSessionProvider);
+			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
+			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
+			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase);
 			return c;
 		});
 	}
