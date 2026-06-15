@@ -63,6 +63,7 @@ public final class CasesController {
 	private static final int LATEST_CASE_UPDATE_PREVIEW_LIMIT = 100;
 	private static final int DESCRIPTION_PREVIEW_LIMIT = 100;
 	private static final int OPPOSING_PARTIES_PREVIEW_LIMIT = 80;
+	private static final double FULL_VALUE_TOOLTIP_MAX_WIDTH = 600.0;
 
 	// Existing controls (keep these IDs in FXML)
 	@FXML
@@ -263,22 +264,42 @@ public final class CasesController {
 		TableColumn<CaseCardVm, String> column = new TableColumn<>(title);
 		column.setPrefWidth(width);
 		column.setCellValueFactory(data -> new ReadOnlyStringWrapper(valueFactory.apply(data.getValue())));
-		column.setCellFactory(col -> new TableCell<>() {
-			@Override
-			protected void updateItem(String fullText, boolean empty) {
-				super.updateItem(fullText, empty);
-				if (empty || fullText == null || fullText.isBlank()) {
-					setText(null);
-					setTooltip(null);
-					return;
-				}
-
-				setText(previewText(fullText, previewLimit));
-				setTooltip(new Tooltip(fullText));
-			}
-		});
+		column.setCellFactory(col -> new FullValueTooltipCell(previewLimit));
 		casesTable.getColumns().add(column);
 	}
+
+	private static Tooltip createWrappedFullValueTooltip(String fullText) {
+		Label content = new Label(fullText);
+		content.setWrapText(true);
+		content.setMaxWidth(FULL_VALUE_TOOLTIP_MAX_WIDTH);
+
+		Tooltip tooltip = new Tooltip();
+		tooltip.setGraphic(content);
+		tooltip.setText(null);
+		return tooltip;
+	}
+
+	private static final class FullValueTooltipCell extends TableCell<CaseCardVm, String> {
+		private final int previewLimit;
+
+		private FullValueTooltipCell(int previewLimit) {
+			this.previewLimit = previewLimit;
+		}
+
+		@Override
+		protected void updateItem(String fullText, boolean empty) {
+			super.updateItem(fullText, empty);
+			if (empty || fullText == null || fullText.isBlank()) {
+				setText(null);
+				setTooltip(null);
+				return;
+			}
+
+			setText(previewText(fullText, previewLimit));
+			setTooltip(createWrappedFullValueTooltip(fullText));
+		}
+	}
+
 	private void initializeGridRowActions() {
 		if (casesTable == null) return;
 		casesTable.setOnKeyPressed(event -> {
