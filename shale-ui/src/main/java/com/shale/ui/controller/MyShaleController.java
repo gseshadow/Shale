@@ -193,6 +193,8 @@ public final class MyShaleController {
 	private boolean loading = false;
 	private boolean hasMore = true;
 	private int loadGeneration = 0;
+	private int taskLoadGeneration = 0;
+	private int myCasesBoardLoadGeneration = 0;
 
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
@@ -260,9 +262,21 @@ public final class MyShaleController {
 
 	private MyTasksSource myTasksSource = MyTasksSource.ASSIGNED_TO_ME;
 
-	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
+	private final ExecutorService casesDbExec = Executors.newSingleThreadExecutor(r ->
 	{
-		Thread t = new Thread(r, "my-cases-loader");
+		Thread t = new Thread(r, "my-shale-cases-loader");
+		t.setDaemon(true);
+		return t;
+	});
+	private final ExecutorService tasksDbExec = Executors.newSingleThreadExecutor(r ->
+	{
+		Thread t = new Thread(r, "my-shale-tasks-loader");
+		t.setDaemon(true);
+		return t;
+	});
+	private final ExecutorService prefsDbExec = Executors.newSingleThreadExecutor(r ->
+	{
+		Thread t = new Thread(r, "my-shale-prefs-loader");
 		t.setDaemon(true);
 		return t;
 	});
@@ -609,9 +623,12 @@ public final class MyShaleController {
 			return;
 		}
 
-		dbExec.submit(() ->
+		casesDbExec.submit(() ->
 		{
+			long statusStartNanos = PerfLog.start();
+			PerfLog.log("DAO", "start", "method=listStatusesForTenant page=my_shale organizationId=" + tenantId);
 			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(tenantId);
+			PerfLog.logDone("DAO", "method=listStatusesForTenant page=my_shale organizationId=" + tenantId + " rows=" + (statuses == null ? 0 : statuses.size()), statusStartNanos);
 			List<CaseListUiSupport.StatusFilterOption> options = statuses == null
 					? List.of()
 					: statuses.stream()
@@ -646,10 +663,13 @@ public final class MyShaleController {
 
 		final int userId = appState.getUserId();
 		final int generationAtSubmit = loadGeneration;
-		dbExec.submit(() ->
+		casesDbExec.submit(() ->
 		{
 			try {
+				long daoStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=getMyCaseRow page=my_shale caseId=" + caseId + " userId=" + userId);
 				CaseDao.CaseRow row = caseDao.getMyCaseRow(userId, caseId);
+				PerfLog.logDone("DAO", "method=getMyCaseRow page=my_shale caseId=" + caseId + " userId=" + userId + " rows=" + (row == null ? 0 : 1), daoStartNanos);
 				Platform.runLater(() ->
 				{
 					if (generationAtSubmit != loadGeneration) {
@@ -757,7 +777,7 @@ public final class MyShaleController {
 		final int generationAtSubmit = loadGeneration;
 		final int userId = appState.getUserId();
 
-		dbExec.submit(() ->
+		casesDbExec.submit(() ->
 		{
 			try {
 				long daoStartNanos = PerfLog.start();
@@ -951,13 +971,15 @@ public final class MyShaleController {
 
 		CaseTaskService.MyTasksSortOption sortOption = selectedMyTaskSort();
 		final boolean includeCompleted = showCompletedMyTasks;
+		final MyTasksSource sourceAtSubmit = myTasksSource;
 		final int shaleClientIdValue = shaleClientId;
 		final int userIdValue = userId;
-		dbExec.submit(() -> {
+		final int generationAtSubmit = ++taskLoadGeneration;
+		tasksDbExec.submit(() -> {
 			try {
 				long loadStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadMyTasks page=my_shale userId=" + userIdValue);
-				List<CaseTaskListItemDto> tasks = myTasksSource == MyTasksSource.CREATED_BY_ME
+				List<CaseTaskListItemDto> tasks = sourceAtSubmit == MyTasksSource.CREATED_BY_ME
 						? caseTaskService.loadTasksCreatedByUser(
 								shaleClientIdValue,
 								userIdValue,
@@ -975,9 +997,10 @@ public final class MyShaleController {
 						.toList();
 				PerfLog.logDone("DAO", "method=loadMyTasks page=my_shale userId=" + userIdValue + " rows=" + (tasks == null ? 0 : tasks.size()), loadStartNanos);
 				long usersLoadStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue);
-					java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = caseTaskService
-							.loadAssignedUsersForTasks(taskIds, shaleClientIdValue)
+				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " taskCount=" + taskIds.size());
+					java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = taskIds.isEmpty()
+							? java.util.Map.of()
+							: caseTaskService.loadAssignedUsersForTasks(taskIds, shaleClientIdValue)
 						.stream()
 						.collect(java.util.stream.Collectors.groupingBy(
 								CaseTaskService.TaskAssignedUsersByTask::taskId,
@@ -987,6 +1010,8 @@ public final class MyShaleController {
 												row.displayName(),
 												row.color()),
 											java.util.stream.Collectors.toList())));
+					long prioritiesLoadStartNanos = PerfLog.start();
+					PerfLog.log("DAO", "start", "method=loadActivePriorities page=my_shale organizationId=" + shaleClientIdValue);
 					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientIdValue).stream()
 							.filter(Objects::nonNull)
 							.collect(java.util.stream.Collectors.toMap(
@@ -994,8 +1019,13 @@ public final class MyShaleController {
 									option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
 									(existing, replacement) -> existing,
 									java.util.LinkedHashMap::new));
+					PerfLog.logDone("DAO", "method=loadActivePriorities page=my_shale organizationId=" + shaleClientIdValue + " rows=" + prioritiesById.size(), prioritiesLoadStartNanos);
 					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " rows=" + assignedByTask.size(), usersLoadStartNanos);
 					runOnFx(() -> {
+						if (generationAtSubmit != taskLoadGeneration) {
+							PerfLog.log("CTRL", "stale", "panel=my_tasks page=my_shale generation=" + generationAtSubmit);
+							return;
+						}
 						loadingOverview = false;
 						loadingMyTasks = false;
 						myTasks = tasks == null ? List.of() : tasks;
@@ -1079,9 +1109,13 @@ public final class MyShaleController {
 			return;
 		}
 		final int userIdValue = userId;
-		dbExec.submit(() -> {
+		final int generationAtSubmit = ++myCasesBoardLoadGeneration;
+		casesDbExec.submit(() -> {
 			try {
+				long daoStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=listAssignedCasesForBoard page=my_shale userId=" + userIdValue);
 				List<CaseDao.CaseRow> rows = caseDao.listAssignedCasesForBoard(userIdValue);
+				PerfLog.logDone("DAO", "method=listAssignedCasesForBoard page=my_shale userId=" + userIdValue + " rows=" + (rows == null ? 0 : rows.size()), daoStartNanos);
 				int rowCount = rows == null ? 0 : rows.size();
 				System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.refreshMyCasesBoard] dao returned rowCount=" + rowCount
 						+ " userId=" + userIdValue);
@@ -1090,6 +1124,10 @@ public final class MyShaleController {
 						.map(this::toVm)
 						.toList();
 				runOnFx(() -> {
+					if (generationAtSubmit != myCasesBoardLoadGeneration) {
+						PerfLog.log("CTRL", "stale", "panel=my_cases_board page=my_shale generation=" + generationAtSubmit);
+						return;
+					}
 						loadingMyCases = false;
 						myCasesLoadFailed = false;
 						myAssignedCasesBoard = cases;
@@ -1117,12 +1155,15 @@ public final class MyShaleController {
 		if (myCasesBoardList == null || myCasesBoardEmptyLabel == null || myCasesBoardScroll == null || myCasesLoadingLabel == null) {
 			return;
 		}
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=my_cases_board page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		if (loadingMyCases) {
 			myCasesBoardList.getChildren().clear();
 			myCasesBoardEmptyLabel.setText("Loading your cases...");
 			setVisibleManaged(myCasesBoardEmptyLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
 			setVisibleManaged(myCasesLoadingLabel, false);
+			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=loading childCount=0", renderStartNanos);
 			return;
 		}
 		myCasesBoardList.getChildren().clear();
@@ -1132,6 +1173,7 @@ public final class MyShaleController {
 			setVisibleManaged(myCasesBoardEmptyLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
 			System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.renderMyCasesBoard] error state rendered");
+			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=error childCount=0", renderStartNanos);
 			return;
 		}
 
@@ -1197,6 +1239,7 @@ public final class MyShaleController {
 			setVisibleManaged(myCasesBoardEmptyLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
 			System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.renderMyCasesBoard] empty state rendered");
+			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=empty childCount=0", renderStartNanos);
 			return;
 		}
 
@@ -1204,6 +1247,7 @@ public final class MyShaleController {
 		setVisibleManaged(myCasesBoardScroll, true);
 		System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.renderMyCasesBoard] board rendered laneCount=" + laneCount
 				+ " cardCount=" + cardCount);
+		PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale laneCount=" + laneCount + " childCount=" + cardCount, renderStartNanos);
 	}
 
 	private void syncMyCasesBoardStatusFilterOptions() {
@@ -1453,16 +1497,20 @@ public final class MyShaleController {
 		if (overviewMainRow == null) {
 			return;
 		}
+		long renderStartNanos = PerfLog.start();
+		PerfLog.log("RENDER", "start", "panel=overview page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		if (loadingOverview) {
 			Label loadingLabel = new Label("Loading your overview...");
 			loadingLabel.getStyleClass().add("muted-text");
 			overviewMainRow.getChildren().setAll(loadingLabel);
+			PerfLog.logDone("RENDER", "panel=overview page=my_shale state=loading childCount=1", renderStartNanos);
 			return;
 		}
 		ensureOverviewContentShell();
 		List<CaseTaskListItemDto> overviewSource = overviewEligibleTasks(myTasks);
 		syncOverviewControlOptions(overviewSource);
 		renderOverviewSections(overviewSource);
+		PerfLog.logDone("RENDER", "panel=overview page=my_shale sourceRows=" + (overviewSource == null ? 0 : overviewSource.size()) + " childCount=" + overviewMainRow.getChildren().size(), renderStartNanos);
 	}
 
 	private void ensureOverviewContentShell() {
@@ -2131,7 +2179,7 @@ public final class MyShaleController {
 		final int shaleClientIdValue = shaleClientId;
 		final int userIdValue = userId;
 		final boolean collapsed = isCollapsedLane(key);
-		dbExec.submit(() -> userBoardLanePreferencesDao.upsertLanePreference(
+		prefsDbExec.submit(() -> userBoardLanePreferencesDao.upsertLanePreference(
 				shaleClientIdValue,
 				userIdValue,
 				MY_TASKS_BOARD_KEY,
@@ -2156,7 +2204,7 @@ public final class MyShaleController {
 		final int shaleClientIdValue = shaleClientId;
 		final int userIdValue = userId;
 		final boolean pinned = isPinnedLane(key);
-		dbExec.submit(() -> userBoardLanePreferencesDao.upsertLanePreference(
+		prefsDbExec.submit(() -> userBoardLanePreferencesDao.upsertLanePreference(
 				shaleClientIdValue,
 				userIdValue,
 				MY_TASKS_BOARD_KEY,
