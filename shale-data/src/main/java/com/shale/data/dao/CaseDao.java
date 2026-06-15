@@ -1201,6 +1201,58 @@ public final class CaseDao {
 					) ra
 					LEFT JOIN %s u
 					  ON u.id = ra.UserId
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      CASE
+					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
+					        ELSE COALESCE(ct.Name, '')
+					      END AS ClientName
+					    FROM dbo.CaseParties cp
+					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
+					    WHERE cp.CaseId = c.Id
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
+					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					) clientContact
+					OUTER APPLY (
+					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
+					    FROM (
+					      SELECT
+					        LTRIM(RTRIM(
+					          CASE
+					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
+					            ELSE COALESCE(ct.Name, o.Name, '')
+					          END
+					        )) AS DisplayName,
+					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
+					        cp.UpdatedAt,
+					        cp.CreatedAt,
+					        cp.Id
+					      FROM dbo.CaseParties cp
+					      LEFT JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
+					      WHERE cp.CaseId = c.Id
+					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
+					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+					    ) opp
+					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
+					) oppContact
+					OUTER APPLY (
+					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
+					    FROM dbo.CaseUpdates cu
+					    WHERE cu.CaseId = c.Id
+					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
+					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
+					) latestUpdate
 					WHERE c.ShaleClientId = ?
 					  AND %s
 					  AND LOWER(COALESCE(c.Name, '')) LIKE ?
@@ -1302,6 +1354,58 @@ public final class CaseDao {
 					) ra
 					LEFT JOIN %s u
 					  ON u.id = ra.UserId
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      CASE
+					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
+					        ELSE COALESCE(ct.Name, '')
+					      END AS ClientName
+					    FROM dbo.CaseParties cp
+					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
+					    WHERE cp.CaseId = c.Id
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
+					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					) clientContact
+					OUTER APPLY (
+					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
+					    FROM (
+					      SELECT
+					        LTRIM(RTRIM(
+					          CASE
+					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
+					            ELSE COALESCE(ct.Name, o.Name, '')
+					          END
+					        )) AS DisplayName,
+					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
+					        cp.UpdatedAt,
+					        cp.CreatedAt,
+					        cp.Id
+					      FROM dbo.CaseParties cp
+					      LEFT JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
+					      WHERE cp.CaseId = c.Id
+					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
+					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+					    ) opp
+					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
+					) oppContact
+					OUTER APPLY (
+					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
+					    FROM dbo.CaseUpdates cu
+					    WHERE cu.CaseId = c.Id
+					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
+					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
+					) latestUpdate
 					WHERE c.ShaleClientId = ?
 					  AND %s
 					  AND LOWER(COALESCE(c.Name, '')) LIKE ?

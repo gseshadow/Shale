@@ -73,6 +73,24 @@
                                 <FlowPane fx:id="usersFlow" hgap="16" vgap="16" prefWrapLength="1040" />
                                 <Label fx:id="usersEmptyLabel" text="No matching users" visible="false" managed="false" />
                             </VBox>
+                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
+                                <padding>
+                                    <Insets top="16" right="16" bottom="16" left="16" />
+                                </padding>
+                                <Label text="Tasks" styleClass="search-section-title" />
+                                <FlowPane fx:id="tasksFlow" hgap="16" vgap="16" prefWrapLength="1040" />
+                                <Label fx:id="tasksEmptyLabel" text="No matching tasks" visible="false" managed="false" />
+                            </VBox>
+
+                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
+                                <padding>
+                                    <Insets top="16" right="16" bottom="16" left="16" />
+                                </padding>
+                                <Label text="Calendar Events" styleClass="search-section-title" />
+                                <FlowPane fx:id="calendarEventsFlow" hgap="16" vgap="16" prefWrapLength="1040" />
+                                <Label fx:id="calendarEventsEmptyLabel" text="No matching calendar events" visible="false" managed="false" />
+                            </VBox>
+
                         </VBox>
                     </content>
                 </ScrollPane>

@@ -5,6 +5,10 @@ import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
+import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.CalendarEventDao;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Comparator;
 import java.util.List;
@@ -36,54 +40,52 @@ public final class SearchService {
 	private static final int USER_NAME_PART_WEIGHT = 470;
 	private static final int USER_EMAIL_WEIGHT = 250;
 	private static final int USER_PHONE_WEIGHT = 225;
+	private static final Logger LOG = LoggerFactory.getLogger(SearchService.class);
 
 	private final CaseDao caseDao;
 	private final ContactDao contactDao;
 	private final OrganizationDao organizationDao;
 	private final UserDao userDao;
+	private final TaskDao taskDao;
+	private final CalendarEventDao calendarEventDao;
 
-	public SearchService(CaseDao caseDao, ContactDao contactDao, OrganizationDao organizationDao, UserDao userDao) {
+	public SearchService(CaseDao caseDao, ContactDao contactDao, OrganizationDao organizationDao, UserDao userDao, TaskDao taskDao, CalendarEventDao calendarEventDao) {
 		this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
 		this.contactDao = Objects.requireNonNull(contactDao, "contactDao");
 		this.organizationDao = Objects.requireNonNull(organizationDao, "organizationDao");
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
+		this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
+		this.calendarEventDao = Objects.requireNonNull(calendarEventDao, "calendarEventDao");
 	}
 
-	public SearchResults searchAll(int shaleClientId, String query, boolean includeDeletedCases) {
+	public SearchResults searchAll(int shaleClientId, Integer currentUserId, String query, boolean includeDeletedCases) {
 		SearchQuery searchQuery = SearchQuery.from(query);
 		if (searchQuery.normalizedText().isBlank()) {
 			return SearchResults.empty(searchQuery.rawQuery());
 		}
+		LOG.info("Global search start query=\"{}\" userId={} shaleClientId={} providers={}", searchQuery.rawQuery(), currentUserId, shaleClientId, "cases,deletedCases,contacts,organizations,users,tasks,calendarEvents");
+		List<ProviderFailure> failures = new java.util.ArrayList<>();
+		List<CaseDao.CaseRow> cases = provider("cases", failures, () -> sortResults(caseDao.searchCasesByName(searchQuery.rawQuery()), row -> scoreCase(row, searchQuery), CaseDao.CaseRow::name, row -> Long.toString(row.id())));
+		List<CaseDao.CaseRow> deletedCases = includeDeletedCases ? provider("deletedCases", failures, () -> sortResults(caseDao.searchDeletedCasesByName(searchQuery.rawQuery()), row -> scoreCase(row, searchQuery), CaseDao.CaseRow::name, row -> Long.toString(row.id()))) : List.of();
+		List<ContactDao.DirectoryContactRow> contacts = provider("contacts", failures, () -> sortResults(contactDao.searchContacts(shaleClientId, searchQuery.rawQuery()), row -> scoreContact(row, searchQuery), ContactDao.DirectoryContactRow::displayName, row -> Integer.toString(row.id())));
+		List<Organization> organizations = provider("organizations", failures, () -> sortResults(organizationDao.searchOrganizations(searchQuery.rawQuery()), row -> scoreOrganization(row, searchQuery), Organization::getName, row -> Integer.toString(Objects.requireNonNullElse(row.getId(), 0))));
+		List<UserDao.DirectoryUserRow> users = provider("users", failures, () -> sortResults(userDao.searchUsers(shaleClientId, searchQuery.rawQuery()), row -> scoreUser(row, searchQuery), UserDao.DirectoryUserRow::displayName, row -> Integer.toString(row.id())));
+		List<TaskDao.GlobalSearchTaskRow> tasks = provider("tasks", failures, () -> sortResults(taskDao.searchTasks(shaleClientId, searchQuery.rawQuery()), row -> weightedTextScore(searchQuery, row.title(), CASE_NAME_WEIGHT), TaskDao.GlobalSearchTaskRow::title, row -> Long.toString(row.taskId())));
+		List<CalendarEventDao.GlobalSearchCalendarEventRow> calendarEvents = provider("calendarEvents", failures, () -> sortResults(calendarEventDao.searchCalendarEvents(shaleClientId, searchQuery.rawQuery()), row -> weightedTextScore(searchQuery, row.title(), CASE_NAME_WEIGHT), CalendarEventDao.GlobalSearchCalendarEventRow::title, row -> Integer.toString(row.calendarEventId())));
+		return new SearchResults(searchQuery.rawQuery(), cases, deletedCases, contacts, organizations, users, tasks, calendarEvents, failures);
+	}
 
-		List<CaseDao.CaseRow> cases = sortResults(
-				caseDao.searchCasesByName(searchQuery.rawQuery()),
-				row -> scoreCase(row, searchQuery),
-				CaseDao.CaseRow::name,
-				row -> Long.toString(row.id()));
-		List<CaseDao.CaseRow> deletedCases = includeDeletedCases
-				? sortResults(
-						caseDao.searchDeletedCasesByName(searchQuery.rawQuery()),
-						row -> scoreCase(row, searchQuery),
-						CaseDao.CaseRow::name,
-						row -> Long.toString(row.id()))
-				: List.of();
-		List<ContactDao.DirectoryContactRow> contacts = sortResults(
-				contactDao.searchContacts(shaleClientId, searchQuery.rawQuery()),
-				row -> scoreContact(row, searchQuery),
-				ContactDao.DirectoryContactRow::displayName,
-				row -> Integer.toString(row.id()));
-		List<Organization> organizations = sortResults(
-				organizationDao.searchOrganizations(searchQuery.rawQuery()),
-				row -> scoreOrganization(row, searchQuery),
-				Organization::getName,
-				row -> Integer.toString(Objects.requireNonNullElse(row.getId(), 0)));
-		List<UserDao.DirectoryUserRow> users = sortResults(
-				userDao.searchUsers(shaleClientId, searchQuery.rawQuery()),
-				row -> scoreUser(row, searchQuery),
-				UserDao.DirectoryUserRow::displayName,
-				row -> Integer.toString(row.id()));
-
-		return new SearchResults(searchQuery.rawQuery(), cases, deletedCases, contacts, organizations, users);
+	private static <T> List<T> provider(String provider, List<ProviderFailure> failures, java.util.function.Supplier<List<T>> loader) {
+		try {
+			LOG.info("Global search provider start provider={}", provider);
+			List<T> rows = loader.get();
+			LOG.info("Global search provider done provider={} rows={}", provider, rows == null ? 0 : rows.size());
+			return rows == null ? List.of() : rows;
+		} catch (RuntimeException ex) {
+			LOG.error("Global search provider failed provider={} exceptionClass={} message={}", provider, ex.getClass().getName(), ex.getMessage(), ex);
+			failures.add(new ProviderFailure(provider, ex.getClass().getName(), ex.getMessage()));
+			return List.of();
+		}
 	}
 
 	private static int scoreCase(CaseDao.CaseRow row, SearchQuery query) {
@@ -258,7 +260,10 @@ public final class SearchService {
 			List<CaseDao.CaseRow> deletedCases,
 			List<ContactDao.DirectoryContactRow> contacts,
 			List<Organization> organizations,
-			List<UserDao.DirectoryUserRow> users) {
+			List<UserDao.DirectoryUserRow> users,
+			List<TaskDao.GlobalSearchTaskRow> tasks,
+			List<CalendarEventDao.GlobalSearchCalendarEventRow> calendarEvents,
+			List<ProviderFailure> failures) {
 		public SearchResults {
 			query = query == null ? "" : query;
 			cases = List.copyOf(cases == null ? List.of() : cases);
@@ -266,10 +271,17 @@ public final class SearchService {
 			contacts = List.copyOf(contacts == null ? List.of() : contacts);
 			organizations = List.copyOf(organizations == null ? List.of() : organizations);
 			users = List.copyOf(users == null ? List.of() : users);
+			tasks = List.copyOf(tasks == null ? List.of() : tasks);
+			calendarEvents = List.copyOf(calendarEvents == null ? List.of() : calendarEvents);
+			failures = List.copyOf(failures == null ? List.of() : failures);
 		}
 
+		public boolean hasFailures() { return !failures.isEmpty(); }
+		public boolean hasAnyResults() { return !(cases.isEmpty() && deletedCases.isEmpty() && contacts.isEmpty() && organizations.isEmpty() && users.isEmpty() && tasks.isEmpty() && calendarEvents.isEmpty()); }
+
 		public static SearchResults empty(String query) {
-			return new SearchResults(query, List.of(), List.of(), List.of(), List.of(), List.of());
+			return new SearchResults(query, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
 		}
 	}
+	public record ProviderFailure(String provider, String exceptionClass, String message) { }
 }

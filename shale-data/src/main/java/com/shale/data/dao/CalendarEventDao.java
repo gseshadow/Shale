@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Objects;
 
 public final class CalendarEventDao {
+    public record GlobalSearchCalendarEventRow(Integer calendarEventId, int shaleClientId, Integer caseId, String caseName, String title, String description, String location, LocalDateTime startsAt, LocalDateTime endsAt) { }
     private final DbSessionProvider db;
 
     public CalendarEventDao(DbSessionProvider db) {
@@ -118,6 +119,46 @@ public final class CalendarEventDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to list calendar events by date range", e);
+        }
+    }
+
+
+    public List<GlobalSearchCalendarEventRow> searchCalendarEvents(int shaleClientId, String query) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        String q = query == null ? "" : query.trim();
+        if (q.isBlank()) {
+            return List.of();
+        }
+        String like = "%" + q + "%";
+        String sql = """
+                SELECT TOP (100) e.CalendarEventId, e.ShaleClientId, e.CaseId, c.Name AS CaseName,
+                       e.Title, e.Description, CAST(NULL AS nvarchar(4000)) AS Location, e.StartsAt, e.EndsAt
+                FROM dbo.CalendarEvents e
+                LEFT JOIN dbo.Cases c ON c.Id = e.CaseId AND c.ShaleClientId = e.ShaleClientId
+                WHERE e.ShaleClientId = ?
+                  AND ISNULL(e.IsCancelled, 0) = 0
+                  AND (e.Title LIKE ? OR e.Description LIKE ? OR c.Name LIKE ?)
+                ORDER BY e.StartsAt ASC, e.CalendarEventId ASC;
+                """;
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, shaleClientId);
+            ps.setString(2, like);
+            ps.setString(3, like);
+            ps.setString(4, like);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<GlobalSearchCalendarEventRow> rows = new ArrayList<>();
+                while (rs.next()) {
+                    rows.add(new GlobalSearchCalendarEventRow(
+                            rs.getInt("CalendarEventId"), rs.getInt("ShaleClientId"), (Integer) rs.getObject("CaseId"), rs.getString("CaseName"),
+                            rs.getString("Title"), rs.getString("Description"), rs.getString("Location"),
+                            rs.getTimestamp("StartsAt").toLocalDateTime(), rs.getTimestamp("EndsAt") == null ? null : rs.getTimestamp("EndsAt").toLocalDateTime()));
+                }
+                return rows;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to search calendar events for tenant (clientId=" + shaleClientId + ")", e);
         }
     }
 

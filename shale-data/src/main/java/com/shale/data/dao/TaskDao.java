@@ -111,6 +111,21 @@ public final class TaskDao {
     }
     public record TaskAssignableUserRow(int id, String displayName, String color) {
     }
+
+    public record GlobalSearchTaskRow(
+            long taskId,
+            int shaleClientId,
+            long caseId,
+            String caseName,
+            String title,
+            String description,
+            String statusName,
+            LocalDateTime dueAt,
+            LocalDateTime completedAt,
+            Integer assignedUserId,
+            String assignedUserDisplayName) {
+    }
+
     public record TaskTimelineEventRow(
             long id,
             long taskId,
@@ -702,6 +717,57 @@ public final class TaskDao {
             throw new RuntimeException(
                     "Failed to load assigned user tasks for assignedUserId=" + assignedUserId + " shaleClientId=" + shaleClientId,
                     e);
+        }
+    }
+
+
+    public List<GlobalSearchTaskRow> searchTasks(int shaleClientId, String query) {
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        String q = query == null ? "" : query.trim();
+        if (q.isBlank()) {
+            return List.of();
+        }
+        String like = "%" + q + "%";
+        String sql = """
+                SELECT TOP (100)
+                  t.Id, t.ShaleClientId, t.CaseId, c.Name AS CaseName,
+                  t.Title, t.Description, ts.Name AS StatusName, t.DueAt, t.CompletedAt,
+                  assignment.UserId AS AssignedUserId, assignment.DisplayName AS AssignedUserDisplayName
+                FROM dbo.Tasks t
+                INNER JOIN dbo.Cases c ON c.Id = t.CaseId AND c.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.TaskStatuses ts ON ts.Id = t.StatusId AND (ts.ShaleClientId = t.ShaleClientId OR ts.ShaleClientId IS NULL)
+                OUTER APPLY (
+                  SELECT TOP (1) ta.UserId,
+                    LTRIM(RTRIM(COALESCE(u.name_first, '') + CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(u.name_last, ''))) AS DisplayName
+                  FROM dbo.TaskAssignments ta
+                  INNER JOIN dbo.Users u ON u.Id = ta.UserId AND u.ShaleClientId = ta.ShaleClientId
+                  WHERE ta.TaskId = t.Id AND ta.ShaleClientId = t.ShaleClientId AND ta.IsPrimary = 1
+                  ORDER BY ta.AssignedAt DESC, ta.UserId DESC
+                ) assignment
+                WHERE t.ShaleClientId = ?
+                  AND ISNULL(t.IsDeleted, 0) = 0
+                  AND (t.Title LIKE ? OR t.Description LIKE ?)
+                ORDER BY CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END, t.DueAt ASC, t.UpdatedAt DESC, t.Id DESC;
+                """;
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, shaleClientId);
+            ps.setString(2, like);
+            ps.setString(3, like);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<GlobalSearchTaskRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(new GlobalSearchTaskRow(
+                            rs.getLong("Id"), rs.getInt("ShaleClientId"), rs.getLong("CaseId"), rs.getString("CaseName"),
+                            rs.getString("Title"), rs.getString("Description"), rs.getString("StatusName"),
+                            toLocalDateTime(rs.getTimestamp("DueAt")), toLocalDateTime(rs.getTimestamp("CompletedAt")),
+                            (Integer) rs.getObject("AssignedUserId"), rs.getString("AssignedUserDisplayName")));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to search tasks for tenant (clientId=" + shaleClientId + ")", e);
         }
     }
 
