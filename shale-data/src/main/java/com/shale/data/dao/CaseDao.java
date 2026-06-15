@@ -884,7 +884,7 @@ public final class CaseDao {
 					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
 					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
 					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, '')
+					            ELSE COALESCE(ct.Name, o.Name, '')
 					          END
 					        )) AS DisplayName,
 					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
@@ -892,12 +892,13 @@ public final class CaseDao {
 					        cp.CreatedAt,
 					        cp.Id
 					      FROM dbo.CaseParties cp
-					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
 					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
 					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
+					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 					    ) opp
 					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
@@ -1050,7 +1051,7 @@ public final class CaseDao {
 					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
 					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
 					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, '')
+					            ELSE COALESCE(ct.Name, o.Name, '')
 					          END
 					        )) AS DisplayName,
 					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
@@ -1058,12 +1059,13 @@ public final class CaseDao {
 					        cp.CreatedAt,
 					        cp.Id
 					      FROM dbo.CaseParties cp
-					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
 					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
 					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
+					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 					    ) opp
 					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
@@ -1418,7 +1420,7 @@ public final class CaseDao {
 					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
 					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
 					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, '')
+					            ELSE COALESCE(ct.Name, o.Name, '')
 					          END
 					        )) AS DisplayName,
 					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
@@ -1426,12 +1428,13 @@ public final class CaseDao {
 					        cp.CreatedAt,
 					        cp.Id
 					      FROM dbo.CaseParties cp
-					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
 					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
 					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
+					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 					    ) opp
 					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
@@ -1562,7 +1565,7 @@ public final class CaseDao {
 					SELECT COUNT(1)
 					FROM %s c
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -1572,85 +1575,14 @@ public final class CaseDao {
 					      cs.CreatedAt DESC,
 					      cs.Id DESC
 					) current_status
-					OUTER APPLY (
-					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
-					    WHERE cu.CaseId = c.Id
-					      AND cu.RoleId = ?
-					      AND cu.IsPrimary = 1
-					    ORDER BY
-					      cu.UpdatedAt DESC,
-					      cu.CreatedAt DESC,
-					      cu.Id DESC
-					) ra
-					LEFT JOIN %s u
-					  ON u.id = ra.UserId
-					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS ClientName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
-					) clientContact
-					OUTER APPLY (
-					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
-					    FROM (
-					      SELECT
-					        LTRIM(RTRIM(
-					          CASE
-					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, '')
-					          END
-					        )) AS DisplayName,
-					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
-					        cp.UpdatedAt,
-					        cp.CreatedAt,
-					        cp.Id
-					      FROM dbo.CaseParties cp
-					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
-					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ) opp
-					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
-					) oppContact
-					OUTER APPLY (
-					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
-					    FROM dbo.CaseUpdates cu
-					    WHERE cu.CaseId = c.Id
-					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
-					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
-					) latestUpdate
 					WHERE %s
 					  AND c.ShaleClientId = ?
-					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c")));
+					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c")));
 
 			if (!normalizedQuery.isBlank()) {
 				sql.append("""
-						  AND (
-						    LOWER(COALESCE(c.Name, '')) LIKE ?
-						    OR LOWER(LTRIM(RTRIM(
-						      COALESCE(u.name_first, '') +
-						      CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-						      COALESCE(u.name_last, '')
-						    ))) LIKE ?
-						  )
-						""");
+					  AND LOWER(COALESCE(c.Name, '')) LIKE ?
+					""");
 			}
 
 			sql.append("  AND (current_status.PrimaryStatusId IS NULL");
@@ -1664,12 +1596,9 @@ public final class CaseDao {
 
 			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
 				int idx = 1;
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(idx++, requireCurrentShaleClientId(con));
 				if (!normalizedQuery.isBlank()) {
-					String pattern = containsPattern(normalizedQuery);
-					ps.setString(idx++, pattern);
-					ps.setString(idx++, pattern);
+					ps.setString(idx++, containsPattern(normalizedQuery));
 				}
 				for (Integer statusId : effectiveStatusIds) {
 					ps.setInt(idx++, statusId);
@@ -5477,7 +5406,7 @@ public final class CaseDao {
 					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
 					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
 					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, '')
+					            ELSE COALESCE(ct.Name, o.Name, '')
 					          END
 					        )) AS DisplayName,
 					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
@@ -5485,12 +5414,13 @@ public final class CaseDao {
 					        cp.CreatedAt,
 					        cp.Id
 					      FROM dbo.CaseParties cp
-					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
 					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
 					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
+					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 					    ) opp
 					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
@@ -5616,7 +5546,7 @@ public final class CaseDao {
 					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
 					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
 					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, '')
+					            ELSE COALESCE(ct.Name, o.Name, '')
 					          END
 					        )) AS DisplayName,
 					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
@@ -5624,12 +5554,13 @@ public final class CaseDao {
 					        cp.CreatedAt,
 					        cp.Id
 					      FROM dbo.CaseParties cp
-					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN Contacts ct ON ct.Id = cp.ContactId
+					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
 					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
 					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
+					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 					    ) opp
 					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
