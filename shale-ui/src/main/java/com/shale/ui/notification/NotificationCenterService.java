@@ -141,35 +141,43 @@ public final class NotificationCenterService {
 		} else {
 			Platform.runLater(() -> pushNotificationsInternal(snapshot, "bulk"));
 		}
+		String eventKey = notification.getEventKey();
+		return eventKey != null && !eventKey.isBlank() && eventKeys.contains(eventKey);
 	}
 
 	private void pushNotificationsInternal(List<AppNotification> incoming, String source) {
 		long startNanos = System.nanoTime();
+		NotificationPushStats stats = appendNewNotifications(incoming);
+		if (serverUnreadCount != null && stats.unreadAdded() > 0) {
+			serverUnreadCount += stats.unreadAdded();
+		}
+		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+		if (stats.added() > 0 || stats.duplicate() > 0) {
+			log.info("PERF notifications.push source={} incoming={} added={} duplicates={} total={} elapsedMs={} fxThread={}",
+					source, incoming.size(), stats.added(), stats.duplicate(), notifications.size(), elapsedMs, Platform.isFxApplicationThread());
+		}
+	}
+
+	private NotificationPushStats appendNewNotifications(List<AppNotification> incoming) {
 		int added = 0;
 		int duplicate = 0;
 		int unreadAdded = 0;
-		for (AppNotification notification : incoming) {
-			if (isKnownNotification(notification)) {
+		for (AppNotification item : incoming) {
+			if (isKnownNotification(item)) {
 				duplicate++;
 				continue;
 			}
-			notifications.add(notification);
-			indexNotification(notification);
-			if (notification.isUnread()) {
+			notifications.add(item);
+			indexNotification(item);
+			if (item.isUnread()) {
 				unreadAdded++;
 			}
 			added++;
 		}
-		if (serverUnreadCount != null && unreadAdded > 0) {
-			serverUnreadCount += unreadAdded;
-		}
-		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-		if (added > 0 || duplicate > 0) {
-			log.info("PERF notifications.push source={} incoming={} added={} duplicates={} total={} elapsedMs={} fxThread={}",
-					source, incoming.size(), added, duplicate, notifications.size(), elapsedMs, Platform.isFxApplicationThread());
-		}
-		String eventKey = notification.getEventKey();
-		return eventKey != null && !eventKey.isBlank() && eventKeys.contains(eventKey);
+		return new NotificationPushStats(added, duplicate, unreadAdded);
+	}
+
+	private record NotificationPushStats(int added, int duplicate, int unreadAdded) {
 	}
 
 	private boolean isKnownNotification(AppNotification notification) {
