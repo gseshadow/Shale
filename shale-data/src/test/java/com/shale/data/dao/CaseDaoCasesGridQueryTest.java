@@ -18,6 +18,18 @@ final class CaseDaoCasesGridQueryTest {
                 "Cases grid queries must not reference IncidentOccurred unless schema detection guards it");
         assertTrue(source.contains("c.DateOfInjury AS DateOfIncident"),
                 "Cases grid should hydrate Date of Incident from the existing DateOfInjury column");
+        assertTrue(source.contains("c.StatuteOfLimitations"),
+                "Cases grid should hydrate Statute of Limitations from the existing StatuteOfLimitations column");
+        assertTrue(source.contains("c.TortNoticeDeadline"),
+                "Cases grid should hydrate Tort Claims Notice Deadline from the existing TortNoticeDeadline column");
+    }
+
+    @Test
+    void casesGridQueryUsesIncidentDescriptionSource() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+
+        assertTrue(source.contains("c.IncidentDescription AS Description"),
+                "Cases grid should expose Description from dbo.Cases.IncidentDescription");
     }
 
     @Test
