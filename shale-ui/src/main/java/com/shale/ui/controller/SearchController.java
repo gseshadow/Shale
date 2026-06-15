@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import com.shale.core.model.Organization;
+import com.shale.core.model.CalendarFeedItem;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.UserDao;
@@ -13,6 +14,8 @@ import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
+import com.shale.ui.component.factory.TaskCardFactory;
+import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.SearchService;
@@ -88,6 +91,8 @@ public final class SearchController {
 	private ContactCardFactory contactCardFactory;
 	private OrganizationCardFactory organizationCardFactory;
 	private UserCardFactory userCardFactory;
+	private TaskCardFactory taskCardFactory;
+	private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
 	private Consumer<Long> onOpenTask = id -> {};
 	private Consumer<Long> onOpenCalendarEvent = id -> {};
 	private int loadGeneration = 0;
@@ -126,6 +131,7 @@ public final class SearchController {
 		} : onOpenUser);
 		this.onOpenTask = onOpenTask == null ? id -> { } : onOpenTask;
 		this.onOpenCalendarEvent = onOpenCalendarEvent == null ? id -> { } : onOpenCalendarEvent;
+		this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id -> { }, onOpenCase == null ? id -> { } : onOpenCase, id -> { });
 	}
 
 	@FXML
@@ -358,8 +364,24 @@ public final class SearchController {
 	private void renderTasks(List<TaskDao.GlobalSearchTaskRow> tasks) {
 		if (tasksFlow == null) return;
 		List<Node> cards = tasks.stream().map(row -> {
-			VBox card = simpleCard(row.title(), "Status: " + safe(row.statusName()), "Due: " + safe(row.dueAt()), "Assigned: " + safe(row.assignedUserDisplayName()), "Case: " + safe(row.caseName()));
-			card.setOnMouseClicked(e -> onOpenTask.accept(row.taskId()));
+			var assignedUsers = row.assignedUserId() == null
+					? List.<TaskCardFactory.AssignedUserModel>of()
+					: List.of(new TaskCardFactory.AssignedUserModel(row.assignedUserId(), row.assignedUserDisplayName(), null));
+			String description = "Status: " + safe(row.statusName()) + (safe(row.description()).equals("—") ? "" : "\n" + row.description());
+			var card = taskCardFactory.create(new TaskCardFactory.TaskCardModel(
+					row.taskId(),
+					row.caseId() <= 0 ? null : row.caseId(),
+					row.caseName(),
+					null,
+					null,
+					null,
+					row.title(),
+					description,
+					null,
+					null,
+					row.dueAt(),
+					row.completedAt(),
+					assignedUsers), TaskCardFactory.Variant.FULL, true);
 			card.setPrefWidth(TASK_CARD_WIDTH); card.setMaxWidth(TASK_CARD_WIDTH);
 			return (Node) card;
 		}).toList();
@@ -370,23 +392,31 @@ public final class SearchController {
 	private void renderCalendarEvents(List<CalendarEventDao.GlobalSearchCalendarEventRow> events) {
 		if (calendarEventsFlow == null) return;
 		List<Node> cards = events.stream().map(row -> {
-			VBox card = simpleCard(row.title(), "Start: " + safe(row.startsAt()), "End: " + safe(row.endsAt()), "Location: " + safe(row.location()), "Case: " + safe(row.caseName()));
-			card.setOnMouseClicked(e -> onOpenCalendarEvent.accept(row.calendarEventId() == null ? 0L : row.calendarEventId().longValue()));
-			card.setPrefWidth(EVENT_CARD_WIDTH); card.setMaxWidth(EVENT_CARD_WIDTH);
-			return (Node) card;
+			CalendarFeedItem item = new CalendarFeedItem(
+					"EVENT:" + safe(row.calendarEventId()),
+					row.title(),
+					row.startsAt(),
+					row.endsAt(),
+					false,
+					"MANUAL",
+					null,
+					row.caseId(),
+					null,
+					row.caseName(),
+					null,
+					"Event",
+					null,
+					null);
+			Node eventCard = calendarEventCardFactory.create(item, java.time.LocalDate.now(), java.time.LocalDateTime.now());
+			VBox container = new VBox(4, eventCard);
+			container.getStyleClass().add("search-calendar-event-result");
+			if (!safe(row.location()).equals("—")) container.getChildren().add(new Label("Location: " + row.location()));
+			container.setOnMouseClicked(e -> onOpenCalendarEvent.accept(row.calendarEventId() == null ? 0L : row.calendarEventId().longValue()));
+			container.setPrefWidth(EVENT_CARD_WIDTH); container.setMaxWidth(EVENT_CARD_WIDTH);
+			return (Node) container;
 		}).toList();
 		calendarEventsFlow.getChildren().setAll(cards);
 		updateSectionState(calendarEventsFlow, calendarEventsEmptyLabel, cards.isEmpty());
-	}
-
-	private static VBox simpleCard(String title, String... lines) {
-		VBox box = new VBox(4);
-		box.getStyleClass().addAll("card", "search-result-card");
-		Label titleLabel = new Label(safe(title));
-		titleLabel.getStyleClass().add("section-title");
-		box.getChildren().add(titleLabel);
-		for (String line : lines) box.getChildren().add(new Label(line));
-		return box;
 	}
 
 	private static String safe(Object value) {

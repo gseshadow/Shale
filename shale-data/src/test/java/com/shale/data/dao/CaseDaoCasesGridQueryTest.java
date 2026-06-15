@@ -40,4 +40,28 @@ final class CaseDaoCasesGridQueryTest {
         assertTrue(source.contains("cu.NoteText"));
         assertTrue(source.contains("ORDER BY cu.CreatedAt DESC, cu.Id DESC"));
     }
+    @Test
+    void activeCaseSearchRestoresLatestUpdateAlias() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String method = source.substring(source.indexOf("public List<CaseRow> searchCasesByName"), source.indexOf("public List<CaseRow> searchDeletedCasesByName"));
+
+        assertTrue(method.contains("latestUpdate.LatestCaseUpdate"));
+        assertTrue(method.contains(") latestUpdate"),
+                "Active case search must define the latestUpdate OUTER APPLY alias used by the SELECT list");
+        assertTrue(method.contains("FROM dbo.CaseUpdates cu"));
+        assertTrue(method.contains("ORDER BY cu.CreatedAt DESC, cu.Id DESC"));
+    }
+
+    @Test
+    void deletedCaseSearchRestoresLatestUpdateAlias() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String method = source.substring(source.indexOf("public List<CaseRow> searchDeletedCasesByName"), source.indexOf("private PagedResult<CaseRow> findPageInternal"));
+
+        assertTrue(method.contains("latestUpdate.LatestCaseUpdate"));
+        assertTrue(method.contains(") latestUpdate"),
+                "Deleted case search must define the latestUpdate OUTER APPLY alias used by the SELECT list");
+        assertTrue(method.contains("FROM dbo.CaseUpdates cu"));
+        assertTrue(method.contains("ORDER BY cu.CreatedAt DESC, cu.Id DESC"));
+    }
+
 }
