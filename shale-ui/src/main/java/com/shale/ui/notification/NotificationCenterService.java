@@ -141,8 +141,6 @@ public final class NotificationCenterService {
 		} else {
 			Platform.runLater(() -> pushNotificationsInternal(snapshot, "bulk"));
 		}
-		String eventKey = notification.getEventKey();
-		return eventKey != null && !eventKey.isBlank() && eventKeys.contains(eventKey);
 	}
 
 	private void pushNotificationsInternal(List<AppNotification> incoming, String source) {
@@ -188,7 +186,10 @@ public final class NotificationCenterService {
 		if (durableId != null) {
 			return durableNotificationIds.contains(durableId);
 		}
-		String eventKey = notification.getEventKey();
+		return hasKnownEventKey(notification.getEventKey());
+	}
+
+	private boolean hasKnownEventKey(String eventKey) {
 		return eventKey != null && !eventKey.isBlank() && eventKeys.contains(eventKey);
 	}
 
