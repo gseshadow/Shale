@@ -16,8 +16,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ContactDao {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ContactDao.class);
 
     public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
     }
@@ -214,6 +218,7 @@ public final class ContactDao {
     }
 
     public PagedResult<DirectoryContactRow> findDirectoryContactsPage(int shaleClientId, int page, int pageSize, String searchQuery) {
+        long started = System.nanoTime();
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
@@ -230,8 +235,11 @@ public final class ContactDao {
             ContactSchema schema = ContactSchema.load(con);
             logDetectedCoreColumns(schema);
 
+            long countStarted = System.nanoTime();
             long total = countDirectoryContacts(con, schema, shaleClientId, searchQuery);
+            logPerf("contacts.directory.count", "tenantId=" + shaleClientId + " page=" + page + " queryLength=" + normalizedQueryLength(searchQuery) + " total=" + total, countStarted);
             if (total == 0) {
+                logPerf("contacts.directory.page", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=0 total=0", started);
                 return new PagedResult<>(List.of(), page, pageSize, 0);
             }
 
@@ -281,7 +289,9 @@ public final class ContactDao {
                     }
                 }
             }
-            return new PagedResult<>(List.copyOf(out), page, pageSize, total);
+            PagedResult<DirectoryContactRow> result = new PagedResult<>(List.copyOf(out), page, pageSize, total);
+            logPerf("contacts.directory.page", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=" + out.size() + " total=" + total, started);
+            return result;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load contacts page for tenant (clientId=" + shaleClientId + ", page=" + page + ")", e);
         }
@@ -315,6 +325,7 @@ public final class ContactDao {
     }
 
     public ContactDetailRow findById(int contactId, int shaleClientId) {
+        long started = System.nanoTime();
         if (contactId <= 0) {
             throw new IllegalArgumentException("contactId must be > 0");
         }
@@ -324,13 +335,16 @@ public final class ContactDao {
 
         try (Connection con = db.requireConnection()) {
             verifyTenantMatchesSession(con, shaleClientId);
-            return findById(con, contactId, shaleClientId);
+            ContactDetailRow row = findById(con, contactId, shaleClientId);
+            logPerf("contacts.detail.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " found=" + (row != null), started);
+            return row;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load contact by id (id=" + contactId + ")", e);
         }
     }
 
     public List<RelatedCaseRow> findRelatedCases(int contactId, int shaleClientId) {
+        long started = System.nanoTime();
         if (contactId <= 0) {
             throw new IllegalArgumentException("contactId must be > 0");
         }
@@ -410,7 +424,9 @@ public final class ContactDao {
                                 rs.getString("Notes")));
                     }
                 }
-                return List.copyOf(out);
+                List<RelatedCaseRow> result = List.copyOf(out);
+                logPerf("contacts.relatedCases.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " rows=" + result.size(), started);
+                return result;
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load related cases for contact (id=" + contactId + ")", e);
@@ -418,6 +434,7 @@ public final class ContactDao {
     }
 
     public boolean updateBasicProfile(ContactProfileUpdateRequest request) {
+        long started = System.nanoTime();
         Objects.requireNonNull(request, "request");
         if (request.contactId() <= 0) {
             throw new IllegalArgumentException("contactId must be > 0");
@@ -505,6 +522,7 @@ public final class ContactDao {
                                 after.condition());
                     }
                 }
+                logPerf("contacts.save.query", "contactId=" + request.contactId() + " tenantId=" + request.shaleClientId() + " updated=" + updated, started);
                 return updated;
             }
         } catch (SQLException e) {
@@ -736,6 +754,15 @@ public final class ContactDao {
                         updatedAt == null ? null : updatedAt.toInstant());
             }
         }
+    }
+
+    private static void logPerf(String area, String fields, long startedNanos) {
+        long elapsedMs = (System.nanoTime() - startedNanos) / 1_000_000;
+        LOG.info("PERF {} {} elapsedMs={}", area, fields, elapsedMs);
+    }
+
+    private static int normalizedQueryLength(String query) {
+        return query == null ? 0 : query.trim().length();
     }
 
     private static void verifyTenantMatchesSession(Connection con, int shaleClientId) throws SQLException {
