@@ -176,6 +176,30 @@ public final class NotificationDao {
 		}
 	}
 
+	public int countUnreadNotificationsForUser(int shaleClientId, int userId) {
+		if (shaleClientId <= 0 || userId <= 0) {
+			return 0;
+		}
+		String sql = """
+				SELECT COUNT_BIG(1) AS UnreadCount
+				FROM dbo.Notifications n
+				WHERE n.ShaleClientId = ?
+				  AND n.UserId = ?
+				  AND ISNULL(n.IsDismissed, 0) = 0
+				  AND ISNULL(n.IsRead, 0) = 0
+				""";
+		try (Connection con = db.requireConnection();
+		     PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			ps.setInt(2, userId);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? Math.toIntExact(rs.getLong("UnreadCount")) : 0;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to count unread notifications", e);
+		}
+	}
+
 	public List<NotificationRow> listUnreadNotificationsForUser(int shaleClientId, int userId) {
 		if (shaleClientId <= 0 || userId <= 0) {
 			return List.of();

@@ -10,7 +10,6 @@ import com.shale.ui.notification.NotificationGroup;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -50,8 +49,12 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class NotificationCenterDialog {
+	private static final Logger log = LoggerFactory.getLogger(NotificationCenterDialog.class);
+
 	private static final double DEFAULT_WIDTH = 760;
 	private static final double DEFAULT_HEIGHT = 560;
 	private static final double MIN_WIDTH = 640;
@@ -68,6 +71,9 @@ public final class NotificationCenterDialog {
 			Consumer<Integer> onOpenCase,
 			Consumer<AppNotification> onActivateNotification) {
 		Objects.requireNonNull(notificationService, "notificationService");
+		long openStartNanos = System.nanoTime();
+		log.info("PERF notifications.center.open.start count={} unread={} fxThread={}",
+				notificationService.getNotificationsNewestFirst().size(), notificationService.getUnreadCount(), javafx.application.Platform.isFxApplicationThread());
 
 		Stage stage = new Stage();
 		AppDialogs.applySecondaryWindowChrome(stage);
@@ -212,7 +218,12 @@ public final class NotificationCenterDialog {
 		scene.getStylesheets().add(Objects.requireNonNull(
 				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
+		long renderElapsedMs = (System.nanoTime() - openStartNanos) / 1_000_000;
+		log.info("PERF notifications.center.open.renderReady count={} groups={} elapsedMs={}",
+				notificationService.getNotificationsNewestFirst().size(), notificationGroups.size(), renderElapsedMs);
 		stage.showAndWait();
+		long totalElapsedMs = (System.nanoTime() - openStartNanos) / 1_000_000;
+		log.info("PERF notifications.center.open.closed elapsedMs={}", totalElapsedMs);
 	}
 
 	public static void show(
@@ -334,6 +345,7 @@ public final class NotificationCenterDialog {
 			String searchText) {
 		CategoryFilter effectiveCategory = categoryFilter == null ? CategoryFilter.ALL : categoryFilter;
 		String normalizedSearch = normalizeSearch(searchText);
+		long startNanos = System.nanoTime();
 		Map<String, List<AppNotification>> grouped = new LinkedHashMap<>();
 		for (AppNotification notification : notificationService.getNotificationsNewestFirst()) {
 			if (!matchesFilters(notification, effectiveCategory, unreadOnly, normalizedSearch)) {
@@ -344,9 +356,12 @@ public final class NotificationCenterDialog {
 		}
 		List<NotificationGroup> groups = grouped.entrySet().stream()
 				.map(entry -> new NotificationGroup(entry.getKey(), entry.getValue()))
-				.sorted(Comparator.comparing(NotificationGroup::getLatestCreatedAt).reversed())
 				.toList();
 		notificationGroups.setAll(groups);
+		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+		log.info("PERF notifications.center.group sourceCount={} groups={} category={} unreadOnly={} hasSearch={} elapsedMs={}",
+				notificationService.getNotificationsNewestFirst().size(), groups.size(), effectiveCategory, unreadOnly,
+				!normalizedSearch.isEmpty(), elapsedMs);
 	}
 
 	private static void rebuildCategoryOptions(
@@ -406,8 +421,9 @@ public final class NotificationCenterDialog {
 			MenuItem dismissReadItem,
 			MenuItem dismissOlderItem,
 			MenuButton cleanupMenuButton) {
-		int readCount = readNotifications(notificationService).size();
-		int olderCount = olderNotifications(notificationService).size();
+		CleanupCounts counts = cleanupCounts(notificationService);
+		int readCount = counts.readCount();
+		int olderCount = counts.olderCount();
 		dismissReadItem.setDisable(readCount == 0);
 		dismissOlderItem.setDisable(olderCount == 0);
 		cleanupMenuButton.setDisable(readCount == 0 && olderCount == 0);
@@ -509,10 +525,12 @@ public final class NotificationCenterDialog {
 			List<AppNotification> notifications,
 			String actionDescription) {
 		try {
+			long startNanos = System.nanoTime();
 			notificationService.dismissAll(notifications);
+			long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+			log.info("PERF notifications.center.action action={} count={} elapsedMs={}", actionDescription, notifications.size(), elapsedMs);
 		} catch (RuntimeException ex) {
-			System.err.println("[NotificationCenterDialog] " + actionDescription + " failed for count=" + notifications.size());
-			ex.printStackTrace(System.err);
+			log.error("Notification center action failed action={} count={}", actionDescription, notifications.size(), ex);
 			throw ex;
 		}
 	}
@@ -522,12 +540,35 @@ public final class NotificationCenterDialog {
 			return;
 		}
 		try {
+			long startNanos = System.nanoTime();
 			notificationService.dismiss(item);
+			long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+			log.info("PERF notifications.center.action action=dismiss-one durableId={} elapsedMs={}", item.getDurableNotificationId(), elapsedMs);
 		} catch (RuntimeException ex) {
-			System.err.println("[NotificationCenterDialog] dismiss failed for notification id=" + item.getId());
-			ex.printStackTrace(System.err);
+			log.error("Notification center dismiss failed notificationId={}", item.getId(), ex);
 			throw ex;
 		}
+	}
+
+	private static CleanupCounts cleanupCounts(NotificationCenterService notificationService) {
+		Instant cutoff = Instant.now().minus(30, ChronoUnit.DAYS);
+		int readCount = 0;
+		int olderCount = 0;
+		for (AppNotification notification : notificationService.getNotificationsNewestFirst()) {
+			if (notification == null) {
+				continue;
+			}
+			if (!notification.isUnread()) {
+				readCount++;
+			}
+			if (notification.getCreatedAt().isBefore(cutoff)) {
+				olderCount++;
+			}
+		}
+		return new CleanupCounts(readCount, olderCount);
+	}
+
+	private record CleanupCounts(int readCount, int olderCount) {
 	}
 
 	private enum CategoryFilter {
@@ -656,6 +697,7 @@ public final class NotificationCenterDialog {
 				return;
 			}
 			setText(null);
+			long startNanos = System.nanoTime();
 			NotificationCard card = notificationCardFactory.create(
 					new NotificationCardFactory.NotificationCardModel(item),
 					NotificationCardFactory.Variant.CENTER_ROW);
@@ -664,6 +706,11 @@ public final class NotificationCenterDialog {
 			card.maxWidthProperty().bind(card.prefWidthProperty());
 			boundCard = card;
 			setGraphic(card);
+			long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+			if (elapsedMs >= 5) {
+				log.info("PERF notifications.center.cardRender groupKey={} count={} elapsedMs={}",
+						item.getGroupKey(), item.getCount(), elapsedMs);
+			}
 		}
 
 		private void clearBoundGraphic() {
@@ -681,7 +728,8 @@ public final class NotificationCenterDialog {
 			}
 			return hasStyleClassInAncestorChain(node, "notification-row-dismiss")
 					|| hasStyleClassInAncestorChain(node, "notification-row-expand")
-					|| hasStyleClassInAncestorChain(node, "notification-row-case-mini");
+					|| hasStyleClassInAncestorChain(node, "notification-row-case-mini")
+					|| hasStyleClassInAncestorChain(node, "notification-row-case-mini-card");
 		}
 
 		private static boolean hasStyleClassInAncestorChain(Node node, String styleClass) {
