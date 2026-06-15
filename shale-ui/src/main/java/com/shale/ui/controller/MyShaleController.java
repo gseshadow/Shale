@@ -99,6 +99,7 @@ public final class MyShaleController {
 	private static final String PREF_MY_TASKS_CASE_FILTER = "my_shale_tasks.case_filter";
 	private static final double MY_TASKS_GRID_HGAP = 10;
 	private static final double MY_TASKS_GRID_VGAP = 10;
+	private static final long MY_SHALE_PRIORITY_CACHE_TTL_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -200,6 +201,9 @@ public final class MyShaleController {
 	private List<CaseTaskListItemDto> myTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
 	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
+	private java.util.Map<Integer, String> cachedPriorityNamesById = java.util.Map.of();
+	private Integer cachedPriorityTenantId;
+	private long cachedPriorityLoadedAtNanos;
 	private List<CaseCardVm> myAssignedCasesBoard = List.of();
 	private boolean loadingOverview;
 	private boolean loadingMyTasks;
@@ -516,7 +520,9 @@ public final class MyShaleController {
 		setVisibleManaged(myCasesSectionPane, showMyCases);
 		if (showOverview) {
 			primeTasksLoadingStateForFirstLoad();
-			renderMyOverview();
+			if (myTasksLoadedOnce && !myTasksDirty && !loadingMyTasks) {
+				renderMyOverview();
+			}
 			ensureMyTasksFresh(false);
 		}
 		if (showTasks) {
@@ -938,20 +944,60 @@ public final class MyShaleController {
 		if (!Objects.equals(cachedTasksUserId, currentUserId) || !Objects.equals(cachedTasksTenantId, currentTenantId)) {
 			myTasksLoadedOnce = false;
 			myTasksDirty = true;
+			cachedPriorityTenantId = null;
+			cachedPriorityNamesById = java.util.Map.of();
+			cachedPriorityLoadedAtNanos = 0L;
 		}
+	}
+
+	private void renderActiveTaskViews() {
+		if (SECTION_OVERVIEW.equals(activeSection)) {
+			renderMyOverview();
+			return;
+		}
+		if (SECTION_TASKS.equals(activeSection)) {
+			renderMyTasks();
+		}
+	}
+
+	private java.util.Map<Integer, String> loadMyShalePriorityNames(int shaleClientId) {
+		long now = System.nanoTime();
+		if (Objects.equals(cachedPriorityTenantId, shaleClientId)
+				&& cachedPriorityLoadedAtNanos > 0L
+				&& now - cachedPriorityLoadedAtNanos < MY_SHALE_PRIORITY_CACHE_TTL_NANOS) {
+			PerfLog.log("DAO", "cache_hit", "method=loadActivePriorities page=my_shale organizationId=" + shaleClientId + " rows=" + cachedPriorityNamesById.size());
+			return cachedPriorityNamesById;
+		}
+
+		long prioritiesLoadStartNanos = PerfLog.start();
+		PerfLog.log("DAO", "start", "method=loadActivePriorities page=my_shale organizationId=" + shaleClientId);
+		java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientId).stream()
+				.filter(Objects::nonNull)
+				.collect(java.util.stream.Collectors.toMap(
+						TaskPriorityOptionDto::id,
+						option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
+						(existing, replacement) -> existing,
+						java.util.LinkedHashMap::new));
+		cachedPriorityTenantId = shaleClientId;
+		cachedPriorityNamesById = prioritiesById;
+		cachedPriorityLoadedAtNanos = System.nanoTime();
+		PerfLog.logDone("DAO", "method=loadActivePriorities page=my_shale organizationId=" + shaleClientId + " rows=" + prioritiesById.size(), prioritiesLoadStartNanos);
+		return prioritiesById;
 	}
 
 	private void refreshMyTasks(boolean force) {
 		if (caseTaskService == null || appState == null) {
 			return;
 		}
-		if (!force && loadingMyTasks) {
-			return;
+		if (loadingMyTasks) {
+			if (!force) {
+				return;
+			}
+			PerfLog.log("CTRL", "supersede", "panel=my_tasks page=my_shale generation=" + (taskLoadGeneration + 1));
 		}
 		loadingOverview = true;
 		loadingMyTasks = true;
-		renderMyOverview();
-		renderMyTasks();
+		renderActiveTaskViews();
 		Integer shaleClientId = appState.getShaleClientId();
 		Integer userId = appState.getUserId();
 			if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
@@ -964,8 +1010,7 @@ public final class MyShaleController {
 				myTasksDirty = false;
 			loadingOverview = false;
 			loadingMyTasks = false;
-			renderMyOverview();
-			renderMyTasks();
+			renderActiveTaskViews();
 			return;
 		}
 
@@ -1010,16 +1055,7 @@ public final class MyShaleController {
 												row.displayName(),
 												row.color()),
 											java.util.stream.Collectors.toList())));
-					long prioritiesLoadStartNanos = PerfLog.start();
-					PerfLog.log("DAO", "start", "method=loadActivePriorities page=my_shale organizationId=" + shaleClientIdValue);
-					java.util.Map<Integer, String> prioritiesById = caseTaskService.loadActivePriorities(shaleClientIdValue).stream()
-							.filter(Objects::nonNull)
-							.collect(java.util.stream.Collectors.toMap(
-									TaskPriorityOptionDto::id,
-									option -> safe(option.name()).isBlank() ? ("Priority #" + option.id()) : option.name().trim(),
-									(existing, replacement) -> existing,
-									java.util.LinkedHashMap::new));
-					PerfLog.logDone("DAO", "method=loadActivePriorities page=my_shale organizationId=" + shaleClientIdValue + " rows=" + prioritiesById.size(), prioritiesLoadStartNanos);
+					java.util.Map<Integer, String> prioritiesById = loadMyShalePriorityNames(shaleClientIdValue);
 					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " rows=" + assignedByTask.size(), usersLoadStartNanos);
 					runOnFx(() -> {
 						if (generationAtSubmit != taskLoadGeneration) {
@@ -1041,8 +1077,7 @@ public final class MyShaleController {
 							myTasksDirty = false;
 						syncMyTaskPriorityFilterOptions();
 						syncMyTaskCaseFilterOptions();
-						renderMyOverview();
-						renderMyTasks();
+						renderActiveTaskViews();
 					});
 			} catch (Exception ex) {
 				System.err.println("My tasks load failed: " + ex.getMessage());
@@ -1051,8 +1086,7 @@ public final class MyShaleController {
 					loadingOverview = false;
 					loadingMyTasks = false;
 					myTasksDirty = true;
-					renderMyOverview();
-					renderMyTasks();
+					renderActiveTaskViews();
 					showTaskActionError("Failed to load your tasks.");
 				});
 			}
