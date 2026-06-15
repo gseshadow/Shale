@@ -25,11 +25,11 @@ final class CaseDaoCasesGridQueryTest {
     }
 
     @Test
-    void casesGridQueryUsesIncidentDescriptionSource() throws Exception {
+    void casesGridQueryUsesDescriptionSource() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
 
-        assertTrue(source.contains("c.IncidentDescription AS Description"),
-                "Cases grid should expose Description from dbo.Cases.IncidentDescription");
+        assertTrue(source.contains("c.Description AS Description"),
+                "Cases grid should expose Description from dbo.Cases.Description");
     }
 
     @Test
