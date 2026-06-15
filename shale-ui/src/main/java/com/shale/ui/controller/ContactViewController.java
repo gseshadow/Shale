@@ -17,6 +17,7 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.PhiReadAuditService;
+import com.shale.ui.util.PerfLog;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
@@ -77,6 +78,7 @@ public final class ContactViewController {
     private CaseCardFactory caseCardFactory;
     private List<RelatedCaseRow> relatedCases = List.of();
     private PhiReadAuditService phiReadAuditService;
+    private int detailLoadGeneration = 0;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contact-view-loader");
@@ -130,18 +132,27 @@ public final class ContactViewController {
     }
 
     private void loadContact() {
+        final int generation = ++detailLoadGeneration;
+        final int requestedContactId = contactId;
+        final long loadStarted = PerfLog.start();
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
-        if (contactDetailService == null || tenantId == null || tenantId <= 0 || contactId <= 0) {
+        if (contactDetailService == null || tenantId == null || tenantId <= 0 || requestedContactId <= 0) {
             setError("Contact details are unavailable right now.");
             return;
         }
 
+        PerfLog.log("contacts.detail", "load.start", "contactId=" + requestedContactId + " tenantId=" + tenantId + " generation=" + generation);
         setBusy(true);
         dbExec.submit(() -> {
             try {
-                ContactDetailRow row = contactDetailService.loadContact(contactId, tenantId);
-                List<RelatedCaseRow> loadedRelatedCases = contactDetailService.loadRelatedCases(contactId, tenantId);
+                ContactDetailService.ContactDetailSnapshot snapshot = contactDetailService.loadSnapshot(requestedContactId, tenantId);
+                ContactDetailRow row = snapshot.contact();
+                List<RelatedCaseRow> loadedRelatedCases = snapshot.relatedCases();
                 Platform.runLater(() -> {
+                    if (generation != detailLoadGeneration || contactId != requestedContactId) {
+                        PerfLog.logDone("contacts.detail", "phase=discard generation=" + generation + " reason=stale", loadStarted);
+                        return;
+                    }
                     setBusy(false);
                     if (row == null) {
                         currentContact = null;
@@ -153,10 +164,13 @@ public final class ContactViewController {
                     }
                     currentContact = row;
                     relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
+                    long renderStarted = PerfLog.start();
                     renderFromCurrent();
                     renderRelatedCases();
                     setEditMode(false);
                     clearError();
+                    PerfLog.logDone("contacts.detail.render", "contactId=" + contactId + " relatedCases=" + relatedCases.size() + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
+                    PerfLog.logDone("contacts.detail", "phase=apply generation=" + generation + " contactId=" + contactId + " relatedCases=" + relatedCases.size(), loadStarted);
                 });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> {
@@ -204,6 +218,7 @@ public final class ContactViewController {
             return;
         }
 
+        long saveStarted = PerfLog.start();
         ContactProfileUpdateRequest request = new ContactProfileUpdateRequest(
                 currentContact.id(),
                 currentContact.shaleClientId(),
@@ -219,6 +234,7 @@ public final class ContactViewController {
                 deceasedEditor != null && deceasedEditor.isSelected(),
                 currentContact.client());
 
+        PerfLog.log("contacts.save", "start", "contactId=" + request.contactId() + " tenantId=" + request.shaleClientId());
         setBusy(true);
         dbExec.submit(() -> {
             try {
@@ -231,8 +247,9 @@ public final class ContactViewController {
                     return;
                 }
 
-                ContactDetailRow reloaded = contactDetailService.loadContact(currentContact.id(), currentContact.shaleClientId());
-                List<RelatedCaseRow> reloadedRelatedCases = contactDetailService.loadRelatedCases(currentContact.id(), currentContact.shaleClientId());
+                ContactDetailService.ContactDetailSnapshot reloadedSnapshot = contactDetailService.loadSnapshot(request.contactId(), request.shaleClientId());
+                ContactDetailRow reloaded = reloadedSnapshot.contact();
+                List<RelatedCaseRow> reloadedRelatedCases = reloadedSnapshot.relatedCases();
                 Platform.runLater(() -> {
                     setBusy(false);
                     if (reloaded == null) {
@@ -245,6 +262,7 @@ public final class ContactViewController {
                     renderRelatedCases();
                     setEditMode(false);
                     clearError();
+                    PerfLog.logDone("contacts.save", "phase=apply contactId=" + currentContact.id() + " relatedCases=" + relatedCases.size(), saveStarted);
                 });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> {
@@ -414,6 +432,7 @@ public final class ContactViewController {
             return;
         }
 
+        long renderStarted = PerfLog.start();
         if (relatedCasesContainer == null) {
             return;
         }
@@ -439,6 +458,7 @@ public final class ContactViewController {
                 relatedCasesEmptyLabel.toBack();
             }
         }
+        PerfLog.logDone("contacts.relatedCases.render", "contactId=" + contactId + " cards=" + cards.size() + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
     }
 
     private Node createRelatedCaseCard(RelatedCaseRow row) {

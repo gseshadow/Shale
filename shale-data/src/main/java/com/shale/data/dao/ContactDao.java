@@ -16,8 +16,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ContactDao {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ContactDao.class);
 
     public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
     }
@@ -26,6 +30,14 @@ public final class ContactDao {
             int id,
             String firstName,
             String lastName,
+            String displayName,
+            String email,
+            String phone
+    ) {
+    }
+
+    public record ContactCardSummaryRow(
+            int id,
             String displayName,
             String email,
             String phone
@@ -213,7 +225,8 @@ public final class ContactDao {
         }
     }
 
-    public PagedResult<DirectoryContactRow> findDirectoryContactsPage(int shaleClientId, int page, int pageSize, String searchQuery) {
+    public PagedResult<ContactCardSummaryRow> findDirectoryContactsPage(int shaleClientId, int page, int pageSize, String searchQuery) {
+        long started = System.nanoTime();
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
@@ -230,39 +243,39 @@ public final class ContactDao {
             ContactSchema schema = ContactSchema.load(con);
             logDetectedCoreColumns(schema);
 
+            long countStarted = System.nanoTime();
             long total = countDirectoryContacts(con, schema, shaleClientId, searchQuery);
+            logPerf("contacts.directory.count", "tenantId=" + shaleClientId + " page=" + page + " queryLength=" + normalizedQueryLength(searchQuery) + " total=" + total, countStarted);
             if (total == 0) {
+                logPerf("contacts.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=0 total=0 fullDetailHydration=false selectedFields=id,displayName,email,phone", started);
                 return new PagedResult<>(List.of(), page, pageSize, 0);
             }
 
-            String searchClause = searchClause(schema, "c");
+            String searchClause = lightweightSearchClause(schema, "c");
+            String displayName = lightweightDisplayNameExpression(schema, "c");
             String sql = """
                     SELECT
                       c.Id,
-                      %s,
-                      %s,
                       %s AS DisplayName,
-                      %s,
-                      %s
+                      %s AS Email,
+                      %s AS Phone
                     FROM dbo.Contacts c
                     WHERE c.%s = ?
-                      AND NULLIF(LTRIM(RTRIM(%s)), '') IS NOT NULL
+                      AND %s IS NOT NULL
                     %s
                     %s
                     ORDER BY DisplayName ASC, c.Id ASC
                     OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
                     """.formatted(
-                    optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
-                    optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
-                    displayNameExpression(schema, "c"),
-                    optionalColumnExpression(schema.emailColumn(), "c", "Email"),
-                    optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    displayName,
+                    lightweightColumnExpression(schema.emailColumn(), "c"),
+                    lightweightColumnExpression(schema.phoneColumn(), "c"),
                     schema.tenantColumn(),
-                    displayNameExpression(schema, "c"),
+                    displayName,
                     activeFilter(schema.deletedColumn(), "c"),
                     searchClause);
 
-            List<DirectoryContactRow> out = new ArrayList<>(pageSize);
+            List<ContactCardSummaryRow> out = new ArrayList<>(pageSize);
             try (PreparedStatement ps = con.prepareStatement(sql)) {
                 int idx = 1;
                 idx = bindDirectoryQuery(ps, idx, shaleClientId, schema, searchQuery);
@@ -271,17 +284,17 @@ public final class ContactDao {
 
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        out.add(new DirectoryContactRow(
+                        out.add(new ContactCardSummaryRow(
                                 rs.getInt("Id"),
-                                rs.getString("FirstName"),
-                                rs.getString("LastName"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
                                 rs.getString("Phone")));
                     }
                 }
             }
-            return new PagedResult<>(List.copyOf(out), page, pageSize, total);
+            PagedResult<ContactCardSummaryRow> result = new PagedResult<>(List.copyOf(out), page, pageSize, total);
+            logPerf("contacts.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=" + out.size() + " total=" + total + " fullDetailHydration=false selectedFields=id,displayName,email,phone", started);
+            return result;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load contacts page for tenant (clientId=" + shaleClientId + ", page=" + page + ")", e);
         }
@@ -315,6 +328,7 @@ public final class ContactDao {
     }
 
     public ContactDetailRow findById(int contactId, int shaleClientId) {
+        long started = System.nanoTime();
         if (contactId <= 0) {
             throw new IllegalArgumentException("contactId must be > 0");
         }
@@ -324,13 +338,16 @@ public final class ContactDao {
 
         try (Connection con = db.requireConnection()) {
             verifyTenantMatchesSession(con, shaleClientId);
-            return findById(con, contactId, shaleClientId);
+            ContactDetailRow row = findById(con, contactId, shaleClientId);
+            logPerf("contacts.detail.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " found=" + (row != null), started);
+            return row;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load contact by id (id=" + contactId + ")", e);
         }
     }
 
     public List<RelatedCaseRow> findRelatedCases(int contactId, int shaleClientId) {
+        long started = System.nanoTime();
         if (contactId <= 0) {
             throw new IllegalArgumentException("contactId must be > 0");
         }
@@ -410,7 +427,9 @@ public final class ContactDao {
                                 rs.getString("Notes")));
                     }
                 }
-                return List.copyOf(out);
+                List<RelatedCaseRow> result = List.copyOf(out);
+                logPerf("contacts.relatedCases.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " rows=" + result.size(), started);
+                return result;
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load related cases for contact (id=" + contactId + ")", e);
@@ -418,6 +437,7 @@ public final class ContactDao {
     }
 
     public boolean updateBasicProfile(ContactProfileUpdateRequest request) {
+        long started = System.nanoTime();
         Objects.requireNonNull(request, "request");
         if (request.contactId() <= 0) {
             throw new IllegalArgumentException("contactId must be > 0");
@@ -505,6 +525,7 @@ public final class ContactDao {
                                 after.condition());
                     }
                 }
+                logPerf("contacts.save.query", "contactId=" + request.contactId() + " tenantId=" + request.shaleClientId() + " updated=" + updated, started);
                 return updated;
             }
         } catch (SQLException e) {
@@ -738,6 +759,15 @@ public final class ContactDao {
         }
     }
 
+    private static void logPerf(String area, String fields, long startedNanos) {
+        long elapsedMs = (System.nanoTime() - startedNanos) / 1_000_000;
+        LOG.info("PERF {} {} elapsedMs={}", area, fields, elapsedMs);
+    }
+
+    private static int normalizedQueryLength(String query) {
+        return query == null ? 0 : query.trim().length();
+    }
+
     private static void verifyTenantMatchesSession(Connection con, int shaleClientId) throws SQLException {
         int sessionClientId = requireCurrentShaleClientId(con);
         if (sessionClientId != shaleClientId) {
@@ -806,6 +836,22 @@ public final class ContactDao {
         return "NULLIF(LTRIM(RTRIM(" + alias + "." + column + ")), '')";
     }
 
+    private static String lightweightColumnExpression(String column, String alias) {
+        if (column == null || column.isBlank()) {
+            return "CAST(NULL AS NVARCHAR(255))";
+        }
+        return "NULLIF(LTRIM(RTRIM(CONVERT(NVARCHAR(255), " + alias + "." + column + "))), '')";
+    }
+
+    private static String lightweightDisplayNameExpression(ContactSchema schema, String alias) {
+        String first = lightweightColumnExpression(schema.firstNameColumn(), alias);
+        String last = lightweightColumnExpression(schema.lastNameColumn(), alias);
+        String name = lightweightColumnExpression(schema.nameColumn(), alias);
+        return "NULLIF(LTRIM(RTRIM(CASE WHEN (" + first + " IS NOT NULL) OR (" + last + " IS NOT NULL) THEN "
+                + "COALESCE(" + first + ", '') + CASE WHEN COALESCE(" + first + ", '') = '' OR COALESCE(" + last + ", '') = '' THEN '' ELSE ' ' END + COALESCE(" + last + ", '') "
+                + "ELSE COALESCE(" + name + ", '') END)), '')";
+    }
+
     private static String phoneDigitsExpression(String column, String alias) {
         if (column == null || column.isBlank()) {
             return "CAST(NULL AS NVARCHAR(255))";
@@ -854,6 +900,26 @@ public final class ContactDao {
                 displayNameExpression(schema, alias),
                 coreTextExpression(schema.emailColumn(), alias),
                 coreTextExpression(schema.phoneColumn(), alias));
+    }
+
+    private static String lightweightSearchClause(ContactSchema schema, String alias) {
+        return """
+                  AND (
+                    ? = ''
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                    OR LOWER(%s) LIKE ?
+                  )
+                """.formatted(
+                lightweightColumnExpression(schema.nameColumn(), alias),
+                lightweightColumnExpression(schema.firstNameColumn(), alias),
+                lightweightColumnExpression(schema.lastNameColumn(), alias),
+                lightweightDisplayNameExpression(schema, alias),
+                lightweightColumnExpression(schema.emailColumn(), alias),
+                lightweightColumnExpression(schema.phoneColumn(), alias));
     }
 
     private static int bindDirectoryQuery(PreparedStatement ps,

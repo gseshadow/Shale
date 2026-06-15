@@ -1,10 +1,11 @@
 package com.shale.ui.controller;
 
 import com.shale.data.dao.ContactDao;
-import com.shale.data.dao.ContactDao.DirectoryContactRow;
+import com.shale.data.dao.ContactDao.ContactCardSummaryRow;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -40,7 +41,7 @@ public final class ContactsController {
     private AppState appState;
     private ContactDao contactDao;
     private ContactCardFactory contactCardFactory;
-    private final List<DirectoryContactRow> loadedContacts = new ArrayList<>();
+    private final List<ContactCardSummaryRow> loadedContacts = new ArrayList<>();
     private String emptyStateMessage = "No contacts to display yet.";
     private String loadingStateMessage = "Loading contacts…";
     private int loadGeneration = 0;
@@ -48,6 +49,7 @@ public final class ContactsController {
     private final int pageSize = 100;
     private boolean loading = false;
     private boolean hasMore = true;
+    private long pageLoadStartedNanos;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contacts-directory-loader");
@@ -91,6 +93,7 @@ public final class ContactsController {
     }
 
     private void loadFirstPage() {
+        long started = PerfLog.start();
         loadGeneration++;
         currentPage = 0;
         loading = false;
@@ -99,7 +102,9 @@ public final class ContactsController {
         if (contactsFlow != null) {
             contactsFlow.getChildren().clear();
         }
+        PerfLog.log("contacts.page", "load.start", "generation=" + loadGeneration + " queryLength=" + normalizedQuery().length());
         loadNextPage();
+        PerfLog.logDone("contacts.page", "phase=reset generation=" + loadGeneration, started);
     }
 
     private void loadNextPage() {
@@ -126,6 +131,10 @@ public final class ContactsController {
 
         loading = true;
         final int pageToLoad = currentPage;
+        final String queryAtSubmit = normalizedQuery();
+        final long queryStarted = PerfLog.start();
+        if (pageToLoad == 0) { pageLoadStartedNanos = queryStarted; }
+        PerfLog.log("contacts.search", "execute.start", "generation=" + generationAtSubmit + " page=" + pageToLoad + " pageSize=" + pageSize + " tenantId=" + tenantId + " queryLength=" + queryAtSubmit.length());
         if (loadedContacts.isEmpty()) {
             setLoadingStateMessage("Loading contacts…");
             updateLoadingState(true);
@@ -135,10 +144,13 @@ public final class ContactsController {
 
         dbExec.submit(() -> {
             try {
-                var page = contactDao.findDirectoryContactsPage(tenantId, pageToLoad, pageSize, normalizedQuery());
+                long daoStarted = PerfLog.start();
+                var page = contactDao.findDirectoryContactsPage(tenantId, pageToLoad, pageSize, queryAtSubmit);
+                PerfLog.logDone("contacts.search.dao", "generation=" + generationAtSubmit + " page=" + pageToLoad + " tenantId=" + tenantId + " rows=" + page.items().size() + " total=" + page.total(), daoStarted);
 
                 Platform.runLater(() -> {
-                    if (generationAtSubmit != loadGeneration) {
+                    if (generationAtSubmit != loadGeneration || !queryAtSubmit.equals(normalizedQuery())) {
+                        PerfLog.logDone("contacts.search", "phase=discard generation=" + generationAtSubmit + " page=" + pageToLoad + " reason=stale", queryStarted);
                         return;
                     }
                     loadedContacts.addAll(page.items());
@@ -147,6 +159,8 @@ public final class ContactsController {
                     loading = false;
                     setEmptyStateMessage("No contacts to display yet.");
                     rerender();
+                    PerfLog.logDone("contacts.search", "phase=apply generation=" + generationAtSubmit + " page=" + pageToLoad + " loaded=" + loadedContacts.size() + " hasMore=" + hasMore, queryStarted);
+                    if (pageToLoad == 0) { PerfLog.logDone("contacts.page", "phase=initialLoad generation=" + generationAtSubmit + " rows=" + loadedContacts.size(), pageLoadStartedNanos); }
                 });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> {
@@ -163,6 +177,7 @@ public final class ContactsController {
     }
 
     private void rerender() {
+        long renderStarted = PerfLog.start();
         if (contactsFlow == null) {
             return;
         }
@@ -186,9 +201,10 @@ public final class ContactsController {
         }
         updateLoadingState(false);
         updateEmptyState(empty);
+        PerfLog.logDone("contacts.render", "cards=" + cards.size() + " loaded=" + loadedContacts.size() + " loading=" + loading + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
     }
 
-    private Node buildCard(DirectoryContactRow row) {
+    private Node buildCard(ContactCardSummaryRow row) {
         String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
         var card = contactCardFactory.create(new ContactCardModel(
                 row.id(),
