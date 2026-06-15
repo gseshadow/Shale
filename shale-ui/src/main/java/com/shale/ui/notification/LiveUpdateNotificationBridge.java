@@ -69,20 +69,25 @@ public final class LiveUpdateNotificationBridge {
 	}
 
 	private void handleEntityUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
+		long startNanos = System.nanoTime();
 		if (isCalendarAssignmentEventForCurrentUser(event)) {
 			pushCalendarAssignment(event);
 			return;
 		}
 		if (!isTaskNotificationEventForCurrentUser(event)) {
+			logLiveSkipped(event, "not_for_current_user", startNanos);
 			return;
 		}
 		if (isSelfNotificationEvent(event)) {
+			logLiveSkipped(event, "self_event", startNanos);
 			return;
 		}
 		if (isDuplicate(event)) {
+			logLiveSkipped(event, "duplicate", startNanos);
 			return;
 		}
 		if (!notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_ASSIGNED_TO_ME)) {
+			logLiveSkipped(event, "preference_disabled", startNanos);
 			return;
 		}
 
@@ -141,6 +146,9 @@ public final class LiveUpdateNotificationBridge {
 					caseResponsibleAttorney,
 					caseResponsibleAttorneyColor,
 					caseNonEngagementLetterSent));
+		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+		log.info("PERF notifications.live.handle type=TASK eventId={} entityId={} durableId={} elapsedMs={}",
+				event.eventId(), entityId, durableNotificationId, elapsedMs);
 	}
 
 	private void pushCalendarAssignment(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -172,8 +180,14 @@ public final class LiveUpdateNotificationBridge {
 				event.entityId() > 0 ? event.entityId() : null,
 				null,
 				"CALENDAR_EVENT_ASSIGNED"));
-		log.info("Live notification type=CALENDAR_EVENT_ASSIGNED targetUserId={} currentUserId={} deliveredLive=true",
-				targetUserId, currentUserId);
+		log.info("PERF notifications.live.handle type=CALENDAR_EVENT_ASSIGNED eventId={} targetUserId={} currentUserId={} deliveredLive=true",
+				event.eventId(), targetUserId, currentUserId);
+	}
+
+	private void logLiveSkipped(UiRuntimeBridge.EntityUpdatedEvent event, String reason, long startNanos) {
+		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+		log.info("PERF notifications.live.skip reason={} eventType={} eventId={} entityId={} elapsedMs={}",
+				reason, event == null ? null : event.entityType(), event == null ? null : event.eventId(), event == null ? null : event.entityId(), elapsedMs);
 	}
 
 	private boolean isTaskNotificationEventForCurrentUser(UiRuntimeBridge.EntityUpdatedEvent event) {
