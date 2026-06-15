@@ -778,7 +778,28 @@ public final class CaseDao {
 
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, null);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, null, null, null);
+	}
+
+	/** page is 0-based; query/status filters are pushed into SQL for the Cases view. */
+	public PagedResult<CaseRow> findCasesViewPage(int page,
+			int pageSize,
+			CaseSort sort,
+			boolean includeClosedDenied,
+			String query,
+			Set<Integer> selectedStatusIds) {
+		return findCasesViewPage(page, pageSize, sort, includeClosedDenied, query, selectedStatusIds, null);
+	}
+
+	/** page is 0-based; reuses knownTotal to avoid recounting unchanged Cases-view queries. */
+	public PagedResult<CaseRow> findCasesViewPage(int page,
+			int pageSize,
+			CaseSort sort,
+			boolean includeClosedDenied,
+			String query,
+			Set<Integer> selectedStatusIds,
+			Long knownTotal) {
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, query, selectedStatusIds, knownTotal);
 	}
 
 	/** page is 0-based */
@@ -792,7 +813,7 @@ public final class CaseDao {
 				+ " pageSize=" + pageSize
 				+ " sort=" + sort
 				+ " includeClosedDenied=" + includeClosedDenied);
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId, null, null, null);
 	}
 
 	public List<CaseRow> listActiveCasesForUserTeamMember(int userId, int limit) {
@@ -1327,13 +1348,23 @@ public final class CaseDao {
 			int pageSize,
 			CaseSort sort,
 			boolean includeClosedDenied,
-			Integer restrictToUserId) {
+			Integer restrictToUserId,
+			String query,
+			Set<Integer> selectedStatusIds,
+			Long knownTotal) {
 		if (page < 0)
 			throw new IllegalArgumentException("page must be >= 0");
 		if (pageSize <= 0)
 			throw new IllegalArgumentException("pageSize must be > 0");
 
-		long total = countAll(includeClosedDenied, restrictToUserId);
+		String normalizedQuery = normalizeSearchQuery(query);
+		Set<Integer> effectiveStatusIds = selectedStatusIds == null ? Set.of() : new HashSet<>(selectedStatusIds);
+		boolean casesViewFiltered = restrictToUserId == null && (!normalizedQuery.isBlank() || !effectiveStatusIds.isEmpty());
+		long total = knownTotal != null && knownTotal >= 0
+				? knownTotal
+				: (casesViewFiltered
+						? countForCasesView(normalizedQuery, effectiveStatusIds)
+						: countAll(includeClosedDenied, restrictToUserId));
 		if (total == 0) {
 			return new PagedResult<>(List.of(), page, pageSize, 0);
 		}
@@ -1347,6 +1378,16 @@ public final class CaseDao {
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
 			String userMembershipFilter = membershipExistsFilter(restrictToUserId, resolveCaseUsersDeletedColumn(con));
+			StringBuilder casesViewFilter = new StringBuilder();
+			if (!normalizedQuery.isBlank()) {
+				casesViewFilter.append("\n  AND LOWER(COALESCE(c.Name, '')) LIKE ?");
+			}
+			if (!effectiveStatusIds.isEmpty()) {
+				casesViewFilter.append("\n  AND (current_status.PrimaryStatusId IS NULL OR current_status.PrimaryStatusId IN (");
+				casesViewFilter.append("?,".repeat(effectiveStatusIds.size()));
+				casesViewFilter.setLength(casesViewFilter.length() - 1);
+				casesViewFilter.append("))");
+			}
 			String sql = """
 					SELECT
 					  c.Id,
@@ -1452,7 +1493,7 @@ public final class CaseDao {
 					ORDER BY
 					  %s
 					OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter,
+					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter + casesViewFilter,
 					orderByClause);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -1468,6 +1509,13 @@ public final class CaseDao {
 					ps.setInt(idx++, restrictToUserId);
 					traceParams.append(" restrictToUserId=").append(restrictToUserId)
 							.append(" restrictByAnyCaseUserMembership=true");
+				}
+				if (!normalizedQuery.isBlank()) {
+					ps.setString(idx++, containsPattern(normalizedQuery));
+					traceParams.append(" queryActive=true");
+				}
+				for (Integer statusId : effectiveStatusIds) {
+					ps.setInt(idx++, statusId);
 				}
 				ps.setInt(idx++, offset);
 				ps.setInt(idx++, pageSize);
