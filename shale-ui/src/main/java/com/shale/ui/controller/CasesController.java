@@ -28,9 +28,11 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.CheckMenuItem;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.ToggleGroup;
 import javafx.animation.PauseTransition;
 import javafx.beans.property.ReadOnlyStringWrapper;
@@ -41,6 +43,8 @@ import javafx.scene.layout.FlowPane;
 import javafx.util.Duration;
 
 public final class CasesController {
+
+	private static final int LATEST_CASE_UPDATE_PREVIEW_LIMIT = 100;
 
 	// Existing controls (keep these IDs in FXML)
 	@FXML
@@ -207,7 +211,7 @@ public final class CasesController {
 		addGridColumn("Intake Date / Caller Date", vm -> formatDate(vm.intakeDate), 150);
 		addGridColumn("Case Status", vm -> vm.primaryStatusName, 130);
 		addGridColumn("Opposing Parties", vm -> vm.opposingPartiesName, 160);
-		addGridColumn("Latest Case Update", vm -> vm.latestCaseUpdate, 220);
+		addLatestCaseUpdateGridColumn();
 		addGridColumn("Description", vm -> vm.description, 240);
 		addGridColumn("Date of Incident", vm -> formatDate(vm.dateOfIncident), 130);
 		addGridColumn("Statute of Limitations", vm -> formatDate(vm.solDate), 150);
@@ -229,6 +233,35 @@ public final class CasesController {
 		column.setPrefWidth(width);
 		column.setCellValueFactory(data -> new ReadOnlyStringWrapper(valueFactory.apply(data.getValue())));
 		casesTable.getColumns().add(column);
+	}
+
+	private void addLatestCaseUpdateGridColumn() {
+		TableColumn<CaseCardVm, String> column = new TableColumn<>("Latest Case Update");
+		column.setPrefWidth(220);
+		column.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().latestCaseUpdate));
+		column.setCellFactory(col -> new TableCell<>() {
+			@Override
+			protected void updateItem(String updateText, boolean empty) {
+				super.updateItem(updateText, empty);
+				if (empty || updateText == null || updateText.isEmpty()) {
+					setText(null);
+					setTooltip(null);
+					return;
+				}
+
+				setText(previewLatestCaseUpdate(updateText));
+				setTooltip(new Tooltip(updateText));
+			}
+		});
+		casesTable.getColumns().add(column);
+	}
+
+	private static String previewLatestCaseUpdate(String updateText) {
+		String safeText = safe(updateText);
+		if (safeText.length() <= LATEST_CASE_UPDATE_PREVIEW_LIMIT) {
+			return safeText;
+		}
+		return safeText.substring(0, LATEST_CASE_UPDATE_PREVIEW_LIMIT) + "...";
 	}
 
 	private static String formatDate(LocalDate date) {
