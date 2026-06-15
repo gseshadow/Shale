@@ -597,9 +597,11 @@ public final class SceneManager {
 					caseDao,
 					new ContactDao(dbSessionProvider),
 					new OrganizationDao(dbSessionProvider),
-					new UserDao(dbSessionProvider));
+					new UserDao(dbSessionProvider),
+					new TaskDao(dbSessionProvider),
+					new CalendarEventDao(dbSessionProvider));
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
-			c.init(appState, searchService, caseDetailService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser);
+			c.init(appState, searchService, caseDetailService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser, this::openTaskProfile, this::openCalendarEventFromNotification);
 			return c;
 		});
 	}
