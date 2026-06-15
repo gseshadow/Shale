@@ -7,16 +7,28 @@ import com.shale.ui.state.AppState;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class DurableNotificationService {
+	private static final Logger log = LoggerFactory.getLogger(DurableNotificationService.class);
+
 	private final NotificationDao notificationDao;
 	private final AppState appState;
 	private final NotificationPreferencesService notificationPreferencesService;
+	private final ExecutorService persistenceExecutor;
 
 	public DurableNotificationService(NotificationDao notificationDao, AppState appState, NotificationPreferencesService notificationPreferencesService) {
 		this.notificationDao = Objects.requireNonNull(notificationDao, "notificationDao");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
+		this.persistenceExecutor = Executors.newSingleThreadExecutor(r -> {
+			Thread t = new Thread(r, "notification-persistence-worker");
+			t.setDaemon(true);
+			return t;
+		});
 	}
 
 	public void loadUnreadInto(NotificationCenterService notificationCenterService) {
@@ -33,11 +45,17 @@ public final class DurableNotificationService {
 		if (shaleClientId <= 0 || userId <= 0) {
 			return List.of();
 		}
+		long startNanos = System.nanoTime();
 		List<NotificationRow> rows = notificationDao.listUnreadNotificationsForUser(shaleClientId, userId);
-		return rows.stream()
+		long queryElapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+		List<AppNotification> mapped = rows.stream()
 				.map(this::toAppNotification)
 				.filter(Objects::nonNull)
 				.toList();
+		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+		log.info("PERF notifications.durable.load tenantId={} userId={} rows={} mapped={} queryElapsedMs={} totalElapsedMs={} thread={}",
+				shaleClientId, userId, rows.size(), mapped.size(), queryElapsedMs, elapsedMs, Thread.currentThread().getName());
+		return mapped;
 	}
 
 	public void pushLoaded(NotificationCenterService notificationCenterService, List<AppNotification> notifications) {
@@ -45,9 +63,7 @@ public final class DurableNotificationService {
 		if (notifications == null || notifications.isEmpty()) {
 			return;
 		}
-		for (AppNotification notification : notifications) {
-			notificationCenterService.pushNotification(notification);
-		}
+		notificationCenterService.pushNotifications(notifications);
 	}
 
 	public void markRead(List<AppNotification> notifications) {
@@ -64,7 +80,20 @@ public final class DurableNotificationService {
 				.filter(Objects::nonNull)
 				.distinct()
 				.toList();
-		notificationDao.markNotificationsRead(shaleClientId, userId, durableIds);
+		if (durableIds.isEmpty()) {
+			return;
+		}
+		persistenceExecutor.submit(() -> {
+			long startNanos = System.nanoTime();
+			try {
+				notificationDao.markNotificationsRead(shaleClientId, userId, durableIds);
+				long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+				log.info("PERF notifications.persist.markRead tenantId={} userId={} count={} elapsedMs={} thread={}",
+						shaleClientId, userId, durableIds.size(), elapsedMs, Thread.currentThread().getName());
+			} catch (RuntimeException ex) {
+				log.error("Notification mark-read persistence failed tenantId={} userId={} count={}", shaleClientId, userId, durableIds.size(), ex);
+			}
+		});
 	}
 
 	public void dismiss(List<AppNotification> notifications) {
@@ -81,7 +110,20 @@ public final class DurableNotificationService {
 				.filter(Objects::nonNull)
 				.distinct()
 				.toList();
-		notificationDao.markNotificationsDismissed(shaleClientId, userId, durableIds);
+		if (durableIds.isEmpty()) {
+			return;
+		}
+		persistenceExecutor.submit(() -> {
+			long startNanos = System.nanoTime();
+			try {
+				notificationDao.markNotificationsDismissed(shaleClientId, userId, durableIds);
+				long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+				log.info("PERF notifications.persist.dismiss tenantId={} userId={} count={} elapsedMs={} thread={}",
+						shaleClientId, userId, durableIds.size(), elapsedMs, Thread.currentThread().getName());
+			} catch (RuntimeException ex) {
+				log.error("Notification dismiss persistence failed tenantId={} userId={} count={}", shaleClientId, userId, durableIds.size(), ex);
+			}
+		});
 	}
 
 	private AppNotification toAppNotification(NotificationRow row) {
