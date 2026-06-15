@@ -41,6 +41,18 @@ public final class DurableNotificationService {
 		pushLoaded(notificationCenterService, listUnread(shaleClientId, userId));
 	}
 
+	public int countUnread(int shaleClientId, int userId) {
+		if (shaleClientId <= 0 || userId <= 0) {
+			return 0;
+		}
+		long startNanos = System.nanoTime();
+		int unreadCount = notificationDao.countUnreadNotificationsForUser(shaleClientId, userId);
+		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+		log.info("PERF notifications.badge.count.query tenantId={} userId={} unreadCount={} elapsedMs={} thread={}",
+				shaleClientId, userId, unreadCount, elapsedMs, Thread.currentThread().getName());
+		return unreadCount;
+	}
+
 	public List<AppNotification> listUnread(int shaleClientId, int userId) {
 		if (shaleClientId <= 0 || userId <= 0) {
 			return List.of();

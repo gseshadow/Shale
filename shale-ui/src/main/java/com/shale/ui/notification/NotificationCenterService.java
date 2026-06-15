@@ -35,6 +35,7 @@ public final class NotificationCenterService {
 	private final ReadOnlyObjectWrapper<AppNotification> activeBanner = new ReadOnlyObjectWrapper<>();
 	private final Set<Long> durableNotificationIds = new HashSet<>();
 	private final Set<String> eventKeys = new HashSet<>();
+	private Integer serverUnreadCount;
 	private Consumer<List<AppNotification>> readListener = ignored -> {};
 	private Consumer<List<AppNotification>> dismissListener = ignored -> {};
 
@@ -72,6 +73,33 @@ public final class NotificationCenterService {
 
 	public int getUnreadCount() {
 		return unreadCount.get();
+	}
+
+	public void applyServerUnreadCount(int unreadCount) {
+		int safeUnreadCount = Math.max(0, unreadCount);
+		if (Platform.isFxApplicationThread()) {
+			applyServerUnreadCountInternal(safeUnreadCount);
+		} else {
+			Platform.runLater(() -> applyServerUnreadCountInternal(safeUnreadCount));
+		}
+	}
+
+	private void applyServerUnreadCountInternal(int unreadCount) {
+		serverUnreadCount = unreadCount;
+		recomputeDerivedState();
+	}
+
+	public void completeInitialHydration() {
+		if (Platform.isFxApplicationThread()) {
+			completeInitialHydrationInternal();
+		} else {
+			Platform.runLater(this::completeInitialHydrationInternal);
+		}
+	}
+
+	private void completeInitialHydrationInternal() {
+		serverUnreadCount = null;
+		recomputeDerivedState();
 	}
 
 	public ReadOnlyObjectProperty<AppNotification> activeBannerProperty() {
@@ -119,6 +147,7 @@ public final class NotificationCenterService {
 		long startNanos = System.nanoTime();
 		int added = 0;
 		int duplicate = 0;
+		int unreadAdded = 0;
 		for (AppNotification notification : incoming) {
 			if (isKnownNotification(notification)) {
 				duplicate++;
@@ -126,13 +155,21 @@ public final class NotificationCenterService {
 			}
 			notifications.add(notification);
 			indexNotification(notification);
+			if (notification.isUnread()) {
+				unreadAdded++;
+			}
 			added++;
+		}
+		if (serverUnreadCount != null && unreadAdded > 0) {
+			serverUnreadCount += unreadAdded;
 		}
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
 		if (added > 0 || duplicate > 0) {
 			log.info("PERF notifications.push source={} incoming={} added={} duplicates={} total={} elapsedMs={} fxThread={}",
 					source, incoming.size(), added, duplicate, notifications.size(), elapsedMs, Platform.isFxApplicationThread());
 		}
+		String eventKey = notification.getEventKey();
+		return eventKey != null && !eventKey.isBlank() && eventKeys.contains(eventKey);
 	}
 
 	private boolean isKnownNotification(AppNotification notification) {
@@ -170,12 +207,14 @@ public final class NotificationCenterService {
 			notifications.clear();
 			durableNotificationIds.clear();
 			eventKeys.clear();
+			serverUnreadCount = null;
 			recomputeDerivedState();
 		} else {
 			Platform.runLater(() -> {
 				notifications.clear();
 				durableNotificationIds.clear();
 				eventKeys.clear();
+				serverUnreadCount = null;
 				recomputeDerivedState();
 			});
 		}
@@ -219,6 +258,9 @@ public final class NotificationCenterService {
 				.filter(AppNotification::isUnread)
 				.toList();
 		changed.forEach(item -> item.setUnread(false));
+		if (serverUnreadCount != null && !changed.isEmpty()) {
+			serverUnreadCount = Math.max(0, serverUnreadCount - changed.size());
+		}
 		recomputeDerivedState();
 		if (!changed.isEmpty()) {
 			readListener.accept(changed);
@@ -232,6 +274,9 @@ public final class NotificationCenterService {
 	public void markRead(AppNotification notification) {
 		if (notification != null && notification.isUnread()) {
 			notification.setUnread(false);
+			if (serverUnreadCount != null) {
+				serverUnreadCount = Math.max(0, serverUnreadCount - 1);
+			}
 			recomputeDerivedState();
 			readListener.accept(List.of(notification));
 		}
@@ -338,6 +383,7 @@ public final class NotificationCenterService {
 			return;
 		}
 		long startNanos = System.nanoTime();
+		long unreadRemoved = removed.stream().filter(AppNotification::isUnread).count();
 		notifications.removeAll(removed);
 		for (AppNotification notification : removed) {
 			Long durableId = notification.getDurableNotificationId();
@@ -348,6 +394,9 @@ public final class NotificationCenterService {
 			if (eventKey != null && !eventKey.isBlank()) {
 				eventKeys.remove(eventKey);
 			}
+		}
+		if (serverUnreadCount != null && unreadRemoved > 0) {
+			serverUnreadCount = Math.max(0, serverUnreadCount - Math.toIntExact(unreadRemoved));
 		}
 		recomputeDerivedState();
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
@@ -416,7 +465,8 @@ public final class NotificationCenterService {
 	}
 
 	private void recomputeDerivedState() {
-		unreadCount.set((int) notifications.stream().filter(AppNotification::isUnread).count());
+		int hydratedUnreadCount = (int) notifications.stream().filter(AppNotification::isUnread).count();
+		unreadCount.set(serverUnreadCount == null ? hydratedUnreadCount : Math.max(serverUnreadCount, hydratedUnreadCount));
 		activeBanner.set(notifications.stream()
 				.filter(AppNotification::isShowAsBanner)
 				.filter(AppNotification::isUnread)
