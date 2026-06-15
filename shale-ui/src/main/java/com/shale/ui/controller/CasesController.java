@@ -32,11 +32,13 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.animation.PauseTransition;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
+import javafx.util.Duration;
 
 public final class CasesController {
 
@@ -77,6 +79,8 @@ public final class CasesController {
 	private int resultsCountGeneration = 0;
 	private String lastCountQuery;
 	private Set<Integer> lastCountStatuses;
+	private long lastCountTotal = -1;
+	private PauseTransition searchDebounce;
 
 	// Loaded items (we keep these so search/sort can re-render)
 	private final List<CaseCardVm> loaded = new ArrayList<>();
@@ -135,9 +139,20 @@ public final class CasesController {
 			casesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> loadFirstPage());
 		}
 
-		// search filter
+		// search filter: debounce and restart the SQL-backed query instead of filtering loaded pages.
 		if (casesSearchField != null) {
-			casesSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
+			searchDebounce = new PauseTransition(Duration.millis(300));
+			searchDebounce.setOnFinished(event -> loadFirstPage());
+			casesSearchField.textProperty().addListener((obs, oldV, newV) -> {
+				if (Objects.equals(oldV, newV)) {
+					return;
+				}
+				loadGeneration++;
+				loading = false;
+				if (searchDebounce != null) {
+					searchDebounce.playFromStart();
+				}
+			});
 		}
 
 		initializeViewToggle();
@@ -383,7 +398,7 @@ public final class CasesController {
 		// vvalue is 0..1
 		casesScroll.vvalueProperty().addListener((obs, oldV, newV) ->
 		{
-			if (newV != null && newV.doubleValue() >= 0.95 && !isSearchActive()) {
+			if (newV != null && newV.doubleValue() >= 0.95 && !isGridViewActive()) {
 				loadNextPage();
 			}
 		});
@@ -413,14 +428,20 @@ public final class CasesController {
 		loading = true;
 		final int pageToLoad = currentPage;
 		final int generationAtSubmit = loadGeneration;
+		final String queryAtSubmit = normalizedSearchQuery();
+		final Set<Integer> statusesAtSubmit = new LinkedHashSet<>(selectedStatusIds);
+		final Long knownTotalAtSubmit = knownResultsTotal(queryAtSubmit, statusesAtSubmit);
+		final boolean gridAtSubmit = isGridViewActive();
+		final CaseSort sortAtSubmit = selectedSort();
+		final boolean includeClosedDeniedAtSubmit = includeClosedDeniedInQuery();
 
 		dbExec.submit(() ->
 		{
 			try {
 				long daoStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=findPage page=cases_list pageIndex=" + pageToLoad);
-				var page = caseDao.findPage(pageToLoad, pageSize, selectedSort(), includeClosedDeniedInQuery());
-				PerfLog.logDone("DAO", "method=findPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
+				PerfLog.log("DAO", "start", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " grid=" + gridAtSubmit);
+				var page = caseDao.findCasesViewPage(pageToLoad, pageSize, sortAtSubmit, includeClosedDeniedAtSubmit, queryAtSubmit, statusesAtSubmit, knownTotalAtSubmit);
+				PerfLog.logDone("DAO", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
 
 				// map DAO rows into UI VM
 				long mapStartNanos = PerfLog.start();
@@ -457,6 +478,8 @@ public final class CasesController {
 
 					currentPage++;
 					hasMore = loaded.size() < page.total();
+					cacheResultsCount(queryAtSubmit, statusesAtSubmit, page.total());
+					updateResultsCountLabel(page.total());
 					loading = false;
 
 					// Render according to current search/sort
@@ -497,25 +520,12 @@ public final class CasesController {
 		PerfLog.log("RENDER", "start", "panel=cases_list page=cases_list");
 
 		String q = normalizedSearchQuery();
-		String sort = casesSortChoice == null ? "Intake date (newest first)" : casesSortChoice.getValue();
-
-		Comparator<CaseCardVm> comp = comparatorFor(sort);
-
-		List<CaseCardVm> filtered = loaded.stream()
-				.filter(vm -> matchesQuery(vm, q) && matchesSelectedStatus(vm))
-				.sorted(comp)
-				.toList();
 		if (shouldRefreshResultsCount(q, selectedStatusIds)) {
 			refreshResultsCountAsync(q, selectedStatusIds);
 		}
 
-		boolean statusFilterActive = selectedStatusIds.size() < statusFilterOptions.size();
-		if (( !q.isEmpty() || statusFilterActive ) && filtered.size() < pageSize && hasMore && !loading) {
-			loadNextPage();
-		}
-
 		boolean grid = isGridViewActive();
-		List<CaseCardVm> view = grid ? filtered : (q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList());
+		List<CaseCardVm> view = List.copyOf(loaded);
 
 		long uiModelStartNanos = PerfLog.start();
 		PerfLog.log("UI_MODEL", "start", "panel=cases_list grid=" + grid + " rows=" + view.size());
@@ -537,6 +547,21 @@ public final class CasesController {
 			loadRemainingPagesForGrid();
 		}
 		PerfLog.logDone("RENDER", "panel=cases_list page=cases_list rowCount=" + view.size(), renderStartNanos);
+	}
+
+	private Long knownResultsTotal(String normalizedQuery, Set<Integer> selectedStatuses) {
+		String query = normalizedQuery == null ? "" : normalizedQuery;
+		Set<Integer> statuses = new LinkedHashSet<>(selectedStatuses == null ? Set.of() : selectedStatuses);
+		if (lastCountTotal >= 0 && Objects.equals(lastCountQuery, query) && Objects.equals(lastCountStatuses, statuses)) {
+			return lastCountTotal;
+		}
+		return null;
+	}
+
+	private void cacheResultsCount(String normalizedQuery, Set<Integer> selectedStatuses, long total) {
+		lastCountQuery = normalizedQuery == null ? "" : normalizedQuery;
+		lastCountStatuses = new LinkedHashSet<>(selectedStatuses == null ? Set.of() : selectedStatuses);
+		lastCountTotal = total;
 	}
 
 	private void refreshResultsCountAsync(String normalizedQuery, Set<Integer> selectedStatuses) {
@@ -561,6 +586,7 @@ public final class CasesController {
 					if (generationAtSubmit != resultsCountGeneration) {
 						return;
 					}
+					cacheResultsCount(query, statusesSnapshot, total);
 					updateResultsCountLabel(total);
 				});
 			} catch (Exception ex) {
@@ -573,6 +599,9 @@ public final class CasesController {
 		String nextQuery = normalizedQuery == null ? "" : normalizedQuery;
 		Set<Integer> nextStatuses = new LinkedHashSet<>(selectedStatuses == null ? Set.of() : selectedStatuses);
 		if (Objects.equals(lastCountQuery, nextQuery) && Objects.equals(lastCountStatuses, nextStatuses)) {
+			if (lastCountTotal >= 0) {
+				updateResultsCountLabel(lastCountTotal);
+			}
 			return false;
 		}
 		lastCountQuery = nextQuery;
