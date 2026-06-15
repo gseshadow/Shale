@@ -176,6 +176,11 @@ public final class CasesController {
 			boolean grid = newToggle == gridViewToggle;
 			if (casesScroll != null) { casesScroll.setVisible(!grid); casesScroll.setManaged(!grid); }
 			if (casesTable != null) { casesTable.setVisible(grid); casesTable.setManaged(grid); }
+			if (grid) {
+				loadRemainingPagesForGrid();
+			} else {
+				rerender();
+			}
 		});
 	}
 
@@ -418,6 +423,8 @@ public final class CasesController {
 				PerfLog.logDone("DAO", "method=findPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
 
 				// map DAO rows into UI VM
+				long mapStartNanos = PerfLog.start();
+				PerfLog.log("DAO_MAP", "start", "method=findPage page=cases_list rows=" + (page == null || page.items() == null ? 0 : page.items().size()));
 				List<CaseCardVm> newItems = page.items().stream()
 						.map(r -> new CaseCardVm(
 								r.id(),
@@ -437,6 +444,7 @@ public final class CasesController {
 								r.tortClaimsNoticeDeadline()
 						))
 						.toList();
+				PerfLog.logDone("DAO_MAP", "method=findPage page=cases_list rows=" + newItems.size(), mapStartNanos);
 
 				Platform.runLater(() ->
 				{
@@ -471,6 +479,17 @@ public final class CasesController {
 		});
 	}
 
+	private boolean isGridViewActive() {
+		return gridViewToggle != null && gridViewToggle.isSelected();
+	}
+
+	private void loadRemainingPagesForGrid() {
+		if (loading || !hasMore || caseDao == null || !isGridViewActive()) {
+			return;
+		}
+		loadNextPage();
+	}
+
 	private void rerender() {
 		if (casesFlow == null)
 			return;
@@ -495,13 +514,29 @@ public final class CasesController {
 			loadNextPage();
 		}
 
-		List<CaseCardVm> view = q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList();
+		boolean grid = isGridViewActive();
+		List<CaseCardVm> view = grid ? filtered : (q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList());
 
-		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
+		long uiModelStartNanos = PerfLog.start();
+		PerfLog.log("UI_MODEL", "start", "panel=cases_list grid=" + grid + " rows=" + view.size());
+		var tableItems = FXCollections.observableArrayList(view);
+		PerfLog.logDone("UI_MODEL", "panel=cases_list grid=" + grid + " rows=" + tableItems.size(), uiModelStartNanos);
+
+		long tableRenderStartNanos = PerfLog.start();
 		if (casesTable != null) {
-			casesTable.setItems(FXCollections.observableArrayList(view));
+			casesTable.setItems(tableItems);
 		}
-		PerfLog.logDone("RENDER", "panel=cases_list page=cases_list childCount=" + casesFlow.getChildren().size(), renderStartNanos);
+		PerfLog.logDone("RENDER", "component=cases_table page=cases_list rowCount=" + tableItems.size(), tableRenderStartNanos);
+
+		long cardRenderStartNanos = PerfLog.start();
+		if (!grid) {
+			casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
+		}
+		PerfLog.logDone("RENDER", "component=cases_cards page=cases_list childCount=" + casesFlow.getChildren().size() + " skipped=" + grid, cardRenderStartNanos);
+		if (grid && hasMore && !loading) {
+			loadRemainingPagesForGrid();
+		}
+		PerfLog.logDone("RENDER", "panel=cases_list page=cases_list rowCount=" + view.size(), renderStartNanos);
 	}
 
 	private void refreshResultsCountAsync(String normalizedQuery, Set<Integer> selectedStatuses) {
