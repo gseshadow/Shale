@@ -175,7 +175,7 @@ public final class CaseDao {
 			Boolean nonEngagementLetterSent,
 			String primaryStatusName,
 			String clientName,
-			String opposingCounselName,
+			String opposingPartiesName,
 			String latestCaseUpdate,
 			String description,
 			LocalDate dateOfIncident,
@@ -824,7 +824,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
 					  clientContact.ClientName,
-					  oppContact.OpposingCounselName,
+					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
 				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
@@ -876,21 +876,30 @@ public final class CaseDao {
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) clientContact
 					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS OpposingCounselName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
+					    FROM (
+					      SELECT
+					        LTRIM(RTRIM(
+					          CASE
+					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
+					            ELSE COALESCE(ct.Name, '')
+					          END
+					        )) AS DisplayName,
+					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
+					        cp.UpdatedAt,
+					        cp.CreatedAt,
+					        cp.Id
+					      FROM dbo.CaseParties cp
+					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      WHERE cp.CaseId = c.Id
+					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ) opp
+					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
 					OUTER APPLY (
 					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
@@ -1033,21 +1042,30 @@ public final class CaseDao {
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) clientContact
 					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS OpposingCounselName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
+					    FROM (
+					      SELECT
+					        LTRIM(RTRIM(
+					          CASE
+					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
+					            ELSE COALESCE(ct.Name, '')
+					          END
+					        )) AS DisplayName,
+					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
+					        cp.UpdatedAt,
+					        cp.CreatedAt,
+					        cp.Id
+					      FROM dbo.CaseParties cp
+					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      WHERE cp.CaseId = c.Id
+					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ) opp
+					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
 					OUTER APPLY (
 					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
@@ -1126,7 +1144,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
 					  clientContact.ClientName,
-					  oppContact.OpposingCounselName,
+					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
 				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
@@ -1187,7 +1205,7 @@ public final class CaseDao {
 								getNullableBoolean(rs, "NonEngagementLetterSent"),
 								rs.getString("CurrentStatusName"),
 								rs.getString("ClientName"),
-								rs.getString("OpposingCounselName"),
+								rs.getString("OpposingPartiesName"),
 								rs.getString("LatestCaseUpdate"),
 								rs.getString("Description"),
 								toLocalDate(rs.getDate("DateOfIncident")),
@@ -1227,7 +1245,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
 					  clientContact.ClientName,
-					  oppContact.OpposingCounselName,
+					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
 				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
@@ -1288,7 +1306,7 @@ public final class CaseDao {
 								getNullableBoolean(rs, "NonEngagementLetterSent"),
 								rs.getString("CurrentStatusName"),
 								rs.getString("ClientName"),
-								rs.getString("OpposingCounselName"),
+								rs.getString("OpposingPartiesName"),
 								rs.getString("LatestCaseUpdate"),
 								rs.getString("Description"),
 								toLocalDate(rs.getDate("DateOfIncident")),
@@ -1340,7 +1358,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
 					  clientContact.ClientName,
-					  oppContact.OpposingCounselName,
+					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
 				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
@@ -1392,21 +1410,30 @@ public final class CaseDao {
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) clientContact
 					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS OpposingCounselName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
+					    FROM (
+					      SELECT
+					        LTRIM(RTRIM(
+					          CASE
+					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
+					            ELSE COALESCE(ct.Name, '')
+					          END
+					        )) AS DisplayName,
+					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
+					        cp.UpdatedAt,
+					        cp.CreatedAt,
+					        cp.Id
+					      FROM dbo.CaseParties cp
+					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      WHERE cp.CaseId = c.Id
+					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ) opp
+					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
 					OUTER APPLY (
 					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
@@ -1461,7 +1488,7 @@ public final class CaseDao {
 								getNullableBoolean(rs, "NonEngagementLetterSent"),
 								rs.getString("CurrentStatusName"),
 								rs.getString("ClientName"),
-								rs.getString("OpposingCounselName"),
+								rs.getString("OpposingPartiesName"),
 								rs.getString("LatestCaseUpdate"),
 								rs.getString("Description"),
 								toLocalDate(rs.getDate("DateOfIncident")),
@@ -1576,21 +1603,30 @@ public final class CaseDao {
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) clientContact
 					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS OpposingCounselName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
+					    FROM (
+					      SELECT
+					        LTRIM(RTRIM(
+					          CASE
+					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
+					            ELSE COALESCE(ct.Name, '')
+					          END
+					        )) AS DisplayName,
+					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
+					        cp.UpdatedAt,
+					        cp.CreatedAt,
+					        cp.Id
+					      FROM dbo.CaseParties cp
+					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      WHERE cp.CaseId = c.Id
+					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ) opp
+					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
 					OUTER APPLY (
 					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
@@ -5384,7 +5420,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
 					  clientContact.ClientName,
-					  oppContact.OpposingCounselName,
+					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
 				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
@@ -5433,21 +5469,30 @@ public final class CaseDao {
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) clientContact
 					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS OpposingCounselName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
+					    FROM (
+					      SELECT
+					        LTRIM(RTRIM(
+					          CASE
+					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
+					            ELSE COALESCE(ct.Name, '')
+					          END
+					        )) AS DisplayName,
+					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
+					        cp.UpdatedAt,
+					        cp.CreatedAt,
+					        cp.Id
+					      FROM dbo.CaseParties cp
+					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      WHERE cp.CaseId = c.Id
+					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ) opp
+					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
 					OUTER APPLY (
 					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
@@ -5482,7 +5527,7 @@ public final class CaseDao {
 							getNullableBoolean(rs, "NonEngagementLetterSent"),
 							rs.getString("CurrentStatusName"),
 							rs.getString("ClientName"),
-							rs.getString("OpposingCounselName"),
+							rs.getString("OpposingPartiesName"),
 							rs.getString("LatestCaseUpdate"),
 							rs.getString("Description"),
 							toLocalDate(rs.getDate("DateOfIncident")),
@@ -5514,7 +5559,7 @@ public final class CaseDao {
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
 					  clientContact.ClientName,
-					  oppContact.OpposingCounselName,
+					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
 				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
@@ -5563,21 +5608,30 @@ public final class CaseDao {
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) clientContact
 					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS OpposingCounselName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
+					    FROM (
+					      SELECT
+					        LTRIM(RTRIM(
+					          CASE
+					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
+					            ELSE COALESCE(ct.Name, '')
+					          END
+					        )) AS DisplayName,
+					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
+					        cp.UpdatedAt,
+					        cp.CreatedAt,
+					        cp.Id
+					      FROM dbo.CaseParties cp
+					      INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					      INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					      WHERE cp.CaseId = c.Id
+					        AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					        AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ) opp
+					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
 					OUTER APPLY (
 					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
@@ -5619,7 +5673,7 @@ public final class CaseDao {
 							getNullableBoolean(rs, "NonEngagementLetterSent"),
 							rs.getString("CurrentStatusName"),
 							rs.getString("ClientName"),
-							rs.getString("OpposingCounselName"),
+							rs.getString("OpposingPartiesName"),
 							rs.getString("LatestCaseUpdate"),
 							rs.getString("Description"),
 							toLocalDate(rs.getDate("DateOfIncident")),
