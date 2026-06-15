@@ -23,7 +23,7 @@ public final class CaseListUiSupport {
 			return defaults;
 		}
 		for (StatusFilterOption option : options) {
-			if (option == null || option.terminal()) {
+			if (option == null) {
 				continue;
 			}
 			defaults.add(option.id());
@@ -105,6 +105,6 @@ public final class CaseListUiSupport {
 			List<StatusFilterOption> options) {
 		int total = options == null ? 0 : options.size();
 		statusFilterMenuButton
-				.setText("Status (" + selectedStatusIds.size() + "/" + total + ")");
+				.setText("Case Status (" + selectedStatusIds.size() + "/" + total + ")");
 	}
 }
