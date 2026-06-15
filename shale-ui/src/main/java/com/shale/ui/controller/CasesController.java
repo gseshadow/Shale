@@ -45,6 +45,8 @@ import javafx.util.Duration;
 public final class CasesController {
 
 	private static final int LATEST_CASE_UPDATE_PREVIEW_LIMIT = 100;
+	private static final int DESCRIPTION_PREVIEW_LIMIT = 100;
+	private static final int OPPOSING_PARTIES_PREVIEW_LIMIT = 80;
 
 	// Existing controls (keep these IDs in FXML)
 	@FXML
@@ -210,9 +212,9 @@ public final class CasesController {
 		addGridColumn("Client", vm -> vm.clientName, 160);
 		addGridColumn("Intake Date / Caller Date", vm -> formatDate(vm.intakeDate), 150);
 		addGridColumn("Case Status", vm -> vm.primaryStatusName, 130);
-		addGridColumn("Opposing Parties", vm -> vm.opposingPartiesName, 160);
-		addLatestCaseUpdateGridColumn();
-		addGridColumn("Description", vm -> vm.description, 240);
+		addPreviewGridColumn("Opposing Parties", vm -> vm.opposingPartiesName, 160, OPPOSING_PARTIES_PREVIEW_LIMIT);
+		addPreviewGridColumn("Latest Case Update", vm -> vm.latestCaseUpdate, 220, LATEST_CASE_UPDATE_PREVIEW_LIMIT);
+		addPreviewGridColumn("Description", vm -> vm.description, 240, DESCRIPTION_PREVIEW_LIMIT);
 		addGridColumn("Date of Incident", vm -> formatDate(vm.dateOfIncident), 130);
 		addGridColumn("Statute of Limitations", vm -> formatDate(vm.solDate), 150);
 		addGridColumn("Tort Claims Notice Deadline", vm -> formatDate(vm.tortClaimsNoticeDeadline), 190);
@@ -235,33 +237,33 @@ public final class CasesController {
 		casesTable.getColumns().add(column);
 	}
 
-	private void addLatestCaseUpdateGridColumn() {
-		TableColumn<CaseCardVm, String> column = new TableColumn<>("Latest Case Update");
-		column.setPrefWidth(220);
-		column.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().latestCaseUpdate));
+	private void addPreviewGridColumn(String title, java.util.function.Function<CaseCardVm, String> valueFactory, double width, int previewLimit) {
+		TableColumn<CaseCardVm, String> column = new TableColumn<>(title);
+		column.setPrefWidth(width);
+		column.setCellValueFactory(data -> new ReadOnlyStringWrapper(valueFactory.apply(data.getValue())));
 		column.setCellFactory(col -> new TableCell<>() {
 			@Override
-			protected void updateItem(String updateText, boolean empty) {
-				super.updateItem(updateText, empty);
-				if (empty || updateText == null || updateText.isEmpty()) {
+			protected void updateItem(String fullText, boolean empty) {
+				super.updateItem(fullText, empty);
+				if (empty || fullText == null || fullText.isBlank()) {
 					setText(null);
 					setTooltip(null);
 					return;
 				}
 
-				setText(previewLatestCaseUpdate(updateText));
-				setTooltip(new Tooltip(updateText));
+				setText(previewText(fullText, previewLimit));
+				setTooltip(new Tooltip(fullText));
 			}
 		});
 		casesTable.getColumns().add(column);
 	}
 
-	private static String previewLatestCaseUpdate(String updateText) {
-		String safeText = safe(updateText);
-		if (safeText.length() <= LATEST_CASE_UPDATE_PREVIEW_LIMIT) {
+	private static String previewText(String fullText, int previewLimit) {
+		String safeText = safe(fullText);
+		if (safeText.length() <= previewLimit) {
 			return safeText;
 		}
-		return safeText.substring(0, LATEST_CASE_UPDATE_PREVIEW_LIMIT) + "...";
+		return safeText.substring(0, previewLimit) + "...";
 	}
 
 	private static String formatDate(LocalDate date) {
