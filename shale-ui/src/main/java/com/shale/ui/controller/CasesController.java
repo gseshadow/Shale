@@ -27,6 +27,13 @@ import javafx.scene.Node;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.CheckMenuItem;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.FXCollections;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
@@ -42,6 +49,14 @@ public final class CasesController {
 	private MenuButton statusFilterMenuButton;
 	@FXML
 	private Label resultsCountLabel;
+	@FXML
+	private ToggleButton cardsViewToggle;
+	@FXML
+	private ToggleButton gridViewToggle;
+	@FXML
+	private MenuButton columnMenuButton;
+	@FXML
+	private TableView<CaseCardVm> casesTable;
 
 	// NEW: FlowPane layout (add these IDs in FXML)
 	@FXML
@@ -112,7 +127,9 @@ public final class CasesController {
 					"Case name (A–Z)",
 					"Case name (Z–A)",
 					"Responsible attorney (A–Z)",
-					"Responsible attorney (Z–A)"
+					"Responsible attorney (Z–A)",
+					"Case Status (A–Z)",
+					"Case Status (Z–A)"
 			);
 			casesSortChoice.getSelectionModel().select(0);
 			casesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> loadFirstPage());
@@ -123,6 +140,8 @@ public final class CasesController {
 			casesSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
 		}
 
+		initializeViewToggle();
+		initializeGridColumns();
 		initializeStatusFilter();
 
 		Platform.runLater(() ->
@@ -145,6 +164,55 @@ public final class CasesController {
 		}
 
 		subscribeLiveCaseUpdates();
+	}
+
+	private void initializeViewToggle() {
+		if (cardsViewToggle == null || gridViewToggle == null) return;
+		ToggleGroup group = new ToggleGroup();
+		cardsViewToggle.setToggleGroup(group);
+		gridViewToggle.setToggleGroup(group);
+		group.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+			if (newToggle == null) { cardsViewToggle.setSelected(true); return; }
+			boolean grid = newToggle == gridViewToggle;
+			if (casesScroll != null) { casesScroll.setVisible(!grid); casesScroll.setManaged(!grid); }
+			if (casesTable != null) { casesTable.setVisible(grid); casesTable.setManaged(grid); }
+		});
+	}
+
+	private void initializeGridColumns() {
+		if (casesTable == null) return;
+		casesTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+		addGridColumn("Case Name", vm -> vm.name, 180);
+		addGridColumn("Client", vm -> vm.clientName, 160);
+		addGridColumn("Intake Date / Caller Date", vm -> formatDate(vm.intakeDate), 150);
+		addGridColumn("Case Status", vm -> vm.primaryStatusName, 130);
+		addGridColumn("Opposing Counsel", vm -> vm.opposingCounselName, 160);
+		addGridColumn("Latest Case Update", vm -> vm.latestCaseUpdate, 220);
+		addGridColumn("Description", vm -> vm.description, 240);
+		addGridColumn("Date of Incident", vm -> formatDate(vm.dateOfIncident), 130);
+		addGridColumn("Statute of Limitations", vm -> formatDate(vm.solDate), 150);
+		addGridColumn("Tort Claims Notice Deadline", vm -> formatDate(vm.tortClaimsNoticeDeadline), 190);
+		addGridColumn("Responsible Attorney", vm -> vm.responsibleAttorney, 170);
+		if (columnMenuButton != null) {
+			columnMenuButton.getItems().clear();
+			for (TableColumn<CaseCardVm, ?> column : casesTable.getColumns()) {
+				CheckMenuItem item = new CheckMenuItem(column.getText());
+				item.setSelected(column.isVisible());
+				column.visibleProperty().bind(item.selectedProperty());
+				columnMenuButton.getItems().add(item);
+			}
+		}
+	}
+
+	private void addGridColumn(String title, java.util.function.Function<CaseCardVm, String> valueFactory, double width) {
+		TableColumn<CaseCardVm, String> column = new TableColumn<>(title);
+		column.setPrefWidth(width);
+		column.setCellValueFactory(data -> new ReadOnlyStringWrapper(valueFactory.apply(data.getValue())));
+		casesTable.getColumns().add(column);
+	}
+
+	private static String formatDate(LocalDate date) {
+		return date == null ? "" : date.toString();
 	}
 
 	private void subscribeLiveCaseUpdates() {
@@ -250,7 +318,7 @@ public final class CasesController {
 					if (safeVal.equals(vm.name)) {
 						return false; // no change
 					}
-					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent));
+					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.clientName, vm.opposingCounselName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
 					return true;
 				}
 
@@ -296,7 +364,7 @@ public final class CasesController {
 		for (int i = 0; i < loaded.size(); i++) {
 			CaseCardVm vm = loaded.get(i);
 			if (vm.id == caseId) {
-				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent));
+				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.clientName, vm.opposingCounselName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
 				rerender();
 				return;
 			}
@@ -359,7 +427,14 @@ public final class CasesController {
 								r.primaryStatusId(),
 								safe(r.responsibleAttorneyName()),
 								safe(r.responsibleAttorneyColor()),
-								r.nonEngagementLetterSent()
+								r.nonEngagementLetterSent(),
+								safe(r.primaryStatusName()),
+								safe(r.clientName()),
+								safe(r.opposingCounselName()),
+								safe(r.latestCaseUpdate()),
+								safe(r.description()),
+								r.dateOfIncident(),
+								r.tortClaimsNoticeDeadline()
 						))
 						.toList();
 
@@ -423,6 +498,9 @@ public final class CasesController {
 		List<CaseCardVm> view = q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList();
 
 		casesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
+		if (casesTable != null) {
+			casesTable.setItems(FXCollections.observableArrayList(view));
+		}
 		PerfLog.logDone("RENDER", "panel=cases_list page=cases_list childCount=" + casesFlow.getChildren().size(), renderStartNanos);
 	}
 
@@ -565,6 +643,8 @@ public final class CasesController {
 		case "Case name (Z–A)" -> CaseSort.CASE_NAME_DESC;
 		case "Responsible attorney (A–Z)" -> CaseSort.RESPONSIBLE_ATTORNEY_ASC;
 		case "Responsible attorney (Z–A)" -> CaseSort.RESPONSIBLE_ATTORNEY_DESC;
+		case "Case Status (A–Z)" -> CaseSort.CASE_STATUS_ASC;
+		case "Case Status (Z–A)" -> CaseSort.CASE_STATUS_DESC;
 		default -> CaseSort.INTAKE_NEWEST;
 		};
 	}
@@ -594,6 +674,12 @@ public final class CasesController {
 
 		case "Responsible attorney (Z–A)" ->
 			Comparator.comparing((CaseCardVm v) -> v.responsibleAttorney, this::nullsLastString).reversed();
+
+		case "Case Status (A–Z)" ->
+			Comparator.comparing((CaseCardVm v) -> v.primaryStatusName, this::nullsLastString);
+
+		case "Case Status (Z–A)" ->
+			Comparator.comparing((CaseCardVm v) -> v.primaryStatusName, this::nullsLastString).reversed();
 
 		// default: newest first
 		default ->
@@ -655,9 +741,18 @@ public final class CasesController {
 		final String responsibleAttorney;
 		final String responsibleAttorneyColor;
 		final Boolean nonEngagementLetterSent;
+		final String primaryStatusName;
+		final String clientName;
+		final String opposingCounselName;
+		final String latestCaseUpdate;
+		final String description;
+		final LocalDate dateOfIncident;
+		final LocalDate tortClaimsNoticeDeadline;
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId, String responsibleAttorney,
-				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
+				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String clientName,
+				String opposingCounselName, String latestCaseUpdate, String description, LocalDate dateOfIncident,
+				LocalDate tortClaimsNoticeDeadline) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
@@ -666,6 +761,13 @@ public final class CasesController {
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
 			this.nonEngagementLetterSent = nonEngagementLetterSent;
+			this.primaryStatusName = Objects.requireNonNullElse(primaryStatusName, "");
+			this.clientName = Objects.requireNonNullElse(clientName, "");
+			this.opposingCounselName = Objects.requireNonNullElse(opposingCounselName, "");
+			this.latestCaseUpdate = Objects.requireNonNullElse(latestCaseUpdate, "");
+			this.description = Objects.requireNonNullElse(description, "");
+			this.dateOfIncident = dateOfIncident;
+			this.tortClaimsNoticeDeadline = tortClaimsNoticeDeadline;
 		}
 	}
 
@@ -754,9 +856,19 @@ public final class CasesController {
 				String newColor = safe(r.responsibleAttorneyColor());
 
 				boolean same = newName.equals(vm.name)
+						&& Objects.equals(r.intakeDate(), vm.intakeDate)
+						&& Objects.equals(r.statuteOfLimitationsDate(), vm.solDate)
+						&& Objects.equals(r.primaryStatusId(), vm.primaryStatusId)
 						&& newAtty.equals(vm.responsibleAttorney)
 						&& newColor.equals(vm.responsibleAttorneyColor)
-						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent);
+						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent)
+						&& safe(r.primaryStatusName()).equals(vm.primaryStatusName)
+						&& safe(r.clientName()).equals(vm.clientName)
+						&& safe(r.opposingCounselName()).equals(vm.opposingCounselName)
+						&& safe(r.latestCaseUpdate()).equals(vm.latestCaseUpdate)
+						&& safe(r.description()).equals(vm.description)
+						&& Objects.equals(r.dateOfIncident(), vm.dateOfIncident)
+						&& Objects.equals(r.tortClaimsNoticeDeadline(), vm.tortClaimsNoticeDeadline);
 
 				if (same)
 					return false;
@@ -769,7 +881,14 @@ public final class CasesController {
 						r.primaryStatusId(),
 						newAtty,
 						newColor,
-						r.nonEngagementLetterSent()
+						r.nonEngagementLetterSent(),
+						safe(r.primaryStatusName()),
+						safe(r.clientName()),
+						safe(r.opposingCounselName()),
+						safe(r.latestCaseUpdate()),
+						safe(r.description()),
+						r.dateOfIncident(),
+						r.tortClaimsNoticeDeadline()
 				));
 				return true;
 			}
