@@ -856,9 +856,19 @@ public final class CasesController {
 				String newColor = safe(r.responsibleAttorneyColor());
 
 				boolean same = newName.equals(vm.name)
+						&& Objects.equals(r.intakeDate(), vm.intakeDate)
+						&& Objects.equals(r.statuteOfLimitationsDate(), vm.solDate)
+						&& Objects.equals(r.primaryStatusId(), vm.primaryStatusId)
 						&& newAtty.equals(vm.responsibleAttorney)
 						&& newColor.equals(vm.responsibleAttorneyColor)
-						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent);
+						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent)
+						&& safe(r.primaryStatusName()).equals(vm.primaryStatusName)
+						&& safe(r.clientName()).equals(vm.clientName)
+						&& safe(r.opposingCounselName()).equals(vm.opposingCounselName)
+						&& safe(r.latestCaseUpdate()).equals(vm.latestCaseUpdate)
+						&& safe(r.description()).equals(vm.description)
+						&& Objects.equals(r.dateOfIncident(), vm.dateOfIncident)
+						&& Objects.equals(r.tortClaimsNoticeDeadline(), vm.tortClaimsNoticeDeadline);
 
 				if (same)
 					return false;

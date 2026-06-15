@@ -817,9 +817,9 @@ public final class CaseDao {
 					  c.Name,
 					  c.CallerDate,
 					  c.StatuteOfLimitations,
-					  c.DateOfInjury,
+					  COALESCE(c.IncidentOccurred, c.DateOfInjury) AS DateOfIncident,
 					  c.TortNoticeDeadline,
-					  c.ReceivedUpdates,
+					  latestUpdate.LatestCaseUpdate,
 					  c.Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
@@ -892,6 +892,14 @@ public final class CaseDao {
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) oppContact
+					OUTER APPLY (
+					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
+					    FROM dbo.CaseUpdates cu
+					    WHERE cu.CaseId = c.Id
+					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
+					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
+					) latestUpdate
 					WHERE %s
 					  AND c.ShaleClientId = ?
 					  AND EXISTS (
@@ -1041,6 +1049,14 @@ public final class CaseDao {
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) oppContact
+					OUTER APPLY (
+					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
+					    FROM dbo.CaseUpdates cu
+					    WHERE cu.CaseId = c.Id
+					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
+					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
+					) latestUpdate
 					WHERE %s
 					  AND c.ShaleClientId = ?
 					  AND EXISTS (
@@ -1103,9 +1119,9 @@ public final class CaseDao {
 					  c.Name,
 					  c.CallerDate,
 					  c.StatuteOfLimitations,
-					  c.DateOfInjury,
+					  COALESCE(c.IncidentOccurred, c.DateOfInjury) AS DateOfIncident,
 					  c.TortNoticeDeadline,
-					  c.ReceivedUpdates,
+					  latestUpdate.LatestCaseUpdate,
 					  c.Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
@@ -1172,9 +1188,9 @@ public final class CaseDao {
 								rs.getString("CurrentStatusName"),
 								rs.getString("ClientName"),
 								rs.getString("OpposingCounselName"),
-								rs.getString("ReceivedUpdates"),
+								rs.getString("LatestCaseUpdate"),
 								rs.getString("Description"),
-								toLocalDate(rs.getDate("DateOfInjury")),
+								toLocalDate(rs.getDate("DateOfIncident")),
 								toLocalDate(rs.getDate("TortNoticeDeadline"))
 						));
 					}
@@ -1204,9 +1220,9 @@ public final class CaseDao {
 					  c.Name,
 					  c.CallerDate,
 					  c.StatuteOfLimitations,
-					  c.DateOfInjury,
+					  COALESCE(c.IncidentOccurred, c.DateOfInjury) AS DateOfIncident,
 					  c.TortNoticeDeadline,
-					  c.ReceivedUpdates,
+					  latestUpdate.LatestCaseUpdate,
 					  c.Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
@@ -1273,9 +1289,9 @@ public final class CaseDao {
 								rs.getString("CurrentStatusName"),
 								rs.getString("ClientName"),
 								rs.getString("OpposingCounselName"),
-								rs.getString("ReceivedUpdates"),
+								rs.getString("LatestCaseUpdate"),
 								rs.getString("Description"),
-								toLocalDate(rs.getDate("DateOfInjury")),
+								toLocalDate(rs.getDate("DateOfIncident")),
 								toLocalDate(rs.getDate("TortNoticeDeadline"))
 						));
 					}
@@ -1317,9 +1333,9 @@ public final class CaseDao {
 					  c.Name,
 					  c.CallerDate,
 					  c.StatuteOfLimitations,
-					  c.DateOfInjury,
+					  COALESCE(c.IncidentOccurred, c.DateOfInjury) AS DateOfIncident,
 					  c.TortNoticeDeadline,
-					  c.ReceivedUpdates,
+					  latestUpdate.LatestCaseUpdate,
 					  c.Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
@@ -1392,6 +1408,14 @@ public final class CaseDao {
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) oppContact
+					OUTER APPLY (
+					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
+					    FROM dbo.CaseUpdates cu
+					    WHERE cu.CaseId = c.Id
+					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
+					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
+					) latestUpdate
 					WHERE %s
 					  AND c.ShaleClientId = ?
 					  %s
@@ -1438,9 +1462,9 @@ public final class CaseDao {
 								rs.getString("CurrentStatusName"),
 								rs.getString("ClientName"),
 								rs.getString("OpposingCounselName"),
-								rs.getString("ReceivedUpdates"),
+								rs.getString("LatestCaseUpdate"),
 								rs.getString("Description"),
-								toLocalDate(rs.getDate("DateOfInjury")),
+								toLocalDate(rs.getDate("DateOfIncident")),
 								toLocalDate(rs.getDate("TortNoticeDeadline"))
 						));
 					}
@@ -1568,6 +1592,14 @@ public final class CaseDao {
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) oppContact
+					OUTER APPLY (
+					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
+					    FROM dbo.CaseUpdates cu
+					    WHERE cu.CaseId = c.Id
+					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
+					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
+					) latestUpdate
 					WHERE %s
 					  AND c.ShaleClientId = ?
 					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c")));
@@ -5345,9 +5377,9 @@ public final class CaseDao {
 					  c.Name,
 					  c.CallerDate,
 					  c.StatuteOfLimitations,
-					  c.DateOfInjury,
+					  COALESCE(c.IncidentOccurred, c.DateOfInjury) AS DateOfIncident,
 					  c.TortNoticeDeadline,
-					  c.ReceivedUpdates,
+					  latestUpdate.LatestCaseUpdate,
 					  c.Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
@@ -5383,6 +5415,48 @@ public final class CaseDao {
 					) ra
 					LEFT JOIN %s u
 					  ON u.id = ra.UserId
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      CASE
+					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
+					        ELSE COALESCE(ct.Name, '')
+					      END AS ClientName
+					    FROM dbo.CaseParties cp
+					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    WHERE cp.CaseId = c.Id
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
+					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					) clientContact
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      CASE
+					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
+					        ELSE COALESCE(ct.Name, '')
+					      END AS OpposingCounselName
+					    FROM dbo.CaseParties cp
+					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    WHERE cp.CaseId = c.Id
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					) oppContact
+					OUTER APPLY (
+					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
+					    FROM dbo.CaseUpdates cu
+					    WHERE cu.CaseId = c.Id
+					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
+					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
+					) latestUpdate
 					WHERE c.Id = ?
 					  AND %s;
 					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
@@ -5405,7 +5479,14 @@ public final class CaseDao {
 							getNullableInt(rs, "ResponsibleAttorneyId"),
 							rs.getString("ResponsibleAttorneyName"),
 							rs.getString("ResponsibleAttorneyColor"),
-							getNullableBoolean(rs, "NonEngagementLetterSent")
+							getNullableBoolean(rs, "NonEngagementLetterSent"),
+							rs.getString("CurrentStatusName"),
+							rs.getString("ClientName"),
+							rs.getString("OpposingCounselName"),
+							rs.getString("LatestCaseUpdate"),
+							rs.getString("Description"),
+							toLocalDate(rs.getDate("DateOfIncident")),
+							toLocalDate(rs.getDate("TortNoticeDeadline"))
 					);
 				}
 			}
@@ -5426,9 +5507,9 @@ public final class CaseDao {
 					  c.Name,
 					  c.CallerDate,
 					  c.StatuteOfLimitations,
-					  c.DateOfInjury,
+					  COALESCE(c.IncidentOccurred, c.DateOfInjury) AS DateOfIncident,
 					  c.TortNoticeDeadline,
-					  c.ReceivedUpdates,
+					  latestUpdate.LatestCaseUpdate,
 					  c.Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
@@ -5464,6 +5545,48 @@ public final class CaseDao {
 					) ra
 					LEFT JOIN %s u
 					  ON u.id = ra.UserId
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      CASE
+					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
+					        ELSE COALESCE(ct.Name, '')
+					      END AS ClientName
+					    FROM dbo.CaseParties cp
+					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    WHERE cp.CaseId = c.Id
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
+					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					) clientContact
+					OUTER APPLY (
+					    SELECT TOP (1)
+					      CASE
+					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
+					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
+					        ELSE COALESCE(ct.Name, '')
+					      END AS OpposingCounselName
+					    FROM dbo.CaseParties cp
+					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
+					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    WHERE cp.CaseId = c.Id
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
+					) oppContact
+					OUTER APPLY (
+					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
+					    FROM dbo.CaseUpdates cu
+					    WHERE cu.CaseId = c.Id
+					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
+					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
+					) latestUpdate
 					WHERE c.Id = ?
 					  AND %s
 					  AND EXISTS (
@@ -5493,7 +5616,14 @@ public final class CaseDao {
 							getNullableInt(rs, "ResponsibleAttorneyId"),
 							rs.getString("ResponsibleAttorneyName"),
 							rs.getString("ResponsibleAttorneyColor"),
-							getNullableBoolean(rs, "NonEngagementLetterSent")
+							getNullableBoolean(rs, "NonEngagementLetterSent"),
+							rs.getString("CurrentStatusName"),
+							rs.getString("ClientName"),
+							rs.getString("OpposingCounselName"),
+							rs.getString("LatestCaseUpdate"),
+							rs.getString("Description"),
+							toLocalDate(rs.getDate("DateOfIncident")),
+							toLocalDate(rs.getDate("TortNoticeDeadline"))
 					);
 				}
 			}
