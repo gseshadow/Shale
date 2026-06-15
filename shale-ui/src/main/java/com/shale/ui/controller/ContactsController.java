@@ -1,7 +1,7 @@
 package com.shale.ui.controller;
 
 import com.shale.data.dao.ContactDao;
-import com.shale.data.dao.ContactDao.DirectoryContactRow;
+import com.shale.data.dao.ContactDao.ContactCardSummaryRow;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.state.AppState;
@@ -41,7 +41,7 @@ public final class ContactsController {
     private AppState appState;
     private ContactDao contactDao;
     private ContactCardFactory contactCardFactory;
-    private final List<DirectoryContactRow> loadedContacts = new ArrayList<>();
+    private final List<ContactCardSummaryRow> loadedContacts = new ArrayList<>();
     private String emptyStateMessage = "No contacts to display yet.";
     private String loadingStateMessage = "Loading contacts…";
     private int loadGeneration = 0;
@@ -204,7 +204,7 @@ public final class ContactsController {
         PerfLog.logDone("contacts.render", "cards=" + cards.size() + " loaded=" + loadedContacts.size() + " loading=" + loading + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
     }
 
-    private Node buildCard(DirectoryContactRow row) {
+    private Node buildCard(ContactCardSummaryRow row) {
         String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
         var card = contactCardFactory.create(new ContactCardModel(
                 row.id(),
