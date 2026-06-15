@@ -47,7 +47,9 @@ echo
 
 echo "Step 0: Force sync repo to origin/$BRANCH"
 git fetch origin
-git checkout "$BRANCH"
+git reset --hard "origin/$BRANCH"
+git clean -fd
+git checkout -B "$BRANCH" "origin/$BRANCH"
 git reset --hard "origin/$BRANCH"
 git clean -fd
 PREVIOUS_VERSION=$(python3 "$ROOT/build/scripts/preflight-version.py" "$ROOT" --print-root-version)
