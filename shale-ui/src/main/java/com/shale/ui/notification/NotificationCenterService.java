@@ -168,6 +168,8 @@ public final class NotificationCenterService {
 			log.info("PERF notifications.push source={} incoming={} added={} duplicates={} total={} elapsedMs={} fxThread={}",
 					source, incoming.size(), added, duplicate, notifications.size(), elapsedMs, Platform.isFxApplicationThread());
 		}
+		String eventKey = notification.getEventKey();
+		return eventKey != null && !eventKey.isBlank() && eventKeys.contains(eventKey);
 	}
 
 	private boolean isKnownNotification(AppNotification notification) {
