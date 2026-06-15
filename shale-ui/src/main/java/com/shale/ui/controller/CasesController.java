@@ -12,11 +12,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.component.dialog.NewTaskDialog;
 import com.shale.ui.controller.support.CaseListUiSupport;
+import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
@@ -24,15 +27,25 @@ import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.control.Alert;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.animation.PauseTransition;
 import javafx.beans.property.ReadOnlyStringWrapper;
@@ -40,6 +53,9 @@ import javafx.collections.FXCollections;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
 import javafx.util.Duration;
 
 public final class CasesController {
@@ -73,6 +89,7 @@ public final class CasesController {
 	private FlowPane casesFlow;
 
 	private CaseDao caseDao;
+	private CaseTaskService caseTaskService;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 
@@ -92,6 +109,7 @@ public final class CasesController {
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 
 	private CaseCardFactory caseCardFactory;
+	private Consumer<Integer> onOpenCase;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
 
@@ -113,10 +131,13 @@ public final class CasesController {
 	public void init(AppState appState,
 			UiRuntimeBridge runtimeBridge,
 			CaseDao caseDao,
+			CaseTaskService caseTaskService,
 			Consumer<Integer> onOpenCase) {
 		System.out.println("CasesController.init()");
 		PerfLog.log("CTRL", "start", "controller=CasesController page=cases_list");
 		this.caseDao = caseDao;
+		this.caseTaskService = caseTaskService;
+		this.onOpenCase = onOpenCase;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
@@ -163,6 +184,7 @@ public final class CasesController {
 
 		initializeViewToggle();
 		initializeGridColumns();
+		initializeGridRowActions();
 		initializeStatusFilter();
 
 		Platform.runLater(() ->
@@ -256,6 +278,144 @@ public final class CasesController {
 			}
 		});
 		casesTable.getColumns().add(column);
+	}
+	private void initializeGridRowActions() {
+		if (casesTable == null) return;
+		casesTable.setOnKeyPressed(event -> {
+			if (event.getCode() == KeyCode.ENTER) {
+				openSelectedCase();
+				event.consume();
+			}
+		});
+		casesTable.setRowFactory(table -> {
+			TableRow<CaseCardVm> row = new TableRow<>();
+			row.setOnMouseClicked(event -> {
+				if (!row.isEmpty() && event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+					openCase(row.getItem());
+					event.consume();
+				}
+			});
+			row.contextMenuProperty().bind(javafx.beans.binding.Bindings.when(row.emptyProperty())
+					.then((ContextMenu) null)
+					.otherwise(createCaseRowContextMenu(row)));
+			row.setStyle("-fx-cursor: hand;");
+			return row;
+		});
+	}
+
+	private ContextMenu createCaseRowContextMenu(TableRow<CaseCardVm> row) {
+		MenuItem open = new MenuItem("Open Case");
+		open.setOnAction(e -> openCase(row.getItem()));
+
+		MenuItem copyName = new MenuItem("Copy Case Name");
+		copyName.setOnAction(e -> copyToClipboard(row.getItem() == null ? "" : row.getItem().name));
+
+		MenuItem copyNumber = new MenuItem("Copy Case Number");
+		copyNumber.setOnAction(e -> copyCaseNumber(row.getItem()));
+
+		MenuItem createTask = new MenuItem("Create Task");
+		createTask.setOnAction(e -> createTaskForCase(row.getItem()));
+
+		MenuItem addUpdate = new MenuItem("Add Case Update");
+		addUpdate.setOnAction(e -> addCaseUpdate(row.getItem()));
+
+		return new ContextMenu(open, new SeparatorMenuItem(), copyName, copyNumber,
+				new SeparatorMenuItem(), createTask, addUpdate);
+	}
+
+	private void openSelectedCase() {
+		openCase(casesTable == null ? null : casesTable.getSelectionModel().getSelectedItem());
+	}
+
+	private void openCase(CaseCardVm vm) {
+		if (vm != null && onOpenCase != null && vm.id > 0 && vm.id <= Integer.MAX_VALUE) {
+			onOpenCase.accept((int) vm.id);
+		}
+	}
+
+	private void copyToClipboard(String value) {
+		ClipboardContent content = new ClipboardContent();
+		content.putString(safe(value));
+		Clipboard.getSystemClipboard().setContent(content);
+	}
+
+	private void copyCaseNumber(CaseCardVm vm) {
+		if (vm == null || caseDao == null) return;
+		dbExec.submit(() -> {
+			try {
+				var detail = caseDao.getDetail(vm.id);
+				String caseNumber = detail == null ? "" : safe(detail.getCaseNumber());
+				Platform.runLater(() -> copyToClipboard(caseNumber));
+			} catch (Exception ex) {
+				Platform.runLater(() -> showActionError("Unable to copy the case number right now."));
+			}
+		});
+	}
+
+	private void createTaskForCase(CaseCardVm vm) {
+		if (vm == null || caseTaskService == null || appState == null) return;
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showActionError("You must be signed in to create tasks.");
+			return;
+		}
+		dbExec.submit(() -> {
+			try {
+				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
+				Platform.runLater(() -> NewTaskDialog.showAndWait(dialogOwner(), priorities, users).ifPresent(input ->
+					dbExec.submit(() -> caseTaskService.createTask(new CaseTaskService.CreateTaskRequest(
+						shaleClientId, vm.id, input.title(), input.description(), input.dueAt(),
+						input.priorityId(), input.assignedUserIds(), currentUserId)))));
+			} catch (Exception ex) {
+				Platform.runLater(() -> showActionError("Unable to create a task for this case right now."));
+			}
+		});
+	}
+
+	private void addCaseUpdate(CaseCardVm vm) {
+		if (vm == null || caseDao == null || appState == null) return;
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showActionError("You must be signed in to add case updates.");
+			return;
+		}
+		TextArea updateArea = new TextArea();
+		updateArea.setPromptText("Add an update for " + vm.name);
+		updateArea.setPrefRowCount(6);
+		updateArea.setWrapText(true);
+		VBox content = new VBox(8, new Label("Case update"), updateArea);
+		VBox.setVgrow(updateArea, Priority.ALWAYS);
+		Alert dialog = new Alert(Alert.AlertType.CONFIRMATION);
+		dialog.initOwner(dialogOwner());
+		dialog.setTitle("Add Case Update");
+		dialog.setHeaderText(vm.name);
+		dialog.getDialogPane().setContent(content);
+		dialog.showAndWait().ifPresent(button -> {
+			if (button != javafx.scene.control.ButtonType.OK) return;
+			String text = safe(updateArea.getText()).trim();
+			if (text.isBlank()) return;
+			dbExec.submit(() -> {
+				try {
+					caseDao.addCaseNote(vm.id, shaleClientId, text, currentUserId);
+					refreshCaseRowFromDb(vm.id);
+				} catch (Exception ex) {
+					Platform.runLater(() -> showActionError("Unable to add the case update right now."));
+				}
+			});
+		});
+	}
+
+	private Window dialogOwner() {
+		return casesTable == null || casesTable.getScene() == null ? null : casesTable.getScene().getWindow();
+	}
+
+	private void showActionError(String message) {
+		Alert alert = new Alert(Alert.AlertType.ERROR, message);
+		alert.initOwner(dialogOwner());
+		alert.showAndWait();
 	}
 
 	private static String previewText(String fullText, int previewLimit) {

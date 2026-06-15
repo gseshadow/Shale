@@ -15,7 +15,7 @@
 				<Insets top="10" right="10" bottom="10" left="10" />
 			</padding>
 			<ToggleButton fx:id="cardsViewToggle" text="Cards" selected="true" />
-			<ToggleButton fx:id="gridViewToggle" text="Grid" />
+			<ToggleButton fx:id="gridViewToggle" text="List" />
 			<TextField fx:id="casesSearchField"
 				promptText="Search cases…" HBox.hgrow="ALWAYS" />
 			<MenuButton fx:id="statusFilterMenuButton" text="Status (8/8)">
