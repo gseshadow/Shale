@@ -186,7 +186,7 @@ public final class CasesController {
 		addGridColumn("Client", vm -> vm.clientName, 160);
 		addGridColumn("Intake Date / Caller Date", vm -> formatDate(vm.intakeDate), 150);
 		addGridColumn("Case Status", vm -> vm.primaryStatusName, 130);
-		addGridColumn("Opposing Counsel", vm -> vm.opposingCounselName, 160);
+		addGridColumn("Opposing Parties", vm -> vm.opposingPartiesName, 160);
 		addGridColumn("Latest Case Update", vm -> vm.latestCaseUpdate, 220);
 		addGridColumn("Description", vm -> vm.description, 240);
 		addGridColumn("Date of Incident", vm -> formatDate(vm.dateOfIncident), 130);
@@ -318,7 +318,7 @@ public final class CasesController {
 					if (safeVal.equals(vm.name)) {
 						return false; // no change
 					}
-					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.clientName, vm.opposingCounselName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
+					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.clientName, vm.opposingPartiesName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
 					return true;
 				}
 
@@ -364,7 +364,7 @@ public final class CasesController {
 		for (int i = 0; i < loaded.size(); i++) {
 			CaseCardVm vm = loaded.get(i);
 			if (vm.id == caseId) {
-				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.clientName, vm.opposingCounselName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
+				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.clientName, vm.opposingPartiesName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
 				rerender();
 				return;
 			}
@@ -430,7 +430,7 @@ public final class CasesController {
 								r.nonEngagementLetterSent(),
 								safe(r.primaryStatusName()),
 								safe(r.clientName()),
-								safe(r.opposingCounselName()),
+								safe(r.opposingPartiesName()),
 								safe(r.latestCaseUpdate()),
 								safe(r.description()),
 								r.dateOfIncident(),
@@ -743,7 +743,7 @@ public final class CasesController {
 		final Boolean nonEngagementLetterSent;
 		final String primaryStatusName;
 		final String clientName;
-		final String opposingCounselName;
+		final String opposingPartiesName;
 		final String latestCaseUpdate;
 		final String description;
 		final LocalDate dateOfIncident;
@@ -751,7 +751,7 @@ public final class CasesController {
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId, String responsibleAttorney,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String clientName,
-				String opposingCounselName, String latestCaseUpdate, String description, LocalDate dateOfIncident,
+				String opposingPartiesName, String latestCaseUpdate, String description, LocalDate dateOfIncident,
 				LocalDate tortClaimsNoticeDeadline) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
@@ -763,7 +763,7 @@ public final class CasesController {
 			this.nonEngagementLetterSent = nonEngagementLetterSent;
 			this.primaryStatusName = Objects.requireNonNullElse(primaryStatusName, "");
 			this.clientName = Objects.requireNonNullElse(clientName, "");
-			this.opposingCounselName = Objects.requireNonNullElse(opposingCounselName, "");
+			this.opposingPartiesName = Objects.requireNonNullElse(opposingPartiesName, "");
 			this.latestCaseUpdate = Objects.requireNonNullElse(latestCaseUpdate, "");
 			this.description = Objects.requireNonNullElse(description, "");
 			this.dateOfIncident = dateOfIncident;
@@ -864,7 +864,7 @@ public final class CasesController {
 						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent)
 						&& safe(r.primaryStatusName()).equals(vm.primaryStatusName)
 						&& safe(r.clientName()).equals(vm.clientName)
-						&& safe(r.opposingCounselName()).equals(vm.opposingCounselName)
+						&& safe(r.opposingPartiesName()).equals(vm.opposingPartiesName)
 						&& safe(r.latestCaseUpdate()).equals(vm.latestCaseUpdate)
 						&& safe(r.description()).equals(vm.description)
 						&& Objects.equals(r.dateOfIncident(), vm.dateOfIncident)
@@ -884,7 +884,7 @@ public final class CasesController {
 						r.nonEngagementLetterSent(),
 						safe(r.primaryStatusName()),
 						safe(r.clientName()),
-						safe(r.opposingCounselName()),
+						safe(r.opposingPartiesName()),
 						safe(r.latestCaseUpdate()),
 						safe(r.description()),
 						r.dateOfIncident(),

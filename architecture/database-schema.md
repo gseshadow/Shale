@@ -456,7 +456,7 @@ LEFT JOIN dbo.Users updateUser
 | Client                      | `dbo.CaseContacts` Role `1` + `dbo.Contacts` display name                                  |
 | Intake Date                 | `dbo.Cases.CallerDate`                                                                     |
 | Case Status                 | No confirmed `dbo.Cases` status FK in live schema. Trace existing app behavior before use. |
-| Opposing Counsel            | Verify role/source before use                                                              |
+| Opposing Parties            | `dbo.CaseParties` role `party` + side `opposing` + `dbo.Contacts` display names            |
 | Latest Case Update          | Latest non-deleted `dbo.CaseUpdates.NoteText`                                              |
 | Description                 | `dbo.Cases.Description`                                                                    |
 | Date of Incident            | `dbo.Cases.DateOfInjury`                                                                   |
