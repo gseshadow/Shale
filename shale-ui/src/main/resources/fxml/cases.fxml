@@ -43,8 +43,8 @@
 	</top>
 
 	<center>
-		<AnchorPane>
-			<ScrollPane fx:id="casesScroll" fitToWidth="true" AnchorPane.topAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
+		<AnchorPane maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+			<ScrollPane fx:id="casesScroll" fitToWidth="true" fitToHeight="true" AnchorPane.topAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
 				pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
 				<content>
 					<FlowPane fx:id="casesFlow" hgap="10" vgap="10"
@@ -55,7 +55,7 @@
 					</FlowPane>
 				</content>
 			</ScrollPane>
-			<TableView fx:id="casesTable" visible="false" managed="false" AnchorPane.topAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" styleClass="cases-content-surface" />
+			<TableView fx:id="casesTable" visible="false" managed="false" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308" AnchorPane.topAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" styleClass="cases-content-surface" />
 		</AnchorPane>
 	</center>
 

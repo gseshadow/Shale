@@ -92,7 +92,7 @@
 
 	<!-- Main content area (shell-controlled) -->
 	<center>
-		<VBox spacing="6" styleClass="content-root shell-transparent">
+		<VBox spacing="6" styleClass="content-root shell-transparent" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 			<children>
 				<VBox fx:id="sectionHeaderBox" spacing="2">
 					<children>
@@ -105,7 +105,7 @@
 				</VBox>
 
 				<!-- Shell-controlled content placeholder -->
-				<StackPane fx:id="sectionContent">
+				<StackPane fx:id="sectionContent" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 					<children>
 						<Label fx:id="placeholderLabel"
 							text="This section is not implemented yet." />
