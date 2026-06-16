@@ -52,6 +52,19 @@ public final class OrganizationDao {
 	public record OrganizationOptionRow(Integer organizationId, String name) {
 	}
 
+	public record DirectoryOrganizationRow(
+			Integer id,
+			String name,
+			Integer organizationTypeId,
+			String organizationTypeName,
+			String phone,
+			String email,
+			String website,
+			String city,
+			String state
+	) {
+	}
+
 	public record OrganizationCreateRequest(
 			int shaleClientId,
 			int organizationTypeId,
@@ -141,6 +154,85 @@ public final class OrganizationDao {
 		}
 	}
 
+	/** Lightweight directory/list page. Keeps organization cards from hydrating full detail columns. */
+	public PagedResult<DirectoryOrganizationRow> findDirectoryPage(int page, int pageSize, String searchName) {
+		if (page < 0)
+			throw new IllegalArgumentException("page must be >= 0");
+		if (pageSize <= 0)
+			throw new IllegalArgumentException("pageSize must be > 0");
+
+		long started = perfStart();
+		String normalizedSearch = normalizeSearch(searchName);
+		int offset = page * pageSize;
+		String countSql = """
+				SELECT COUNT(1)
+				FROM %s o
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				  AND (? = '' OR o.Name LIKE ?);
+				""".formatted(ORGANIZATIONS_TABLE);
+		String pageSql = """
+				SELECT
+				  o.Id,
+				  o.OrganizationTypeId,
+				  ot.Name AS OrganizationTypeName,
+				  o.Name,
+				  o.Phone,
+				  o.Email,
+				  o.Website,
+				  o.City,
+				  o.State
+				FROM %s o
+				LEFT JOIN %s ot
+				  ON ot.OrganizationTypeId = o.OrganizationTypeId
+				 AND ot.ShaleClientId = o.ShaleClientId
+				WHERE o.ShaleClientId = ?
+				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
+				  AND (? = '' OR o.Name LIKE ?)
+				ORDER BY o.Name ASC, o.Id ASC
+				OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
+				""".formatted(ORGANIZATIONS_TABLE, ORGANIZATION_TYPES_TABLE);
+
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			long countStarted = perfStart();
+			long total;
+			try (PreparedStatement ps = con.prepareStatement(countSql)) {
+				ps.setInt(1, shaleClientId);
+				ps.setString(2, normalizedSearch);
+				ps.setString(3, containsPattern(normalizedSearch));
+				try (ResultSet rs = ps.executeQuery()) {
+					rs.next();
+					total = rs.getLong(1);
+				}
+			}
+			logPerf("organizations.directory.count", "tenantId=" + shaleClientId + " page=" + page + " queryLength=" + normalizedSearch.length() + " total=" + total, countStarted);
+			if (total == 0) {
+				logPerf("organizations.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedSearch.length() + " rows=0 total=0 fullDetailHydration=false", started);
+				return new PagedResult<>(List.of(), page, pageSize, 0);
+			}
+
+			List<DirectoryOrganizationRow> items = new ArrayList<>(pageSize);
+			try (PreparedStatement ps = con.prepareStatement(pageSql)) {
+				int idx = 1;
+				ps.setInt(idx++, shaleClientId);
+				ps.setString(idx++, normalizedSearch);
+				ps.setString(idx++, containsPattern(normalizedSearch));
+				ps.setInt(idx++, offset);
+				ps.setInt(idx++, pageSize);
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						items.add(mapDirectoryOrganization(rs));
+					}
+				}
+			}
+			logPerf("organizations.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedSearch.length() + " rows=" + items.size() + " total=" + total + " fullDetailHydration=false selectedFields=id,name,type,phone,email,website,city,state", started);
+			return new PagedResult<>(items, page, pageSize, total);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load organization directory page (page=" + page + ", pageSize=" + pageSize + ")", e);
+		}
+	}
+
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize, String searchName) {
 		if (page < 0)
@@ -216,6 +308,7 @@ public final class OrganizationDao {
 	}
 
 	public Organization findById(int organizationId) {
+		long started = perfStart();
 		if (organizationId <= 0) {
 			throw new IllegalArgumentException("organizationId must be > 0");
 		}
@@ -258,9 +351,12 @@ public final class OrganizationDao {
 
 			try (ResultSet rs = ps.executeQuery()) {
 				if (!rs.next()) {
+					logPerf("organizations.detail.findById", "organizationId=" + organizationId + " found=false fullDetailHydration=true", started);
 					return null;
 				}
-				return mapOrganization(rs);
+				Organization organization = mapOrganization(rs);
+				logPerf("organizations.detail.findById", "organizationId=" + organizationId + " found=true fullDetailHydration=true", started);
+				return organization;
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load organization by id (id=" + organizationId + ")", e);
@@ -341,6 +437,7 @@ public final class OrganizationDao {
 	}
 
 	public void update(Organization organization) {
+		long started = perfStart();
 		Objects.requireNonNull(organization, "organization");
 		if (organization.getId() == null || organization.getId() <= 0) {
 			throw new IllegalArgumentException("organization.id is required");
@@ -392,6 +489,7 @@ public final class OrganizationDao {
 			ps.setInt(idx++, requireCurrentShaleClientId(con));
 
 			int affected = ps.executeUpdate();
+			logPerf("organizations.save.update", "organizationId=" + organization.getId() + " affected=" + affected, started);
 			if (affected == 0) {
 				throw new RuntimeException("Organization not found or cannot be updated (id=" + organization.getId() + ")");
 			}
@@ -403,6 +501,7 @@ public final class OrganizationDao {
 
 
 	public boolean softDeleteOrganization(int organizationId, Integer shaleClientId) {
+		long started = perfStart();
 		if (organizationId <= 0) {
 			throw new IllegalArgumentException("organizationId must be > 0");
 		}
@@ -451,6 +550,7 @@ public final class OrganizationDao {
 				ps.setInt(idx++, shaleClientId);
 				boolean deleted = ps.executeUpdate() > 0;
 				con.commit();
+				logPerf("organizations.delete.softDelete", "organizationId=" + organizationId + " tenantId=" + shaleClientId + " deleted=" + deleted, started);
 				return deleted;
 			} catch (SQLException e) {
 				con.rollback();
@@ -609,6 +709,7 @@ public final class OrganizationDao {
 	}
 
 	public List<RelatedCaseRow> findRelatedCases(int organizationId) {
+		long started = perfStart();
 		if (organizationId <= 0) {
 			throw new IllegalArgumentException("organizationId must be > 0");
 		}
@@ -688,8 +789,8 @@ public final class OrganizationDao {
 					));
 				}
 			}
-			System.out.println("Organization related-cases load: organizationId=" + organizationId
-					+ ", queryPath=CasePartiesOnly, rowCount=" + out.size());
+			logPerf("organizations.relatedCases.dao", "organizationId=" + organizationId
+					+ " queryPath=CasePartiesOnly rows=" + out.size(), started);
 			return out;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load related cases for organization (id=" + organizationId + ")", e);
@@ -774,6 +875,19 @@ public final class OrganizationDao {
 		}
 	}
 
+	private static DirectoryOrganizationRow mapDirectoryOrganization(ResultSet rs) throws SQLException {
+		return new DirectoryOrganizationRow(
+				getNullableInt(rs, "Id"),
+				rs.getString("Name"),
+				getNullableInt(rs, "OrganizationTypeId"),
+				rs.getString("OrganizationTypeName"),
+				rs.getString("Phone"),
+				rs.getString("Email"),
+				rs.getString("Website"),
+				rs.getString("City"),
+				rs.getString("State"));
+	}
+
 	private static Organization mapOrganization(ResultSet rs) throws SQLException {
 		return Organization.builder()
 				.id(getNullableInt(rs, "Id"))
@@ -831,6 +945,15 @@ public final class OrganizationDao {
 		return "%" + normalizedSearch + "%";
 	}
 
+
+	private static long perfStart() {
+		return System.nanoTime();
+	}
+
+	private static void logPerf(String area, String fields, long startNanos) {
+		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+		System.out.println("PERF " + area + " " + fields + " elapsedMs=" + elapsedMs);
+	}
 
 	private static int requireCurrentShaleClientId(Connection con) throws SQLException {
 		String sql = "SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT);";

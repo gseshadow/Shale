@@ -4,6 +4,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -16,6 +18,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
 import javafx.application.Platform;
@@ -35,6 +38,9 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 public final class OrganizationController {
+
+	private static final Map<String, Organization> DETAIL_CACHE = new ConcurrentHashMap<>();
+	private static final Map<Integer, List<OrganizationDao.OrganizationTypeRow>> TYPE_OPTIONS_CACHE = new ConcurrentHashMap<>();
 
 	@FXML private Label organizationTitleLabel;
 	@FXML private Label lastUpdatedLabel;
@@ -170,30 +176,60 @@ public final class OrganizationController {
 	}
 
 	private void loadOrganization() {
+		long loadStarted = PerfLog.start();
 		if (organizationDao == null || organizationId == null) {
 			setError("Organization view is not configured.");
 			return;
 		}
 
 		setBusy(true);
+		PerfLog.log("organizations.detail.load", "queued", "organizationId=" + organizationId + " tenantId=" + currentTenantId());
 		dbExec.submit(() -> {
 			try {
-				Organization loaded = organizationDao.findById(organizationId);
-				List<OrganizationDao.OrganizationTypeRow> loadedTypeOptions = organizationDao.findOrganizationTypes();
+				String cacheKey = detailCacheKey(organizationId);
+				Organization loaded = cacheKey == null ? null : DETAIL_CACHE.get(cacheKey);
+				boolean cacheHit = loaded != null;
+				if (loaded == null) {
+					long daoStarted = PerfLog.start();
+					PerfLog.log("organizations.detail.dao", "start", "organizationId=" + organizationId + " tenantId=" + currentTenantId() + " cacheHit=false");
+					loaded = organizationDao.findById(organizationId);
+					PerfLog.logDone("organizations.detail.dao", "organizationId=" + organizationId + " found=" + (loaded != null) + " fullDetailHydration=true", daoStarted);
+					if (loaded != null && cacheKey != null) {
+						DETAIL_CACHE.put(cacheKey, loaded);
+					}
+				} else {
+					PerfLog.log("organizations.detail.cache", "hit", "organizationId=" + organizationId + " tenantId=" + currentTenantId());
+				}
+				Integer tenantId = currentTenantId();
+				List<OrganizationDao.OrganizationTypeRow> loadedTypeOptions = tenantId == null ? null : TYPE_OPTIONS_CACHE.get(tenantId);
+				if (loadedTypeOptions == null) {
+					long typesStarted = PerfLog.start();
+					loadedTypeOptions = organizationDao.findOrganizationTypes();
+					if (tenantId != null) {
+						TYPE_OPTIONS_CACHE.put(tenantId, loadedTypeOptions == null ? List.of() : loadedTypeOptions);
+					}
+					PerfLog.logDone("organizations.detail.types.dao", "tenantId=" + tenantId + " rows=" + (loadedTypeOptions == null ? 0 : loadedTypeOptions.size()) + " cacheHit=false", typesStarted);
+				} else {
+					PerfLog.log("organizations.detail.types.cache", "hit", "tenantId=" + tenantId + " rows=" + loadedTypeOptions.size());
+				}
+				final Organization loadedForUi = loaded;
+				final List<OrganizationDao.OrganizationTypeRow> typeOptionsForUi = loadedTypeOptions == null ? List.of() : loadedTypeOptions;
+				final boolean cacheHitForUi = cacheHit;
 				Platform.runLater(() -> {
 					setBusy(false);
-					if (loaded == null) {
+					if (loadedForUi == null) {
 						relatedCases = List.of();
 						renderRelatedCases();
 						setError("Organization not found.");
 						return;
 					}
 
-					currentOrganization = loaded;
-					organizationTypeOptions = loadedTypeOptions == null ? List.of() : loadedTypeOptions;
+					currentOrganization = loadedForUi;
+					organizationTypeOptions = typeOptionsForUi;
 					resetRelatedCaseControls();
 					renderFromCurrent();
 					clearError();
+					PerfLog.logDone("organizations.detail.load", "phase=detailApplied organizationId=" + organizationId + " cacheHit=" + cacheHitForUi, loadStarted);
 					loadRelatedCasesSafe();
 				});
 			} catch (Exception ex) {
@@ -206,6 +242,7 @@ public final class OrganizationController {
 	}
 
 	private void loadRelatedCasesSafe() {
+		long relatedStarted = PerfLog.start();
 		if (organizationDao == null || organizationId == null) {
 			relatedCases = List.of();
 			renderRelatedCases();
@@ -214,13 +251,13 @@ public final class OrganizationController {
 
 		dbExec.submit(() -> {
 			try {
+				PerfLog.log("organizations.relatedCases.dao", "start", "organizationId=" + organizationId);
 				List<OrganizationDao.RelatedCaseRow> loadedRelatedCases = organizationDao.findRelatedCases(organizationId);
 				int rowCount = loadedRelatedCases == null ? 0 : loadedRelatedCases.size();
-				System.out.println("Organization related-cases UI load: organizationId=" + organizationId
-						+ ", queryPath=OrganizationDao.findRelatedCases(CasePartiesOnly), rowCount=" + rowCount);
 				Platform.runLater(() -> {
 					relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
 					renderRelatedCases();
+					PerfLog.logDone("organizations.relatedCases.load", "organizationId=" + organizationId + " rows=" + rowCount, relatedStarted);
 				});
 			} catch (Exception ex) {
 				System.out.println("Failed to load related cases for organization id=" + organizationId + ": " + ex.getMessage());
@@ -256,6 +293,7 @@ public final class OrganizationController {
 	}
 
 	private void onSave() {
+		long saveStarted = PerfLog.start();
 		if (currentOrganization == null || organizationDao == null) {
 			setError("Organization details are unavailable.");
 			return;
@@ -286,7 +324,9 @@ public final class OrganizationController {
 		setBusy(true);
 		dbExec.submit(() -> {
 			try {
+				PerfLog.log("organizations.save", "start", "organizationId=" + updated.getId());
 				organizationDao.update(updated);
+				invalidateDetailCache(updated.getId());
 				publishOrganizationUpdated(updated.getId());
 				Organization reloaded = organizationDao.findById(currentOrganization.getId());
 				Platform.runLater(() -> {
@@ -296,11 +336,13 @@ public final class OrganizationController {
 						return;
 					}
 					currentOrganization = reloaded;
+					cacheDetail(reloaded);
 					pendingRemoteUpdate = false;
 					hideRemoteUpdateBanner();
 					renderFromCurrent();
 					setEditMode(false);
 					clearError();
+					PerfLog.logDone("organizations.save", "phase=apply organizationId=" + updated.getId(), saveStarted);
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
@@ -312,6 +354,7 @@ public final class OrganizationController {
 	}
 
 	private void onDeleteOrganization() {
+		long deleteStarted = PerfLog.start();
 		if (organizationDao == null || currentOrganization == null || currentOrganization.getId() == null) {
 			setError("Organization details are unavailable.");
 			return;
@@ -327,7 +370,11 @@ public final class OrganizationController {
 		setBusy(true);
 		dbExec.submit(() -> {
 			try {
+				PerfLog.log("organizations.delete", "start", "organizationId=" + currentOrganization.getId() + " tenantId=" + appState.getShaleClientId());
 				boolean deleted = organizationDao.softDeleteOrganization(currentOrganization.getId(), appState.getShaleClientId());
+				if (deleted) {
+					invalidateDetailCache(currentOrganization.getId());
+				}
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (!deleted) {
@@ -339,6 +386,7 @@ public final class OrganizationController {
 					hideRemoteUpdateBanner();
 					clearError();
 					navigateAfterDelete();
+					PerfLog.logDone("organizations.delete", "phase=apply organizationId=" + currentOrganization.getId(), deleteStarted);
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
@@ -464,6 +512,7 @@ public final class OrganizationController {
 	}
 
 	private void renderFromCurrent() {
+		long renderStarted = PerfLog.start();
 		Organization o = currentOrganization;
 		if (o == null) {
 			return;
@@ -496,6 +545,7 @@ public final class OrganizationController {
 
 		writeEditorsFromOrganization(o);
 		refreshAdminActions();
+		PerfLog.logDone("organizations.detail.render", "organizationId=" + (o == null ? null : o.getId()) + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
 	}
 
 	private void writeEditorsFromOrganization(Organization o) {
@@ -606,6 +656,36 @@ public final class OrganizationController {
 		String role = safe(roleName).isBlank() ? "Relationship" : safe(roleName).trim();
 		String sideLabel = safe(side).isBlank() ? "unclassified" : safe(side).trim();
 		return primary ? role + " • " + sideLabel + " • primary" : role + " • " + sideLabel;
+	}
+
+	private Integer currentTenantId() {
+		return appState == null ? null : appState.getShaleClientId();
+	}
+
+	private String detailCacheKey(Integer id) {
+		Integer tenantId = currentTenantId();
+		if (tenantId == null || tenantId <= 0 || id == null || id <= 0) {
+			return null;
+		}
+		return tenantId + ":" + id;
+	}
+
+	private void cacheDetail(Organization organization) {
+		if (organization == null) {
+			return;
+		}
+		String cacheKey = detailCacheKey(organization.getId());
+		if (cacheKey != null) {
+			DETAIL_CACHE.put(cacheKey, organization);
+		}
+	}
+
+	private void invalidateDetailCache(Integer id) {
+		String cacheKey = detailCacheKey(id);
+		if (cacheKey != null) {
+			DETAIL_CACHE.remove(cacheKey);
+			PerfLog.log("organizations.detail.cache", "invalidate", "organizationId=" + id + " tenantId=" + currentTenantId());
+		}
 	}
 
 	private static String safe(String value) {
