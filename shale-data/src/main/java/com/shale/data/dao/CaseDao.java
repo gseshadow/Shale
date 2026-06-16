@@ -176,6 +176,8 @@ public final class CaseDao {
 			String responsibleAttorneyColor,
 			Boolean nonEngagementLetterSent,
 			String primaryStatusName,
+			String primaryStatusColor,
+			String practiceAreaColor,
 			String clientName,
 			String opposingPartiesName,
 			String latestCaseUpdate,
@@ -187,7 +189,7 @@ public final class CaseDao {
 				Integer primaryStatusId, Integer responsibleAttorneyId, String responsibleAttorneyName,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
 			this(id, name, intakeDate, statuteOfLimitationsDate, primaryStatusId, responsibleAttorneyId,
-					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent, null, null, null, null, null, null, null);
+					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent, null, null, null, null, null, null, null, null, null);
 		}
 	}
 
@@ -846,6 +848,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -857,8 +861,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -972,7 +977,16 @@ public final class CaseDao {
 								getNullableInt(rs, "ResponsibleAttorneyId"),
 								rs.getString("ResponsibleAttorneyName"),
 								rs.getString("ResponsibleAttorneyColor"),
-								getNullableBoolean(rs, "NonEngagementLetterSent")));
+								getNullableBoolean(rs, "NonEngagementLetterSent"),
+								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
+								rs.getString("ClientName"),
+								rs.getString("OpposingPartiesName"),
+								rs.getString("LatestCaseUpdate"),
+								rs.getString("Description"),
+								toLocalDate(rs.getDate("DateOfIncident")),
+								toLocalDate(rs.getDate("TortNoticeDeadline"))));
 					}
 				}
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
@@ -1024,6 +1038,7 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) s.Id AS PrimaryStatusId
 					    FROM %s cs
@@ -1086,7 +1101,16 @@ public final class CaseDao {
 								getNullableInt(rs, "ResponsibleAttorneyId"),
 								rs.getString("ResponsibleAttorneyName"),
 								rs.getString("ResponsibleAttorneyColor"),
-								getNullableBoolean(rs, "NonEngagementLetterSent")));
+								getNullableBoolean(rs, "NonEngagementLetterSent"),
+								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
+								rs.getString("ClientName"),
+								rs.getString("OpposingPartiesName"),
+								rs.getString("LatestCaseUpdate"),
+								rs.getString("Description"),
+								toLocalDate(rs.getDate("DateOfIncident")),
+								toLocalDate(rs.getDate("TortNoticeDeadline"))));
 					}
 				}
 				return out;
@@ -1116,6 +1140,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -1127,8 +1153,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -1229,6 +1256,8 @@ public final class CaseDao {
 								rs.getString("ResponsibleAttorneyColor"),
 								getNullableBoolean(rs, "NonEngagementLetterSent"),
 								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
 								rs.getString("ClientName"),
 								rs.getString("OpposingPartiesName"),
 								rs.getString("LatestCaseUpdate"),
@@ -1269,6 +1298,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -1280,8 +1311,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -1382,6 +1414,8 @@ public final class CaseDao {
 								rs.getString("ResponsibleAttorneyColor"),
 								getNullableBoolean(rs, "NonEngagementLetterSent"),
 								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
 								rs.getString("ClientName"),
 								rs.getString("OpposingPartiesName"),
 								rs.getString("LatestCaseUpdate"),
@@ -1454,6 +1488,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -1465,8 +1501,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -1592,6 +1629,8 @@ public final class CaseDao {
 								rs.getString("ResponsibleAttorneyColor"),
 								getNullableBoolean(rs, "NonEngagementLetterSent"),
 								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
 								rs.getString("ClientName"),
 								rs.getString("OpposingPartiesName"),
 								rs.getString("LatestCaseUpdate"),
@@ -1666,6 +1705,7 @@ public final class CaseDao {
 			StringBuilder sql = new StringBuilder("""
 					SELECT COUNT(1)
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) s.Id AS PrimaryStatusId
 					    FROM %s cs
@@ -1723,6 +1763,7 @@ public final class CaseDao {
 			String sql = """
 					SELECT COUNT(1)
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) s.Name AS CurrentStatusName
 					    FROM %s cs
@@ -5676,6 +5717,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -5687,8 +5730,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -5784,6 +5828,8 @@ public final class CaseDao {
 							rs.getString("ResponsibleAttorneyColor"),
 							getNullableBoolean(rs, "NonEngagementLetterSent"),
 							rs.getString("CurrentStatusName"),
+							rs.getString("PrimaryStatusColor"),
+							rs.getString("PracticeAreaColor"),
 							rs.getString("ClientName"),
 							rs.getString("OpposingPartiesName"),
 							rs.getString("LatestCaseUpdate"),
@@ -5816,6 +5862,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -5827,8 +5875,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -5931,6 +5980,8 @@ public final class CaseDao {
 							rs.getString("ResponsibleAttorneyColor"),
 							getNullableBoolean(rs, "NonEngagementLetterSent"),
 							rs.getString("CurrentStatusName"),
+							rs.getString("PrimaryStatusColor"),
+							rs.getString("PracticeAreaColor"),
 							rs.getString("ClientName"),
 							rs.getString("OpposingPartiesName"),
 							rs.getString("LatestCaseUpdate"),
