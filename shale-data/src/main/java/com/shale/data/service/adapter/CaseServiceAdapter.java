@@ -8,6 +8,7 @@ import java.util.Optional;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.data.dao.CaseDao;
 
@@ -53,6 +54,36 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
+		return caseGateway.listCaseStatuses(shaleClientId, includeInactive);
+	}
+
+	@Override
+	public CaseStatusDto createCaseStatus(CaseStatusCommand command) {
+		Objects.requireNonNull(command, "command");
+		return caseGateway.createCaseStatus(command.shaleClientId(), command.name(), command.description(), command.active(), command.sortOrder());
+	}
+
+	@Override
+	public CaseStatusDto updateCaseStatus(CaseStatusCommand command) {
+		Objects.requireNonNull(command, "command");
+		if (command.id() == null) {
+			throw new IllegalArgumentException("Status id is required.");
+		}
+		return caseGateway.updateCaseStatus(command.shaleClientId(), command.id(), command.name(), command.description(), command.active(), command.sortOrder());
+	}
+
+	@Override
+	public void setCaseStatusActive(int shaleClientId, int statusId, boolean active) {
+		caseGateway.setCaseStatusActive(shaleClientId, statusId, active);
+	}
+
+	@Override
+	public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
+		caseGateway.reorderCaseStatuses(shaleClientId, firstStatusId, secondStatusId);
+	}
+
+	@Override
 	public void addCaseNote(AddCaseNoteCommand command) {
 		Objects.requireNonNull(command, "command");
 		caseGateway.addCaseNote(command.caseId(), command.shaleClientId(), command.noteText(), command.actorUserId());
@@ -82,6 +113,16 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		List<CaseUpdateDto> listCaseUpdates(long caseId);
 
 		void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId);
+
+		List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
+
+		CaseStatusDto createCaseStatus(int shaleClientId, String name, String description, boolean active, Integer sortOrder);
+
+		CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, String description, boolean active, Integer sortOrder);
+
+		void setCaseStatusActive(int shaleClientId, int statusId, boolean active);
+
+		void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
 		CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
 				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId);
@@ -115,6 +156,31 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId) {
 			caseDao.addCaseNote(caseId, shaleClientId, noteText, createdByUserId);
+		}
+
+		@Override
+		public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
+			return caseDao.listCaseStatuses(shaleClientId, includeInactive);
+		}
+
+		@Override
+		public CaseStatusDto createCaseStatus(int shaleClientId, String name, String description, boolean active, Integer sortOrder) {
+			return caseDao.createCaseStatus(shaleClientId, name, description, active, sortOrder);
+		}
+
+		@Override
+		public CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, String description, boolean active, Integer sortOrder) {
+			return caseDao.updateCaseStatus(shaleClientId, statusId, name, description, active, sortOrder);
+		}
+
+		@Override
+		public void setCaseStatusActive(int shaleClientId, int statusId, boolean active) {
+			caseDao.setCaseStatusActive(shaleClientId, statusId, active);
+		}
+
+		@Override
+		public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
+			caseDao.reorderCaseStatuses(shaleClientId, firstStatusId, secondStatusId);
 		}
 
 		@Override

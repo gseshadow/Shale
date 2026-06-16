@@ -5,6 +5,8 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -61,6 +63,34 @@
                     </HBox.margin>
                 </Label>
             </HBox>
+
+            <Separator/>
+
+            <VBox spacing="8" styleClass="strong-panel">
+                <padding>
+                    <Insets top="12" right="12" bottom="12" left="12"/>
+                </padding>
+                <Label text="Case Statuses" styleClass="search-section-title"/>
+                <Label text="Manage the case statuses available for this tenant."
+                       styleClass="search-summary-text" wrapText="true"/>
+                <TableView fx:id="caseStatusesTable" prefHeight="260">
+                    <columns>
+                        <TableColumn fx:id="statusNameColumn" text="Status name" prefWidth="180"/>
+                        <TableColumn fx:id="statusDescriptionColumn" text="Description" prefWidth="260"/>
+                        <TableColumn fx:id="statusActiveColumn" text="State" prefWidth="120"/>
+                        <TableColumn fx:id="statusSortOrderColumn" text="Sort/order" prefWidth="100"/>
+                    </columns>
+                </TableView>
+                <HBox spacing="8">
+                    <Button text="Add Status" onAction="#onAddCaseStatus" styleClass="button-primary"/>
+                    <Button text="Edit Status" onAction="#onEditCaseStatus" styleClass="button-secondary"/>
+                    <Button text="Deactivate" onAction="#onDeactivateCaseStatus" styleClass="button-secondary"/>
+                    <Button text="Reactivate" onAction="#onReactivateCaseStatus" styleClass="button-secondary"/>
+                    <Button text="Move Up" onAction="#onMoveCaseStatusUp" styleClass="button-secondary"/>
+                    <Button text="Move Down" onAction="#onMoveCaseStatusDown" styleClass="button-secondary"/>
+                    <Label fx:id="caseStatusSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+                </HBox>
+            </VBox>
 
             <VBox fx:id="auditSection" spacing="8" styleClass="strong-panel">
                 <padding>

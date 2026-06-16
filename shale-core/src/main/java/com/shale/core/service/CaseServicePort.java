@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.shale.core.dto.CaseDetailDto;
+import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 
@@ -25,6 +26,16 @@ public interface CaseServicePort {
 
 	List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
+	List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
+
+	CaseStatusDto createCaseStatus(CaseStatusCommand command);
+
+	CaseStatusDto updateCaseStatus(CaseStatusCommand command);
+
+	void setCaseStatusActive(int shaleClientId, int statusId, boolean active);
+
+	void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
+
 	/**
 	 * Adds a user-authored case note using the existing CaseDao.addCaseNote
 	 * behavior, which persists the note and touches the case but does not expose
@@ -44,6 +55,15 @@ public interface CaseServicePort {
 			int shaleClientId,
 			int actorUserId,
 			String noteText) {
+	}
+
+	record CaseStatusCommand(
+			Integer id,
+			int shaleClientId,
+			String name,
+			String description,
+			boolean active,
+			Integer sortOrder) {
 	}
 
 	record UpdateCaseCoreDetailsCommand(

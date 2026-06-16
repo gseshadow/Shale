@@ -1,15 +1,29 @@
 package com.shale.ui.controller;
 
+import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.service.CaseServicePort;
+import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
 import com.shale.ui.state.AppState;
 import javafx.fxml.FXML;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.GridPane;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Objects;
 
@@ -38,28 +52,44 @@ public final class SettingsController {
 	private Label notificationSettingsStatusLabel;
 	@FXML
 	private VBox auditSection;
+	@FXML
+	private TableView<CaseStatusViewRow> caseStatusesTable;
+	@FXML
+	private TableColumn<CaseStatusViewRow, String> statusNameColumn;
+	@FXML
+	private TableColumn<CaseStatusViewRow, String> statusDescriptionColumn;
+	@FXML
+	private TableColumn<CaseStatusViewRow, String> statusActiveColumn;
+	@FXML
+	private TableColumn<CaseStatusViewRow, Integer> statusSortOrderColumn;
+	@FXML
+	private Label caseStatusSettingsStatusLabel;
 
 	private NotificationPreferencesService notificationPreferencesService;
 	private AppState appState;
+	private CaseServicePort caseService;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
 
 	@FXML
 	private void initialize() {
 		fxmlReady = true;
+		configureCaseStatusesTable();
 		updateAuditVisibility();
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
 	}
 
-	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog) {
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.onOpenAuditLog = Objects.requireNonNull(onOpenAuditLog, "onOpenAuditLog");
+		this.caseService = Objects.requireNonNull(caseService, "caseService");
 		if (fxmlReady) {
 			loadFromPreferences();
 			updateAuditVisibility();
+			loadCaseStatuses();
 		}
 	}
 
@@ -94,6 +124,138 @@ public final class SettingsController {
 		}
 		onOpenAuditLog.run();
 	}
+
+
+	@FXML
+	private void onAddCaseStatus() {
+		showCaseStatusDialog(null).ifPresent(input -> {
+			caseService.createCaseStatus(new CaseServicePort.CaseStatusCommand(null, requireTenantId(), input.name(), input.description(), input.active(), input.sortOrder()));
+			loadCaseStatuses();
+			setCaseStatusMessage("Case status added.");
+		});
+	}
+
+	@FXML
+	private void onEditCaseStatus() {
+		CaseStatusViewRow selected = selectedStatusRow();
+		if (selected == null) return;
+		showCaseStatusDialog(selected.status()).ifPresent(input -> {
+			caseService.updateCaseStatus(new CaseServicePort.CaseStatusCommand(selected.id(), requireTenantId(), input.name(), input.description(), input.active(), input.sortOrder()));
+			loadCaseStatuses();
+			setCaseStatusMessage("Case status updated.");
+		});
+	}
+
+	@FXML
+	private void onDeactivateCaseStatus() { setSelectedStatusActive(false); }
+
+	@FXML
+	private void onReactivateCaseStatus() { setSelectedStatusActive(true); }
+
+	@FXML
+	private void onMoveCaseStatusUp() { moveSelectedStatus(-1); }
+
+	@FXML
+	private void onMoveCaseStatusDown() { moveSelectedStatus(1); }
+
+	private void configureCaseStatusesTable() {
+		if (caseStatusesTable == null) return;
+		statusNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+		statusDescriptionColumn.setCellValueFactory(new PropertyValueFactory<>("description"));
+		statusActiveColumn.setCellValueFactory(new PropertyValueFactory<>("state"));
+		statusSortOrderColumn.setCellValueFactory(new PropertyValueFactory<>("sortOrder"));
+	}
+
+	private void loadCaseStatuses() {
+		if (caseService == null || caseStatusesTable == null) return;
+		try {
+			List<CaseStatusViewRow> rows = new ArrayList<>();
+			for (CaseStatusDto status : caseService.listCaseStatuses(requireTenantId(), true)) rows.add(new CaseStatusViewRow(status));
+			caseStatusesTable.getItems().setAll(rows);
+		} catch (RuntimeException ex) {
+			setCaseStatusMessage("Failed to load case statuses. " + rootMessage(ex));
+		}
+	}
+
+	private void setSelectedStatusActive(boolean active) {
+		CaseStatusViewRow selected = selectedStatusRow();
+		if (selected == null) return;
+		try {
+			caseService.setCaseStatusActive(requireTenantId(), selected.id(), active);
+			loadCaseStatuses();
+			setCaseStatusMessage(active ? "Case status reactivated." : "Case status deactivated.");
+		} catch (RuntimeException ex) { AppDialogs.showError(caseStatusesTable.getScene().getWindow(), "Case Statuses", rootMessage(ex)); }
+	}
+
+	private void moveSelectedStatus(int delta) {
+		CaseStatusViewRow selected = selectedStatusRow();
+		if (selected == null) return;
+		int index = caseStatusesTable.getItems().indexOf(selected);
+		int otherIndex = index + delta;
+		if (otherIndex < 0 || otherIndex >= caseStatusesTable.getItems().size()) return;
+		CaseStatusViewRow other = caseStatusesTable.getItems().get(otherIndex);
+		caseService.reorderCaseStatuses(requireTenantId(), selected.id(), other.id());
+		loadCaseStatuses();
+		caseStatusesTable.getSelectionModel().select(otherIndex);
+	}
+
+	private Optional<CaseStatusInput> showCaseStatusDialog(CaseStatusDto existing) {
+		Dialog<CaseStatusInput> dialog = new Dialog<>();
+		dialog.setTitle(existing == null ? "Add Status" : "Edit Status");
+		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		TextField name = new TextField(existing == null ? "" : existing.name());
+		TextArea description = new TextArea(existing == null ? "" : safe(existing.description()));
+		description.setPrefRowCount(3);
+		CheckBox active = new CheckBox("Active"); active.setSelected(existing == null || existing.active());
+		TextField sortOrder = new TextField(existing == null || existing.sortOrder() == null ? "" : String.valueOf(existing.sortOrder()));
+		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
+		grid.add(new Label("Name"), 0, 0); grid.add(name, 1, 0);
+		grid.add(new Label("Description"), 0, 1); grid.add(description, 1, 1);
+		grid.add(active, 1, 2);
+		grid.add(new Label("Sort/order"), 0, 3); grid.add(sortOrder, 1, 3);
+		dialog.getDialogPane().setContent(grid);
+		dialog.setResultConverter(button -> {
+			if (button != ButtonType.OK) return null;
+			String trimmedName = name.getText() == null ? "" : name.getText().trim();
+			if (trimmedName.isBlank()) throw new IllegalArgumentException("Name is required.");
+			Integer sort = null;
+			String sortText = sortOrder.getText() == null ? "" : sortOrder.getText().trim();
+			if (!sortText.isBlank()) sort = Integer.parseInt(sortText);
+			return new CaseStatusInput(trimmedName, description.getText(), active.isSelected(), sort);
+		});
+		try { return dialog.showAndWait(); }
+		catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Case Statuses", rootMessage(ex)); return Optional.empty(); }
+	}
+
+	private CaseStatusViewRow selectedStatusRow() {
+		CaseStatusViewRow selected = caseStatusesTable == null ? null : caseStatusesTable.getSelectionModel().getSelectedItem();
+		if (selected == null) setCaseStatusMessage("Select a case status first.");
+		return selected;
+	}
+
+	private int requireTenantId() {
+		Integer id = appState == null ? null : appState.getShaleClientId();
+		if (id == null || id <= 0) throw new IllegalStateException("No tenant is selected.");
+		return id;
+	}
+
+	private void setCaseStatusMessage(String message) { if (caseStatusSettingsStatusLabel != null) caseStatusSettingsStatusLabel.setText(message == null ? "" : message); }
+	private static String safe(String value) { return value == null ? "" : value; }
+	private static String rootMessage(Throwable ex) { Throwable t = ex; while (t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? t.toString() : t.getMessage(); }
+
+	public static final class CaseStatusViewRow {
+		private final CaseStatusDto status;
+		CaseStatusViewRow(CaseStatusDto status) { this.status = status; }
+		public int getId() { return status.id(); }
+		public int id() { return status.id(); }
+		public String getName() { return safe(status.name()); }
+		public String getDescription() { return safe(status.description()); }
+		public String getState() { return status.active() ? "Active" : "Inactive"; }
+		public Integer getSortOrder() { return status.sortOrder(); }
+		CaseStatusDto status() { return status; }
+	}
+
+	private record CaseStatusInput(String name, String description, boolean active, Integer sortOrder) {}
 
 	private void loadFromPreferences() {
 		if (notificationPreferencesService == null) {
