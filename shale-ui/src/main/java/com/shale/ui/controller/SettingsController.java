@@ -3,6 +3,7 @@ package com.shale.ui.controller;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.service.CaseServicePort;
+import com.shale.data.dao.UserDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
@@ -17,6 +18,9 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.Button;
+import javafx.scene.Node;
 import javafx.scene.paint.Color;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
@@ -80,10 +84,35 @@ public final class SettingsController {
 	private TableColumn<PracticeAreaViewRow, String> practiceAreaSystemKeyColumn;
 	@FXML
 	private Label practiceAreaSettingsStatusLabel;
+	@FXML
+	private TableView<UserManagementViewRow> userManagementTable;
+	@FXML
+	private TableColumn<UserManagementViewRow, String> userNameColumn;
+	@FXML
+	private TableColumn<UserManagementViewRow, String> userEmailColumn;
+	@FXML
+	private TableColumn<UserManagementViewRow, String> userInitialsColumn;
+	@FXML
+	private TableColumn<UserManagementViewRow, String> userAttorneyColumn;
+	@FXML
+	private TableColumn<UserManagementViewRow, String> userAdminColumn;
+	@FXML
+	private TableColumn<UserManagementViewRow, String> userStatusColumn;
+	@FXML
+	private CheckBox showInactiveUsersCheck;
+	@FXML
+	private Button deactivateUserButton;
+	@FXML
+	private Button reactivateUserButton;
+	@FXML
+	private Button resetPasswordButton;
+	@FXML
+	private Label userManagementStatusLabel;
 
 	private NotificationPreferencesService notificationPreferencesService;
 	private AppState appState;
 	private CaseServicePort caseService;
+	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
 
@@ -92,7 +121,8 @@ public final class SettingsController {
 		fxmlReady = true;
 		configureCaseStatusesTable();
 		configurePracticeAreasTable();
-		updateAuditVisibility();
+		configureUserManagementTable();
+		updateAdminControlsVisibility();
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
@@ -100,18 +130,23 @@ public final class SettingsController {
 			loadCaseStatuses();
 			loadPracticeAreas();
 		}
+		if (userDao != null && isAdminUser()) {
+			loadManagedUsers();
+		}
 	}
 
-	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService) {
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.onOpenAuditLog = Objects.requireNonNull(onOpenAuditLog, "onOpenAuditLog");
 		this.caseService = Objects.requireNonNull(caseService, "caseService");
+		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		if (fxmlReady) {
 			loadFromPreferences();
-			updateAuditVisibility();
+			updateAdminControlsVisibility();
 			loadCaseStatuses();
 			loadPracticeAreas();
+			loadManagedUsers();
 		}
 	}
 
@@ -418,6 +453,209 @@ public final class SettingsController {
 	}
 
 	private void setCaseStatusMessage(String message) { if (caseStatusSettingsStatusLabel != null) caseStatusSettingsStatusLabel.setText(message == null ? "" : message); }
+	@FXML
+	private void onAddUser() {
+		if (!isAdminUser()) {
+			AppDialogs.showError(null, "Add User", "Only admin users can create users.");
+			return;
+		}
+		showAddUserDialog().ifPresent(request -> {
+			try {
+				userDao.createUser(request);
+				loadManagedUsers();
+				AppDialogs.showInfo(null, "Add User", "User added.");
+			} catch (RuntimeException ex) {
+				AppDialogs.showError(null, "Add User", rootMessage(ex));
+			}
+		});
+	}
+
+	private Optional<UserDao.UserCreateRequest> showAddUserDialog() {
+		Dialog<UserDao.UserCreateRequest> dialog = new Dialog<>();
+		dialog.setTitle("Add User");
+		AppDialogs.applySecondaryDialogShell(dialog, "Add User");
+		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		TextField firstName = new TextField();
+		TextField lastName = new TextField();
+		TextField email = new TextField();
+		Label emailValidation = new Label("");
+		emailValidation.getStyleClass().add("dialog-error-text");
+		email.focusedProperty().addListener((obs, oldValue, focused) -> {
+			if (!focused) validateAddUserEmail(email, emailValidation);
+		});
+		PasswordField password = new PasswordField();
+		TextField initials = new TextField();
+		ColorPicker colorPicker = new ColorPicker(DEFAULT_STATUS_COLOR);
+		CheckBox attorney = new CheckBox("Attorney");
+		CheckBox admin = new CheckBox("Admin");
+		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
+		grid.add(new Label("First Name"), 0, 0); grid.add(firstName, 1, 0);
+		grid.add(new Label("Last Name"), 0, 1); grid.add(lastName, 1, 1);
+		grid.add(new Label("Email"), 0, 2); grid.add(email, 1, 2);
+		grid.add(emailValidation, 1, 3);
+		grid.add(new Label("Temporary Password"), 0, 4); grid.add(password, 1, 4);
+		grid.add(new Label("Initials"), 0, 5); grid.add(initials, 1, 5);
+		grid.add(new Label("Color"), 0, 6); grid.add(colorPicker, 1, 6);
+		grid.add(attorney, 1, 7);
+		grid.add(admin, 1, 8);
+		dialog.getDialogPane().setContent(grid);
+		dialog.setResultConverter(button -> {
+			if (button != ButtonType.OK) return null;
+			String duplicateMessage = validateAddUserEmail(email, emailValidation);
+			if (!duplicateMessage.isBlank()) throw new IllegalArgumentException(duplicateMessage);
+			return new UserDao.UserCreateRequest(
+					trim(firstName.getText()),
+					trim(lastName.getText()),
+					trim(email.getText()),
+					password.getText(),
+					fxColorToDb(colorPicker.getValue()),
+					trim(initials.getText()),
+					attorney.isSelected(),
+					admin.isSelected());
+		});
+		try { return dialog.showAndWait(); }
+		catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Add User", rootMessage(ex)); return Optional.empty(); }
+	}
+
+
+	private String validateAddUserEmail(TextField emailField, Label emailValidation) {
+		String normalized = UserDao.normalizeEmail(trim(emailField == null ? null : emailField.getText()));
+		if (normalized.isBlank() || userDao == null) {
+			if (emailValidation != null) emailValidation.setText("");
+			return "";
+		}
+		try {
+			UserDao.ExistingEmailRow existing = userDao.findExistingEmailForCurrentTenant(normalized);
+			String message = existing == null ? "" : UserDao.duplicateEmailMessage(existing.deleted());
+			if (emailValidation != null) emailValidation.setText(message);
+			return message;
+		} catch (RuntimeException ex) {
+			String message = rootMessage(ex);
+			if (emailValidation != null) emailValidation.setText(message);
+			return message;
+		}
+	}
+
+	@FXML
+	private void onToggleInactiveUsers() { loadManagedUsers(); }
+
+	@FXML
+	private void onDeactivateUser() {
+		UserManagementViewRow selected = selectedManagedUser();
+		if (selected == null) return;
+		boolean confirmed = AppDialogs.showConfirmation(null, "Deactivate User", "Deactivate this user?", "This will disable their access while preserving historical records.", "Deactivate", AppDialogs.DialogActionKind.DANGER);
+		if (!confirmed) return;
+		try {
+			userDao.deactivateUser(selected.id());
+			loadManagedUsers();
+			setUserManagementMessage("User deactivated.");
+		} catch (RuntimeException ex) {
+			AppDialogs.showError(null, "Deactivate User", rootMessage(ex));
+		}
+	}
+
+	@FXML
+	private void onReactivateUser() {
+		UserManagementViewRow selected = selectedManagedUser();
+		if (selected == null) return;
+		try {
+			userDao.reactivateUser(selected.id());
+			loadManagedUsers();
+			setUserManagementMessage("User reactivated.");
+		} catch (RuntimeException ex) {
+			AppDialogs.showError(null, "Reactivate User", rootMessage(ex));
+		}
+	}
+
+	@FXML
+	private void onResetUserPassword() {
+		UserManagementViewRow selected = selectedManagedUser();
+		if (selected == null) return;
+		Dialog<String> dialog = new Dialog<>();
+		dialog.setTitle("Reset Password");
+		AppDialogs.applySecondaryDialogShell(dialog, "Reset Password");
+		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		PasswordField password = new PasswordField();
+		PasswordField confirm = new PasswordField();
+		Label validation = new Label("");
+		validation.getStyleClass().add("dialog-error-text");
+		password.textProperty().addListener((obs, oldValue, newValue) -> validation.setText(""));
+		confirm.textProperty().addListener((obs, oldValue, newValue) -> validation.setText(""));
+		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
+		grid.add(new Label("New Password"), 0, 0); grid.add(password, 1, 0);
+		grid.add(new Label("Confirm Password"), 0, 1); grid.add(confirm, 1, 1);
+		grid.add(validation, 1, 2);
+		dialog.getDialogPane().setContent(grid);
+		Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
+		okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+			String message = resetPasswordValidationMessage(password.getText(), confirm.getText());
+			if (!message.isBlank()) {
+				validation.setText(message);
+				event.consume();
+			}
+		});
+		dialog.setResultConverter(button -> button == ButtonType.OK ? password.getText() : null);
+		try {
+			dialog.showAndWait().ifPresent(newPassword -> {
+				boolean confirmed = AppDialogs.showConfirmation(null, "Reset Password", "Reset password for " + selected.name() + "?", "Password access will change immediately.", "Reset", AppDialogs.DialogActionKind.PRIMARY);
+				if (!confirmed) return;
+				userDao.resetPassword(selected.id(), newPassword);
+				AppDialogs.showInfo(null, "Reset Password", "Password successfully updated.");
+			});
+		} catch (RuntimeException ex) {
+			AppDialogs.showError(null, "Reset Password", rootMessage(ex));
+		}
+	}
+
+	static String resetPasswordValidationMessage(String password, String confirmPassword) {
+		if (password == null || password.isBlank()) return "Password is required.";
+		if (confirmPassword == null || confirmPassword.isBlank()) return "Confirm password is required.";
+		if (!Objects.equals(password, confirmPassword)) return "Passwords do not match.";
+		return "";
+	}
+
+	private void configureUserManagementTable() {
+		if (userManagementTable == null) return;
+		userNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+		userEmailColumn.setCellValueFactory(new PropertyValueFactory<>("email"));
+		userInitialsColumn.setCellValueFactory(new PropertyValueFactory<>("initials"));
+		userAttorneyColumn.setCellValueFactory(new PropertyValueFactory<>("attorneyState"));
+		userAdminColumn.setCellValueFactory(new PropertyValueFactory<>("adminState"));
+		userStatusColumn.setCellValueFactory(new PropertyValueFactory<>("status"));
+		userManagementTable.getSelectionModel().selectedItemProperty().addListener((obs, oldRow, newRow) -> updateUserActionButtons(newRow));
+	}
+
+	private void loadManagedUsers() {
+		if (userDao == null || userManagementTable == null || !isAdminUser()) return;
+		try {
+			boolean includeInactive = showInactiveUsersCheck != null && showInactiveUsersCheck.isSelected();
+			List<UserManagementViewRow> rows = new ArrayList<>();
+			for (UserDao.UserManagementRow row : userDao.listUsersForManagement(includeInactive)) rows.add(new UserManagementViewRow(row));
+			userManagementTable.getItems().setAll(rows);
+			updateUserActionButtons(userManagementTable.getSelectionModel().getSelectedItem());
+			setUserManagementMessage(rows.isEmpty() ? "No users found for this tenant." : "");
+		} catch (RuntimeException ex) {
+			setUserManagementMessage("Failed to load users. " + rootMessage(ex));
+		}
+	}
+
+	private UserManagementViewRow selectedManagedUser() {
+		UserManagementViewRow selected = userManagementTable == null ? null : userManagementTable.getSelectionModel().getSelectedItem();
+		if (selected == null) setUserManagementMessage("Select a user first.");
+		return selected;
+	}
+
+	private void updateUserActionButtons(UserManagementViewRow selected) {
+		boolean has = selected != null;
+		if (deactivateUserButton != null) deactivateUserButton.setDisable(!has || selected.deleted());
+		if (reactivateUserButton != null) reactivateUserButton.setDisable(!has || !selected.deleted());
+		if (resetPasswordButton != null) resetPasswordButton.setDisable(!has || selected.deleted());
+	}
+
+	private void setUserManagementMessage(String message) { if (userManagementStatusLabel != null) userManagementStatusLabel.setText(message == null ? "" : message); }
+
+	private static String trim(String value) { return value == null ? "" : value.trim(); }
+
 	private void setPracticeAreaMessage(String message) { if (practiceAreaSettingsStatusLabel != null) practiceAreaSettingsStatusLabel.setText(message == null ? "" : message); }
 	private static String safe(String value) { return value == null ? "" : value; }
 	private static String rootMessage(Throwable ex) { Throwable t = ex; while (t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? t.toString() : t.getMessage(); }
@@ -433,6 +671,22 @@ public final class SettingsController {
 		public String getLifecycleKey() { return safe(status.lifecycleKey()); }
 		public String getSystemKey() { return safe(status.systemKey()); }
 		CaseStatusDto status() { return status; }
+	}
+
+
+	public static final class UserManagementViewRow {
+		private final UserDao.UserManagementRow row;
+		UserManagementViewRow(UserDao.UserManagementRow row) { this.row = row; }
+		public int getId() { return row.id(); }
+		public int id() { return row.id(); }
+		public String getName() { return safe(row.name()); }
+		public String name() { return getName(); }
+		public String getEmail() { return safe(row.email()); }
+		public String getInitials() { return safe(row.initials()); }
+		public String getAttorneyState() { return row.attorney() ? "Yes" : "No"; }
+		public String getAdminState() { return row.admin() ? "Yes" : "No"; }
+		public String getStatus() { return row.deleted() ? "Inactive" : "Active"; }
+		public boolean deleted() { return row.deleted(); }
 	}
 
 	public static final class PracticeAreaViewRow {
@@ -506,11 +760,19 @@ public final class SettingsController {
 		return appState != null && appState.isAdmin();
 	}
 
-	private void updateAuditVisibility() {
+	@FXML
+	private VBox userAdministrationSection;
+
+	private void updateAdminControlsVisibility() {
+		boolean visible = isAdminUser();
 		if (auditSection != null) {
-			boolean visible = isAdminUser();
 			auditSection.setVisible(visible);
 			auditSection.setManaged(visible);
 		}
+		if (userAdministrationSection != null) {
+			userAdministrationSection.setVisible(visible);
+			userAdministrationSection.setManaged(visible);
+		}
+		if (visible) loadManagedUsers();
 	}
 }

@@ -632,7 +632,7 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)));
+			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new UserDao(dbSessionProvider));
 			return c;
 		});
 	}
