@@ -5,6 +5,7 @@ import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
@@ -631,7 +632,7 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService, appState, this::showAuditLogViewer);
+			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)));
 			return c;
 		});
 	}
