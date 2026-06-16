@@ -26,6 +26,7 @@ public class CaseCard extends VBox {
 	private final Label intakeLabel = new Label();
 	private final Label solLabel = new Label();
 	private final Label statusLabel = new Label();
+	private final Region practiceAreaBar = new Region();
 	private final Region attorneyDot = new Region();
 
 	private final HBox cardRow = new HBox(0);
@@ -41,6 +42,7 @@ public class CaseCard extends VBox {
 	private Consumer<Integer> onOpen;
 	private String statusColorCss = "#F1F5F9";
 	private String attorneyColorCss = "#94A3B8";
+	private String practiceAreaColorCss = "#CBD5E1";
 	private String statusLabelBaseStyle = "-fx-font-size: 11px; -fx-font-weight: 700;";
 	private boolean hovered;
 
@@ -64,6 +66,7 @@ public class CaseCard extends VBox {
 		bodyPane.setPadding(new Insets(5, 9, 5, 9));
 		statusPane.setPadding(new Insets(6, 6, 6, 10));
 		statusPane.setPrefWidth(64);
+		practiceAreaBar.setPrefWidth(5);
 		attorneyLabel.setManaged(false);
 		attorneyLabel.setVisible(false);
 		datesBox.setManaged(false);
@@ -81,6 +84,7 @@ public class CaseCard extends VBox {
 		bodyPane.setPadding(new Insets(10));
 		statusPane.setPadding(new Insets(10, 8, 10, 18));
 		statusPane.setPrefWidth(96);
+		practiceAreaBar.setPrefWidth(6);
 		attorneyLabel.setManaged(true);
 		attorneyLabel.setVisible(true);
 		datesBox.setManaged(true);
@@ -154,6 +158,11 @@ public class CaseCard extends VBox {
 		refreshSurfaceStyle();
 	}
 
+	public void setPracticeAreaCssColor(String practiceAreaColorCss) {
+		this.practiceAreaColorCss = normalizeColor(practiceAreaColorCss, "#CBD5E1");
+		refreshSurfaceStyle();
+	}
+
 	/**
 	 * Convenience: if you ever want to set a plain Color directly (not required). This does
 	 * NOT use your gradient/tint logic; it just sets a solid background.
@@ -190,6 +199,7 @@ public class CaseCard extends VBox {
 
 	private void buildUi() {
 		getStyleClass().add("case-card");
+		practiceAreaBar.getStyleClass().add("case-card__practice-area-bar");
 		bodyPane.getStyleClass().add("case-card__body");
 		statusPane.getStyleClass().add("case-card__status-panel");
 		statusLabel.getStyleClass().add("case-card__status-label");
@@ -214,7 +224,7 @@ public class CaseCard extends VBox {
 		statusLabel.setWrapText(true);
 		statusLabel.setMaxWidth(Double.MAX_VALUE);
 		getChildren().setAll(cardRow);
-		cardRow.getChildren().setAll(bodyPane, statusPane);
+		cardRow.getChildren().setAll(practiceAreaBar, bodyPane, statusPane);
 
 		// Nice UX: looks clickable
 		setCursor(Cursor.HAND);
@@ -247,12 +257,16 @@ public class CaseCard extends VBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(CardSurfaceStyles.cardContainerStyle(null, hovered));
+		setStyle(cardGradientStyle(hovered));
+		practiceAreaBar.setStyle("""
+				-fx-background-color: %s;
+				-fx-background-radius: 14 0 0 14;
+				""".formatted(practiceAreaColorCss));
 		bodyPane.setStyle("-fx-background-color: transparent;");
 		statusPane.setStyle("""
-				-fx-background-color: linear-gradient(to right, %s 0%%, %s 42%%, %s 100%%);
+				-fx-background-color: transparent;
 				-fx-background-radius: 0 14 14 0;
-				""".formatted(rgba(statusColorCss, 0.0), rgba(statusColorCss, 0.86), statusColorCss));
+				""");
 		statusLabel.setStyle(statusLabelBaseStyle + "-fx-text-fill: " + readableTextColor(statusColorCss) + ";");
 		attorneyDot.setStyle("""
 				-fx-background-color: %s;
@@ -262,6 +276,22 @@ public class CaseCard extends VBox {
 				-fx-border-width: 2;
 				-fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.26), 8, 0.18, 0, 1);
 				""".formatted(attorneyColorCss));
+	}
+
+	private String cardGradientStyle(boolean hovered) {
+		String neutral = hovered ? "rgba(255,255,255,0.985)" : "rgba(248,250,252,0.96)";
+		String border = hovered ? "rgba(74, 104, 138, 0.34)" : "rgba(74, 104, 138, 0.24)";
+		String effect = hovered
+				? "dropshadow(gaussian, rgba(7, 23, 44, 0.18), 24, 0.2, 0, 8)"
+				: "dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4)";
+		return """
+				-fx-background-color: linear-gradient(to right, %s 0%%, %s 42%%, %s 52%%, %s 74%%, %s 100%%);
+				-fx-background-radius: 14;
+				-fx-border-radius: 14;
+				-fx-border-color: %s;
+				-fx-border-width: 1;
+				-fx-effect: %s;
+				""".formatted(neutral, neutral, rgba(statusColorCss, 0.22), rgba(statusColorCss, 0.72), statusColorCss, border, effect);
 	}
 
 	private static String rgba(String cssColor, double opacityMultiplier) {

@@ -10,6 +10,7 @@ import javafx.scene.Node;
 public final class CaseCardFactory {
 	private static final String STATUS_FALLBACK_CSS = "#F1F5F9";
 	private static final String ATTORNEY_FALLBACK_CSS = "#94A3B8";
+	private static final String PRACTICE_AREA_FALLBACK_CSS = "#CBD5E1";
 
 	public enum Variant {
 		FULL, COMPACT, MINI
@@ -37,6 +38,7 @@ public final class CaseCardFactory {
 		card.setStatus(vm.primaryStatusName());
 		card.setStatusCssColor(CaseCard.normalizeColor(vm.primaryStatusColor(), STATUS_FALLBACK_CSS));
 		card.setAttorneyDotCssColor(CaseCard.normalizeColor(vm.responsibleAttorneyColor(), ATTORNEY_FALLBACK_CSS));
+		card.setPracticeAreaCssColor(CaseCard.normalizeColor(vm.practiceAreaColor(), PRACTICE_AREA_FALLBACK_CSS));
 
 		card.setOnOpen(id ->
 		{
@@ -63,11 +65,18 @@ public final class CaseCardFactory {
 			String responsibleAttorneyColor,
 			Boolean nonEngagementLetterSent,
 			String primaryStatusName,
-			String primaryStatusColor
+			String primaryStatusColor,
+			String practiceAreaColor
 	) {
 		public CaseCardModel(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
-			this(id, name, intakeDate, solDate, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent, "", "");
+			this(id, name, intakeDate, solDate, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent, "", "", "");
+		}
+
+		public CaseCardModel(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney,
+				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String primaryStatusColor) {
+			this(id, name, intakeDate, solDate, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent,
+					primaryStatusName, primaryStatusColor, "");
 		}
 
 		public CaseCardModel {
@@ -77,6 +86,7 @@ public final class CaseCardFactory {
 			nonEngagementLetterSent = Boolean.TRUE.equals(nonEngagementLetterSent);
 			primaryStatusName = Objects.requireNonNullElse(primaryStatusName, "");
 			primaryStatusColor = Objects.requireNonNullElse(primaryStatusColor, "");
+			practiceAreaColor = Objects.requireNonNullElse(practiceAreaColor, "");
 		}
 	}
 }

@@ -554,7 +554,7 @@ public final class CasesController {
 					if (safeVal.equals(vm.name)) {
 						return false; // no change
 					}
-					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.primaryStatusColor, vm.clientName, vm.opposingPartiesName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
+					loaded.set(i, new CaseCardVm(vm.id, safeVal, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.primaryStatusColor, vm.practiceAreaColor, vm.clientName, vm.opposingPartiesName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
 					return true;
 				}
 
@@ -600,7 +600,7 @@ public final class CasesController {
 		for (int i = 0; i < loaded.size(); i++) {
 			CaseCardVm vm = loaded.get(i);
 			if (vm.id == caseId) {
-				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.primaryStatusColor, vm.clientName, vm.opposingPartiesName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
+				loaded.set(i, new CaseCardVm(vm.id, safeName, vm.intakeDate, vm.solDate, vm.primaryStatusId, vm.responsibleAttorney, vm.responsibleAttorneyColor, vm.nonEngagementLetterSent, vm.primaryStatusName, vm.primaryStatusColor, vm.practiceAreaColor, vm.clientName, vm.opposingPartiesName, vm.latestCaseUpdate, vm.description, vm.dateOfIncident, vm.tortClaimsNoticeDeadline));
 				rerender();
 				return;
 			}
@@ -674,6 +674,7 @@ public final class CasesController {
 								r.nonEngagementLetterSent(),
 								safe(r.primaryStatusName()),
 								safe(r.primaryStatusColor()),
+								safe(r.practiceAreaColor()),
 								safe(r.clientName()),
 								safe(r.opposingPartiesName()),
 								safe(r.latestCaseUpdate()),
@@ -998,7 +999,8 @@ public final class CasesController {
 				vm.responsibleAttorneyColor,
 				vm.nonEngagementLetterSent,
 				vm.primaryStatusName,
-				vm.primaryStatusColor
+				vm.primaryStatusColor,
+				vm.practiceAreaColor
 		));
 	}
 
@@ -1026,6 +1028,7 @@ public final class CasesController {
 		final Boolean nonEngagementLetterSent;
 		final String primaryStatusName;
 		final String primaryStatusColor;
+		final String practiceAreaColor;
 		final String clientName;
 		final String opposingPartiesName;
 		final String latestCaseUpdate;
@@ -1034,7 +1037,7 @@ public final class CasesController {
 		final LocalDate tortClaimsNoticeDeadline;
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId, String responsibleAttorney,
-				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String primaryStatusColor, String clientName,
+				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String primaryStatusColor, String practiceAreaColor, String clientName,
 				String opposingPartiesName, String latestCaseUpdate, String description, LocalDate dateOfIncident,
 				LocalDate tortClaimsNoticeDeadline) {
 			this.id = id;
@@ -1047,6 +1050,7 @@ public final class CasesController {
 			this.nonEngagementLetterSent = nonEngagementLetterSent;
 			this.primaryStatusName = Objects.requireNonNullElse(primaryStatusName, "");
 			this.primaryStatusColor = Objects.requireNonNullElse(primaryStatusColor, "");
+			this.practiceAreaColor = Objects.requireNonNullElse(practiceAreaColor, "");
 			this.clientName = Objects.requireNonNullElse(clientName, "");
 			this.opposingPartiesName = Objects.requireNonNullElse(opposingPartiesName, "");
 			this.latestCaseUpdate = Objects.requireNonNullElse(latestCaseUpdate, "");
@@ -1149,6 +1153,7 @@ public final class CasesController {
 						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent)
 						&& safe(r.primaryStatusName()).equals(vm.primaryStatusName)
 						&& safe(r.primaryStatusColor()).equals(vm.primaryStatusColor)
+						&& safe(r.practiceAreaColor()).equals(vm.practiceAreaColor)
 						&& safe(r.clientName()).equals(vm.clientName)
 						&& safe(r.opposingPartiesName()).equals(vm.opposingPartiesName)
 						&& safe(r.latestCaseUpdate()).equals(vm.latestCaseUpdate)
@@ -1170,6 +1175,7 @@ public final class CasesController {
 						r.nonEngagementLetterSent(),
 						safe(r.primaryStatusName()),
 						safe(r.primaryStatusColor()),
+						safe(r.practiceAreaColor()),
 						safe(r.clientName()),
 						safe(r.opposingPartiesName()),
 						safe(r.latestCaseUpdate()),
