@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.function.Consumer;
 
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -13,8 +14,8 @@ import javafx.scene.paint.Color;
 /**
  * CaseCard - reusable VBox "card" for rendering a case summary.
  *
- * Case card surface with neutral main body, status-colored right panel, and a
- * responsible-attorney color dot.
+ * Case card surface with a neutral main body, practice-area accent bar, compact
+ * status chip, and responsible-attorney color dot.
  *
  * The host screen wires navigation via setOnOpen(...)
  */
@@ -31,12 +32,11 @@ public class CaseCard extends VBox {
 
 	private final HBox cardRow = new HBox(0);
 	private final VBox bodyPane = new VBox(6);
-	private final VBox statusPane = new VBox(6);
-	private final HBox dotRow = new HBox();
+	private final HBox headerRow = new HBox(8);
+	private final HBox indicatorRow = new HBox(6);
 	private final VBox datesBox = new VBox(2);
 	private final Region bodySpacer = new Region();
-	private final Region dotSpacer = new Region();
-	private final Region statusSpacer = new Region();
+	private final Region headerSpacer = new Region();
 
 	private Integer caseId;
 	private Consumer<Integer> onOpen;
@@ -64,8 +64,6 @@ public class CaseCard extends VBox {
 		setPrefWidth(Region.USE_COMPUTED_SIZE);
 		setMaxWidth(Region.USE_COMPUTED_SIZE);
 		bodyPane.setPadding(new Insets(5, 9, 5, 9));
-		statusPane.setPadding(new Insets(6, 6, 6, 10));
-		statusPane.setPrefWidth(64);
 		practiceAreaBar.setPrefWidth(5);
 		attorneyLabel.setManaged(false);
 		attorneyLabel.setVisible(false);
@@ -74,6 +72,7 @@ public class CaseCard extends VBox {
 		titleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		statusLabelBaseStyle = "-fx-font-size: 9px; -fx-font-weight: 700;";
 		attorneyDot.setPrefSize(18, 18);
+		indicatorRow.setSpacing(4);
 		refreshSurfaceStyle();
 	}
 
@@ -82,8 +81,6 @@ public class CaseCard extends VBox {
 		setPadding(Insets.EMPTY);
 		setPrefWidth(280);
 		bodyPane.setPadding(new Insets(10));
-		statusPane.setPadding(new Insets(10, 8, 10, 18));
-		statusPane.setPrefWidth(96);
 		practiceAreaBar.setPrefWidth(6);
 		attorneyLabel.setManaged(true);
 		attorneyLabel.setVisible(true);
@@ -92,6 +89,7 @@ public class CaseCard extends VBox {
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
 		statusLabelBaseStyle = "-fx-font-size: 11px; -fx-font-weight: 700;";
 		attorneyDot.setPrefSize(22, 22);
+		indicatorRow.setSpacing(6);
 		refreshSurfaceStyle();
 	}
 
@@ -201,7 +199,7 @@ public class CaseCard extends VBox {
 		getStyleClass().add("case-card");
 		practiceAreaBar.getStyleClass().add("case-card__practice-area-bar");
 		bodyPane.getStyleClass().add("case-card__body");
-		statusPane.getStyleClass().add("case-card__status-panel");
+		indicatorRow.getStyleClass().add("case-card__indicator-row");
 		statusLabel.getStyleClass().add("case-card__status-label");
 		attorneyDot.getStyleClass().add("case-card__attorney-dot");
 		setBackgroundCssColor(null);
@@ -214,17 +212,16 @@ public class CaseCard extends VBox {
 		datesBox.getChildren().setAll(intakeLabel, solLabel);
 
 		VBox.setVgrow(bodySpacer, Priority.ALWAYS);
-		VBox.setVgrow(statusSpacer, Priority.ALWAYS);
 		HBox.setHgrow(bodyPane, Priority.ALWAYS);
-		HBox.setHgrow(dotSpacer, Priority.ALWAYS);
-		bodyPane.getChildren().setAll(titleLabel, attorneyLabel, bodySpacer, datesBox);
-		dotRow.getChildren().setAll(dotSpacer, attorneyDot);
-		statusPane.getChildren().setAll(dotRow, statusSpacer, statusLabel);
-		statusPane.setMinWidth(Region.USE_PREF_SIZE);
+		HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+		indicatorRow.setAlignment(Pos.CENTER_RIGHT);
+		indicatorRow.getChildren().setAll(statusLabel, attorneyDot);
 		statusLabel.setWrapText(true);
-		statusLabel.setMaxWidth(Double.MAX_VALUE);
+		statusLabel.setMaxWidth(96);
+		headerRow.getChildren().setAll(titleLabel, headerSpacer, indicatorRow);
+		bodyPane.getChildren().setAll(headerRow, attorneyLabel, bodySpacer, datesBox);
 		getChildren().setAll(cardRow);
-		cardRow.getChildren().setAll(practiceAreaBar, bodyPane, statusPane);
+		cardRow.getChildren().setAll(practiceAreaBar, bodyPane);
 
 		// Nice UX: looks clickable
 		setCursor(Cursor.HAND);
@@ -257,17 +254,22 @@ public class CaseCard extends VBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(cardGradientStyle(hovered));
+		setStyle(CardSurfaceStyles.cardContainerStyle(null, hovered));
 		practiceAreaBar.setStyle("""
 				-fx-background-color: %s;
 				-fx-background-radius: 14 0 0 14;
 				""".formatted(practiceAreaColorCss));
 		bodyPane.setStyle("-fx-background-color: transparent;");
-		statusPane.setStyle("""
-				-fx-background-color: transparent;
-				-fx-background-radius: 0 14 14 0;
-				""");
-		statusLabel.setStyle(statusLabelBaseStyle + "-fx-text-fill: " + readableTextColor(statusColorCss) + ";");
+		statusLabel.setStyle("""
+				%s
+				-fx-text-fill: %s;
+				-fx-background-color: %s;
+				-fx-background-radius: 999;
+				-fx-border-color: rgba(7, 23, 44, 0.12);
+				-fx-border-radius: 999;
+				-fx-border-width: 1;
+				-fx-padding: 3 8 3 8;
+				""".formatted(statusLabelBaseStyle, readableTextColor(statusColorCss), statusColorCss));
 		attorneyDot.setStyle("""
 				-fx-background-color: %s;
 				-fx-background-radius: 999;
@@ -276,32 +278,6 @@ public class CaseCard extends VBox {
 				-fx-border-width: 2;
 				-fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.26), 8, 0.18, 0, 1);
 				""".formatted(attorneyColorCss));
-	}
-
-	private String cardGradientStyle(boolean hovered) {
-		String neutral = hovered ? "rgba(255,255,255,0.985)" : "rgba(248,250,252,0.96)";
-		String border = hovered ? "rgba(74, 104, 138, 0.34)" : "rgba(74, 104, 138, 0.24)";
-		String effect = hovered
-				? "dropshadow(gaussian, rgba(7, 23, 44, 0.18), 24, 0.2, 0, 8)"
-				: "dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4)";
-		return """
-				-fx-background-color: linear-gradient(to right, %s 0%%, %s 42%%, %s 52%%, %s 74%%, %s 100%%);
-				-fx-background-radius: 14;
-				-fx-border-radius: 14;
-				-fx-border-color: %s;
-				-fx-border-width: 1;
-				-fx-effect: %s;
-				""".formatted(neutral, neutral, rgba(statusColorCss, 0.22), rgba(statusColorCss, 0.72), statusColorCss, border, effect);
-	}
-
-	private static String rgba(String cssColor, double opacityMultiplier) {
-		Color color = com.shale.ui.util.ColorUtil.toFxColor(cssColor);
-		double opacity = Math.max(0.0, Math.min(1.0, color.getOpacity() * opacityMultiplier));
-		return "rgba(%d,%d,%d,%.3f)".formatted(
-				(int) Math.round(color.getRed() * 255),
-				(int) Math.round(color.getGreen() * 255),
-				(int) Math.round(color.getBlue() * 255),
-				opacity);
 	}
 
 	public static String normalizeColor(String dbColor, String fallback) {
