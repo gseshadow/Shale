@@ -8,6 +8,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.PracticeAreaDto;
 
 /**
  * Shared case application boundary for future desktop/server adapters.
@@ -27,6 +28,14 @@ public interface CaseServicePort {
 	List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
 	List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
+
+	List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive);
+
+	PracticeAreaDto createPracticeArea(PracticeAreaCommand command);
+
+	PracticeAreaDto updatePracticeArea(PracticeAreaCommand command);
+
+	void deactivatePracticeArea(int shaleClientId, int practiceAreaId);
 
 	CaseStatusDto createCaseStatus(CaseStatusCommand command);
 
@@ -54,6 +63,15 @@ public interface CaseServicePort {
 			int shaleClientId,
 			int actorUserId,
 			String noteText) {
+	}
+
+	record PracticeAreaCommand(
+			Integer id,
+			int shaleClientId,
+			String name,
+			String color,
+			boolean active,
+			String systemKey) {
 	}
 
 	record CaseStatusCommand(

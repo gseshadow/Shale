@@ -91,6 +91,30 @@
                 </HBox>
             </VBox>
 
+
+            <VBox spacing="8" styleClass="strong-panel">
+                <padding>
+                    <Insets top="12" right="12" bottom="12" left="12"/>
+                </padding>
+                <Label text="Practice Areas" styleClass="search-section-title"/>
+                <Label text="Manage the practice areas available for this tenant."
+                       styleClass="search-summary-text" wrapText="true"/>
+                <TableView fx:id="practiceAreasTable" prefHeight="240">
+                    <columns>
+                        <TableColumn fx:id="practiceAreaNameColumn" text="Name" prefWidth="220"/>
+                        <TableColumn fx:id="practiceAreaColorColumn" text="Color" prefWidth="120"/>
+                        <TableColumn fx:id="practiceAreaActiveColumn" text="Active/Inactive" prefWidth="130"/>
+                        <TableColumn fx:id="practiceAreaSystemKeyColumn" text="System Key" prefWidth="160"/>
+                    </columns>
+                </TableView>
+                <HBox spacing="8">
+                    <Button text="Add Practice Area" onAction="#onAddPracticeArea" styleClass="button-primary"/>
+                    <Button text="Edit Practice Area" onAction="#onEditPracticeArea" styleClass="button-secondary"/>
+                    <Button text="Remove Practice Area" onAction="#onRemovePracticeArea" styleClass="button-secondary"/>
+                    <Label fx:id="practiceAreaSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+                </HBox>
+            </VBox>
+
             <VBox fx:id="auditSection" spacing="8" styleClass="strong-panel">
                 <padding>
                     <Insets top="12" right="12" bottom="12" left="12"/>

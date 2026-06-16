@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.notification.NotificationPreferenceKey;
@@ -67,6 +68,18 @@ public final class SettingsController {
 	private TableColumn<CaseStatusViewRow, Integer> statusSortOrderColumn;
 	@FXML
 	private Label caseStatusSettingsStatusLabel;
+	@FXML
+	private TableView<PracticeAreaViewRow> practiceAreasTable;
+	@FXML
+	private TableColumn<PracticeAreaViewRow, String> practiceAreaNameColumn;
+	@FXML
+	private TableColumn<PracticeAreaViewRow, String> practiceAreaColorColumn;
+	@FXML
+	private TableColumn<PracticeAreaViewRow, String> practiceAreaActiveColumn;
+	@FXML
+	private TableColumn<PracticeAreaViewRow, String> practiceAreaSystemKeyColumn;
+	@FXML
+	private Label practiceAreaSettingsStatusLabel;
 
 	private NotificationPreferencesService notificationPreferencesService;
 	private AppState appState;
@@ -78,12 +91,14 @@ public final class SettingsController {
 	private void initialize() {
 		fxmlReady = true;
 		configureCaseStatusesTable();
+		configurePracticeAreasTable();
 		updateAuditVisibility();
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
 		if (caseService != null) {
 			loadCaseStatuses();
+			loadPracticeAreas();
 		}
 	}
 
@@ -96,6 +111,7 @@ public final class SettingsController {
 			loadFromPreferences();
 			updateAuditVisibility();
 			loadCaseStatuses();
+			loadPracticeAreas();
 		}
 	}
 
@@ -131,6 +147,97 @@ public final class SettingsController {
 		onOpenAuditLog.run();
 	}
 
+
+
+	@FXML
+	private void onAddPracticeArea() {
+		showPracticeAreaDialog(null).ifPresent(input -> {
+			caseService.createPracticeArea(new CaseServicePort.PracticeAreaCommand(
+					null, requireTenantId(), input.name(), input.color(), input.active(), input.systemKey()));
+			loadPracticeAreas();
+			setPracticeAreaMessage("Practice area added.");
+		});
+	}
+
+	@FXML
+	private void onEditPracticeArea() {
+		PracticeAreaViewRow selected = selectedPracticeAreaRow();
+		if (selected == null) return;
+		showPracticeAreaDialog(selected.practiceArea()).ifPresent(input -> {
+			caseService.updatePracticeArea(new CaseServicePort.PracticeAreaCommand(
+					selected.id(), requireTenantId(), input.name(), input.color(), input.active(), input.systemKey()));
+			loadPracticeAreas();
+			setPracticeAreaMessage("Practice area updated.");
+		});
+	}
+
+	@FXML
+	private void onRemovePracticeArea() {
+		PracticeAreaViewRow selected = selectedPracticeAreaRow();
+		if (selected == null) return;
+		try {
+			caseService.deactivatePracticeArea(requireTenantId(), selected.id());
+			loadPracticeAreas();
+			setPracticeAreaMessage("Practice area removed from new selections. Existing cases keep their value.");
+		} catch (RuntimeException ex) {
+			AppDialogs.showError(practiceAreasTable.getScene().getWindow(), "Practice Areas", rootMessage(ex));
+		}
+	}
+
+	private void configurePracticeAreasTable() {
+		if (practiceAreasTable == null) return;
+		practiceAreaNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+		practiceAreaColorColumn.setCellValueFactory(new PropertyValueFactory<>("color"));
+		practiceAreaActiveColumn.setCellValueFactory(new PropertyValueFactory<>("activeState"));
+		practiceAreaSystemKeyColumn.setCellValueFactory(new PropertyValueFactory<>("systemKey"));
+	}
+
+	private void loadPracticeAreas() {
+		if (caseService == null || practiceAreasTable == null) return;
+		try {
+			List<PracticeAreaViewRow> rows = new ArrayList<>();
+			for (PracticeAreaDto area : caseService.listPracticeAreas(requireTenantId(), true)) rows.add(new PracticeAreaViewRow(area));
+			practiceAreasTable.getItems().setAll(rows);
+			setPracticeAreaMessage(rows.isEmpty() ? "No practice areas are configured for this tenant." : "");
+		} catch (RuntimeException ex) {
+			setPracticeAreaMessage("Failed to load practice areas. " + rootMessage(ex));
+		}
+	}
+
+	private Optional<PracticeAreaInput> showPracticeAreaDialog(PracticeAreaDto existing) {
+		Dialog<PracticeAreaInput> dialog = new Dialog<>();
+		String dialogTitle = existing == null ? "Add Practice Area" : "Edit Practice Area";
+		dialog.setTitle(dialogTitle);
+		AppDialogs.applySecondaryDialogShell(dialog, dialogTitle);
+		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		TextField name = new TextField(existing == null ? "" : existing.name());
+		CheckBox active = new CheckBox("Active");
+		active.setSelected(existing == null || existing.active());
+		ColorPicker colorPicker = new ColorPicker(dbColorToFx(existing == null ? null : existing.color()));
+		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
+		grid.add(new Label("Name"), 0, 0); grid.add(name, 1, 0);
+		grid.add(new Label("Color"), 0, 1); grid.add(colorPicker, 1, 1);
+		grid.add(active, 1, 2);
+		if (existing != null && !safe(existing.systemKey()).isBlank()) {
+			grid.add(new Label("System Key"), 0, 3);
+			grid.add(new Label(existing.systemKey()), 1, 3);
+		}
+		dialog.getDialogPane().setContent(grid);
+		dialog.setResultConverter(button -> {
+			if (button != ButtonType.OK) return null;
+			String trimmedName = name.getText() == null ? "" : name.getText().trim();
+			if (trimmedName.isBlank()) throw new IllegalArgumentException("Name is required.");
+			return new PracticeAreaInput(trimmedName, fxColorToDb(colorPicker.getValue()), active.isSelected(), practiceAreaSystemKeyForSave(existing));
+		});
+		try { return dialog.showAndWait(); }
+		catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Practice Areas", rootMessage(ex)); return Optional.empty(); }
+	}
+
+	private PracticeAreaViewRow selectedPracticeAreaRow() {
+		PracticeAreaViewRow selected = practiceAreasTable == null ? null : practiceAreasTable.getSelectionModel().getSelectedItem();
+		if (selected == null) setPracticeAreaMessage("Select a practice area first.");
+		return selected;
+	}
 
 	@FXML
 	private void onAddCaseStatus() {
@@ -302,11 +409,16 @@ public final class SettingsController {
 		return existing == null ? null : existing.lifecycleKey();
 	}
 
+	static String practiceAreaSystemKeyForSave(PracticeAreaDto existing) {
+		return existing == null ? null : existing.systemKey();
+	}
+
 	static String systemKeyForSave(CaseStatusDto existing) {
 		return existing == null ? null : existing.systemKey();
 	}
 
 	private void setCaseStatusMessage(String message) { if (caseStatusSettingsStatusLabel != null) caseStatusSettingsStatusLabel.setText(message == null ? "" : message); }
+	private void setPracticeAreaMessage(String message) { if (practiceAreaSettingsStatusLabel != null) practiceAreaSettingsStatusLabel.setText(message == null ? "" : message); }
 	private static String safe(String value) { return value == null ? "" : value; }
 	private static String rootMessage(Throwable ex) { Throwable t = ex; while (t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? t.toString() : t.getMessage(); }
 
@@ -322,6 +434,20 @@ public final class SettingsController {
 		public String getSystemKey() { return safe(status.systemKey()); }
 		CaseStatusDto status() { return status; }
 	}
+
+	public static final class PracticeAreaViewRow {
+		private final PracticeAreaDto practiceArea;
+		PracticeAreaViewRow(PracticeAreaDto practiceArea) { this.practiceArea = practiceArea; }
+		public int getId() { return practiceArea.id(); }
+		public int id() { return practiceArea.id(); }
+		public String getName() { return safe(practiceArea.name()); }
+		public String getColor() { return safe(practiceArea.color()); }
+		public String getActiveState() { return practiceArea.active() && !practiceArea.deleted() ? "Active" : "Inactive"; }
+		public String getSystemKey() { return safe(practiceArea.systemKey()); }
+		PracticeAreaDto practiceArea() { return practiceArea; }
+	}
+
+	private record PracticeAreaInput(String name, String color, boolean active, String systemKey) {}
 
 	private record CaseStatusInput(
 			String name,

@@ -9,6 +9,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.data.dao.CaseDao;
 
@@ -56,6 +57,31 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override
 	public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
 		return caseGateway.listCaseStatuses(shaleClientId, includeInactive);
+	}
+
+	@Override
+	public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
+		return caseGateway.listPracticeAreas(shaleClientId, includeInactive);
+	}
+
+	@Override
+	public PracticeAreaDto createPracticeArea(PracticeAreaCommand command) {
+		Objects.requireNonNull(command, "command");
+		return caseGateway.createPracticeArea(command.shaleClientId(), command.name(), command.color(), command.active(), command.systemKey());
+	}
+
+	@Override
+	public PracticeAreaDto updatePracticeArea(PracticeAreaCommand command) {
+		Objects.requireNonNull(command, "command");
+		if (command.id() == null) {
+			throw new IllegalArgumentException("Practice area id is required.");
+		}
+		return caseGateway.updatePracticeArea(command.shaleClientId(), command.id(), command.name(), command.color(), command.active(), command.systemKey());
+	}
+
+	@Override
+	public void deactivatePracticeArea(int shaleClientId, int practiceAreaId) {
+		caseGateway.deactivatePracticeArea(shaleClientId, practiceAreaId);
 	}
 
 	@Override
@@ -112,6 +138,14 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
 
+		List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive);
+
+		PracticeAreaDto createPracticeArea(int shaleClientId, String name, String color, boolean active, String systemKey);
+
+		PracticeAreaDto updatePracticeArea(int shaleClientId, int practiceAreaId, String name, String color, boolean active, String systemKey);
+
+		void deactivatePracticeArea(int shaleClientId, int practiceAreaId);
+
 		CaseStatusDto createCaseStatus(int shaleClientId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey);
 
 		CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey);
@@ -156,6 +190,26 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
 			return caseDao.listCaseStatuses(shaleClientId, includeInactive);
+		}
+
+		@Override
+		public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
+			return caseDao.listPracticeAreas(shaleClientId, includeInactive);
+		}
+
+		@Override
+		public PracticeAreaDto createPracticeArea(int shaleClientId, String name, String color, boolean active, String systemKey) {
+			return caseDao.createPracticeArea(shaleClientId, name, color, active, systemKey);
+		}
+
+		@Override
+		public PracticeAreaDto updatePracticeArea(int shaleClientId, int practiceAreaId, String name, String color, boolean active, String systemKey) {
+			return caseDao.updatePracticeArea(shaleClientId, practiceAreaId, name, color, active, systemKey);
+		}
+
+		@Override
+		public void deactivatePracticeArea(int shaleClientId, int practiceAreaId) {
+			caseDao.deactivatePracticeArea(shaleClientId, practiceAreaId);
 		}
 
 		@Override
