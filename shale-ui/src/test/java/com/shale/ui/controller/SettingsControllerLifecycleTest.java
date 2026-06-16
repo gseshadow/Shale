@@ -73,4 +73,40 @@ final class SettingsControllerLifecycleTest {
         assertTrue(!method.contains("new Label(\"Sort Order\")"),
                 "Sort Order should remain table/reorder-button driven and not be a manual dialog field.");
     }
+
+    @Test
+    void addUserFlowIsAdminOnlyAndUsesUserDaoCreateRequestWithoutTenantField() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+
+        assertTrue(fxml.contains("fx:id=\"userAdministrationSection\""));
+        assertTrue(fxml.contains("text=\"Add User\""));
+        assertTrue(source.contains("if (!isAdminUser())"),
+                "Settings Add User handler must block non-admin users before opening or saving the dialog.");
+        assertTrue(source.contains("new UserDao.UserCreateRequest("));
+        assertTrue(!source.contains("shaleClientId,"),
+                "The Add User form must not provide a ShaleClientId value; UserDao derives it from session context.");
+        assertTrue(!source.contains("Default Organization"),
+                "The Add User form should not expose organization fields until user organization editing is supported in the UI.");
+        assertTrue(!source.contains("new Label(\"Organization\")"),
+                "The Add User form should not expose raw organization ids.");
+    }
+
+
+    @Test
+    void userManagementSectionIncludesListFilterAndActions() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+
+        assertTrue(fxml.contains("fx:id=\"userManagementTable\""));
+        assertTrue(fxml.contains("fx:id=\"showInactiveUsersCheck\""));
+        assertTrue(fxml.contains("onAction=\"#onDeactivateUser\""));
+        assertTrue(fxml.contains("onAction=\"#onReactivateUser\""));
+        assertTrue(fxml.contains("onAction=\"#onResetUserPassword\""));
+        assertTrue(source.contains("focusedProperty().addListener"),
+                "Email duplicate validation should run when the Add User email field loses focus.");
+        assertTrue(source.contains("findExistingEmailForCurrentTenant"),
+                "UI duplicate validation should use the DAO normalization/tenant-aware lookup.");
+    }
+
 }

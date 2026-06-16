@@ -7,10 +7,14 @@ import com.shale.data.runtime.RuntimeSessionService;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Statement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+
+import org.mindrot.jbcrypt.BCrypt;
 
 public final class UserDao {
 	public record DirectoryUserRow(
@@ -51,6 +55,30 @@ public final class UserDao {
 	}
 
 	public record UserRoleRow(int roleId, String roleName) {
+	}
+
+	public record UserCreateRequest(
+			String firstName,
+			String lastName,
+			String email,
+			String temporaryPassword,
+			String color,
+			String initials,
+			boolean attorney,
+			boolean admin) {
+	}
+
+	public record UserManagementRow(
+			int id,
+			String name,
+			String email,
+			String initials,
+			boolean attorney,
+			boolean admin,
+			boolean deleted) {
+	}
+
+	public record ExistingEmailRow(int id, boolean deleted) {
 	}
 
 	private final DbSessionProvider db;
@@ -344,6 +372,195 @@ public final class UserDao {
 		}
 	}
 
+	public UserDetailRow createUser(UserCreateRequest request) {
+		Objects.requireNonNull(request, "request");
+		validateCreateRequest(request);
+
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			requireCurrentAdmin(con, shaleClientId);
+			String email = normalizeEmail(request.email());
+			ExistingEmailRow existingEmail = findExistingEmail(con, shaleClientId, email);
+			if (existingEmail != null) {
+				throw new IllegalArgumentException(duplicateEmailMessage(existingEmail.deleted()));
+			}
+			String passwordHash = hashPassword(request.temporaryPassword());
+			String phoneColumn = existingPhoneColumn(con);
+
+			StringBuilder sql = new StringBuilder("""
+					INSERT INTO dbo.Users (
+					  name_first, name_last, email, email_norm, password_hash, password_alg,
+					  Color, Initials, is_attorney, is_admin, is_deleted,
+					  default_organization, organization_id, ShaleClientId, created_at, LegacyUserId
+					""");
+			if (phoneColumn != null) {
+				sql.append(", ").append(phoneColumn);
+			}
+			sql.append("""
+					)
+					VALUES (?, ?, ?, ?, ?, 'bcrypt', ?, ?, ?, ?, 0, ?, ?, ?, SYSUTCDATETIME(), NULL
+					""");
+			if (phoneColumn != null) {
+				sql.append(", NULL");
+			}
+			sql.append(")");
+
+			try (PreparedStatement ps = con.prepareStatement(sql.toString(), Statement.RETURN_GENERATED_KEYS)) {
+				int idx = 1;
+				setNullableString(ps, idx++, request.firstName());
+				setNullableString(ps, idx++, request.lastName());
+				ps.setString(idx++, email);
+				ps.setString(idx++, email);
+				ps.setString(idx++, passwordHash);
+				setNullableString(ps, idx++, request.color());
+				setNullableString(ps, idx++, request.initials());
+				ps.setBoolean(idx++, request.attorney());
+				ps.setBoolean(idx++, request.admin());
+				ps.setNull(idx++, java.sql.Types.INTEGER);
+				ps.setNull(idx++, java.sql.Types.INTEGER);
+				ps.setInt(idx++, shaleClientId);
+				ps.executeUpdate();
+				try (ResultSet keys = ps.getGeneratedKeys()) {
+					if (keys.next()) {
+						return findById(keys.getInt(1), shaleClientId);
+					}
+				}
+			}
+			throw new IllegalStateException("User was created but no generated id was returned.");
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create tenant user", e);
+		}
+	}
+
+	static void validateCreateRequest(UserCreateRequest request) {
+		if (isBlank(request.firstName())) throw new IllegalArgumentException("First name is required.");
+		if (isBlank(request.lastName())) throw new IllegalArgumentException("Last name is required.");
+		if (isBlank(request.email())) throw new IllegalArgumentException("Email is required.");
+		if (!normalizeEmail(request.email()).contains("@")) throw new IllegalArgumentException("A valid email is required.");
+		validatePassword(request.temporaryPassword());
+	}
+
+	public static String normalizeEmail(String email) {
+		return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+	}
+
+	public static String hashPassword(String plaintext) {
+		return BCrypt.hashpw(plaintext, BCrypt.gensalt());
+	}
+
+	private static boolean isBlank(String value) {
+		return value == null || value.trim().isEmpty();
+	}
+
+	public List<UserManagementRow> listUsersForManagement(boolean includeInactive) {
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			requireCurrentAdmin(con, shaleClientId);
+			StringBuilder sql = new StringBuilder("""
+					SELECT Id,
+					       LTRIM(RTRIM(COALESCE(name_first, '') + CASE WHEN COALESCE(name_first, '') = '' OR COALESCE(name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(name_last, ''))) AS DisplayName,
+					       COALESCE(email, '') AS Email,
+					       COALESCE(Initials, '') AS Initials,
+					       COALESCE(is_attorney, 0) AS IsAttorney,
+					       COALESCE(is_admin, 0) AS IsAdmin,
+					       COALESCE(is_deleted, 0) AS IsDeleted
+					FROM dbo.Users
+					WHERE ShaleClientId = ?
+					""");
+			if (!includeInactive) {
+				sql.append("  AND COALESCE(is_deleted, 0) = 0\n");
+			}
+			sql.append("ORDER BY IsDeleted ASC, DisplayName ASC, Id ASC");
+			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+				ps.setInt(1, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<UserManagementRow> out = new ArrayList<>();
+					while (rs.next()) {
+						out.add(new UserManagementRow(
+								rs.getInt("Id"),
+								rs.getString("DisplayName"),
+								rs.getString("Email"),
+								rs.getString("Initials"),
+								rs.getBoolean("IsAttorney"),
+								rs.getBoolean("IsAdmin"),
+								rs.getBoolean("IsDeleted")));
+					}
+					return out;
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list users for management", e);
+		}
+	}
+
+	public ExistingEmailRow findExistingEmailForCurrentTenant(String email) {
+		String normalizedEmail = normalizeEmail(email);
+		if (normalizedEmail.isBlank()) {
+			return null;
+		}
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			return findExistingEmail(con, shaleClientId, normalizedEmail);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to validate user email", e);
+		}
+	}
+
+	public boolean deactivateUser(int userId) {
+		if (userId <= 0) throw new IllegalArgumentException("userId must be > 0");
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			int principalUserId = requireCurrentAdmin(con, shaleClientId);
+			if (userId == principalUserId) throw new IllegalArgumentException("You cannot deactivate yourself.");
+			UserManagementRow target = findManagementUser(con, shaleClientId, userId);
+			if (target == null) throw new IllegalArgumentException("User was not found for this tenant.");
+			if (target.admin() && countActiveAdmins(con, shaleClientId) <= 1) {
+				throw new IllegalArgumentException("Cannot deactivate the last active admin in this tenant.");
+			}
+			try (PreparedStatement ps = con.prepareStatement("UPDATE dbo.Users SET is_deleted = 1 WHERE Id = ? AND ShaleClientId = ?")) {
+				ps.setInt(1, userId);
+				ps.setInt(2, shaleClientId);
+				return ps.executeUpdate() > 0;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to deactivate user", e);
+		}
+	}
+
+	public boolean reactivateUser(int userId) {
+		if (userId <= 0) throw new IllegalArgumentException("userId must be > 0");
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			requireCurrentAdmin(con, shaleClientId);
+			try (PreparedStatement ps = con.prepareStatement("UPDATE dbo.Users SET is_deleted = 0 WHERE Id = ? AND ShaleClientId = ?")) {
+				ps.setInt(1, userId);
+				ps.setInt(2, shaleClientId);
+				return ps.executeUpdate() > 0;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to reactivate user", e);
+		}
+	}
+
+	public boolean resetPassword(int userId, String newPassword) {
+		if (userId <= 0) throw new IllegalArgumentException("userId must be > 0");
+		validatePassword(newPassword);
+		String passwordHash = hashPassword(newPassword);
+		try (Connection con = db.requireConnection()) {
+			int shaleClientId = requireCurrentShaleClientId(con);
+			requireCurrentAdmin(con, shaleClientId);
+			try (PreparedStatement ps = con.prepareStatement("UPDATE dbo.Users SET password_hash = ?, password_alg = 'bcrypt' WHERE Id = ? AND ShaleClientId = ?")) {
+				ps.setString(1, passwordHash);
+				ps.setInt(2, userId);
+				ps.setInt(3, shaleClientId);
+				return ps.executeUpdate() > 0;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to reset user password", e);
+		}
+	}
+
+
 	public List<UserRoleRow> listAssignedRoles(int userId, int shaleClientId) {
 		if (userId <= 0 || shaleClientId <= 0) {
 			throw new IllegalArgumentException("userId and shaleClientId must be > 0");
@@ -519,6 +736,99 @@ public final class UserDao {
 		int currentShaleClientId = requireCurrentShaleClientId(con);
 		if (requestedShaleClientId != currentShaleClientId) {
 			throw new IllegalArgumentException("shaleClientId does not match current session");
+		}
+	}
+
+	private static ExistingEmailRow findExistingEmail(Connection con, int shaleClientId, String normalizedEmail) throws SQLException {
+		String sql = """
+				SELECT TOP 1 Id, COALESCE(is_deleted, 0) AS IsDeleted
+				FROM dbo.Users
+				WHERE ShaleClientId = ?
+				  AND COALESCE(email_norm, LOWER(LTRIM(RTRIM(email)))) = ?
+				ORDER BY COALESCE(is_deleted, 0) ASC, Id ASC
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			ps.setString(2, normalizedEmail);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) return null;
+				return new ExistingEmailRow(rs.getInt("Id"), rs.getBoolean("IsDeleted"));
+			}
+		}
+	}
+
+	public static String duplicateEmailMessage(boolean inactive) {
+		return inactive
+				? "A user with this email already exists but is inactive. Reactivate the existing account instead."
+				: "A user with this email already exists.";
+	}
+
+	static void validatePassword(String password) {
+		if (password == null || password.length() < 8) {
+			throw new IllegalArgumentException("Password must be at least 8 characters.");
+		}
+	}
+
+	private static UserManagementRow findManagementUser(Connection con, int shaleClientId, int userId) throws SQLException {
+		String sql = """
+				SELECT Id,
+				       LTRIM(RTRIM(COALESCE(name_first, '') + CASE WHEN COALESCE(name_first, '') = '' OR COALESCE(name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(name_last, ''))) AS DisplayName,
+				       COALESCE(email, '') AS Email,
+				       COALESCE(Initials, '') AS Initials,
+				       COALESCE(is_attorney, 0) AS IsAttorney,
+				       COALESCE(is_admin, 0) AS IsAdmin,
+				       COALESCE(is_deleted, 0) AS IsDeleted
+				FROM dbo.Users
+				WHERE Id = ? AND ShaleClientId = ?
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, userId);
+			ps.setInt(2, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) return null;
+				return new UserManagementRow(rs.getInt("Id"), rs.getString("DisplayName"), rs.getString("Email"), rs.getString("Initials"), rs.getBoolean("IsAttorney"), rs.getBoolean("IsAdmin"), rs.getBoolean("IsDeleted"));
+			}
+		}
+	}
+
+	private static int countActiveAdmins(Connection con, int shaleClientId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("SELECT COUNT(*) FROM dbo.Users WHERE ShaleClientId = ? AND COALESCE(is_deleted, 0) = 0 AND COALESCE(is_admin, 0) = 1")) {
+			ps.setInt(1, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				rs.next();
+				return rs.getInt(1);
+			}
+		}
+	}
+
+
+	private static int requireCurrentAdmin(Connection con, int shaleClientId) throws SQLException {
+		Integer principalUserId = requireCurrentPrincipalUserId(con);
+		String sql = "SELECT COALESCE(is_admin, 0) FROM dbo.Users WHERE Id = ? AND ShaleClientId = ? AND COALESCE(is_deleted, 0) = 0";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, principalUserId);
+			ps.setInt(2, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next() || !rs.getBoolean(1)) {
+					throw new SecurityException("Only admin users can create users.");
+				}
+			}
+		}
+		return principalUserId;
+	}
+
+	private static Integer requireCurrentPrincipalUserId(Connection con) throws SQLException {
+		String sql = "SELECT CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT);";
+		try (PreparedStatement ps = con.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+			if (!rs.next()) {
+				throw new IllegalStateException("PrincipalUserId session context is missing.");
+			}
+			Integer principalUserId = getNullableInt(rs, 1);
+			if (principalUserId == null || principalUserId <= 0) {
+				throw new IllegalStateException("PrincipalUserId session context is missing.");
+			}
+			return principalUserId;
 		}
 	}
 
