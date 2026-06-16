@@ -25,7 +25,7 @@ import javafx.scene.layout.VBox;
 public final class TaskCard extends VBox {
 
 	public enum Variant {
-		FULL, COMPACT, COMPACT_FLUID, MINI
+		FULL, MY_TASKS, COMPACT, COMPACT_FLUID, MINI
 	}
 
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
@@ -60,6 +60,14 @@ public final class TaskCard extends VBox {
 	});
 
 	private Long taskId;
+	private Long relatedCaseId;
+	private String relatedCaseName = "";
+	private String relatedCasePrimaryStatusName = "";
+	private String relatedCasePrimaryStatusColor = "";
+	private String relatedCasePracticeAreaColor = "";
+	private String relatedCaseResponsibleAttorney = "";
+	private String relatedCaseResponsibleAttorneyColor = "";
+	private Boolean relatedCaseNonEngagementLetterSent;
 	private LocalDateTime dueAtValue;
 	private Variant currentVariant = Variant.MINI;
 	private Consumer<Long> onOpen;
@@ -182,27 +190,18 @@ public final class TaskCard extends VBox {
 		teamSection.setVisible(true);
 	}
 
-	public void setRelatedCase(Long caseId, String caseName, String responsibleAttorney, String responsibleAttorneyColor,
+	public void setRelatedCase(Long caseId, String caseName, String casePrimaryStatusName, String casePrimaryStatusColor,
+			String casePracticeAreaColor, String responsibleAttorney, String responsibleAttorneyColor,
 			Boolean nonEngagementLetterSent) {
-		String normalizedName = caseName == null ? "" : caseName.trim();
-		if (caseId == null || caseId <= 0 || normalizedName.isBlank()) {
-			relatedCaseHost.getChildren().clear();
-			caseSection.setManaged(false);
-			caseSection.setVisible(false);
-			return;
-		}
-		var caseCard = caseCardFactory.create(
-				new CaseCardModel(caseId, normalizedName, null, null, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent),
-				CaseCardFactory.Variant.MINI);
-		caseCard.setOnMouseClicked(e -> {
-			e.consume();
-			if (onOpenRelatedCase != null) {
-				onOpenRelatedCase.accept(caseId.intValue());
-			}
-		});
-		relatedCaseHost.getChildren().setAll(caseCard);
-		caseSection.setManaged(true);
-		caseSection.setVisible(true);
+		relatedCaseId = caseId;
+		relatedCaseName = caseName == null ? "" : caseName.trim();
+		relatedCasePrimaryStatusName = casePrimaryStatusName == null ? "" : casePrimaryStatusName.trim();
+		relatedCasePrimaryStatusColor = casePrimaryStatusColor == null ? "" : casePrimaryStatusColor.trim();
+		relatedCasePracticeAreaColor = casePracticeAreaColor == null ? "" : casePracticeAreaColor.trim();
+		relatedCaseResponsibleAttorney = responsibleAttorney == null ? "" : responsibleAttorney.trim();
+		relatedCaseResponsibleAttorneyColor = responsibleAttorneyColor == null ? "" : responsibleAttorneyColor.trim();
+		relatedCaseNonEngagementLetterSent = nonEngagementLetterSent;
+		renderRelatedCaseCard();
 	}
 
 	public void setBackgroundCssColor(String css) {
@@ -293,6 +292,13 @@ public final class TaskCard extends VBox {
 		setMaxWidth(Double.MAX_VALUE);
 	}
 
+	public void applyMyTasks() {
+		applyFull();
+		currentVariant = Variant.MY_TASKS;
+		fullHeaderText.getChildren().setAll(titleLabel, dueLabel, relatedCaseHost);
+		renderRelatedCaseCard();
+	}
+
 	public void applyFull() {
 		currentVariant = Variant.FULL;
 		fullHeaderText.getChildren().setAll(titleLabel, dueLabel);
@@ -339,7 +345,7 @@ public final class TaskCard extends VBox {
 		expandDetailsButton.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 0 0 0 0;");
 		expandDetailsButton.setOnAction(e -> {
 			e.consume();
-			if (currentVariant != Variant.FULL) {
+			if (currentVariant != Variant.FULL && currentVariant != Variant.MY_TASKS) {
 				return;
 			}
 			setFullExpanded(!fullExpanded);
@@ -373,12 +379,12 @@ public final class TaskCard extends VBox {
 			}
 		});
 		setAssignees(List.of());
-		setRelatedCase(null, null, null, null, null);
+		setRelatedCase(null, null, null, null, null, null, null, null);
 	}
 
 	private void setFullExpanded(boolean expanded) {
 		fullExpanded = expanded;
-		if (currentVariant == Variant.FULL) {
+		if (currentVariant == Variant.FULL || currentVariant == Variant.MY_TASKS) {
 			fullExpandedContent.setManaged(expanded);
 			fullExpandedContent.setVisible(expanded);
 			expandDetailsButton.setText(expanded ? "−" : "+");
@@ -397,6 +403,43 @@ public final class TaskCard extends VBox {
 		relatedCaseHost.setMaxWidth(Region.USE_PREF_SIZE);
 		assigneeHost.setAlignment(Pos.CENTER_LEFT);
 		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
+	}
+
+	private void renderRelatedCaseCard() {
+		boolean hasCase = relatedCaseId != null && relatedCaseId > 0 && !relatedCaseName.isBlank();
+		if (!hasCase) {
+			relatedCaseHost.getChildren().clear();
+			relatedCaseHost.setManaged(false);
+			relatedCaseHost.setVisible(false);
+			caseSection.setManaged(false);
+			caseSection.setVisible(false);
+			return;
+		}
+		CaseCardFactory.Variant variant = currentVariant == Variant.MY_TASKS
+				? CaseCardFactory.Variant.TASK_PREVIEW
+				: CaseCardFactory.Variant.MINI;
+		var caseCard = caseCardFactory.create(
+				new CaseCardModel(relatedCaseId, relatedCaseName, null, null, relatedCaseResponsibleAttorney,
+						relatedCaseResponsibleAttorneyColor, relatedCaseNonEngagementLetterSent,
+						relatedCasePrimaryStatusName, relatedCasePrimaryStatusColor, relatedCasePracticeAreaColor),
+				variant);
+		caseCard.getStyleClass().add(currentVariant == Variant.MY_TASKS ? "my-tasks-mini-case-card" : "task-related-case-card");
+		if (caseCard instanceof Region region && currentVariant == Variant.MY_TASKS) {
+			region.setMinWidth(0);
+			region.setPrefWidth(Region.USE_COMPUTED_SIZE);
+			region.setMaxWidth(Double.MAX_VALUE);
+		}
+		caseCard.setOnMouseClicked(e -> {
+			e.consume();
+			if (onOpenRelatedCase != null) {
+				onOpenRelatedCase.accept(relatedCaseId.intValue());
+			}
+		});
+		relatedCaseHost.getChildren().setAll(caseCard);
+		relatedCaseHost.setManaged(true);
+		relatedCaseHost.setVisible(true);
+		caseSection.setManaged(true);
+		caseSection.setVisible(true);
 	}
 
 	private void refreshSurfaceStyle() {

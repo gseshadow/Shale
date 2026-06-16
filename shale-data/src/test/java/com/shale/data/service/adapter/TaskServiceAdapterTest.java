@@ -63,7 +63,7 @@ class TaskServiceAdapterTest {
 	}
 
 	private static CaseTaskListItemDto taskItem(long id) {
-		return new CaseTaskListItemDto(id, 42, 123, "Case", "Attorney", null, null,
+		return new CaseTaskListItemDto(id, 42, 123, "Case", "Open", "#00AA00", "#222222", "Attorney", null, null,
 				"Title", "Description", 1, "#fff", null, null, null, null, null,
 				7, "Creator", LocalDateTime.now(), LocalDateTime.now(), false);
 	}

@@ -9,11 +9,10 @@ import javafx.scene.Node;
 
 public final class CaseCardFactory {
 	private static final String STATUS_FALLBACK_CSS = "#F1F5F9";
-	private static final String ATTORNEY_FALLBACK_CSS = "#94A3B8";
 	private static final String PRACTICE_AREA_FALLBACK_CSS = "#CBD5E1";
 
 	public enum Variant {
-		FULL, COMPACT, MINI
+		FULL, COMPACT, MINI, TASK_PREVIEW
 	}
 
 	private final Consumer<Integer> onOpenCase;
@@ -37,7 +36,7 @@ public final class CaseCardFactory {
 
 		card.setStatus(vm.primaryStatusName());
 		card.setStatusCssColor(CaseCard.normalizeColor(vm.primaryStatusColor(), STATUS_FALLBACK_CSS));
-		card.setAttorneyDotCssColor(CaseCard.normalizeColor(vm.responsibleAttorneyColor(), ATTORNEY_FALLBACK_CSS));
+		card.setAttorneyDotCssColor(vm.responsibleAttorneyColor());
 		card.setPracticeAreaCssColor(CaseCard.normalizeColor(vm.practiceAreaColor(), PRACTICE_AREA_FALLBACK_CSS));
 
 		card.setOnOpen(id ->
@@ -50,6 +49,7 @@ public final class CaseCardFactory {
 		case FULL -> card.applyFull();
 		case COMPACT -> card.applyCompact();
 		case MINI -> card.applyMini();
+		case TASK_PREVIEW -> card.applyTaskPreview();
 		}
 
 		return card;

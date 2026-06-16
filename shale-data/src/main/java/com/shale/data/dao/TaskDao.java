@@ -212,6 +212,9 @@ public final class TaskDao {
                   t.ShaleClientId,
                   t.CaseId,
                   c.Name AS CaseName,
+                  current_status.CurrentStatusName AS CasePrimaryStatusName,
+                  current_status.PrimaryStatusColor AS CasePrimaryStatusColor,
+                  pa.Color AS CasePracticeAreaColor,
                   caseAttorney.DisplayName AS CaseResponsibleAttorney,
                   caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
@@ -243,6 +246,15 @@ public final class TaskDao {
                 LEFT JOIN dbo.Priorities p
                   ON p.Id = t.PriorityId
                  AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
+                LEFT JOIN dbo.PracticeAreas pa
+                  ON pa.Id = c.PracticeAreaId
+                OUTER APPLY (
+                  SELECT TOP (1) s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
+                  FROM dbo.CaseStatuses cs
+                  INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+                  WHERE cs.CaseId = c.Id AND cs.IsPrimary = 1
+                  ORDER BY cs.UpdatedAt DESC, cs.CreatedAt DESC, cs.Id DESC
+                ) current_status
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -315,6 +327,9 @@ public final class TaskDao {
                             rs.getInt("ShaleClientId"),
                             rs.getLong("CaseId"),
                             rs.getString("CaseName"),
+                            rs.getString("CasePrimaryStatusName"),
+                            rs.getString("CasePrimaryStatusColor"),
+                            rs.getString("CasePracticeAreaColor"),
                             rs.getString("CaseResponsibleAttorney"),
                             rs.getString("CaseResponsibleAttorneyColor"),
                             (Boolean) rs.getObject("CaseNonEngagementLetterSent"),
@@ -366,6 +381,9 @@ public final class TaskDao {
                   t.ShaleClientId,
                   t.CaseId,
                   c.Name AS CaseName,
+                  current_status.CurrentStatusName AS CasePrimaryStatusName,
+                  current_status.PrimaryStatusColor AS CasePrimaryStatusColor,
+                  pa.Color AS CasePracticeAreaColor,
                   caseAttorney.DisplayName AS CaseResponsibleAttorney,
                   caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
@@ -397,6 +415,15 @@ public final class TaskDao {
                 LEFT JOIN dbo.Priorities p
                   ON p.Id = t.PriorityId
                  AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
+                LEFT JOIN dbo.PracticeAreas pa
+                  ON pa.Id = c.PracticeAreaId
+                OUTER APPLY (
+                  SELECT TOP (1) s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
+                  FROM dbo.CaseStatuses cs
+                  INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+                  WHERE cs.CaseId = c.Id AND cs.IsPrimary = 1
+                  ORDER BY cs.UpdatedAt DESC, cs.CreatedAt DESC, cs.Id DESC
+                ) current_status
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -481,6 +508,9 @@ public final class TaskDao {
                             rs.getInt("ShaleClientId"),
                             rs.getLong("CaseId"),
                             rs.getString("CaseName"),
+                            rs.getString("CasePrimaryStatusName"),
+                            rs.getString("CasePrimaryStatusColor"),
+                            rs.getString("CasePracticeAreaColor"),
                             rs.getString("CaseResponsibleAttorney"),
                             rs.getString("CaseResponsibleAttorneyColor"),
                             (Boolean) rs.getObject("CaseNonEngagementLetterSent"),
@@ -525,6 +555,8 @@ public final class TaskDao {
         String sql = """
                 SELECT
                   t.Id, t.ShaleClientId, t.CaseId, c.Name AS CaseName,
+                  current_status.CurrentStatusName AS CasePrimaryStatusName, current_status.PrimaryStatusColor AS CasePrimaryStatusColor,
+                  pa.Color AS CasePracticeAreaColor,
                   caseAttorney.DisplayName AS CaseResponsibleAttorney, caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
                   t.Title, t.Description, t.PriorityId, p.ColorHex AS PriorityColorHex,
@@ -537,6 +569,14 @@ public final class TaskDao {
                 INNER JOIN dbo.Cases c ON c.Id = t.CaseId AND c.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Users createdByUser ON createdByUser.Id = t.CreatedByUserId AND createdByUser.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Priorities p ON p.Id = t.PriorityId AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
+                LEFT JOIN dbo.PracticeAreas pa ON pa.Id = c.PracticeAreaId
+                OUTER APPLY (
+                  SELECT TOP (1) s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
+                  FROM dbo.CaseStatuses cs
+                  INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+                  WHERE cs.CaseId = c.Id AND cs.IsPrimary = 1
+                  ORDER BY cs.UpdatedAt DESC, cs.CreatedAt DESC, cs.Id DESC
+                ) current_status
                 OUTER APPLY (
                   SELECT TOP (1) LTRIM(RTRIM(COALESCE(u.name_first, '') + CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(u.name_last, ''))) AS DisplayName, u.Color
                   FROM dbo.CaseUsers cu
@@ -573,6 +613,7 @@ public final class TaskDao {
                 while (rs.next()) {
                     out.add(new CaseTaskListItemDto(
                             rs.getLong("Id"), rs.getInt("ShaleClientId"), rs.getLong("CaseId"), rs.getString("CaseName"),
+                            rs.getString("CasePrimaryStatusName"), rs.getString("CasePrimaryStatusColor"), rs.getString("CasePracticeAreaColor"),
                             rs.getString("CaseResponsibleAttorney"), rs.getString("CaseResponsibleAttorneyColor"),
                             (Boolean) rs.getObject("CaseNonEngagementLetterSent"), rs.getString("Title"), rs.getString("Description"),
                             (Integer) rs.getObject("PriorityId"), rs.getString("PriorityColorHex"),
