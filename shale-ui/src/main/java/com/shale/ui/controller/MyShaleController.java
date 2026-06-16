@@ -1478,6 +1478,9 @@ public final class MyShaleController {
 					task.id(),
 					task.caseId(),
 					task.caseName(),
+					task.casePrimaryStatusName(),
+					task.casePrimaryStatusColor(),
+					task.casePracticeAreaColor(),
 					task.caseResponsibleAttorney(),
 					task.caseResponsibleAttorneyColor(),
 					task.caseNonEngagementLetterSent(),
@@ -1488,7 +1491,7 @@ public final class MyShaleController {
 					task.dueAt(),
 					task.completedAt(),
 					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			var taskCard = taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true);
+			var taskCard = taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true);
 			taskCard.getStyleClass().add("my-tasks-grid-card");
 			taskCard.setMinWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
 			taskCard.setPrefWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
@@ -1907,6 +1910,9 @@ public final class MyShaleController {
 						task.id(),
 						task.caseId(),
 						task.caseName(),
+						task.casePrimaryStatusName(),
+						task.casePrimaryStatusColor(),
+						task.casePracticeAreaColor(),
 						task.caseResponsibleAttorney(),
 						task.caseResponsibleAttorneyColor(),
 						task.caseNonEngagementLetterSent(),
@@ -2271,6 +2277,9 @@ public final class MyShaleController {
 					task.id(),
 					task.caseId(),
 					task.caseName(),
+					task.casePrimaryStatusName(),
+					task.casePrimaryStatusColor(),
+					task.casePracticeAreaColor(),
 					task.caseResponsibleAttorney(),
 					task.caseResponsibleAttorneyColor(),
 					task.caseNonEngagementLetterSent(),
@@ -2282,7 +2291,7 @@ public final class MyShaleController {
 					task.completedAt(),
 					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
 			if (fullVariant) {
-				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true));
 			} else {
 				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
 			}
