@@ -12,7 +12,7 @@ public final class CaseCardFactory {
 	private static final String PRACTICE_AREA_FALLBACK_CSS = "#CBD5E1";
 
 	public enum Variant {
-		FULL, COMPACT, MINI
+		FULL, COMPACT, MINI, TASK_PREVIEW
 	}
 
 	private final Consumer<Integer> onOpenCase;
@@ -49,6 +49,7 @@ public final class CaseCardFactory {
 		case FULL -> card.applyFull();
 		case COMPACT -> card.applyCompact();
 		case MINI -> card.applyMini();
+		case TASK_PREVIEW -> card.applyTaskPreview();
 		}
 
 		return card;

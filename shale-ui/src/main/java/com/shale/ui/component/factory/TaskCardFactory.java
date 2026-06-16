@@ -12,13 +12,16 @@ import com.shale.ui.util.ColorUtil;
 public final class TaskCardFactory {
 
     public enum Variant {
-        FULL, COMPACT, COMPACT_FLUID, MINI
+        FULL, MY_TASKS, COMPACT, COMPACT_FLUID, MINI
     }
 
     public record TaskCardModel(
             long taskId,
             Long caseId,
             String caseName,
+            String casePrimaryStatusName,
+            String casePrimaryStatusColor,
+            String casePracticeAreaColor,
             String caseResponsibleAttorney,
             String caseResponsibleAttorneyColor,
             Boolean caseNonEngagementLetterSent,
@@ -63,7 +66,7 @@ public final class TaskCardFactory {
         Objects.requireNonNull(model, "model");
 
         TaskCard card = new TaskCard();
-        boolean passiveSurface = variant != Variant.FULL;
+        boolean passiveSurface = variant != Variant.FULL && variant != Variant.MY_TASKS;
         boolean suppressTitleForPassiveSurface = passiveSurface
                 && variant != Variant.COMPACT
                 && variant != Variant.MINI
@@ -71,7 +74,7 @@ public final class TaskCardFactory {
         String displayTitle = suppressTitleForPassiveSurface
                 ? "Task #" + model.taskId()
                 : model.title();
-        String safeDescription = variant == Variant.FULL
+        String safeDescription = (variant == Variant.FULL || variant == Variant.MY_TASKS)
                 && (allowPhiDescriptionForFull || !PhiFieldRegistry.isPhi("Tasks", "Description"))
                 ? model.description()
                 : null;
@@ -83,6 +86,9 @@ public final class TaskCardFactory {
         card.setRelatedCase(
                 model.caseId(),
                 model.caseName(),
+                model.casePrimaryStatusName(),
+                model.casePrimaryStatusColor(),
+                model.casePracticeAreaColor(),
                 model.caseResponsibleAttorney(),
                 model.caseResponsibleAttorneyColor(),
                 model.caseNonEngagementLetterSent());
@@ -97,6 +103,7 @@ public final class TaskCardFactory {
 
         switch (variant) {
             case FULL -> card.applyFull();
+            case MY_TASKS -> card.applyMyTasks();
             case COMPACT -> card.applyCompact();
             case COMPACT_FLUID -> card.applyCompactFluid();
             case MINI -> card.applyMini();
