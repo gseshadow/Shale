@@ -25,6 +25,7 @@ import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
+import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -67,7 +68,7 @@ public final class TaskDetailDialog {
             NotesEditor notesEditor,
             Consumer<Integer> onOpenUser,
             Consumer<Integer> onOpenCase) {
-        long dialogCreateStartedAt = System.nanoTime();
+        long dialogCreateStartedAt = PerfLog.start();
         Stage stage = AppDialogs.createModalStage(owner, "Task Details");
         Consumer<Integer> closeAndOpenUser = userId -> {
             stage.close();
@@ -481,21 +482,18 @@ public final class TaskDetailDialog {
                 TaskDetailDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
         String context = safe(timingContext).isBlank() ? "UNKNOWN" : timingContext;
-        System.out.println("[TASK_DETAIL_TIMING][" + context + "] dialog_creation_ms=" + elapsedMillis(dialogCreateStartedAt)
-                + " taskId=" + model.taskId());
-        System.out.println("[TASK_DETAIL_TIMING][" + context + "] fxml_load_ms=0 taskId=" + model.taskId() + " reason=programmatic-dialog");
+        PerfLog.logElapsed("TASK_DETAIL_TIMING", "dialog_creation", "context=" + context + " taskId=" + model.taskId(), elapsedMillis(dialogCreateStartedAt));
+        PerfLog.log("TASK_DETAIL_TIMING", "fxml_load", "context=" + context + " taskId=" + model.taskId() + " reason=programmatic-dialog");
         stage.setOnShown(e -> {
             AtomicLong coreLoadVersion = new AtomicLong();
             AtomicLong assignedLoadVersion = new AtomicLong();
             AtomicLong activityLoadVersion = new AtomicLong();
             AtomicLong notesLoadVersion = new AtomicLong();
-            System.out.println("[TASK_DETAIL_TIMING][" + context + "] initial_show_ms=" + elapsedMillis(dialogCreateStartedAt)
-                    + " taskId=" + model.taskId());
+            PerfLog.logElapsed("TASK_DETAIL_TIMING", "initial_show", "context=" + context + " taskId=" + model.taskId(), elapsedMillis(dialogCreateStartedAt));
             if (clickReceivedAtNanos > 0L) {
-                System.out.println("[TASK_DETAIL_TIMING][" + context + "] total_time_to_visible_ms="
-                        + elapsedMillis(clickReceivedAtNanos) + " taskId=" + model.taskId());
+                PerfLog.logElapsed("TASK_DETAIL_TIMING", "total_time_to_visible", "context=" + context + " taskId=" + model.taskId(), elapsedMillis(clickReceivedAtNanos));
             }
-            System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_start_all taskId=" + model.taskId());
+            PerfLog.log("TASK_DETAIL_TIMING", "background_load_start_all", "context=" + context + " taskId=" + model.taskId());
             if (loadCoreTaskData != null) {
                 loadSectionAsync(
                         context,
@@ -648,9 +646,9 @@ public final class TaskDetailDialog {
             Callable<List<T>> loader,
             Consumer<List<T>> onSuccess,
             Consumer<Throwable> onError) {
-        System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_start section=" + sectionName + " taskId=" + taskId);
+        PerfLog.log("TASK_DETAIL_TIMING", "background_load_start", "context=" + context + " section=" + sectionName + " taskId=" + taskId);
         long requestVersion = sectionVersion == null ? 0L : sectionVersion.incrementAndGet();
-        long startedAt = System.nanoTime();
+        long startedAt = PerfLog.start();
         new Thread(() -> {
             try {
                 List<T> value = loader == null ? List.of() : loader.call();
@@ -664,8 +662,7 @@ public final class TaskDetailDialog {
                     if (onSuccess != null) {
                         onSuccess.accept(value == null ? List.of() : value);
                     }
-                    System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_end section=" + sectionName
-                            + " duration_ms=" + elapsedMillis(startedAt) + " taskId=" + taskId);
+                    PerfLog.logElapsed("TASK_DETAIL_TIMING", "background_load_end", "context=" + context + " section=" + sectionName + " taskId=" + taskId, elapsedMillis(startedAt));
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
@@ -678,8 +675,7 @@ public final class TaskDetailDialog {
                     if (onError != null) {
                         onError.accept(ex);
                     }
-                    System.out.println("[TASK_DETAIL_TIMING][" + context + "] background_load_end section=" + sectionName
-                            + " duration_ms=" + elapsedMillis(startedAt) + " taskId=" + taskId + " status=error");
+                    PerfLog.logElapsed("TASK_DETAIL_TIMING", "background_load_end", "context=" + context + " section=" + sectionName + " taskId=" + taskId + " status=error", elapsedMillis(startedAt));
                 });
             }
         }, "task-detail-dialog-load-" + sectionName + "-" + taskId).start();
