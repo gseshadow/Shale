@@ -24,6 +24,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
 
@@ -5183,6 +5184,158 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list statuses (clientId=" + shaleClientId + ")", e);
 		}
+	}
+
+
+	public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
+		if (shaleClientId <= 0) {
+			return List.of();
+		}
+		try (Connection con = db.requireConnection()) {
+			boolean hasSystemKey = tableHasColumn(con, "PracticeAreas", "SystemKey");
+			String systemKeySelect = hasSystemKey ? "SystemKey" : "NULL AS SystemKey";
+			String activeFilter = includeInactive ? "" : " AND IsActive = 1 AND IsDeleted = 0";
+			String sql = """
+					SELECT Id, ShaleClientId, Name, Color, IsActive, IsDeleted, %s
+					FROM dbo.PracticeAreas
+					WHERE (ShaleClientId = ? OR ShaleClientId IS NULL)
+					%s
+					ORDER BY CASE WHEN ShaleClientId = ? THEN 0 ELSE 1 END, Name, Id;
+					""".formatted(systemKeySelect, activeFilter);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, shaleClientId);
+				ps.setInt(2, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<PracticeAreaDto> out = new ArrayList<>();
+					while (rs.next()) {
+						out.add(mapPracticeAreaDto(rs));
+					}
+					return out;
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list practice areas (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public PracticeAreaDto createPracticeArea(int shaleClientId, String name, String color, boolean active, String systemKey) {
+		String normalizedName = normalizePracticeAreaName(name);
+		String normalizedSystemKey = normalizeSystemKey(systemKey);
+		try (Connection con = db.requireConnection()) {
+			validatePracticeAreaUnique(con, shaleClientId, null, normalizedName, normalizedSystemKey);
+			String sql = """
+					INSERT INTO dbo.PracticeAreas (ShaleClientId, Name, Color, IsActive, IsDeleted, CreatedAt, UpdatedAt, SystemKey)
+					VALUES (?, ?, ?, ?, 0, SYSUTCDATETIME(), SYSUTCDATETIME(), ?);
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+				ps.setInt(1, shaleClientId);
+				ps.setString(2, normalizedName);
+				ps.setString(3, trimToNull(color));
+				ps.setBoolean(4, active);
+				ps.setString(5, normalizedSystemKey);
+				ps.executeUpdate();
+				try (ResultSet keys = ps.getGeneratedKeys()) {
+					if (keys.next()) return findPracticeAreaById(con, keys.getInt(1));
+				}
+			}
+			throw new RuntimeException("Failed to read created practice area id.");
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create practice area.", e);
+		}
+	}
+
+	public PracticeAreaDto updatePracticeArea(int shaleClientId, int practiceAreaId, String name, String color, boolean active, String systemKey) {
+		String normalizedName = normalizePracticeAreaName(name);
+		try (Connection con = db.requireConnection()) {
+			PracticeAreaDto existing = findPracticeAreaById(con, practiceAreaId);
+			if (existing == null) throw new IllegalArgumentException("Practice area not found.");
+			String normalizedSystemKey = normalizeSystemKey(systemKey == null ? existing.systemKey() : systemKey);
+			if (existing.shaleClientId() == null) {
+				return createPracticeArea(shaleClientId, normalizedName, color, active, normalizedSystemKey);
+			}
+			if (existing.shaleClientId() != shaleClientId) throw new IllegalArgumentException("Practice area belongs to a different tenant.");
+			validatePracticeAreaUnique(con, shaleClientId, practiceAreaId, normalizedName, normalizedSystemKey);
+			String sql = """
+					UPDATE dbo.PracticeAreas
+					SET Name = ?, Color = ?, IsActive = ?, UpdatedAt = SYSUTCDATETIME(), SystemKey = ?
+					WHERE Id = ? AND ShaleClientId = ?;
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, normalizedName);
+				ps.setString(2, trimToNull(color));
+				ps.setBoolean(3, active);
+				ps.setString(4, normalizedSystemKey);
+				ps.setInt(5, practiceAreaId);
+				ps.setInt(6, shaleClientId);
+				if (ps.executeUpdate() == 0) throw new IllegalArgumentException("Practice area not found for this tenant.");
+			}
+			return findPracticeAreaById(con, practiceAreaId);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update practice area.", e);
+		}
+	}
+
+	public void deactivatePracticeArea(int shaleClientId, int practiceAreaId) {
+		try (Connection con = db.requireConnection()) {
+			PracticeAreaDto existing = findPracticeAreaById(con, practiceAreaId);
+			if (existing == null) throw new IllegalArgumentException("Practice area not found.");
+			if (existing.systemKey() != null && !existing.systemKey().isBlank()) throw new IllegalArgumentException("System practice areas cannot be removed.");
+			if (existing.shaleClientId() == null) throw new IllegalArgumentException("Global practice areas cannot be removed from tenant settings.");
+			if (existing.shaleClientId() != shaleClientId) throw new IllegalArgumentException("Practice area belongs to a different tenant.");
+			try (PreparedStatement ps = con.prepareStatement("""
+					UPDATE dbo.PracticeAreas
+					SET IsActive = 0, IsDeleted = 1, UpdatedAt = SYSUTCDATETIME()
+					WHERE Id = ? AND ShaleClientId = ?;
+					""")) {
+				ps.setInt(1, practiceAreaId);
+				ps.setInt(2, shaleClientId);
+				ps.executeUpdate();
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to remove practice area.", e);
+		}
+	}
+
+	private static PracticeAreaDto mapPracticeAreaDto(ResultSet rs) throws SQLException {
+		return new PracticeAreaDto(rs.getInt("Id"), rs.getString("Name"), rs.getString("Color"),
+				rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"), normalizeSystemKey(rs.getString("SystemKey")),
+				getNullableInt(rs, "ShaleClientId"));
+	}
+
+	private PracticeAreaDto findPracticeAreaById(Connection con, int practiceAreaId) throws SQLException {
+		String systemKeySelect = tableHasColumn(con, "PracticeAreas", "SystemKey") ? "SystemKey" : "NULL AS SystemKey";
+		String sql = "SELECT Id, ShaleClientId, Name, Color, IsActive, IsDeleted, " + systemKeySelect + " FROM dbo.PracticeAreas WHERE Id = ?";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, practiceAreaId);
+			try (ResultSet rs = ps.executeQuery()) { return rs.next() ? mapPracticeAreaDto(rs) : null; }
+		}
+	}
+
+	private static void validatePracticeAreaUnique(Connection con, int shaleClientId, Integer excludeId, String name, String systemKey) throws SQLException {
+		StringBuilder sql = new StringBuilder("""
+				SELECT 1 FROM dbo.PracticeAreas
+				WHERE ShaleClientId = ? AND IsDeleted = 0
+				  AND (LOWER(LTRIM(RTRIM(Name))) = LOWER(?)
+				""");
+		if (systemKey != null) sql.append(" OR SystemKey = ?");
+		sql.append(")");
+		if (excludeId != null) sql.append(" AND Id <> ?");
+		try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+			int i = 1;
+			ps.setInt(i++, shaleClientId);
+			ps.setString(i++, name);
+			if (systemKey != null) ps.setString(i++, systemKey);
+			if (excludeId != null) ps.setInt(i++, excludeId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) throw new IllegalArgumentException("A tenant practice area with this name already exists.");
+			}
+		}
+	}
+
+	private static String normalizePracticeAreaName(String name) {
+		String trimmed = name == null ? "" : name.trim();
+		if (trimmed.isBlank()) throw new IllegalArgumentException("Practice area name is required.");
+		return trimmed;
 	}
 
 	public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
 import com.shale.core.service.CaseServicePort.CaseStatusCommand;
@@ -144,6 +145,25 @@ class CaseServiceAdapterTest {
 		@Override
 		public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
 			return List.of();
+		}
+
+		@Override
+		public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
+			return List.of();
+		}
+
+		@Override
+		public PracticeAreaDto createPracticeArea(int shaleClientId, String name, String color, boolean active, String systemKey) {
+			return new PracticeAreaDto(2, name, color, active, false, systemKey, shaleClientId);
+		}
+
+		@Override
+		public PracticeAreaDto updatePracticeArea(int shaleClientId, int practiceAreaId, String name, String color, boolean active, String systemKey) {
+			return new PracticeAreaDto(practiceAreaId, name, color, active, false, systemKey, shaleClientId);
+		}
+
+		@Override
+		public void deactivatePracticeArea(int shaleClientId, int practiceAreaId) {
 		}
 
 		@Override
