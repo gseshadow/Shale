@@ -80,6 +80,9 @@ public final class SettingsController {
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
+		if (caseService != null) {
+			loadCaseStatuses();
+		}
 	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService) {
