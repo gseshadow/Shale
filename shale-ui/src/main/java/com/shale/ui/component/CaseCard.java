@@ -1,6 +1,7 @@
 package com.shale.ui.component;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.function.Consumer;
 
 import javafx.geometry.Insets;
@@ -33,9 +34,10 @@ public class CaseCard extends VBox {
 	private final HBox cardRow = new HBox(0);
 	private final VBox bodyPane = new VBox(6);
 	private final HBox headerRow = new HBox(8);
-	private final HBox indicatorRow = new HBox(6);
+	private final HBox bottomRow = new HBox(8);
 	private final VBox datesBox = new VBox(2);
 	private final Region bodySpacer = new Region();
+	private final Region bottomSpacer = new Region();
 	private final Region headerSpacer = new Region();
 
 	private Integer caseId;
@@ -43,7 +45,8 @@ public class CaseCard extends VBox {
 	private String statusColorCss = "#F1F5F9";
 	private String attorneyColorCss = "#94A3B8";
 	private String practiceAreaColorCss = "#CBD5E1";
-	private String statusLabelBaseStyle = "-fx-font-size: 11px; -fx-font-weight: 700;";
+	private String statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
+	private LocalDate solDate;
 	private boolean hovered;
 
 	public CaseCard() {
@@ -63,16 +66,16 @@ public class CaseCard extends VBox {
 		setMinWidth(Region.USE_COMPUTED_SIZE);
 		setPrefWidth(Region.USE_COMPUTED_SIZE);
 		setMaxWidth(Region.USE_COMPUTED_SIZE);
-		bodyPane.setPadding(new Insets(5, 9, 5, 9));
+		bodyPane.setPadding(new Insets(7, 9, 7, 10));
 		practiceAreaBar.setPrefWidth(5);
 		attorneyLabel.setManaged(false);
 		attorneyLabel.setVisible(false);
 		datesBox.setManaged(false);
 		datesBox.setVisible(false);
 		titleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: #112542;");
-		statusLabelBaseStyle = "-fx-font-size: 9px; -fx-font-weight: 700;";
-		attorneyDot.setPrefSize(18, 18);
-		indicatorRow.setSpacing(4);
+		statusLabelBaseStyle = "-fx-font-size: 10px; -fx-font-weight: 800;";
+		attorneyDot.setPrefSize(22, 22);
+		bottomRow.setSpacing(4);
 		refreshSurfaceStyle();
 	}
 
@@ -80,16 +83,16 @@ public class CaseCard extends VBox {
 		setSpacing(6);
 		setPadding(Insets.EMPTY);
 		setPrefWidth(280);
-		bodyPane.setPadding(new Insets(10));
-		practiceAreaBar.setPrefWidth(6);
+		bodyPane.setPadding(new Insets(12, 12, 11, 14));
+		practiceAreaBar.setPrefWidth(7);
 		attorneyLabel.setManaged(true);
 		attorneyLabel.setVisible(true);
 		datesBox.setManaged(true);
 		datesBox.setVisible(true);
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-		statusLabelBaseStyle = "-fx-font-size: 11px; -fx-font-weight: 700;";
-		attorneyDot.setPrefSize(22, 22);
-		indicatorRow.setSpacing(6);
+		statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
+		attorneyDot.setPrefSize(30, 30);
+		bottomRow.setSpacing(8);
 		refreshSurfaceStyle();
 	}
 
@@ -128,7 +131,9 @@ public class CaseCard extends VBox {
 	}
 
 	public void setSolDate(LocalDate solDate) {
+		this.solDate = solDate;
 		solLabel.setText("SOL: " + (solDate == null ? "" : solDate.toString()));
+		refreshSolStyle();
 	}
 
 	/**
@@ -199,29 +204,35 @@ public class CaseCard extends VBox {
 		getStyleClass().add("case-card");
 		practiceAreaBar.getStyleClass().add("case-card__practice-area-bar");
 		bodyPane.getStyleClass().add("case-card__body");
-		indicatorRow.getStyleClass().add("case-card__indicator-row");
+		bottomRow.getStyleClass().add("case-card__bottom-row");
 		statusLabel.getStyleClass().add("case-card__status-label");
 		attorneyDot.getStyleClass().add("case-card__attorney-dot");
 		setBackgroundCssColor(null);
 		// Title / attorney styles exactly like your snippet
 		attorneyLabel.setStyle("-fx-font-size: 12px; -fx-opacity: 0.75;");
 
-		intakeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.72);");
-		solLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.72);");
+		intakeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.78);");
+		refreshSolStyle();
 
 		datesBox.getChildren().setAll(intakeLabel, solLabel);
 
 		VBox.setVgrow(bodySpacer, Priority.ALWAYS);
 		HBox.setHgrow(bodyPane, Priority.ALWAYS);
 		HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-		indicatorRow.setAlignment(Pos.CENTER_RIGHT);
-		indicatorRow.getChildren().setAll(statusLabel, attorneyDot);
+		HBox.setHgrow(bottomSpacer, Priority.ALWAYS);
+		headerRow.setAlignment(Pos.TOP_LEFT);
+		bottomRow.setAlignment(Pos.BOTTOM_LEFT);
 		statusLabel.setWrapText(true);
-		statusLabel.setMaxWidth(96);
-		headerRow.getChildren().setAll(titleLabel, headerSpacer, indicatorRow);
-		bodyPane.getChildren().setAll(headerRow, attorneyLabel, bodySpacer, datesBox);
+		statusLabel.setMaxWidth(128);
+		statusLabel.setAlignment(Pos.CENTER_RIGHT);
+		datesBox.setMinWidth(118);
+		datesBox.setFillWidth(true);
+		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyDot);
+		bottomRow.getChildren().setAll(datesBox, bottomSpacer, statusLabel);
+		bodyPane.getChildren().setAll(headerRow, attorneyLabel, bodySpacer, bottomRow);
 		getChildren().setAll(cardRow);
 		cardRow.getChildren().setAll(practiceAreaBar, bodyPane);
+		HBox.setMargin(practiceAreaBar, new Insets(8, 0, 8, 8));
 
 		// Nice UX: looks clickable
 		setCursor(Cursor.HAND);
@@ -254,10 +265,10 @@ public class CaseCard extends VBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(CardSurfaceStyles.cardContainerStyle(null, hovered));
+		setStyle(CardSurfaceStyles.cardContainerStyle(statusGradientCss(), hovered));
 		practiceAreaBar.setStyle("""
 				-fx-background-color: %s;
-				-fx-background-radius: 14 0 0 14;
+				-fx-background-radius: 999;
 				""".formatted(practiceAreaColorCss));
 		bodyPane.setStyle("-fx-background-color: transparent;");
 		statusLabel.setStyle("""
@@ -286,6 +297,28 @@ public class CaseCard extends VBox {
 			return normalized;
 		normalized = com.shale.ui.util.ColorUtil.toCssBackgroundColorOrNull(fallback);
 		return normalized == null ? "#F1F5F9" : normalized;
+	}
+
+	private String statusGradientCss() {
+		return "linear-gradient(to right, #FFFFFF 0%, #F8FAFC 32%, " + statusColorCss + " 68%, " + statusColorCss + " 100%)";
+	}
+
+	private void refreshSolStyle() {
+		String color = solUrgencyColor(solDate);
+		solLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: " + color + ";");
+	}
+
+	private static String solUrgencyColor(LocalDate solDate) {
+		if (solDate == null)
+			return "rgba(17,37,66,0.72)";
+		long days = ChronoUnit.DAYS.between(LocalDate.now(), solDate);
+		if (days < 30)
+			return "#DC2626";
+		if (days <= 90)
+			return "#EA580C";
+		if (days <= 180)
+			return "#B45309";
+		return "#15803D";
 	}
 
 	public static String readableTextColor(String backgroundColor) {
