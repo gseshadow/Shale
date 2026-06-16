@@ -10,10 +10,18 @@ import com.shale.ui.util.PerfLog;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ColorPicker;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
 import javafx.animation.PauseTransition;
 import javafx.util.Duration;
 
@@ -25,6 +33,7 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import javafx.scene.paint.Color;
 
 public final class TeamController {
 
@@ -40,6 +49,8 @@ public final class TeamController {
 	private FlowPane teamFlow;
 	@FXML
 	private Label teamEmptyStateLabel;
+	@FXML
+	private Button addUserButton;
 
 	private AppState appState;
 	private UserDao userDao;
@@ -79,6 +90,10 @@ public final class TeamController {
 				PerfLog.logDone("FILTER", "page=team_list debounceScheduled=true generation=" + generation, filterStartNanos);
 			});
 		}
+		if (addUserButton != null) {
+			addUserButton.setVisible(appState != null && appState.isAdmin());
+			addUserButton.setManaged(appState != null && appState.isAdmin());
+		}
 		if (teamFlow != null) {
 			teamFlow.setHgap(14);
 			teamFlow.setVgap(14);
@@ -86,6 +101,81 @@ public final class TeamController {
 		}
 
 		Platform.runLater(this::loadUsers);
+	}
+
+	@FXML
+	private void onAddUser() {
+		if (appState == null || !appState.isAdmin()) {
+			setEmptyStateMessage("Only admins can add users.");
+			return;
+		}
+		Integer tenantId = appState.getShaleClientId();
+		Integer adminUserId = appState.getUserId();
+		if (tenantId == null || tenantId <= 0 || adminUserId == null || adminUserId <= 0) {
+			setEmptyStateMessage("No admin session is available.");
+			return;
+		}
+
+		Dialog<UserDao.CreateUserRequest> dialog = new Dialog<>();
+		dialog.setTitle("Add User");
+		dialog.setHeaderText("Create a user for the current tenant");
+		ButtonType createButton = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(createButton, ButtonType.CANCEL);
+
+		TextField firstName = new TextField();
+		TextField lastName = new TextField();
+		TextField email = new TextField();
+		PasswordField temporaryPassword = new PasswordField();
+		ColorPicker color = new ColorPicker(Color.WHITE);
+		TextField initials = new TextField();
+		CheckBox attorney = new CheckBox();
+		CheckBox admin = new CheckBox();
+
+		GridPane grid = new GridPane();
+		grid.setHgap(10);
+		grid.setVgap(10);
+		grid.addRow(0, new Label("First name"), firstName);
+		grid.addRow(1, new Label("Last name"), lastName);
+		grid.addRow(2, new Label("Email"), email);
+		grid.addRow(3, new Label("Temporary password"), temporaryPassword);
+		grid.addRow(4, new Label("Color"), color);
+		grid.addRow(5, new Label("Initials"), initials);
+		grid.addRow(6, new Label("Is attorney"), attorney);
+		grid.addRow(7, new Label("Is admin"), admin);
+		dialog.getDialogPane().setContent(grid);
+
+		dialog.setResultConverter(button -> {
+			if (button != createButton) {
+				return null;
+			}
+			return new UserDao.CreateUserRequest(
+					adminUserId,
+					tenantId,
+					firstName.getText(),
+					lastName.getText(),
+					email.getText(),
+					temporaryPassword.getText(),
+					toHex(color.getValue()),
+					initials.getText(),
+					attorney.isSelected(),
+					admin.isSelected(),
+					null);
+		});
+
+		dialog.showAndWait().ifPresent(request -> dbExec.submit(() -> {
+			try {
+				userDao.createUser(request);
+				Platform.runLater(this::loadUsers);
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> setEmptyStateMessage(ex.getMessage() == null ? "Unable to add user." : ex.getMessage()));
+			}
+		}));
+	}
+
+	private static String toHex(Color color) {
+		Color safeColor = color == null ? Color.WHITE : color;
+		return String.format("#%02X%02X%02X", (int) Math.round(safeColor.getRed() * 255),
+				(int) Math.round(safeColor.getGreen() * 255), (int) Math.round(safeColor.getBlue() * 255));
 	}
 
 	private void loadUsers() {

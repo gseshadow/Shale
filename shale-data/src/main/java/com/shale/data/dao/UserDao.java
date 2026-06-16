@@ -7,10 +7,14 @@ import com.shale.data.runtime.RuntimeSessionService;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Statement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Locale;
+
+import org.mindrot.jbcrypt.BCrypt;
 
 public final class UserDao {
 	public record DirectoryUserRow(
@@ -51,6 +55,20 @@ public final class UserDao {
 	}
 
 	public record UserRoleRow(int roleId, String roleName) {
+	}
+
+	public record CreateUserRequest(
+			int actingUserId,
+			int shaleClientId,
+			String firstName,
+			String lastName,
+			String email,
+			String temporaryPassword,
+			String color,
+			String initials,
+			boolean attorney,
+			boolean admin,
+			Integer organizationId) {
 	}
 
 	private final DbSessionProvider db;
@@ -342,6 +360,106 @@ public final class UserDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update user basic profile (id=" + request.userId() + ")", e);
 		}
+	}
+
+	public int createUser(CreateUserRequest request) {
+		Objects.requireNonNull(request, "request");
+		if (request.actingUserId() <= 0) {
+			throw new IllegalArgumentException("actingUserId must be > 0");
+		}
+		if (request.shaleClientId() <= 0) {
+			throw new IllegalArgumentException("shaleClientId must be > 0");
+		}
+		String firstName = requireText(request.firstName(), "First name");
+		String lastName = requireText(request.lastName(), "Last name");
+		String email = requireText(request.email(), "Email");
+		String temporaryPassword = requireText(request.temporaryPassword(), "Temporary password");
+		String normalizedEmail = normalizeEmail(email);
+		String passwordHash = hashTemporaryPassword(temporaryPassword);
+
+		try (Connection con = db.requireConnection()) {
+			verifyTenantMatchesSession(con, request.shaleClientId());
+			verifyActingUserIsAdmin(con, request.actingUserId(), request.shaleClientId());
+			Integer organizationId = validatedOrganizationId(con, request.organizationId(), request.shaleClientId());
+
+			List<String> columns = new ArrayList<>(List.of(
+					"ShaleClientId", "name_first", "name_last", "email", "email_norm", "password_hash", "password_alg",
+					"Color", "Initials", RoleSemantics.FLAG_IS_ATTORNEY, RoleSemantics.FLAG_IS_ADMIN, "is_deleted"));
+			List<Object> values = new ArrayList<>(List.of(
+					request.shaleClientId(), firstName, lastName, email.trim(), normalizedEmail, passwordHash, "bcrypt",
+					nullIfBlank(request.color()), nullIfBlank(request.initials()), request.attorney(), request.admin(), false));
+			if (organizationId != null && tableHasColumn(con, "Users", "organization_id")) {
+				columns.add("organization_id");
+				values.add(organizationId);
+			}
+
+			String placeholders = String.join(", ", java.util.Collections.nCopies(columns.size(), "?"));
+			String sql = "INSERT INTO dbo.Users (" + String.join(", ", columns) + ") VALUES (" + placeholders + ");";
+			try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+				for (int i = 0; i < values.size(); i++) {
+					ps.setObject(i + 1, values.get(i));
+				}
+				ps.executeUpdate();
+				try (ResultSet keys = ps.getGeneratedKeys()) {
+					return keys.next() ? keys.getInt(1) : 0;
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create user", e);
+		}
+	}
+
+	static String normalizeEmail(String email) {
+		return requireText(email, "Email").toLowerCase(Locale.ROOT);
+	}
+
+	static String hashTemporaryPassword(String password) {
+		return BCrypt.hashpw(requireText(password, "Temporary password"), BCrypt.gensalt());
+	}
+
+	private static String requireText(String value, String label) {
+		if (value == null || value.trim().isEmpty()) {
+			throw new IllegalArgumentException(label + " is required.");
+		}
+		return value.trim();
+	}
+
+	private static String nullIfBlank(String value) {
+		return value == null || value.trim().isEmpty() ? null : value.trim();
+	}
+
+	private static void verifyActingUserIsAdmin(Connection con, int actingUserId, int shaleClientId) throws SQLException {
+		String sql = "SELECT COALESCE(" + RoleSemantics.FLAG_IS_ADMIN + ", 0) FROM dbo.Users WHERE Id = ? AND ShaleClientId = ?";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, actingUserId);
+			ps.setInt(2, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next() || !rs.getBoolean(1)) {
+					throw new SecurityException("Only admins can add users.");
+				}
+			}
+		}
+	}
+
+	private static Integer validatedOrganizationId(Connection con, Integer organizationId, int shaleClientId) throws SQLException {
+		if (organizationId == null || !tableHasColumn(con, "Users", "organization_id")) {
+			return null;
+		}
+		String table = firstExistingTable(con, "Organizations", "Organization");
+		if (table == null) {
+			return null;
+		}
+		String sql = "SELECT 1 FROM dbo." + table + " WHERE Id = ? AND (ShaleClientId = ? OR ShaleClientId IS NULL)";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, organizationId);
+			ps.setInt(2, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) {
+					throw new IllegalArgumentException("Organization is not available for this tenant.");
+				}
+			}
+		}
+		return organizationId;
 	}
 
 	public List<UserRoleRow> listAssignedRoles(int userId, int shaleClientId) {
