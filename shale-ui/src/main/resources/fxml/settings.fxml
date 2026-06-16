@@ -120,11 +120,26 @@
                 <padding>
                     <Insets top="12" right="12" bottom="12" left="12"/>
                 </padding>
-                <Label text="User Administration" styleClass="search-section-title"/>
-                <Label text="Create users for the current tenant. Tenant id is applied from your signed-in session."
+                <Label text="User Management" styleClass="search-section-title"/>
+                <Label text="Manage users for the current tenant. Tenant id is applied from your signed-in session."
                        styleClass="search-summary-text" wrapText="true"/>
+                <CheckBox fx:id="showInactiveUsersCheck" text="Show inactive users" onAction="#onToggleInactiveUsers"/>
+                <TableView fx:id="userManagementTable" prefHeight="260">
+                    <columns>
+                        <TableColumn fx:id="userNameColumn" text="Name" prefWidth="180"/>
+                        <TableColumn fx:id="userEmailColumn" text="Email" prefWidth="220"/>
+                        <TableColumn fx:id="userInitialsColumn" text="Initials" prefWidth="80"/>
+                        <TableColumn fx:id="userAttorneyColumn" text="Attorney" prefWidth="90"/>
+                        <TableColumn fx:id="userAdminColumn" text="Admin" prefWidth="80"/>
+                        <TableColumn fx:id="userStatusColumn" text="Status" prefWidth="100"/>
+                    </columns>
+                </TableView>
                 <HBox spacing="8">
                     <Button text="Add User" onAction="#onAddUser" styleClass="button-primary"/>
+                    <Button fx:id="deactivateUserButton" text="Deactivate User" onAction="#onDeactivateUser" styleClass="button-secondary" disable="true"/>
+                    <Button fx:id="reactivateUserButton" text="Reactivate User" onAction="#onReactivateUser" styleClass="button-secondary" disable="true"/>
+                    <Button fx:id="resetPasswordButton" text="Reset Password" onAction="#onResetUserPassword" styleClass="button-secondary" disable="true"/>
+                    <Label fx:id="userManagementStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
             </VBox>
 

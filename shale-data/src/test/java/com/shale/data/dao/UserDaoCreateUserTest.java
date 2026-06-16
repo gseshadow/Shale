@@ -62,4 +62,43 @@ final class UserDaoCreateUserTest {
 		assertTrue(source.contains("Only admin users can create users."));
 	}
 
+
+	@Test
+	void duplicateEmailMessagesDistinguishActiveAndInactiveUsers() {
+		assertEquals("A user with this email already exists.", UserDao.duplicateEmailMessage(false));
+		assertEquals("A user with this email already exists but is inactive. Reactivate the existing account instead.",
+				UserDao.duplicateEmailMessage(true));
+	}
+
+	@Test
+	void userManagementActionsAreTenantScopedAndUseSoftDeleteAndBcrypt() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/UserDao.java"));
+
+		assertTrue(source.contains("findExistingEmail(con, shaleClientId, email)"),
+				"Create must re-check duplicate normalized email on the server before insert.");
+		assertTrue(source.contains("WHERE ShaleClientId = ?"),
+				"Management queries/actions must be tenant-scoped.");
+		assertTrue(source.contains("UPDATE dbo.Users SET is_deleted = 1 WHERE Id = ? AND ShaleClientId = ?"),
+				"Deactivate should soft-delete only within the current tenant.");
+		assertTrue(source.contains("UPDATE dbo.Users SET is_deleted = 0 WHERE Id = ? AND ShaleClientId = ?"),
+				"Reactivate should preserve the user id and tenant scope.");
+		assertTrue(source.contains("if (userId == principalUserId)"),
+				"Self-deactivation must be blocked.");
+		assertTrue(source.contains("countActiveAdmins(con, shaleClientId) <= 1"),
+				"Last active tenant admin must be protected.");
+		assertTrue(source.contains("password_hash = ?, password_alg = 'bcrypt'"),
+				"Password reset must store a bcrypt hash, not plaintext.");
+		assertTrue(!source.contains("System.out.println(newPassword)") && !source.contains("println(passwordHash)"),
+				"Password reset must not log plaintext passwords or hashes.");
+	}
+
+
+	@Test
+	void normalizedEmailUniquenessBackstopIsDocumented() throws Exception {
+		String sql = Files.readString(Path.of("../docs/sql/2026-06-16_users_email_norm_unique.sql"));
+
+		assertTrue(sql.contains("CREATE UNIQUE INDEX UX_Users_ShaleClientId_EmailNorm"));
+		assertTrue(sql.contains("ON dbo.Users (ShaleClientId, email_norm)"));
+	}
+
 }

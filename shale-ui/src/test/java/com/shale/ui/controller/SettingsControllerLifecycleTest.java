@@ -92,4 +92,21 @@ final class SettingsControllerLifecycleTest {
                 "The Add User form should not expose raw organization ids.");
     }
 
+
+    @Test
+    void userManagementSectionIncludesListFilterAndActions() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+
+        assertTrue(fxml.contains("fx:id=\"userManagementTable\""));
+        assertTrue(fxml.contains("fx:id=\"showInactiveUsersCheck\""));
+        assertTrue(fxml.contains("onAction=\"#onDeactivateUser\""));
+        assertTrue(fxml.contains("onAction=\"#onReactivateUser\""));
+        assertTrue(fxml.contains("onAction=\"#onResetUserPassword\""));
+        assertTrue(source.contains("focusedProperty().addListener"),
+                "Email duplicate validation should run when the Add User email field loses focus.");
+        assertTrue(source.contains("findExistingEmailForCurrentTenant"),
+                "UI duplicate validation should use the DAO normalization/tenant-aware lookup.");
+    }
+
 }
