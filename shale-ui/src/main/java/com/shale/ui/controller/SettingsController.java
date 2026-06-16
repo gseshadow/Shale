@@ -20,6 +20,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.Button;
+import javafx.scene.Node;
 import javafx.scene.paint.Color;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
@@ -576,15 +577,24 @@ public final class SettingsController {
 		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		PasswordField password = new PasswordField();
 		PasswordField confirm = new PasswordField();
+		Label validation = new Label("");
+		validation.getStyleClass().add("dialog-error-text");
+		password.textProperty().addListener((obs, oldValue, newValue) -> validation.setText(""));
+		confirm.textProperty().addListener((obs, oldValue, newValue) -> validation.setText(""));
 		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
 		grid.add(new Label("New Password"), 0, 0); grid.add(password, 1, 0);
 		grid.add(new Label("Confirm Password"), 0, 1); grid.add(confirm, 1, 1);
+		grid.add(validation, 1, 2);
 		dialog.getDialogPane().setContent(grid);
-		dialog.setResultConverter(button -> {
-			if (button != ButtonType.OK) return null;
-			if (!Objects.equals(password.getText(), confirm.getText())) throw new IllegalArgumentException("Passwords must match.");
-			return password.getText();
+		Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
+		okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+			String message = resetPasswordValidationMessage(password.getText(), confirm.getText());
+			if (!message.isBlank()) {
+				validation.setText(message);
+				event.consume();
+			}
 		});
+		dialog.setResultConverter(button -> button == ButtonType.OK ? password.getText() : null);
 		try {
 			dialog.showAndWait().ifPresent(newPassword -> {
 				boolean confirmed = AppDialogs.showConfirmation(null, "Reset Password", "Reset password for " + selected.name() + "?", "Password access will change immediately.", "Reset", AppDialogs.DialogActionKind.PRIMARY);
@@ -595,6 +605,13 @@ public final class SettingsController {
 		} catch (RuntimeException ex) {
 			AppDialogs.showError(null, "Reset Password", rootMessage(ex));
 		}
+	}
+
+	static String resetPasswordValidationMessage(String password, String confirmPassword) {
+		if (password == null || password.isBlank()) return "Password is required.";
+		if (confirmPassword == null || confirmPassword.isBlank()) return "Confirm password is required.";
+		if (!Objects.equals(password, confirmPassword)) return "Passwords do not match.";
+		return "";
 	}
 
 	private void configureUserManagementTable() {

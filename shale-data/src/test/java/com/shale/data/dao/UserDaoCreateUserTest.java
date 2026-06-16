@@ -101,4 +101,18 @@ final class UserDaoCreateUserTest {
 		assertTrue(sql.contains("ON dbo.Users (ShaleClientId, email_norm)"));
 	}
 
+
+	@Test
+	void createUserInsertDoesNotWriteComputedOrSystemColumns() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/UserDao.java"));
+		String createUser = source.substring(source.indexOf("\tpublic UserDetailRow createUser"),
+				source.indexOf("\n\tstatic void validateCreateRequest", source.indexOf("\tpublic UserDetailRow createUser")));
+		String insertSql = createUser.substring(createUser.indexOf("INSERT INTO dbo.Users"), createUser.indexOf("try (PreparedStatement ps"));
+
+		assertFalse(insertSql.contains("email_norm"), "email_norm is computed by SQL Server and must not be inserted.");
+		assertFalse(insertSql.contains("created_at"), "created_at should be database/default generated.");
+		assertFalse(insertSql.contains("LegacyUserId"), "LegacyUserId is a system/import field and must not be inserted by Add User.");
+		assertFalse(createUser.contains("UPDATE dbo.Users") && createUser.contains("email_norm"), "Add User must not update email_norm.");
+	}
+
 }

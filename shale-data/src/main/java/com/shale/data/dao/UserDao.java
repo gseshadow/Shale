@@ -389,16 +389,15 @@ public final class UserDao {
 
 			StringBuilder sql = new StringBuilder("""
 					INSERT INTO dbo.Users (
-					  name_first, name_last, email, email_norm, password_hash, password_alg,
-					  Color, Initials, is_attorney, is_admin, is_deleted,
-					  default_organization, organization_id, ShaleClientId, created_at, LegacyUserId
+					  name_first, name_last, email, password_hash, password_alg,
+					  Color, Initials, is_attorney, is_admin, is_deleted, ShaleClientId
 					""");
 			if (phoneColumn != null) {
 				sql.append(", ").append(phoneColumn);
 			}
 			sql.append("""
 					)
-					VALUES (?, ?, ?, ?, ?, 'bcrypt', ?, ?, ?, ?, 0, ?, ?, ?, SYSUTCDATETIME(), NULL
+					VALUES (?, ?, ?, ?, 'bcrypt', ?, ?, ?, ?, 0, ?
 					""");
 			if (phoneColumn != null) {
 				sql.append(", NULL");
@@ -410,14 +409,11 @@ public final class UserDao {
 				setNullableString(ps, idx++, request.firstName());
 				setNullableString(ps, idx++, request.lastName());
 				ps.setString(idx++, email);
-				ps.setString(idx++, email);
 				ps.setString(idx++, passwordHash);
 				setNullableString(ps, idx++, request.color());
 				setNullableString(ps, idx++, request.initials());
 				ps.setBoolean(idx++, request.attorney());
 				ps.setBoolean(idx++, request.admin());
-				ps.setNull(idx++, java.sql.Types.INTEGER);
-				ps.setNull(idx++, java.sql.Types.INTEGER);
 				ps.setInt(idx++, shaleClientId);
 				ps.executeUpdate();
 				try (ResultSet keys = ps.getGeneratedKeys()) {

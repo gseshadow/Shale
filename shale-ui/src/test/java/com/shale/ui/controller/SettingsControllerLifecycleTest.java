@@ -109,4 +109,21 @@ final class SettingsControllerLifecycleTest {
                 "UI duplicate validation should use the DAO normalization/tenant-aware lookup.");
     }
 
+
+    @Test
+    void resetPasswordValidationUsesInlineMessagesWithoutResultConverterExceptions() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String method = source.substring(source.indexOf("\t@FXML\n\tprivate void onResetUserPassword"),
+                source.indexOf("\n\tprivate void configureUserManagementTable", source.indexOf("\t@FXML\n\tprivate void onResetUserPassword")));
+
+        assertEquals("Password is required.", SettingsController.resetPasswordValidationMessage("", "anything"));
+        assertEquals("Confirm password is required.", SettingsController.resetPasswordValidationMessage("newPassword1", ""));
+        assertEquals("Passwords do not match.", SettingsController.resetPasswordValidationMessage("newPassword1", "differentPassword1"));
+        assertEquals("", SettingsController.resetPasswordValidationMessage("newPassword1", "newPassword1"));
+        assertTrue(method.contains("addEventFilter(javafx.event.ActionEvent.ACTION"));
+        assertTrue(method.contains("event.consume()"));
+        assertTrue(!method.contains("throw new IllegalArgumentException(\"Passwords"),
+                "Reset password validation failures should keep the dialog open with inline feedback, not throw from the result converter.");
+    }
+
 }
