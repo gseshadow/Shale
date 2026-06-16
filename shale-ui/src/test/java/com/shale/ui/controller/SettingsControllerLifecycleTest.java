@@ -73,4 +73,19 @@ final class SettingsControllerLifecycleTest {
         assertTrue(!method.contains("new Label(\"Sort Order\")"),
                 "Sort Order should remain table/reorder-button driven and not be a manual dialog field.");
     }
+
+    @Test
+    void addUserFlowIsAdminOnlyAndUsesUserDaoCreateRequestWithoutTenantField() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+
+        assertTrue(fxml.contains("fx:id=\"userAdministrationSection\""));
+        assertTrue(fxml.contains("text=\"Add User\""));
+        assertTrue(source.contains("if (!isAdminUser())"),
+                "Settings Add User handler must block non-admin users before opening or saving the dialog.");
+        assertTrue(source.contains("new UserDao.UserCreateRequest("));
+        assertTrue(!source.contains("shaleClientId,"),
+                "The Add User form must not provide a ShaleClientId value; UserDao derives it from session context.");
+    }
+
 }

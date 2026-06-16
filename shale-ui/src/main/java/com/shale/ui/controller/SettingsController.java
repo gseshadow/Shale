@@ -3,6 +3,7 @@ package com.shale.ui.controller;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.service.CaseServicePort;
+import com.shale.data.dao.UserDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
@@ -17,6 +18,7 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.PasswordField;
 import javafx.scene.paint.Color;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
@@ -84,6 +86,7 @@ public final class SettingsController {
 	private NotificationPreferencesService notificationPreferencesService;
 	private AppState appState;
 	private CaseServicePort caseService;
+	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
 
@@ -92,7 +95,7 @@ public final class SettingsController {
 		fxmlReady = true;
 		configureCaseStatusesTable();
 		configurePracticeAreasTable();
-		updateAuditVisibility();
+		updateAdminControlsVisibility();
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
@@ -102,14 +105,15 @@ public final class SettingsController {
 		}
 	}
 
-	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService) {
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.onOpenAuditLog = Objects.requireNonNull(onOpenAuditLog, "onOpenAuditLog");
 		this.caseService = Objects.requireNonNull(caseService, "caseService");
+		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		if (fxmlReady) {
 			loadFromPreferences();
-			updateAuditVisibility();
+			updateAdminControlsVisibility();
 			loadCaseStatuses();
 			loadPracticeAreas();
 		}
@@ -418,6 +422,79 @@ public final class SettingsController {
 	}
 
 	private void setCaseStatusMessage(String message) { if (caseStatusSettingsStatusLabel != null) caseStatusSettingsStatusLabel.setText(message == null ? "" : message); }
+	@FXML
+	private void onAddUser() {
+		if (!isAdminUser()) {
+			AppDialogs.showError(null, "Add User", "Only admin users can create users.");
+			return;
+		}
+		showAddUserDialog().ifPresent(request -> {
+			try {
+				userDao.createUser(request);
+				AppDialogs.showInfo(null, "Add User", "User added.");
+			} catch (RuntimeException ex) {
+				AppDialogs.showError(null, "Add User", rootMessage(ex));
+			}
+		});
+	}
+
+	private Optional<UserDao.UserCreateRequest> showAddUserDialog() {
+		Dialog<UserDao.UserCreateRequest> dialog = new Dialog<>();
+		dialog.setTitle("Add User");
+		AppDialogs.applySecondaryDialogShell(dialog, "Add User");
+		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		TextField firstName = new TextField();
+		TextField lastName = new TextField();
+		TextField email = new TextField();
+		PasswordField password = new PasswordField();
+		TextField initials = new TextField();
+		ColorPicker colorPicker = new ColorPicker(DEFAULT_STATUS_COLOR);
+		CheckBox attorney = new CheckBox("Attorney");
+		CheckBox admin = new CheckBox("Admin");
+		TextField defaultOrganization = new TextField();
+		defaultOrganization.setPromptText("Optional numeric organization id");
+		TextField organizationId = new TextField();
+		organizationId.setPromptText("Optional numeric organization id");
+
+		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
+		grid.add(new Label("First Name"), 0, 0); grid.add(firstName, 1, 0);
+		grid.add(new Label("Last Name"), 0, 1); grid.add(lastName, 1, 1);
+		grid.add(new Label("Email"), 0, 2); grid.add(email, 1, 2);
+		grid.add(new Label("Temporary Password"), 0, 3); grid.add(password, 1, 3);
+		grid.add(new Label("Initials"), 0, 4); grid.add(initials, 1, 4);
+		grid.add(new Label("Color"), 0, 5); grid.add(colorPicker, 1, 5);
+		grid.add(attorney, 1, 6);
+		grid.add(admin, 1, 7);
+		grid.add(new Label("Default Organization"), 0, 8); grid.add(defaultOrganization, 1, 8);
+		grid.add(new Label("Organization"), 0, 9); grid.add(organizationId, 1, 9);
+		dialog.getDialogPane().setContent(grid);
+		dialog.setResultConverter(button -> {
+			if (button != ButtonType.OK) return null;
+			return new UserDao.UserCreateRequest(
+					trim(firstName.getText()),
+					trim(lastName.getText()),
+					trim(email.getText()),
+					password.getText(),
+					fxColorToDb(colorPicker.getValue()),
+					trim(initials.getText()),
+					attorney.isSelected(),
+					admin.isSelected(),
+					parseOptionalInt(defaultOrganization.getText(), "Default organization"),
+					parseOptionalInt(organizationId.getText(), "Organization"));
+		});
+		try { return dialog.showAndWait(); }
+		catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Add User", rootMessage(ex)); return Optional.empty(); }
+	}
+
+	private static String trim(String value) { return value == null ? "" : value.trim(); }
+
+	private static Integer parseOptionalInt(String value, String label) {
+		String trimmed = trim(value);
+		if (trimmed.isBlank()) return null;
+		try { return Integer.valueOf(trimmed); }
+		catch (NumberFormatException ex) { throw new IllegalArgumentException(label + " must be a number."); }
+	}
+
 	private void setPracticeAreaMessage(String message) { if (practiceAreaSettingsStatusLabel != null) practiceAreaSettingsStatusLabel.setText(message == null ? "" : message); }
 	private static String safe(String value) { return value == null ? "" : value; }
 	private static String rootMessage(Throwable ex) { Throwable t = ex; while (t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? t.toString() : t.getMessage(); }
@@ -506,11 +583,18 @@ public final class SettingsController {
 		return appState != null && appState.isAdmin();
 	}
 
-	private void updateAuditVisibility() {
+	@FXML
+	private VBox userAdministrationSection;
+
+	private void updateAdminControlsVisibility() {
+		boolean visible = isAdminUser();
 		if (auditSection != null) {
-			boolean visible = isAdminUser();
 			auditSection.setVisible(visible);
 			auditSection.setManaged(visible);
+		}
+		if (userAdministrationSection != null) {
+			userAdministrationSection.setVisible(visible);
+			userAdministrationSection.setManaged(visible);
 		}
 	}
 }
