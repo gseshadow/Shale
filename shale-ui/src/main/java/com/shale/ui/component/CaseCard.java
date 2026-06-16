@@ -23,13 +23,11 @@ import javafx.scene.paint.Color;
 public class CaseCard extends VBox {
 
 	private final Label titleLabel = new Label();
-	private final Label attorneyLabel = new Label();
-
 	private final Label intakeLabel = new Label();
 	private final Label solLabel = new Label();
 	private final Label statusLabel = new Label();
 	private final Region practiceAreaBar = new Region();
-	private final Region attorneyDot = new Region();
+	private final ContactCard attorneyMiniCard = new ContactCard();
 
 	private final HBox cardRow = new HBox(0);
 	private final VBox bodyPane = new VBox(6);
@@ -43,7 +41,7 @@ public class CaseCard extends VBox {
 	private Integer caseId;
 	private Consumer<Integer> onOpen;
 	private String statusColorCss = "#F1F5F9";
-	private String attorneyColorCss = "#94A3B8";
+	private String attorneyColorCss;
 	private String practiceAreaColorCss = "#CBD5E1";
 	private String statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
 	private LocalDate solDate;
@@ -68,13 +66,11 @@ public class CaseCard extends VBox {
 		setMaxWidth(Region.USE_COMPUTED_SIZE);
 		bodyPane.setPadding(new Insets(7, 9, 7, 10));
 		practiceAreaBar.setPrefWidth(5);
-		attorneyLabel.setManaged(false);
-		attorneyLabel.setVisible(false);
 		datesBox.setManaged(false);
 		datesBox.setVisible(false);
 		titleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		statusLabelBaseStyle = "-fx-font-size: 10px; -fx-font-weight: 800;";
-		attorneyDot.setPrefSize(22, 22);
+		attorneyMiniCard.setMaxWidth(118);
 		bottomRow.setSpacing(4);
 		refreshSurfaceStyle();
 	}
@@ -85,13 +81,11 @@ public class CaseCard extends VBox {
 		setPrefWidth(280);
 		bodyPane.setPadding(new Insets(12, 12, 11, 14));
 		practiceAreaBar.setPrefWidth(7);
-		attorneyLabel.setManaged(true);
-		attorneyLabel.setVisible(true);
 		datesBox.setManaged(true);
 		datesBox.setVisible(true);
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
 		statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
-		attorneyDot.setPrefSize(30, 30);
+		attorneyMiniCard.setMaxWidth(132);
 		bottomRow.setSpacing(8);
 		refreshSurfaceStyle();
 	}
@@ -122,8 +116,8 @@ public class CaseCard extends VBox {
 	}
 
 	public void setResponsibleAttorney(String responsibleAttorney) {
-		String text = (responsibleAttorney == null || responsibleAttorney.isBlank()) ? "" : responsibleAttorney;
-		attorneyLabel.setText(text);
+		String text = (responsibleAttorney == null || responsibleAttorney.isBlank()) ? "—" : responsibleAttorney.trim();
+		attorneyMiniCard.setName(text);
 	}
 
 	public void setIntakeDate(LocalDate intakeDate) {
@@ -157,7 +151,7 @@ public class CaseCard extends VBox {
 	}
 
 	public void setAttorneyDotCssColor(String attorneyColorCss) {
-		this.attorneyColorCss = normalizeColor(attorneyColorCss, "#94A3B8");
+		this.attorneyColorCss = com.shale.ui.util.ColorUtil.toCssBackgroundColorOrNull(attorneyColorCss);
 		refreshSurfaceStyle();
 	}
 
@@ -206,11 +200,8 @@ public class CaseCard extends VBox {
 		bodyPane.getStyleClass().add("case-card__body");
 		bottomRow.getStyleClass().add("case-card__bottom-row");
 		statusLabel.getStyleClass().add("case-card__status-label");
-		attorneyDot.getStyleClass().add("case-card__attorney-dot");
+		attorneyMiniCard.getStyleClass().add("case-card__attorney-mini-card");
 		setBackgroundCssColor(null);
-		// Title / attorney styles exactly like your snippet
-		attorneyLabel.setStyle("-fx-font-size: 12px; -fx-opacity: 0.75;");
-
 		intakeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.78);");
 		refreshSolStyle();
 
@@ -227,9 +218,9 @@ public class CaseCard extends VBox {
 		statusLabel.setAlignment(Pos.CENTER_RIGHT);
 		datesBox.setMinWidth(118);
 		datesBox.setFillWidth(true);
-		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyDot);
+		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
 		bottomRow.getChildren().setAll(datesBox, bottomSpacer, statusLabel);
-		bodyPane.getChildren().setAll(headerRow, attorneyLabel, bodySpacer, bottomRow);
+		bodyPane.getChildren().setAll(headerRow, bodySpacer, bottomRow);
 		getChildren().setAll(cardRow);
 		cardRow.getChildren().setAll(practiceAreaBar, bodyPane);
 		HBox.setMargin(practiceAreaBar, new Insets(8, 0, 8, 8));
@@ -281,14 +272,7 @@ public class CaseCard extends VBox {
 				-fx-border-width: 1;
 				-fx-padding: 3 8 3 8;
 				""".formatted(statusLabelBaseStyle, readableTextColor(statusColorCss), statusColorCss));
-		attorneyDot.setStyle("""
-				-fx-background-color: %s;
-				-fx-background-radius: 999;
-				-fx-border-color: rgba(255,255,255,0.9);
-				-fx-border-radius: 999;
-				-fx-border-width: 2;
-				-fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.26), 8, 0.18, 0, 1);
-				""".formatted(attorneyColorCss));
+		attorneyMiniCard.setBackgroundCssColor(attorneyColorCss);
 	}
 
 	public static String normalizeColor(String dbColor, String fallback) {
