@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
@@ -114,6 +115,29 @@ class CaseServiceAdapterTest {
 		public List<CaseUpdateDto> listCaseUpdates(long caseId) {
 			lastCaseUpdatesCaseId = caseId;
 			return caseUpdates;
+		}
+
+		@Override
+		public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
+			return List.of();
+		}
+
+		@Override
+		public CaseStatusDto createCaseStatus(int shaleClientId, String name, String description, boolean active, Integer sortOrder) {
+			return new CaseStatusDto(1, name, description, active, sortOrder, null, null, null, shaleClientId);
+		}
+
+		@Override
+		public CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, String description, boolean active, Integer sortOrder) {
+			return new CaseStatusDto(statusId, name, description, active, sortOrder, null, null, null, shaleClientId);
+		}
+
+		@Override
+		public void setCaseStatusActive(int shaleClientId, int statusId, boolean active) {
+		}
+
+		@Override
+		public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
 		}
 
 		@Override
