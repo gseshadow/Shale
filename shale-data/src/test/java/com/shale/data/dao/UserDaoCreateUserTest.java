@@ -27,13 +27,13 @@ final class UserDaoCreateUserTest {
 	@Test
 	void requiredFieldsAreValidated() {
 		assertThrows(IllegalArgumentException.class, () -> UserDao.validateCreateRequest(
-				new UserDao.UserCreateRequest("", "User", "new@example.com", "password1", null, null, false, false, null, null)));
+				new UserDao.UserCreateRequest("", "User", "new@example.com", "password1", null, null, false, false)));
 		assertThrows(IllegalArgumentException.class, () -> UserDao.validateCreateRequest(
-				new UserDao.UserCreateRequest("New", "", "new@example.com", "password1", null, null, false, false, null, null)));
+				new UserDao.UserCreateRequest("New", "", "new@example.com", "password1", null, null, false, false)));
 		assertThrows(IllegalArgumentException.class, () -> UserDao.validateCreateRequest(
-				new UserDao.UserCreateRequest("New", "User", "", "password1", null, null, false, false, null, null)));
+				new UserDao.UserCreateRequest("New", "User", "", "password1", null, null, false, false)));
 		assertThrows(IllegalArgumentException.class, () -> UserDao.validateCreateRequest(
-				new UserDao.UserCreateRequest("New", "User", "new@example.com", "short", null, null, false, false, null, null)));
+				new UserDao.UserCreateRequest("New", "User", "new@example.com", "short", null, null, false, false)));
 	}
 
 	@Test

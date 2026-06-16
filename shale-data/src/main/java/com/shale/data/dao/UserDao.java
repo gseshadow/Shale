@@ -65,9 +65,7 @@ public final class UserDao {
 			String color,
 			String initials,
 			boolean attorney,
-			boolean admin,
-			Integer defaultOrganization,
-			Integer organizationId) {
+			boolean admin) {
 	}
 
 	private final DbSessionProvider db;
@@ -401,8 +399,8 @@ public final class UserDao {
 				setNullableString(ps, idx++, request.initials());
 				ps.setBoolean(idx++, request.attorney());
 				ps.setBoolean(idx++, request.admin());
-				setNullableInteger(ps, idx++, request.defaultOrganization());
-				setNullableInteger(ps, idx++, request.organizationId());
+				ps.setNull(idx++, java.sql.Types.INTEGER);
+				ps.setNull(idx++, java.sql.Types.INTEGER);
 				ps.setInt(idx++, shaleClientId);
 				ps.executeUpdate();
 				try (ResultSet keys = ps.getGeneratedKeys()) {

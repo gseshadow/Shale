@@ -451,11 +451,6 @@ public final class SettingsController {
 		ColorPicker colorPicker = new ColorPicker(DEFAULT_STATUS_COLOR);
 		CheckBox attorney = new CheckBox("Attorney");
 		CheckBox admin = new CheckBox("Admin");
-		TextField defaultOrganization = new TextField();
-		defaultOrganization.setPromptText("Optional numeric organization id");
-		TextField organizationId = new TextField();
-		organizationId.setPromptText("Optional numeric organization id");
-
 		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
 		grid.add(new Label("First Name"), 0, 0); grid.add(firstName, 1, 0);
 		grid.add(new Label("Last Name"), 0, 1); grid.add(lastName, 1, 1);
@@ -465,8 +460,6 @@ public final class SettingsController {
 		grid.add(new Label("Color"), 0, 5); grid.add(colorPicker, 1, 5);
 		grid.add(attorney, 1, 6);
 		grid.add(admin, 1, 7);
-		grid.add(new Label("Default Organization"), 0, 8); grid.add(defaultOrganization, 1, 8);
-		grid.add(new Label("Organization"), 0, 9); grid.add(organizationId, 1, 9);
 		dialog.getDialogPane().setContent(grid);
 		dialog.setResultConverter(button -> {
 			if (button != ButtonType.OK) return null;
@@ -478,22 +471,13 @@ public final class SettingsController {
 					fxColorToDb(colorPicker.getValue()),
 					trim(initials.getText()),
 					attorney.isSelected(),
-					admin.isSelected(),
-					parseOptionalInt(defaultOrganization.getText(), "Default organization"),
-					parseOptionalInt(organizationId.getText(), "Organization"));
+					admin.isSelected());
 		});
 		try { return dialog.showAndWait(); }
 		catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Add User", rootMessage(ex)); return Optional.empty(); }
 	}
 
 	private static String trim(String value) { return value == null ? "" : value.trim(); }
-
-	private static Integer parseOptionalInt(String value, String label) {
-		String trimmed = trim(value);
-		if (trimmed.isBlank()) return null;
-		try { return Integer.valueOf(trimmed); }
-		catch (NumberFormatException ex) { throw new IllegalArgumentException(label + " must be a number."); }
-	}
 
 	private void setPracticeAreaMessage(String message) { if (practiceAreaSettingsStatusLabel != null) practiceAreaSettingsStatusLabel.setText(message == null ? "" : message); }
 	private static String safe(String value) { return value == null ? "" : value; }

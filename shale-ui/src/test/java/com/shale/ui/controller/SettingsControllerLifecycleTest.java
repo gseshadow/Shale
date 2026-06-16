@@ -86,6 +86,10 @@ final class SettingsControllerLifecycleTest {
         assertTrue(source.contains("new UserDao.UserCreateRequest("));
         assertTrue(!source.contains("shaleClientId,"),
                 "The Add User form must not provide a ShaleClientId value; UserDao derives it from session context.");
+        assertTrue(!source.contains("Default Organization"),
+                "The Add User form should not expose organization fields until user organization editing is supported in the UI.");
+        assertTrue(!source.contains("new Label(\"Organization\")"),
+                "The Add User form should not expose raw organization ids.");
     }
 
 }
