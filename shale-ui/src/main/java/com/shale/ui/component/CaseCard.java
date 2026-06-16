@@ -9,6 +9,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 
@@ -46,6 +47,7 @@ public class CaseCard extends VBox {
 	private String statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
 	private LocalDate solDate;
 	private boolean hovered;
+	private boolean embeddedMini;
 
 	public CaseCard() {
 		super(6);
@@ -59,33 +61,59 @@ public class CaseCard extends VBox {
 	}
 
 	public void applyMini() {
-		setSpacing(3);
+		embeddedMini = true;
+		getStyleClass().removeAll("case-card-full", "case-card-compact");
+		getStyleClass().add("case-card-compact");
+		setSpacing(2);
 		setPadding(Insets.EMPTY);
-		setMinWidth(Region.USE_COMPUTED_SIZE);
-		setPrefWidth(Region.USE_COMPUTED_SIZE);
-		setMaxWidth(Region.USE_COMPUTED_SIZE);
-		bodyPane.setPadding(new Insets(7, 9, 7, 10));
-		practiceAreaBar.setPrefWidth(5);
+		setMinWidth(0);
+		setPrefWidth(210);
+		setMaxWidth(210);
+		bodyPane.setSpacing(0);
+		bodyPane.setPadding(new Insets(5, 7, 5, 8));
+		practiceAreaBar.setPrefWidth(3);
+		HBox.setMargin(practiceAreaBar, new Insets(5, 0, 5, 6));
 		datesBox.setManaged(false);
 		datesBox.setVisible(false);
+		bottomRow.setManaged(false);
+		bottomRow.setVisible(false);
+		bodySpacer.setManaged(false);
+		bodySpacer.setVisible(false);
 		titleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		titleLabel.setWrapText(false);
+		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		titleLabel.setMinWidth(0);
+		titleLabel.setMaxWidth(Double.MAX_VALUE);
 		statusLabelBaseStyle = "-fx-font-size: 10px; -fx-font-weight: 800;";
-		attorneyMiniCard.setMaxWidth(118);
+		attorneyMiniCard.applyCompactMini();
+		attorneyMiniCard.setMaxWidth(88);
+		bodyPane.getChildren().setAll(headerRow);
 		bottomRow.setSpacing(4);
 		refreshSurfaceStyle();
 	}
 
 	public void applyCompact() {
+		embeddedMini = false;
+		getStyleClass().removeAll("case-card-full", "case-card-compact");
+		getStyleClass().add("case-card-full");
 		setSpacing(6);
 		setPadding(Insets.EMPTY);
 		setPrefWidth(280);
+		bodyPane.setSpacing(6);
 		bodyPane.setPadding(new Insets(12, 12, 11, 14));
 		practiceAreaBar.setPrefWidth(7);
+		HBox.setMargin(practiceAreaBar, new Insets(8, 0, 8, 8));
 		datesBox.setManaged(true);
 		datesBox.setVisible(true);
+		bottomRow.setManaged(true);
+		bottomRow.setVisible(true);
+		bodySpacer.setManaged(true);
+		bodySpacer.setVisible(true);
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
 		statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
+		attorneyMiniCard.applyMini();
 		attorneyMiniCard.setMaxWidth(132);
+		bodyPane.getChildren().setAll(headerRow, bodySpacer, bottomRow);
 		bottomRow.setSpacing(8);
 		refreshSurfaceStyle();
 	}
@@ -284,6 +312,9 @@ public class CaseCard extends VBox {
 	}
 
 	private String statusGradientCss() {
+		if (embeddedMini) {
+			return "linear-gradient(to right, #FFFFFF 0%, #F8FAFC 76%, " + statusColorCss + " 100%)";
+		}
 		return "linear-gradient(to right, #FFFFFF 0%, #F8FAFC 32%, " + statusColorCss + " 68%, " + statusColorCss + " 100%)";
 	}
 
