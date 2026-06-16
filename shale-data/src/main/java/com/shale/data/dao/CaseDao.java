@@ -6,6 +6,7 @@ import java.sql.Timestamp;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -22,6 +23,7 @@ import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
 
@@ -5140,6 +5142,273 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list statuses (clientId=" + shaleClientId + ")", e);
 		}
+	}
+
+	public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
+		if (shaleClientId <= 0) {
+			return List.of();
+		}
+		try (Connection con = db.requireConnection()) {
+			return listCaseStatusDtosForTenant(con, shaleClientId);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list case statuses (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public CaseStatusDto createCaseStatus(int shaleClientId, String name, boolean closed, Integer sortOrder,
+			String color, String lifecycleKey, String systemKey) {
+		String normalizedName = normalizeStatusName(name);
+		try (Connection con = db.requireConnection()) {
+			int effectiveSort = sortOrder == null ? nextStatusSortOrder(con, shaleClientId) : sortOrder;
+			String normalizedLifecycle = normalizeLifecycleKey(lifecycleKey);
+			String normalizedSystemKey = normalizeSystemKey(systemKey);
+			validateCaseStatusUnique(con, shaleClientId, null, normalizedName, normalizedSystemKey);
+			String sql = """
+					INSERT INTO dbo.Statuses (ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey)
+					VALUES (?, ?, ?, ?, ?, ?, ?);
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+				ps.setInt(1, shaleClientId);
+				ps.setString(2, normalizedName);
+				ps.setBoolean(3, closed);
+				ps.setInt(4, effectiveSort);
+				ps.setString(5, trimToNull(color));
+				ps.setString(6, normalizedLifecycle);
+				ps.setString(7, normalizedSystemKey);
+				ps.executeUpdate();
+				try (ResultSet keys = ps.getGeneratedKeys()) {
+					if (keys.next()) {
+						return findCaseStatusById(con, keys.getInt(1));
+					}
+				}
+			}
+			throw new RuntimeException("Failed to read created case status id.");
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create case status.", e);
+		}
+	}
+
+	public CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, boolean closed,
+			Integer sortOrder, String color, String lifecycleKey, String systemKey) {
+		String normalizedName = normalizeStatusName(name);
+		try (Connection con = db.requireConnection()) {
+			CaseStatusDto existing = findCaseStatusById(con, statusId);
+			if (existing == null) {
+				throw new IllegalArgumentException("Case status not found.");
+			}
+			int targetId = statusId;
+			Integer targetTenantId = existing.shaleClientId();
+			String normalizedLifecycle = normalizeLifecycleKey(lifecycleKey);
+			String normalizedSystemKey = normalizeSystemKey(systemKey);
+			validateCaseStatusUnique(con, shaleClientId, targetTenantId == null ? null : targetId, normalizedName, normalizedSystemKey);
+			if (targetTenantId == null) {
+				// Global/default statuses are part of the effective lookup set. Editing them from
+				// tenant Settings creates a tenant-scoped override instead of mutating global data.
+				return createCaseStatus(shaleClientId, normalizedName, closed, sortOrder, color, normalizedLifecycle,
+						normalizedSystemKey == null ? existing.systemKey() : normalizedSystemKey);
+			}
+			if (targetTenantId != shaleClientId) {
+				throw new IllegalArgumentException("Case status belongs to a different tenant.");
+			}
+			String sql = """
+					UPDATE dbo.Statuses
+					SET Name = ?, IsClosed = ?, SortOrder = ?, Color = ?, LifecycleKey = ?, SystemKey = ?
+					WHERE Id = ? AND ShaleClientId = ?;
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, normalizedName);
+				ps.setBoolean(2, closed);
+				ps.setInt(3, sortOrder == null ? 0 : sortOrder);
+				ps.setString(4, trimToNull(color));
+				ps.setString(5, normalizedLifecycle);
+				ps.setString(6, normalizedSystemKey);
+				ps.setInt(7, targetId);
+				ps.setInt(8, shaleClientId);
+				if (ps.executeUpdate() == 0) {
+					throw new IllegalArgumentException("Case status not found for this tenant.");
+				}
+			}
+			return findCaseStatusById(con, targetId);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update case status.", e);
+		}
+	}
+
+	public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
+		try (Connection con = db.requireConnection()) {
+			CaseStatusDto first = requireTenantEditableStatus(con, shaleClientId, firstStatusId);
+			CaseStatusDto second = requireTenantEditableStatus(con, shaleClientId, secondStatusId);
+			try (PreparedStatement ps = con.prepareStatement("""
+					UPDATE dbo.Statuses
+					SET SortOrder = CASE Id WHEN ? THEN ? WHEN ? THEN ? ELSE SortOrder END
+					WHERE ShaleClientId = ? AND Id IN (?, ?);
+					""")) {
+				ps.setInt(1, first.id());
+				ps.setInt(2, second.sortOrder() == null ? 0 : second.sortOrder());
+				ps.setInt(3, second.id());
+				ps.setInt(4, first.sortOrder() == null ? 0 : first.sortOrder());
+				ps.setInt(5, shaleClientId);
+				ps.setInt(6, first.id());
+				ps.setInt(7, second.id());
+				ps.executeUpdate();
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to reorder case statuses.", e);
+		}
+	}
+
+	private List<CaseStatusDto> listCaseStatusDtosForTenant(Connection con, int shaleClientId) throws SQLException {
+		List<CaseStatusDto> globalStatuses = new ArrayList<>();
+		List<CaseStatusDto> tenantStatuses = new ArrayList<>();
+		String sql = """
+				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey
+				FROM dbo.Statuses
+				WHERE ShaleClientId IS NULL OR ShaleClientId = ?
+				ORDER BY SortOrder, Name, Id;
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					CaseStatusDto status = mapCaseStatusDto(rs);
+					if (status.shaleClientId() == null) {
+						globalStatuses.add(status);
+					} else {
+						tenantStatuses.add(status);
+					}
+				}
+			}
+		}
+		return resolveEffectiveCaseStatuses(globalStatuses, tenantStatuses);
+	}
+
+	private static List<CaseStatusDto> resolveEffectiveCaseStatuses(List<CaseStatusDto> globalStatuses,
+			List<CaseStatusDto> tenantStatuses) {
+		List<CaseStatusDto> globalUnkeyed = new ArrayList<>();
+		List<CaseStatusDto> tenantUnkeyed = new ArrayList<>();
+		Map<String, CaseStatusDto> bySystemKey = new LinkedHashMap<>();
+		for (CaseStatusDto status : globalStatuses) {
+			String systemKey = normalizeSystemKey(status.systemKey());
+			if (systemKey == null) {
+				globalUnkeyed.add(status);
+			} else {
+				bySystemKey.putIfAbsent(systemKey, status);
+			}
+		}
+		for (CaseStatusDto status : tenantStatuses) {
+			String systemKey = normalizeSystemKey(status.systemKey());
+			if (systemKey == null) {
+				tenantUnkeyed.add(status);
+			} else {
+				bySystemKey.put(systemKey, status);
+			}
+		}
+		List<CaseStatusDto> merged = new ArrayList<>(globalUnkeyed.size() + bySystemKey.size() + tenantUnkeyed.size());
+		merged.addAll(globalUnkeyed);
+		merged.addAll(bySystemKey.values());
+		merged.addAll(tenantUnkeyed);
+		merged.sort((a, b) -> {
+			int bySort = Integer.compare(a.sortOrder() == null ? 0 : a.sortOrder(), b.sortOrder() == null ? 0 : b.sortOrder());
+			if (bySort != 0) return bySort;
+			int byName = (a.name() == null ? "" : a.name()).compareToIgnoreCase(b.name() == null ? "" : b.name());
+			return byName != 0 ? byName : Integer.compare(a.id(), b.id());
+		});
+		return merged;
+	}
+
+	private static CaseStatusDto mapCaseStatusDto(ResultSet rs) throws SQLException {
+		return new CaseStatusDto(
+				rs.getInt("Id"),
+				rs.getString("Name"),
+				rs.getBoolean("IsClosed"),
+				getNullableInt(rs, "SortOrder"),
+				rs.getString("Color"),
+				resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name")),
+				normalizeSystemKey(rs.getString("SystemKey")),
+				getNullableInt(rs, "ShaleClientId"));
+	}
+
+	private CaseStatusDto findCaseStatusById(Connection con, int statusId) throws SQLException {
+		String sql = """
+				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey
+				FROM dbo.Statuses
+				WHERE Id = ?;
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, statusId);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? mapCaseStatusDto(rs) : null;
+			}
+		}
+	}
+
+	private CaseStatusDto requireTenantEditableStatus(Connection con, int shaleClientId, int statusId) throws SQLException {
+		CaseStatusDto status = findCaseStatusById(con, statusId);
+		if (status == null) {
+			throw new IllegalArgumentException("Case status not found.");
+		}
+		if (status.shaleClientId() == null) {
+			throw new IllegalArgumentException("Create a tenant override before reordering a global status.");
+		}
+		if (status.shaleClientId() != shaleClientId) {
+			throw new IllegalArgumentException("Case status belongs to a different tenant.");
+		}
+		return status;
+	}
+
+	private static void validateCaseStatusUnique(Connection con, int shaleClientId, Integer excludeId, String name,
+			String systemKey) throws SQLException {
+		StringBuilder sql = new StringBuilder("""
+				SELECT 1
+				FROM dbo.Statuses
+				WHERE ShaleClientId = ?
+				  AND (
+				    LOWER(LTRIM(RTRIM(Name))) = LOWER(?)
+				""");
+		if (systemKey != null) {
+			sql.append(" OR SystemKey = ?");
+		}
+		sql.append(")");
+		if (excludeId != null) {
+			sql.append(" AND Id <> ?");
+		}
+		try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+			int i = 1;
+			ps.setInt(i++, shaleClientId);
+			ps.setString(i++, name);
+			if (systemKey != null) {
+				ps.setString(i++, systemKey);
+			}
+			if (excludeId != null) {
+				ps.setInt(i++, excludeId);
+			}
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) {
+					throw new IllegalArgumentException("A tenant case status with this name or system key already exists.");
+				}
+			}
+		}
+	}
+
+	private static Integer nextStatusSortOrder(Connection con, int shaleClientId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("SELECT COALESCE(MAX(SortOrder), 0) + 10 FROM dbo.Statuses WHERE ShaleClientId = ?")) {
+			ps.setInt(1, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getInt(1) : 10;
+			}
+		}
+	}
+
+	private static String normalizeStatusName(String name) {
+		String trimmed = name == null ? "" : name.trim();
+		if (trimmed.isBlank()) throw new IllegalArgumentException("Status name is required.");
+		return trimmed;
+	}
+
+	private static String trimToNull(String value) {
+		if (value == null) return null;
+		String trimmed = value.trim();
+		return trimmed.isBlank() ? null : trimmed;
 	}
 
 	public String findLifecycleKeyForStatus(int shaleClientId, int statusId) {
