@@ -5148,11 +5148,29 @@ public final class CaseDao {
 		if (shaleClientId <= 0) {
 			return List.of();
 		}
-		try (Connection con = db.requireConnection()) {
-			return listCaseStatusDtosForTenant(con, shaleClientId);
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to list case statuses (clientId=" + shaleClientId + ")", e);
+		return toCaseStatusDtos(listStatusesForTenant(shaleClientId));
+	}
+
+	static List<CaseStatusDto> toCaseStatusDtos(List<StatusRow> statuses) {
+		if (statuses == null || statuses.isEmpty()) {
+			return List.of();
 		}
+		List<CaseStatusDto> out = new ArrayList<>(statuses.size());
+		for (StatusRow status : statuses) {
+			if (status == null) {
+				continue;
+			}
+			out.add(new CaseStatusDto(
+					status.id(),
+					status.name(),
+					isTerminalStatus(status),
+					status.sortOrder(),
+					status.color(),
+					status.lifecycleKey(),
+					status.systemKey(),
+					null));
+		}
+		return out;
 	}
 
 	public CaseStatusDto createCaseStatus(int shaleClientId, String name, boolean closed, Integer sortOrder,
@@ -5255,65 +5273,6 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to reorder case statuses.", e);
 		}
-	}
-
-	private List<CaseStatusDto> listCaseStatusDtosForTenant(Connection con, int shaleClientId) throws SQLException {
-		List<CaseStatusDto> globalStatuses = new ArrayList<>();
-		List<CaseStatusDto> tenantStatuses = new ArrayList<>();
-		String sql = """
-				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey
-				FROM dbo.Statuses
-				WHERE ShaleClientId IS NULL OR ShaleClientId = ?
-				ORDER BY SortOrder, Name, Id;
-				""";
-		try (PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, shaleClientId);
-			try (ResultSet rs = ps.executeQuery()) {
-				while (rs.next()) {
-					CaseStatusDto status = mapCaseStatusDto(rs);
-					if (status.shaleClientId() == null) {
-						globalStatuses.add(status);
-					} else {
-						tenantStatuses.add(status);
-					}
-				}
-			}
-		}
-		return resolveEffectiveCaseStatuses(globalStatuses, tenantStatuses);
-	}
-
-	private static List<CaseStatusDto> resolveEffectiveCaseStatuses(List<CaseStatusDto> globalStatuses,
-			List<CaseStatusDto> tenantStatuses) {
-		List<CaseStatusDto> globalUnkeyed = new ArrayList<>();
-		List<CaseStatusDto> tenantUnkeyed = new ArrayList<>();
-		Map<String, CaseStatusDto> bySystemKey = new LinkedHashMap<>();
-		for (CaseStatusDto status : globalStatuses) {
-			String systemKey = normalizeSystemKey(status.systemKey());
-			if (systemKey == null) {
-				globalUnkeyed.add(status);
-			} else {
-				bySystemKey.putIfAbsent(systemKey, status);
-			}
-		}
-		for (CaseStatusDto status : tenantStatuses) {
-			String systemKey = normalizeSystemKey(status.systemKey());
-			if (systemKey == null) {
-				tenantUnkeyed.add(status);
-			} else {
-				bySystemKey.put(systemKey, status);
-			}
-		}
-		List<CaseStatusDto> merged = new ArrayList<>(globalUnkeyed.size() + bySystemKey.size() + tenantUnkeyed.size());
-		merged.addAll(globalUnkeyed);
-		merged.addAll(bySystemKey.values());
-		merged.addAll(tenantUnkeyed);
-		merged.sort((a, b) -> {
-			int bySort = Integer.compare(a.sortOrder() == null ? 0 : a.sortOrder(), b.sortOrder() == null ? 0 : b.sortOrder());
-			if (bySort != 0) return bySort;
-			int byName = (a.name() == null ? "" : a.name()).compareToIgnoreCase(b.name() == null ? "" : b.name());
-			return byName != 0 ? byName : Integer.compare(a.id(), b.id());
-		});
-		return merged;
 	}
 
 	private static CaseStatusDto mapCaseStatusDto(ResultSet rs) throws SQLException {
