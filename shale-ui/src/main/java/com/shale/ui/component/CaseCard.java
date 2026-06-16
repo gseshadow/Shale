@@ -42,12 +42,14 @@ public class CaseCard extends VBox {
 	private Integer caseId;
 	private Consumer<Integer> onOpen;
 	private String statusColorCss = "#F1F5F9";
+	private String statusName = "";
 	private String attorneyColorCss;
 	private String practiceAreaColorCss = "#CBD5E1";
 	private String statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
 	private LocalDate solDate;
 	private boolean hovered;
 	private boolean embeddedMini;
+	private boolean taskPreview;
 
 	public CaseCard() {
 		super(6);
@@ -62,6 +64,7 @@ public class CaseCard extends VBox {
 
 	public void applyMini() {
 		embeddedMini = true;
+		taskPreview = false;
 		getStyleClass().removeAll("case-card-full", "case-card-compact");
 		getStyleClass().add("case-card-compact");
 		setSpacing(2);
@@ -96,6 +99,7 @@ public class CaseCard extends VBox {
 
 	public void applyTaskPreview() {
 		embeddedMini = true;
+		taskPreview = true;
 		getStyleClass().removeAll("case-card-full", "case-card-compact");
 		getStyleClass().add("case-card-compact");
 		setSpacing(2);
@@ -103,8 +107,9 @@ public class CaseCard extends VBox {
 		setMinWidth(0);
 		setPrefWidth(210);
 		setMaxWidth(Double.MAX_VALUE);
-		bodyPane.setSpacing(3);
-		bodyPane.setPadding(new Insets(5, 7, 5, 8));
+		bodyPane.setSpacing(0);
+		bodyPane.setPadding(new Insets(5, 8, 5, 8));
+		bodyPane.setAlignment(Pos.CENTER_LEFT);
 		practiceAreaBar.setPrefWidth(3);
 		HBox.setMargin(practiceAreaBar, new Insets(5, 0, 5, 6));
 		datesBox.setManaged(false);
@@ -113,24 +118,24 @@ public class CaseCard extends VBox {
 		bodySpacer.setVisible(false);
 		attorneyMiniCard.setManaged(false);
 		attorneyMiniCard.setVisible(false);
-		bottomRow.setManaged(true);
-		bottomRow.setVisible(true);
+		bottomRow.setManaged(false);
+		bottomRow.setVisible(false);
+		statusLabel.setManaged(false);
+		statusLabel.setVisible(false);
 		titleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
-		statusLabelBaseStyle = "-fx-font-size: 10px; -fx-font-weight: 800;";
-		statusLabel.setMaxWidth(96);
+		headerRow.setAlignment(Pos.CENTER_LEFT);
 		headerRow.getChildren().setAll(titleLabel);
-		bottomRow.getChildren().setAll(bottomSpacer, statusLabel);
-		bodyPane.getChildren().setAll(headerRow, bottomRow);
-		bottomRow.setSpacing(4);
+		bodyPane.getChildren().setAll(headerRow);
 		refreshSurfaceStyle();
 	}
 
 	public void applyCompact() {
 		embeddedMini = false;
+		taskPreview = false;
 		getStyleClass().removeAll("case-card-full", "case-card-compact");
 		getStyleClass().add("case-card-full");
 		setSpacing(6);
@@ -150,6 +155,10 @@ public class CaseCard extends VBox {
 		bodySpacer.setVisible(true);
 		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
 		statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
+		statusLabel.setManaged(true);
+		statusLabel.setVisible(true);
+		bodyPane.setAlignment(Pos.TOP_LEFT);
+		headerRow.setAlignment(Pos.TOP_LEFT);
 		attorneyMiniCard.applyMini();
 		attorneyMiniCard.setMaxWidth(132);
 		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
@@ -211,7 +220,9 @@ public class CaseCard extends VBox {
 	}
 
 	public void setStatus(String statusName) {
-		statusLabel.setText((statusName == null || statusName.isBlank()) ? "—" : statusName.trim());
+		this.statusName = statusName == null ? "" : statusName.trim();
+		statusLabel.setText(this.statusName.isBlank() ? "—" : this.statusName);
+		refreshSurfaceStyle();
 	}
 
 	public void setStatusCssColor(String statusColorCss) {
@@ -325,7 +336,7 @@ public class CaseCard extends VBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(CardSurfaceStyles.cardContainerStyle(statusGradientCss(), hovered));
+		setStyle(CardSurfaceStyles.cardContainerStyle(taskPreview ? statusTintCss() : statusGradientCss(), hovered));
 		practiceAreaBar.setStyle("""
 				-fx-background-color: %s;
 				-fx-background-radius: 999;
@@ -350,6 +361,19 @@ public class CaseCard extends VBox {
 			return normalized;
 		normalized = com.shale.ui.util.ColorUtil.toCssBackgroundColorOrNull(fallback);
 		return normalized == null ? "#F1F5F9" : normalized;
+	}
+
+	private String statusTintCss() {
+		String normalized = statusName == null ? "" : statusName.trim().toLowerCase(java.util.Locale.ROOT);
+		if (normalized.contains("prelitigation") || normalized.contains("pre-litigation"))
+			return "#EFF6FF";
+		if (normalized.contains("accepted"))
+			return "#F0FDF4";
+		if (normalized.contains("denied"))
+			return "#FEF2F2";
+		if (normalized.contains("closed"))
+			return "#F8FAFC";
+		return "#FFFFFF";
 	}
 
 	private String statusGradientCss() {
