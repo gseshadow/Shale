@@ -8,12 +8,14 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
+import javafx.animation.PauseTransition;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
+import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +28,7 @@ public final class ContactsController {
     private static final ContactCardFactory.Variant CONTACTS_CARD_VARIANT = ContactCardFactory.Variant.FULL;
     private static final double CONTACT_CARD_WIDTH = 340;
     private static final double CONTACT_CARD_HEIGHT = 78;
+    private static final Duration SEARCH_DEBOUNCE = Duration.millis(300);
 
     @FXML
     private TextField contactsSearchField;
@@ -44,7 +47,9 @@ public final class ContactsController {
     private final List<ContactCardSummaryRow> loadedContacts = new ArrayList<>();
     private String emptyStateMessage = "No contacts to display yet.";
     private String loadingStateMessage = "Loading contacts…";
-    private int loadGeneration = 0;
+    private PauseTransition searchDebounce;
+    private volatile int loadGeneration = 0;
+    private volatile String latestRequestedQuery = "";
     private int currentPage = 0;
     private final int pageSize = 100;
     private boolean loading = false;
@@ -67,7 +72,13 @@ public final class ContactsController {
     @FXML
     private void initialize() {
         if (contactsSearchField != null) {
-            contactsSearchField.textProperty().addListener((obs, oldV, newV) -> loadFirstPage());
+            searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
+            searchDebounce.setOnFinished(e -> {
+                latestRequestedQuery = normalizedQuery();
+                PerfLog.log("contacts.search.debounce", "fired", "queryLength=" + latestRequestedQuery.length() + " nextGeneration=" + (loadGeneration + 1));
+                loadFirstPage();
+            });
+            contactsSearchField.textProperty().addListener((obs, oldV, newV) -> scheduleSearchReload());
         }
         if (contactsFlow != null) {
             contactsFlow.setHgap(16);
@@ -92,8 +103,22 @@ public final class ContactsController {
         });
     }
 
+    private void scheduleSearchReload() {
+        latestRequestedQuery = normalizedQuery();
+        if (searchDebounce == null) {
+            loadFirstPage();
+            return;
+        }
+        PerfLog.log("contacts.search.debounce", "scheduled", "queryLength=" + latestRequestedQuery.length() + " delayMs=" + Math.round(SEARCH_DEBOUNCE.toMillis()) + " currentGeneration=" + loadGeneration);
+        searchDebounce.playFromStart();
+    }
+
     private void loadFirstPage() {
         long started = PerfLog.start();
+        if (searchDebounce != null) {
+            searchDebounce.stop();
+        }
+        latestRequestedQuery = normalizedQuery();
         loadGeneration++;
         currentPage = 0;
         loading = false;
@@ -132,9 +157,10 @@ public final class ContactsController {
         loading = true;
         final int pageToLoad = currentPage;
         final String queryAtSubmit = normalizedQuery();
+        latestRequestedQuery = queryAtSubmit;
         final long queryStarted = PerfLog.start();
         if (pageToLoad == 0) { pageLoadStartedNanos = queryStarted; }
-        PerfLog.log("contacts.search", "execute.start", "generation=" + generationAtSubmit + " page=" + pageToLoad + " pageSize=" + pageSize + " tenantId=" + tenantId + " queryLength=" + queryAtSubmit.length());
+        PerfLog.log("contacts.search", "queued", "generation=" + generationAtSubmit + " page=" + pageToLoad + " pageSize=" + pageSize + " tenantId=" + tenantId + " queryLength=" + queryAtSubmit.length());
         if (loadedContacts.isEmpty()) {
             setLoadingStateMessage("Loading contacts…");
             updateLoadingState(true);
@@ -144,13 +170,18 @@ public final class ContactsController {
 
         dbExec.submit(() -> {
             try {
+                if (generationAtSubmit != loadGeneration || !queryAtSubmit.equals(latestRequestedQuery)) {
+                    PerfLog.logDone("contacts.search", "phase=skipBeforeDao generation=" + generationAtSubmit + " page=" + pageToLoad + " reason=staleQueued latestGeneration=" + loadGeneration, queryStarted);
+                    return;
+                }
                 long daoStarted = PerfLog.start();
+                PerfLog.log("contacts.search.dao", "start", "generation=" + generationAtSubmit + " page=" + pageToLoad + " tenantId=" + tenantId + " queryLength=" + queryAtSubmit.length());
                 var page = contactDao.findDirectoryContactsPage(tenantId, pageToLoad, pageSize, queryAtSubmit);
                 PerfLog.logDone("contacts.search.dao", "generation=" + generationAtSubmit + " page=" + pageToLoad + " tenantId=" + tenantId + " rows=" + page.items().size() + " total=" + page.total(), daoStarted);
 
                 Platform.runLater(() -> {
                     if (generationAtSubmit != loadGeneration || !queryAtSubmit.equals(normalizedQuery())) {
-                        PerfLog.logDone("contacts.search", "phase=discard generation=" + generationAtSubmit + " page=" + pageToLoad + " reason=stale", queryStarted);
+                        PerfLog.logDone("contacts.search", "phase=discardAfterDao generation=" + generationAtSubmit + " page=" + pageToLoad + " reason=stale latestGeneration=" + loadGeneration, queryStarted);
                         return;
                     }
                     loadedContacts.addAll(page.items());
