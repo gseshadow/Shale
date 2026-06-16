@@ -213,38 +213,35 @@ public final class SettingsController {
 
 	private Optional<CaseStatusInput> showCaseStatusDialog(CaseStatusDto existing) {
 		Dialog<CaseStatusInput> dialog = new Dialog<>();
-		dialog.setTitle(existing == null ? "Add Status" : "Edit Status");
+		String dialogTitle = existing == null ? "Add Status" : "Edit Status";
+		dialog.setTitle(dialogTitle);
+		AppDialogs.applySecondaryDialogShell(dialog, dialogTitle);
 		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		TextField name = new TextField(existing == null ? "" : existing.name());
 		CheckBox closed = new CheckBox("Closed status");
 		closed.setSelected(existing != null && existing.closed());
-		TextField sortOrder = new TextField(existing == null || existing.sortOrder() == null ? "" : String.valueOf(existing.sortOrder()));
 		ColorPicker colorPicker = new ColorPicker(dbColorToFx(existing == null ? null : existing.color()));
 		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
 		grid.add(new Label("Name"), 0, 0); grid.add(name, 1, 0);
 		grid.add(closed, 1, 1);
-		grid.add(new Label("Sort Order"), 0, 2); grid.add(sortOrder, 1, 2);
-		grid.add(new Label("Color"), 0, 3); grid.add(colorPicker, 1, 3);
+		grid.add(new Label("Color"), 0, 2); grid.add(colorPicker, 1, 2);
 		if (existing != null && !safe(existing.lifecycleKey()).isBlank()) {
-			grid.add(new Label("Lifecycle Key"), 0, 4);
-			grid.add(new Label(existing.lifecycleKey()), 1, 4);
+			grid.add(new Label("Lifecycle Key"), 0, 3);
+			grid.add(new Label(existing.lifecycleKey()), 1, 3);
 		}
 		if (existing != null && !safe(existing.systemKey()).isBlank()) {
-			grid.add(new Label("System Key"), 0, 5);
-			grid.add(new Label(existing.systemKey()), 1, 5);
+			grid.add(new Label("System Key"), 0, 4);
+			grid.add(new Label(existing.systemKey()), 1, 4);
 		}
 		dialog.getDialogPane().setContent(grid);
 		dialog.setResultConverter(button -> {
 			if (button != ButtonType.OK) return null;
 			String trimmedName = name.getText() == null ? "" : name.getText().trim();
 			if (trimmedName.isBlank()) throw new IllegalArgumentException("Name is required.");
-			Integer sort = null;
-			String sortText = sortOrder.getText() == null ? "" : sortOrder.getText().trim();
-			if (!sortText.isBlank()) sort = Integer.parseInt(sortText);
 			return new CaseStatusInput(
 					trimmedName,
 					closed.isSelected(),
-					sort,
+					sortOrderForSave(existing),
 					fxColorToDb(colorPicker.getValue()),
 					lifecycleKeyForSave(existing),
 					systemKeyForSave(existing));
@@ -295,6 +292,10 @@ public final class SettingsController {
 
 	private static int toColorByte(double value) {
 		return Math.max(0, Math.min(255, (int) Math.round(value * 255.0)));
+	}
+
+	static Integer sortOrderForSave(CaseStatusDto existing) {
+		return existing == null ? null : existing.sortOrder();
 	}
 
 	static String lifecycleKeyForSave(CaseStatusDto existing) {

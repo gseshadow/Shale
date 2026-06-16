@@ -53,4 +53,24 @@ final class SettingsControllerLifecycleTest {
         assertNull(SettingsController.systemKeyForSave(null));
     }
 
+    @Test
+    void statusDialogPreservesExistingSortOrderAndOmitsSortForNewStatuses() {
+        CaseStatusDto existing = new CaseStatusDto(7, "Accepted", true, 20, "0x28A745FF", "accepted", "accepted", 7);
+
+        assertEquals(20, SettingsController.sortOrderForSave(existing));
+        assertNull(SettingsController.sortOrderForSave(null));
+    }
+
+    @Test
+    void statusDialogUsesSecondaryShellAndDoesNotExposeSortOrderEditor() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String methodStart = "\tprivate Optional<CaseStatusInput> showCaseStatusDialog";
+        String method = source.substring(source.indexOf(methodStart),
+                source.indexOf("\n\tprivate CaseStatusViewRow selectedStatusRow", source.indexOf(methodStart)));
+
+        assertTrue(method.contains("AppDialogs.applySecondaryDialogShell"),
+                "Case status dialogs should use the same secondary dialog shell as existing Shale dialogs instead of the default JavaFX window chrome/icon.");
+        assertTrue(!method.contains("new Label(\"Sort Order\")"),
+                "Sort Order should remain table/reorder-button driven and not be a manual dialog field.");
+    }
 }
