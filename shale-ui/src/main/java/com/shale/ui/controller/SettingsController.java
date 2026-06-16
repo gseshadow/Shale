@@ -11,10 +11,12 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.paint.Color;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.GridPane;
@@ -217,16 +219,20 @@ public final class SettingsController {
 		CheckBox closed = new CheckBox("Closed status");
 		closed.setSelected(existing != null && existing.closed());
 		TextField sortOrder = new TextField(existing == null || existing.sortOrder() == null ? "" : String.valueOf(existing.sortOrder()));
-		TextField color = new TextField(existing == null ? "" : safe(existing.color()));
-		TextField lifecycleKey = new TextField(existing == null ? "" : safe(existing.lifecycleKey()));
-		TextField systemKey = new TextField(existing == null ? "" : safe(existing.systemKey()));
+		ColorPicker colorPicker = new ColorPicker(dbColorToFx(existing == null ? null : existing.color()));
 		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
 		grid.add(new Label("Name"), 0, 0); grid.add(name, 1, 0);
 		grid.add(closed, 1, 1);
 		grid.add(new Label("Sort Order"), 0, 2); grid.add(sortOrder, 1, 2);
-		grid.add(new Label("Color"), 0, 3); grid.add(color, 1, 3);
-		grid.add(new Label("Lifecycle Key"), 0, 4); grid.add(lifecycleKey, 1, 4);
-		grid.add(new Label("System Key"), 0, 5); grid.add(systemKey, 1, 5);
+		grid.add(new Label("Color"), 0, 3); grid.add(colorPicker, 1, 3);
+		if (existing != null && !safe(existing.lifecycleKey()).isBlank()) {
+			grid.add(new Label("Lifecycle Key"), 0, 4);
+			grid.add(new Label(existing.lifecycleKey()), 1, 4);
+		}
+		if (existing != null && !safe(existing.systemKey()).isBlank()) {
+			grid.add(new Label("System Key"), 0, 5);
+			grid.add(new Label(existing.systemKey()), 1, 5);
+		}
 		dialog.getDialogPane().setContent(grid);
 		dialog.setResultConverter(button -> {
 			if (button != ButtonType.OK) return null;
@@ -239,9 +245,9 @@ public final class SettingsController {
 					trimmedName,
 					closed.isSelected(),
 					sort,
-					color.getText(),
-					lifecycleKey.getText(),
-					systemKey.getText());
+					fxColorToDb(colorPicker.getValue()),
+					lifecycleKeyForSave(existing),
+					systemKeyForSave(existing));
 		});
 		try { return dialog.showAndWait(); }
 		catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Case Statuses", rootMessage(ex)); return Optional.empty(); }
@@ -257,6 +263,46 @@ public final class SettingsController {
 		Integer id = appState == null ? null : appState.getShaleClientId();
 		if (id == null || id <= 0) throw new IllegalStateException("No tenant is selected.");
 		return id;
+	}
+
+	private static final Color DEFAULT_STATUS_COLOR = Color.rgb(108, 117, 125);
+
+
+	static Color dbColorToFx(String value) {
+		String normalized = value == null ? "" : value.trim();
+		if (normalized.matches("(?i)^0x[0-9a-f]{8}$")) {
+			try {
+				int red = Integer.parseInt(normalized.substring(2, 4), 16);
+				int green = Integer.parseInt(normalized.substring(4, 6), 16);
+				int blue = Integer.parseInt(normalized.substring(6, 8), 16);
+				int alpha = Integer.parseInt(normalized.substring(8, 10), 16);
+				return Color.rgb(red, green, blue, alpha / 255.0);
+			} catch (RuntimeException ignored) {
+				return DEFAULT_STATUS_COLOR;
+			}
+		}
+		return DEFAULT_STATUS_COLOR;
+	}
+
+	static String fxColorToDb(Color color) {
+		Color safeColor = color == null ? DEFAULT_STATUS_COLOR : color;
+		return String.format("0x%02X%02X%02X%02X",
+				toColorByte(safeColor.getRed()),
+				toColorByte(safeColor.getGreen()),
+				toColorByte(safeColor.getBlue()),
+				toColorByte(safeColor.getOpacity()));
+	}
+
+	private static int toColorByte(double value) {
+		return Math.max(0, Math.min(255, (int) Math.round(value * 255.0)));
+	}
+
+	static String lifecycleKeyForSave(CaseStatusDto existing) {
+		return existing == null ? null : existing.lifecycleKey();
+	}
+
+	static String systemKeyForSave(CaseStatusDto existing) {
+		return existing == null ? null : existing.systemKey();
 	}
 
 	private void setCaseStatusMessage(String message) { if (caseStatusSettingsStatusLabel != null) caseStatusSettingsStatusLabel.setText(message == null ? "" : message); }
