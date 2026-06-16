@@ -1,5 +1,6 @@
 package com.shale.ui.notification;
 
+import com.shale.ui.util.PerfLog;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -151,7 +152,7 @@ public final class NotificationCenterService {
 		}
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
 		if (stats.added() > 0 || stats.duplicate() > 0) {
-			log.info("PERF notifications.push source={} incoming={} added={} duplicates={} total={} elapsedMs={} fxThread={}",
+			PerfLog.debug(log, "PERF notifications.push source={} incoming={} added={} duplicates={} total={} elapsedMs={} fxThread={}",
 					source, incoming.size(), stats.added(), stats.duplicate(), notifications.size(), elapsedMs, Platform.isFxApplicationThread());
 		}
 	}
@@ -409,7 +410,7 @@ public final class NotificationCenterService {
 		}
 		recomputeDerivedState();
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-		log.info("PERF notifications.dismiss removed={} remaining={} elapsedMs={} fxThread={}", removed.size(), notifications.size(), elapsedMs, Platform.isFxApplicationThread());
+		PerfLog.debug(log, "PERF notifications.dismiss removed={} remaining={} elapsedMs={} fxThread={}", removed.size(), notifications.size(), elapsedMs, Platform.isFxApplicationThread());
 		dismissListener.accept(removed);
 	}
 

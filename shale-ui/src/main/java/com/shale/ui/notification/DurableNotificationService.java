@@ -1,5 +1,6 @@
 package com.shale.ui.notification;
 
+import com.shale.ui.util.PerfLog;
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.NotificationDao.NotificationRow;
 import com.shale.ui.privacy.PhiFieldRegistry;
@@ -48,7 +49,7 @@ public final class DurableNotificationService {
 		long startNanos = System.nanoTime();
 		int unreadCount = notificationDao.countUnreadNotificationsForUser(shaleClientId, userId);
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-		log.info("PERF notifications.badge.count.query tenantId={} userId={} unreadCount={} elapsedMs={} thread={}",
+		PerfLog.debug(log, "PERF notifications.badge.count.query tenantId={} userId={} unreadCount={} elapsedMs={} thread={}",
 				shaleClientId, userId, unreadCount, elapsedMs, Thread.currentThread().getName());
 		return unreadCount;
 	}
@@ -65,7 +66,7 @@ public final class DurableNotificationService {
 				.filter(Objects::nonNull)
 				.toList();
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-		log.info("PERF notifications.durable.load tenantId={} userId={} rows={} mapped={} queryElapsedMs={} totalElapsedMs={} thread={}",
+		PerfLog.debug(log, "PERF notifications.durable.load tenantId={} userId={} rows={} mapped={} queryElapsedMs={} totalElapsedMs={} thread={}",
 				shaleClientId, userId, rows.size(), mapped.size(), queryElapsedMs, elapsedMs, Thread.currentThread().getName());
 		return mapped;
 	}
@@ -100,7 +101,7 @@ public final class DurableNotificationService {
 			try {
 				notificationDao.markNotificationsRead(shaleClientId, userId, durableIds);
 				long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-				log.info("PERF notifications.persist.markRead tenantId={} userId={} count={} elapsedMs={} thread={}",
+				PerfLog.debug(log, "PERF notifications.persist.markRead tenantId={} userId={} count={} elapsedMs={} thread={}",
 						shaleClientId, userId, durableIds.size(), elapsedMs, Thread.currentThread().getName());
 			} catch (RuntimeException ex) {
 				log.error("Notification mark-read persistence failed tenantId={} userId={} count={}", shaleClientId, userId, durableIds.size(), ex);
@@ -130,7 +131,7 @@ public final class DurableNotificationService {
 			try {
 				notificationDao.markNotificationsDismissed(shaleClientId, userId, durableIds);
 				long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-				log.info("PERF notifications.persist.dismiss tenantId={} userId={} count={} elapsedMs={} thread={}",
+				PerfLog.debug(log, "PERF notifications.persist.dismiss tenantId={} userId={} count={} elapsedMs={} thread={}",
 						shaleClientId, userId, durableIds.size(), elapsedMs, Thread.currentThread().getName());
 			} catch (RuntimeException ex) {
 				log.error("Notification dismiss persistence failed tenantId={} userId={} count={}", shaleClientId, userId, durableIds.size(), ex);

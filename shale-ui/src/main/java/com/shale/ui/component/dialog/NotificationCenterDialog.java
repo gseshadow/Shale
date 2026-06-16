@@ -1,5 +1,6 @@
 package com.shale.ui.component.dialog;
 
+import com.shale.ui.util.PerfLog;
 import com.shale.ui.component.NotificationCard;
 import com.shale.ui.component.factory.NotificationCardFactory;
 import com.shale.ui.notification.AppNotification;
@@ -72,7 +73,7 @@ public final class NotificationCenterDialog {
 			Consumer<AppNotification> onActivateNotification) {
 		Objects.requireNonNull(notificationService, "notificationService");
 		long openStartNanos = System.nanoTime();
-		log.info("PERF notifications.center.open.start count={} unread={} fxThread={}",
+		PerfLog.debug(log, "PERF notifications.center.open.start count={} unread={} fxThread={}",
 				notificationService.getNotificationsNewestFirst().size(), notificationService.getUnreadCount(), javafx.application.Platform.isFxApplicationThread());
 
 		Stage stage = new Stage();
@@ -219,11 +220,11 @@ public final class NotificationCenterDialog {
 				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
 		long renderElapsedMs = (System.nanoTime() - openStartNanos) / 1_000_000;
-		log.info("PERF notifications.center.open.renderReady count={} groups={} elapsedMs={}",
+		PerfLog.debug(log, "PERF notifications.center.open.renderReady count={} groups={} elapsedMs={}",
 				notificationService.getNotificationsNewestFirst().size(), notificationGroups.size(), renderElapsedMs);
 		stage.showAndWait();
 		long totalElapsedMs = (System.nanoTime() - openStartNanos) / 1_000_000;
-		log.info("PERF notifications.center.open.closed elapsedMs={}", totalElapsedMs);
+		PerfLog.debug(log, "PERF notifications.center.open.closed elapsedMs={}", totalElapsedMs);
 	}
 
 	public static void show(
@@ -359,7 +360,7 @@ public final class NotificationCenterDialog {
 				.toList();
 		notificationGroups.setAll(groups);
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-		log.info("PERF notifications.center.group sourceCount={} groups={} category={} unreadOnly={} hasSearch={} elapsedMs={}",
+		PerfLog.debug(log, "PERF notifications.center.group sourceCount={} groups={} category={} unreadOnly={} hasSearch={} elapsedMs={}",
 				notificationService.getNotificationsNewestFirst().size(), groups.size(), effectiveCategory, unreadOnly,
 				!normalizedSearch.isEmpty(), elapsedMs);
 	}
@@ -528,7 +529,7 @@ public final class NotificationCenterDialog {
 			long startNanos = System.nanoTime();
 			notificationService.dismissAll(notifications);
 			long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-			log.info("PERF notifications.center.action action={} count={} elapsedMs={}", actionDescription, notifications.size(), elapsedMs);
+			PerfLog.debug(log, "PERF notifications.center.action action={} count={} elapsedMs={}", actionDescription, notifications.size(), elapsedMs);
 		} catch (RuntimeException ex) {
 			log.error("Notification center action failed action={} count={}", actionDescription, notifications.size(), ex);
 			throw ex;
@@ -543,7 +544,7 @@ public final class NotificationCenterDialog {
 			long startNanos = System.nanoTime();
 			notificationService.dismiss(item);
 			long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-			log.info("PERF notifications.center.action action=dismiss-one durableId={} elapsedMs={}", item.getDurableNotificationId(), elapsedMs);
+			PerfLog.debug(log, "PERF notifications.center.action action=dismiss-one durableId={} elapsedMs={}", item.getDurableNotificationId(), elapsedMs);
 		} catch (RuntimeException ex) {
 			log.error("Notification center dismiss failed notificationId={}", item.getId(), ex);
 			throw ex;
@@ -708,7 +709,7 @@ public final class NotificationCenterDialog {
 			setGraphic(card);
 			long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
 			if (elapsedMs >= 5) {
-				log.info("PERF notifications.center.cardRender groupKey={} count={} elapsedMs={}",
+				PerfLog.debug(log, "PERF notifications.center.cardRender groupKey={} count={} elapsedMs={}",
 						item.getGroupKey(), item.getCount(), elapsedMs);
 			}
 		}

@@ -2598,8 +2598,8 @@ public final class MyShaleController {
 	}
 
 	private void showTaskDetailPopup(Long taskId) {
-		long clickReceivedAt = System.nanoTime();
-		System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] click_received taskId=" + taskId);
+		long clickReceivedAt = PerfLog.start();
+		PerfLog.log("TASK_DETAIL_TIMING", "click_received", "context=MY_TASKS taskId=" + taskId);
 		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
 			return;
 		}
@@ -2611,7 +2611,7 @@ public final class MyShaleController {
 			return;
 		}
 		if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
-			System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] open_skipped_in_flight taskId=" + taskId);
+			PerfLog.log("TASK_DETAIL_TIMING", "open_skipped_in_flight", "context=MY_TASKS taskId=" + taskId);
 			return;
 		}
 		Optional<CaseTaskListItemDto> summary = findMyTaskById(taskId);
@@ -2633,8 +2633,7 @@ public final class MyShaleController {
 				List.of(),
 				List.of(),
 				summary.map(item -> item.completedAt() != null).orElse(false));
-		System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] shell_stage_created_ms="
-				+ ((System.nanoTime() - clickReceivedAt) / 1_000_000L) + " taskId=" + taskId);
+		PerfLog.logElapsed("TASK_DETAIL_TIMING", "shell_stage_created", "context=MY_TASKS taskId=" + taskId, PerfLog.elapsedMs(clickReceivedAt));
 		try {
 			auditTaskRead(taskId);
 			Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(

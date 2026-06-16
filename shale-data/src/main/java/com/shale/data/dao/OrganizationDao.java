@@ -13,6 +13,7 @@ import java.util.Objects;
 import com.shale.core.model.Organization;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
+import com.shale.core.util.PerformanceLogging;
 
 public final class OrganizationDao {
 
@@ -947,12 +948,18 @@ public final class OrganizationDao {
 
 
 	private static long perfStart() {
-		return System.nanoTime();
+		return PerformanceLogging.start();
 	}
 
 	private static void logPerf(String area, String fields, long startNanos) {
-		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-		System.out.println("PERF " + area + " " + fields + " elapsedMs=" + elapsedMs);
+		long elapsedMs = PerformanceLogging.elapsedMs(startNanos);
+		if (!PerformanceLogging.shouldLogElapsed(elapsedMs)) {
+			return;
+		}
+		System.Logger.Level level = PerformanceLogging.isSlow(elapsedMs)
+				? System.Logger.Level.WARNING
+				: System.Logger.Level.DEBUG;
+		System.getLogger("PERF").log(level, "PERF " + area + " " + fields + " elapsedMs=" + elapsedMs);
 	}
 
 	private static int requireCurrentShaleClientId(Connection con) throws SQLException {

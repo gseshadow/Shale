@@ -1,26 +1,75 @@
 package com.shale.ui.util;
 
+import com.shale.core.util.PerformanceLogging;
+import org.slf4j.Logger;
+
 public final class PerfLog {
 
     private PerfLog() {
     }
 
     public static long start() {
-        return System.nanoTime();
+        return PerformanceLogging.start();
     }
 
     public static long elapsedMs(long startNanos) {
-        return (System.nanoTime() - startNanos) / 1_000_000;
+        return PerformanceLogging.elapsedMs(startNanos);
+    }
+
+    public static boolean isEnabled() {
+        return PerformanceLogging.isEnabled();
+    }
+
+    public static long slowThresholdMs() {
+        return PerformanceLogging.slowThresholdMs();
+    }
+
+    public static boolean isSlow(long elapsedMs) {
+        return PerformanceLogging.isSlow(elapsedMs);
     }
 
     public static void log(String area, String phase, String fields) {
+        if (!isEnabled()) {
+            return;
+        }
         String suffix = (fields == null || fields.isBlank()) ? "" : " " + fields.trim();
-        System.out.println("PERF " + area + " " + phase + suffix);
+        System.getLogger("PERF").log(System.Logger.Level.DEBUG, "PERF " + area + " " + phase + suffix);
     }
 
     public static void logDone(String area, String fields, long startNanos) {
         long elapsedMs = elapsedMs(startNanos);
+        logElapsed(area, "done", fields, elapsedMs);
+    }
+
+    public static void logElapsed(String area, String phase, String fields, long elapsedMs) {
+        if (!PerformanceLogging.shouldLogElapsed(elapsedMs)) {
+            return;
+        }
         String suffix = (fields == null || fields.isBlank()) ? "" : " " + fields.trim();
-        System.out.println("PERF " + area + " done" + suffix + " elapsedMs=" + elapsedMs);
+        System.Logger.Level level = isSlow(elapsedMs) ? System.Logger.Level.WARNING : System.Logger.Level.DEBUG;
+        System.getLogger("PERF").log(level, "PERF " + area + " " + phase + suffix + " elapsedMs=" + elapsedMs);
+    }
+
+    public static void debug(Logger log, String message, Object... args) {
+        if (isEnabled()) {
+            log.debug(message, args);
+        }
+    }
+
+    public static void elapsed(Logger log, long startNanos, String message, Object... args) {
+        long elapsedMs = elapsedMs(startNanos);
+        if (isSlow(elapsedMs)) {
+            log.warn(message + " slow=true thresholdMs={}", append(args, elapsedMs, slowThresholdMs()));
+        } else if (isEnabled()) {
+            log.debug(message, append(args, elapsedMs));
+        }
+    }
+
+    private static Object[] append(Object[] args, Object... tail) {
+        Object[] safeArgs = args == null ? new Object[0] : args;
+        Object[] out = new Object[safeArgs.length + tail.length];
+        System.arraycopy(safeArgs, 0, out, 0, safeArgs.length);
+        System.arraycopy(tail, 0, out, safeArgs.length, tail.length);
+        return out;
     }
 }

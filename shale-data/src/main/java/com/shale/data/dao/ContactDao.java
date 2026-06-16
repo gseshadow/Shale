@@ -2,6 +2,7 @@ package com.shale.data.dao;
 
 import com.shale.core.semantics.RoleSemantics;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.util.PerformanceLogging;
 
 import java.sql.Connection;
 import java.sql.Date;
@@ -760,8 +761,12 @@ public final class ContactDao {
     }
 
     private static void logPerf(String area, String fields, long startedNanos) {
-        long elapsedMs = (System.nanoTime() - startedNanos) / 1_000_000;
-        LOG.info("PERF {} {} elapsedMs={}", area, fields, elapsedMs);
+        long elapsedMs = PerformanceLogging.elapsedMs(startedNanos);
+        if (PerformanceLogging.isSlow(elapsedMs)) {
+            LOG.warn("PERF {} {} elapsedMs={} slow=true thresholdMs={}", area, fields, elapsedMs, PerformanceLogging.slowThresholdMs());
+        } else if (PerformanceLogging.isEnabled()) {
+            LOG.debug("PERF {} {} elapsedMs={}", area, fields, elapsedMs);
+        }
     }
 
     private static int normalizedQueryLength(String query) {

@@ -1,5 +1,6 @@
 package com.shale.ui.notification;
 
+import com.shale.ui.util.PerfLog;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 
@@ -147,7 +148,7 @@ public final class LiveUpdateNotificationBridge {
 					caseResponsibleAttorneyColor,
 					caseNonEngagementLetterSent));
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-		log.info("PERF notifications.live.handle type=TASK eventId={} entityId={} durableId={} elapsedMs={}",
+		PerfLog.debug(log, "PERF notifications.live.handle type=TASK eventId={} entityId={} durableId={} elapsedMs={}",
 				event.eventId(), entityId, durableNotificationId, elapsedMs);
 	}
 
@@ -180,13 +181,13 @@ public final class LiveUpdateNotificationBridge {
 				event.entityId() > 0 ? event.entityId() : null,
 				null,
 				"CALENDAR_EVENT_ASSIGNED"));
-		log.info("PERF notifications.live.handle type=CALENDAR_EVENT_ASSIGNED eventId={} targetUserId={} currentUserId={} deliveredLive=true",
+		PerfLog.debug(log, "PERF notifications.live.handle type=CALENDAR_EVENT_ASSIGNED eventId={} targetUserId={} currentUserId={} deliveredLive=true",
 				event.eventId(), targetUserId, currentUserId);
 	}
 
 	private void logLiveSkipped(UiRuntimeBridge.EntityUpdatedEvent event, String reason, long startNanos) {
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-		log.info("PERF notifications.live.skip reason={} eventType={} eventId={} entityId={} elapsedMs={}",
+		PerfLog.debug(log, "PERF notifications.live.skip reason={} eventType={} eventId={} entityId={} elapsedMs={}",
 				reason, event == null ? null : event.entityType(), event == null ? null : event.eventId(), event == null ? null : event.entityId(), elapsedMs);
 	}
 
