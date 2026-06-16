@@ -61,7 +61,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override
 	public CaseStatusDto createCaseStatus(CaseStatusCommand command) {
 		Objects.requireNonNull(command, "command");
-		return caseGateway.createCaseStatus(command.shaleClientId(), command.name(), command.description(), command.active(), command.sortOrder());
+		return caseGateway.createCaseStatus(command.shaleClientId(), command.name(), command.closed(), command.sortOrder(), command.color(), command.lifecycleKey(), command.systemKey());
 	}
 
 	@Override
@@ -70,13 +70,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		if (command.id() == null) {
 			throw new IllegalArgumentException("Status id is required.");
 		}
-		return caseGateway.updateCaseStatus(command.shaleClientId(), command.id(), command.name(), command.description(), command.active(), command.sortOrder());
+		return caseGateway.updateCaseStatus(command.shaleClientId(), command.id(), command.name(), command.closed(), command.sortOrder(), command.color(), command.lifecycleKey(), command.systemKey());
 	}
 
-	@Override
-	public void setCaseStatusActive(int shaleClientId, int statusId, boolean active) {
-		caseGateway.setCaseStatusActive(shaleClientId, statusId, active);
-	}
 
 	@Override
 	public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
@@ -116,11 +112,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
 
-		CaseStatusDto createCaseStatus(int shaleClientId, String name, String description, boolean active, Integer sortOrder);
+		CaseStatusDto createCaseStatus(int shaleClientId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey);
 
-		CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, String description, boolean active, Integer sortOrder);
+		CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey);
 
-		void setCaseStatusActive(int shaleClientId, int statusId, boolean active);
 
 		void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
@@ -164,19 +159,15 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		}
 
 		@Override
-		public CaseStatusDto createCaseStatus(int shaleClientId, String name, String description, boolean active, Integer sortOrder) {
-			return caseDao.createCaseStatus(shaleClientId, name, description, active, sortOrder);
+		public CaseStatusDto createCaseStatus(int shaleClientId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey) {
+			return caseDao.createCaseStatus(shaleClientId, name, closed, sortOrder, color, lifecycleKey, systemKey);
 		}
 
 		@Override
-		public CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, String description, boolean active, Integer sortOrder) {
-			return caseDao.updateCaseStatus(shaleClientId, statusId, name, description, active, sortOrder);
+		public CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey) {
+			return caseDao.updateCaseStatus(shaleClientId, statusId, name, closed, sortOrder, color, lifecycleKey, systemKey);
 		}
 
-		@Override
-		public void setCaseStatusActive(int shaleClientId, int statusId, boolean active) {
-			caseDao.setCaseStatusActive(shaleClientId, statusId, active);
-		}
 
 		@Override
 		public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {

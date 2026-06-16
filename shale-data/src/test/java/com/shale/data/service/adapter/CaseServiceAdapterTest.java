@@ -15,6 +15,7 @@ import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
+import com.shale.core.service.CaseServicePort.CaseStatusCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
 import com.shale.data.dao.CaseDao;
 
@@ -66,6 +67,29 @@ class CaseServiceAdapterTest {
 		assertEquals(LocalDate.of(2026, 2, 3), gateway.lastUpdateSolDate);
 		assertArrayEquals(rowVer, gateway.lastUpdateRowVer);
 		assertEquals(5, gateway.lastUpdateActorUserId);
+	}
+
+	@Test
+	void caseStatusCommandsDelegateRealStatusColumns() {
+		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
+		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
+
+		CaseStatusDto created = adapter.createCaseStatus(new CaseStatusCommand(
+				null, 7, "Pending", false, 10, "#336699", "OPEN", "pending"));
+		CaseStatusDto updated = adapter.updateCaseStatus(new CaseStatusCommand(
+				created.id(), 7, "Closed", true, 20, "#663399", "CLOSED", "closed"));
+
+		assertEquals("Pending", created.name());
+		assertEquals(false, created.closed());
+		assertEquals("#336699", created.color());
+		assertEquals("OPEN", created.lifecycleKey());
+		assertEquals("pending", created.systemKey());
+		assertEquals("Closed", updated.name());
+		assertEquals(true, updated.closed());
+		assertEquals(20, updated.sortOrder());
+		assertEquals("#663399", updated.color());
+		assertEquals("CLOSED", updated.lifecycleKey());
+		assertEquals("closed", updated.systemKey());
 	}
 
 	private static CaseDetailDto detail(long caseId, String caseName) {
@@ -123,17 +147,13 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
-		public CaseStatusDto createCaseStatus(int shaleClientId, String name, String description, boolean active, Integer sortOrder) {
-			return new CaseStatusDto(1, name, description, active, sortOrder, null, null, null, shaleClientId);
+		public CaseStatusDto createCaseStatus(int shaleClientId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey) {
+			return new CaseStatusDto(1, name, closed, sortOrder, color, lifecycleKey, systemKey, shaleClientId);
 		}
 
 		@Override
-		public CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, String description, boolean active, Integer sortOrder) {
-			return new CaseStatusDto(statusId, name, description, active, sortOrder, null, null, null, shaleClientId);
-		}
-
-		@Override
-		public void setCaseStatusActive(int shaleClientId, int statusId, boolean active) {
+		public CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey) {
+			return new CaseStatusDto(statusId, name, closed, sortOrder, color, lifecycleKey, systemKey, shaleClientId);
 		}
 
 		@Override

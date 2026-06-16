@@ -14,7 +14,6 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
@@ -57,9 +56,11 @@ public final class SettingsController {
 	@FXML
 	private TableColumn<CaseStatusViewRow, String> statusNameColumn;
 	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusDescriptionColumn;
+	private TableColumn<CaseStatusViewRow, String> statusClosedColumn;
 	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusActiveColumn;
+	private TableColumn<CaseStatusViewRow, String> statusLifecycleKeyColumn;
+	@FXML
+	private TableColumn<CaseStatusViewRow, String> statusSystemKeyColumn;
 	@FXML
 	private TableColumn<CaseStatusViewRow, Integer> statusSortOrderColumn;
 	@FXML
@@ -129,7 +130,15 @@ public final class SettingsController {
 	@FXML
 	private void onAddCaseStatus() {
 		showCaseStatusDialog(null).ifPresent(input -> {
-			caseService.createCaseStatus(new CaseServicePort.CaseStatusCommand(null, requireTenantId(), input.name(), input.description(), input.active(), input.sortOrder()));
+			caseService.createCaseStatus(new CaseServicePort.CaseStatusCommand(
+					null,
+					requireTenantId(),
+					input.name(),
+					input.closed(),
+					input.sortOrder(),
+					input.color(),
+					input.lifecycleKey(),
+					input.systemKey()));
 			loadCaseStatuses();
 			setCaseStatusMessage("Case status added.");
 		});
@@ -140,17 +149,19 @@ public final class SettingsController {
 		CaseStatusViewRow selected = selectedStatusRow();
 		if (selected == null) return;
 		showCaseStatusDialog(selected.status()).ifPresent(input -> {
-			caseService.updateCaseStatus(new CaseServicePort.CaseStatusCommand(selected.id(), requireTenantId(), input.name(), input.description(), input.active(), input.sortOrder()));
+			caseService.updateCaseStatus(new CaseServicePort.CaseStatusCommand(
+					selected.id(),
+					requireTenantId(),
+					input.name(),
+					input.closed(),
+					input.sortOrder(),
+					input.color(),
+					input.lifecycleKey(),
+					input.systemKey()));
 			loadCaseStatuses();
 			setCaseStatusMessage("Case status updated.");
 		});
 	}
-
-	@FXML
-	private void onDeactivateCaseStatus() { setSelectedStatusActive(false); }
-
-	@FXML
-	private void onReactivateCaseStatus() { setSelectedStatusActive(true); }
 
 	@FXML
 	private void onMoveCaseStatusUp() { moveSelectedStatus(-1); }
@@ -161,9 +172,10 @@ public final class SettingsController {
 	private void configureCaseStatusesTable() {
 		if (caseStatusesTable == null) return;
 		statusNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
-		statusDescriptionColumn.setCellValueFactory(new PropertyValueFactory<>("description"));
-		statusActiveColumn.setCellValueFactory(new PropertyValueFactory<>("state"));
+		statusClosedColumn.setCellValueFactory(new PropertyValueFactory<>("closedState"));
 		statusSortOrderColumn.setCellValueFactory(new PropertyValueFactory<>("sortOrder"));
+		statusLifecycleKeyColumn.setCellValueFactory(new PropertyValueFactory<>("lifecycleKey"));
+		statusSystemKeyColumn.setCellValueFactory(new PropertyValueFactory<>("systemKey"));
 	}
 
 	private void loadCaseStatuses() {
@@ -172,19 +184,10 @@ public final class SettingsController {
 			List<CaseStatusViewRow> rows = new ArrayList<>();
 			for (CaseStatusDto status : caseService.listCaseStatuses(requireTenantId(), true)) rows.add(new CaseStatusViewRow(status));
 			caseStatusesTable.getItems().setAll(rows);
+			setCaseStatusMessage(rows.isEmpty() ? "No case statuses are configured for this tenant." : "");
 		} catch (RuntimeException ex) {
 			setCaseStatusMessage("Failed to load case statuses. " + rootMessage(ex));
 		}
-	}
-
-	private void setSelectedStatusActive(boolean active) {
-		CaseStatusViewRow selected = selectedStatusRow();
-		if (selected == null) return;
-		try {
-			caseService.setCaseStatusActive(requireTenantId(), selected.id(), active);
-			loadCaseStatuses();
-			setCaseStatusMessage(active ? "Case status reactivated." : "Case status deactivated.");
-		} catch (RuntimeException ex) { AppDialogs.showError(caseStatusesTable.getScene().getWindow(), "Case Statuses", rootMessage(ex)); }
 	}
 
 	private void moveSelectedStatus(int delta) {
@@ -194,9 +197,13 @@ public final class SettingsController {
 		int otherIndex = index + delta;
 		if (otherIndex < 0 || otherIndex >= caseStatusesTable.getItems().size()) return;
 		CaseStatusViewRow other = caseStatusesTable.getItems().get(otherIndex);
-		caseService.reorderCaseStatuses(requireTenantId(), selected.id(), other.id());
-		loadCaseStatuses();
-		caseStatusesTable.getSelectionModel().select(otherIndex);
+		try {
+			caseService.reorderCaseStatuses(requireTenantId(), selected.id(), other.id());
+			loadCaseStatuses();
+			caseStatusesTable.getSelectionModel().select(otherIndex);
+		} catch (RuntimeException ex) {
+			AppDialogs.showError(caseStatusesTable.getScene().getWindow(), "Case Statuses", rootMessage(ex));
+		}
 	}
 
 	private Optional<CaseStatusInput> showCaseStatusDialog(CaseStatusDto existing) {
@@ -204,15 +211,19 @@ public final class SettingsController {
 		dialog.setTitle(existing == null ? "Add Status" : "Edit Status");
 		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		TextField name = new TextField(existing == null ? "" : existing.name());
-		TextArea description = new TextArea(existing == null ? "" : safe(existing.description()));
-		description.setPrefRowCount(3);
-		CheckBox active = new CheckBox("Active"); active.setSelected(existing == null || existing.active());
+		CheckBox closed = new CheckBox("Closed status");
+		closed.setSelected(existing != null && existing.closed());
 		TextField sortOrder = new TextField(existing == null || existing.sortOrder() == null ? "" : String.valueOf(existing.sortOrder()));
+		TextField color = new TextField(existing == null ? "" : safe(existing.color()));
+		TextField lifecycleKey = new TextField(existing == null ? "" : safe(existing.lifecycleKey()));
+		TextField systemKey = new TextField(existing == null ? "" : safe(existing.systemKey()));
 		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8);
 		grid.add(new Label("Name"), 0, 0); grid.add(name, 1, 0);
-		grid.add(new Label("Description"), 0, 1); grid.add(description, 1, 1);
-		grid.add(active, 1, 2);
-		grid.add(new Label("Sort/order"), 0, 3); grid.add(sortOrder, 1, 3);
+		grid.add(closed, 1, 1);
+		grid.add(new Label("Sort Order"), 0, 2); grid.add(sortOrder, 1, 2);
+		grid.add(new Label("Color"), 0, 3); grid.add(color, 1, 3);
+		grid.add(new Label("Lifecycle Key"), 0, 4); grid.add(lifecycleKey, 1, 4);
+		grid.add(new Label("System Key"), 0, 5); grid.add(systemKey, 1, 5);
 		dialog.getDialogPane().setContent(grid);
 		dialog.setResultConverter(button -> {
 			if (button != ButtonType.OK) return null;
@@ -221,7 +232,13 @@ public final class SettingsController {
 			Integer sort = null;
 			String sortText = sortOrder.getText() == null ? "" : sortOrder.getText().trim();
 			if (!sortText.isBlank()) sort = Integer.parseInt(sortText);
-			return new CaseStatusInput(trimmedName, description.getText(), active.isSelected(), sort);
+			return new CaseStatusInput(
+					trimmedName,
+					closed.isSelected(),
+					sort,
+					color.getText(),
+					lifecycleKey.getText(),
+					systemKey.getText());
 		});
 		try { return dialog.showAndWait(); }
 		catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Case Statuses", rootMessage(ex)); return Optional.empty(); }
@@ -249,13 +266,20 @@ public final class SettingsController {
 		public int getId() { return status.id(); }
 		public int id() { return status.id(); }
 		public String getName() { return safe(status.name()); }
-		public String getDescription() { return safe(status.description()); }
-		public String getState() { return status.active() ? "Active" : "Inactive"; }
+		public String getClosedState() { return status.closed() ? "Closed" : "Open"; }
 		public Integer getSortOrder() { return status.sortOrder(); }
+		public String getLifecycleKey() { return safe(status.lifecycleKey()); }
+		public String getSystemKey() { return safe(status.systemKey()); }
 		CaseStatusDto status() { return status; }
 	}
 
-	private record CaseStatusInput(String name, String description, boolean active, Integer sortOrder) {}
+	private record CaseStatusInput(
+			String name,
+			boolean closed,
+			Integer sortOrder,
+			String color,
+			String lifecycleKey,
+			String systemKey) {}
 
 	private void loadFromPreferences() {
 		if (notificationPreferencesService == null) {
