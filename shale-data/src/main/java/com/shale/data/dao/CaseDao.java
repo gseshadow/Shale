@@ -24,6 +24,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.CaseStatusReportRowDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
@@ -1008,6 +1009,65 @@ public final class CaseDao {
 					+ " daoException=" + e.getMessage());
 			e.printStackTrace(System.err);
 			throw new RuntimeException("Failed to list assigned cases for team-member user (userId=" + userId + ")", e);
+		}
+	}
+
+	public List<CaseStatusReportRowDto> listCaseStatusReport(int shaleClientId, LocalDate startDate, LocalDate endDate) {
+		if (shaleClientId <= 0 || startDate == null || endDate == null) {
+			return List.of();
+		}
+		String sql = """
+				SELECT
+				    s.Id AS StatusId,
+				    s.Name AS CaseStatus,
+				    s.SystemKey,
+				    s.Color,
+				    COUNT(*) AS CaseCount
+				FROM dbo.Cases c
+				OUTER APPLY (
+				    SELECT TOP (1)
+				        cs.StatusId
+				    FROM dbo.CaseStatuses cs
+				    WHERE cs.CaseId = c.Id
+				      AND cs.EndDate IS NULL
+				    ORDER BY
+				        cs.IsPrimary DESC,
+				        cs.EffectiveDate DESC,
+				        cs.Id DESC
+				) currentStatus
+				INNER JOIN dbo.Statuses s
+				    ON s.Id = currentStatus.StatusId
+				WHERE c.ShaleClientId = ?
+				  AND ISNULL(c.IsDeleted, 0) = 0
+				  AND c.CallerDate >= ?
+				  AND c.CallerDate < DATEADD(day, 1, ?)
+				GROUP BY
+				    s.Id,
+				    s.Name,
+				    s.SystemKey,
+				    s.Color
+				ORDER BY
+				    COUNT(*) DESC,
+				    s.Name ASC;
+				""";
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			ps.setDate(2, java.sql.Date.valueOf(startDate));
+			ps.setDate(3, java.sql.Date.valueOf(endDate));
+			List<CaseStatusReportRowDto> rows = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					rows.add(new CaseStatusReportRowDto(
+							rs.getInt("StatusId"),
+							rs.getString("CaseStatus"),
+							rs.getString("SystemKey"),
+							rs.getString("Color"),
+							rs.getLong("CaseCount")));
+				}
+			}
+			return rows;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load case status report.", e);
 		}
 	}
 

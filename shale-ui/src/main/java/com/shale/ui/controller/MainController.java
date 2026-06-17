@@ -69,6 +69,9 @@ public final class MainController {
 	private Button navTeamButton;
 
 	@FXML
+	private Button navReportsButton;
+
+	@FXML
 	private Button navSettingsButton;
 
 	@FXML
@@ -166,6 +169,11 @@ public final class MainController {
 	@FXML
 	private void onNavTeam() {
 		sceneManager.openTeamListView();
+	}
+
+	@FXML
+	private void onNavReports() {
+		sceneManager.openReportsView();
 	}
 
 	@FXML
@@ -317,6 +325,13 @@ public final class MainController {
 		sectionContent.getChildren().setAll(teamRoot);
 	}
 
+	public void showReportsView() {
+		highlightNav(navReportsButton);
+		setSectionHeader("Reports", "Analyze case activity and status trends.", true);
+		Node reportsRoot = sceneManager.createReportsView();
+		sectionContent.getChildren().setAll(reportsRoot);
+	}
+
 	public void showCalendarView() {
 		highlightNav(navCalendarButton);
 		setSectionHeader("Calendar", "Calendar events and case/task deadlines will appear here.", true);
@@ -400,6 +415,7 @@ public final class MainController {
 				navContactsButton,
 				navOrganizationsButton,
 				navTeamButton,
+				navReportsButton,
 				navCalendarButton,
 				navSettingsButton
 		);
@@ -423,6 +439,7 @@ public final class MainController {
 		navContactsButton.setDisable(false);
 		navOrganizationsButton.setDisable(false);
 		navTeamButton.setDisable(false);
+		navReportsButton.setDisable(false);
 		navCalendarButton.setDisable(false);
 		navSettingsButton.setDisable(false);
 
