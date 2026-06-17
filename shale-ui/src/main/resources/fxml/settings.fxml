@@ -66,7 +66,7 @@
 
             <Separator/>
 
-            <VBox spacing="8" styleClass="strong-panel">
+            <VBox fx:id="caseStatusAdministrationSection" spacing="8" styleClass="strong-panel">
                 <padding>
                     <Insets top="12" right="12" bottom="12" left="12"/>
                 </padding>
@@ -92,7 +92,7 @@
             </VBox>
 
 
-            <VBox spacing="8" styleClass="strong-panel">
+            <VBox fx:id="practiceAreaAdministrationSection" spacing="8" styleClass="strong-panel">
                 <padding>
                     <Insets top="12" right="12" bottom="12" left="12"/>
                 </padding>

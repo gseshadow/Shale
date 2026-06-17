@@ -59,6 +59,8 @@ public final class SettingsController {
 	@FXML
 	private VBox auditSection;
 	@FXML
+	private VBox caseStatusAdministrationSection;
+	@FXML
 	private TableView<CaseStatusViewRow> caseStatusesTable;
 	@FXML
 	private TableColumn<CaseStatusViewRow, String> statusNameColumn;
@@ -72,6 +74,8 @@ public final class SettingsController {
 	private TableColumn<CaseStatusViewRow, Integer> statusSortOrderColumn;
 	@FXML
 	private Label caseStatusSettingsStatusLabel;
+	@FXML
+	private VBox practiceAreaAdministrationSection;
 	@FXML
 	private TableView<PracticeAreaViewRow> practiceAreasTable;
 	@FXML
@@ -126,7 +130,7 @@ public final class SettingsController {
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
-		if (caseService != null) {
+		if (caseService != null && isAdminUser()) {
 			loadCaseStatuses();
 			loadPracticeAreas();
 		}
@@ -144,9 +148,11 @@ public final class SettingsController {
 		if (fxmlReady) {
 			loadFromPreferences();
 			updateAdminControlsVisibility();
-			loadCaseStatuses();
-			loadPracticeAreas();
-			loadManagedUsers();
+			if (isAdminUser()) {
+				loadCaseStatuses();
+				loadPracticeAreas();
+				loadManagedUsers();
+			}
 		}
 	}
 
@@ -186,6 +192,7 @@ public final class SettingsController {
 
 	@FXML
 	private void onAddPracticeArea() {
+		if (!requireAdminLookupManagement("Practice Areas")) return;
 		showPracticeAreaDialog(null).ifPresent(input -> {
 			caseService.createPracticeArea(new CaseServicePort.PracticeAreaCommand(
 					null, requireTenantId(), input.name(), input.color(), input.active(), input.systemKey()));
@@ -196,6 +203,7 @@ public final class SettingsController {
 
 	@FXML
 	private void onEditPracticeArea() {
+		if (!requireAdminLookupManagement("Practice Areas")) return;
 		PracticeAreaViewRow selected = selectedPracticeAreaRow();
 		if (selected == null) return;
 		showPracticeAreaDialog(selected.practiceArea()).ifPresent(input -> {
@@ -208,6 +216,7 @@ public final class SettingsController {
 
 	@FXML
 	private void onRemovePracticeArea() {
+		if (!requireAdminLookupManagement("Practice Areas")) return;
 		PracticeAreaViewRow selected = selectedPracticeAreaRow();
 		if (selected == null) return;
 		try {
@@ -229,6 +238,10 @@ public final class SettingsController {
 
 	private void loadPracticeAreas() {
 		if (caseService == null || practiceAreasTable == null) return;
+		if (!requireAdminLookupManagement("Practice Areas")) {
+			practiceAreasTable.getItems().clear();
+			return;
+		}
 		try {
 			List<PracticeAreaViewRow> rows = new ArrayList<>();
 			for (PracticeAreaDto area : caseService.listPracticeAreas(requireTenantId(), true)) rows.add(new PracticeAreaViewRow(area));
@@ -276,6 +289,7 @@ public final class SettingsController {
 
 	@FXML
 	private void onAddCaseStatus() {
+		if (!requireAdminLookupManagement("Case Statuses")) return;
 		showCaseStatusDialog(null).ifPresent(input -> {
 			caseService.createCaseStatus(new CaseServicePort.CaseStatusCommand(
 					null,
@@ -293,6 +307,7 @@ public final class SettingsController {
 
 	@FXML
 	private void onEditCaseStatus() {
+		if (!requireAdminLookupManagement("Case Statuses")) return;
 		CaseStatusViewRow selected = selectedStatusRow();
 		if (selected == null) return;
 		showCaseStatusDialog(selected.status()).ifPresent(input -> {
@@ -311,10 +326,10 @@ public final class SettingsController {
 	}
 
 	@FXML
-	private void onMoveCaseStatusUp() { moveSelectedStatus(-1); }
+	private void onMoveCaseStatusUp() { if (requireAdminLookupManagement("Case Statuses")) moveSelectedStatus(-1); }
 
 	@FXML
-	private void onMoveCaseStatusDown() { moveSelectedStatus(1); }
+	private void onMoveCaseStatusDown() { if (requireAdminLookupManagement("Case Statuses")) moveSelectedStatus(1); }
 
 	private void configureCaseStatusesTable() {
 		if (caseStatusesTable == null) return;
@@ -327,6 +342,10 @@ public final class SettingsController {
 
 	private void loadCaseStatuses() {
 		if (caseService == null || caseStatusesTable == null) return;
+		if (!requireAdminLookupManagement("Case Statuses")) {
+			caseStatusesTable.getItems().clear();
+			return;
+		}
 		try {
 			List<CaseStatusViewRow> rows = new ArrayList<>();
 			for (CaseStatusDto status : caseService.listCaseStatuses(requireTenantId(), true)) rows.add(new CaseStatusViewRow(status));
@@ -338,6 +357,7 @@ public final class SettingsController {
 	}
 
 	private void moveSelectedStatus(int delta) {
+		if (!requireAdminLookupManagement("Case Statuses")) return;
 		CaseStatusViewRow selected = selectedStatusRow();
 		if (selected == null) return;
 		int index = caseStatusesTable.getItems().indexOf(selected);
@@ -396,6 +416,19 @@ public final class SettingsController {
 		CaseStatusViewRow selected = caseStatusesTable == null ? null : caseStatusesTable.getSelectionModel().getSelectedItem();
 		if (selected == null) setCaseStatusMessage("Select a case status first.");
 		return selected;
+	}
+
+	private boolean requireAdminLookupManagement(String sectionName) {
+		if (isAdminUser()) {
+			return true;
+		}
+		String message = "Only admin users can manage " + sectionName.toLowerCase() + ".";
+		if ("Case Statuses".equals(sectionName)) {
+			setCaseStatusMessage(message);
+		} else if ("Practice Areas".equals(sectionName)) {
+			setPracticeAreaMessage(message);
+		}
+		return false;
 	}
 
 	private int requireTenantId() {
@@ -769,10 +802,22 @@ public final class SettingsController {
 			auditSection.setVisible(visible);
 			auditSection.setManaged(visible);
 		}
+		if (caseStatusAdministrationSection != null) {
+			caseStatusAdministrationSection.setVisible(visible);
+			caseStatusAdministrationSection.setManaged(visible);
+		}
+		if (practiceAreaAdministrationSection != null) {
+			practiceAreaAdministrationSection.setVisible(visible);
+			practiceAreaAdministrationSection.setManaged(visible);
+		}
 		if (userAdministrationSection != null) {
 			userAdministrationSection.setVisible(visible);
 			userAdministrationSection.setManaged(visible);
 		}
-		if (visible) loadManagedUsers();
+		if (visible) {
+			loadCaseStatuses();
+			loadPracticeAreas();
+			loadManagedUsers();
+		}
 	}
 }
