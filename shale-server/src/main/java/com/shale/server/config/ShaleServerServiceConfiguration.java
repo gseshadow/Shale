@@ -26,6 +26,8 @@ import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
+import com.shale.server.health.AppDatabaseHealthCheck;
+import com.shale.server.health.DataSourcesAppDatabaseHealthCheck;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.CompositeServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
@@ -94,6 +96,12 @@ public class ShaleServerServiceConfiguration {
     @Profile({"dev", "local", "prod", "azure"})
     DataSources serverDataSources() {
         return new DataSources(new Config());
+    }
+
+    @Bean
+    @Profile({"dev", "local", "prod", "azure"})
+    AppDatabaseHealthCheck appDatabaseHealthCheck(DataSources serverDataSources) {
+        return new DataSourcesAppDatabaseHealthCheck(serverDataSources);
     }
 
     @Bean

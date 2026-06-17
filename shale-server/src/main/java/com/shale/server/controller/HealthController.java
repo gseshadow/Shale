@@ -5,23 +5,25 @@ import java.sql.Statement;
 import java.util.Map;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.shale.data.config.DataSources;
+import com.shale.server.health.AppDatabaseHealthCheck;
 
 @RestController
 public final class HealthController {
-    private final ObjectProvider<DataSources> dataSources;
+    private final ObjectProvider<AppDatabaseHealthCheck> databaseHealthCheck;
 
-    public HealthController(ObjectProvider<DataSources> dataSources) {
-        this.dataSources = dataSources;
+    @Autowired
+    public HealthController(ObjectProvider<AppDatabaseHealthCheck> databaseHealthCheck) {
+        this.databaseHealthCheck = databaseHealthCheck;
     }
 
     public HealthController() {
-        this.dataSources = null;
+        this.databaseHealthCheck = null;
     }
 
     @GetMapping("/api/health")
@@ -31,18 +33,15 @@ public final class HealthController {
 
     @GetMapping("/api/health/db")
     public ResponseEntity<Map<String, String>> databaseHealth() {
-        if (dataSources == null || dataSources.getIfAvailable() == null) {
+        AppDatabaseHealthCheck activeHealthCheck = databaseHealthCheck == null ? null : databaseHealthCheck.getIfAvailable();
+        if (activeHealthCheck == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("status", "unavailable", "message", "database configuration is not active"));
         }
-
-        try (Connection connection = dataSources.getObject().auth().getConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute("SELECT 1");
+        if (activeHealthCheck.isReady()) {
             return ResponseEntity.ok(Map.of("status", "ok"));
-        } catch (RuntimeException | java.sql.SQLException ex) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("status", "unavailable", "message", "database health check failed"));
         }
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("status", "unavailable", "message", "database health check failed"));
     }
 }
