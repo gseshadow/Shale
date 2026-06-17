@@ -29,8 +29,11 @@ import com.shale.core.service.NotificationServicePort.TaskActionNotificationComm
 import com.shale.core.service.NotificationServicePort.TaskDueDateNotificationCommand;
 import com.shale.core.service.NotificationServicePort.TaskNotificationCommand;
 import com.shale.core.service.TaskServicePort;
+import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
+import com.shale.server.runtime.ServerPrincipal;
 import com.shale.server.runtime.ServerRuntimeSessionState;
+import com.shale.server.runtime.ShaleAuthTokenService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -82,6 +85,25 @@ class ApiReadControllerTest {
     }
 
 
+    private static MockMvc tokenMockMvc(
+            ShaleAuthTokenService tokenService,
+            CaseServicePort caseServicePort,
+            TaskServicePort taskServicePort,
+            ContactServicePort contactServicePort,
+            NotificationServicePort notificationServicePort) {
+        ApiReadController apiReadController = new ApiReadController(
+                caseServicePort,
+                taskServicePort,
+                contactServicePort,
+                notificationServicePort,
+                new ServerRuntimeSessionState(new BearerTokenServerSessionResolver(tokenService), currentRequestProvider()));
+        return MockMvcBuilders
+                .standaloneSetup(apiReadController)
+                .setControllerAdvice(new ApiExceptionHandler())
+                .build();
+    }
+
+
     @Test
     void caseSearchReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
@@ -103,6 +125,30 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("smith", caseServicePort.searchQuery);
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.searchShaleClientId);
         org.junit.jupiter.api.Assertions.assertEquals(25, caseServicePort.searchLimit);
+    }
+
+
+    @Test
+    void protectedCaseSearchAcceptsRealBearerTokenPrincipal() throws Exception {
+        ShaleAuthTokenService tokenService = new ShaleAuthTokenService(
+                "test-auth-token-secret-that-is-long-enough", 3600, java.time.Clock.systemUTC());
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc tokenMockMvc = tokenMockMvc(
+                tokenService,
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+        String token = tokenService.issue(new ServerPrincipal(31, 41, "ada@example.test"));
+
+        tokenMockMvc.perform(get("/api/cases/search")
+                .param("query", "smith")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].caseId").value(501));
+
+        org.junit.jupiter.api.Assertions.assertEquals("smith", caseServicePort.searchQuery);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.searchShaleClientId);
     }
 
     @Test
@@ -462,37 +508,37 @@ class ApiReadControllerTest {
     @Test
     void caseSearchFailsClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/cases/search").param("query", "smith"))
-                .andExpect(status().isNotImplemented())
-                .andExpect(jsonPath("$.error").value("not_implemented"))
-                .andExpect(jsonPath("$.message", containsString("TODO: server auth/session context is not wired yet")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.message", containsString("Authentication is required")))
                 .andExpect(jsonPath("$.path").value("/api/cases/search"));
     }
 
     @Test
     void caseDetailRouteFailsClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/cases/123"))
-                .andExpect(status().isNotImplemented())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/cases/123"));
     }
 
     @Test
     void caseTasksRouteFailsClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/cases/123/tasks"))
-                .andExpect(status().isNotImplemented())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/cases/123/tasks"));
     }
 
     @Test
     void contactSearchFailsClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/contacts/search").param("query", "ada"))
-                .andExpect(status().isNotImplemented())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/contacts/search"));
     }
 
     @Test
     void unreadNotificationsFailClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/notifications/unread"))
-                .andExpect(status().isNotImplemented())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/notifications/unread"));
     }
 }

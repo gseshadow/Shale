@@ -37,7 +37,7 @@ class RequestScopedDbSessionProviderTest {
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class, provider::requireConnection);
 
-        assertEquals(501, error.getStatusCode().value());
+        assertEquals(401, error.getStatusCode().value());
         assertEquals(0, runtimeConnectionProvider.calls);
     }
 
