@@ -183,3 +183,41 @@ The server resolves `userId` and `shaleClientId` from the signed token and uses 
 ### Azure/prod behavior
 
 `prod` and `azure` profiles accept bearer tokens only. They do not trust `X-Shale-UserId` or `X-Shale-TenantId`.
+
+## Step 4C logout and revocation
+
+Access tokens now include a unique `jti` token id claim. `POST /api/auth/logout` verifies the presented bearer token and stores only the revoked token id until the token expiry time; raw tokens are not stored. Expired revocation entries are ignored and removed opportunistically.
+
+```bash
+curl -i -X POST http://localhost:8080/api/auth/logout \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Logout is safe to call with a missing or invalid token. The client should clear any locally held bearer token regardless of the response.
+
+`GET /api/auth/me` returns a safe user profile shape when a valid, non-revoked token is presented:
+
+```json
+{
+  "authenticated": true,
+  "userId": 123,
+  "shaleClientId": 456,
+  "email": "ada@example.test",
+  "displayName": "Ada Lovelace",
+  "nameFirst": "Ada",
+  "nameLast": "Lovelace",
+  "isAdmin": false,
+  "isAttorney": true,
+  "initials": "AL",
+  "color": "#123456"
+}
+```
+
+`POST /api/auth/refresh` is available as a conservative foundation: it accepts a valid, non-revoked bearer token, revokes that token id, and returns a new access token. Long-lived refresh tokens are deferred.
+
+Recommended web-client behavior:
+
+- Store the bearer token only for as long as needed to keep the user signed in.
+- Clear the bearer token on logout.
+- Treat any `401` from protected API calls as a signal to return to login.
+- Do not store tenant ids separately as trusted client state; use the signed token/server response only for display and let the server enforce tenant context.

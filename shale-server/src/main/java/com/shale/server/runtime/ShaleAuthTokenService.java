@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -73,6 +74,7 @@ public final class ShaleAuthTokenService {
         String header = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
         StringBuilder payload = new StringBuilder()
                 .append("{\"sub\":").append(principal.userId())
+                .append(",\"jti\":\"").append(UUID.randomUUID()).append("\"")
                 .append(",\"userId\":").append(principal.userId())
                 .append(",\"shaleClientId\":").append(principal.shaleClientId())
                 .append(",\"iat\":").append(issuedAt)
@@ -86,6 +88,10 @@ public final class ShaleAuthTokenService {
     }
 
     public Optional<ServerPrincipal> verify(String token) {
+        return verifyToken(token).map(VerifiedAuthToken::principal);
+    }
+
+    public Optional<VerifiedAuthToken> verifyToken(String token) {
         if (!enabled) {
             return Optional.empty();
         }
@@ -113,14 +119,16 @@ public final class ShaleAuthTokenService {
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }
+        String tokenId = stringClaim(payload, "jti");
         Integer userId = intClaim(payload, "userId");
         Integer shaleClientId = intClaim(payload, "shaleClientId");
         Long exp = longClaim(payload, "exp");
-        if (userId == null || shaleClientId == null || exp == null || exp <= Instant.now(clock).getEpochSecond()) {
+        if (tokenId == null || userId == null || shaleClientId == null || exp == null || exp <= Instant.now(clock).getEpochSecond()) {
             return Optional.empty();
         }
         try {
-            return Optional.of(new ServerPrincipal(userId, shaleClientId, stringClaim(payload, "email")));
+            ServerPrincipal principal = new ServerPrincipal(userId, shaleClientId, stringClaim(payload, "email"));
+            return Optional.of(new VerifiedAuthToken(principal, tokenId, exp));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }

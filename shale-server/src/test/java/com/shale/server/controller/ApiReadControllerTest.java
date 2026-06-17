@@ -31,6 +31,7 @@ import com.shale.core.service.NotificationServicePort.TaskNotificationCommand;
 import com.shale.core.service.TaskServicePort;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
+import com.shale.server.runtime.InMemoryTokenRevocationStore;
 import com.shale.server.runtime.ServerPrincipal;
 import com.shale.server.runtime.ServerRuntimeSessionState;
 import com.shale.server.runtime.ShaleAuthTokenService;
@@ -96,7 +97,7 @@ class ApiReadControllerTest {
                 taskServicePort,
                 contactServicePort,
                 notificationServicePort,
-                new ServerRuntimeSessionState(new BearerTokenServerSessionResolver(tokenService), currentRequestProvider()));
+                new ServerRuntimeSessionState(new BearerTokenServerSessionResolver(tokenService, new InMemoryTokenRevocationStore()), currentRequestProvider()));
         return MockMvcBuilders
                 .standaloneSetup(apiReadController)
                 .setControllerAdvice(new ApiExceptionHandler())

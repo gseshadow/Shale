@@ -6,13 +6,15 @@ import org.springframework.web.server.ResponseStatusException;
 import jakarta.servlet.http.HttpServletRequest;
 
 public final class BearerTokenServerSessionResolver implements ServerSessionResolver {
-    private static final String AUTHORIZATION = "Authorization";
-    private static final String BEARER_PREFIX = "Bearer ";
+    public static final String AUTHORIZATION = "Authorization";
+    public static final String BEARER_PREFIX = "Bearer ";
 
     private final ShaleAuthTokenService tokenService;
+    private final TokenRevocationStore revocationStore;
 
-    public BearerTokenServerSessionResolver(ShaleAuthTokenService tokenService) {
+    public BearerTokenServerSessionResolver(ShaleAuthTokenService tokenService, TokenRevocationStore revocationStore) {
         this.tokenService = java.util.Objects.requireNonNull(tokenService, "tokenService");
+        this.revocationStore = java.util.Objects.requireNonNull(revocationStore, "revocationStore");
     }
 
     @Override
@@ -20,17 +22,27 @@ public final class BearerTokenServerSessionResolver implements ServerSessionReso
         if (request == null) {
             return ServerSessionContext.unauthenticated();
         }
-        String authorization = request.getHeader(AUTHORIZATION);
-        if (authorization == null || authorization.isBlank()) {
+        String token = bearerToken(request);
+        if (token == null) {
             return ServerSessionContext.unauthenticated();
+        }
+        VerifiedAuthToken verifiedToken = tokenService.verifyToken(token)
+                .orElseThrow(BearerTokenServerSessionResolver::invalidToken);
+        if (revocationStore.isRevoked(verifiedToken.tokenId())) {
+            throw invalidToken();
+        }
+        return ServerSessionContext.authenticated(verifiedToken.principal());
+    }
+
+    public static String bearerToken(HttpServletRequest request) {
+        String authorization = request == null ? null : request.getHeader(AUTHORIZATION);
+        if (authorization == null || authorization.isBlank()) {
+            return null;
         }
         if (!authorization.startsWith(BEARER_PREFIX)) {
             throw invalidToken();
         }
-        String token = authorization.substring(BEARER_PREFIX.length()).trim();
-        return tokenService.verify(token)
-                .map(ServerSessionContext::authenticated)
-                .orElseThrow(BearerTokenServerSessionResolver::invalidToken);
+        return authorization.substring(BEARER_PREFIX.length()).trim();
     }
 
     private static ResponseStatusException invalidToken() {

@@ -12,13 +12,21 @@ import org.springframework.web.bind.annotation.RestController;
 import com.shale.core.model.User;
 import com.shale.core.result.Result;
 import com.shale.core.service.AuthServicePort;
+import com.shale.server.auth.CurrentUserProfileService;
 import com.shale.server.dto.AuthenticatedUserResponse;
 import com.shale.server.dto.LoginErrorResponse;
 import com.shale.server.dto.LoginRequest;
 import com.shale.server.dto.LoginResponse;
+import com.shale.server.dto.LogoutResponse;
+import com.shale.server.dto.RefreshResponse;
+import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.ServerPrincipal;
 import com.shale.server.runtime.ServerRuntimeSessionState;
 import com.shale.server.runtime.ShaleAuthTokenService;
+import com.shale.server.runtime.TokenRevocationStore;
+import com.shale.server.runtime.VerifiedAuthToken;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 public final class AuthController {
@@ -29,15 +37,21 @@ public final class AuthController {
 
     private final AuthServicePort authServicePort;
     private final ShaleAuthTokenService tokenService;
+    private final TokenRevocationStore revocationStore;
     private final ServerRuntimeSessionState runtimeSessionState;
+    private final CurrentUserProfileService currentUserProfileService;
 
     public AuthController(
             AuthServicePort authServicePort,
             ShaleAuthTokenService tokenService,
-            ServerRuntimeSessionState runtimeSessionState) {
+            TokenRevocationStore revocationStore,
+            ServerRuntimeSessionState runtimeSessionState,
+            CurrentUserProfileService currentUserProfileService) {
         this.authServicePort = Objects.requireNonNull(authServicePort, "authServicePort");
         this.tokenService = Objects.requireNonNull(tokenService, "tokenService");
+        this.revocationStore = Objects.requireNonNull(revocationStore, "revocationStore");
         this.runtimeSessionState = Objects.requireNonNull(runtimeSessionState, "runtimeSessionState");
+        this.currentUserProfileService = Objects.requireNonNull(currentUserProfileService, "currentUserProfileService");
     }
 
     @PostMapping("/api/auth/login")
@@ -61,17 +75,42 @@ public final class AuthController {
                 userResponse(user)));
     }
 
+    @PostMapping("/api/auth/logout")
+    public LogoutResponse logout(HttpServletRequest request) {
+        VerifiedAuthToken token = currentToken(request);
+        if (token != null) {
+            revocationStore.revoke(token.tokenId(), token.expiresAtEpochSeconds());
+        }
+        return new LogoutResponse(token != null, "Logged out.");
+    }
+
+    @PostMapping("/api/auth/refresh")
+    public ResponseEntity<?> refresh(HttpServletRequest request) {
+        VerifiedAuthToken token = currentToken(request);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new LogoutResponse(false, "Authentication is required."));
+        }
+        revocationStore.revoke(token.tokenId(), token.expiresAtEpochSeconds());
+        String refreshed = tokenService.issue(token.principal());
+        return ResponseEntity.ok(new RefreshResponse(true, "Bearer", refreshed, tokenService.ttlSeconds()));
+    }
+
     @GetMapping("/api/auth/me")
     public AuthenticatedUserResponse me() {
         ServerPrincipal principal = runtimeSessionState.requirePrincipal();
-        return new AuthenticatedUserResponse(
-                true,
-                principal.userId(),
-                principal.shaleClientId(),
-                principal.email(),
-                null,
-                null,
-                null);
+        return currentUserProfileService.findCurrentUser(principal)
+                .orElseGet(() -> principalResponse(principal));
+    }
+
+    private VerifiedAuthToken currentToken(HttpServletRequest request) {
+        String rawToken = BearerTokenServerSessionResolver.bearerToken(request);
+        if (rawToken == null) {
+            return null;
+        }
+        return tokenService.verifyToken(rawToken)
+                .filter(token -> !revocationStore.isRevoked(token.tokenId()))
+                .orElse(null);
     }
 
     private static AuthenticatedUserResponse userResponse(User user) {
@@ -82,7 +121,26 @@ public final class AuthController {
                 user.getEmail(),
                 displayName(user),
                 user.getNameFirst(),
-                user.getNameLast());
+                user.getNameLast(),
+                user.isAdmin(),
+                user.isAttorney(),
+                user.getInitials(),
+                user.getColor());
+    }
+
+    private static AuthenticatedUserResponse principalResponse(ServerPrincipal principal) {
+        return new AuthenticatedUserResponse(
+                true,
+                principal.userId(),
+                principal.shaleClientId(),
+                principal.email(),
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                null);
     }
 
     private static String displayName(User user) {

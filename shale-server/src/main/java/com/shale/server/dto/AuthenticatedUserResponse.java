@@ -7,5 +7,9 @@ public record AuthenticatedUserResponse(
         String email,
         String displayName,
         String nameFirst,
-        String nameLast) {
+        String nameLast,
+        boolean isAdmin,
+        boolean isAttorney,
+        String initials,
+        String color) {
 }

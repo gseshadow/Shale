@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.server.auth.CurrentUserProfileService;
+import com.shale.server.auth.UserDaoCurrentUserProfileService;
 import com.shale.core.service.AuthServicePort;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
@@ -20,6 +22,7 @@ import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.UserDao;
 import com.shale.data.errors.AuthException;
 import com.shale.data.service.adapter.AuthServiceAdapter;
 import com.shale.data.service.adapter.CaseServiceAdapter;
@@ -36,7 +39,9 @@ import com.shale.server.runtime.RuntimeConnectionProvider;
 import com.shale.server.runtime.RuntimeSessionServiceConnectionProvider;
 import com.shale.server.runtime.ServerRuntimeSessionState;
 import com.shale.server.runtime.ServerSessionResolver;
+import com.shale.server.runtime.InMemoryTokenRevocationStore;
 import com.shale.server.runtime.ShaleAuthTokenService;
+import com.shale.server.runtime.TokenRevocationStore;
 import com.shale.server.runtime.UnauthenticatedServerSessionResolver;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,8 +51,8 @@ public class ShaleServerServiceConfiguration {
 
     @Bean
     @Profile({"prod", "azure"})
-    ServerSessionResolver serverSessionResolver(ShaleAuthTokenService tokenService) {
-        return new BearerTokenServerSessionResolver(tokenService);
+    ServerSessionResolver serverSessionResolver(ShaleAuthTokenService tokenService, TokenRevocationStore tokenRevocationStore) {
+        return new BearerTokenServerSessionResolver(tokenService, tokenRevocationStore);
     }
 
     @Bean
@@ -62,9 +67,9 @@ public class ShaleServerServiceConfiguration {
      */
     @Bean
     @Profile({"dev", "local"})
-    ServerSessionResolver developmentServerSessionResolver(ShaleAuthTokenService tokenService) {
+    ServerSessionResolver developmentServerSessionResolver(ShaleAuthTokenService tokenService, TokenRevocationStore tokenRevocationStore) {
         return new CompositeServerSessionResolver(java.util.List.of(
-                new BearerTokenServerSessionResolver(tokenService),
+                new BearerTokenServerSessionResolver(tokenService, tokenRevocationStore),
                 new DevelopmentHeaderServerSessionResolver()));
     }
 
@@ -111,6 +116,11 @@ public class ShaleServerServiceConfiguration {
     }
 
     @Bean
+    TokenRevocationStore tokenRevocationStore() {
+        return new InMemoryTokenRevocationStore();
+    }
+
+    @Bean
     @Profile({"dev", "local", "prod", "azure"})
     ShaleAuthTokenService shaleAuthTokenService() {
         return ShaleAuthTokenService.fromEnvironment();
@@ -139,6 +149,11 @@ public class ShaleServerServiceConfiguration {
     @Bean
     AuthServicePort authServicePort(AuthService serverAuthService) {
         return new AuthServiceAdapter(serverAuthService);
+    }
+
+    @Bean
+    CurrentUserProfileService currentUserProfileService(DbSessionProvider serverDbSessionProvider) {
+        return new UserDaoCurrentUserProfileService(new UserDao(serverDbSessionProvider));
     }
 
     @Bean

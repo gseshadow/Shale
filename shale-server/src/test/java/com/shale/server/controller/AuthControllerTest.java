@@ -14,14 +14,19 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import com.jayway.jsonpath.JsonPath;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.shale.core.model.User;
 import com.shale.core.result.Result;
 import com.shale.core.service.AuthServicePort;
+import com.shale.server.auth.CurrentUserProfileService;
+import com.shale.server.dto.AuthenticatedUserResponse;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
+import com.shale.server.runtime.InMemoryTokenRevocationStore;
 import com.shale.server.runtime.ServerRuntimeSessionState;
 import com.shale.server.runtime.ShaleAuthTokenService;
+import com.shale.server.runtime.TokenRevocationStore;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -29,17 +34,33 @@ class AuthControllerTest {
     private static final String TEST_SECRET = "test-auth-token-secret-that-is-long-enough";
     private RecordingAuthServicePort authServicePort;
     private ShaleAuthTokenService tokenService;
+    private TokenRevocationStore revocationStore;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         authServicePort = new RecordingAuthServicePort();
         tokenService = new ShaleAuthTokenService(TEST_SECRET, 3600, java.time.Clock.systemUTC());
+        revocationStore = new InMemoryTokenRevocationStore();
+        CurrentUserProfileService profileService = principal -> java.util.Optional.of(new AuthenticatedUserResponse(
+                true,
+                principal.userId(),
+                principal.shaleClientId(),
+                principal.email(),
+                "Ada Lovelace",
+                "Ada",
+                "Lovelace",
+                true,
+                false,
+                "AL",
+                "#123456"));
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AuthController(
                         authServicePort,
                         tokenService,
-                        new ServerRuntimeSessionState(new BearerTokenServerSessionResolver(tokenService), currentRequestProvider())))
+                        revocationStore,
+                        new ServerRuntimeSessionState(new BearerTokenServerSessionResolver(tokenService, revocationStore), currentRequestProvider()),
+                        profileService))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .build();
     }
@@ -75,6 +96,8 @@ class AuthControllerTest {
 
         org.junit.jupiter.api.Assertions.assertEquals("ada@example.test", authServicePort.email);
         org.junit.jupiter.api.Assertions.assertEquals("correct horse battery staple", authServicePort.password);
+        String accessToken = JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+        org.junit.jupiter.api.Assertions.assertTrue(tokenService.verifyToken(accessToken).orElseThrow().tokenId().length() > 10);
         org.junit.jupiter.api.Assertions.assertNull(result.getResponse().getCookie("JSESSIONID"));
     }
 
@@ -117,7 +140,46 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.authenticated").value(true))
                 .andExpect(jsonPath("$.userId").value(42))
                 .andExpect(jsonPath("$.shaleClientId").value(7))
-                .andExpect(jsonPath("$.email").value("ada@example.test"));
+                .andExpect(jsonPath("$.email").value("ada@example.test"))
+                .andExpect(jsonPath("$.displayName").value("Ada Lovelace"))
+                .andExpect(jsonPath("$.nameFirst").value("Ada"))
+                .andExpect(jsonPath("$.nameLast").value("Lovelace"))
+                .andExpect(jsonPath("$.isAdmin").value(true))
+                .andExpect(jsonPath("$.isAttorney").value(false))
+                .andExpect(jsonPath("$.initials").value("AL"))
+                .andExpect(jsonPath("$.color").value("#123456"))
+                .andExpect(content().string(not(containsString("password"))))
+                .andExpect(content().string(not(containsString("hash"))));
+    }
+
+
+    @Test
+    void logoutRevokesCurrentTokenAndMeRejectsRevokedToken() throws Exception {
+        String token = tokenService.issue(new com.shale.server.runtime.ServerPrincipal(42, 7, "ada@example.test"));
+
+        mockMvc.perform(post("/api/auth/logout")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revoked").value(true));
+
+        mockMvc.perform(get("/api/auth/me")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void logoutWithMissingOrInvalidTokenReturnsSafeResponse() throws Exception {
+        mockMvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revoked").value(false))
+                .andExpect(jsonPath("$.message").value("Logged out."));
+
+        mockMvc.perform(post("/api/auth/logout")
+                .header("Authorization", "Bearer invalid.token.value"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revoked").value(false))
+                .andExpect(jsonPath("$.message").value("Logged out."));
     }
 
     @Test
