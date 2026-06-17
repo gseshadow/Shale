@@ -27,8 +27,12 @@ import com.shale.server.runtime.TokenRevocationStore;
 import com.shale.server.runtime.VerifiedAuthToken;
 
 import jakarta.servlet.http.HttpServletRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
+@Tag(name = "Authentication", description = "Login, bearer-token session, logout, refresh, and current-user endpoints")
 public final class AuthController {
     private static final LoginErrorResponse INVALID_CREDENTIALS = new LoginErrorResponse(
             false,
@@ -54,12 +58,12 @@ public final class AuthController {
         this.currentUserProfileService = Objects.requireNonNull(currentUserProfileService, "currentUserProfileService");
     }
 
+    @Operation(summary = "Login", description = "Authenticates an existing Shale user by email/password and returns a server-issued bearer token plus a safe user profile.")
     @PostMapping("/api/auth/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        String email = request == null ? null : request.email();
-        String password = request == null ? null : request.password();
+        LoginRequest validRequest = ApiValidation.requireValidLogin(request);
 
-        Result<User> result = authServicePort.authenticate(email, password);
+        Result<User> result = authServicePort.authenticate(validRequest.email(), validRequest.password());
         if (!result.isOk()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(INVALID_CREDENTIALS);
         }
@@ -75,6 +79,8 @@ public final class AuthController {
                 userResponse(user)));
     }
 
+    @Operation(summary = "Logout", description = "Revokes the current bearer token when one is present. Raw tokens are never stored by the server.")
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/api/auth/logout")
     public LogoutResponse logout(HttpServletRequest request) {
         VerifiedAuthToken token = currentToken(request);
@@ -84,6 +90,8 @@ public final class AuthController {
         return new LogoutResponse(token != null, "Logged out.");
     }
 
+    @Operation(summary = "Refresh access token", description = "Issues a replacement access token when the current token is valid and not revoked.")
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/api/auth/refresh")
     public ResponseEntity<?> refresh(HttpServletRequest request) {
         VerifiedAuthToken token = currentToken(request);
@@ -96,6 +104,8 @@ public final class AuthController {
         return ResponseEntity.ok(new RefreshResponse(true, "Bearer", refreshed, tokenService.ttlSeconds()));
     }
 
+    @Operation(summary = "Current authenticated user", description = "Returns a safe current-user profile resolved from the authenticated server principal.")
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/api/auth/me")
     public AuthenticatedUserResponse me() {
         ServerPrincipal principal = runtimeSessionState.requirePrincipal();

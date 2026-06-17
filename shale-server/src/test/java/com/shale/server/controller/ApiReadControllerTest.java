@@ -239,6 +239,79 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(41, notificationServicePort.shaleClientId);
     }
 
+    @Test
+    void caseSearchPageReturnsPageContractWithDevelopmentHeaders() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/cases/search-page")
+                .param("query", "smith")
+                .param("page", "1")
+                .param("size", "1")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].caseId").value(502))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.total").doesNotExist());
+
+        org.junit.jupiter.api.Assertions.assertEquals("smith", caseServicePort.searchQuery);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.searchShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(2, caseServicePort.searchLimit);
+    }
+
+    @Test
+    void contactSearchPageReturnsPageContractWithDevelopmentHeaders() throws Exception {
+        RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                unusedPort(TaskServicePort.class),
+                contactServicePort,
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/contacts/search-page")
+                .param("query", "ada")
+                .param("page", "0")
+                .param("size", "1")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(801))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.total").doesNotExist());
+
+        org.junit.jupiter.api.Assertions.assertEquals("ada", contactServicePort.query);
+        org.junit.jupiter.api.Assertions.assertEquals(41, contactServicePort.shaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(1, contactServicePort.limit);
+    }
+
+    @Test
+    void invalidSearchInputReturnsStandardizedBadRequestBeforeDbAccess() throws Exception {
+        mockMvc.perform(get("/api/cases/search").param("query", "x".repeat(101)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Search query must be 100 characters or fewer."))
+                .andExpect(jsonPath("$.path").value("/api/cases/search"));
+    }
+
+    @Test
+    void invalidCaseIdReturnsStandardizedBadRequestBeforeDbAccess() throws Exception {
+        mockMvc.perform(get("/api/cases/0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("caseId must be positive."))
+                .andExpect(jsonPath("$.path").value("/api/cases/0"));
+    }
+
     private static ObjectProvider<HttpServletRequest> currentRequestProvider() {
         return new ObjectProvider<>() {
             @Override
@@ -295,7 +368,7 @@ class ApiReadControllerTest {
             this.searchQuery = query;
             this.searchShaleClientId = shaleClientId;
             this.searchLimit = limit;
-            return List.of(caseOverview());
+            return List.of(caseOverview(), secondCaseOverview());
         }
 
         @Override
@@ -354,7 +427,15 @@ class ApiReadControllerTest {
         }
 
         private static CaseOverviewDto caseOverview() {
-            return new CaseOverviewDto(501L, "CASE-501", "Smith v. Example", "Open", 1, "#00AA00",
+            return caseOverview(501L, "CASE-501");
+        }
+
+        private static CaseOverviewDto secondCaseOverview() {
+            return caseOverview(502L, "CASE-502");
+        }
+
+        private static CaseOverviewDto caseOverview(long caseId, String caseNumber) {
+            return new CaseOverviewDto(caseId, caseNumber, "Smith v. Example", "Open", 1, "#00AA00",
                     31, "Ada Attorney", "#111111", 10, "PI", "#222222",
                     null, null, null, null, null, null, "Caller", "Client", List.of(),
                     "Opposing", List.of("Ada Attorney"), "Overview");

@@ -102,6 +102,22 @@ class AuthControllerTest {
     }
 
     @Test
+    void blankLoginRequestReturnsStandardizedBadRequestWithoutCallingAuthService() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\" \",\"password\":\" \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Email and password are required."))
+                .andExpect(jsonPath("$.path").value("/api/auth/login"));
+
+        org.junit.jupiter.api.Assertions.assertNull(authServicePort.email);
+        org.junit.jupiter.api.Assertions.assertNull(authServicePort.password);
+    }
+
+    @Test
     void loginReturnsSafeUnauthorizedResponseOnBadPassword() throws Exception {
         authServicePort.nextResult = Result.fail("database-specific auth failure should not leak");
 

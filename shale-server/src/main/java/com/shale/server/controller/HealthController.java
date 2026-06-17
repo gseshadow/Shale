@@ -13,7 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.shale.server.health.AppDatabaseHealthCheck;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @RestController
+@Tag(name = "Health", description = "Deployment health checks")
 public final class HealthController {
     private final ObjectProvider<AppDatabaseHealthCheck> databaseHealthCheck;
 
@@ -26,11 +30,13 @@ public final class HealthController {
         this.databaseHealthCheck = null;
     }
 
+    @Operation(summary = "Application health", description = "DB-free liveness check for App Service probes.")
     @GetMapping("/api/health")
     public Map<String, String> health() {
         return Map.of("status", "ok");
     }
 
+    @Operation(summary = "Database health", description = "Safe readiness check for the configured auth/app database pool. Does not expose connection details.")
     @GetMapping("/api/health/db")
     public ResponseEntity<Map<String, String>> databaseHealth() {
         AppDatabaseHealthCheck activeHealthCheck = databaseHealthCheck == null ? null : databaseHealthCheck.getIfAvailable();

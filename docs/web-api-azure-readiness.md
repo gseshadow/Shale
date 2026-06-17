@@ -221,3 +221,100 @@ Recommended web-client behavior:
 - Clear the bearer token on logout.
 - Treat any `401` from protected API calls as a signal to return to login.
 - Do not store tenant ids separately as trusted client state; use the signed token/server response only for display and let the server enforce tenant context.
+
+## Step 4D API contracts for the React web app
+
+### OpenAPI and Swagger UI
+
+`shale-server` publishes generated API documentation when the app is running:
+
+- OpenAPI JSON: `GET /v3/api-docs`
+- Swagger UI: `GET /swagger-ui/index.html`
+
+The OpenAPI document includes the `bearerAuth` HTTP bearer security scheme. Protected endpoints derive `userId` and `shaleClientId` from the server-issued token or the dev/local-only header resolver; clients must not send tenant ids as trusted request input.
+
+### Standard error response
+
+API errors use one safe JSON response shape:
+
+```json
+{
+  "timestamp": "2026-06-17T21:00:00Z",
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Authentication is required.",
+  "path": "/api/cases/search"
+}
+```
+
+The server intentionally avoids stack traces, SQL text, JDBC URLs, usernames, hostnames, tenant ids, and raw exception details in API error bodies.
+
+### Validation rules
+
+- `POST /api/auth/login` requires nonblank `email` and `password`.
+- Login email values are trimmed, must look like an email address, and must be 254 characters or fewer.
+- Login password values must be 1024 characters or fewer.
+- Search `query` values are optional but limited to 100 characters after trimming.
+- Path IDs such as `caseId` must be positive.
+- Paged search `page` must be between `0` and `100`; `size` must be between `1` and `100`.
+
+Invalid input returns the standard `400 Bad Request` error shape.
+
+### Paginated search endpoints
+
+The original list endpoints remain available for compatibility:
+
+```bash
+curl -i 'http://localhost:8080/api/cases/search?query=smith' \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -i 'http://localhost:8080/api/contacts/search?query=ada' \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+React clients can use page-shaped endpoints:
+
+```bash
+curl -i 'http://localhost:8080/api/cases/search-page?query=smith&page=0&size=25' \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -i 'http://localhost:8080/api/contacts/search-page?query=ada&page=0&size=25' \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Example paged response:
+
+```json
+{
+  "items": [],
+  "page": 0,
+  "size": 25,
+  "total": null
+}
+```
+
+`total` is currently `null` because there is no cheap count query in the existing DAO/service contract. Avoid adding expensive full-count queries without explicit DAO support.
+
+### Step 4D smoke-test checklist
+
+```bash
+curl -i http://localhost:8080/api/health
+curl -i http://localhost:8080/api/health/db
+curl -i http://localhost:8080/v3/api-docs
+curl -i http://localhost:8080/swagger-ui/index.html
+curl -i -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ada@example.test","password":"correct horse battery staple"}'
+curl -i http://localhost:8080/api/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+curl -i 'http://localhost:8080/api/cases/search?query=smith' \
+  -H "Authorization: Bearer $TOKEN"
+curl -i 'http://localhost:8080/api/cases/search-page?query=smith&page=0&size=25' \
+  -H "Authorization: Bearer $TOKEN"
+curl -i 'http://localhost:8080/api/cases/search?query=smith'
+curl -i -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"","password":""}'
+curl -i 'http://localhost:8080/api/cases/search?query=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' \
+  -H "Authorization: Bearer $TOKEN"
+```
