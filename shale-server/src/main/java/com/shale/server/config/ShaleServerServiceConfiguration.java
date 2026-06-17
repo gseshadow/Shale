@@ -38,7 +38,7 @@ import jakarta.servlet.http.HttpServletRequest;
 public class ShaleServerServiceConfiguration {
 
     @Bean
-    @Profile("!dev")
+    @Profile("!dev & !local")
     ServerSessionResolver serverSessionResolver() {
         return new UnauthenticatedServerSessionResolver();
     }
@@ -48,7 +48,7 @@ public class ShaleServerServiceConfiguration {
      * while the Spring dev profile is active and is not browser/mobile auth.
      */
     @Bean
-    @Profile("dev")
+    @Profile({"dev", "local"})
     ServerSessionResolver developmentServerSessionResolver() {
         return new DevelopmentHeaderServerSessionResolver();
     }
@@ -69,7 +69,7 @@ public class ShaleServerServiceConfiguration {
     }
 
     @Bean
-    @Profile("!dev")
+    @Profile("!dev & !local")
     RuntimeConnectionProvider disabledRuntimeConnectionProvider() {
         return principal -> {
             throw new IllegalStateException(
@@ -78,13 +78,13 @@ public class ShaleServerServiceConfiguration {
     }
 
     @Bean
-    @Profile("dev")
+    @Profile({"dev", "local", "prod", "azure"})
     DataSources serverDataSources() {
         return new DataSources(new Config());
     }
 
     @Bean
-    @Profile("dev")
+    @Profile({"dev", "local"})
     RuntimeConnectionProvider runtimeConnectionProvider(DataSources serverDataSources) {
         return new RuntimeSessionServiceConnectionProvider(serverDataSources.runtime());
     }
