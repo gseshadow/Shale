@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import com.shale.core.dto.CaseStatusReportRowDto;
+import com.shale.core.dto.ReportCaseDetailRowDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.ui.state.AppState;
@@ -14,14 +15,22 @@ import javafx.scene.chart.PieChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.DatePicker;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.ButtonType;
+import javafx.scene.layout.BorderPane;
 
 import java.text.DecimalFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -33,6 +42,7 @@ import java.util.concurrent.Executors;
 
 public final class ReportsController {
     private static final DecimalFormat PERCENT_FORMAT = new DecimalFormat("0.0");
+    private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @FXML private DatePicker startDatePicker;
     @FXML private DatePicker endDatePicker;
@@ -52,6 +62,7 @@ public final class ReportsController {
     });
     private final Map<Integer, CaseStatusDto> availableStatusesById = new LinkedHashMap<>();
     private final Map<Integer, CheckMenuItem> statusMenuItemsById = new LinkedHashMap<>();
+    private final Map<String, CaseStatusReportRowDto> reportRowsBySliceName = new LinkedHashMap<>();
     private AppState appState;
     private CaseDao caseDao;
 
@@ -175,6 +186,7 @@ public final class ReportsController {
         List<CaseStatusReportRowDto> safeRows = rows == null ? List.of() : rows;
         statusReportTable.setItems(FXCollections.observableArrayList(safeRows));
         statusPieChart.getData().clear();
+        reportRowsBySliceName.clear();
         long total = safeRows.stream().mapToLong(CaseStatusReportRowDto::caseCount).sum();
         if (safeRows.isEmpty()) {
             setStatus("No case statuses selected.");
@@ -200,10 +212,15 @@ public final class ReportsController {
             }
             slices.add(slice);
             colorsBySliceName.put(sliceName, color);
+            reportRowsBySliceName.put(sliceName, row);
         }
         statusPieChart.setData(FXCollections.observableArrayList(slices));
         applyPieSliceColors(colorsBySliceName);
-        Platform.runLater(() -> applyPieSliceColors(colorsBySliceName));
+        attachPieSliceHandlers();
+        Platform.runLater(() -> {
+            applyPieSliceColors(colorsBySliceName);
+            attachPieSliceHandlers();
+        });
     }
 
     private void applyPieSliceColors(Map<String, String> colorsBySliceName) {
@@ -213,6 +230,105 @@ public final class ReportsController {
                 slice.getNode().setStyle("-fx-pie-color: " + color + ";");
             }
         }
+    }
+
+
+    private void attachPieSliceHandlers() {
+        for (PieChart.Data slice : statusPieChart.getData()) {
+            if (slice == null || slice.getNode() == null) continue;
+            CaseStatusReportRowDto row = reportRowsBySliceName.get(slice.getName());
+            if (row == null || row.caseCount() <= 0) continue;
+            slice.getNode().setOnMouseClicked(event -> openCaseStatusCasesDialog(row));
+        }
+    }
+
+    private void openCaseStatusCasesDialog(CaseStatusReportRowDto row) {
+        if (row == null || row.caseCount() <= 0 || appState == null || caseDao == null) return;
+        Integer shaleClientId = appState.getShaleClientId();
+        if (shaleClientId == null || shaleClientId <= 0) {
+            setStatus("No tenant is selected.");
+            return;
+        }
+        LocalDate startDate = startDatePicker == null ? null : startDatePicker.getValue();
+        LocalDate endDate = endDatePicker == null ? null : endDatePicker.getValue();
+        setLoading(true);
+        executor.submit(() -> {
+            try {
+                List<ReportCaseDetailRowDto> rows = caseDao.listCaseStatusReportCases(shaleClientId, row.statusId(), startDate, endDate);
+                Platform.runLater(() -> showCaseDetailsDialog(row.caseStatus(), startDate, endDate, rows));
+            } catch (RuntimeException ex) {
+                Platform.runLater(() -> setStatus("Unable to load cases for " + row.caseStatus() + ". Please try again."));
+            } finally {
+                Platform.runLater(() -> setLoading(false));
+            }
+        });
+    }
+
+    private void showCaseDetailsDialog(String statusName, LocalDate startDate, LocalDate endDate, List<ReportCaseDetailRowDto> rows) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle(statusName + " — " + dateRangeLabel(startDate, endDate));
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        DialogPane pane = dialog.getDialogPane();
+        pane.setPrefSize(1200, 650);
+        pane.setMinSize(800, 420);
+        dialog.setResizable(true);
+
+        TableView<ReportCaseDetailRowDto> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        table.setPlaceholder(new Label("No cases found for this status and date range."));
+        addCaseDetailColumn(table, "Case Name", 180, ReportCaseDetailRowDto::caseName);
+        addCaseDetailColumn(table, "Created At", 145, row -> formatDateTime(row.createdAt()));
+        addCaseDetailColumn(table, "Intake Date", 110, row -> formatDate(row.intakeDate()));
+        addCaseDetailColumn(table, "Denied Date", 110, row -> formatDate(row.deniedDate()));
+        addCaseDetailColumn(table, "Closed Date", 110, row -> formatDate(row.closedDate()));
+        addCaseDetailColumn(table, "Date of Injury", 120, row -> formatDate(row.dateOfInjury()));
+        addCaseDetailColumn(table, "Description", 260, ReportCaseDetailRowDto::description);
+        addCaseDetailColumn(table, "Statute of Limitations", 160, row -> formatDate(row.statuteOfLimitations()));
+        addCaseDetailColumn(table, "Tort Notice Deadline", 160, row -> formatDate(row.tortNoticeDeadline()));
+        addCaseDetailColumn(table, "Updated At", 145, row -> formatDateTime(row.updatedAt()));
+        addCaseDetailColumn(table, "Responsible Attorney", 170, ReportCaseDetailRowDto::responsibleAttorney);
+        table.setItems(FXCollections.observableArrayList(rows == null ? List.of() : rows));
+
+        BorderPane content = new BorderPane(table);
+        content.setPrefSize(1180, 600);
+        pane.setContent(content);
+        dialog.initOwner(statusPieChart == null || statusPieChart.getScene() == null ? null : statusPieChart.getScene().getWindow());
+        dialog.showAndWait();
+    }
+
+    private interface CaseDetailTextProvider {
+        String value(ReportCaseDetailRowDto row);
+    }
+
+    private void addCaseDetailColumn(TableView<ReportCaseDetailRowDto> table, String title, double width, CaseDetailTextProvider provider) {
+        TableColumn<ReportCaseDetailRowDto, String> column = new TableColumn<>(title);
+        column.setPrefWidth(width);
+        column.setCellValueFactory(data -> new ReadOnlyStringWrapper(provider.value(data.getValue())));
+        column.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                String value = empty || item == null ? "" : item;
+                setText(value);
+                setTooltip(value.isBlank() ? null : new Tooltip(value));
+            }
+        });
+        table.getColumns().add(column);
+    }
+
+    private String dateRangeLabel(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null && endDate == null) return "All dates";
+        if (startDate != null && endDate != null) return startDate + " to " + endDate;
+        if (startDate != null) return startDate + " onward";
+        return "Through " + endDate;
+    }
+
+    private String formatDate(LocalDate value) {
+        return value == null ? "" : value.toString();
+    }
+
+    private String formatDateTime(LocalDateTime value) {
+        return value == null ? "" : DATE_TIME_FORMAT.format(value);
     }
 
     private List<Integer> selectedStatusIds() {
@@ -238,6 +354,7 @@ public final class ReportsController {
     private void clearReport() {
         statusReportTable.setItems(FXCollections.observableArrayList());
         statusPieChart.getData().clear();
+        reportRowsBySliceName.clear();
     }
 
     private void setLoading(boolean loading) {

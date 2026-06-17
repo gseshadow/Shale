@@ -33,7 +33,7 @@ final class ReportsControllerLifecycleTest {
 
         assertTrue(source.contains("PERCENT_FORMAT.format(percentage) + \"%\""));
         assertTrue(source.contains("ColorUtil.toCssBackgroundColorOrNull(row.color())"));
-        assertTrue(source.contains("Platform.runLater(() -> applyPieSliceColors"),
+        assertTrue(source.contains("Platform.runLater(() -> {") && source.contains("applyPieSliceColors(colorsBySliceName)"),
                 "Pie slice colors should be re-applied after JavaFX creates chart nodes.");
         assertTrue(source.contains("if (total <= 0)"),
                 "Reports should avoid NaN/Infinity labels when there are no matching cases.");
