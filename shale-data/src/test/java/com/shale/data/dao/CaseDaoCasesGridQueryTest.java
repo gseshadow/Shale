@@ -64,4 +64,32 @@ final class CaseDaoCasesGridQueryTest {
         assertTrue(method.contains("ORDER BY cu.CreatedAt DESC, cu.Id DESC"));
     }
 
+    @Test
+    void caseStatusReportUsesCurrentCaseStatusesAndTenantFilters() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String method = source.substring(source.indexOf("public List<CaseStatusReportRowDto> listCaseStatusReport"), source.indexOf("public List<CaseRow> listAssignedCasesForBoard"));
+
+        assertTrue(method.contains("FROM dbo.Cases c"));
+        assertTrue(method.contains("FROM dbo.CaseStatuses cs"));
+        assertTrue(method.contains("cs.EndDate IS NULL"));
+        assertTrue(method.contains("cs.IsPrimary DESC"));
+        assertTrue(method.contains("cs.EffectiveDate DESC"));
+        assertTrue(method.contains("cs.Id DESC"));
+        assertTrue(method.contains("INNER JOIN dbo.Statuses s"));
+        assertTrue(method.contains("WHERE c.ShaleClientId = ?"));
+        assertTrue(method.contains("ISNULL(c.IsDeleted, 0) = 0"));
+        assertTrue(method.contains("(? IS NULL OR c.CallerDate >= ?)"));
+        assertTrue(method.contains("(? IS NULL OR c.CallerDate < DATEADD(day, 1, ?))"));
+        assertTrue(method.contains("s.Id IN (%s)"));
+        assertTrue(method.contains("sqlPlaceholders(selectedStatusIds.size())"));
+        assertTrue(method.contains("status.lifecycleKey()"));
+        assertTrue(method.contains("status.sortOrder()"));
+        assertFalse(method.contains("Cases.CaseStatusId"));
+        assertFalse(method.contains("c.CaseStatusId"));
+        assertFalse(method.contains("AcceptedDate"));
+        assertFalse(method.contains("DeniedDate"));
+        assertFalse(method.contains("ClosedDate"));
+        assertFalse(method.contains("NonEngagementLetterSent"));
+    }
+
 }

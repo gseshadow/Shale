@@ -32,6 +32,7 @@ import com.shale.ui.controller.NewOrganizationController;
 import com.shale.ui.controller.OrganizationController;
 import com.shale.ui.controller.OrganizationsController;
 import com.shale.ui.controller.SearchController;
+import com.shale.ui.controller.ReportsController;
 import com.shale.ui.controller.SettingsController;
 import com.shale.ui.controller.TeamController;
 import com.shale.ui.controller.UserController;
@@ -380,6 +381,10 @@ public final class SceneManager {
 		navigateTo(AppRoute.calendar(), true);
 	}
 
+	public void openReportsView() {
+		navigateTo(AppRoute.reports(), true);
+	}
+
 	public void openCalendarEventFromNotification(long calendarEventId) {
 		if (calendarEventId <= 0 || calendarEventId > Integer.MAX_VALUE) {
 			return;
@@ -484,6 +489,7 @@ public final class SceneManager {
 			case ORGANIZATIONS_LIST -> mainController.showOrganizationsListView();
 			case TEAM_LIST -> mainController.showTeamListView();
 			case CALENDAR -> mainController.showCalendarView();
+			case REPORTS -> mainController.showReportsView();
 			case SETTINGS -> mainController.showSettingsView();
 			case SEARCH -> mainController.showSearchResultsView(route.searchQuery() == null ? "" : route.searchQuery());
 			case CASE_PROFILE -> mainController.showCaseProfileView(route.entityId(), route.sectionKey());
@@ -598,6 +604,15 @@ public final class SceneManager {
 			TeamController c = (TeamController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
 			c.init(appState, userDao, onOpenUser);
+			return c;
+		});
+	}
+
+	public Parent createReportsView() {
+		return load("/fxml/reports.fxml", controller ->
+		{
+			ReportsController c = (ReportsController) controller;
+			c.init(appState, new CaseDao(dbSessionProvider));
 			return c;
 		});
 	}
