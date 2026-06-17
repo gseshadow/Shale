@@ -34,10 +34,12 @@ public class CaseCard extends VBox {
 	private final VBox bodyPane = new VBox(6);
 	private final HBox headerRow = new HBox(8);
 	private final HBox bottomRow = new HBox(8);
+	private final HBox attorneyRow = new HBox(0);
 	private final VBox datesBox = new VBox(2);
 	private final Region bodySpacer = new Region();
 	private final Region bottomSpacer = new Region();
 	private final Region headerSpacer = new Region();
+	private final Region attorneySpacer = new Region();
 
 	private Integer caseId;
 	private Consumer<Integer> onOpen;
@@ -92,6 +94,7 @@ public class CaseCard extends VBox {
 		statusLabelBaseStyle = "-fx-font-size: 10px; -fx-font-weight: 800;";
 		attorneyMiniCard.applyCompactMini();
 		attorneyMiniCard.setMaxWidth(88);
+		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
 		bodyPane.getChildren().setAll(headerRow);
 		bottomRow.setSpacing(4);
 		refreshSurfaceStyle();
@@ -143,7 +146,7 @@ public class CaseCard extends VBox {
 		setPrefWidth(280);
 		bodyPane.setSpacing(6);
 		bodyPane.setPadding(new Insets(12, 12, 11, 14));
-		practiceAreaBar.setPrefWidth(7);
+		setPracticeAreaBarWidth(7);
 		HBox.setMargin(practiceAreaBar, new Insets(8, 0, 8, 8));
 		datesBox.setManaged(true);
 		datesBox.setVisible(true);
@@ -161,9 +164,10 @@ public class CaseCard extends VBox {
 		headerRow.setAlignment(Pos.TOP_LEFT);
 		attorneyMiniCard.applyMini();
 		attorneyMiniCard.setMaxWidth(132);
-		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
+		headerRow.getChildren().setAll(titleLabel);
+		attorneyRow.getChildren().setAll(attorneySpacer, attorneyMiniCard);
 		bottomRow.getChildren().setAll(datesBox, bottomSpacer, statusLabel);
-		bodyPane.getChildren().setAll(headerRow, bodySpacer, bottomRow);
+		bodyPane.getChildren().setAll(headerRow, attorneyRow, bodySpacer, bottomRow);
 		bottomRow.setSpacing(8);
 		refreshSurfaceStyle();
 	}
@@ -290,24 +294,37 @@ public class CaseCard extends VBox {
 		VBox.setVgrow(bodySpacer, Priority.ALWAYS);
 		HBox.setHgrow(bodyPane, Priority.ALWAYS);
 		HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+		HBox.setHgrow(attorneySpacer, Priority.ALWAYS);
 		HBox.setHgrow(bottomSpacer, Priority.ALWAYS);
+		HBox.setHgrow(practiceAreaBar, Priority.NEVER);
 		headerRow.setAlignment(Pos.TOP_LEFT);
+		attorneyRow.setAlignment(Pos.CENTER_RIGHT);
 		bottomRow.setAlignment(Pos.BOTTOM_LEFT);
 		statusLabel.setWrapText(true);
 		statusLabel.setMaxWidth(128);
 		statusLabel.setAlignment(Pos.CENTER_RIGHT);
 		datesBox.setMinWidth(118);
 		datesBox.setFillWidth(true);
+		titleLabel.setMinWidth(0);
+		titleLabel.setMaxWidth(Double.MAX_VALUE);
+		HBox.setHgrow(titleLabel, Priority.ALWAYS);
 		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
 		bottomRow.getChildren().setAll(datesBox, bottomSpacer, statusLabel);
 		bodyPane.getChildren().setAll(headerRow, bodySpacer, bottomRow);
 		getChildren().setAll(cardRow);
 		cardRow.getChildren().setAll(practiceAreaBar, bodyPane);
+		setPracticeAreaBarWidth(7);
 		HBox.setMargin(practiceAreaBar, new Insets(8, 0, 8, 8));
 
 		// Nice UX: looks clickable
 		setCursor(Cursor.HAND);
 		applyCompact();
+	}
+
+	private void setPracticeAreaBarWidth(double width) {
+		practiceAreaBar.setMinWidth(width);
+		practiceAreaBar.setPrefWidth(width);
+		practiceAreaBar.setMaxWidth(width);
 	}
 
 	private void wireEvents() {
