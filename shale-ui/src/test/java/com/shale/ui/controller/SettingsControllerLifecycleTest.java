@@ -21,10 +21,12 @@ final class SettingsControllerLifecycleTest {
         String initialize = source.substring(source.indexOf("\t@FXML\n\tprivate void initialize()"),
                 source.indexOf("\n\tpublic void init", source.indexOf("\t@FXML\n\tprivate void initialize()")));
 
-        assertTrue(initialize.contains("if (caseService != null)"),
-                "SceneManager injects SettingsController dependencies through the controller factory before FXML initialize(); initialize must load statuses after TableView injection.");
+        assertTrue(initialize.contains("if (caseService != null && isAdminUser())"),
+                "SceneManager injects SettingsController dependencies through the controller factory before FXML initialize(); initialize must only load lookup-management lists for admins.");
         assertTrue(initialize.contains("loadCaseStatuses();"),
-                "SettingsController.initialize() should populate Settings > Case Statuses when service injection already happened.");
+                "SettingsController.initialize() should populate Settings > Case Statuses for admins when service injection already happened.");
+        assertTrue(initialize.contains("loadPracticeAreas();"),
+                "SettingsController.initialize() should populate Settings > Practice Areas for admins when service injection already happened.");
     }
 
     @Test
@@ -73,6 +75,43 @@ final class SettingsControllerLifecycleTest {
         assertTrue(!method.contains("new Label(\"Sort Order\")"),
                 "Sort Order should remain table/reorder-button driven and not be a manual dialog field.");
     }
+
+    @Test
+    void lookupManagementSectionsAreAdminOnlyButGeneralSettingsRemainVisible() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+
+        assertTrue(fxml.contains("fx:id=\"caseStatusAdministrationSection\""),
+                "Case Statuses must be wrapped in a managed section so non-admins do not see an empty gap.");
+        assertTrue(fxml.contains("fx:id=\"practiceAreaAdministrationSection\""),
+                "Practice Areas must be wrapped in a managed section so non-admins do not see an empty gap.");
+        assertTrue(fxml.contains("fx:id=\"taskAssignedToMeCheck\""));
+        assertTrue(fxml.contains("fx:id=\"notificationSettingsStatusLabel\""),
+                "General notification settings should remain present for non-admin Settings users.");
+        assertTrue(source.contains("caseStatusAdministrationSection.setVisible(visible)"));
+        assertTrue(source.contains("caseStatusAdministrationSection.setManaged(visible)"));
+        assertTrue(source.contains("practiceAreaAdministrationSection.setVisible(visible)"));
+        assertTrue(source.contains("practiceAreaAdministrationSection.setManaged(visible)"));
+    }
+
+    @Test
+    void lookupManagementLoadsAndActionsRequireAdmin() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+
+        assertTrue(source.contains("private boolean requireAdminLookupManagement"),
+                "Lookup-management controller paths should share an admin authorization guard.");
+        assertTrue(source.contains("if (!requireAdminLookupManagement(\"Case Statuses\"))"),
+                "Case status load/edit paths must reject non-admins before service calls.");
+        assertTrue(source.contains("if (!requireAdminLookupManagement(\"Practice Areas\"))"),
+                "Practice area load/edit paths must reject non-admins before service calls.");
+        assertTrue(source.contains("caseService.createCaseStatus"));
+        assertTrue(source.contains("caseService.updateCaseStatus"));
+        assertTrue(source.contains("caseService.reorderCaseStatuses"));
+        assertTrue(source.contains("caseService.createPracticeArea"));
+        assertTrue(source.contains("caseService.updatePracticeArea"));
+        assertTrue(source.contains("caseService.deactivatePracticeArea"));
+    }
+
 
     @Test
     void addUserFlowIsAdminOnlyAndUsesUserDaoCreateRequestWithoutTenantField() throws Exception {
