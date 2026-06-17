@@ -89,7 +89,7 @@ public class ShaleServerServiceConfiguration {
     }
 
     @Bean
-    @Profile("!dev & !local")
+    @Profile("!dev & !local & !prod & !azure")
     RuntimeConnectionProvider disabledRuntimeConnectionProvider() {
         return principal -> {
             throw new IllegalStateException(
@@ -110,7 +110,7 @@ public class ShaleServerServiceConfiguration {
     }
 
     @Bean
-    @Profile({"dev", "local"})
+    @Profile({"dev", "local", "prod", "azure"})
     RuntimeConnectionProvider runtimeConnectionProvider(DataSources serverDataSources) {
         return new RuntimeSessionServiceConnectionProvider(serverDataSources.runtime());
     }

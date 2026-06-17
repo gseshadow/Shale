@@ -58,7 +58,7 @@ class ShaleServerServiceConfigurationTest {
     }
 
     @Test
-    void azureProfileDisablesDevelopmentHeaderResolverAndRuntimeConnections() {
+    void azureProfileDisablesDevelopmentHeaderResolverAndEnablesRuntimeConnections() {
         withDatabaseProperties(() -> {
             try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
                 context.getEnvironment().setActiveProfiles("azure");
@@ -66,8 +66,7 @@ class ShaleServerServiceConfigurationTest {
                 context.refresh();
 
                 assertInstanceOf(BearerTokenServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
-                RuntimeConnectionProvider provider = context.getBean(RuntimeConnectionProvider.class);
-                assertThrows(IllegalStateException.class, () -> provider.openConnection(null));
+                assertInstanceOf(com.shale.server.runtime.RuntimeSessionServiceConnectionProvider.class, context.getBean(com.shale.server.runtime.RuntimeConnectionProvider.class));
             }
         });
     }

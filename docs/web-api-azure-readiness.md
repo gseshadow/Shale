@@ -318,3 +318,7 @@ curl -i -X POST http://localhost:8080/api/auth/login \
 curl -i 'http://localhost:8080/api/cases/search?query=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+## Step 4E Azure deployment guide
+
+Use `docs/azure-app-service-deployment.md` as the repeatable first-deployment runbook for Azure App Service. It covers App Service creation, Java runtime selection, required app settings, startup command options, health checks, log streaming, restart, rollback, jar packaging, and smoke tests.
