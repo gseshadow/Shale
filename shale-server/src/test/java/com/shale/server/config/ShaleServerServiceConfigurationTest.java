@@ -19,6 +19,7 @@ import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
+import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
 import com.shale.server.runtime.RequestScopedDbSessionProvider;
 import com.shale.server.runtime.RuntimeConnectionProvider;
@@ -51,7 +52,7 @@ class ShaleServerServiceConfigurationTest {
                 context.register(ShaleServerServiceConfiguration.class);
                 context.refresh();
 
-                assertInstanceOf(DevelopmentHeaderServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
+                assertInstanceOf(com.shale.server.runtime.CompositeServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
             }
         });
     }
@@ -64,7 +65,7 @@ class ShaleServerServiceConfigurationTest {
                 context.register(ShaleServerServiceConfiguration.class);
                 context.refresh();
 
-                assertInstanceOf(UnauthenticatedServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
+                assertInstanceOf(BearerTokenServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
                 RuntimeConnectionProvider provider = context.getBean(RuntimeConnectionProvider.class);
                 assertThrows(IllegalStateException.class, () -> provider.openConnection(null));
             }
@@ -88,6 +89,7 @@ class ShaleServerServiceConfigurationTest {
         System.setProperty("SHALE_RT_DB_URL", "jdbc:sqlserver://example.invalid:1433;databaseName=ShaleRuntime");
         System.setProperty("SHALE_RT_DB_USER", "rt_user");
         System.setProperty("SHALE_RT_DB_PASSWORD", "rt_password");
+        System.setProperty("SHALE_AUTH_TOKEN_SECRET", "test-auth-token-secret-that-is-long-enough");
         try {
             test.run();
         } finally {
@@ -97,6 +99,7 @@ class ShaleServerServiceConfigurationTest {
             System.clearProperty("SHALE_RT_DB_URL");
             System.clearProperty("SHALE_RT_DB_USER");
             System.clearProperty("SHALE_RT_DB_PASSWORD");
+            System.clearProperty("SHALE_AUTH_TOKEN_SECRET");
         }
     }
 }

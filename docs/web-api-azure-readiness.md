@@ -115,3 +115,71 @@ Expected behavior:
 - `/api/health` returns `200` with `status=ok`.
 - `/api/dev/whoami` is not available.
 - DB-backed endpoints reject development headers and fail closed until real auth is implemented.
+
+## Step 4B authentication foundation
+
+`POST /api/auth/login` now validates credentials through the existing `AuthServicePort` / `AuthServiceImpl` path and issues a signed bearer token. The token contains only server-derived identity claims: `userId`, `shaleClientId`, optional `email`, issued-at time, and expiry. Tenant ids are not accepted from login request bodies.
+
+### Required auth environment variables
+
+- `SHALE_AUTH_TOKEN_SECRET` is required in `dev`, `local`, `prod`, and `azure` profiles. Use a high-entropy value of at least 32 characters. Do not commit it to source control.
+- `SHALE_AUTH_TOKEN_TTL_SECONDS` is optional and defaults to 8 hours.
+
+### Login request
+
+```bash
+curl -i -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ada@example.test","password":"correct horse battery staple"}'
+```
+
+Successful responses include a bearer token and a safe user payload:
+
+```json
+{
+  "authenticated": true,
+  "tokenType": "Bearer",
+  "accessToken": "<signed-token>",
+  "expiresInSeconds": 28800,
+  "user": {
+    "authenticated": true,
+    "userId": 123,
+    "shaleClientId": 456,
+    "email": "ada@example.test",
+    "displayName": "Ada Lovelace",
+    "nameFirst": "Ada",
+    "nameLast": "Lovelace"
+  }
+}
+```
+
+Invalid passwords and unknown users return `401` with the same safe `invalid_credentials` response. Passwords, password hashes, and database-specific failure details are never returned.
+
+### Current user
+
+```bash
+TOKEN='<signed-token-from-login>'
+curl -i http://localhost:8080/api/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Missing, malformed, invalid, or expired tokens return `401`.
+
+### Calling protected endpoints
+
+Use the bearer token on DB-backed read endpoints:
+
+```bash
+curl -i 'http://localhost:8080/api/cases/search?query=smith' \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+The server resolves `userId` and `shaleClientId` from the signed token and uses that principal for runtime DB session context. Clients must not send tenant ids in request bodies or query strings to select a tenant.
+
+### Dev/local compatibility
+
+`dev` and `local` profiles still accept `X-Shale-UserId` / `X-Shale-TenantId` for the temporary local workflow, and they also accept bearer tokens when `SHALE_AUTH_TOKEN_SECRET` is configured.
+
+### Azure/prod behavior
+
+`prod` and `azure` profiles accept bearer tokens only. They do not trust `X-Shale-UserId` or `X-Shale-TenantId`.
