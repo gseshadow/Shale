@@ -40,7 +40,7 @@ import java.util.function.Consumer;
 
 public final class SearchController {
 
-	private static final double CASE_CARD_WIDTH = 300;
+	private static final double CASE_CARD_WIDTH = 380;
 	private static final double CONTACT_CARD_WIDTH = 340;
 	private static final double ORGANIZATION_CARD_WIDTH = 340;
 	private static final double USER_CARD_WIDTH = 280;
@@ -136,8 +136,8 @@ public final class SearchController {
 
 	@FXML
 	private void initialize() {
-		configureFlow(casesFlow, 16, 16, 1040);
-		configureFlow(deletedCasesFlow, 16, 16, 1040);
+		configureFlow(casesFlow, 16, 16, 1200);
+		configureFlow(deletedCasesFlow, 16, 16, 1200);
 		configureFlow(contactsFlow, 16, 16, 1040);
 		configureFlow(organizationsFlow, 16, 16, 1040);
 		configureFlow(usersFlow, 16, 16, 1040);
@@ -372,6 +372,9 @@ public final class SearchController {
 					row.taskId(),
 					row.caseId() <= 0 ? null : row.caseId(),
 					row.caseName(),
+					null,
+					null,
+					null,
 					null,
 					null,
 					null,

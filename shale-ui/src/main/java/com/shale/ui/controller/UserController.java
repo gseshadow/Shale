@@ -25,6 +25,8 @@ import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
 import javafx.application.Platform;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -128,11 +130,18 @@ public final class UserController {
 	private List<AssignedUserTaskRow> assignedTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedTaskUsers = java.util.Map.of();
 	private boolean showCompletedTasks;
+	private long userLoadSequence;
+	private long rolesRefreshSequence;
 	private long assignedCasesRefreshSequence;
 	private long assignedTasksRefreshSequence;
+	private long assignedCasesRenderSequence;
+	private long assignedTasksRenderSequence;
+	private PauseTransition assignedCasesFilterDebounce;
+	private PauseTransition assignedTasksFilterDebounce;
 	private boolean editMode;
 	private boolean colorEditedInSession;
 	private long pageLoadStartNanos;
+	private UserDetailCache userDetailCache;
 	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 	private static final double MIN_SECTION_HEIGHT = 320;
 	private static final double SECTION_HEIGHT_PADDING = 12;
@@ -186,7 +195,7 @@ public final class UserController {
 		if (addRoleButton != null) {
 			addRoleButton.setOnAction(e -> onAddRole());
 		}
-		CaseListFilterSortSupport.initializeControls(assignedCasesSearchField, assignedCasesSortChoice, this::renderAssignedCases);
+		initializeAssignedCaseControls();
 		initializeAssignedTaskControls();
 		configureColorEditor();
 		configureResponsiveSectionSizing();
@@ -194,6 +203,19 @@ public final class UserController {
 		setEditMode(false);
 		wireLiveRefreshLifecycle();
 		Platform.runLater(this::loadUser);
+	}
+
+	private void initializeAssignedCaseControls() {
+		assignedCasesFilterDebounce = new PauseTransition(Duration.millis(180));
+		assignedCasesFilterDebounce.setOnFinished(e -> renderAssignedCases());
+		CaseListFilterSortSupport.initializeControls(assignedCasesSearchField, assignedCasesSortChoice, () -> {
+			long filterStartNanos = PerfLog.start();
+			long generation = ++assignedCasesRenderSequence;
+			PerfLog.log("FILTER", "start", "panel=assigned_cases page=user_view userId=" + (currentUser == null ? null : currentUser.id())
+					+ " queryLength=" + normalizedAssignedCaseQuery().length() + " generation=" + generation);
+			assignedCasesFilterDebounce.playFromStart();
+			PerfLog.logDone("FILTER", "panel=assigned_cases page=user_view debounceScheduled=true generation=" + generation, filterStartNanos);
+		});
 	}
 
 	private void configureResponsiveSectionSizing() {
@@ -288,10 +310,12 @@ public final class UserController {
 		if (currentShaleClientId == null || currentShaleClientId <= 0 || event.shaleClientId() != currentShaleClientId) {
 			return;
 		}
+		invalidateAssignedCasesCache();
 		refreshAssignedCasesAsync();
 	}
 
 	private void loadUser() {
+		final long requestId = ++userLoadSequence;
 		if (userDetailService == null || userId == null || userId <= 0) {
 			setError("User view is not configured.");
 			return;
@@ -310,12 +334,17 @@ public final class UserController {
 				UserDetailRow loaded = userDetailService.loadUser(userId, shaleClientId);
 				PerfLog.logDone("DAO", "method=loadUser page=user_view userId=" + userId + " organizationId=" + shaleClientId + " rows=" + (loaded == null ? 0 : 1), daoStartNanos);
 				Platform.runLater(() -> {
+					if (requestId != userLoadSequence) {
+						PerfLog.log("CTRL", "stale", "controller=UserController page=user_view userId=" + userId + " requestId=" + requestId + " activeRequestId=" + userLoadSequence);
+						return;
+					}
 					setBusy(false);
 					if (loaded == null) {
 						setError("User not found.");
 						return;
 					}
 						currentUser = loaded;
+						userDetailCache = new UserDetailCache(loaded.id(), loaded.shaleClientId());
 						resetAssignedCaseControls();
 						resetAssignedTaskControls();
 						renderFromCurrent();
@@ -345,6 +374,7 @@ public final class UserController {
 
 		final int targetUserId = currentUser.id();
 		final int shaleClientId = currentUser.shaleClientId();
+		final long requestId = ++rolesRefreshSequence;
 		dbExec.submit(() -> {
 			try {
 				long assignedRolesStartNanos = PerfLog.start();
@@ -357,6 +387,10 @@ public final class UserController {
 						: List.of();
 				PerfLog.logDone("DAO", "method=loadAssignableRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (loadedAssignable == null ? 0 : loadedAssignable.size()), assignableRolesStartNanos);
 				Platform.runLater(() -> {
+					if (requestId != rolesRefreshSequence || currentUser == null || currentUser.id() != targetUserId) {
+						PerfLog.log("CTRL", "stale", "panel=roles page=user_view userId=" + targetUserId + " requestId=" + requestId);
+						return;
+					}
 					assignedRoles = loadedAssigned == null ? List.of() : List.copyOf(loadedAssigned);
 					assignableRoles = loadedAssignable == null ? List.of() : List.copyOf(loadedAssignable);
 					renderRoles();
@@ -381,6 +415,11 @@ public final class UserController {
 			return;
 		}
 		final int targetUserId = currentUser.id();
+		if (userDetailCache != null && userDetailCache.matches(targetUserId, currentUser.shaleClientId()) && userDetailCache.assignedCases != null) {
+			assignedCases = userDetailCache.assignedCases;
+			PerfLog.log("CACHE", "hit", "panel=assigned_cases page=user_view userId=" + targetUserId + " rows=" + assignedCases.size());
+			renderAssignedCases();
+		}
 		final long requestId = ++assignedCasesRefreshSequence;
 		final String targetUserName = safeText(currentUser.displayName());
 		final String targetUserEmail = safeText(currentUser.email());
@@ -396,7 +435,7 @@ public final class UserController {
 				List<CaseRow> loaded = userDetailService.loadAssignedCases(targetUserId);
 				PerfLog.logDone("DAO", "method=loadAssignedCases page=user_view userId=" + targetUserId + " rows=" + (loaded == null ? 0 : loaded.size()), assignedCasesStartNanos);
 				Platform.runLater(() -> {
-					if (requestId != assignedCasesRefreshSequence) {
+					if (requestId != assignedCasesRefreshSequence || currentUser == null || currentUser.id() != targetUserId) {
 						System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
 								+ "requestId=" + requestId
 								+ " selectedUserId=" + targetUserId
@@ -404,6 +443,9 @@ public final class UserController {
 						return;
 					}
 					assignedCases = loaded == null ? List.of() : List.copyOf(loaded);
+					if (userDetailCache != null && userDetailCache.matches(targetUserId, currentUser.shaleClientId())) {
+						userDetailCache.assignedCases = assignedCases;
+					}
 					System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
 							+ "requestId=" + requestId
 							+ " selectedUserId=" + targetUserId
@@ -443,6 +485,12 @@ public final class UserController {
 		}
 		final int targetUserId = currentUser.id();
 		final int tenantId = shaleClientId;
+		if (userDetailCache != null && userDetailCache.matches(targetUserId, tenantId) && userDetailCache.assignedTasks != null) {
+			assignedTasks = userDetailCache.assignedTasks;
+			assignedTaskUsers = userDetailCache.assignedTaskUsers == null ? java.util.Map.of() : userDetailCache.assignedTaskUsers;
+			PerfLog.log("CACHE", "hit", "panel=assigned_tasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId + " rows=" + assignedTasks.size());
+			renderAssignedTasks();
+		}
 		final long requestId = ++assignedTasksRefreshSequence;
 		dbExec.submit(() -> {
 			try {
@@ -468,11 +516,15 @@ public final class UserController {
 												java.util.stream.Collectors.toList())));
 				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId + " rows=" + usersByTask.size(), assignedTaskUsersStartNanos);
 				Platform.runLater(() -> {
-					if (requestId != assignedTasksRefreshSequence) {
+					if (requestId != assignedTasksRefreshSequence || currentUser == null || currentUser.id() != targetUserId) {
 						return;
 					}
 					assignedTasks = loaded == null ? List.of() : List.copyOf(loaded);
 					assignedTaskUsers = usersByTask;
+					if (userDetailCache != null && userDetailCache.matches(targetUserId, tenantId)) {
+						userDetailCache.assignedTasks = assignedTasks;
+						userDetailCache.assignedTaskUsers = assignedTaskUsers;
+					}
 					renderAssignedTasks();
 				});
 			} catch (Exception ex) {
@@ -530,9 +582,14 @@ public final class UserController {
 				selectedStoredColor());
 
 		setBusy(true);
+		long saveStartNanos = PerfLog.start();
+		PerfLog.log("SAVE", "start", "page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId());
 		dbExec.submit(() -> {
 			try {
+				long daoStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=updateBasicProfile page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId());
 				boolean updated = userDetailService.updateBasicProfile(request);
+				PerfLog.logDone("DAO", "method=updateBasicProfile page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId() + " updated=" + updated, daoStartNanos);
 				if (!updated) {
 					Platform.runLater(() -> {
 						setBusy(false);
@@ -541,7 +598,7 @@ public final class UserController {
 					return;
 				}
 
-				UserDetailRow reloaded = userDetailService.loadUser(currentUser.id(), currentUser.shaleClientId());
+				UserDetailRow reloaded = userDetailService.loadUser(request.userId(), request.shaleClientId());
 				Platform.runLater(() -> {
 					setBusy(false);
 					if (reloaded == null) {
@@ -549,12 +606,14 @@ public final class UserController {
 						return;
 					}
 					currentUser = reloaded;
+					userDetailCache = new UserDetailCache(reloaded.id(), reloaded.shaleClientId());
 					if (isViewingSelf() && appState != null) {
 						appState.setUserEmail(reloaded.email());
 					}
 					renderFromCurrent();
 					setEditMode(false);
 					clearError();
+					PerfLog.logDone("SAVE", "page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId(), saveStartNanos);
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
@@ -780,27 +839,47 @@ public final class UserController {
 	}
 
 	private void initializeAssignedTaskControls() {
+		assignedTasksFilterDebounce = new PauseTransition(Duration.millis(180));
+		assignedTasksFilterDebounce.setOnFinished(e -> renderAssignedTasks());
 		if (assignedTasksSortChoice != null) {
 			assignedTasksSortChoice.getItems().setAll(TASK_SORT_RECENT, TASK_SORT_DUE_DATE, TASK_SORT_PRIORITY, TASK_SORT_NAME);
 			assignedTasksSortChoice.getSelectionModel().select(TASK_SORT_RECENT);
-			assignedTasksSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderAssignedTasks());
+			assignedTasksSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> scheduleAssignedTasksRender());
 		}
 		if (assignedTasksSearchField != null) {
-			assignedTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderAssignedTasks());
+			assignedTasksSearchField.textProperty().addListener((obs, oldV, newV) -> scheduleAssignedTasksRender());
 		}
 		if (assignedTasksCompletedToggleButton != null) {
 			assignedTasksCompletedToggleButton.setOnAction(e -> {
+				long toggleStartNanos = PerfLog.start();
 				showCompletedTasks = !showCompletedTasks;
+				PerfLog.log("FILTER", "start", "panel=assigned_tasks_completed_toggle page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " showCompleted=" + showCompletedTasks);
 				renderAssignedTasks();
+				PerfLog.logDone("FILTER", "panel=assigned_tasks_completed_toggle page=user_view showCompleted=" + showCompletedTasks, toggleStartNanos);
 			});
 			updateAssignedTasksCompletedToggleText();
 		}
+	}
+
+	private void scheduleAssignedTasksRender() {
+		long filterStartNanos = PerfLog.start();
+		long generation = ++assignedTasksRenderSequence;
+		PerfLog.log("FILTER", "start", "panel=assigned_tasks page=user_view userId=" + (currentUser == null ? null : currentUser.id())
+				+ " queryLength=" + normalizedAssignedTaskQuery().length() + " showCompleted=" + showCompletedTasks + " generation=" + generation);
+		if (assignedTasksFilterDebounce == null) {
+			renderAssignedTasks();
+		} else {
+			assignedTasksFilterDebounce.playFromStart();
+		}
+		PerfLog.logDone("FILTER", "panel=assigned_tasks page=user_view debounceScheduled=" + (assignedTasksFilterDebounce != null) + " generation=" + generation, filterStartNanos);
 	}
 
 	private void resetAssignedTaskControls() {
 		if (assignedTasksSearchField != null) {
 			assignedTasksSearchField.clear();
 		}
+		assignedTasksFilterDebounce = new PauseTransition(Duration.millis(180));
+		assignedTasksFilterDebounce.setOnFinished(e -> renderAssignedTasks());
 		if (assignedTasksSortChoice != null) {
 			assignedTasksSortChoice.getSelectionModel().select(TASK_SORT_RECENT);
 		}
@@ -862,6 +941,9 @@ public final class UserController {
 				row.taskId(),
 				row.caseId(),
 				row.caseName(),
+				null,
+				null,
+				null,
 				row.caseResponsibleAttorney(),
 				row.caseResponsibleAttorneyColor(),
 				row.caseNonEngagementLetterSent(),
@@ -1099,6 +1181,7 @@ public final class UserController {
 				.orElse(false);
 		new Thread(() -> {
 			try {
+				invalidateAssignedTasksCache();
 				if (currentlyCompleted) {
 					caseTaskService.uncompleteTask(taskId, shaleClientId, appState.getUserId());
 				} else {
@@ -1319,6 +1402,7 @@ public final class UserController {
 	}
 
 	private void saveTaskFromDetail(long taskId, int shaleClientId, int currentUserId, TaskDetailDialog.SaveTaskPayload payload) {
+		invalidateAssignedTasksCache();
 		CaseTaskService.UpdateTaskRequest request = new CaseTaskService.UpdateTaskRequest(
 				taskId,
 				shaleClientId,
@@ -1340,6 +1424,7 @@ public final class UserController {
 	}
 
 	private void deleteTaskFromDetail(long taskId, int shaleClientId, int currentUserId) {
+		invalidateAssignedTasksCache();
 		new Thread(() -> {
 			try {
 				caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
@@ -1460,6 +1545,38 @@ public final class UserController {
 		}
 		String email = fallback(user.email());
 		return "—".equals(email) ? "User #" + user.id() : email;
+	}
+
+	private void invalidateAssignedCasesCache() {
+		if (userDetailCache != null) {
+			userDetailCache.assignedCases = null;
+			PerfLog.log("CACHE", "invalidate", "panel=assigned_cases page=user_view userId=" + userDetailCache.userId);
+		}
+	}
+
+	private void invalidateAssignedTasksCache() {
+		if (userDetailCache != null) {
+			userDetailCache.assignedTasks = null;
+			userDetailCache.assignedTaskUsers = null;
+			PerfLog.log("CACHE", "invalidate", "panel=assigned_tasks page=user_view userId=" + userDetailCache.userId);
+		}
+	}
+
+	private static final class UserDetailCache {
+		private final int userId;
+		private final int shaleClientId;
+		private List<CaseRow> assignedCases;
+		private List<AssignedUserTaskRow> assignedTasks;
+		private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedTaskUsers;
+
+		private UserDetailCache(int userId, int shaleClientId) {
+			this.userId = userId;
+			this.shaleClientId = shaleClientId;
+		}
+
+		private boolean matches(int userId, int shaleClientId) {
+			return this.userId == userId && this.shaleClientId == shaleClientId;
+		}
 	}
 
 	private static String safeText(String value) {

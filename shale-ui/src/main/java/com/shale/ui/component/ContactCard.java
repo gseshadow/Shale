@@ -83,6 +83,31 @@ public class ContactCard extends HBox {
         getChildren().add(nameLabel);
     }
 
+
+    public void applyCompactMini() {
+        applyMini();
+        setPadding(new Insets(2, 6, 2, 6));
+        setSpacing(4);
+        setMaxWidth(96);
+        nameLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700;");
+        nameLabel.setWrapText(false);
+        nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        nameLabel.setMinWidth(0);
+        nameLabel.setMaxWidth(Double.MAX_VALUE);
+    }
+
+    public void applySecondaryMini() {
+        applyMini();
+        setPadding(new Insets(3, 8, 3, 8));
+        setSpacing(5);
+        setMaxWidth(124);
+        nameLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600;");
+        nameLabel.setWrapText(false);
+        nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        nameLabel.setMinWidth(0);
+        nameLabel.setMaxWidth(Double.MAX_VALUE);
+    }
+
     public void applyCompact() {
         getChildren().clear();
 

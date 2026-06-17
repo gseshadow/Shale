@@ -5,8 +5,10 @@ import java.util.List;
 import java.util.Optional;
 
 import com.shale.core.dto.CaseDetailDto;
+import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.PracticeAreaDto;
 
 /**
  * Shared case application boundary for future desktop/server adapters.
@@ -24,6 +26,23 @@ public interface CaseServicePort {
 	List<CaseOverviewDto> searchCases(String query, int shaleClientId, int limit);
 
 	List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
+
+	List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
+
+	List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive);
+
+	PracticeAreaDto createPracticeArea(PracticeAreaCommand command);
+
+	PracticeAreaDto updatePracticeArea(PracticeAreaCommand command);
+
+	void deactivatePracticeArea(int shaleClientId, int practiceAreaId);
+
+	CaseStatusDto createCaseStatus(CaseStatusCommand command);
+
+	CaseStatusDto updateCaseStatus(CaseStatusCommand command);
+
+
+	void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
 	/**
 	 * Adds a user-authored case note using the existing CaseDao.addCaseNote
@@ -44,6 +63,26 @@ public interface CaseServicePort {
 			int shaleClientId,
 			int actorUserId,
 			String noteText) {
+	}
+
+	record PracticeAreaCommand(
+			Integer id,
+			int shaleClientId,
+			String name,
+			String color,
+			boolean active,
+			String systemKey) {
+	}
+
+	record CaseStatusCommand(
+			Integer id,
+			int shaleClientId,
+			String name,
+			boolean closed,
+			Integer sortOrder,
+			String color,
+			String lifecycleKey,
+			String systemKey) {
 	}
 
 	record UpdateCaseCoreDetailsCommand(

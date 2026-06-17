@@ -6,6 +6,7 @@ import java.sql.Timestamp;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -22,6 +23,8 @@ import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
 
@@ -174,6 +177,8 @@ public final class CaseDao {
 			String responsibleAttorneyColor,
 			Boolean nonEngagementLetterSent,
 			String primaryStatusName,
+			String primaryStatusColor,
+			String practiceAreaColor,
 			String clientName,
 			String opposingPartiesName,
 			String latestCaseUpdate,
@@ -185,7 +190,7 @@ public final class CaseDao {
 				Integer primaryStatusId, Integer responsibleAttorneyId, String responsibleAttorneyName,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
 			this(id, name, intakeDate, statuteOfLimitationsDate, primaryStatusId, responsibleAttorneyId,
-					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent, null, null, null, null, null, null, null);
+					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent, null, null, null, null, null, null, null, null, null);
 		}
 	}
 
@@ -844,6 +849,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -855,8 +862,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -970,7 +978,16 @@ public final class CaseDao {
 								getNullableInt(rs, "ResponsibleAttorneyId"),
 								rs.getString("ResponsibleAttorneyName"),
 								rs.getString("ResponsibleAttorneyColor"),
-								getNullableBoolean(rs, "NonEngagementLetterSent")));
+								getNullableBoolean(rs, "NonEngagementLetterSent"),
+								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
+								rs.getString("ClientName"),
+								rs.getString("OpposingPartiesName"),
+								rs.getString("LatestCaseUpdate"),
+								rs.getString("Description"),
+								toLocalDate(rs.getDate("DateOfIncident")),
+								toLocalDate(rs.getDate("TortNoticeDeadline"))));
 					}
 				}
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
@@ -1022,6 +1039,7 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) s.Id AS PrimaryStatusId
 					    FROM %s cs
@@ -1084,7 +1102,16 @@ public final class CaseDao {
 								getNullableInt(rs, "ResponsibleAttorneyId"),
 								rs.getString("ResponsibleAttorneyName"),
 								rs.getString("ResponsibleAttorneyColor"),
-								getNullableBoolean(rs, "NonEngagementLetterSent")));
+								getNullableBoolean(rs, "NonEngagementLetterSent"),
+								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
+								rs.getString("ClientName"),
+								rs.getString("OpposingPartiesName"),
+								rs.getString("LatestCaseUpdate"),
+								rs.getString("Description"),
+								toLocalDate(rs.getDate("DateOfIncident")),
+								toLocalDate(rs.getDate("TortNoticeDeadline"))));
 					}
 				}
 				return out;
@@ -1114,6 +1141,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -1125,8 +1154,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -1227,6 +1257,8 @@ public final class CaseDao {
 								rs.getString("ResponsibleAttorneyColor"),
 								getNullableBoolean(rs, "NonEngagementLetterSent"),
 								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
 								rs.getString("ClientName"),
 								rs.getString("OpposingPartiesName"),
 								rs.getString("LatestCaseUpdate"),
@@ -1267,6 +1299,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -1278,8 +1312,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -1380,6 +1415,8 @@ public final class CaseDao {
 								rs.getString("ResponsibleAttorneyColor"),
 								getNullableBoolean(rs, "NonEngagementLetterSent"),
 								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
 								rs.getString("ClientName"),
 								rs.getString("OpposingPartiesName"),
 								rs.getString("LatestCaseUpdate"),
@@ -1452,6 +1489,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -1463,8 +1502,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -1590,6 +1630,8 @@ public final class CaseDao {
 								rs.getString("ResponsibleAttorneyColor"),
 								getNullableBoolean(rs, "NonEngagementLetterSent"),
 								rs.getString("CurrentStatusName"),
+								rs.getString("PrimaryStatusColor"),
+								rs.getString("PracticeAreaColor"),
 								rs.getString("ClientName"),
 								rs.getString("OpposingPartiesName"),
 								rs.getString("LatestCaseUpdate"),
@@ -1664,6 +1706,7 @@ public final class CaseDao {
 			StringBuilder sql = new StringBuilder("""
 					SELECT COUNT(1)
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) s.Id AS PrimaryStatusId
 					    FROM %s cs
@@ -1721,6 +1764,7 @@ public final class CaseDao {
 			String sql = """
 					SELECT COUNT(1)
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) s.Name AS CurrentStatusName
 					    FROM %s cs
@@ -5142,6 +5186,384 @@ public final class CaseDao {
 		}
 	}
 
+
+	public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
+		if (shaleClientId <= 0) {
+			return List.of();
+		}
+		try (Connection con = db.requireConnection()) {
+			boolean hasSystemKey = tableHasColumn(con, "PracticeAreas", "SystemKey");
+			String systemKeySelect = hasSystemKey ? "SystemKey" : "NULL AS SystemKey";
+			String activeFilter = includeInactive ? "" : " AND IsActive = 1 AND IsDeleted = 0";
+			String sql = """
+					SELECT Id, ShaleClientId, Name, Color, IsActive, IsDeleted, %s
+					FROM dbo.PracticeAreas
+					WHERE (ShaleClientId = ? OR ShaleClientId IS NULL)
+					%s
+					ORDER BY CASE WHEN ShaleClientId = ? THEN 0 ELSE 1 END, Name, Id;
+					""".formatted(systemKeySelect, activeFilter);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, shaleClientId);
+				ps.setInt(2, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<PracticeAreaDto> out = new ArrayList<>();
+					while (rs.next()) {
+						out.add(mapPracticeAreaDto(rs));
+					}
+					return out;
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list practice areas (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public PracticeAreaDto createPracticeArea(int shaleClientId, String name, String color, boolean active, String systemKey) {
+		String normalizedName = normalizePracticeAreaName(name);
+		String normalizedSystemKey = normalizeSystemKey(systemKey);
+		try (Connection con = db.requireConnection()) {
+			validatePracticeAreaUnique(con, shaleClientId, null, normalizedName, normalizedSystemKey);
+			String sql = """
+					INSERT INTO dbo.PracticeAreas (ShaleClientId, Name, Color, IsActive, IsDeleted, CreatedAt, UpdatedAt, SystemKey)
+					VALUES (?, ?, ?, ?, 0, SYSUTCDATETIME(), SYSUTCDATETIME(), ?);
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+				ps.setInt(1, shaleClientId);
+				ps.setString(2, normalizedName);
+				ps.setString(3, trimToNull(color));
+				ps.setBoolean(4, active);
+				ps.setString(5, normalizedSystemKey);
+				ps.executeUpdate();
+				try (ResultSet keys = ps.getGeneratedKeys()) {
+					if (keys.next()) return findPracticeAreaById(con, keys.getInt(1));
+				}
+			}
+			throw new RuntimeException("Failed to read created practice area id.");
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create practice area.", e);
+		}
+	}
+
+	public PracticeAreaDto updatePracticeArea(int shaleClientId, int practiceAreaId, String name, String color, boolean active, String systemKey) {
+		String normalizedName = normalizePracticeAreaName(name);
+		try (Connection con = db.requireConnection()) {
+			PracticeAreaDto existing = findPracticeAreaById(con, practiceAreaId);
+			if (existing == null) throw new IllegalArgumentException("Practice area not found.");
+			String normalizedSystemKey = normalizeSystemKey(systemKey == null ? existing.systemKey() : systemKey);
+			if (existing.shaleClientId() == null) {
+				return createPracticeArea(shaleClientId, normalizedName, color, active, normalizedSystemKey);
+			}
+			if (existing.shaleClientId() != shaleClientId) throw new IllegalArgumentException("Practice area belongs to a different tenant.");
+			validatePracticeAreaUnique(con, shaleClientId, practiceAreaId, normalizedName, normalizedSystemKey);
+			String sql = """
+					UPDATE dbo.PracticeAreas
+					SET Name = ?, Color = ?, IsActive = ?, UpdatedAt = SYSUTCDATETIME(), SystemKey = ?
+					WHERE Id = ? AND ShaleClientId = ?;
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, normalizedName);
+				ps.setString(2, trimToNull(color));
+				ps.setBoolean(3, active);
+				ps.setString(4, normalizedSystemKey);
+				ps.setInt(5, practiceAreaId);
+				ps.setInt(6, shaleClientId);
+				if (ps.executeUpdate() == 0) throw new IllegalArgumentException("Practice area not found for this tenant.");
+			}
+			return findPracticeAreaById(con, practiceAreaId);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update practice area.", e);
+		}
+	}
+
+	public void deactivatePracticeArea(int shaleClientId, int practiceAreaId) {
+		try (Connection con = db.requireConnection()) {
+			PracticeAreaDto existing = findPracticeAreaById(con, practiceAreaId);
+			if (existing == null) throw new IllegalArgumentException("Practice area not found.");
+			if (existing.systemKey() != null && !existing.systemKey().isBlank()) throw new IllegalArgumentException("System practice areas cannot be removed.");
+			if (existing.shaleClientId() == null) throw new IllegalArgumentException("Global practice areas cannot be removed from tenant settings.");
+			if (existing.shaleClientId() != shaleClientId) throw new IllegalArgumentException("Practice area belongs to a different tenant.");
+			try (PreparedStatement ps = con.prepareStatement("""
+					UPDATE dbo.PracticeAreas
+					SET IsActive = 0, IsDeleted = 1, UpdatedAt = SYSUTCDATETIME()
+					WHERE Id = ? AND ShaleClientId = ?;
+					""")) {
+				ps.setInt(1, practiceAreaId);
+				ps.setInt(2, shaleClientId);
+				ps.executeUpdate();
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to remove practice area.", e);
+		}
+	}
+
+	private static PracticeAreaDto mapPracticeAreaDto(ResultSet rs) throws SQLException {
+		return new PracticeAreaDto(rs.getInt("Id"), rs.getString("Name"), rs.getString("Color"),
+				rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"), normalizeSystemKey(rs.getString("SystemKey")),
+				getNullableInt(rs, "ShaleClientId"));
+	}
+
+	private PracticeAreaDto findPracticeAreaById(Connection con, int practiceAreaId) throws SQLException {
+		String systemKeySelect = tableHasColumn(con, "PracticeAreas", "SystemKey") ? "SystemKey" : "NULL AS SystemKey";
+		String sql = "SELECT Id, ShaleClientId, Name, Color, IsActive, IsDeleted, " + systemKeySelect + " FROM dbo.PracticeAreas WHERE Id = ?";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, practiceAreaId);
+			try (ResultSet rs = ps.executeQuery()) { return rs.next() ? mapPracticeAreaDto(rs) : null; }
+		}
+	}
+
+	private static void validatePracticeAreaUnique(Connection con, int shaleClientId, Integer excludeId, String name, String systemKey) throws SQLException {
+		StringBuilder sql = new StringBuilder("""
+				SELECT 1 FROM dbo.PracticeAreas
+				WHERE ShaleClientId = ? AND IsDeleted = 0
+				  AND (LOWER(LTRIM(RTRIM(Name))) = LOWER(?)
+				""");
+		if (systemKey != null) sql.append(" OR SystemKey = ?");
+		sql.append(")");
+		if (excludeId != null) sql.append(" AND Id <> ?");
+		try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+			int i = 1;
+			ps.setInt(i++, shaleClientId);
+			ps.setString(i++, name);
+			if (systemKey != null) ps.setString(i++, systemKey);
+			if (excludeId != null) ps.setInt(i++, excludeId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) throw new IllegalArgumentException("A tenant practice area with this name already exists.");
+			}
+		}
+	}
+
+	private static String normalizePracticeAreaName(String name) {
+		String trimmed = name == null ? "" : name.trim();
+		if (trimmed.isBlank()) throw new IllegalArgumentException("Practice area name is required.");
+		return trimmed;
+	}
+
+	public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
+		if (shaleClientId <= 0) {
+			return List.of();
+		}
+		return toCaseStatusDtos(listStatusesForTenant(shaleClientId));
+	}
+
+	static List<CaseStatusDto> toCaseStatusDtos(List<StatusRow> statuses) {
+		if (statuses == null || statuses.isEmpty()) {
+			return List.of();
+		}
+		List<CaseStatusDto> out = new ArrayList<>(statuses.size());
+		for (StatusRow status : statuses) {
+			if (status == null) {
+				continue;
+			}
+			out.add(new CaseStatusDto(
+					status.id(),
+					status.name(),
+					isTerminalStatus(status),
+					status.sortOrder(),
+					status.color(),
+					status.lifecycleKey(),
+					status.systemKey(),
+					null));
+		}
+		return out;
+	}
+
+	public CaseStatusDto createCaseStatus(int shaleClientId, String name, boolean closed, Integer sortOrder,
+			String color, String lifecycleKey, String systemKey) {
+		String normalizedName = normalizeStatusName(name);
+		try (Connection con = db.requireConnection()) {
+			int effectiveSort = sortOrder == null ? nextStatusSortOrder(con, shaleClientId) : sortOrder;
+			String normalizedLifecycle = normalizeLifecycleKey(lifecycleKey);
+			String normalizedSystemKey = normalizeSystemKey(systemKey);
+			validateCaseStatusUnique(con, shaleClientId, null, normalizedName, normalizedSystemKey);
+			String sql = """
+					INSERT INTO dbo.Statuses (ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey)
+					VALUES (?, ?, ?, ?, ?, ?, ?);
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+				ps.setInt(1, shaleClientId);
+				ps.setString(2, normalizedName);
+				ps.setBoolean(3, closed);
+				ps.setInt(4, effectiveSort);
+				ps.setString(5, trimToNull(color));
+				ps.setString(6, normalizedLifecycle);
+				ps.setString(7, normalizedSystemKey);
+				ps.executeUpdate();
+				try (ResultSet keys = ps.getGeneratedKeys()) {
+					if (keys.next()) {
+						return findCaseStatusById(con, keys.getInt(1));
+					}
+				}
+			}
+			throw new RuntimeException("Failed to read created case status id.");
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create case status.", e);
+		}
+	}
+
+	public CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, boolean closed,
+			Integer sortOrder, String color, String lifecycleKey, String systemKey) {
+		String normalizedName = normalizeStatusName(name);
+		try (Connection con = db.requireConnection()) {
+			CaseStatusDto existing = findCaseStatusById(con, statusId);
+			if (existing == null) {
+				throw new IllegalArgumentException("Case status not found.");
+			}
+			int targetId = statusId;
+			Integer targetTenantId = existing.shaleClientId();
+			String normalizedLifecycle = normalizeLifecycleKey(lifecycleKey);
+			String normalizedSystemKey = normalizeSystemKey(systemKey);
+			validateCaseStatusUnique(con, shaleClientId, targetTenantId == null ? null : targetId, normalizedName, normalizedSystemKey);
+			if (targetTenantId == null) {
+				// Global/default statuses are part of the effective lookup set. Editing them from
+				// tenant Settings creates a tenant-scoped override instead of mutating global data.
+				return createCaseStatus(shaleClientId, normalizedName, closed, sortOrder, color, normalizedLifecycle,
+						normalizedSystemKey == null ? existing.systemKey() : normalizedSystemKey);
+			}
+			if (targetTenantId != shaleClientId) {
+				throw new IllegalArgumentException("Case status belongs to a different tenant.");
+			}
+			String sql = """
+					UPDATE dbo.Statuses
+					SET Name = ?, IsClosed = ?, SortOrder = ?, Color = ?, LifecycleKey = ?, SystemKey = ?
+					WHERE Id = ? AND ShaleClientId = ?;
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, normalizedName);
+				ps.setBoolean(2, closed);
+				ps.setInt(3, sortOrder == null ? 0 : sortOrder);
+				ps.setString(4, trimToNull(color));
+				ps.setString(5, normalizedLifecycle);
+				ps.setString(6, normalizedSystemKey);
+				ps.setInt(7, targetId);
+				ps.setInt(8, shaleClientId);
+				if (ps.executeUpdate() == 0) {
+					throw new IllegalArgumentException("Case status not found for this tenant.");
+				}
+			}
+			return findCaseStatusById(con, targetId);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update case status.", e);
+		}
+	}
+
+	public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
+		try (Connection con = db.requireConnection()) {
+			CaseStatusDto first = requireTenantEditableStatus(con, shaleClientId, firstStatusId);
+			CaseStatusDto second = requireTenantEditableStatus(con, shaleClientId, secondStatusId);
+			try (PreparedStatement ps = con.prepareStatement("""
+					UPDATE dbo.Statuses
+					SET SortOrder = CASE Id WHEN ? THEN ? WHEN ? THEN ? ELSE SortOrder END
+					WHERE ShaleClientId = ? AND Id IN (?, ?);
+					""")) {
+				ps.setInt(1, first.id());
+				ps.setInt(2, second.sortOrder() == null ? 0 : second.sortOrder());
+				ps.setInt(3, second.id());
+				ps.setInt(4, first.sortOrder() == null ? 0 : first.sortOrder());
+				ps.setInt(5, shaleClientId);
+				ps.setInt(6, first.id());
+				ps.setInt(7, second.id());
+				ps.executeUpdate();
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to reorder case statuses.", e);
+		}
+	}
+
+	private static CaseStatusDto mapCaseStatusDto(ResultSet rs) throws SQLException {
+		return new CaseStatusDto(
+				rs.getInt("Id"),
+				rs.getString("Name"),
+				rs.getBoolean("IsClosed"),
+				getNullableInt(rs, "SortOrder"),
+				rs.getString("Color"),
+				resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name")),
+				normalizeSystemKey(rs.getString("SystemKey")),
+				getNullableInt(rs, "ShaleClientId"));
+	}
+
+	private CaseStatusDto findCaseStatusById(Connection con, int statusId) throws SQLException {
+		String sql = """
+				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey
+				FROM dbo.Statuses
+				WHERE Id = ?;
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, statusId);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? mapCaseStatusDto(rs) : null;
+			}
+		}
+	}
+
+	private CaseStatusDto requireTenantEditableStatus(Connection con, int shaleClientId, int statusId) throws SQLException {
+		CaseStatusDto status = findCaseStatusById(con, statusId);
+		if (status == null) {
+			throw new IllegalArgumentException("Case status not found.");
+		}
+		if (status.shaleClientId() == null) {
+			throw new IllegalArgumentException("Create a tenant override before reordering a global status.");
+		}
+		if (status.shaleClientId() != shaleClientId) {
+			throw new IllegalArgumentException("Case status belongs to a different tenant.");
+		}
+		return status;
+	}
+
+	private static void validateCaseStatusUnique(Connection con, int shaleClientId, Integer excludeId, String name,
+			String systemKey) throws SQLException {
+		StringBuilder sql = new StringBuilder("""
+				SELECT 1
+				FROM dbo.Statuses
+				WHERE ShaleClientId = ?
+				  AND (
+				    LOWER(LTRIM(RTRIM(Name))) = LOWER(?)
+				""");
+		if (systemKey != null) {
+			sql.append(" OR SystemKey = ?");
+		}
+		sql.append(")");
+		if (excludeId != null) {
+			sql.append(" AND Id <> ?");
+		}
+		try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+			int i = 1;
+			ps.setInt(i++, shaleClientId);
+			ps.setString(i++, name);
+			if (systemKey != null) {
+				ps.setString(i++, systemKey);
+			}
+			if (excludeId != null) {
+				ps.setInt(i++, excludeId);
+			}
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) {
+					throw new IllegalArgumentException("A tenant case status with this name or system key already exists.");
+				}
+			}
+		}
+	}
+
+	private static Integer nextStatusSortOrder(Connection con, int shaleClientId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("SELECT COALESCE(MAX(SortOrder), 0) + 10 FROM dbo.Statuses WHERE ShaleClientId = ?")) {
+			ps.setInt(1, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getInt(1) : 10;
+			}
+		}
+	}
+
+	private static String normalizeStatusName(String name) {
+		String trimmed = name == null ? "" : name.trim();
+		if (trimmed.isBlank()) throw new IllegalArgumentException("Status name is required.");
+		return trimmed;
+	}
+
+	private static String trimToNull(String value) {
+		if (value == null) return null;
+		String trimmed = value.trim();
+		return trimmed.isBlank() ? null : trimmed;
+	}
+
 	public String findLifecycleKeyForStatus(int shaleClientId, int statusId) {
 		StatusRow status = findStatusForTenantById(shaleClientId, statusId);
 		return status == null ? null : status.lifecycleKey();
@@ -5448,6 +5870,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -5459,8 +5883,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -5556,6 +5981,8 @@ public final class CaseDao {
 							rs.getString("ResponsibleAttorneyColor"),
 							getNullableBoolean(rs, "NonEngagementLetterSent"),
 							rs.getString("CurrentStatusName"),
+							rs.getString("PrimaryStatusColor"),
+							rs.getString("PracticeAreaColor"),
 							rs.getString("ClientName"),
 							rs.getString("OpposingPartiesName"),
 							rs.getString("LatestCaseUpdate"),
@@ -5588,6 +6015,8 @@ public final class CaseDao {
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
 					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
 					  clientContact.ClientName,
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
@@ -5599,8 +6028,9 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName
 					FROM %s c
+					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
 					    FROM %s cs
 					    INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
@@ -5703,6 +6133,8 @@ public final class CaseDao {
 							rs.getString("ResponsibleAttorneyColor"),
 							getNullableBoolean(rs, "NonEngagementLetterSent"),
 							rs.getString("CurrentStatusName"),
+							rs.getString("PrimaryStatusColor"),
+							rs.getString("PracticeAreaColor"),
 							rs.getString("ClientName"),
 							rs.getString("OpposingPartiesName"),
 							rs.getString("LatestCaseUpdate"),

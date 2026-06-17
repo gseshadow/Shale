@@ -283,7 +283,7 @@ class ApiReadControllerTest {
             this.caseId = caseId;
             this.shaleClientId = shaleClientId;
             return List.of(new CaseTaskListItemDto(701L, shaleClientId, caseId, "Smith v. Example",
-                    "Ada Attorney", "#111111", false, "Review records", "Read intake packet",
+                    "Open", "#00AA00", "#222222", "Ada Attorney", "#111111", false, "Review records", "Read intake packet",
                     1, "#FFAA00", LocalDateTime.of(2026, 1, 2, 12, 0), null,
                     31, "Ada Attorney", "#111111", 32, "Case Creator",
                     LocalDateTime.of(2026, 1, 1, 9, 0), LocalDateTime.of(2026, 1, 1, 10, 0), false));

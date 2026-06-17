@@ -5,6 +5,7 @@ import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
@@ -232,24 +233,24 @@ public final class SceneManager {
 		}
 		notificationBadgeCountFuture = notificationBadgeCountExecutor.submit(() -> {
 			long startNanos = System.nanoTime();
-			log.info("PERF notifications.badge.count.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
+			PerfLog.debug(log, "PERF notifications.badge.count.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
 			try {
 				int unreadCount = durableNotificationService.countUnread(shaleClientId, userId);
 				long queryElapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
 				if (!isActiveBadgeSession(generation, shaleClientId, userId)) {
-					log.info("PERF notifications.badge.count.discard tenantId={} userId={} generation={} unreadCount={} elapsedMs={}",
+					PerfLog.debug(log, "PERF notifications.badge.count.discard tenantId={} userId={} generation={} unreadCount={} elapsedMs={}",
 							shaleClientId, userId, generation, unreadCount, queryElapsedMs);
 					return;
 				}
 				Platform.runLater(() -> {
 					if (!isActiveBadgeSession(generation, shaleClientId, userId)) {
-						log.info("PERF notifications.badge.count.applySkipped tenantId={} userId={} generation={} unreadCount={}",
+						PerfLog.debug(log, "PERF notifications.badge.count.applySkipped tenantId={} userId={} generation={} unreadCount={}",
 								shaleClientId, userId, generation, unreadCount);
 						return;
 					}
 					notificationCenterService.applyServerUnreadCount(unreadCount);
 					long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-					log.info("PERF notifications.badge.count.done tenantId={} userId={} generation={} unreadCount={} elapsedMs={}",
+					PerfLog.debug(log, "PERF notifications.badge.count.done tenantId={} userId={} generation={} unreadCount={} elapsedMs={}",
 							shaleClientId, userId, generation, unreadCount, elapsedMs);
 				});
 			} catch (RuntimeException ex) {
@@ -267,28 +268,28 @@ public final class SceneManager {
 		long generation = notificationStartupGeneration.incrementAndGet();
 		notificationStartupFuture = notificationStartupExecutor.submit(() -> {
 			long bootstrapStartNanos = System.nanoTime();
-			log.info("PERF notifications.bootstrap.full.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
+			PerfLog.debug(log, "PERF notifications.bootstrap.full.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
 			try {
 				long dueStartNanos = System.nanoTime();
 				taskDueDateNotificationGenerator.runOnce();
 				long dueElapsedMs = (System.nanoTime() - dueStartNanos) / 1_000_000;
-				log.info("PERF notifications.bootstrap.dueDate.done tenantId={} userId={} generation={} elapsedMs={}",
+				PerfLog.debug(log, "PERF notifications.bootstrap.dueDate.done tenantId={} userId={} generation={} elapsedMs={}",
 						shaleClientId, userId, generation, dueElapsedMs);
 
 				long hydrateStartNanos = System.nanoTime();
 				var unread = durableNotificationService.listUnread(shaleClientId, userId);
 				long hydrateElapsedMs = (System.nanoTime() - hydrateStartNanos) / 1_000_000;
-				log.info("PERF notifications.bootstrap.hydrate.done tenantId={} userId={} generation={} count={} elapsedMs={}",
+				PerfLog.debug(log, "PERF notifications.bootstrap.hydrate.done tenantId={} userId={} generation={} count={} elapsedMs={}",
 						shaleClientId, userId, generation, unread.size(), hydrateElapsedMs);
 
 				if (!isActiveSession(generation, shaleClientId, userId)) {
-					log.info("PERF notifications.bootstrap.full.discard tenantId={} userId={} generation={} reason=session_changed",
+					PerfLog.debug(log, "PERF notifications.bootstrap.full.discard tenantId={} userId={} generation={} reason=session_changed",
 							shaleClientId, userId, generation);
 					return;
 				}
 				Platform.runLater(() -> {
 					if (!isActiveSession(generation, shaleClientId, userId)) {
-						log.info("PERF notifications.bootstrap.full.applySkipped tenantId={} userId={} generation={} reason=session_changed",
+						PerfLog.debug(log, "PERF notifications.bootstrap.full.applySkipped tenantId={} userId={} generation={} reason=session_changed",
 								shaleClientId, userId, generation);
 						return;
 					}
@@ -296,7 +297,7 @@ public final class SceneManager {
 					notificationCenterService.completeInitialHydration();
 					notificationBadgeCountGeneration.incrementAndGet();
 					long bootstrapElapsedMs = (System.nanoTime() - bootstrapStartNanos) / 1_000_000;
-					log.info("PERF notifications.bootstrap.full.done tenantId={} userId={} generation={} hydratedCount={} elapsedMs={}",
+					PerfLog.debug(log, "PERF notifications.bootstrap.full.done tenantId={} userId={} generation={} hydratedCount={} elapsedMs={}",
 							shaleClientId, userId, generation, unread.size(), bootstrapElapsedMs);
 				});
 			} catch (RuntimeException ex) {
@@ -631,7 +632,7 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService, appState, this::showAuditLogViewer);
+			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new UserDao(dbSessionProvider));
 			return c;
 		});
 	}

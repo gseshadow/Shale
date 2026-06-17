@@ -743,7 +743,10 @@ public final class MyShaleController {
 				r.primaryStatusId(),
 				safe(r.responsibleAttorneyName()),
 				safe(r.responsibleAttorneyColor()),
-				r.nonEngagementLetterSent()
+				r.nonEngagementLetterSent(),
+				safe(r.primaryStatusName()),
+				safe(r.primaryStatusColor()),
+				safe(r.practiceAreaColor())
 		);
 	}
 
@@ -922,7 +925,10 @@ public final class MyShaleController {
 				vm.solDate,
 				vm.responsibleAttorney,
 				vm.responsibleAttorneyColor,
-				vm.nonEngagementLetterSent));
+				vm.nonEngagementLetterSent,
+				vm.primaryStatusName,
+				vm.primaryStatusColor,
+				vm.practiceAreaColor));
 	}
 
 	private void refreshMyTasks() {
@@ -1472,6 +1478,9 @@ public final class MyShaleController {
 					task.id(),
 					task.caseId(),
 					task.caseName(),
+					task.casePrimaryStatusName(),
+					task.casePrimaryStatusColor(),
+					task.casePracticeAreaColor(),
 					task.caseResponsibleAttorney(),
 					task.caseResponsibleAttorneyColor(),
 					task.caseNonEngagementLetterSent(),
@@ -1482,7 +1491,7 @@ public final class MyShaleController {
 					task.dueAt(),
 					task.completedAt(),
 					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-			var taskCard = taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true);
+			var taskCard = taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true);
 			taskCard.getStyleClass().add("my-tasks-grid-card");
 			taskCard.setMinWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
 			taskCard.setPrefWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
@@ -1901,6 +1910,9 @@ public final class MyShaleController {
 						task.id(),
 						task.caseId(),
 						task.caseName(),
+						task.casePrimaryStatusName(),
+						task.casePrimaryStatusColor(),
+						task.casePracticeAreaColor(),
 						task.caseResponsibleAttorney(),
 						task.caseResponsibleAttorneyColor(),
 						task.caseNonEngagementLetterSent(),
@@ -2265,6 +2277,9 @@ public final class MyShaleController {
 					task.id(),
 					task.caseId(),
 					task.caseName(),
+					task.casePrimaryStatusName(),
+					task.casePrimaryStatusColor(),
+					task.casePracticeAreaColor(),
 					task.caseResponsibleAttorney(),
 					task.caseResponsibleAttorneyColor(),
 					task.caseNonEngagementLetterSent(),
@@ -2276,7 +2291,7 @@ public final class MyShaleController {
 					task.completedAt(),
 					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
 			if (fullVariant) {
-				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.FULL, true));
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true));
 			} else {
 				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
 			}
@@ -2598,8 +2613,8 @@ public final class MyShaleController {
 	}
 
 	private void showTaskDetailPopup(Long taskId) {
-		long clickReceivedAt = System.nanoTime();
-		System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] click_received taskId=" + taskId);
+		long clickReceivedAt = PerfLog.start();
+		PerfLog.log("TASK_DETAIL_TIMING", "click_received", "context=MY_TASKS taskId=" + taskId);
 		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
 			return;
 		}
@@ -2611,7 +2626,7 @@ public final class MyShaleController {
 			return;
 		}
 		if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
-			System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] open_skipped_in_flight taskId=" + taskId);
+			PerfLog.log("TASK_DETAIL_TIMING", "open_skipped_in_flight", "context=MY_TASKS taskId=" + taskId);
 			return;
 		}
 		Optional<CaseTaskListItemDto> summary = findMyTaskById(taskId);
@@ -2633,8 +2648,7 @@ public final class MyShaleController {
 				List.of(),
 				List.of(),
 				summary.map(item -> item.completedAt() != null).orElse(false));
-		System.out.println("[TASK_DETAIL_TIMING][MY_TASKS] shell_stage_created_ms="
-				+ ((System.nanoTime() - clickReceivedAt) / 1_000_000L) + " taskId=" + taskId);
+		PerfLog.logElapsed("TASK_DETAIL_TIMING", "shell_stage_created", "context=MY_TASKS taskId=" + taskId, PerfLog.elapsedMs(clickReceivedAt));
 		try {
 			auditTaskRead(taskId);
 			Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
@@ -2906,9 +2920,13 @@ public final class MyShaleController {
 		final String responsibleAttorney;
 		final String responsibleAttorneyColor;
 		final Boolean nonEngagementLetterSent;
+		final String primaryStatusName;
+		final String primaryStatusColor;
+		final String practiceAreaColor;
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId,
-				String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
+				String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent,
+				String primaryStatusName, String primaryStatusColor, String practiceAreaColor) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
@@ -2917,6 +2935,9 @@ public final class MyShaleController {
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
 			this.nonEngagementLetterSent = nonEngagementLetterSent;
+			this.primaryStatusName = Objects.requireNonNullElse(primaryStatusName, "");
+			this.primaryStatusColor = Objects.requireNonNullElse(primaryStatusColor, "");
+			this.practiceAreaColor = Objects.requireNonNullElse(practiceAreaColor, "");
 		}
 
 		boolean sameContent(CaseCardVm other) {
@@ -2930,7 +2951,10 @@ public final class MyShaleController {
 					&& Objects.equals(primaryStatusId, other.primaryStatusId)
 					&& Objects.equals(responsibleAttorney, other.responsibleAttorney)
 					&& Objects.equals(responsibleAttorneyColor, other.responsibleAttorneyColor)
-					&& Objects.equals(nonEngagementLetterSent, other.nonEngagementLetterSent);
+					&& Objects.equals(nonEngagementLetterSent, other.nonEngagementLetterSent)
+					&& Objects.equals(primaryStatusName, other.primaryStatusName)
+					&& Objects.equals(primaryStatusColor, other.primaryStatusColor)
+					&& Objects.equals(practiceAreaColor, other.practiceAreaColor);
 		}
 	}
 }

@@ -5,6 +5,7 @@ import com.shale.data.dao.UserDao.DirectoryUserRow;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.PerfLog;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -13,6 +14,8 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -44,6 +47,8 @@ public final class TeamController {
 	private List<DirectoryUserRow> loadedUsers = List.of();
 	private String emptyStateMessage = "No team members to display yet.";
 	private int loadGeneration = 0;
+	private long searchRenderGeneration = 0;
+	private PauseTransition searchDebounce;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "team-directory-loader");
@@ -64,7 +69,15 @@ public final class TeamController {
 	@FXML
 	private void initialize() {
 		if (teamSearchField != null) {
-			teamSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
+			searchDebounce = new PauseTransition(Duration.millis(180));
+			searchDebounce.setOnFinished(e -> rerender());
+			teamSearchField.textProperty().addListener((obs, oldV, newV) -> {
+				long filterStartNanos = PerfLog.start();
+				long generation = ++searchRenderGeneration;
+				PerfLog.log("FILTER", "start", "page=team_list queryLength=" + safe(newV).trim().length() + " generation=" + generation);
+				searchDebounce.playFromStart();
+				PerfLog.logDone("FILTER", "page=team_list debounceScheduled=true generation=" + generation, filterStartNanos);
+			});
 		}
 		if (teamFlow != null) {
 			teamFlow.setHgap(14);
@@ -76,6 +89,8 @@ public final class TeamController {
 	}
 
 	private void loadUsers() {
+		long pageLoadStartNanos = PerfLog.start();
+		PerfLog.log("NAV", "start", "page=team_list");
 		loadGeneration++;
 		final int generationAtSubmit = loadGeneration;
 
@@ -96,17 +111,22 @@ public final class TeamController {
 
 		dbExec.submit(() -> {
 			try {
+				long daoStartNanos = PerfLog.start();
+				PerfLog.log("DAO", "start", "method=listUsersForTenant page=team_list organizationId=" + tenantId + " generation=" + generationAtSubmit);
 				List<DirectoryUserRow> users = new ArrayList<>(userDao.listUsersForTenant(tenantId));
+				PerfLog.logDone("DAO", "method=listUsersForTenant page=team_list organizationId=" + tenantId + " rows=" + users.size() + " generation=" + generationAtSubmit, daoStartNanos);
 				users.sort(Comparator.comparing((DirectoryUserRow row) -> safe(row.displayName()), String.CASE_INSENSITIVE_ORDER)
 						.thenComparingInt(DirectoryUserRow::id));
 
 				Platform.runLater(() -> {
 					if (generationAtSubmit != loadGeneration) {
+						PerfLog.log("NAV", "stale", "page=team_list generation=" + generationAtSubmit + " activeGeneration=" + loadGeneration);
 						return;
 					}
 					loadedUsers = List.copyOf(users);
 					setEmptyStateMessage("No team members to display yet.");
 					rerender();
+					PerfLog.logDone("NAV", "ready page=team_list rows=" + loadedUsers.size() + " generation=" + generationAtSubmit, pageLoadStartNanos);
 				});
 			} catch (RuntimeException ex) {
 				Platform.runLater(() -> {
@@ -126,6 +146,11 @@ public final class TeamController {
 			return;
 		}
 
+		long renderStartNanos = PerfLog.start();
+		long generation = searchRenderGeneration;
+		String query = normalizedQuery();
+		PerfLog.log("RENDER", "start", "page=team_list queryLength=" + query.length() + " loadedRows=" + loadedUsers.size() + " generation=" + generation);
+
 		List<DirectoryUserRow> filteredUsers = loadedUsers.stream()
 				.filter(Objects::nonNull)
 				.filter(this::matchesSearch)
@@ -138,13 +163,13 @@ public final class TeamController {
 		teamFlow.getChildren().setAll(cards);
 
 		boolean empty = cards.isEmpty();
-		String query = normalizedQuery();
 		if (empty && !query.isBlank() && !loadedUsers.isEmpty()) {
 			setEmptyStateMessage("No team members match your search.");
 		} else if (empty && loadedUsers.isEmpty()) {
 			setEmptyStateMessage(emptyStateMessage);
 		}
 		updateEmptyState(empty);
+		PerfLog.logDone("RENDER", "page=team_list filteredRows=" + filteredUsers.size() + " childCount=" + cards.size() + " generation=" + generation, renderStartNanos);
 	}
 
 	private Node buildCard(DirectoryUserRow row) {
