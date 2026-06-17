@@ -23,6 +23,10 @@ import javafx.scene.paint.Color;
  */
 public class CaseCard extends VBox {
 
+	private static final double FULL_CARD_MIN_WIDTH = 340;
+	private static final double FULL_CARD_PREF_WIDTH = 380;
+	private static final double FULL_CARD_MAX_WIDTH = 420;
+
 	private final Label titleLabel = new Label();
 	private final Label intakeLabel = new Label();
 	private final Label solLabel = new Label();
@@ -143,9 +147,11 @@ public class CaseCard extends VBox {
 		getStyleClass().add("case-card-full");
 		setSpacing(6);
 		setPadding(Insets.EMPTY);
-		setPrefWidth(280);
-		bodyPane.setSpacing(6);
-		bodyPane.setPadding(new Insets(12, 12, 11, 14));
+		setMinWidth(FULL_CARD_MIN_WIDTH);
+		setPrefWidth(FULL_CARD_PREF_WIDTH);
+		setMaxWidth(FULL_CARD_MAX_WIDTH);
+		bodyPane.setSpacing(5);
+		bodyPane.setPadding(new Insets(12, 14, 11, 16));
 		setPracticeAreaBarWidth(7);
 		HBox.setMargin(practiceAreaBar, new Insets(8, 0, 8, 8));
 		datesBox.setManaged(true);
@@ -162,8 +168,7 @@ public class CaseCard extends VBox {
 		statusLabel.setVisible(true);
 		bodyPane.setAlignment(Pos.TOP_LEFT);
 		headerRow.setAlignment(Pos.TOP_LEFT);
-		attorneyMiniCard.applyMini();
-		attorneyMiniCard.setMaxWidth(132);
+		attorneyMiniCard.applySecondaryMini();
 		headerRow.getChildren().setAll(titleLabel);
 		attorneyRow.getChildren().setAll(attorneySpacer, attorneyMiniCard);
 		bottomRow.getChildren().setAll(datesBox, bottomSpacer, statusLabel);
@@ -397,7 +402,28 @@ public class CaseCard extends VBox {
 		if (embeddedMini) {
 			return "linear-gradient(to right, #FFFFFF 0%, #F8FAFC 76%, " + statusColorCss + " 100%)";
 		}
-		return "linear-gradient(to right, #FFFFFF 0%, #F8FAFC 32%, " + statusColorCss + " 68%, " + statusColorCss + " 100%)";
+		return "linear-gradient(to right, "
+				+ "#FFFFFF 0%, "
+				+ "#F8FAFC 30%, "
+				+ statusTintStop(0.18) + " 48%, "
+				+ statusTintStop(0.42) + " 72%, "
+				+ statusTintStop(0.72) + " 88%, "
+				+ statusColorCss + " 98%, "
+				+ statusColorCss + " 100%)";
+	}
+
+	private String statusTintStop(double weight) {
+		try {
+			Color statusColor = com.shale.ui.util.ColorUtil.toFxColor(statusColorCss);
+			Color tint = Color.WHITE.interpolate(statusColor, weight);
+			return "rgba(%d, %d, %d, %.3f)".formatted(
+					Math.round(tint.getRed() * 255),
+					Math.round(tint.getGreen() * 255),
+					Math.round(tint.getBlue() * 255),
+					tint.getOpacity());
+		} catch (Exception ignored) {
+			return "#F8FAFC";
+		}
 	}
 
 	private void refreshSolStyle() {

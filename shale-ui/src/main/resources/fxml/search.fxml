@@ -34,7 +34,7 @@
                                     <Insets top="16" right="16" bottom="16" left="16" />
                                 </padding>
                                 <Label text="Cases" styleClass="search-section-title" />
-                                <FlowPane fx:id="casesFlow" hgap="16" vgap="16" prefWrapLength="1040" />
+                                <FlowPane fx:id="casesFlow" hgap="16" vgap="16" prefWrapLength="1200" />
                                 <Label fx:id="casesEmptyLabel" text="No matching cases" visible="false" managed="false" />
                             </VBox>
 
@@ -43,7 +43,7 @@
                                     <Insets top="16" right="16" bottom="16" left="16" />
                                 </padding>
                                 <Label text="Deleted Cases" styleClass="search-section-title" />
-                                <FlowPane fx:id="deletedCasesFlow" hgap="16" vgap="16" prefWrapLength="1040" />
+                                <FlowPane fx:id="deletedCasesFlow" hgap="16" vgap="16" prefWrapLength="1200" />
                                 <Label fx:id="deletedCasesEmptyLabel" text="No matching deleted cases" visible="false" managed="false" />
                             </VBox>
 
