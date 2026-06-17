@@ -67,7 +67,7 @@ final class CaseDaoCasesGridQueryTest {
     @Test
     void caseStatusReportUsesCurrentCaseStatusesAndTenantFilters() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String method = source.substring(source.indexOf("public List<CaseStatusReportRowDto> listCaseStatusReport"), source.indexOf("public List<CaseRow> listAssignedCasesForBoard"));
+        String method = source.substring(source.indexOf("public List<CaseStatusReportRowDto> listCaseStatusReport"), source.indexOf("public List<ReportCaseDetailRowDto> listCaseStatusReportCases"));
 
         assertTrue(method.contains("FROM dbo.Cases c"));
         assertTrue(method.contains("FROM dbo.CaseStatuses cs"));

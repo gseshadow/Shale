@@ -27,6 +27,7 @@ import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseStatusReportRowDto;
 import com.shale.core.dto.PracticeAreaDto;
+import com.shale.core.dto.ReportCaseDetailRowDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
 
@@ -1118,6 +1119,90 @@ public final class CaseDao {
 		ps.setDate(startIndex, sqlDate);
 		ps.setDate(startIndex + 1, sqlDate);
 	}
+
+	public List<ReportCaseDetailRowDto> listCaseStatusReportCases(int shaleClientId, int statusId, LocalDate startDate, LocalDate endDate) {
+		if (shaleClientId <= 0 || statusId <= 0) {
+			return List.of();
+		}
+		String sql = """
+				SELECT
+				    c.Id,
+				    c.Name AS CaseName,
+				    c.CreatedAt,
+				    c.CallerDate AS IntakeDate,
+				    c.DeniedDate,
+				    c.ClosedDate,
+				    c.DateOfInjury,
+				    c.Description,
+				    c.StatuteOfLimitations,
+				    c.TortNoticeDeadline,
+				    c.UpdatedAt,
+				    LTRIM(RTRIM(CONCAT(ra.name_first, ' ', ra.name_last))) AS ResponsibleAttorney
+				FROM dbo.Cases c
+				OUTER APPLY (
+				    SELECT TOP (1)
+				        cs.StatusId
+				    FROM dbo.CaseStatuses cs
+				    WHERE cs.CaseId = c.Id
+				      AND cs.EndDate IS NULL
+				    ORDER BY
+				        cs.IsPrimary DESC,
+				        cs.EffectiveDate DESC,
+				        cs.Id DESC
+				) currentStatus
+				OUTER APPLY (
+				    SELECT TOP (1)
+				        cu.UserId
+				    FROM dbo.CaseUsers cu
+				    WHERE cu.CaseId = c.Id
+				      AND cu.RoleId = 4
+				    ORDER BY
+				        cu.IsPrimary DESC,
+				        cu.UpdatedAt DESC,
+				        cu.Id DESC
+				) raLink
+				LEFT JOIN dbo.Users ra
+				    ON ra.id = raLink.UserId
+				WHERE c.ShaleClientId = ?
+				  AND ISNULL(c.IsDeleted, 0) = 0
+				  AND currentStatus.StatusId = ?
+				  AND (? IS NULL OR c.CallerDate >= ?)
+				  AND (? IS NULL OR c.CallerDate < DATEADD(day, 1, ?))
+				ORDER BY
+				    c.CallerDate DESC,
+				    c.Id DESC;
+				""";
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, statusId);
+			setNullableDateTwice(ps, idx, startDate);
+			idx += 2;
+			setNullableDateTwice(ps, idx, endDate);
+			List<ReportCaseDetailRowDto> rows = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					rows.add(new ReportCaseDetailRowDto(
+							rs.getInt("Id"),
+							rs.getString("CaseName"),
+							toLocalDateTime(rs.getTimestamp("CreatedAt")),
+							toLocalDate(rs.getDate("IntakeDate")),
+							toLocalDate(rs.getDate("DeniedDate")),
+							toLocalDate(rs.getDate("ClosedDate")),
+							toLocalDate(rs.getDate("DateOfInjury")),
+							rs.getString("Description"),
+							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							toLocalDate(rs.getDate("TortNoticeDeadline")),
+							toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+							rs.getString("ResponsibleAttorney")));
+				}
+			}
+			return rows;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load case status report cases.", e);
+		}
+	}
+
 
 	public List<CaseRow> listAssignedCasesForBoard(int userId) {
 		if (userId <= 0) {
