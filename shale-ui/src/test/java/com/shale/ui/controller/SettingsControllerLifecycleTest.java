@@ -3,9 +3,12 @@ package com.shale.ui.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
@@ -18,8 +21,7 @@ final class SettingsControllerLifecycleTest {
     @Test
     void initializeLoadsCaseStatusesWhenServiceWasInjectedBeforeFxmlInjection() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
-        String initialize = source.substring(source.indexOf("\t@FXML\n\tprivate void initialize()"),
-                source.indexOf("\n\tpublic void init", source.indexOf("\t@FXML\n\tprivate void initialize()")));
+        String initialize = methodSource(source, "initialize");
 
         assertTrue(initialize.contains("if (caseService != null && isAdminUser())"),
                 "SceneManager injects SettingsController dependencies through the controller factory before FXML initialize(); initialize must only load lookup-management lists for admins.");
@@ -66,9 +68,7 @@ final class SettingsControllerLifecycleTest {
     @Test
     void statusDialogUsesSecondaryShellAndDoesNotExposeSortOrderEditor() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
-        String methodStart = "\tprivate Optional<CaseStatusInput> showCaseStatusDialog";
-        String method = source.substring(source.indexOf(methodStart),
-                source.indexOf("\n\tprivate CaseStatusViewRow selectedStatusRow", source.indexOf(methodStart)));
+        String method = methodSource(source, "showCaseStatusDialog");
 
         assertTrue(method.contains("AppDialogs.applySecondaryDialogShell"),
                 "Case status dialogs should use the same secondary dialog shell as existing Shale dialogs instead of the default JavaFX window chrome/icon.");
@@ -152,8 +152,7 @@ final class SettingsControllerLifecycleTest {
     @Test
     void resetPasswordValidationUsesInlineMessagesWithoutResultConverterExceptions() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
-        String method = source.substring(source.indexOf("\t@FXML\n\tprivate void onResetUserPassword"),
-                source.indexOf("\n\tprivate void configureUserManagementTable", source.indexOf("\t@FXML\n\tprivate void onResetUserPassword")));
+        String method = methodSource(source, "onResetUserPassword");
 
         assertEquals("Password is required.", SettingsController.resetPasswordValidationMessage("", "anything"));
         assertEquals("Confirm password is required.", SettingsController.resetPasswordValidationMessage("newPassword1", ""));
@@ -163,6 +162,29 @@ final class SettingsControllerLifecycleTest {
         assertTrue(method.contains("event.consume()"));
         assertTrue(!method.contains("throw new IllegalArgumentException(\"Passwords"),
                 "Reset password validation failures should keep the dialog open with inline feedback, not throw from the result converter.");
+    }
+
+
+    private static String methodSource(String source, String methodName) {
+        Pattern signaturePattern = Pattern.compile("(?m)^\\s*(?:@FXML\\s*)?(?:private|public|protected|static|final|\\s)+[^{;=]*\\b"
+                + Pattern.quote(methodName) + "\\s*\\([^)]*\\)\\s*\\{");
+        Matcher matcher = signaturePattern.matcher(source);
+        assertTrue(matcher.find(), () -> "Expected SettingsController source to contain method '" + methodName
+                + "' before checking its lifecycle behavior markers.");
+        int bodyStart = matcher.end() - 1;
+        int depth = 0;
+        for (int i = bodyStart; i < source.length(); i++) {
+            char current = source.charAt(i);
+            if (current == '{') {
+                depth++;
+            } else if (current == '}') {
+                depth--;
+                if (depth == 0) {
+                    return source.substring(matcher.start(), i + 1);
+                }
+            }
+        }
+        return fail("Expected SettingsController method '" + methodName + "' to have a complete brace-delimited body.");
     }
 
 }
