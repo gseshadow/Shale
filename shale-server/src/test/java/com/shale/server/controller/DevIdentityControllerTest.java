@@ -33,8 +33,8 @@ class DevIdentityControllerTest {
     @Test
     void whoamiBlocksMissingDevelopmentHeaders() throws Exception {
         mockMvc.perform(get("/api/dev/whoami"))
-                .andExpect(status().isNotImplemented())
-                .andExpect(jsonPath("$.message", containsString("TODO: server auth/session context is not wired yet")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message", containsString("Authentication is required")));
     }
 
     @Test
