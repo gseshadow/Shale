@@ -40,7 +40,7 @@ public final class RequestScopedDbSessionProvider implements DbSessionProvider {
     public Connection requireConnection() {
         ServerSessionContext context = sessionResolver.resolve(currentRequest.getIfAvailable());
         if (context == null || context.principal().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, ServerRuntimeSessionState.NOT_IMPLEMENTED_MESSAGE);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ServerRuntimeSessionState.AUTHENTICATION_REQUIRED_MESSAGE);
         }
         try {
             return runtimeConnectionProvider.openConnection(context.principal().orElseThrow());
