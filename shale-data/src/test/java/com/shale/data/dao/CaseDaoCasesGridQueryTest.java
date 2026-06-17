@@ -92,4 +92,36 @@ final class CaseDaoCasesGridQueryTest {
         assertFalse(method.contains("NonEngagementLetterSent"));
     }
 
+
+    @Test
+    void assignedCaseBoardUsesDynamicCurrentStatusAliasesAndTenantStatuses() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String method = source.substring(source.indexOf("public List<CaseRow> listAssignedCasesForBoard"), source.indexOf("public List<CaseRow> searchCasesByName"));
+
+        assertTrue(method.contains("current_status.CurrentStatusName"),
+                "Assigned case board must select the status alias read by the mapper");
+        assertTrue(method.contains("s.Name AS CurrentStatusName"),
+                "Current status display name must come from dbo.Statuses");
+        assertTrue(method.contains("s.Color AS PrimaryStatusColor"),
+                "Current status color must come from dbo.Statuses");
+        assertTrue(method.contains("FROM %s cs"));
+        assertTrue(method.contains("INNER JOIN %s s"));
+        assertTrue(method.contains("AND (s.ShaleClientId = ? OR s.ShaleClientId IS NULL)"),
+                "Assigned case board must allow tenant-specific and global statuses");
+        assertTrue(method.contains("cs.EndDate IS NULL"),
+                "Assigned case board must resolve the current CaseStatuses row");
+        assertTrue(method.contains("cs.IsPrimary DESC"));
+        assertTrue(method.contains("s.SortOrder"),
+                "Assigned case board ordering must use status sort order instead of fixed names");
+        assertTrue(method.contains("cs.EffectiveDate DESC"));
+        assertTrue(method.contains("rs.getString(\"CurrentStatusName\")"));
+        assertTrue(method.contains("rs.getString(\"PrimaryStatusColor\")"));
+        assertFalse(method.contains("c.CaseStatusId"));
+        assertFalse(method.contains("Accepted"));
+        assertFalse(method.contains("Denied"));
+        assertFalse(method.contains("Closed"));
+        assertFalse(method.contains("Prelitigation"));
+        assertFalse(method.contains("Testing"));
+    }
+
 }
