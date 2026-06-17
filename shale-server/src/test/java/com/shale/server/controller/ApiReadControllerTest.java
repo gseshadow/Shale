@@ -257,6 +257,41 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public List<com.shale.core.dto.CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
+            throw new AssertionError("listCaseStatuses should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
+            throw new AssertionError("listPracticeAreas should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.PracticeAreaDto createPracticeArea(PracticeAreaCommand command) {
+            throw new AssertionError("createPracticeArea should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.PracticeAreaDto updatePracticeArea(PracticeAreaCommand command) {
+            throw new AssertionError("updatePracticeArea should not be called");
+        }
+
+        @Override
+        public void deactivatePracticeArea(int shaleClientId, int practiceAreaId) {
+            throw new AssertionError("deactivatePracticeArea should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseStatusDto createCaseStatus(CaseStatusCommand command) {
+            throw new AssertionError("createCaseStatus should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseStatusDto updateCaseStatus(CaseStatusCommand command) {
+            throw new AssertionError("updateCaseStatus should not be called");
+        }
+
+        @Override
         public void addCaseNote(AddCaseNoteCommand command) {
             throw new AssertionError("addCaseNote should not be called");
         }
@@ -264,6 +299,11 @@ class ApiReadControllerTest {
         @Override
         public CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command) {
             throw new AssertionError("updateCaseCoreDetails should not be called");
+        }
+
+        @Override
+        public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
+            throw new AssertionError("reorderCaseStatuses should not be called");
         }
 
         private static CaseOverviewDto caseOverview() {
@@ -362,108 +402,6 @@ class ApiReadControllerTest {
         public boolean softDeleteContact(int contactId, int shaleClientId, int actorUserId) {
             throw new AssertionError("softDeleteContact should not be called");
         }
-    }
-
-    private static final class RecordingNotificationServicePort implements NotificationServicePort {
-        private int shaleClientId;
-        private int userId;
-
-        @Override
-        public List<NotificationSummary> listUnreadNotifications(int shaleClientId, int userId) {
-            this.shaleClientId = shaleClientId;
-            this.userId = userId;
-            return List.of(new NotificationSummary(100L, shaleClientId, userId, "INFO",
-                    "Development proof notification", "Request context reached service layer.", Instant.EPOCH));
-        }
-
-        @Override
-        public void markRead(int shaleClientId, int userId, long notificationId) {
-            throw new AssertionError("markRead should not be called");
-        }
-
-        @Override
-        public void dismiss(int shaleClientId, int userId, long notificationId) {
-            throw new AssertionError("dismiss should not be called");
-        }
-
-        @Override
-        public Optional<Long> createTaskAssignedNotification(TaskNotificationCommand command) {
-            throw new AssertionError("createTaskAssignedNotification should not be called");
-        }
-
-        @Override
-        public Optional<Long> createTaskNoteAddedNotification(TaskNotificationCommand command) {
-            throw new AssertionError("createTaskNoteAddedNotification should not be called");
-        }
-
-        @Override
-        public Optional<Long> createTaskDueDateNotification(TaskDueDateNotificationCommand command) {
-            throw new AssertionError("createTaskDueDateNotification should not be called");
-        }
-
-        @Override
-        public Optional<Long> createTaskActionNotification(TaskActionNotificationCommand command) {
-            throw new AssertionError("createTaskActionNotification should not be called");
-        }
-
-        @Override
-        public Optional<Long> createCalendarEventAssignedNotification(CalendarEventNotificationCommand command) {
-            throw new AssertionError("createCalendarEventAssignedNotification should not be called");
-        }
-    }
-
-    @Test
-    void unreadNotificationsReachesServiceLayerWithDevelopmentHeaders() throws Exception {
-        RecordingNotificationServicePort notificationServicePort = new RecordingNotificationServicePort();
-        ApiReadController apiReadController = new ApiReadController(
-                unusedPort(CaseServicePort.class),
-                unusedPort(TaskServicePort.class),
-                unusedPort(ContactServicePort.class),
-                notificationServicePort,
-                new ServerRuntimeSessionState(new DevelopmentHeaderServerSessionResolver(), currentRequestProvider()));
-        MockMvc devMockMvc = MockMvcBuilders
-                .standaloneSetup(apiReadController)
-                .setControllerAdvice(new ApiExceptionHandler())
-                .build();
-
-        devMockMvc.perform(get("/api/notifications/unread")
-                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
-                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].userId").value(31))
-                .andExpect(jsonPath("$[0].shaleClientId").value(41))
-                .andExpect(jsonPath("$[0].title").value("Development proof notification"));
-
-        org.junit.jupiter.api.Assertions.assertEquals(31, notificationServicePort.userId);
-        org.junit.jupiter.api.Assertions.assertEquals(41, notificationServicePort.shaleClientId);
-    }
-
-    private static ObjectProvider<HttpServletRequest> currentRequestProvider() {
-        return new ObjectProvider<>() {
-            @Override
-            public HttpServletRequest getObject(Object... args) {
-                return getIfAvailable();
-            }
-
-            @Override
-            public HttpServletRequest getIfAvailable() {
-                var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
-                if (attributes instanceof org.springframework.web.context.request.ServletRequestAttributes servletAttributes) {
-                    return servletAttributes.getRequest();
-                }
-                return null;
-            }
-
-            @Override
-            public HttpServletRequest getIfUnique() {
-                return getIfAvailable();
-            }
-
-            @Override
-            public HttpServletRequest getObject() {
-                return getIfAvailable();
-            }
-        };
     }
 
     private static final class RecordingNotificationServicePort implements NotificationServicePort {
