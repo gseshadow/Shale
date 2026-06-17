@@ -22,6 +22,7 @@ import com.shale.data.service.adapter.TaskServiceAdapter;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
 import com.shale.server.runtime.RequestScopedDbSessionProvider;
+import com.shale.server.runtime.RuntimeConnectionProvider;
 import com.shale.server.runtime.ServerRuntimeSessionState;
 import com.shale.server.runtime.ServerSessionResolver;
 import com.shale.server.runtime.UnauthenticatedServerSessionResolver;
