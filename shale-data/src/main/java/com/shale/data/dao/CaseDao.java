@@ -13,6 +13,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -24,7 +25,9 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.CaseStatusReportRowDto;
 import com.shale.core.dto.PracticeAreaDto;
+import com.shale.core.dto.ReportCaseDetailRowDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
 
@@ -1011,6 +1014,196 @@ public final class CaseDao {
 		}
 	}
 
+	public List<CaseStatusReportRowDto> listCaseStatusReport(int shaleClientId, LocalDate startDate, LocalDate endDate, List<Integer> selectedStatusIds) {
+		if (shaleClientId <= 0) {
+			return List.of();
+		}
+		List<StatusRow> availableStatuses = listStatusesForTenant(shaleClientId);
+		Set<Integer> selectedIds = normalizeSelectedStatusIds(selectedStatusIds);
+		if (selectedIds.isEmpty()) {
+			return List.of();
+		}
+		Map<Integer, Long> countsByStatusId = loadCaseStatusReportCounts(shaleClientId, startDate, endDate, selectedIds);
+		List<CaseStatusReportRowDto> rows = new ArrayList<>();
+		for (StatusRow status : availableStatuses) {
+			if (status == null || !selectedIds.contains(status.id())) {
+				continue;
+			}
+			rows.add(new CaseStatusReportRowDto(
+					status.id(),
+					status.name(),
+					status.systemKey(),
+					status.lifecycleKey(),
+					status.color(),
+					status.sortOrder(),
+					countsByStatusId.getOrDefault(status.id(), 0L)));
+		}
+		return rows;
+	}
+
+	private Map<Integer, Long> loadCaseStatusReportCounts(int shaleClientId, LocalDate startDate, LocalDate endDate, Set<Integer> selectedStatusIds) {
+		if (selectedStatusIds == null || selectedStatusIds.isEmpty()) {
+			return Map.of();
+		}
+		String placeholders = sqlPlaceholders(selectedStatusIds.size());
+		String sql = """
+				SELECT
+				    currentStatus.StatusId AS StatusId,
+				    COUNT(*) AS CaseCount
+				FROM dbo.Cases c
+				OUTER APPLY (
+				    SELECT TOP (1)
+				        cs.StatusId
+				    FROM dbo.CaseStatuses cs
+				    WHERE cs.CaseId = c.Id
+				      AND cs.EndDate IS NULL
+				    ORDER BY
+				        cs.IsPrimary DESC,
+				        cs.EffectiveDate DESC,
+				        cs.Id DESC
+				) currentStatus
+				INNER JOIN dbo.Statuses s
+				    ON s.Id = currentStatus.StatusId
+				WHERE c.ShaleClientId = ?
+				  AND ISNULL(c.IsDeleted, 0) = 0
+				  AND (? IS NULL OR c.CallerDate >= ?)
+				  AND (? IS NULL OR c.CallerDate < DATEADD(day, 1, ?))
+				  AND s.Id IN (%s)
+				GROUP BY
+				    currentStatus.StatusId;
+				""".formatted(placeholders);
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setInt(idx++, shaleClientId);
+			setNullableDateTwice(ps, idx, startDate);
+			idx += 2;
+			setNullableDateTwice(ps, idx, endDate);
+			idx += 2;
+			for (Integer statusId : selectedStatusIds) {
+				ps.setInt(idx++, statusId);
+			}
+			Map<Integer, Long> counts = new LinkedHashMap<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					counts.put(rs.getInt("StatusId"), rs.getLong("CaseCount"));
+				}
+			}
+			return counts;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load case status report.", e);
+		}
+	}
+
+	private static Set<Integer> normalizeSelectedStatusIds(List<Integer> selectedStatusIds) {
+		if (selectedStatusIds == null || selectedStatusIds.isEmpty()) {
+			return Set.of();
+		}
+		Set<Integer> ids = new LinkedHashSet<>();
+		for (Integer statusId : selectedStatusIds) {
+			if (statusId != null && statusId > 0) {
+				ids.add(statusId);
+			}
+		}
+		return ids;
+	}
+
+	private static String sqlPlaceholders(int count) {
+		if (count <= 0) {
+			throw new IllegalArgumentException("count must be positive");
+		}
+		return String.join(", ", java.util.Collections.nCopies(count, "?"));
+	}
+
+	private static void setNullableDateTwice(PreparedStatement ps, int startIndex, LocalDate value) throws SQLException {
+		java.sql.Date sqlDate = value == null ? null : java.sql.Date.valueOf(value);
+		ps.setDate(startIndex, sqlDate);
+		ps.setDate(startIndex + 1, sqlDate);
+	}
+
+	public List<ReportCaseDetailRowDto> listCaseStatusReportCases(int shaleClientId, int statusId, LocalDate startDate, LocalDate endDate) {
+		if (shaleClientId <= 0 || statusId <= 0) {
+			return List.of();
+		}
+		String sql = """
+				SELECT
+				    c.Id,
+				    c.Name AS CaseName,
+				    c.CreatedAt,
+				    c.CallerDate AS IntakeDate,
+				    c.DeniedDate,
+				    c.ClosedDate,
+				    c.DateOfInjury,
+				    c.Description,
+				    c.StatuteOfLimitations,
+				    c.TortNoticeDeadline,
+				    c.UpdatedAt,
+				    LTRIM(RTRIM(CONCAT(ra.name_first, ' ', ra.name_last))) AS ResponsibleAttorney
+				FROM dbo.Cases c
+				OUTER APPLY (
+				    SELECT TOP (1)
+				        cs.StatusId
+				    FROM dbo.CaseStatuses cs
+				    WHERE cs.CaseId = c.Id
+				      AND cs.EndDate IS NULL
+				    ORDER BY
+				        cs.IsPrimary DESC,
+				        cs.EffectiveDate DESC,
+				        cs.Id DESC
+				) currentStatus
+				OUTER APPLY (
+				    SELECT TOP (1)
+				        cu.UserId
+				    FROM dbo.CaseUsers cu
+				    WHERE cu.CaseId = c.Id
+				      AND cu.RoleId = 4
+				    ORDER BY
+				        cu.IsPrimary DESC,
+				        cu.UpdatedAt DESC,
+				        cu.Id DESC
+				) raLink
+				LEFT JOIN dbo.Users ra
+				    ON ra.id = raLink.UserId
+				WHERE c.ShaleClientId = ?
+				  AND ISNULL(c.IsDeleted, 0) = 0
+				  AND currentStatus.StatusId = ?
+				  AND (? IS NULL OR c.CallerDate >= ?)
+				  AND (? IS NULL OR c.CallerDate < DATEADD(day, 1, ?))
+				ORDER BY
+				    c.CallerDate DESC,
+				    c.Id DESC;
+				""";
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, statusId);
+			setNullableDateTwice(ps, idx, startDate);
+			idx += 2;
+			setNullableDateTwice(ps, idx, endDate);
+			List<ReportCaseDetailRowDto> rows = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					rows.add(new ReportCaseDetailRowDto(
+							rs.getInt("Id"),
+							rs.getString("CaseName"),
+							toLocalDateTime(rs.getTimestamp("CreatedAt")),
+							toLocalDate(rs.getDate("IntakeDate")),
+							toLocalDate(rs.getDate("DeniedDate")),
+							toLocalDate(rs.getDate("ClosedDate")),
+							toLocalDate(rs.getDate("DateOfInjury")),
+							rs.getString("Description"),
+							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							toLocalDate(rs.getDate("TortNoticeDeadline")),
+							toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+							rs.getString("ResponsibleAttorney")));
+				}
+			}
+			return rows;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load case status report cases.", e);
+		}
+	}
+
+
 	public List<CaseRow> listAssignedCasesForBoard(int userId) {
 		if (userId <= 0) {
 			return List.of();
@@ -1029,7 +1222,16 @@ public final class CaseDao {
 					  c.Name,
 					  c.CallerDate,
 					  c.StatuteOfLimitations,
+					  c.DateOfInjury AS DateOfIncident,
+					  c.TortNoticeDeadline,
+					  CAST(NULL AS nvarchar(max)) AS LatestCaseUpdate,
+					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
+					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
+					  CAST(NULL AS nvarchar(max)) AS ClientName,
+					  CAST(NULL AS nvarchar(max)) AS OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
 					  c.NonEngagementLetterSent AS NonEngagementLetterSent,
@@ -1041,14 +1243,21 @@ public final class CaseDao {
 					FROM %s c
 					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId
+					    SELECT TOP (1)
+					      s.Id AS PrimaryStatusId,
+					      s.Name AS CurrentStatusName,
+					      s.Color AS PrimaryStatusColor,
+					      s.SortOrder AS CurrentStatusSortOrder
 					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    INNER JOIN %s s
+					      ON s.Id = cs.StatusId
+					     AND (s.ShaleClientId = ? OR s.ShaleClientId IS NULL)
 					    WHERE cs.CaseId = c.Id
+					      AND cs.EndDate IS NULL
 					    ORDER BY
-					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-					      cs.UpdatedAt DESC,
-					      cs.CreatedAt DESC,
+					      cs.IsPrimary DESC,
+					      s.SortOrder,
+					      cs.EffectiveDate DESC,
 					      cs.Id DESC
 					) current_status
 					OUTER APPLY (
@@ -1073,7 +1282,7 @@ public final class CaseDao {
 					      AND cu_scope.UserId = ?
 					      AND %s
 					  )
-					ORDER BY c.CallerDate DESC, c.Id DESC;
+					ORDER BY current_status.CurrentStatusSortOrder, c.CallerDate DESC, c.Id DESC;
 					""".formatted(
 					CASES_TABLE,
 					CASE_STATUSES_TABLE,
@@ -1086,6 +1295,7 @@ public final class CaseDao {
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
+				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, userId);

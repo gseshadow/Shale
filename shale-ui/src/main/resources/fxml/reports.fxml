@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.chart.PieChart?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.shale.ui.controller.ReportsController" styleClass="app-shell">
+    <top>
+        <VBox spacing="10" styleClass="strong-panel">
+            <padding><Insets top="10" right="10" bottom="10" left="10" /></padding>
+            <Label text="Case Status Report" styleClass="page-heading" />
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="Start date" />
+                <DatePicker fx:id="startDatePicker" />
+                <Label text="End date" />
+                <DatePicker fx:id="endDatePicker" />
+                <MenuButton fx:id="statusFilterMenuButton" text="Statuses (0/0)" />
+                <Button fx:id="refreshButton" text="Apply" onAction="#onRefresh" />
+                <Button fx:id="showAllResultsButton" text="Show all results" onAction="#onShowAllResults" />
+                <Label fx:id="statusLabel" styleClass="search-summary-text" />
+            </HBox>
+        </VBox>
+    </top>
+    <center>
+        <SplitPane dividerPositions="0.48">
+            <TableView fx:id="statusReportTable">
+                <columns>
+                    <TableColumn fx:id="caseStatusColumn" text="Case Status" prefWidth="260" />
+                    <TableColumn fx:id="caseCountColumn" text="Case Count" prefWidth="140" />
+                </columns>
+            </TableView>
+            <PieChart fx:id="statusPieChart" title="Cases by Current Status" />
+        </SplitPane>
+    </center>
+</BorderPane>
