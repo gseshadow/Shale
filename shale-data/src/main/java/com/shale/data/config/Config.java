@@ -1,30 +1,30 @@
 package com.shale.data.config;
 
-import java.util.Optional;
+import java.util.Arrays;
 
 public final class Config {
 	public String appJdbcUrl() {
-		return must("SHALE_APP_JDBC_URL");
+		return must("SHALE_APP_DB_URL", "SHALE_APP_JDBC_URL");
 	}
 
 	public String appUser() {
-		return must("SHALE_APP_USER");
+		return must("SHALE_APP_DB_USER", "SHALE_APP_USER");
 	}
 
 	public String appPass() {
-		return must("SHALE_APP_PASS");
+		return must("SHALE_APP_DB_PASSWORD", "SHALE_APP_PASS");
 	}
 
 	public String rtJdbcUrl() {
-		return must("SHALE_RT_JDBC_URL");
+		return must("SHALE_RT_DB_URL", "SHALE_RT_JDBC_URL");
 	}
 
 	public String rtUser() {
-		return must("SHALE_RT_USER");
+		return must("SHALE_RT_DB_USER", "SHALE_RT_USER");
 	}
 
 	public String rtPass() {
-		return must("SHALE_RT_PASS");
+		return must("SHALE_RT_DB_PASSWORD", "SHALE_RT_PASS");
 	}
 
 	public int maxPoolSize() {
@@ -35,10 +35,12 @@ public final class Config {
 		return longVal("DB_CONNECTION_TIMEOUT_MS", 10000L);
 	}
 
-	private static String must(String key) {
-		return Optional.ofNullable(get(key))
-				.filter(s -> !s.isBlank())
-				.orElseThrow(() -> new IllegalStateException("Missing required config: " + key));
+	private static String must(String... keys) {
+		return Arrays.stream(keys)
+				.map(Config::get)
+				.filter(v -> v != null && !v.isBlank())
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException("Missing required config: " + String.join(" or ", keys)));
 	}
 
 	private static int intVal(String key, int def) {
