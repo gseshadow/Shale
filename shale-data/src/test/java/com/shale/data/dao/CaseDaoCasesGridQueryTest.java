@@ -78,8 +78,12 @@ final class CaseDaoCasesGridQueryTest {
         assertTrue(method.contains("INNER JOIN dbo.Statuses s"));
         assertTrue(method.contains("WHERE c.ShaleClientId = ?"));
         assertTrue(method.contains("ISNULL(c.IsDeleted, 0) = 0"));
-        assertTrue(method.contains("c.CallerDate >= ?"));
-        assertTrue(method.contains("c.CallerDate < DATEADD(day, 1, ?)"));
+        assertTrue(method.contains("(? IS NULL OR c.CallerDate >= ?)"));
+        assertTrue(method.contains("(? IS NULL OR c.CallerDate < DATEADD(day, 1, ?))"));
+        assertTrue(method.contains("s.Id IN (%s)"));
+        assertTrue(method.contains("sqlPlaceholders(selectedStatusIds.size())"));
+        assertTrue(method.contains("status.lifecycleKey()"));
+        assertTrue(method.contains("status.sortOrder()"));
         assertFalse(method.contains("Cases.CaseStatusId"));
         assertFalse(method.contains("c.CaseStatusId"));
         assertFalse(method.contains("AcceptedDate"));

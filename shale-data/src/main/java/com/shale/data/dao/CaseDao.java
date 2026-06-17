@@ -13,6 +13,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -1012,16 +1013,41 @@ public final class CaseDao {
 		}
 	}
 
-	public List<CaseStatusReportRowDto> listCaseStatusReport(int shaleClientId, LocalDate startDate, LocalDate endDate) {
-		if (shaleClientId <= 0 || startDate == null || endDate == null) {
+	public List<CaseStatusReportRowDto> listCaseStatusReport(int shaleClientId, LocalDate startDate, LocalDate endDate, List<Integer> selectedStatusIds) {
+		if (shaleClientId <= 0) {
 			return List.of();
 		}
+		List<StatusRow> availableStatuses = listStatusesForTenant(shaleClientId);
+		Set<Integer> selectedIds = normalizeSelectedStatusIds(selectedStatusIds);
+		if (selectedIds.isEmpty()) {
+			return List.of();
+		}
+		Map<Integer, Long> countsByStatusId = loadCaseStatusReportCounts(shaleClientId, startDate, endDate, selectedIds);
+		List<CaseStatusReportRowDto> rows = new ArrayList<>();
+		for (StatusRow status : availableStatuses) {
+			if (status == null || !selectedIds.contains(status.id())) {
+				continue;
+			}
+			rows.add(new CaseStatusReportRowDto(
+					status.id(),
+					status.name(),
+					status.systemKey(),
+					status.lifecycleKey(),
+					status.color(),
+					status.sortOrder(),
+					countsByStatusId.getOrDefault(status.id(), 0L)));
+		}
+		return rows;
+	}
+
+	private Map<Integer, Long> loadCaseStatusReportCounts(int shaleClientId, LocalDate startDate, LocalDate endDate, Set<Integer> selectedStatusIds) {
+		if (selectedStatusIds == null || selectedStatusIds.isEmpty()) {
+			return Map.of();
+		}
+		String placeholders = sqlPlaceholders(selectedStatusIds.size());
 		String sql = """
 				SELECT
-				    s.Id AS StatusId,
-				    s.Name AS CaseStatus,
-				    s.SystemKey,
-				    s.Color,
+				    currentStatus.StatusId AS StatusId,
 				    COUNT(*) AS CaseCount
 				FROM dbo.Cases c
 				OUTER APPLY (
@@ -1039,36 +1065,58 @@ public final class CaseDao {
 				    ON s.Id = currentStatus.StatusId
 				WHERE c.ShaleClientId = ?
 				  AND ISNULL(c.IsDeleted, 0) = 0
-				  AND c.CallerDate >= ?
-				  AND c.CallerDate < DATEADD(day, 1, ?)
+				  AND (? IS NULL OR c.CallerDate >= ?)
+				  AND (? IS NULL OR c.CallerDate < DATEADD(day, 1, ?))
+				  AND s.Id IN (%s)
 				GROUP BY
-				    s.Id,
-				    s.Name,
-				    s.SystemKey,
-				    s.Color
-				ORDER BY
-				    COUNT(*) DESC,
-				    s.Name ASC;
-				""";
+				    currentStatus.StatusId;
+				""".formatted(placeholders);
 		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, shaleClientId);
-			ps.setDate(2, java.sql.Date.valueOf(startDate));
-			ps.setDate(3, java.sql.Date.valueOf(endDate));
-			List<CaseStatusReportRowDto> rows = new ArrayList<>();
+			int idx = 1;
+			ps.setInt(idx++, shaleClientId);
+			setNullableDateTwice(ps, idx, startDate);
+			idx += 2;
+			setNullableDateTwice(ps, idx, endDate);
+			idx += 2;
+			for (Integer statusId : selectedStatusIds) {
+				ps.setInt(idx++, statusId);
+			}
+			Map<Integer, Long> counts = new LinkedHashMap<>();
 			try (ResultSet rs = ps.executeQuery()) {
 				while (rs.next()) {
-					rows.add(new CaseStatusReportRowDto(
-							rs.getInt("StatusId"),
-							rs.getString("CaseStatus"),
-							rs.getString("SystemKey"),
-							rs.getString("Color"),
-							rs.getLong("CaseCount")));
+					counts.put(rs.getInt("StatusId"), rs.getLong("CaseCount"));
 				}
 			}
-			return rows;
+			return counts;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load case status report.", e);
 		}
+	}
+
+	private static Set<Integer> normalizeSelectedStatusIds(List<Integer> selectedStatusIds) {
+		if (selectedStatusIds == null || selectedStatusIds.isEmpty()) {
+			return Set.of();
+		}
+		Set<Integer> ids = new LinkedHashSet<>();
+		for (Integer statusId : selectedStatusIds) {
+			if (statusId != null && statusId > 0) {
+				ids.add(statusId);
+			}
+		}
+		return ids;
+	}
+
+	private static String sqlPlaceholders(int count) {
+		if (count <= 0) {
+			throw new IllegalArgumentException("count must be positive");
+		}
+		return String.join(", ", java.util.Collections.nCopies(count, "?"));
+	}
+
+	private static void setNullableDateTwice(PreparedStatement ps, int startIndex, LocalDate value) throws SQLException {
+		java.sql.Date sqlDate = value == null ? null : java.sql.Date.valueOf(value);
+		ps.setDate(startIndex, sqlDate);
+		ps.setDate(startIndex + 1, sqlDate);
 	}
 
 	public List<CaseRow> listAssignedCasesForBoard(int userId) {
