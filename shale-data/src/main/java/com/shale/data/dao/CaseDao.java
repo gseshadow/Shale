@@ -1137,7 +1137,16 @@ public final class CaseDao {
 					  c.Name,
 					  c.CallerDate,
 					  c.StatuteOfLimitations,
+					  c.DateOfInjury AS DateOfIncident,
+					  c.TortNoticeDeadline,
+					  CAST(NULL AS nvarchar(max)) AS LatestCaseUpdate,
+					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
+					  current_status.CurrentStatusName,
+					  current_status.PrimaryStatusColor,
+					  pa.Color AS PracticeAreaColor,
+					  CAST(NULL AS nvarchar(max)) AS ClientName,
+					  CAST(NULL AS nvarchar(max)) AS OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
 					  c.NonEngagementLetterSent AS NonEngagementLetterSent,
@@ -1149,14 +1158,21 @@ public final class CaseDao {
 					FROM %s c
 					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId
+					    SELECT TOP (1)
+					      s.Id AS PrimaryStatusId,
+					      s.Name AS CurrentStatusName,
+					      s.Color AS PrimaryStatusColor,
+					      s.SortOrder AS CurrentStatusSortOrder
 					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    INNER JOIN %s s
+					      ON s.Id = cs.StatusId
+					     AND (s.ShaleClientId = ? OR s.ShaleClientId IS NULL)
 					    WHERE cs.CaseId = c.Id
+					      AND cs.EndDate IS NULL
 					    ORDER BY
-					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-					      cs.UpdatedAt DESC,
-					      cs.CreatedAt DESC,
+					      cs.IsPrimary DESC,
+					      s.SortOrder,
+					      cs.EffectiveDate DESC,
 					      cs.Id DESC
 					) current_status
 					OUTER APPLY (
@@ -1181,7 +1197,7 @@ public final class CaseDao {
 					      AND cu_scope.UserId = ?
 					      AND %s
 					  )
-					ORDER BY c.CallerDate DESC, c.Id DESC;
+					ORDER BY current_status.CurrentStatusSortOrder, c.CallerDate DESC, c.Id DESC;
 					""".formatted(
 					CASES_TABLE,
 					CASE_STATUSES_TABLE,
@@ -1194,6 +1210,7 @@ public final class CaseDao {
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
+				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(idx++, shaleClientId);
 				ps.setInt(idx++, userId);

@@ -78,9 +78,9 @@ public final class MyShaleController {
 	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
 	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
 	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 300;
-	private static final double MY_CASES_STATUS_COLUMN_MIN_WIDTH = 245;
-	private static final double MY_CASES_STATUS_COLUMN_PREF_WIDTH = 280;
-	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 320;
+	private static final double MY_CASES_STATUS_COLUMN_MIN_WIDTH = 320;
+	private static final double MY_CASES_STATUS_COLUMN_PREF_WIDTH = 360;
+	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 400;
 	private static final double OVERVIEW_CARD_GAP = 10;
 	private static final double OVERVIEW_SECTION_HORIZONTAL_PADDING = 10;
 	private static final double OVERVIEW_COMPACT_TASK_CARD_WIDTH = 210;
@@ -486,6 +486,9 @@ public final class MyShaleController {
 		if (myCasesBoardScroll != null) {
 			VBox.setVgrow(myCasesBoardScroll, Priority.ALWAYS);
 			myCasesBoardScroll.setFitToHeight(true);
+			myCasesBoardScroll.setFitToWidth(false);
+			myCasesBoardScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+			myCasesBoardScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 			myCasesBoardScroll.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		}
 	}
@@ -1338,7 +1341,7 @@ public final class MyShaleController {
 		VBox body = new VBox(10);
 		body.setFillWidth(true);
 		for (CaseCardVm vm : laneCases) {
-			body.getChildren().add(buildCaseCard(vm));
+			body.getChildren().add(buildMyCasesBoardCard(vm));
 		}
 		return LaneBoardLayout.createLane(
 				header,
@@ -1347,6 +1350,14 @@ public final class MyShaleController {
 						MY_CASES_STATUS_COLUMN_MIN_WIDTH,
 						MY_CASES_STATUS_COLUMN_PREF_WIDTH,
 						MY_CASES_STATUS_COLUMN_MAX_WIDTH));
+	}
+
+	private Node buildMyCasesBoardCard(CaseCardVm vm) {
+		Node card = buildCaseCard(vm);
+		if (card instanceof Region region) {
+			region.setMaxWidth(Double.MAX_VALUE);
+		}
+		return card;
 	}
 
 	private Comparator<CaseCardVm> myCasesLaneComparator(String sortOption) {
