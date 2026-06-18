@@ -36,6 +36,8 @@
 				<Label fx:id="lastUpdatedLabel" text="Last updated: —"
 					style="-fx-opacity: 0.7;" />
 			</HBox>
+
+			<StackPane fx:id="statusTimelineHost" maxWidth="1.7976931348623157E308" minHeight="34" />
 		</VBox>
 	</top>
 

@@ -25,6 +25,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.CaseStatusHistoryDto;
 import com.shale.core.dto.CaseStatusReportRowDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.ReportCaseDetailRowDto;
@@ -4844,6 +4845,57 @@ public final class CaseDao {
 			ps.executeUpdate();
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to set primary status (caseId=" + caseId + ", statusId=" + statusId + ")", e);
+		}
+	}
+
+	public List<CaseStatusHistoryDto> listCaseStatusHistory(long caseId) {
+		String sql = """
+				SELECT
+				  cs.Id AS CaseStatusId,
+				  cs.StatusId,
+				  s.Name AS StatusName,
+				  s.Color AS StatusColor,
+				  s.IsClosed,
+				  s.LifecycleKey,
+				  s.SystemKey,
+				  cs.EffectiveDate,
+				  cs.EndDate,
+				  cs.CreatedAt,
+				  cs.UpdatedAt,
+				  cs.IsPrimary
+				FROM dbo.CaseStatuses cs
+				INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+				WHERE cs.CaseId = ?
+				ORDER BY
+				  cs.EffectiveDate ASC,
+				  cs.CreatedAt ASC,
+				  cs.Id ASC;
+				""";
+
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId);
+			try (ResultSet rs = ps.executeQuery()) {
+				List<CaseStatusHistoryDto> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(new CaseStatusHistoryDto(
+						rs.getLong("CaseStatusId"),
+						rs.getInt("StatusId"),
+						rs.getString("StatusName"),
+						rs.getString("StatusColor"),
+						rs.getString("LifecycleKey"),
+						rs.getString("SystemKey"),
+						rs.getBoolean("IsClosed"),
+						toLocalDateTime(rs.getTimestamp("EffectiveDate")),
+						toLocalDateTime(rs.getTimestamp("EndDate")),
+						toLocalDateTime(rs.getTimestamp("CreatedAt")),
+						toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+						rs.getBoolean("IsPrimary")));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load case status history (caseId=" + caseId + ")", e);
 		}
 	}
 
