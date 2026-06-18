@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
@@ -26,6 +27,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.CaseStatusHistoryDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
@@ -65,6 +67,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.util.AppSectionTabs;
+import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
@@ -93,6 +96,7 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.Node;
 import javafx.scene.layout.BorderPane;
@@ -143,6 +147,8 @@ public class CaseController {
 	private StackPane statusHost;
 	@FXML
 	private StackPane assignedUserHost;
+	@FXML
+	private StackPane statusTimelineHost;
 	@FXML
 	private Label lastUpdatedLabel;
 	@FXML
@@ -1160,6 +1166,97 @@ public class CaseController {
 		}
 
 		AppSectionTabs.setActive(activeButton, sectionTabs.values());
+	}
+
+	private void loadStatusTimelineAsync() {
+		if (caseDao == null || caseId == null || statusTimelineHost == null) {
+			renderStatusTimeline(List.of());
+			return;
+		}
+		final long activeCaseId = caseId.longValue();
+		new Thread(() -> {
+			try {
+				List<CaseStatusHistoryDto> history = caseDao.listCaseStatusHistory(activeCaseId);
+				runOnFx(() -> {
+					if (caseId != null && caseId.longValue() == activeCaseId) {
+						renderStatusTimeline(history);
+					}
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> renderStatusTimeline(List.of()));
+			}
+		}, "case-status-timeline-" + activeCaseId).start();
+	}
+
+	private void renderStatusTimeline(List<CaseStatusHistoryDto> history) {
+		if (statusTimelineHost == null) {
+			return;
+		}
+		statusTimelineHost.getChildren().clear();
+		List<CaseStatusHistoryDto> safeHistory = history == null ? List.of() : history;
+		if (safeHistory.isEmpty()) {
+			Label empty = new Label("No status history");
+			empty.setStyle("-fx-opacity: 0.55; -fx-font-size: 11px;");
+			statusTimelineHost.getChildren().add(empty);
+			return;
+		}
+
+		HBox row = new HBox(6);
+		row.setAlignment(Pos.TOP_LEFT);
+		for (int i = 0; i < safeHistory.size(); i++) {
+			CaseStatusHistoryDto item = safeHistory.get(i);
+			row.getChildren().add(buildStatusTimelineSegment(item));
+			if (i < safeHistory.size() - 1) {
+				Label connector = new Label("→");
+				connector.setStyle("-fx-opacity: 0.5; -fx-font-size: 13px; -fx-padding: 5 0 0 0;");
+				row.getChildren().add(connector);
+			}
+		}
+
+		ScrollPane scroll = new ScrollPane(row);
+		scroll.setFitToHeight(true);
+		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+		scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		scroll.setPannable(true);
+		scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;");
+		statusTimelineHost.getChildren().add(scroll);
+	}
+
+	private Node buildStatusTimelineSegment(CaseStatusHistoryDto item) {
+		String color = ColorUtil.toCssBackgroundColor(item.color());
+		String name = safeText(item.statusName()).isBlank() ? "Status #" + item.statusId() : safeText(item.statusName());
+		Label pill = new Label(name + (item.current() ? "  Current" : ""));
+		pill.setMaxWidth(170);
+		pill.setTextOverrun(OverrunStyle.ELLIPSIS);
+		pill.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 14; -fx-padding: 4 12 4 12; "
+				+ "-fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: " + (item.current() ? "bold" : "normal") + "; "
+				+ (item.current() ? "-fx-border-color: rgba(0,0,0,0.35); -fx-border-radius: 14; -fx-border-width: 1.2;" : ""));
+		Label date = new Label(formatTimelineDate(item.effectiveDate()));
+		date.setStyle("-fx-opacity: 0.72; -fx-font-size: 10px;");
+		VBox box = new VBox(2, pill, date);
+		box.setAlignment(Pos.TOP_CENTER);
+		Tooltip.install(box, new Tooltip(buildStatusTimelineTooltip(item, name)));
+		return box;
+	}
+
+	private static String buildStatusTimelineTooltip(CaseStatusHistoryDto item, String name) {
+		String entered = formatTimelineDateTime(item.effectiveDate());
+		String exited = item.endDate() == null ? "Current" : formatTimelineDateTime(item.endDate());
+		String duration = "—";
+		if (item.effectiveDate() != null) {
+			LocalDateTime end = item.endDate() == null ? LocalDateTime.now() : item.endDate();
+			duration = Math.max(0, ChronoUnit.DAYS.between(item.effectiveDate().toLocalDate(), end.toLocalDate())) + " days";
+		}
+		return name + "\nEntered: " + entered + "\nExited: " + exited + "\nDuration: " + duration;
+	}
+
+	private static String formatTimelineDate(LocalDateTime value) {
+		return value == null ? "—" : formatDate(value.toLocalDate());
+	}
+
+	private static String formatTimelineDateTime(LocalDateTime value) {
+		return value == null ? "—" : value.format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a"));
 	}
 
 	private void showOverview() {
@@ -2716,6 +2813,7 @@ public class CaseController {
 					applyDetail(detail);
 				else
 					applyLastUpdatedLabel(detail.getUpdatedAt());
+				loadStatusTimelineAsync();
 
 				hideRemoteUpdateBanner();
 				clearError();
@@ -2753,6 +2851,7 @@ public class CaseController {
 						}
 						refreshDeleteAction();
 					}
+					loadStatusTimelineAsync();
 					refreshLastUpdatedLabelAsync();
 				});
 			} catch (Exception ex) {
