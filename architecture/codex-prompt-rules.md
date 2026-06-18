@@ -4,7 +4,9 @@
 
 This file is the primary entry point for all Codex work in the Shale project.
 
-Before making any code changes, consult this document first. Use it to determine which additional architecture documents are relevant to the task.
+Before making any code changes, consult this document first. Use it to determine which architecture documents, runbooks, migration guides, and project documentation are relevant to the task.
+
+This document is the authoritative entry point for project knowledge.
 
 ---
 
@@ -13,16 +15,101 @@ Before making any code changes, consult this document first. Use it to determine
 Before making changes:
 
 1. Read this file.
-2. Read any referenced architecture documents relevant to the task.
-3. Inspect existing implementations before creating new ones.
-4. Reuse existing patterns and components whenever possible.
-5. Verify assumptions against the codebase and database schema.
-6. Run compile/tests appropriate to the change.
-7. Summarize:
+2. Identify the feature area being modified.
+3. Read any relevant documents in both:
+
+   * `architecture/`
+   * `docs/`
+4. Inspect existing implementations before creating new ones.
+5. Reuse existing patterns and components whenever possible.
+6. Verify assumptions against the codebase and database schema.
+7. Run compile/tests appropriate to the change.
+8. Summarize:
 
    * Files changed
    * Reason for change
    * Risks or follow-up work
+
+---
+
+## Documentation Hierarchy
+
+Documentation should be consulted in this order:
+
+1. `architecture/codex-prompt-rules.md`
+2. Relevant files in `architecture/`
+3. Relevant files in `docs/`
+4. Existing source code
+
+When architecture documents and assumptions conflict:
+
+* Architecture documents take precedence.
+* Verified source code behavior takes precedence over assumptions.
+
+---
+
+## Documentation Review Requirements
+
+Before implementing any feature:
+
+Identify and review all documentation relevant to the area being modified.
+
+Examples:
+
+### Database Changes
+
+Review:
+
+* `architecture/database-schema.md`
+* `architecture/tenancy-and-rls.md`
+
+### UI Changes
+
+Review:
+
+* `architecture/development-rules.md`
+
+### Live Updates
+
+Review:
+
+* `architecture/live-update-architecture.md`
+
+### System Architecture
+
+Review:
+
+* `architecture/system-overview.md`
+
+### Web/API Work
+
+Review all relevant web migration and deployment documentation under:
+
+* `docs/`
+
+Including (when applicable):
+
+* `web-api-step-2.md`
+* `web-api-step-3.md`
+* `web-api-readiness.md`
+* `azure-app-service-deployment.md`
+* Any newer web migration documents
+* Any deployment runbooks relevant to the task
+
+### Release / Packaging Work
+
+Review:
+
+* Release checklists
+* Packaging guides
+* Deployment runbooks
+* Platform-specific build documentation
+
+under:
+
+* `docs/`
+
+Do not begin implementation until relevant documentation has been reviewed.
 
 ---
 
@@ -32,8 +119,8 @@ Before making changes:
 
 Read:
 
-* architecture/database-schema.md
-* architecture/tenancy-and-rls.md
+* `architecture/database-schema.md`
+* `architecture/tenancy-and-rls.md`
 
 Required:
 
@@ -51,7 +138,7 @@ Required:
 
 Read:
 
-* architecture/development-rules.md
+* `architecture/development-rules.md`
 
 Required:
 
@@ -69,7 +156,7 @@ Do not create duplicate implementations when an existing component already solve
 
 Read:
 
-* architecture/live-update-architecture.md
+* `architecture/live-update-architecture.md`
 
 Required:
 
@@ -84,13 +171,14 @@ Required:
 
 Read:
 
-* architecture/system-overview.md
+* `architecture/system-overview.md`
 
 Required:
 
 * Respect module boundaries.
 * Preserve service-port architecture.
 * Avoid coupling UI directly to persistence.
+* Preserve established modular boundaries.
 
 ---
 
@@ -129,6 +217,7 @@ Instead:
    * DAO
    * DTO
    * ViewModel
+   * Service
    * UI Binding
 4. Confirm the final displayed control receives the expected data.
 5. Use logging to prove the failure point when necessary.
@@ -221,6 +310,19 @@ Never:
 
 ---
 
+## Web Application Rules
+
+For all web application work:
+
+* Reuse existing API contracts whenever possible.
+* Do not duplicate business logic already implemented in shared services.
+* Keep authentication aligned with the bearer-token architecture.
+* Follow existing API response patterns.
+* Review migration documentation before introducing new APIs.
+* Prefer extending existing endpoints over creating redundant endpoints.
+
+---
+
 ## Definition of Done
 
 A task is not complete because it compiles.
@@ -229,6 +331,8 @@ A task is complete when:
 
 1. Code compiles.
 2. Tests pass (when applicable).
-3. The visible UI behaves correctly.
-4. The actual user-reported issue is resolved.
-5. No existing functionality is broken.
+3. Relevant documentation was reviewed.
+4. The visible UI behaves correctly.
+5. The actual user-reported issue is resolved.
+6. No existing functionality is broken.
+7. Architecture rules remain satisfied.
