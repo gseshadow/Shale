@@ -107,6 +107,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Polygon;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -1201,14 +1203,16 @@ public class CaseController {
 			return;
 		}
 
-		HBox row = new HBox(6);
-		row.setAlignment(Pos.TOP_LEFT);
+		HBox row = new HBox(10);
+		row.setAlignment(Pos.CENTER_LEFT);
 		for (int i = 0; i < safeHistory.size(); i++) {
 			CaseStatusHistoryDto item = safeHistory.get(i);
 			row.getChildren().add(buildStatusTimelineSegment(item));
 			if (i < safeHistory.size() - 1) {
 				Label connector = new Label("→");
-				connector.setStyle("-fx-opacity: 0.5; -fx-font-size: 13px; -fx-padding: 5 0 0 0;");
+				connector.setMinHeight(30);
+				connector.setAlignment(Pos.CENTER);
+				connector.setStyle("-fx-opacity: 0.38; -fx-font-size: 15px; -fx-font-weight: bold;");
 				row.getChildren().add(connector);
 			}
 		}
@@ -1216,6 +1220,9 @@ public class CaseController {
 		ScrollPane scroll = new ScrollPane(row);
 		scroll.setFitToHeight(true);
 		scroll.setFitToWidth(true);
+		scroll.setMinViewportHeight(36);
+		scroll.setPrefViewportHeight(38);
+		scroll.setMaxHeight(44);
 		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 		scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		scroll.setPannable(true);
@@ -1226,18 +1233,34 @@ public class CaseController {
 	private Node buildStatusTimelineSegment(CaseStatusHistoryDto item) {
 		String color = ColorUtil.toCssBackgroundColor(item.color());
 		String name = safeText(item.statusName()).isBlank() ? "Status #" + item.statusId() : safeText(item.statusName());
-		Label pill = new Label(name + (item.current() ? "  Current" : ""));
-		pill.setMaxWidth(170);
-		pill.setTextOverrun(OverrunStyle.ELLIPSIS);
-		pill.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 14; -fx-padding: 4 12 4 12; "
-				+ "-fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: " + (item.current() ? "bold" : "normal") + "; "
-				+ (item.current() ? "-fx-border-color: rgba(0,0,0,0.35); -fx-border-radius: 14; -fx-border-width: 1.2;" : ""));
-		Label date = new Label(formatTimelineDate(item.effectiveDate()));
-		date.setStyle("-fx-opacity: 0.72; -fx-font-size: 10px;");
-		VBox box = new VBox(2, pill, date);
-		box.setAlignment(Pos.TOP_CENTER);
-		Tooltip.install(box, new Tooltip(buildStatusTimelineTooltip(item, name)));
-		return box;
+		String textColor = readableTextColor(item.color());
+		String borderColor = item.current() ? "rgba(20,35,55,0.55)" : "rgba(0,0,0,0.16)";
+		String fontWeight = item.current() ? "bold" : "600";
+
+		Label label = new Label(name);
+		label.setMinHeight(30);
+		label.setMaxHeight(30);
+		label.setMinWidth(90);
+		label.setMaxWidth(210);
+		label.setTextOverrun(OverrunStyle.ELLIPSIS);
+		label.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 15 2 2 15; "
+				+ "-fx-padding: 0 14 0 16; -fx-text-fill: " + textColor + "; -fx-font-size: 13px; "
+				+ "-fx-font-weight: " + fontWeight + "; -fx-border-color: " + borderColor + "; "
+				+ "-fx-border-radius: 15 2 2 15; -fx-border-width: " + (item.current() ? "1.4" : "0.8") + ";");
+
+		Polygon arrowHead = new Polygon(0, 0, 14, 15, 0, 30);
+		arrowHead.setFill(Color.web(color));
+		arrowHead.setStroke(item.current() ? Color.rgb(20, 35, 55, 0.55) : Color.rgb(0, 0, 0, 0.12));
+		arrowHead.setStrokeWidth(item.current() ? 1.2 : 0.7);
+		arrowHead.setMouseTransparent(true);
+
+		HBox pill = new HBox(label, arrowHead);
+		pill.setAlignment(Pos.CENTER_LEFT);
+		pill.setMinHeight(30);
+		pill.setMaxHeight(30);
+		pill.setStyle(item.current() ? "-fx-effect: dropshadow(gaussian, rgba(31,41,55,0.24), 7, 0.18, 0, 1);" : "");
+		Tooltip.install(pill, new Tooltip(buildStatusTimelineTooltip(item, name)));
+		return pill;
 	}
 
 	private static String buildStatusTimelineTooltip(CaseStatusHistoryDto item, String name) {
@@ -1251,8 +1274,16 @@ public class CaseController {
 		return name + "\nEntered: " + entered + "\nExited: " + exited + "\nDuration: " + duration;
 	}
 
-	private static String formatTimelineDate(LocalDateTime value) {
-		return value == null ? "—" : formatDate(value.toLocalDate());
+	private static String readableTextColor(String storedColor) {
+		Color color = ColorUtil.toFxColor(storedColor);
+		double luminance = 0.2126 * linearized(color.getRed())
+				+ 0.7152 * linearized(color.getGreen())
+				+ 0.0722 * linearized(color.getBlue());
+		return luminance > 0.48 ? "#172033" : "white";
+	}
+
+	private static double linearized(double channel) {
+		return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
 	}
 
 	private static String formatTimelineDateTime(LocalDateTime value) {
