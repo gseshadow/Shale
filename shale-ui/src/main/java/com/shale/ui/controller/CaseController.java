@@ -108,7 +108,6 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Polygon;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -1203,26 +1202,22 @@ public class CaseController {
 			return;
 		}
 
-		HBox row = new HBox(10);
+		HBox row = new HBox(0);
 		row.setAlignment(Pos.CENTER_LEFT);
 		for (int i = 0; i < safeHistory.size(); i++) {
 			CaseStatusHistoryDto item = safeHistory.get(i);
 			row.getChildren().add(buildStatusTimelineSegment(item));
 			if (i < safeHistory.size() - 1) {
-				Label connector = new Label("→");
-				connector.setMinHeight(30);
-				connector.setAlignment(Pos.CENTER);
-				connector.setStyle("-fx-opacity: 0.38; -fx-font-size: 15px; -fx-font-weight: bold;");
-				row.getChildren().add(connector);
+				row.getChildren().add(buildStatusTimelineConnector());
 			}
 		}
 
 		ScrollPane scroll = new ScrollPane(row);
 		scroll.setFitToHeight(true);
 		scroll.setFitToWidth(true);
-		scroll.setMinViewportHeight(36);
-		scroll.setPrefViewportHeight(38);
-		scroll.setMaxHeight(44);
+		scroll.setMinViewportHeight(48);
+		scroll.setPrefViewportHeight(52);
+		scroll.setMaxHeight(58);
 		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 		scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		scroll.setPannable(true);
@@ -1234,33 +1229,54 @@ public class CaseController {
 		String color = ColorUtil.toCssBackgroundColor(item.color());
 		String name = safeText(item.statusName()).isBlank() ? "Status #" + item.statusId() : safeText(item.statusName());
 		String textColor = readableTextColor(item.color());
-		String borderColor = item.current() ? "rgba(20,35,55,0.55)" : "rgba(0,0,0,0.16)";
-		String fontWeight = item.current() ? "bold" : "600";
+		String borderColor = item.current() ? "rgba(20,35,55,0.62)" : "rgba(0,0,0,0.14)";
+		boolean completed = !item.current() && item.endDate() != null;
+
+		Label check = new Label("✓");
+		check.setVisible(completed);
+		check.setManaged(completed);
+		check.setMinWidth(14);
+		check.setAlignment(Pos.CENTER);
+		check.setStyle("-fx-text-fill: " + textColor + "; -fx-opacity: 0.82; -fx-font-size: 13px; -fx-font-weight: bold;");
 
 		Label label = new Label(name);
-		label.setMinHeight(30);
-		label.setMaxHeight(30);
-		label.setMinWidth(90);
-		label.setMaxWidth(210);
+		label.setMinHeight(38);
+		label.setMaxHeight(38);
+		label.setMinWidth(72);
+		label.setMaxWidth(220);
+		label.setAlignment(Pos.CENTER);
 		label.setTextOverrun(OverrunStyle.ELLIPSIS);
-		label.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 15 2 2 15; "
-				+ "-fx-padding: 0 14 0 16; -fx-text-fill: " + textColor + "; -fx-font-size: 13px; "
-				+ "-fx-font-weight: " + fontWeight + "; -fx-border-color: " + borderColor + "; "
-				+ "-fx-border-radius: 15 2 2 15; -fx-border-width: " + (item.current() ? "1.4" : "0.8") + ";");
+		label.setStyle("-fx-text-fill: " + textColor + "; -fx-font-size: 13px; -fx-font-weight: "
+				+ (item.current() ? "bold" : "600") + ";");
 
-		Polygon arrowHead = new Polygon(0, 0, 14, 15, 0, 30);
-		arrowHead.setFill(Color.web(color));
-		arrowHead.setStroke(item.current() ? Color.rgb(20, 35, 55, 0.55) : Color.rgb(0, 0, 0, 0.12));
-		arrowHead.setStrokeWidth(item.current() ? 1.2 : 0.7);
-		arrowHead.setMouseTransparent(true);
-
-		HBox pill = new HBox(label, arrowHead);
-		pill.setAlignment(Pos.CENTER_LEFT);
-		pill.setMinHeight(30);
-		pill.setMaxHeight(30);
-		pill.setStyle(item.current() ? "-fx-effect: dropshadow(gaussian, rgba(31,41,55,0.24), 7, 0.18, 0, 1);" : "");
+		HBox pill = new HBox(8, check, label);
+		pill.setAlignment(Pos.CENTER);
+		pill.setMinHeight(38);
+		pill.setMaxHeight(38);
+		pill.setMinWidth(112);
+		pill.setMaxWidth(270);
+		pill.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 20; "
+				+ "-fx-padding: 0 18 0 " + (completed ? "14" : "18") + "; "
+				+ "-fx-border-color: " + borderColor + "; -fx-border-radius: 20; "
+				+ "-fx-border-width: " + (item.current() ? "1.8" : "0.8") + "; "
+				+ (item.current() ? "-fx-effect: dropshadow(gaussian, rgba(31,41,55,0.26), 10, 0.2, 0, 1);" : ""));
 		Tooltip.install(pill, new Tooltip(buildStatusTimelineTooltip(item, name)));
 		return pill;
+	}
+
+	private Node buildStatusTimelineConnector() {
+		Region line = new Region();
+		line.setMinSize(30, 2);
+		line.setPrefSize(30, 2);
+		line.setMaxSize(30, 2);
+		line.setStyle("-fx-background-color: rgba(91,103,124,0.36); -fx-background-radius: 2;");
+
+		StackPane connector = new StackPane(line);
+		connector.setMinSize(38, 38);
+		connector.setPrefSize(38, 38);
+		connector.setMaxHeight(38);
+		connector.setAlignment(Pos.CENTER);
+		return connector;
 	}
 
 	private static String buildStatusTimelineTooltip(CaseStatusHistoryDto item, String name) {
