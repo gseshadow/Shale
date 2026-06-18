@@ -253,14 +253,7 @@ public final class SearchController {
 		}
 		List<Node> cards = new ArrayList<>(deletedCases.size());
 		for (CaseDao.CaseRow row : deletedCases) {
-			Node card = caseCardFactory.create(new CaseCardModel(
-					row.id(),
-					row.name(),
-					row.intakeDate(),
-					row.statuteOfLimitationsDate(),
-					row.responsibleAttorneyName(),
-					row.responsibleAttorneyColor(),
-					row.nonEngagementLetterSent()));
+			Node card = caseCardFactory.create(toCaseCardModel(row), CaseCardFactory.Variant.COMPACT);
 			if (card instanceof Region region) {
 				region.setPrefWidth(CASE_CARD_WIDTH);
 				region.setMaxWidth(CASE_CARD_WIDTH);
@@ -286,14 +279,7 @@ public final class SearchController {
 		}
 		List<Node> cards = new ArrayList<>(cases.size());
 		for (CaseDao.CaseRow row : cases) {
-			Node card = caseCardFactory.create(new CaseCardModel(
-					row.id(),
-					row.name(),
-					row.intakeDate(),
-					row.statuteOfLimitationsDate(),
-					row.responsibleAttorneyName(),
-					row.responsibleAttorneyColor(),
-					row.nonEngagementLetterSent()));
+			Node card = caseCardFactory.create(toCaseCardModel(row), CaseCardFactory.Variant.COMPACT);
 			if (card instanceof Region region) {
 				region.setPrefWidth(CASE_CARD_WIDTH);
 				region.setMaxWidth(CASE_CARD_WIDTH);
@@ -302,6 +288,20 @@ public final class SearchController {
 		}
 		casesFlow.getChildren().setAll(cards);
 		updateSectionState(casesFlow, casesEmptyLabel, cards.isEmpty());
+	}
+
+	private static CaseCardModel toCaseCardModel(CaseDao.CaseRow row) {
+		return new CaseCardModel(
+				row.id(),
+				row.name(),
+				row.intakeDate(),
+				row.statuteOfLimitationsDate(),
+				row.responsibleAttorneyName(),
+				row.responsibleAttorneyColor(),
+				row.nonEngagementLetterSent(),
+				row.primaryStatusName(),
+				row.primaryStatusColor(),
+				row.practiceAreaColor());
 	}
 
 	private void renderContacts(List<ContactDao.DirectoryContactRow> contacts) {
