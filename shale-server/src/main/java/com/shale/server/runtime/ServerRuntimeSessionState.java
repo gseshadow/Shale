@@ -17,6 +17,8 @@ import jakarta.servlet.http.HttpServletRequest;
 public final class ServerRuntimeSessionState {
     public static final String NOT_IMPLEMENTED_MESSAGE =
             "TODO: server auth/session context is not wired yet; this endpoint cannot safely access tenant-scoped data without RLS session context.";
+    public static final String AUTHENTICATION_REQUIRED_MESSAGE =
+            "Authentication is required to access tenant-scoped data.";
 
     private final ServerSessionResolver sessionResolver;
     private final ObjectProvider<HttpServletRequest> currentRequest;
@@ -35,7 +37,7 @@ public final class ServerRuntimeSessionState {
     public ServerPrincipal requirePrincipal() {
         ServerSessionContext context = sessionResolver.resolve(currentRequest.getIfAvailable());
         if (context == null || context.principal().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, NOT_IMPLEMENTED_MESSAGE);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, AUTHENTICATION_REQUIRED_MESSAGE);
         }
         return context.principal().orElseThrow();
     }
