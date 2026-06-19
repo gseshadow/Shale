@@ -125,7 +125,7 @@ function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (v
       const result = await login(email, password);
       const verifiedUser = await getCurrentUser(result.accessToken);
       onLogin(result.accessToken, verifiedUser);
-      navigate(loginRedirectPathFrom(location.state), { replace: true });
+      navigate(redirectPathFrom(location.state), { replace: true });
       setPassword('');
     } catch (caught) {
       clearAccessToken();
@@ -350,7 +350,7 @@ function FullPageStatus({ message }: { message: string }) {
   );
 }
 
-function loginRedirectPathFrom(state: unknown): string {
+function redirectPathFrom(state: unknown): string {
   if (!state || typeof state !== 'object' || !('from' in state)) {
     return '/my-shale';
   }
