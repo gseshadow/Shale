@@ -125,7 +125,7 @@ function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (v
       const result = await login(email, password);
       const verifiedUser = await getCurrentUser(result.accessToken);
       onLogin(result.accessToken, verifiedUser);
-      navigate(redirectPathFrom(location.state), { replace: true });
+      navigate(loginRedirectPathFrom(location.state), { replace: true });
       setPassword('');
     } catch (caught) {
       clearAccessToken();
@@ -282,6 +282,75 @@ function FullPageStatus({ message }: { message: string }) {
 }
 
 function redirectPathFrom(state: unknown): string {
+  if (!state || typeof state !== 'object' || !('from' in state)) {
+    return '/my-shale';
+  }
+
+  const from = (state as { from?: unknown }).from;
+  if (!from || typeof from !== 'object' || !('pathname' in from)) {
+    return '/my-shale';
+  }
+
+  const pathname = (from as { pathname?: unknown }).pathname;
+  return typeof pathname === 'string' ? pathname : '/my-shale';
+}
+
+function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="app-layout">
+      <aside className="sidebar" aria-label="Primary navigation">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">S</span>
+          <span>Shale</span>
+        </div>
+        <nav className="nav-list">
+          {navigationItems.map((item) => (
+            <NavLink key={item.path} to={item.path} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="content-column">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Signed in</p>
+            <p className="user-name">{displayNameFor(user)}</p>
+          </div>
+          <button type="button" onClick={onLogout}>Logout</button>
+        </header>
+        <main className="page-content">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function PlaceholderPage({ title }: { title: string }) {
+  return (
+    <section className="placeholder-page" aria-labelledby="page-title">
+      <p className="eyebrow">Placeholder</p>
+      <h1 id="page-title">{title}</h1>
+      <p>This page is part of the Step 5C navigation framework. Business functionality will be added in a later step.</p>
+    </section>
+  );
+}
+
+function FullPageStatus({ message }: { message: string }) {
+  return (
+    <main className="full-page-status">
+      <p className="status">{message}</p>
+    </main>
+  );
+}
+
+function loginRedirectPathFrom(state: unknown): string {
   if (!state || typeof state !== 'object' || !('from' in state)) {
     return '/my-shale';
   }
