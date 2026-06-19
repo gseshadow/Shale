@@ -257,3 +257,89 @@ input {
 .results-table tbody tr:hover {
   background: #f7fafc;
 }
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:focus {
+  background: #edf6fb;
+  outline: 3px solid #91c7e5;
+  outline-offset: -3px;
+}
+
+.case-detail-page {
+  background: white;
+  border: 1px solid #dbe4ed;
+  border-radius: 18px;
+  display: grid;
+  gap: 1.5rem;
+  padding: 2rem;
+}
+
+.breadcrumb {
+  align-items: center;
+  color: #526071;
+  display: flex;
+  flex-wrap: wrap;
+  font-weight: 700;
+  gap: 0.5rem;
+}
+
+.breadcrumb a,
+.button-link {
+  color: #1d4f73;
+}
+
+.page-heading-row {
+  align-items: start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.button-link {
+  border: 1px solid #bdd4e4;
+  border-radius: 999px;
+  font-weight: 800;
+  padding: 0.8rem 1.1rem;
+  text-decoration: none;
+}
+
+.detail-sections {
+  display: grid;
+  gap: 2rem;
+}
+
+.detail-list {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+}
+
+.detail-list.compact {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.detail-list div {
+  border-bottom: 1px solid #edf1f5;
+  padding-bottom: 0.8rem;
+}
+
+.detail-list dt {
+  color: #526071;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
+
+.detail-list dd {
+  margin: 0;
+}
+
+.preserve-whitespace {
+  line-height: 1.7;
+  white-space: pre-wrap;
+}

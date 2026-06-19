@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { AuthenticatedUser, CaseSearchResult, apiBaseUrl, clearAccessToken, getCurrentUser, login, logout, readAccessToken, searchCases, storeAccessToken } from './api';
+import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { AuthenticatedUser, CaseDetail, CaseSearchResult, apiBaseUrl, clearAccessToken, getCaseDetail, getCurrentUser, login, logout, readAccessToken, searchCases, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -81,6 +81,7 @@ function AppRoutes() {
         <Route element={<AuthenticatedShell user={authState.user} onLogout={handleLogout} />}>
           <Route path="/my-shale" element={<PlaceholderPage title="My Shale" />} />
           <Route path="/cases" element={<CasesPage accessToken={authState.accessToken} />} />
+          <Route path="/cases/:caseId" element={<CaseDetailPage accessToken={authState.accessToken} />} />
           <Route path="/tasks" element={<PlaceholderPage title="Tasks" />} />
           <Route path="/contacts" element={<PlaceholderPage title="Contacts" />} />
           <Route path="/organizations" element={<PlaceholderPage title="Organizations" />} />
@@ -282,6 +283,8 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 }
 
 function CaseResultsTable({ results }: { results: CaseSearchResult[] }) {
+  const navigate = useNavigate();
+
   return (
     <div className="table-wrap">
       <table className="results-table">
@@ -299,7 +302,18 @@ function CaseResultsTable({ results }: { results: CaseSearchResult[] }) {
         </thead>
         <tbody>
           {results.map((result) => (
-            <tr key={result.caseId}>
+            <tr
+              key={result.caseId}
+              className="clickable-row"
+              tabIndex={0}
+              onClick={() => navigate(`/cases/${result.caseId}`)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate(`/cases/${result.caseId}`);
+                }
+              }}
+            >
               <td>{result.caseId}</td>
               <td>{result.caseNumber}</td>
               <td>{result.caseName}</td>
@@ -312,6 +326,125 @@ function CaseResultsTable({ results }: { results: CaseSearchResult[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+
+function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
+  const { caseId } = useParams();
+  const numericCaseId = Number(caseId);
+  const [caseDetail, setCaseDetail] = useState<CaseDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!Number.isInteger(numericCaseId) || numericCaseId <= 0) {
+      setCaseDetail(null);
+      setError('That case link is not valid.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!accessToken) {
+      setCaseDetail(null);
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    getCaseDetail(accessToken, numericCaseId)
+      .then((detail) => {
+        if (isCurrent) {
+          setCaseDetail(detail);
+        }
+      })
+      .catch((caught) => {
+        if (isCurrent) {
+          setCaseDetail(null);
+          setError(caught instanceof Error ? caught.message : 'Case detail could not be loaded.');
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [accessToken, numericCaseId]);
+
+  const title = caseDetail?.caseName || 'Case Detail';
+
+  return (
+    <section className="case-detail-page" aria-labelledby="case-detail-title">
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <Link to="/cases">Cases</Link>
+        <span aria-hidden="true">›</span>
+        <span>{title}</span>
+      </nav>
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">Case Detail</p>
+          <h1 id="case-detail-title">{title}</h1>
+        </div>
+        <Link className="button-link" to="/cases">Back to Cases</Link>
+      </div>
+
+      {isLoading && <p className="status">Loading case detail…</p>}
+      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+      {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} />}
+    </section>
+  );
+}
+
+function CaseDetailReadOnly({ detail }: { detail: CaseDetail }) {
+  return (
+    <div className="detail-sections">
+      <section aria-labelledby="case-info-title">
+        <h2 id="case-info-title">Case Information</h2>
+        <dl className="detail-list">
+          <DetailItem label="Case Name" value={detail.caseName} />
+          <DetailItem label="Case Number" value={detail.caseNumber} />
+          <DetailItem label="Status" value={detail.caseStatus} />
+          <DetailItem label="Practice Area" value={detail.practiceAreaId ? `Practice Area ID ${detail.practiceAreaId}` : null} />
+          <DetailItem label="Description" value={detail.description} preserveWhitespace />
+          <DetailItem label="Summary" value={detail.summary} preserveWhitespace />
+        </dl>
+      </section>
+
+      <section aria-labelledby="important-dates-title">
+        <h2 id="important-dates-title">Important Dates</h2>
+        <dl className="detail-list compact">
+          <DetailItem label="Intake Date" value={detail.callerDate} />
+          <DetailItem label="Date of Injury" value={detail.dateOfInjury} />
+          <DetailItem label="Statute of Limitations" value={detail.statuteOfLimitations} />
+          <DetailItem label="Tort Notice Deadline" value={detail.tortNoticeDeadline} />
+        </dl>
+      </section>
+
+      <section aria-labelledby="assignments-title">
+        <h2 id="assignments-title">Assignments</h2>
+        <dl className="detail-list compact">
+          <DetailItem label="Responsible Attorney" value="Not currently returned by the case-detail endpoint." />
+        </dl>
+      </section>
+    </div>
+  );
+}
+
+function DetailItem({ label, value, preserveWhitespace = false }: { label: string; value: string | number | null | undefined; preserveWhitespace?: boolean }) {
+  const displayValue = value === null || value === undefined || value === '' ? '—' : String(value);
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd className={preserveWhitespace ? 'preserve-whitespace' : undefined}>{displayValue}</dd>
     </div>
   );
 }

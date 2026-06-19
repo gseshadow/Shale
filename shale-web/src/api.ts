@@ -34,6 +34,20 @@ export interface CaseSearchResult {
   client: string;
 }
 
+export interface CaseDetail {
+  caseId: number;
+  caseNumber: string | null;
+  caseName: string;
+  description: string;
+  caseStatus: string;
+  practiceAreaId: number | null;
+  callerDate: string | null;
+  dateOfInjury: string | null;
+  statuteOfLimitations: string | null;
+  tortNoticeDeadline: string | null;
+  summary: string;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);
@@ -116,3 +130,23 @@ export async function searchCases(accessToken: string, query: string): Promise<C
   return response.json() as Promise<CaseSearchResult[]>;
 }
 
+
+export async function getCaseDetail(accessToken: string, caseId: number): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that case.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load the case detail.', response.status);
+  }
+
+  return response.json() as Promise<CaseDetail>;
+}
