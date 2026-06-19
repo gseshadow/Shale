@@ -42,7 +42,13 @@ Use a comma-separated list, for example:
 
 ```bash
 SHALE_ALLOWED_CORS_ORIGINS=https://app.example.com,https://staging.example.com
+
+# Current local shale-web browser-login origin
+SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173
 ```
+
+
+For the current Step 5 `shale-web` browser-login milestone, the deployed API origin is `https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net`. Restart Azure App Service after changing CORS or other application settings.
 
 ## Port binding
 

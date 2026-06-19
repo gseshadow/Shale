@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { AuthenticatedUser, apiBaseUrl, login } from './api';
+import { AuthenticatedUser, apiBaseUrl, getCurrentUser, login, storeAccessToken } from './api';
 import './styles.css';
 
 function displayNameFor(user: AuthenticatedUser): string {
@@ -24,7 +24,9 @@ export default function App() {
 
     try {
       const result = await login(email, password);
-      setUser(result.user);
+      storeAccessToken(result.accessToken);
+      const verifiedUser = await getCurrentUser(result.accessToken);
+      setUser(verifiedUser);
       setTokenPreview(`${result.tokenType} ${result.accessToken.slice(0, 16)}…`);
       setPassword('');
     } catch (caught) {
@@ -57,7 +59,7 @@ export default function App() {
           <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Signing in…' : 'Sign in'}</button>
         </form>
         {error && <p className="status error" role="alert">{error}</p>}
-        {user && <p className="status success">Signed in as <strong>{displayNameFor(user)}</strong>. Token: <code>{tokenPreview}</code></p>}
+        {user && <p className="status success">Verified by <code>/api/auth/me</code> as <strong>{displayNameFor(user)}</strong> for tenant <strong>{user.shaleClientId}</strong>. Token: <code>{tokenPreview}</code></p>}
       </section>
     </main>
   );

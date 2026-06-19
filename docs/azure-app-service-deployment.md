@@ -111,7 +111,7 @@ Optional:
 | Setting | Notes |
 |----------|----------|
 | SHALE_AUTH_TOKEN_TTL_SECONDS | Defaults to 28800 (8 hours) |
-| SHALE_ALLOWED_CORS_ORIGINS | Required for browser clients |
+| SHALE_ALLOWED_CORS_ORIGINS | Required for browser clients. For local `shale-web` login, set `SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173` and restart the App Service. |
 | DB_MAX_POOL_SIZE | Pool tuning |
 | DB_CONNECTION_TIMEOUT_MS | Pool tuning |
 
@@ -279,6 +279,22 @@ Using `Bearer <token>` manually may result in:
   "status": 401,
   "message": "Invalid or expired authentication token."
 }
+```
+
+---
+
+## Current Step 5 Browser Login Endpoint
+
+The current deployed Azure API origin for the Step 5 `shale-web` browser-login milestone is:
+
+```text
+https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net
+```
+
+Local browser login from Vite requires this App Service setting followed by an App Service restart:
+
+```text
+SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173
 ```
 
 ---

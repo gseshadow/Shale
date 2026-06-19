@@ -1,4 +1,5 @@
-const DEFAULT_API_BASE_URL = 'https://shale-api.azurewebsites.net';
+const DEFAULT_API_BASE_URL = 'https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net';
+const ACCESS_TOKEN_STORAGE_KEY = 'shale-web.accessToken';
 
 export interface AuthenticatedUser {
   authenticated: boolean;
@@ -22,16 +23,28 @@ export interface LoginResponse {
   user: AuthenticatedUser;
 }
 
-export class LoginError extends Error {
+export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);
-    this.name = 'LoginError';
+    this.name = 'ApiError';
   }
 }
 
 export function apiBaseUrl(): string {
   const configured = import.meta.env.VITE_SHALE_API_BASE_URL?.trim();
   return (configured || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+}
+
+export function storeAccessToken(accessToken: string): void {
+  sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
+}
+
+export function readAccessToken(): string | null {
+  return sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+}
+
+export function clearAccessToken(): void {
+  sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
@@ -45,8 +58,24 @@ export async function login(email: string, password: string): Promise<LoginRespo
   });
 
   if (!response.ok) {
-    throw new LoginError('The email or password was not accepted by Shale.', response.status);
+    throw new ApiError('The email or password was not accepted by Shale.', response.status);
   }
 
   return response.json() as Promise<LoginResponse>;
+}
+
+export async function getCurrentUser(accessToken: string): Promise<AuthenticatedUser> {
+  const response = await fetch(`${apiBaseUrl()}/api/auth/me`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not verify the signed-in user.', response.status);
+  }
+
+  return response.json() as Promise<AuthenticatedUser>;
 }
