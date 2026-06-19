@@ -73,7 +73,10 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={authState.user ? <Navigate to="/my-shale" replace /> : <Navigate to="/login" replace />} />
-      <Route path="/login" element={<LoginPage authState={authState} onLogin={handleLogin} />} />
+      <Route
+        path="/login"
+        element={authState.user ? <Navigate to="/my-shale" replace /> : <LoginPage isVerifying={authState.isVerifying} onLogin={handleLogin} />}
+      />
       <Route element={<ProtectedRoute authState={authState} />}>
         <Route element={<AuthenticatedShell user={authState.user} onLogout={handleLogout} />}>
           <Route path="/my-shale" element={<PlaceholderPage title="My Shale" />} />
@@ -104,7 +107,7 @@ function ProtectedRoute({ authState }: { authState: AuthState }) {
   return <Outlet />;
 }
 
-function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (verifiedAccessToken: string, user: AuthenticatedUser) => void }) {
+function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -112,12 +115,6 @@ function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (ver
   const baseUrl = useMemo(() => apiBaseUrl(), []);
   const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    if (authState.user) {
-      navigate('/my-shale', { replace: true });
-    }
-  }, [authState.user, navigate]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -140,7 +137,7 @@ function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (ver
     }
   }
 
-  if (authState.isVerifying) {
+  if (isVerifying) {
     return <FullPageStatus message="Checking your Shale session…" />;
   }
 
@@ -211,6 +208,75 @@ function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (ver
           )}
         </section>
       )}
+    </main>
+  );
+}
+
+function redirectPathFrom(state: unknown): string {
+  if (!state || typeof state !== 'object' || !('from' in state)) {
+    return '/my-shale';
+  }
+
+  const from = (state as { from?: unknown }).from;
+  if (!from || typeof from !== 'object' || !('pathname' in from)) {
+    return '/my-shale';
+  }
+
+  const pathname = (from as { pathname?: unknown }).pathname;
+  return typeof pathname === 'string' ? pathname : '/my-shale';
+}
+
+function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="app-layout">
+      <aside className="sidebar" aria-label="Primary navigation">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">S</span>
+          <span>Shale</span>
+        </div>
+        <nav className="nav-list">
+          {navigationItems.map((item) => (
+            <NavLink key={item.path} to={item.path} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="content-column">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Signed in</p>
+            <p className="user-name">{displayNameFor(user)}</p>
+          </div>
+          <button type="button" onClick={onLogout}>Logout</button>
+        </header>
+        <main className="page-content">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function PlaceholderPage({ title }: { title: string }) {
+  return (
+    <section className="placeholder-page" aria-labelledby="page-title">
+      <p className="eyebrow">Placeholder</p>
+      <h1 id="page-title">{title}</h1>
+      <p>This page is part of the Step 5C navigation framework. Business functionality will be added in a later step.</p>
+    </section>
+  );
+}
+
+function FullPageStatus({ message }: { message: string }) {
+  return (
+    <main className="full-page-status">
+      <p className="status">{message}</p>
     </main>
   );
 }
