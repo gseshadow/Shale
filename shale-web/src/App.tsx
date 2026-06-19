@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { AuthenticatedUser, apiBaseUrl, clearAccessToken, getCurrentUser, login, logout, readAccessToken, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseSearchResult, apiBaseUrl, clearAccessToken, getCurrentUser, login, logout, readAccessToken, searchCases, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -80,7 +80,7 @@ function AppRoutes() {
       <Route element={<ProtectedRoute authState={authState} />}>
         <Route element={<AuthenticatedShell user={authState.user} onLogout={handleLogout} />}>
           <Route path="/my-shale" element={<PlaceholderPage title="My Shale" />} />
-          <Route path="/cases" element={<PlaceholderPage title="Cases" />} />
+          <Route path="/cases" element={<CasesPage accessToken={authState.accessToken} />} />
           <Route path="/tasks" element={<PlaceholderPage title="Tasks" />} />
           <Route path="/contacts" element={<PlaceholderPage title="Contacts" />} />
           <Route path="/organizations" element={<PlaceholderPage title="Organizations" />} />
@@ -210,6 +210,108 @@ function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null
           <Outlet />
         </main>
       </div>
+    </div>
+  );
+}
+
+function CasesPage({ accessToken }: { accessToken: string | null }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<CaseSearchResult[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSearch(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      setResults([]);
+      setHasSearched(false);
+      setError(null);
+      return;
+    }
+
+    if (!accessToken) {
+      setResults([]);
+      setHasSearched(true);
+      setError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const searchResults = await searchCases(accessToken, trimmedQuery);
+      setResults(searchResults);
+    } catch (caught) {
+      setResults([]);
+      setError(caught instanceof Error ? caught.message : 'Case search failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <section className="cases-page" aria-labelledby="cases-title">
+      <h1 id="cases-title">Cases</h1>
+      <form className="search-form" onSubmit={handleSearch}>
+        <label htmlFor="case-search">Search cases</label>
+        <div className="search-row">
+          <input
+            id="case-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Enter a case name, number, or client"
+          />
+          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching…' : 'Search'}</button>
+        </div>
+      </form>
+
+      <div className="results-area" aria-live="polite">
+        {isLoading && <p className="status">Loading case results…</p>}
+        {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+        {!isLoading && !error && hasSearched && results.length === 0 && <p className="status">No cases matched your search.</p>}
+        {!isLoading && !error && results.length > 0 && <CaseResultsTable results={results} />}
+      </div>
+    </section>
+  );
+}
+
+function CaseResultsTable({ results }: { results: CaseSearchResult[] }) {
+  return (
+    <div className="table-wrap">
+      <table className="results-table">
+        <thead>
+          <tr>
+            <th>Case ID</th>
+            <th>Case number</th>
+            <th>Case name</th>
+            <th>Status</th>
+            <th>Responsible attorney</th>
+            <th>Practice area</th>
+            <th>Intake date</th>
+            <th>Client</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results.map((result) => (
+            <tr key={result.caseId}>
+              <td>{result.caseId}</td>
+              <td>{result.caseNumber}</td>
+              <td>{result.caseName}</td>
+              <td>{result.caseStatus}</td>
+              <td>{result.responsibleAttorney}</td>
+              <td>{result.practiceArea}</td>
+              <td>{result.intakeDate ?? '—'}</td>
+              <td>{result.client}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

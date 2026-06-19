@@ -200,3 +200,60 @@ input {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
 }
+
+.cases-page {
+  background: white;
+  border: 1px solid #dbe4ed;
+  border-radius: 18px;
+  display: grid;
+  gap: 1.5rem;
+  padding: 2rem;
+}
+
+.search-form {
+  max-width: 760px;
+}
+
+.search-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.search-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.results-area {
+  display: grid;
+  gap: 1rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.results-table {
+  border-collapse: collapse;
+  min-width: 960px;
+  width: 100%;
+}
+
+.results-table th,
+.results-table td {
+  border-bottom: 1px solid #dbe4ed;
+  padding: 0.85rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.results-table th {
+  color: #526071;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.results-table tbody tr:hover {
+  background: #f7fafc;
+}
