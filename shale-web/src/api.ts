@@ -23,6 +23,17 @@ export interface LoginResponse {
   user: AuthenticatedUser;
 }
 
+export interface CaseSearchResult {
+  caseId: number;
+  caseNumber: string;
+  caseName: string;
+  caseStatus: string;
+  responsibleAttorney: string;
+  practiceArea: string;
+  intakeDate: string | null;
+  client: string;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);
@@ -78,4 +89,31 @@ export async function getCurrentUser(accessToken: string): Promise<Authenticated
   }
 
   return response.json() as Promise<AuthenticatedUser>;
+}
+
+export async function logout(accessToken: string): Promise<void> {
+  await fetch(`${apiBaseUrl()}/api/auth/logout`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+}
+
+export async function searchCases(accessToken: string, query: string): Promise<CaseSearchResult[]> {
+  const params = new URLSearchParams({ query });
+  const response = await fetch(`${apiBaseUrl()}/api/cases/search?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not search cases for the signed-in user.', response.status);
+  }
+
+  return response.json() as Promise<CaseSearchResult[]>;
 }
