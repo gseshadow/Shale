@@ -56,9 +56,9 @@ function AppRoutes() {
     };
   }, []);
 
-  function handleLogin(accessToken: string, user: AuthenticatedUser) {
-    storeAccessToken(accessToken);
-    setAuthState({ accessToken, user, isVerifying: false });
+  function handleLogin(verifiedAccessToken: string, user: AuthenticatedUser) {
+    storeAccessToken(verifiedAccessToken);
+    setAuthState({ accessToken: verifiedAccessToken, user, isVerifying: false });
   }
 
   async function handleLogout() {
@@ -104,7 +104,7 @@ function ProtectedRoute({ authState }: { authState: AuthState }) {
   return <Outlet />;
 }
 
-function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (accessToken: string, user: AuthenticatedUser) => void }) {
+function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (verifiedAccessToken: string, user: AuthenticatedUser) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -119,31 +119,6 @@ function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (acc
     }
   }, [authState.user, navigate]);
 
-  useEffect(() => {
-    if (!accessToken || user) {
-      return;
-    }
-
-    let isCurrent = true;
-    getCurrentUser(accessToken)
-      .then((verifiedUser) => {
-        if (isCurrent) {
-          setUser(verifiedUser);
-          setTokenPreview(`Bearer ${accessToken.slice(0, 16)}…`);
-        }
-      })
-      .catch(() => {
-        if (isCurrent) {
-          clearAccessToken();
-          setAccessToken(null);
-        }
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [accessToken, user]);
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -153,8 +128,7 @@ function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (acc
       const result = await login(email, password);
       const verifiedUser = await getCurrentUser(result.accessToken);
       onLogin(result.accessToken, verifiedUser);
-      const from = location.state && typeof location.state === 'object' && 'from' in location.state ? location.state.from : null;
-      navigate(typeof from === 'object' && from && 'pathname' in from ? String(from.pathname) : '/my-shale', { replace: true });
+      navigate(redirectPathFrom(location.state), { replace: true });
       setPassword('');
     } catch (caught) {
       clearAccessToken();
@@ -239,6 +213,20 @@ function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (acc
       )}
     </main>
   );
+}
+
+function redirectPathFrom(state: unknown): string {
+  if (!state || typeof state !== 'object' || !('from' in state)) {
+    return '/my-shale';
+  }
+
+  const from = (state as { from?: unknown }).from;
+  if (!from || typeof from !== 'object' || !('pathname' in from)) {
+    return '/my-shale';
+  }
+
+  const pathname = (from as { pathname?: unknown }).pathname;
+  return typeof pathname === 'string' ? pathname : '/my-shale';
 }
 
 function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
