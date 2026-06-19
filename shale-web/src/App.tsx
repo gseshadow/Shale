@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseSearchResult, apiBaseUrl, clearAccessToken, getCaseDetail, getCurrentUser, login, logout, readAccessToken, searchCases, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, apiBaseUrl, clearAccessToken, getCaseDetail, getCurrentUser, listAssignedCases, listAssignedTasks, login, logout, readAccessToken, searchCases, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -79,7 +79,7 @@ function AppRoutes() {
       />
       <Route element={<ProtectedRoute authState={authState} />}>
         <Route element={<AuthenticatedShell user={authState.user} onLogout={handleLogout} />}>
-          <Route path="/my-shale" element={<PlaceholderPage title="My Shale" />} />
+          <Route path="/my-shale" element={<MyShalePage accessToken={authState.accessToken} user={authState.user} />} />
           <Route path="/cases" element={<CasesPage accessToken={authState.accessToken} />} />
           <Route path="/cases/:caseId" element={<CaseDetailPage accessToken={authState.accessToken} />} />
           <Route path="/tasks" element={<PlaceholderPage title="Tasks" />} />
@@ -211,6 +211,116 @@ function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null
           <Outlet />
         </main>
       </div>
+    </div>
+  );
+}
+
+
+function MyShalePage({ accessToken, user }: { accessToken: string | null; user: AuthenticatedUser | null }) {
+  return (
+    <section className="dashboard-page" aria-labelledby="my-shale-title">
+      <div className="dashboard-header">
+        <p className="eyebrow">Dashboard</p>
+        <h1 id="my-shale-title">My Shale</h1>
+        <p className="lede">Welcome{user ? `, ${displayNameFor(user)}` : ''}. Here is your read-only Shale summary.</p>
+      </div>
+      <MyCasesSection accessToken={accessToken} />
+      <MyTasksSection accessToken={accessToken} />
+    </section>
+  );
+}
+
+function MyCasesSection({ accessToken }: { accessToken: string | null }) {
+  const [cases, setCases] = useState<CaseSearchResult[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+    listAssignedCases(accessToken)
+      .then((items) => isCurrent && setCases(items))
+      .catch((caught) => isCurrent && setError(caught instanceof Error ? caught.message : 'Your cases could not be loaded.'))
+      .finally(() => isCurrent && setIsLoading(false));
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  return (
+    <section className="dashboard-section" aria-labelledby="my-cases-title">
+      <h2 id="my-cases-title">My Cases</h2>
+      {isLoading && <p className="status">Loading your cases…</p>}
+      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+      {!isLoading && !error && cases.length === 0 && <p className="status">No assigned cases were found.</p>}
+      {!isLoading && !error && cases.length > 0 && <MyCasesTable cases={cases} />}
+    </section>
+  );
+}
+
+function MyCasesTable({ cases }: { cases: CaseSearchResult[] }) {
+  const navigate = useNavigate();
+  return (
+    <div className="table-wrap">
+      <table className="results-table">
+        <thead><tr><th>Case name</th><th>Status</th><th>Responsible attorney</th><th>Statute of limitations</th></tr></thead>
+        <tbody>{cases.map((item) => (
+          <tr key={item.caseId} className="clickable-row" tabIndex={0} onClick={() => navigate(`/cases/${item.caseId}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/cases/${item.caseId}`); } }}>
+            <td>{item.caseName || `Case ${item.caseId}`}</td><td>{item.caseStatus || '—'}</td><td>{item.responsibleAttorney || '—'}</td><td>{item.solDate ?? '—'}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function MyTasksSection({ accessToken }: { accessToken: string | null }) {
+  const [tasks, setTasks] = useState<CaseTaskListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+    listAssignedTasks(accessToken)
+      .then((items) => isCurrent && setTasks(items))
+      .catch((caught) => isCurrent && setError(caught instanceof Error ? caught.message : 'Your tasks could not be loaded.'))
+      .finally(() => isCurrent && setIsLoading(false));
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  return (
+    <section className="dashboard-section" aria-labelledby="my-tasks-title">
+      <h2 id="my-tasks-title">My Tasks</h2>
+      {isLoading && <p className="status">Loading your tasks…</p>}
+      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+      {!isLoading && !error && tasks.length === 0 && <p className="status">No assigned tasks were found.</p>}
+      {!isLoading && !error && tasks.length > 0 && <MyTasksTable tasks={tasks} />}
+    </section>
+  );
+}
+
+function MyTasksTable({ tasks }: { tasks: CaseTaskListItem[] }) {
+  return (
+    <div className="table-wrap">
+      <table className="results-table">
+        <thead><tr><th>Task</th><th>Case</th><th>Due date</th><th>Priority</th><th>Status</th></tr></thead>
+        <tbody>{tasks.map((task) => (
+          <tr key={task.id}>
+            <td>{task.title || `Task ${task.id}`}</td><td>{task.caseName || '—'}</td><td>{task.dueAt ?? '—'}</td><td>{task.priorityId ? `Priority ${task.priorityId}` : '—'}</td><td>{task.completedAt ? 'Completed' : 'Open'}</td>
+          </tr>
+        ))}</tbody>
+      </table>
     </div>
   );
 }

@@ -50,6 +50,17 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit) {
+		int resolvedLimit = limit <= 0 ? 25 : limit;
+		return caseGateway.listAssignedCasesForBoard(assignedUserId).stream()
+				.limit(resolvedLimit)
+				.map(CaseDao.CaseRow::id)
+				.map(caseGateway::getOverview)
+				.filter(Objects::nonNull)
+				.toList();
+	}
+
+	@Override
 	public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
 		return caseGateway.listCaseUpdates(caseId);
 	}
@@ -132,6 +143,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		List<CaseDao.CaseRow> searchCasesByName(String query);
 
+		List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId);
+
 		List<CaseUpdateDto> listCaseUpdates(long caseId);
 
 		void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId);
@@ -175,6 +188,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public List<CaseDao.CaseRow> searchCasesByName(String query) {
 			return caseDao.searchCasesByName(query);
+		}
+
+		@Override
+		public List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId) {
+			return caseDao.listAssignedCasesForBoard(assignedUserId);
 		}
 
 		@Override

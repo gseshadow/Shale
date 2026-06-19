@@ -25,6 +25,8 @@ public interface CaseServicePort {
 
 	List<CaseOverviewDto> searchCases(String query, int shaleClientId, int limit);
 
+	List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit);
+
 	List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
 	List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
