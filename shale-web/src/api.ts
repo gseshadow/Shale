@@ -23,6 +23,17 @@ export interface LoginResponse {
   user: AuthenticatedUser;
 }
 
+export interface CaseSearchResult {
+  caseId: number;
+  caseNumber: string;
+  caseName: string;
+  caseStatus: string;
+  responsibleAttorney: string;
+  practiceArea: string;
+  intakeDate: string | null;
+  client: string;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);
