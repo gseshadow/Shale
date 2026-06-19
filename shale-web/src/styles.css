@@ -200,3 +200,51 @@ input {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
 }
+
+.section-header {
+  align-items: start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.search-panel {
+  background: transparent;
+  border-top: 1px solid rgba(23, 32, 51, 0.16);
+  padding-top: 1.5rem;
+}
+
+.search-form {
+  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid #dbe4ed;
+  padding: 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: #526071;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+@media (max-width: 720px) {
+  .search-form {
+    grid-template-columns: 1fr;
+  }
+}

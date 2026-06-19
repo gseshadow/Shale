@@ -119,6 +119,31 @@ function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (acc
     }
   }, [authState.user, navigate]);
 
+  useEffect(() => {
+    if (!accessToken || user) {
+      return;
+    }
+
+    let isCurrent = true;
+    getCurrentUser(accessToken)
+      .then((verifiedUser) => {
+        if (isCurrent) {
+          setUser(verifiedUser);
+          setTokenPreview(`Bearer ${accessToken.slice(0, 16)}…`);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          clearAccessToken();
+          setAccessToken(null);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [accessToken, user]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -134,6 +159,8 @@ function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (acc
     } catch (caught) {
       clearAccessToken();
       setError(caught instanceof Error ? caught.message : 'Login failed.');
+      clearAccessToken();
+      setAccessToken(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -163,6 +190,53 @@ function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (acc
         </form>
         {error && <p className="status error" role="alert">{error}</p>}
       </section>
+
+      {user && (
+        <section className="search-panel" aria-labelledby="case-search-title">
+          <h2 id="case-search-title">Case search</h2>
+          <form className="search-form" onSubmit={handleCaseSearch}>
+            <label>
+              Search cases
+              <input type="search" value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} placeholder="Name, number, client, or attorney" />
+            </label>
+            <button type="submit" disabled={caseSearchLoading}>{caseSearchLoading ? 'Searching…' : 'Search'}</button>
+          </form>
+
+          {caseSearchLoading && <p className="status">Loading case results…</p>}
+          {caseSearchError && <p className="status error" role="alert">{caseSearchError}</p>}
+          {!caseSearchLoading && !caseSearchError && caseSearchAttempted && caseResults.length === 0 && <p className="status">No cases matched this search.</p>}
+          {!caseSearchLoading && caseResults.length > 0 && (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Case #</th>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Client</th>
+                    <th>Attorney</th>
+                    <th>Practice area</th>
+                    <th>Intake</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {caseResults.map((result) => (
+                    <tr key={result.caseId}>
+                      <td>{result.caseNumber || result.caseId}</td>
+                      <td>{result.caseName || '—'}</td>
+                      <td>{result.caseStatus || '—'}</td>
+                      <td>{result.client || '—'}</td>
+                      <td>{result.responsibleAttorney || '—'}</td>
+                      <td>{result.practiceArea || '—'}</td>
+                      <td>{displayDate(result.intakeDate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
     </main>
   );
 }
