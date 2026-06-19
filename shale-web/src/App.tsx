@@ -1,52 +1,155 @@
-import { FormEvent, useMemo, useState } from 'react';
-import { AuthenticatedUser, apiBaseUrl, getCurrentUser, login, storeAccessToken } from './api';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { AuthenticatedUser, apiBaseUrl, clearAccessToken, getCurrentUser, login, logout, readAccessToken, storeAccessToken } from './api';
 import './styles.css';
+
+interface AuthState {
+  accessToken: string | null;
+  user: AuthenticatedUser | null;
+  isVerifying: boolean;
+}
+
+const navigationItems = [
+  { path: '/my-shale', label: 'My Shale' },
+  { path: '/cases', label: 'Cases' },
+  { path: '/tasks', label: 'Tasks' },
+  { path: '/contacts', label: 'Contacts' },
+  { path: '/organizations', label: 'Organizations' },
+  { path: '/team', label: 'Team' },
+  { path: '/settings', label: 'Settings' },
+];
 
 function displayNameFor(user: AuthenticatedUser): string {
   return user.displayName || [user.nameFirst, user.nameLast].filter(Boolean).join(' ') || user.email || `User ${user.userId}`;
 }
 
-export default function App() {
+function AppRoutes() {
+  const [authState, setAuthState] = useState<AuthState>(() => ({
+    accessToken: readAccessToken(),
+    user: null,
+    isVerifying: true,
+  }));
+
+  useEffect(() => {
+    const storedToken = readAccessToken();
+    if (!storedToken) {
+      setAuthState({ accessToken: null, user: null, isVerifying: false });
+      return;
+    }
+
+    let isCurrent = true;
+    getCurrentUser(storedToken)
+      .then((verifiedUser) => {
+        if (isCurrent) {
+          setAuthState({ accessToken: storedToken, user: verifiedUser, isVerifying: false });
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          clearAccessToken();
+          setAuthState({ accessToken: null, user: null, isVerifying: false });
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  function handleLogin(accessToken: string, user: AuthenticatedUser) {
+    storeAccessToken(accessToken);
+    setAuthState({ accessToken, user, isVerifying: false });
+  }
+
+  async function handleLogout() {
+    const token = authState.accessToken;
+    clearAccessToken();
+    setAuthState({ accessToken: null, user: null, isVerifying: false });
+    if (token) {
+      await logout(token);
+    }
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={authState.user ? <Navigate to="/my-shale" replace /> : <Navigate to="/login" replace />} />
+      <Route path="/login" element={<LoginPage authState={authState} onLogin={handleLogin} />} />
+      <Route element={<ProtectedRoute authState={authState} />}>
+        <Route element={<AuthenticatedShell user={authState.user} onLogout={handleLogout} />}>
+          <Route path="/my-shale" element={<PlaceholderPage title="My Shale" />} />
+          <Route path="/cases" element={<PlaceholderPage title="Cases" />} />
+          <Route path="/tasks" element={<PlaceholderPage title="Tasks" />} />
+          <Route path="/contacts" element={<PlaceholderPage title="Contacts" />} />
+          <Route path="/organizations" element={<PlaceholderPage title="Organizations" />} />
+          <Route path="/team" element={<PlaceholderPage title="Team" />} />
+          <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
+        </Route>
+      </Route>
+      <Route path="*" element={<Navigate to={authState.user ? '/my-shale' : '/login'} replace />} />
+    </Routes>
+  );
+}
+
+function ProtectedRoute({ authState }: { authState: AuthState }) {
+  const location = useLocation();
+
+  if (authState.isVerifying) {
+    return <FullPageStatus message="Checking your Shale session…" />;
+  }
+
+  if (!authState.user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return <Outlet />;
+}
+
+function LoginPage({ authState, onLogin }: { authState: AuthState; onLogin: (accessToken: string, user: AuthenticatedUser) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const [tokenPreview, setTokenPreview] = useState<string | null>(null);
   const baseUrl = useMemo(() => apiBaseUrl(), []);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (authState.user) {
+      navigate('/my-shale', { replace: true });
+    }
+  }, [authState.user, navigate]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setUser(null);
-    setTokenPreview(null);
     setIsSubmitting(true);
 
     try {
       const result = await login(email, password);
-      storeAccessToken(result.accessToken);
       const verifiedUser = await getCurrentUser(result.accessToken);
-      setUser(verifiedUser);
-      setTokenPreview(`${result.tokenType} ${result.accessToken.slice(0, 16)}…`);
+      onLogin(result.accessToken, verifiedUser);
+      const from = location.state && typeof location.state === 'object' && 'from' in location.state ? location.state.from : null;
+      navigate(typeof from === 'object' && from && 'pathname' in from ? String(from.pathname) : '/my-shale', { replace: true });
       setPassword('');
     } catch (caught) {
+      clearAccessToken();
       setError(caught instanceof Error ? caught.message : 'Login failed.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  return (
-    <main className="app-shell">
-      <section className="hero-card">
-        <p className="eyebrow">Shale Web</p>
-        <h1>Browser login for the deployed Azure API</h1>
-        <p className="lede">This standalone React + TypeScript + Vite app validates the first web milestone without changing the existing JavaFX/Maven desktop app.</p>
-        <p className="api-note">API target: <code>{baseUrl}</code></p>
-      </section>
+  if (authState.isVerifying) {
+    return <FullPageStatus message="Checking your Shale session…" />;
+  }
 
-      <section className="login-card" aria-labelledby="login-title">
-        <h2 id="login-title">Sign in</h2>
+  return (
+    <main className="login-page">
+      <section className="login-panel" aria-labelledby="login-title">
+        <p className="eyebrow">Shale Web</p>
+        <h1 id="login-title">Sign in</h1>
+        <p className="lede">Use your Shale account to access the web application shell.</p>
+        <p className="api-note">API target: <code>{baseUrl}</code></p>
         <form onSubmit={handleSubmit}>
           <label>
             Email
@@ -59,8 +162,70 @@ export default function App() {
           <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Signing in…' : 'Sign in'}</button>
         </form>
         {error && <p className="status error" role="alert">{error}</p>}
-        {user && <p className="status success">Verified by <code>/api/auth/me</code> as <strong>{displayNameFor(user)}</strong> for tenant <strong>{user.shaleClientId}</strong>. Token: <code>{tokenPreview}</code></p>}
       </section>
     </main>
+  );
+}
+
+function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="app-layout">
+      <aside className="sidebar" aria-label="Primary navigation">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">S</span>
+          <span>Shale</span>
+        </div>
+        <nav className="nav-list">
+          {navigationItems.map((item) => (
+            <NavLink key={item.path} to={item.path} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="content-column">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Signed in</p>
+            <p className="user-name">{displayNameFor(user)}</p>
+          </div>
+          <button type="button" onClick={onLogout}>Logout</button>
+        </header>
+        <main className="page-content">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function PlaceholderPage({ title }: { title: string }) {
+  return (
+    <section className="placeholder-page" aria-labelledby="page-title">
+      <p className="eyebrow">Placeholder</p>
+      <h1 id="page-title">{title}</h1>
+      <p>This page is part of the Step 5C navigation framework. Business functionality will be added in a later step.</p>
+    </section>
+  );
+}
+
+function FullPageStatus({ message }: { message: string }) {
+  return (
+    <main className="full-page-status">
+      <p className="status">{message}</p>
+    </main>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
   );
 }
