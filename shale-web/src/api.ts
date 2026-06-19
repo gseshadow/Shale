@@ -31,7 +31,19 @@ export interface CaseSearchResult {
   responsibleAttorney: string;
   practiceArea: string;
   intakeDate: string | null;
+  incidentDate?: string | null;
+  solDate?: string | null;
   client: string;
+}
+
+export interface CaseTaskListItem {
+  id: number;
+  caseId: number;
+  caseName: string | null;
+  title: string | null;
+  priorityId: number | null;
+  dueAt: string | null;
+  completedAt: string | null;
 }
 
 export interface CaseDetail {
@@ -149,4 +161,37 @@ export async function getCaseDetail(accessToken: string, caseId: number): Promis
   }
 
   return response.json() as Promise<CaseDetail>;
+}
+
+
+export async function listAssignedCases(accessToken: string): Promise<CaseSearchResult[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/assigned`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load your cases.', response.status);
+  }
+
+  return response.json() as Promise<CaseSearchResult[]>;
+}
+
+export async function listAssignedTasks(accessToken: string): Promise<CaseTaskListItem[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/tasks/assigned`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load your tasks.', response.status);
+  }
+
+  return response.json() as Promise<CaseTaskListItem[]>;
 }

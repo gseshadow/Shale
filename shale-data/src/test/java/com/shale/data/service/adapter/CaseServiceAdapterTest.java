@@ -137,6 +137,11 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
+		public List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId) {
+			return List.of();
+		}
+
+		@Override
 		public List<CaseUpdateDto> listCaseUpdates(long caseId) {
 			lastCaseUpdatesCaseId = caseId;
 			return caseUpdates;

@@ -372,6 +372,11 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit) {
+            return List.of(caseOverview());
+        }
+
+        @Override
         public List<com.shale.core.dto.CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
             throw new AssertionError("listCaseUpdates should not be called");
         }
