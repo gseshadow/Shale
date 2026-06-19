@@ -8,7 +8,7 @@
 <parent>
     <groupId>com.shale</groupId>
     <artifactId>shale-parent</artifactId>
-    <version>1.0.92</version>
+    <version>1.0.93</version>
     <relativePath>../pom.xml</relativePath>
 </parent>
 
