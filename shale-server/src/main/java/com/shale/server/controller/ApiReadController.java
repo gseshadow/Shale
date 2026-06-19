@@ -91,7 +91,7 @@ public final class ApiReadController {
     }
 
     @Operation(summary = "Get case detail", description = "Returns one tenant-scoped case detail record.")
-    @GetMapping("/api/cases/{caseId}")
+    @GetMapping("/api/cases/{caseId:\\d+}")
     public Object getCase(@PathVariable("caseId") long caseId) {
         long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
         int shaleClientId = runtimeSessionState.requireShaleClientId();
@@ -100,7 +100,7 @@ public final class ApiReadController {
     }
 
     @Operation(summary = "List case tasks", description = "Returns tasks for one tenant-scoped case.")
-    @GetMapping("/api/cases/{caseId}/tasks")
+    @GetMapping("/api/cases/{caseId:\\d+}/tasks")
     public List<CaseTaskListItemDto> listCaseTasks(@PathVariable("caseId") long caseId) {
         long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
         int shaleClientId = runtimeSessionState.requireShaleClientId();

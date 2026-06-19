@@ -153,6 +153,48 @@ class ApiReadControllerTest {
     }
 
     @Test
+    void assignedCasesRouteDoesNotFallThroughToCaseIdRoute() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/cases/assigned")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].caseId").value(501));
+
+        org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.assignedUserId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.assignedShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(25, caseServicePort.assignedLimit);
+        org.junit.jupiter.api.Assertions.assertEquals(0L, caseServicePort.detailCaseId);
+    }
+
+    @Test
+    void assignedTasksRouteReachesAssignedTaskService() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/tasks/assigned")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(701))
+                .andExpect(jsonPath("$[0].title").value("Review records"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.assignedUserId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.assignedShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(0L, taskServicePort.caseId);
+    }
+
+    @Test
     void caseDetailReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
         MockMvc devMockMvc = developmentMockMvc(
@@ -347,6 +389,9 @@ class ApiReadControllerTest {
         private int searchLimit;
         private long detailCaseId;
         private int detailShaleClientId;
+        private int assignedUserId;
+        private int assignedShaleClientId;
+        private int assignedLimit;
 
         @Override
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
@@ -373,6 +418,9 @@ class ApiReadControllerTest {
 
         @Override
         public List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit) {
+            this.assignedUserId = assignedUserId;
+            this.assignedShaleClientId = shaleClientId;
+            this.assignedLimit = limit;
             return List.of(caseOverview());
         }
 
@@ -450,6 +498,8 @@ class ApiReadControllerTest {
     private static final class RecordingTaskServicePort implements TaskServicePort {
         private long caseId;
         private int shaleClientId;
+        private int assignedUserId;
+        private int assignedShaleClientId;
 
         @Override
         public List<CaseTaskListItemDto> listCaseTasks(long caseId, int shaleClientId) {
@@ -464,7 +514,13 @@ class ApiReadControllerTest {
 
         @Override
         public List<CaseTaskListItemDto> listAssignedTasks(int assignedUserId, int shaleClientId) {
-            throw new AssertionError("listAssignedTasks should not be called");
+            this.assignedUserId = assignedUserId;
+            this.assignedShaleClientId = shaleClientId;
+            return List.of(new CaseTaskListItemDto(701L, shaleClientId, 501L, "Smith v. Example",
+                    "Open", "#00AA00", "#222222", "Ada Attorney", "#111111", false, "Review records", "Read intake packet",
+                    1, "#FFAA00", LocalDateTime.of(2026, 1, 2, 12, 0), null,
+                    assignedUserId, "Ada Attorney", "#111111", 32, "Case Creator",
+                    LocalDateTime.of(2026, 1, 1, 9, 0), LocalDateTime.of(2026, 1, 1, 10, 0), false));
         }
 
         @Override
