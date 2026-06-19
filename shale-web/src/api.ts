@@ -79,3 +79,13 @@ export async function getCurrentUser(accessToken: string): Promise<Authenticated
 
   return response.json() as Promise<AuthenticatedUser>;
 }
+
+export async function logout(accessToken: string): Promise<void> {
+  await fetch(`${apiBaseUrl()}/api/auth/logout`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+}
