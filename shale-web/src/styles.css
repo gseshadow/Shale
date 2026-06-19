@@ -343,3 +343,21 @@ input {
   line-height: 1.7;
   white-space: pre-wrap;
 }
+
+.dashboard-page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.dashboard-header,
+.dashboard-section {
+  background: white;
+  border: 1px solid #dbe4ed;
+  border-radius: 18px;
+  padding: 2rem;
+}
+
+.dashboard-section {
+  display: grid;
+  gap: 1rem;
+}

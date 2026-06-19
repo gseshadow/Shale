@@ -74,8 +74,24 @@ public final class ApiReadController {
         return new PagedResponse<>(slice(fetched, safePage, safeSize), safePage, safeSize, null);
     }
 
+    @Operation(summary = "List my cases", description = "Returns cases assigned to the current authenticated user.")
+    @GetMapping("/api/cases/assigned")
+    public List<CaseOverviewDto> listAssignedCases() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        return caseServicePort.listAssignedCases(userId, shaleClientId, DEFAULT_SEARCH_LIMIT);
+    }
+
+    @Operation(summary = "List my tasks", description = "Returns active tasks assigned to the current authenticated user.")
+    @GetMapping("/api/tasks/assigned")
+    public List<CaseTaskListItemDto> listAssignedTasks() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        return taskServicePort.listAssignedTasks(userId, shaleClientId);
+    }
+
     @Operation(summary = "Get case detail", description = "Returns one tenant-scoped case detail record.")
-    @GetMapping("/api/cases/{caseId}")
+    @GetMapping("/api/cases/{caseId:\\d+}")
     public Object getCase(@PathVariable("caseId") long caseId) {
         long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
         int shaleClientId = runtimeSessionState.requireShaleClientId();
@@ -84,7 +100,7 @@ public final class ApiReadController {
     }
 
     @Operation(summary = "List case tasks", description = "Returns tasks for one tenant-scoped case.")
-    @GetMapping("/api/cases/{caseId}/tasks")
+    @GetMapping("/api/cases/{caseId:\\d+}/tasks")
     public List<CaseTaskListItemDto> listCaseTasks(@PathVariable("caseId") long caseId) {
         long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
         int shaleClientId = runtimeSessionState.requireShaleClientId();
