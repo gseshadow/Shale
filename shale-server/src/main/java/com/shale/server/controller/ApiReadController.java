@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactSummary;
@@ -105,6 +106,15 @@ public final class ApiReadController {
         long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         return taskServicePort.listCaseTasks(safeCaseId, shaleClientId);
+    }
+
+    @Operation(summary = "Get task detail", description = "Returns one tenant-scoped task detail record.")
+    @GetMapping("/api/tasks/{taskId:\\d+}")
+    public TaskDetailDto getTask(@PathVariable("taskId") long taskId) {
+        long safeTaskId = ApiValidation.positiveId(taskId, "taskId");
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
     }
 
     @Operation(summary = "Search contacts", description = "Returns the first matching contacts for the authenticated tenant. Preserved list response for existing clients.")

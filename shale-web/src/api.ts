@@ -46,6 +46,26 @@ export interface CaseTaskListItem {
   completedAt: string | null;
 }
 
+export interface TaskDetail {
+  id: number;
+  shaleClientId: number;
+  caseId: number;
+  caseName: string | null;
+  caseResponsibleAttorney: string | null;
+  caseResponsibleAttorneyColor: string | null;
+  caseNonEngagementLetterSent: boolean | null;
+  title: string | null;
+  description: string | null;
+  dueAt: string | null;
+  statusId: number | null;
+  priorityId: number | null;
+  completedAt: string | null;
+  assignedUserId: number | null;
+  assignedUserDisplayName: string | null;
+  assignedUserColor: string | null;
+  createdByDisplayName: string | null;
+}
+
 export interface CaseDetail {
   caseId: number;
   caseNumber: string | null;
@@ -194,4 +214,24 @@ export async function listAssignedTasks(accessToken: string): Promise<CaseTaskLi
   }
 
   return response.json() as Promise<CaseTaskListItem[]>;
+}
+
+export async function getTaskDetail(accessToken: string, taskId: number): Promise<TaskDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that task.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load the task detail.', response.status);
+  }
+
+  return response.json() as Promise<TaskDetail>;
 }

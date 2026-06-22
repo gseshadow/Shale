@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, apiBaseUrl, clearAccessToken, getCaseDetail, getCurrentUser, listAssignedCases, listAssignedTasks, login, logout, readAccessToken, searchCases, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, TaskDetail, apiBaseUrl, clearAccessToken, getCaseDetail, getCurrentUser, getTaskDetail, listAssignedCases, listAssignedTasks, login, logout, readAccessToken, searchCases, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -12,7 +12,6 @@ interface AuthState {
 const navigationItems = [
   { path: '/my-shale', label: 'My Shale' },
   { path: '/cases', label: 'Cases' },
-  { path: '/tasks', label: 'Tasks' },
   { path: '/contacts', label: 'Contacts' },
   { path: '/organizations', label: 'Organizations' },
   { path: '/team', label: 'Team' },
@@ -83,6 +82,7 @@ function AppRoutes() {
           <Route path="/cases" element={<CasesPage accessToken={authState.accessToken} />} />
           <Route path="/cases/:caseId" element={<CaseDetailPage accessToken={authState.accessToken} />} />
           <Route path="/tasks" element={<PlaceholderPage title="Tasks" />} />
+          <Route path="/tasks/:taskId" element={<TaskDetailPage accessToken={authState.accessToken} />} />
           <Route path="/contacts" element={<PlaceholderPage title="Contacts" />} />
           <Route path="/organizations" element={<PlaceholderPage title="Organizations" />} />
           <Route path="/team" element={<PlaceholderPage title="Team" />} />
@@ -311,12 +311,13 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
 }
 
 function MyTasksTable({ tasks }: { tasks: CaseTaskListItem[] }) {
+  const navigate = useNavigate();
   return (
     <div className="table-wrap">
       <table className="results-table">
         <thead><tr><th>Task</th><th>Case</th><th>Due date</th><th>Priority</th><th>Status</th></tr></thead>
         <tbody>{tasks.map((task) => (
-          <tr key={task.id}>
+          <tr key={task.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/tasks/${task.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/tasks/${task.id}`); } }}>
             <td>{task.title || `Task ${task.id}`}</td><td>{task.caseName || '—'}</td><td>{task.dueAt ?? '—'}</td><td>{task.priorityId ? `Priority ${task.priorityId}` : '—'}</td><td>{task.completedAt ? 'Completed' : 'Open'}</td>
           </tr>
         ))}</tbody>
@@ -440,6 +441,100 @@ function CaseResultsTable({ results }: { results: CaseSearchResult[] }) {
   );
 }
 
+
+function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
+  const { taskId } = useParams();
+  const numericTaskId = Number(taskId);
+  const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!Number.isInteger(numericTaskId) || numericTaskId <= 0) {
+      setTaskDetail(null);
+      setError('That task link is not valid.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!accessToken) {
+      setTaskDetail(null);
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    getTaskDetail(accessToken, numericTaskId)
+      .then((detail) => isCurrent && setTaskDetail(detail))
+      .catch((caught) => {
+        if (isCurrent) {
+          setTaskDetail(null);
+          setError(caught instanceof Error ? caught.message : 'Task detail could not be loaded.');
+        }
+      })
+      .finally(() => isCurrent && setIsLoading(false));
+
+    return () => { isCurrent = false; };
+  }, [accessToken, numericTaskId]);
+
+  const title = taskDetail?.title || 'Task Detail';
+
+  return (
+    <section className="task-detail-page" aria-labelledby="task-detail-title">
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <Link to="/my-shale">My Shale</Link>
+        <span aria-hidden="true">›</span>
+        <span>{title}</span>
+      </nav>
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">Task Detail</p>
+          <h1 id="task-detail-title">{title}</h1>
+        </div>
+        <Link className="button-link" to="/my-shale">Back to My Shale</Link>
+      </div>
+
+      {isLoading && <p className="status">Loading task detail…</p>}
+      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+      {!isLoading && !error && !taskDetail && <p className="status">No task detail was found.</p>}
+      {!isLoading && !error && taskDetail && <TaskDetailReadOnly detail={taskDetail} />}
+    </section>
+  );
+}
+
+function TaskDetailReadOnly({ detail }: { detail: TaskDetail }) {
+  return (
+    <div className="detail-sections">
+      <section aria-labelledby="task-info-title">
+        <h2 id="task-info-title">Task Information</h2>
+        <dl className="detail-list">
+          <DetailItem label="Task Name" value={detail.title} />
+          <DetailItem label="Status" value={detail.statusId ? `Status ${detail.statusId}` : null} />
+          <DetailItem label="Priority" value={detail.priorityId ? `Priority ${detail.priorityId}` : null} />
+          <DetailItem label="Assigned To" value={detail.assignedUserDisplayName} />
+          <DetailItem label="Created By" value={detail.createdByDisplayName} />
+          <DetailItem label="Due Date" value={detail.dueAt} />
+          <DetailItem label="Completed Date" value={detail.completedAt} />
+          <DetailItem label="Description" value={detail.description} preserveWhitespace />
+        </dl>
+      </section>
+
+      {detail.caseId > 0 && (
+        <section aria-labelledby="related-case-title">
+          <h2 id="related-case-title">Related Case</h2>
+          <dl className="detail-list compact">
+            <DetailItem label="Related Case Name" value={detail.caseName} />
+          </dl>
+          <Link className="button-link inline-action" to={`/cases/${detail.caseId}`}>Open Case</Link>
+        </section>
+      )}
+    </div>
+  );
+}
 
 function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
   const { caseId } = useParams();
