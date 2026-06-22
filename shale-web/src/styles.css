@@ -202,7 +202,8 @@ input {
 }
 
 .cases-page,
-.contacts-page {
+.contacts-page,
+.organizations-page {
   background: white;
   border: 1px solid #dbe4ed;
   border-radius: 18px;
@@ -271,6 +272,7 @@ input {
 
 .case-detail-page,
 .contact-detail-page,
+.organization-detail-page,
 .task-detail-page {
   background: white;
   border: 1px solid #dbe4ed;

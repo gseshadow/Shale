@@ -73,6 +73,51 @@ export interface ContactSearchResult {
   phone: string | null;
 }
 
+
+export interface OrganizationSearchResult {
+  id: number;
+  name: string | null;
+  organizationTypeId: number | null;
+  organizationTypeName: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  city: string | null;
+  state: string | null;
+}
+
+export interface OrganizationRelatedCase {
+  id: number;
+  name: string | null;
+  intakeDate: string | null;
+  statuteOfLimitationsDate: string | null;
+  responsibleAttorneyName: string | null;
+  partyRoleName: string | null;
+  side: string | null;
+  primary: boolean;
+  notes: string | null;
+}
+
+export interface OrganizationDetail {
+  id: number;
+  shaleClientId: number;
+  organizationTypeId: number | null;
+  organizationTypeName: string | null;
+  name: string | null;
+  phone: string | null;
+  fax: string | null;
+  email: string | null;
+  website: string | null;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  country: string | null;
+  notes: string | null;
+  relatedCases: OrganizationRelatedCase[];
+}
+
 export interface ContactDetail {
   id: number;
   shaleClientId: number;
@@ -288,4 +333,40 @@ export async function getContactDetail(accessToken: string, contactId: number): 
   }
 
   return response.json() as Promise<ContactDetail>;
+}
+
+export async function searchOrganizations(accessToken: string, query: string): Promise<OrganizationSearchResult[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/organizations/search?query=${encodeURIComponent(query)}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not search organizations.', response.status);
+  }
+
+  return response.json() as Promise<OrganizationSearchResult[]>;
+}
+
+export async function getOrganizationDetail(accessToken: string, organizationId: number): Promise<OrganizationDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/organizations/${organizationId}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that organization.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load the organization detail.', response.status);
+  }
+
+  return response.json() as Promise<OrganizationDetail>;
 }
