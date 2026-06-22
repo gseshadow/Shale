@@ -268,7 +268,8 @@ input {
   outline-offset: -3px;
 }
 
-.case-detail-page {
+.case-detail-page,
+.task-detail-page {
   background: white;
   border: 1px solid #dbe4ed;
   border-radius: 18px;
@@ -360,4 +361,9 @@ input {
 .dashboard-section {
   display: grid;
   gap: 1rem;
+}
+
+.inline-action {
+  display: inline-block;
+  margin-top: 1rem;
 }

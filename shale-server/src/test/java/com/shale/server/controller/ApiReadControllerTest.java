@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.NotificationServicePort;
@@ -192,6 +193,27 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.assignedUserId);
         org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.assignedShaleClientId);
         org.junit.jupiter.api.Assertions.assertEquals(0L, taskServicePort.caseId);
+    }
+
+    @Test
+    void taskDetailReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/tasks/701")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(701))
+                .andExpect(jsonPath("$.title").value("Review records"))
+                .andExpect(jsonPath("$.caseId").value(501));
+
+        org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.detailTaskId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.detailShaleClientId);
     }
 
     @Test
@@ -500,6 +522,8 @@ class ApiReadControllerTest {
         private int shaleClientId;
         private int assignedUserId;
         private int assignedShaleClientId;
+        private long detailTaskId;
+        private int detailShaleClientId;
 
         @Override
         public List<CaseTaskListItemDto> listCaseTasks(long caseId, int shaleClientId) {
@@ -524,8 +548,13 @@ class ApiReadControllerTest {
         }
 
         @Override
-        public Optional<com.shale.core.dto.TaskDetailDto> getTaskDetail(long taskId, int shaleClientId) {
-            throw new AssertionError("getTaskDetail should not be called");
+        public Optional<TaskDetailDto> getTaskDetail(long taskId, int shaleClientId) {
+            this.detailTaskId = taskId;
+            this.detailShaleClientId = shaleClientId;
+            return Optional.of(new TaskDetailDto(taskId, shaleClientId, 501L, "Smith v. Example",
+                    "Ada Attorney", "#111111", false, "Review records", "Read intake packet",
+                    LocalDateTime.of(2026, 1, 2, 12, 0), 2, 1, null,
+                    31, "Ada Attorney", "#111111", "Case Creator"));
         }
 
         @Override
