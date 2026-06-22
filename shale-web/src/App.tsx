@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, TaskDetail, apiBaseUrl, clearAccessToken, getCaseDetail, getCurrentUser, getTaskDetail, listAssignedCases, listAssignedTasks, login, logout, readAccessToken, searchCases, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, ContactDetail, ContactSearchResult, TaskDetail, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getTaskDetail, listAssignedCases, listAssignedTasks, login, logout, readAccessToken, searchCases, searchContacts, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -83,7 +83,8 @@ function AppRoutes() {
           <Route path="/cases/:caseId" element={<CaseDetailPage accessToken={authState.accessToken} />} />
           <Route path="/tasks" element={<PlaceholderPage title="Tasks" />} />
           <Route path="/tasks/:taskId" element={<TaskDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/contacts" element={<PlaceholderPage title="Contacts" />} />
+          <Route path="/contacts" element={<ContactsPage accessToken={authState.accessToken} />} />
+          <Route path="/contacts/:contactId" element={<ContactDetailPage accessToken={authState.accessToken} />} />
           <Route path="/organizations" element={<PlaceholderPage title="Organizations" />} />
           <Route path="/team" element={<PlaceholderPage title="Team" />} />
           <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
@@ -441,6 +442,113 @@ function CaseResultsTable({ results }: { results: CaseSearchResult[] }) {
   );
 }
 
+function ContactsPage({ accessToken }: { accessToken: string | null }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<ContactSearchResult[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSearch(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      setResults([]);
+      setHasSearched(false);
+      setError(null);
+      return;
+    }
+
+    if (!accessToken) {
+      setResults([]);
+      setHasSearched(true);
+      setError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const searchResults = await searchContacts(accessToken, trimmedQuery);
+      setResults(searchResults);
+    } catch (caught) {
+      setResults([]);
+      setError(caught instanceof Error ? caught.message : 'Contact search failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <section className="contacts-page" aria-labelledby="contacts-title">
+      <h1 id="contacts-title">Contacts</h1>
+      <form className="search-form" onSubmit={handleSearch}>
+        <label htmlFor="contact-search">Search contacts</label>
+        <div className="search-row">
+          <input
+            id="contact-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Enter a contact name, email, or phone"
+          />
+          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching…' : 'Search'}</button>
+        </div>
+      </form>
+
+      <div className="results-area" aria-live="polite">
+        {isLoading && <p className="status">Loading contact results…</p>}
+        {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+        {!isLoading && !error && hasSearched && results.length === 0 && <p className="status">No contacts matched your search.</p>}
+        {!isLoading && !error && results.length > 0 && <ContactResultsTable results={results} />}
+      </div>
+    </section>
+  );
+}
+
+function ContactResultsTable({ results }: { results: ContactSearchResult[] }) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="table-wrap">
+      <table className="results-table">
+        <thead>
+          <tr>
+            <th>Contact ID</th>
+            <th>Display name</th>
+            <th>Email</th>
+            <th>Phone</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results.map((result) => (
+            <tr
+              key={result.id}
+              className="clickable-row"
+              tabIndex={0}
+              onClick={() => navigate(`/contacts/${result.id}`)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate(`/contacts/${result.id}`);
+                }
+              }}
+            >
+              <td>{result.id}</td>
+              <td>{result.displayName || `Contact ${result.id}`}</td>
+              <td>{result.email || '—'}</td>
+              <td>{result.phone || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 
 function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
   const { taskId } = useParams();
@@ -638,6 +746,87 @@ function CaseDetailReadOnly({ detail }: { detail: CaseDetail }) {
         <h2 id="assignments-title">Assignments</h2>
         <dl className="detail-list compact">
           <DetailItem label="Responsible Attorney" value="Not currently returned by the case-detail endpoint." />
+        </dl>
+      </section>
+    </div>
+  );
+}
+
+function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
+  const { contactId } = useParams();
+  const numericContactId = Number(contactId);
+  const [contactDetail, setContactDetail] = useState<ContactDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!Number.isInteger(numericContactId) || numericContactId <= 0) {
+      setContactDetail(null);
+      setError('That contact link is not valid.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!accessToken) {
+      setContactDetail(null);
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    getContactDetail(accessToken, numericContactId)
+      .then((detail) => isCurrent && setContactDetail(detail))
+      .catch((caught) => {
+        if (isCurrent) {
+          setContactDetail(null);
+          setError(caught instanceof Error ? caught.message : 'Contact detail could not be loaded.');
+        }
+      })
+      .finally(() => isCurrent && setIsLoading(false));
+
+    return () => { isCurrent = false; };
+  }, [accessToken, numericContactId]);
+
+  const title = contactDetail?.displayName || 'Contact Detail';
+
+  return (
+    <section className="contact-detail-page" aria-labelledby="contact-detail-title">
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <Link to="/contacts">Contacts</Link>
+        <span aria-hidden="true">›</span>
+        <span>{title}</span>
+      </nav>
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">Contact Detail</p>
+          <h1 id="contact-detail-title">{title}</h1>
+        </div>
+        <Link className="button-link" to="/contacts">Back to Contacts</Link>
+      </div>
+
+      {isLoading && <p className="status">Loading contact detail…</p>}
+      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+      {!isLoading && !error && !contactDetail && <p className="status">No contact detail was found.</p>}
+      {!isLoading && !error && contactDetail && <ContactDetailReadOnly detail={contactDetail} />}
+    </section>
+  );
+}
+
+function ContactDetailReadOnly({ detail }: { detail: ContactDetail }) {
+  return (
+    <div className="detail-sections">
+      <section aria-labelledby="contact-info-title">
+        <h2 id="contact-info-title">Contact Information</h2>
+        <dl className="detail-list">
+          <DetailItem label="Display Name" value={detail.displayName} />
+          <DetailItem label="First Name" value={detail.firstName} />
+          <DetailItem label="Last Name" value={detail.lastName} />
+          <DetailItem label="Email" value={detail.email} />
+          <DetailItem label="Phone" value={detail.phone} />
         </dl>
       </section>
     </div>

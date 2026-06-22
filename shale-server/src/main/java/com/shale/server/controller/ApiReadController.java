@@ -14,6 +14,7 @@ import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
+import com.shale.core.service.ContactServicePort.ContactDetail;
 import com.shale.core.service.ContactServicePort.ContactSummary;
 import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.NotificationServicePort.NotificationSummary;
@@ -115,6 +116,15 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         return taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
+    }
+
+    @Operation(summary = "Get contact detail", description = "Returns one tenant-scoped contact detail record.")
+    @GetMapping("/api/contacts/{contactId:\\d+}")
+    public ContactDetail getContact(@PathVariable("contactId") int contactId) {
+        int safeContactId = Math.toIntExact(ApiValidation.positiveId(contactId, "contactId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return contactServicePort.getContactDetail(safeContactId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
     }
 
     @Operation(summary = "Search contacts", description = "Returns the first matching contacts for the authenticated tenant. Preserved list response for existing clients.")
