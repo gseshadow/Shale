@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
@@ -183,6 +185,22 @@ public final class ApiReadController {
     }
 
 
+    @Operation(summary = "List case statuses", description = "Returns read-only case status settings for administrators in the authenticated tenant.")
+    @GetMapping("/api/settings/case-statuses")
+    public List<CaseStatusDto> listCaseStatuses() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        requireCurrentUserAdmin(shaleClientId);
+        return caseServicePort.listCaseStatuses(shaleClientId, true);
+    }
+
+    @Operation(summary = "List practice areas", description = "Returns read-only practice area settings for administrators in the authenticated tenant.")
+    @GetMapping("/api/settings/practice-areas")
+    public List<PracticeAreaDto> listPracticeAreas() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        requireCurrentUserAdmin(shaleClientId);
+        return caseServicePort.listPracticeAreas(shaleClientId, true);
+    }
+
     @Operation(summary = "List team members", description = "Returns visible users for the authenticated tenant.")
     @GetMapping("/api/users")
     public List<UserSummary> listTeamMembers() {
@@ -205,6 +223,15 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         return notificationServicePort.listUnreadNotifications(shaleClientId, userId);
+    }
+
+    private void requireCurrentUserAdmin(int shaleClientId) {
+        int userId = runtimeSessionState.requireUserId();
+        UserDetail currentUser = userServicePort.getUserDetail(userId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access is required."));
+        if (!currentUser.admin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access is required.");
+        }
     }
 
     private static <T> List<T> slice(List<T> fetched, int page, int size) {
