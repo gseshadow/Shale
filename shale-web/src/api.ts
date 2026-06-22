@@ -66,6 +66,24 @@ export interface TaskDetail {
   createdByDisplayName: string | null;
 }
 
+
+export interface TeamMemberSummary {
+  id: number;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+  color: string | null;
+  initials: string | null;
+  admin: boolean;
+  attorney: boolean;
+}
+
+export interface TeamMemberDetail extends TeamMemberSummary {
+  shaleClientId: number;
+}
+
 export interface ContactSearchResult {
   id: number;
   displayName: string | null;
@@ -369,4 +387,41 @@ export async function getOrganizationDetail(accessToken: string, organizationId:
   }
 
   return response.json() as Promise<OrganizationDetail>;
+}
+
+
+export async function listTeamMembers(accessToken: string): Promise<TeamMemberSummary[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/users`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load the team directory.', response.status);
+  }
+
+  return response.json() as Promise<TeamMemberSummary[]>;
+}
+
+export async function getTeamMemberDetail(accessToken: string, userId: number): Promise<TeamMemberDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/users/${userId}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that team member.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load the team member detail.', response.status);
+  }
+
+  return response.json() as Promise<TeamMemberDetail>;
 }

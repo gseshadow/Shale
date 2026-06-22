@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, TaskDetail, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, listAssignedCases, listAssignedTasks, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -87,7 +87,8 @@ function AppRoutes() {
           <Route path="/contacts/:contactId" element={<ContactDetailPage accessToken={authState.accessToken} />} />
           <Route path="/organizations" element={<OrganizationsPage accessToken={authState.accessToken} />} />
           <Route path="/organizations/:organizationId" element={<OrganizationDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/team" element={<PlaceholderPage title="Team" />} />
+          <Route path="/team" element={<TeamPage accessToken={authState.accessToken} />} />
+          <Route path="/team/:userId" element={<TeamMemberDetailPage accessToken={authState.accessToken} />} />
           <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
         </Route>
       </Route>
@@ -643,6 +644,153 @@ function OrganizationResultsTable({ results }: { results: OrganizationSearchResu
       </table>
     </div>
   );
+}
+
+
+function TeamPage({ accessToken }: { accessToken: string | null }) {
+  const [members, setMembers] = useState<TeamMemberSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    listTeamMembers(accessToken)
+      .then((items) => isCurrent && setMembers(items))
+      .catch((caught) => isCurrent && setError(caught instanceof Error ? caught.message : 'Team directory could not be loaded.'))
+      .finally(() => isCurrent && setIsLoading(false));
+
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  return (
+    <section className="team-page" aria-labelledby="team-title">
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">Directory</p>
+          <h1 id="team-title">Team</h1>
+        </div>
+      </div>
+
+      <div className="results-area" aria-live="polite">
+        {isLoading && <p className="status">Loading team members…</p>}
+        {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+        {!isLoading && !error && members.length === 0 && <p className="status">No team members were found.</p>}
+        {!isLoading && !error && members.length > 0 && <TeamMembersTable members={members} />}
+      </div>
+    </section>
+  );
+}
+
+function TeamMembersTable({ members }: { members: TeamMemberSummary[] }) {
+  const navigate = useNavigate();
+  return (
+    <div className="table-wrap">
+      <table className="results-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Initials</th><th>Color</th><th>Attorney</th><th>Admin</th></tr></thead>
+        <tbody>{members.map((member) => (
+          <tr key={member.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/team/${member.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/team/${member.id}`); } }}>
+            <td>{teamMemberName(member)}</td><td>{member.email || '—'}</td><td>{member.initials || '—'}</td><td><ColorSwatch color={member.color} /></td><td>{yesNo(member.attorney)}</td><td>{yesNo(member.admin)}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function TeamMemberDetailPage({ accessToken }: { accessToken: string | null }) {
+  const { userId } = useParams();
+  const numericUserId = Number(userId);
+  const [member, setMember] = useState<TeamMemberDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!Number.isInteger(numericUserId) || numericUserId <= 0) {
+      setMember(null);
+      setError('That team member link is not valid.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!accessToken) {
+      setMember(null);
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    getTeamMemberDetail(accessToken, numericUserId)
+      .then((detail) => isCurrent && setMember(detail))
+      .catch((caught) => {
+        if (isCurrent) {
+          setMember(null);
+          setError(caught instanceof Error ? caught.message : 'Team member detail could not be loaded.');
+        }
+      })
+      .finally(() => isCurrent && setIsLoading(false));
+
+    return () => { isCurrent = false; };
+  }, [accessToken, numericUserId]);
+
+  const title = member ? teamMemberName(member) : 'Team Member Detail';
+
+  return (
+    <section className="team-member-detail-page" aria-labelledby="team-member-detail-title">
+      <nav className="breadcrumb" aria-label="Breadcrumb"><Link to="/team">Team</Link><span aria-hidden="true">›</span><span>{title}</span></nav>
+      <div className="page-heading-row"><div><p className="eyebrow">Team Member Detail</p><h1 id="team-member-detail-title">{title}</h1></div><Link className="button-link" to="/team">Back to Team</Link></div>
+      {isLoading && <p className="status">Loading team member detail…</p>}
+      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+      {!isLoading && !error && !member && <p className="status">No team member detail was found.</p>}
+      {!isLoading && !error && member && <TeamMemberReadOnly member={member} />}
+    </section>
+  );
+}
+
+function TeamMemberReadOnly({ member }: { member: TeamMemberDetail }) {
+  return (
+    <div className="detail-sections">
+      <section aria-labelledby="team-member-info-title">
+        <h2 id="team-member-info-title">Team Member Information</h2>
+        <dl className="detail-list">
+          <DetailItem label="Name" value={teamMemberName(member)} />
+          <DetailItem label="First Name" value={member.firstName} />
+          <DetailItem label="Last Name" value={member.lastName} />
+          <DetailItem label="Email" value={member.email} />
+          <DetailItem label="Phone" value={member.phone} />
+          <DetailItem label="Initials" value={member.initials} />
+          <DetailItem label="Color" value={member.color} />
+          <DetailItem label="Attorney" value={yesNo(member.attorney)} />
+          <DetailItem label="Admin" value={yesNo(member.admin)} />
+        </dl>
+      </section>
+    </div>
+  );
+}
+
+function teamMemberName(member: TeamMemberSummary): string {
+  return member.displayName || [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email || `User ${member.id}`;
+}
+
+function yesNo(value: boolean): string {
+  return value ? 'Yes' : 'No';
+}
+
+function ColorSwatch({ color }: { color: string | null }) {
+  if (!color) return <>—</>;
+  return <span className="color-swatch-value"><span className="color-swatch" style={{ backgroundColor: color }} aria-hidden="true" />{color}</span>;
 }
 
 

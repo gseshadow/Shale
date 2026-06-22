@@ -22,6 +22,9 @@ import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.OrganizationServicePort.OrganizationDetail;
 import com.shale.core.service.OrganizationServicePort.OrganizationSummary;
 import com.shale.core.service.TaskServicePort;
+import com.shale.core.service.UserServicePort;
+import com.shale.core.service.UserServicePort.UserDetail;
+import com.shale.core.service.UserServicePort.UserSummary;
 import com.shale.server.dto.PagedResponse;
 import com.shale.server.runtime.ServerRuntimeSessionState;
 
@@ -40,6 +43,7 @@ public final class ApiReadController {
     private final ContactServicePort contactServicePort;
     private final NotificationServicePort notificationServicePort;
     private final OrganizationServicePort organizationServicePort;
+    private final UserServicePort userServicePort;
     private final ServerRuntimeSessionState runtimeSessionState;
 
     public ApiReadController(
@@ -48,12 +52,14 @@ public final class ApiReadController {
             ContactServicePort contactServicePort,
             NotificationServicePort notificationServicePort,
             OrganizationServicePort organizationServicePort,
+            UserServicePort userServicePort,
             ServerRuntimeSessionState runtimeSessionState) {
         this.caseServicePort = caseServicePort;
         this.taskServicePort = taskServicePort;
         this.contactServicePort = contactServicePort;
         this.notificationServicePort = notificationServicePort;
         this.organizationServicePort = organizationServicePort;
+        this.userServicePort = userServicePort;
         this.runtimeSessionState = runtimeSessionState;
     }
 
@@ -174,6 +180,23 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         return organizationServicePort.getOrganizationDetail(safeOrganizationId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
+    }
+
+
+    @Operation(summary = "List team members", description = "Returns visible users for the authenticated tenant.")
+    @GetMapping("/api/users")
+    public List<UserSummary> listTeamMembers() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return userServicePort.listTenantUsers(shaleClientId);
+    }
+
+    @Operation(summary = "Get team member detail", description = "Returns one tenant-scoped user profile.")
+    @GetMapping("/api/users/{userId:\\d+}")
+    public UserDetail getTeamMember(@PathVariable("userId") int userId) {
+        int safeUserId = Math.toIntExact(ApiValidation.positiveId(userId, "userId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return userServicePort.getUserDetail(safeUserId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
     }
 
     @Operation(summary = "List unread notifications", description = "Returns unread notifications for the current authenticated user and tenant.")
