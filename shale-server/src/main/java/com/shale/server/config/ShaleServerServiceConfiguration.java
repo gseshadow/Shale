@@ -14,6 +14,7 @@ import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.TaskServicePort;
+import com.shale.core.service.UserServicePort;
 import com.shale.data.auth.AuthService;
 import com.shale.data.auth.AuthServiceImpl;
 import com.shale.data.auth.BCryptPasswordVerifier;
@@ -32,6 +33,7 @@ import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.service.adapter.OrganizationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
+import com.shale.data.service.adapter.UserServiceAdapter;
 import com.shale.server.health.AppDatabaseHealthCheck;
 import com.shale.server.health.DataSourcesAppDatabaseHealthCheck;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
@@ -157,6 +159,11 @@ public class ShaleServerServiceConfiguration {
     @Bean
     CurrentUserProfileService currentUserProfileService(DbSessionProvider serverDbSessionProvider) {
         return new UserDaoCurrentUserProfileService(new UserDao(serverDbSessionProvider));
+    }
+
+    @Bean
+    UserServicePort userServicePort(DbSessionProvider serverDbSessionProvider) {
+        return new UserServiceAdapter(new UserDao(serverDbSessionProvider));
     }
 
     @Bean

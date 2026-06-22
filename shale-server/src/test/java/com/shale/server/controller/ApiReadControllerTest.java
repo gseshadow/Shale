@@ -31,6 +31,7 @@ import com.shale.core.service.NotificationServicePort.TaskActionNotificationComm
 import com.shale.core.service.NotificationServicePort.TaskDueDateNotificationCommand;
 import com.shale.core.service.NotificationServicePort.TaskNotificationCommand;
 import com.shale.core.service.TaskServicePort;
+import com.shale.core.service.UserServicePort;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
 import com.shale.server.runtime.InMemoryTokenRevocationStore;
@@ -51,6 +52,7 @@ class ApiReadControllerTest {
                 unusedPort(ContactServicePort.class),
                 unusedPort(NotificationServicePort.class),
                 unusedPort(OrganizationServicePort.class),
+                unusedPort(UserServicePort.class),
                 new ServerRuntimeSessionState());
 
         mockMvc = MockMvcBuilders
@@ -82,6 +84,7 @@ class ApiReadControllerTest {
                 contactServicePort,
                 notificationServicePort,
                 unusedPort(OrganizationServicePort.class),
+                unusedPort(UserServicePort.class),
                 new ServerRuntimeSessionState(new DevelopmentHeaderServerSessionResolver(), currentRequestProvider()));
         return MockMvcBuilders
                 .standaloneSetup(apiReadController)
@@ -102,6 +105,7 @@ class ApiReadControllerTest {
                 contactServicePort,
                 notificationServicePort,
                 unusedPort(OrganizationServicePort.class),
+                unusedPort(UserServicePort.class),
                 new ServerRuntimeSessionState(new BearerTokenServerSessionResolver(tokenService, new InMemoryTokenRevocationStore()), currentRequestProvider()));
         return MockMvcBuilders
                 .standaloneSetup(apiReadController)
