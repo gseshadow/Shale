@@ -66,6 +66,23 @@ export interface TaskDetail {
   createdByDisplayName: string | null;
 }
 
+export interface ContactSearchResult {
+  id: number;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface ContactDetail {
+  id: number;
+  shaleClientId: number;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
 export interface CaseDetail {
   caseId: number;
   caseNumber: string | null;
@@ -234,4 +251,41 @@ export async function getTaskDetail(accessToken: string, taskId: number): Promis
   }
 
   return response.json() as Promise<TaskDetail>;
+}
+
+
+export async function searchContacts(accessToken: string, query: string): Promise<ContactSearchResult[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/contacts/search?query=${encodeURIComponent(query)}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not search contacts.', response.status);
+  }
+
+  return response.json() as Promise<ContactSearchResult[]>;
+}
+
+export async function getContactDetail(accessToken: string, contactId: number): Promise<ContactDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/contacts/${contactId}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that contact.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load the contact detail.', response.status);
+  }
+
+  return response.json() as Promise<ContactDetail>;
 }

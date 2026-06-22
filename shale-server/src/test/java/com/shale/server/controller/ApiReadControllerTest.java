@@ -283,6 +283,46 @@ class ApiReadControllerTest {
     }
 
     @Test
+    void contactDetailReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                unusedPort(TaskServicePort.class),
+                contactServicePort,
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/contacts/801")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(801))
+                .andExpect(jsonPath("$.shaleClientId").value(41))
+                .andExpect(jsonPath("$.displayName").value("Ada Lovelace"))
+                .andExpect(jsonPath("$.email").value("ada@example.test"))
+                .andExpect(jsonPath("$.phone").value("555-0100"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(801, contactServicePort.contactId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, contactServicePort.detailShaleClientId);
+    }
+
+    @Test
+    void missingContactDetailReturnsNotFoundWithDevelopmentHeaders() throws Exception {
+        RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                unusedPort(TaskServicePort.class),
+                contactServicePort,
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/contacts/404")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.path").value("/api/contacts/404"));
+    }
+
+    @Test
     void unreadNotificationsReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingNotificationServicePort notificationServicePort = new RecordingNotificationServicePort();
         MockMvc devMockMvc = developmentMockMvc(
@@ -592,6 +632,8 @@ class ApiReadControllerTest {
         private int shaleClientId;
         private String query;
         private int limit;
+        private int contactId;
+        private int detailShaleClientId;
 
         @Override
         public List<ContactSummary> searchContacts(int shaleClientId, String query, int limit) {
@@ -603,7 +645,13 @@ class ApiReadControllerTest {
 
         @Override
         public Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId) {
-            throw new AssertionError("getContactDetail should not be called");
+            this.contactId = contactId;
+            this.detailShaleClientId = shaleClientId;
+            if (contactId == 404) {
+                return Optional.empty();
+            }
+            return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada", "Lovelace",
+                    "Ada Lovelace", "ada@example.test", "555-0100"));
         }
 
         @Override
