@@ -33,10 +33,10 @@ public final class ContactServiceAdapter implements ContactServicePort {
 
 	@Override
 	public Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId) {
-		return Optional.ofNullable(contactGateway.findById(contactId, shaleClientId))
+		return Optional.ofNullable(contactGateway.findDirectoryContactById(contactId, shaleClientId))
 				.map(row -> new ContactDetail(
 						row.id(),
-						row.shaleClientId(),
+						shaleClientId,
 						row.firstName(),
 						row.lastName(),
 						row.displayName(),
@@ -87,6 +87,8 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	interface ContactGateway {
 		List<ContactDao.DirectoryContactRow> searchContacts(int shaleClientId, String query);
 
+		ContactDao.DirectoryContactRow findDirectoryContactById(int contactId, int shaleClientId);
+
 		ContactDao.ContactDetailRow findById(int contactId, int shaleClientId);
 
 		int createContact(ContactDao.CreateContactRequest request);
@@ -109,6 +111,11 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		@Override
 		public ContactDao.ContactDetailRow findById(int contactId, int shaleClientId) {
 			return contactDao.findById(contactId, shaleClientId);
+		}
+
+		@Override
+		public ContactDao.DirectoryContactRow findDirectoryContactById(int contactId, int shaleClientId) {
+			return contactDao.findDirectoryContactById(contactId, shaleClientId);
 		}
 
 		@Override
