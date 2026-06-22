@@ -18,6 +18,9 @@ import com.shale.core.service.ContactServicePort.ContactDetail;
 import com.shale.core.service.ContactServicePort.ContactSummary;
 import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.NotificationServicePort.NotificationSummary;
+import com.shale.core.service.OrganizationServicePort;
+import com.shale.core.service.OrganizationServicePort.OrganizationDetail;
+import com.shale.core.service.OrganizationServicePort.OrganizationSummary;
 import com.shale.core.service.TaskServicePort;
 import com.shale.server.dto.PagedResponse;
 import com.shale.server.runtime.ServerRuntimeSessionState;
@@ -36,6 +39,7 @@ public final class ApiReadController {
     private final TaskServicePort taskServicePort;
     private final ContactServicePort contactServicePort;
     private final NotificationServicePort notificationServicePort;
+    private final OrganizationServicePort organizationServicePort;
     private final ServerRuntimeSessionState runtimeSessionState;
 
     public ApiReadController(
@@ -43,11 +47,13 @@ public final class ApiReadController {
             TaskServicePort taskServicePort,
             ContactServicePort contactServicePort,
             NotificationServicePort notificationServicePort,
+            OrganizationServicePort organizationServicePort,
             ServerRuntimeSessionState runtimeSessionState) {
         this.caseServicePort = caseServicePort;
         this.taskServicePort = taskServicePort;
         this.contactServicePort = contactServicePort;
         this.notificationServicePort = notificationServicePort;
+        this.organizationServicePort = organizationServicePort;
         this.runtimeSessionState = runtimeSessionState;
     }
 
@@ -150,6 +156,24 @@ public final class ApiReadController {
                 safeQuery,
                 ApiValidation.searchLimitForPage(safePage, safeSize));
         return new PagedResponse<>(slice(fetched, safePage, safeSize), safePage, safeSize, null);
+    }
+
+
+    @Operation(summary = "Search organizations", description = "Returns the first matching organizations for the authenticated tenant.")
+    @GetMapping("/api/organizations/search")
+    public List<OrganizationSummary> searchOrganizations(@RequestParam(name = "query", defaultValue = "") String query) {
+        String safeQuery = ApiValidation.searchQuery(query);
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return organizationServicePort.searchOrganizations(shaleClientId, safeQuery, DEFAULT_SEARCH_LIMIT);
+    }
+
+    @Operation(summary = "Get organization detail", description = "Returns one tenant-scoped organization detail record.")
+    @GetMapping("/api/organizations/{organizationId:\\d+}")
+    public OrganizationDetail getOrganization(@PathVariable("organizationId") int organizationId) {
+        int safeOrganizationId = Math.toIntExact(ApiValidation.positiveId(organizationId, "organizationId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return organizationServicePort.getOrganizationDetail(safeOrganizationId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
     }
 
     @Operation(summary = "List unread notifications", description = "Returns unread notifications for the current authenticated user and tenant.")

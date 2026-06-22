@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, ContactDetail, ContactSearchResult, TaskDetail, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getTaskDetail, listAssignedCases, listAssignedTasks, login, logout, readAccessToken, searchCases, searchContacts, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, TaskDetail, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, listAssignedCases, listAssignedTasks, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -85,7 +85,8 @@ function AppRoutes() {
           <Route path="/tasks/:taskId" element={<TaskDetailPage accessToken={authState.accessToken} />} />
           <Route path="/contacts" element={<ContactsPage accessToken={authState.accessToken} />} />
           <Route path="/contacts/:contactId" element={<ContactDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/organizations" element={<PlaceholderPage title="Organizations" />} />
+          <Route path="/organizations" element={<OrganizationsPage accessToken={authState.accessToken} />} />
+          <Route path="/organizations/:organizationId" element={<OrganizationDetailPage accessToken={authState.accessToken} />} />
           <Route path="/team" element={<PlaceholderPage title="Team" />} />
           <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
         </Route>
@@ -550,6 +551,101 @@ function ContactResultsTable({ results }: { results: ContactSearchResult[] }) {
 }
 
 
+function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<OrganizationSearchResult[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSearch(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      setResults([]);
+      setHasSearched(false);
+      setError(null);
+      return;
+    }
+
+    if (!accessToken) {
+      setResults([]);
+      setHasSearched(true);
+      setError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const searchResults = await searchOrganizations(accessToken, trimmedQuery);
+      setResults(searchResults);
+    } catch (caught) {
+      setResults([]);
+      setError(caught instanceof Error ? caught.message : 'Organization search failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <section className="organizations-page" aria-labelledby="organizations-title">
+      <h1 id="organizations-title">Organizations</h1>
+      <form className="search-form" onSubmit={handleSearch}>
+        <label htmlFor="organization-search">Search organizations</label>
+        <div className="search-row">
+          <input
+            id="organization-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Enter an organization name"
+          />
+          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching…' : 'Search'}</button>
+        </div>
+      </form>
+
+      <div className="results-area" aria-live="polite">
+        {isLoading && <p className="status">Loading organization results…</p>}
+        {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+        {!isLoading && !error && hasSearched && results.length === 0 && <p className="status">No organizations matched your search.</p>}
+        {!isLoading && !error && results.length > 0 && <OrganizationResultsTable results={results} />}
+      </div>
+    </section>
+  );
+}
+
+function OrganizationResultsTable({ results }: { results: OrganizationSearchResult[] }) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="table-wrap">
+      <table className="results-table">
+        <thead>
+          <tr><th>Organization ID</th><th>Name</th><th>Type</th><th>Email</th><th>Phone</th><th>Website</th><th>Location</th></tr>
+        </thead>
+        <tbody>
+          {results.map((result) => (
+            <tr key={result.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/organizations/${result.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/organizations/${result.id}`); } }}>
+              <td>{result.id}</td>
+              <td>{result.name || `Organization ${result.id}`}</td>
+              <td>{result.organizationTypeName || '—'}</td>
+              <td>{result.email || '—'}</td>
+              <td>{result.phone || '—'}</td>
+              <td>{result.website || '—'}</td>
+              <td>{[result.city, result.state].filter(Boolean).join(', ') || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
 function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
   const { taskId } = useParams();
   const numericTaskId = Number(taskId);
@@ -832,6 +928,98 @@ function ContactDetailReadOnly({ detail }: { detail: ContactDetail }) {
     </div>
   );
 }
+
+function OrganizationDetailPage({ accessToken }: { accessToken: string | null }) {
+  const { organizationId } = useParams();
+  const numericOrganizationId = Number(organizationId);
+  const [organizationDetail, setOrganizationDetail] = useState<OrganizationDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!Number.isInteger(numericOrganizationId) || numericOrganizationId <= 0) {
+      setOrganizationDetail(null);
+      setError('That organization link is not valid.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!accessToken) {
+      setOrganizationDetail(null);
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    getOrganizationDetail(accessToken, numericOrganizationId)
+      .then((detail) => isCurrent && setOrganizationDetail(detail))
+      .catch((caught) => {
+        if (isCurrent) {
+          setOrganizationDetail(null);
+          setError(caught instanceof Error ? caught.message : 'Organization detail could not be loaded.');
+        }
+      })
+      .finally(() => isCurrent && setIsLoading(false));
+
+    return () => { isCurrent = false; };
+  }, [accessToken, numericOrganizationId]);
+
+  const title = organizationDetail?.name || 'Organization Detail';
+
+  return (
+    <section className="organization-detail-page" aria-labelledby="organization-detail-title">
+      <nav className="breadcrumb" aria-label="Breadcrumb"><Link to="/organizations">Organizations</Link><span aria-hidden="true">›</span><span>{title}</span></nav>
+      <div className="page-heading-row"><div><p className="eyebrow">Organization Detail</p><h1 id="organization-detail-title">{title}</h1></div><Link className="button-link" to="/organizations">Back to Organizations</Link></div>
+      {isLoading && <p className="status">Loading organization detail…</p>}
+      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+      {!isLoading && !error && !organizationDetail && <p className="status">No organization detail was found.</p>}
+      {!isLoading && !error && organizationDetail && <OrganizationDetailReadOnly detail={organizationDetail} />}
+    </section>
+  );
+}
+
+function OrganizationDetailReadOnly({ detail }: { detail: OrganizationDetail }) {
+  return (
+    <div className="detail-sections">
+      <section aria-labelledby="organization-info-title">
+        <h2 id="organization-info-title">Organization Information</h2>
+        <dl className="detail-list">
+          <DetailItem label="Organization Name" value={detail.name} />
+          <DetailItem label="Organization Type" value={detail.organizationTypeName} />
+          <DetailItem label="Email" value={detail.email} />
+          <DetailItem label="Phone" value={detail.phone} />
+          <DetailItem label="Website" value={detail.website} />
+          <DetailItem label="Fax" value={detail.fax} />
+          <DetailItem label="Address" value={[detail.address1, detail.address2, detail.city, detail.state, detail.postalCode, detail.country].filter(Boolean).join(', ')} />
+          <DetailItem label="Notes" value={detail.notes} preserveWhitespace />
+        </dl>
+      </section>
+
+      {detail.relatedCases.length > 0 && (
+        <section aria-labelledby="related-cases-title">
+          <h2 id="related-cases-title">Related Cases</h2>
+          <RelatedOrganizationCasesTable cases={detail.relatedCases} />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function RelatedOrganizationCasesTable({ cases }: { cases: OrganizationDetail['relatedCases'] }) {
+  const navigate = useNavigate();
+  return (
+    <div className="table-wrap"><table className="results-table"><thead><tr><th>Case name</th><th>Role</th><th>Side</th><th>Responsible attorney</th><th>Intake date</th><th>Statute of limitations</th></tr></thead><tbody>{cases.map((item) => (
+      <tr key={item.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/cases/${item.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/cases/${item.id}`); } }}>
+        <td>{item.name || `Case ${item.id}`}</td><td>{item.partyRoleName || '—'}</td><td>{item.side || '—'}</td><td>{item.responsibleAttorneyName || '—'}</td><td>{item.intakeDate ?? '—'}</td><td>{item.statuteOfLimitationsDate ?? '—'}</td>
+      </tr>
+    ))}</tbody></table></div>
+  );
+}
+
 
 function DetailItem({ label, value, preserveWhitespace = false }: { label: string; value: string | number | null | undefined; preserveWhitespace?: boolean }) {
   const displayValue = value === null || value === undefined || value === '' ? '—' : String(value);
