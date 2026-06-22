@@ -12,6 +12,7 @@ import com.shale.core.service.AuthServicePort;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.NotificationServicePort;
+import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.TaskServicePort;
 import com.shale.data.auth.AuthService;
 import com.shale.data.auth.AuthServiceImpl;
@@ -21,6 +22,7 @@ import com.shale.data.config.DataSources;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.NotificationDao;
+import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.errors.AuthException;
@@ -28,6 +30,7 @@ import com.shale.data.service.adapter.AuthServiceAdapter;
 import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
+import com.shale.data.service.adapter.OrganizationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
 import com.shale.server.health.AppDatabaseHealthCheck;
 import com.shale.server.health.DataSourcesAppDatabaseHealthCheck;
@@ -169,6 +172,11 @@ public class ShaleServerServiceConfiguration {
     @Bean
     ContactServicePort contactServicePort(DbSessionProvider serverDbSessionProvider) {
         return new ContactServiceAdapter(new ContactDao(serverDbSessionProvider));
+    }
+
+    @Bean
+    OrganizationServicePort organizationServicePort(DbSessionProvider serverDbSessionProvider) {
+        return new OrganizationServiceAdapter(new OrganizationDao(serverDbSessionProvider));
     }
 
     @Bean
