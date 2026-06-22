@@ -153,7 +153,17 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
+		public List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive) {
+			return List.of();
+		}
+
+		@Override
 		public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
+			return List.of();
+		}
+
+		@Override
+		public List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive) {
 			return List.of();
 		}
 

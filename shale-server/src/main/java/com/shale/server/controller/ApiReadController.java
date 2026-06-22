@@ -190,7 +190,7 @@ public final class ApiReadController {
     public List<CaseStatusDto> listCaseStatuses() {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         requireCurrentUserAdmin(shaleClientId);
-        return caseServicePort.listCaseStatuses(shaleClientId, true);
+        return caseServicePort.listTenantCaseStatuses(shaleClientId, true);
     }
 
     @Operation(summary = "List practice areas", description = "Returns read-only practice area settings for administrators in the authenticated tenant.")
@@ -198,7 +198,7 @@ public final class ApiReadController {
     public List<PracticeAreaDto> listPracticeAreas() {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         requireCurrentUserAdmin(shaleClientId);
-        return caseServicePort.listPracticeAreas(shaleClientId, true);
+        return caseServicePort.listTenantPracticeAreas(shaleClientId, true);
     }
 
     @Operation(summary = "List team members", description = "Returns visible users for the authenticated tenant.")
