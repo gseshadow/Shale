@@ -386,3 +386,32 @@ input {
   height: 0.9rem;
   width: 0.9rem;
 }
+
+.settings-page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.settings-card,
+.settings-subcard {
+  background: white;
+  border: 1px solid #dbe4ed;
+  border-radius: 18px;
+  display: grid;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.settings-subcard {
+  background: #fbfdff;
+  padding: 1.25rem;
+}
+
+.settings-admin-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-table {
+  min-width: 720px;
+}

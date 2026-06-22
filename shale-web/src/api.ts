@@ -15,6 +15,28 @@ export interface AuthenticatedUser {
   color: string | null;
 }
 
+
+export interface CaseStatusSetting {
+  id: number;
+  name: string | null;
+  closed: boolean;
+  sortOrder: number | null;
+  color: string | null;
+  lifecycleKey: string | null;
+  systemKey: string | null;
+  shaleClientId: number | null;
+}
+
+export interface PracticeAreaSetting {
+  id: number;
+  name: string | null;
+  color: string | null;
+  active: boolean;
+  deleted: boolean;
+  systemKey: string | null;
+  shaleClientId: number | null;
+}
+
 export interface LoginResponse {
   authenticated: boolean;
   tokenType: 'Bearer' | string;
@@ -424,4 +446,37 @@ export async function getTeamMemberDetail(accessToken: string, userId: number): 
   }
 
   return response.json() as Promise<TeamMemberDetail>;
+}
+
+
+export async function listCaseStatusSettings(accessToken: string): Promise<CaseStatusSetting[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/settings/case-statuses`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load case status settings.', response.status);
+  }
+
+  return response.json() as Promise<CaseStatusSetting[]>;
+}
+
+export async function listPracticeAreaSettings(accessToken: string): Promise<PracticeAreaSetting[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/settings/practice-areas`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load practice area settings.', response.status);
+  }
+
+  return response.json() as Promise<PracticeAreaSetting[]>;
 }
