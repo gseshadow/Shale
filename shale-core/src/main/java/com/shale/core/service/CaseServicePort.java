@@ -31,7 +31,11 @@ public interface CaseServicePort {
 
 	List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
 
+	List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive);
+
 	List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive);
+
+	List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive);
 
 	PracticeAreaDto createPracticeArea(PracticeAreaCommand command);
 

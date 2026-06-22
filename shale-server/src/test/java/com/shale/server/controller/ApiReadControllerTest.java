@@ -505,8 +505,18 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public List<com.shale.core.dto.CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive) {
+            throw new AssertionError("listTenantCaseStatuses should not be called");
+        }
+
+        @Override
         public List<com.shale.core.dto.PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
             throw new AssertionError("listPracticeAreas should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive) {
+            throw new AssertionError("listTenantPracticeAreas should not be called");
         }
 
         @Override

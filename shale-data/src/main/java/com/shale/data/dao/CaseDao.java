@@ -5449,6 +5449,31 @@ public final class CaseDao {
 	}
 
 
+	public List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive) {
+		if (shaleClientId <= 0) {
+			return List.of();
+		}
+		String sql = """
+				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey
+				FROM dbo.Statuses
+				WHERE ShaleClientId = ?
+				ORDER BY SortOrder, Name, Id;
+				""";
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				List<CaseStatusDto> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(mapCaseStatusDto(rs));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list tenant case statuses (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
 	public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
 		if (shaleClientId <= 0) {
 			return List.of();
@@ -5477,6 +5502,33 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list practice areas (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	public List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive) {
+		if (shaleClientId <= 0) {
+			return List.of();
+		}
+		String activeFilter = includeInactive ? "" : " AND IsActive = 1 AND IsDeleted = 0";
+		String sql = """
+				SELECT Id, ShaleClientId, Name, Color, IsActive, IsDeleted, SystemKey
+				FROM dbo.PracticeAreas
+				WHERE ShaleClientId = ?
+				%s
+				ORDER BY Name, Id;
+				""".formatted(activeFilter);
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				List<PracticeAreaDto> out = new ArrayList<>();
+				while (rs.next()) {
+					out.add(mapPracticeAreaDto(rs));
+				}
+				return out;
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list tenant practice areas (clientId=" + shaleClientId + ")", e);
 		}
 	}
 

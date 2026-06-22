@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -89,11 +89,165 @@ function AppRoutes() {
           <Route path="/organizations/:organizationId" element={<OrganizationDetailPage accessToken={authState.accessToken} />} />
           <Route path="/team" element={<TeamPage accessToken={authState.accessToken} />} />
           <Route path="/team/:userId" element={<TeamMemberDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
+          <Route path="/settings" element={<SettingsPage accessToken={authState.accessToken} user={authState.user} />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={authState.user ? '/my-shale' : '/login'} replace />} />
     </Routes>
+  );
+}
+
+
+function SettingsPage({ accessToken, user }: { accessToken: string | null; user: AuthenticatedUser | null }) {
+  const [caseStatuses, setCaseStatuses] = useState<CaseStatusSetting[]>([]);
+  const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
+  const [isLoadingAdmin, setIsLoadingAdmin] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken || !user?.isAdmin) {
+      setCaseStatuses([]);
+      setPracticeAreas([]);
+      setIsLoadingAdmin(false);
+      setAdminError(null);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoadingAdmin(true);
+    setAdminError(null);
+    Promise.all([listCaseStatusSettings(accessToken), listPracticeAreaSettings(accessToken)])
+      .then(([statusRows, practiceAreaRows]) => {
+        if (isCurrent) {
+          setCaseStatuses(statusRows);
+          setPracticeAreas(practiceAreaRows);
+        }
+      })
+      .catch((caught) => {
+        if (isCurrent) {
+          setAdminError(caught instanceof Error ? caught.message : 'Administrative settings could not be loaded.');
+          setCaseStatuses([]);
+          setPracticeAreas([]);
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoadingAdmin(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [accessToken, user?.isAdmin]);
+
+  return (
+    <section className="settings-page">
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">Settings</p>
+          <h1>Settings</h1>
+          <p className="lede">Read-only account and tenant settings for the signed-in Shale session.</p>
+        </div>
+      </div>
+
+      <div className="detail-sections">
+        <section className="settings-card">
+          <h2>Current User</h2>
+          {user ? (
+            <dl className="detail-list compact">
+              <DetailItem label="Name" value={displayNameFor(user)} />
+              <DetailItem label="Email" value={user.email} />
+              <DetailItem label="User ID" value={String(user.userId)} />
+              <DetailItem label="Role" value={[user.isAdmin ? 'Admin' : null, user.isAttorney ? 'Attorney' : null].filter(Boolean).join(', ') || 'Team member'} />
+              <DetailItem label="Initials" value={user.initials} />
+              <DetailItem label="Color" value={user.color} />
+            </dl>
+          ) : (
+            <p className="status">No current user profile was loaded.</p>
+          )}
+        </section>
+
+        <section className="settings-card">
+          <h2>Organization / Tenant Info</h2>
+          <dl className="detail-list compact">
+            <DetailItem label="Tenant ID" value={user?.shaleClientId ? String(user.shaleClientId) : null} />
+            <DetailItem label="API Base URL" value={apiBaseUrl()} />
+          </dl>
+        </section>
+
+        {user?.isAdmin ? (
+          <section className="settings-card">
+            <h2>Administrative Settings</h2>
+            <p className="lede">These sections are visible only to administrators. All data is read-only in this web workflow.</p>
+            {isLoadingAdmin && <p className="status">Loading administrative settings…</p>}
+            {!isLoadingAdmin && adminError && <p className="status error" role="alert">{adminError}</p>}
+            {!isLoadingAdmin && !adminError && (
+              <div className="settings-admin-grid">
+                <SettingsTable
+                  title="Case Statuses"
+                  emptyText="No case statuses were found for this tenant."
+                  headers={['Name', 'Open/Closed', 'Sort', 'Lifecycle', 'System Key']}
+                  rows={caseStatuses.map((status) => [
+                    status.name || `Status ${status.id}`,
+                    status.closed ? 'Closed' : 'Open',
+                    status.sortOrder == null ? '—' : String(status.sortOrder),
+                    status.lifecycleKey || '—',
+                    status.systemKey || '—',
+                  ])}
+                />
+                <SettingsTable
+                  title="Practice Areas"
+                  emptyText="No practice areas were found for this tenant."
+                  headers={['Name', 'Color', 'Status', 'System Key']}
+                  rows={practiceAreas.map((area) => [
+                    area.name || `Practice Area ${area.id}`,
+                    area.color || '—',
+                    area.deleted ? 'Deleted' : area.active ? 'Active' : 'Inactive',
+                    area.systemKey || '—',
+                  ])}
+                />
+                <div className="settings-subcard">
+                  <h3>Users / Team Administration</h3>
+                  <p className="status">Use the Team page for the current read-only team directory. Administrative user editing will be added in a later step.</p>
+                </div>
+              </div>
+            )}
+          </section>
+        ) : (
+          <section className="settings-card">
+            <h2>Administrative Settings</h2>
+            <p className="status">Administrative settings will be added in a later step.</p>
+          </section>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SettingsTable({ title, emptyText, headers, rows }: { title: string; emptyText: string; headers: string[]; rows: string[][] }) {
+  return (
+    <div className="settings-subcard">
+      <h3>{title}</h3>
+      {rows.length === 0 ? (
+        <p className="status">{emptyText}</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="results-table settings-table">
+            <thead>
+              <tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={`${title}-${rowIndex}`}>
+                  {row.map((cell, cellIndex) => <td key={`${title}-${rowIndex}-${cellIndex}`}>{cell}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
