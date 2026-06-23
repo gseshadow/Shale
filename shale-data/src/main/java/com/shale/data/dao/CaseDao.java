@@ -3253,7 +3253,7 @@ public final class CaseDao {
 
 	private List<com.shale.core.dto.CaseDetailDto.RelatedContactDto> listRelatedContacts(Connection con, long caseId, int shaleClientId) throws SQLException {
 		boolean hasIsDeleted = contactsHasIsDeletedColumn(con);
-		String sql = relatedContactsSql(hasIsDeleted);
+		String sql = relatedCasePartyContactsSql(hasIsDeleted);
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			int idx = 1;
 			ps.setLong(idx++, caseId);
@@ -3278,7 +3278,7 @@ public final class CaseDao {
 		}
 	}
 
-	private static String relatedContactsSql(boolean includeContactSoftDeleteFilter) {
+	private static String relatedCasePartyContactsSql(boolean includeContactSoftDeleteFilter) {
 		String baseSql = """
 				SELECT
 				  ct.Id,
@@ -3294,21 +3294,28 @@ public final class CaseDao {
 				        COALESCE(ct.Name, '')
 				    END
 				  )) AS DisplayName,
-				  cc.Role AS RoleId,
-				  NULLIF(LTRIM(RTRIM(COALESCE(r.Name, ''))), '') AS RoleName,
-				  NULLIF(LTRIM(RTRIM(COALESCE(cc.Side, ''))), '') AS Side,
-				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
-				FROM dbo.CaseContacts cc
+				  CAST(cp.PartyRoleId AS int) AS RoleId,
+				  NULLIF(LTRIM(RTRIM(COALESCE(pr.Name, ''))), '') AS RoleName,
+				  NULLIF(LTRIM(RTRIM(COALESCE(cp.Side, ''))), '') AS Side,
+				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
+				  COALESCE(
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), ''),
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailWork, ''))), ''),
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailOther, ''))), '')
+				  ) AS Email,
+				  COALESCE(
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), ''),
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneHome, ''))), ''),
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneWork, ''))), '')
+				  ) AS Phone
+				FROM dbo.CaseParties cp
 				INNER JOIN dbo.Cases c
-				  ON c.Id = cc.CaseId
+				  ON c.Id = cp.CaseId
+				INNER JOIN dbo.PartyRoles pr
+				  ON pr.Id = cp.PartyRoleId
 				INNER JOIN dbo.Contacts ct
-				  ON ct.Id = cc.ContactId
-				LEFT JOIN dbo.Roles r
-				  ON r.Id = cc.Role
-				 AND r.ShaleClientId = c.ShaleClientId
-				WHERE cc.CaseId = ?
+				  ON ct.Id = cp.ContactId
+				WHERE cp.CaseId = ?
 				  AND c.ShaleClientId = ?
 				  AND ct.ShaleClientId = ?
 				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
@@ -3327,13 +3334,26 @@ public final class CaseDao {
 				""";
 
 		String orderSql = """
-				ORDER BY DisplayName ASC, cc.Role ASC, ct.Id ASC;
-				""";
+				ORDER BY
+				  COALESCE(cp.IsPrimary, 0) DESC,
+				  CASE cp.Side
+				    WHEN '%s' THEN 0
+				    WHEN '%s' THEN 1
+				    WHEN '%s' THEN 2
+				    ELSE 3
+				  END,
+				  DisplayName ASC,
+				  cp.Id ASC;
+				""".formatted(
+					PARTY_SIDE_KEY_REPRESENTED,
+					PARTY_SIDE_KEY_OPPOSING,
+					PARTY_SIDE_KEY_NEUTRAL);
 
 		return includeContactSoftDeleteFilter
 				? baseSql + "\n  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)\n" + orderSql
 				: baseSql + "\n" + orderSql;
 	}
+
 
 	public List<RelatedContactRow> findRelatedContacts(long caseId) {
 		if (caseId <= 0) {
