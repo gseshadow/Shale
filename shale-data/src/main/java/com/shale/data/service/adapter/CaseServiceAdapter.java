@@ -62,7 +62,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 	@Override
 	public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
-		return caseGateway.listCaseUpdates(caseId);
+		return caseGateway.listCaseUpdates(caseId, shaleClientId);
 	}
 
 	@Override
@@ -155,7 +155,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId);
 
-		List<CaseUpdateDto> listCaseUpdates(long caseId);
+		List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
 		void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId);
 
@@ -210,8 +210,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		}
 
 		@Override
-		public List<CaseUpdateDto> listCaseUpdates(long caseId) {
-			return caseDao.listCaseUpdates(caseId);
+		public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
+			return caseDao.listCaseUpdates(caseId, shaleClientId);
 		}
 
 		@Override

@@ -170,6 +170,16 @@ export interface ContactDetail {
   phone: string | null;
 }
 
+export interface CaseUpdate {
+  id: number;
+  caseId: number;
+  noteText: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  createdByUserId: number | null;
+  createdByDisplayName: string;
+}
+
 export interface CaseRelatedContact {
   id: number;
   displayName: string | null;
@@ -347,6 +357,22 @@ export async function listCaseTasks(accessToken: string, caseId: number): Promis
   }
 
   return response.json() as Promise<CaseTaskListItem[]>;
+}
+
+export async function listCaseUpdates(accessToken: string, caseId: number): Promise<CaseUpdate[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/updates`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load the case updates.', response.status);
+  }
+
+  return response.json() as Promise<CaseUpdate[]>;
 }
 
 export async function getTaskDetail(accessToken: string, taskId: number): Promise<TaskDetail> {

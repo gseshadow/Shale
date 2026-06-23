@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseSearchResult, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -46,6 +46,27 @@ function formatDate(value: string | null | undefined): string {
   }
 
   return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (isMissing(value)) {
+    return MISSING_VALUE;
+  }
+
+  const text = String(value);
+  const date = new Date(text);
+
+  if (Number.isNaN(date.getTime())) {
+    return text;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function PageHeader({ eyebrow, title, titleId, lede, action }: { eyebrow: string; title: string; titleId?: string; lede?: string; action?: ReactNode }) {
@@ -1088,7 +1109,9 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
   const numericCaseId = Number(caseId);
   const [caseDetail, setCaseDetail] = useState<CaseDetail | null>(null);
   const [caseTasks, setCaseTasks] = useState<CaseTaskListItem[]>([]);
+  const [caseUpdates, setCaseUpdates] = useState<CaseUpdate[]>([]);
   const [tasksError, setTasksError] = useState<string | null>(null);
+  const [updatesError, setUpdatesError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -1096,7 +1119,9 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
     if (!Number.isInteger(numericCaseId) || numericCaseId <= 0) {
       setCaseDetail(null);
       setCaseTasks([]);
+      setCaseUpdates([]);
       setTasksError(null);
+      setUpdatesError(null);
       setError('That case link is not valid.');
       setIsLoading(false);
       return;
@@ -1105,7 +1130,9 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
     if (!accessToken) {
       setCaseDetail(null);
       setCaseTasks([]);
+      setCaseUpdates([]);
       setTasksError(null);
+      setUpdatesError(null);
       setError('Your Shale session is not available. Please sign in again.');
       setIsLoading(false);
       return;
@@ -1115,12 +1142,14 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
     setIsLoading(true);
     setError(null);
     setTasksError(null);
+    setUpdatesError(null);
 
     Promise.allSettled([
       getCaseDetail(accessToken, numericCaseId),
       listCaseTasks(accessToken, numericCaseId),
+      listCaseUpdates(accessToken, numericCaseId),
     ])
-      .then(([caseResult, tasksResult]) => {
+      .then(([caseResult, tasksResult, updatesResult]) => {
         if (!isCurrent) {
           return;
         }
@@ -1130,6 +1159,7 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
         } else {
           setCaseDetail(null);
           setCaseTasks([]);
+          setCaseUpdates([]);
           setError(caseResult.reason instanceof Error ? caseResult.reason.message : 'Case detail could not be loaded.');
           return;
         }
@@ -1139,6 +1169,13 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
         } else {
           setCaseTasks([]);
           setTasksError(tasksResult.reason instanceof Error ? tasksResult.reason.message : 'Case tasks could not be loaded.');
+        }
+
+        if (updatesResult.status === 'fulfilled') {
+          setCaseUpdates(updatesResult.value);
+        } else {
+          setCaseUpdates([]);
+          setUpdatesError(updatesResult.reason instanceof Error ? updatesResult.reason.message : 'Case updates could not be loaded.');
         }
       })
       .finally(() => {
@@ -1171,12 +1208,12 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
 
       {isLoading && <p className="status">Loading case detail…</p>}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} tasks={caseTasks} tasksError={tasksError} />}
+      {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} tasks={caseTasks} tasksError={tasksError} updates={caseUpdates} updatesError={updatesError} />}
     </section>
   );
 }
 
-function CaseDetailReadOnly({ detail, tasks, tasksError }: { detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null }) {
+function CaseDetailReadOnly({ detail, tasks, tasksError, updates, updatesError }: { detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null }) {
   return (
     <div className="detail-sections">
       <section aria-labelledby="case-info-title">
@@ -1211,6 +1248,8 @@ function CaseDetailReadOnly({ detail, tasks, tasksError }: { detail: CaseDetail;
       <CaseTasksSection tasks={tasks} error={tasksError} />
 
       <RelatedContactsSection contacts={detail.relatedContacts ?? []} />
+
+      <CaseUpdatesSection updates={updates} error={updatesError} />
     </div>
   );
 }
@@ -1238,6 +1277,29 @@ function CaseTasksSection({ tasks, error }: { tasks: CaseTaskListItem[]; error: 
               </tr>
             ))}</tbody>
           </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CaseUpdatesSection({ updates, error }: { updates: CaseUpdate[]; error: string | null }) {
+  return (
+    <section aria-labelledby="case-updates-title">
+      <h2 id="case-updates-title">Case Updates</h2>
+      {error && <p className="status error" role="alert">{error}</p>}
+      {!error && updates.length === 0 && <p className="status">No case updates have been added yet.</p>}
+      {!error && updates.length > 0 && (
+        <div className="case-updates-timeline">
+          {updates.map((update) => (
+            <article className="case-update-card" key={update.id}>
+              <div className="case-update-meta">
+                <time dateTime={update.createdAt ?? undefined}>{formatDateTime(update.createdAt)}</time>
+                <span>{update.createdByDisplayName || 'Unknown author'}</span>
+              </div>
+              <p className="case-update-note preserve-whitespace">{update.noteText}</p>
+            </article>
+          ))}
         </div>
       )}
     </section>

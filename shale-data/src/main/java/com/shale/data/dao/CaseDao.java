@@ -2655,6 +2655,18 @@ public final class CaseDao {
 	}
 
 	public List<CaseUpdateDto> listCaseUpdates(long caseId) {
+		return listCaseUpdatesInternal(caseId, null);
+	}
+
+	public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
+		if (shaleClientId <= 0) {
+			throw new IllegalArgumentException("shaleClientId must be > 0");
+		}
+		return listCaseUpdatesInternal(caseId, shaleClientId);
+	}
+
+	private List<CaseUpdateDto> listCaseUpdatesInternal(long caseId, Integer shaleClientId) {
+		String tenantPredicate = shaleClientId == null ? "" : "\n  AND cu.ShaleClientId = ?";
 		String sql = """
 				SELECT
 				  cu.Id,
@@ -2669,16 +2681,23 @@ public final class CaseDao {
 				    COALESCE(u.name_last, '')
 				  )) AS CreatedByDisplayName
 				FROM dbo.CaseUpdates cu
-				LEFT JOIN dbo.Users u ON u.Id = cu.CreatedByUserId
-				WHERE cu.CaseId = ?
+				LEFT JOIN dbo.Users u
+				  ON u.Id = cu.CreatedByUserId
+				 AND u.ShaleClientId = cu.ShaleClientId
+				 AND COALESCE(u.is_deleted, 0) = 0
+				WHERE cu.CaseId = ?%s
 				  AND ISNULL(cu.IsDeleted, 0) = 0
+				  AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
 				ORDER BY cu.CreatedAt DESC, cu.Id DESC;
-				""";
+				""".formatted(tenantPredicate);
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 
 			ps.setLong(1, caseId);
+			if (shaleClientId != null) {
+				ps.setInt(2, shaleClientId);
+			}
 
 			try (ResultSet rs = ps.executeQuery()) {
 				List<CaseUpdateDto> out = new ArrayList<>();
