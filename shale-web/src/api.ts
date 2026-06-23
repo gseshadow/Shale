@@ -66,6 +66,8 @@ export interface CaseTaskListItem {
   priorityId: number | null;
   dueAt: string | null;
   completedAt: string | null;
+  assignedUserId?: number | null;
+  assignedUserDisplayName?: string | null;
 }
 
 export interface TaskDetail {
@@ -168,6 +170,17 @@ export interface ContactDetail {
   phone: string | null;
 }
 
+export interface CaseRelatedContact {
+  id: number;
+  displayName: string | null;
+  roleId: number | null;
+  roleName: string | null;
+  side: string | null;
+  primary: boolean;
+  email: string | null;
+  phone: string | null;
+}
+
 export interface CaseDetail {
   caseId: number;
   caseNumber: string | null;
@@ -181,6 +194,7 @@ export interface CaseDetail {
   statuteOfLimitations: string | null;
   tortNoticeDeadline: string | null;
   summary: string;
+  relatedContacts: CaseRelatedContact[];
 }
 
 export class ApiError extends Error {
@@ -314,6 +328,22 @@ export async function listAssignedTasks(accessToken: string): Promise<CaseTaskLi
 
   if (!response.ok) {
     throw new ApiError('Shale could not load your tasks.', response.status);
+  }
+
+  return response.json() as Promise<CaseTaskListItem[]>;
+}
+
+export async function listCaseTasks(accessToken: string, caseId: number): Promise<CaseTaskListItem[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/tasks`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load the case tasks.', response.status);
   }
 
   return response.json() as Promise<CaseTaskListItem[]>;
