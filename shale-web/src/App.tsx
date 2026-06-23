@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseSearchResult, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseSearchResult, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1087,12 +1087,16 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
   const { caseId } = useParams();
   const numericCaseId = Number(caseId);
   const [caseDetail, setCaseDetail] = useState<CaseDetail | null>(null);
+  const [caseTasks, setCaseTasks] = useState<CaseTaskListItem[]>([]);
+  const [tasksError, setTasksError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!Number.isInteger(numericCaseId) || numericCaseId <= 0) {
       setCaseDetail(null);
+      setCaseTasks([]);
+      setTasksError(null);
       setError('That case link is not valid.');
       setIsLoading(false);
       return;
@@ -1100,6 +1104,8 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
 
     if (!accessToken) {
       setCaseDetail(null);
+      setCaseTasks([]);
+      setTasksError(null);
       setError('Your Shale session is not available. Please sign in again.');
       setIsLoading(false);
       return;
@@ -1108,17 +1114,31 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
     let isCurrent = true;
     setIsLoading(true);
     setError(null);
+    setTasksError(null);
 
-    getCaseDetail(accessToken, numericCaseId)
-      .then((detail) => {
-        if (isCurrent) {
-          setCaseDetail(detail);
+    Promise.allSettled([
+      getCaseDetail(accessToken, numericCaseId),
+      listCaseTasks(accessToken, numericCaseId),
+    ])
+      .then(([caseResult, tasksResult]) => {
+        if (!isCurrent) {
+          return;
         }
-      })
-      .catch((caught) => {
-        if (isCurrent) {
+
+        if (caseResult.status === 'fulfilled') {
+          setCaseDetail(caseResult.value);
+        } else {
           setCaseDetail(null);
-          setError(caught instanceof Error ? caught.message : 'Case detail could not be loaded.');
+          setCaseTasks([]);
+          setError(caseResult.reason instanceof Error ? caseResult.reason.message : 'Case detail could not be loaded.');
+          return;
+        }
+
+        if (tasksResult.status === 'fulfilled') {
+          setCaseTasks(tasksResult.value);
+        } else {
+          setCaseTasks([]);
+          setTasksError(tasksResult.reason instanceof Error ? tasksResult.reason.message : 'Case tasks could not be loaded.');
         }
       })
       .finally(() => {
@@ -1151,12 +1171,12 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
 
       {isLoading && <p className="status">Loading case detail…</p>}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} />}
+      {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} tasks={caseTasks} tasksError={tasksError} />}
     </section>
   );
 }
 
-function CaseDetailReadOnly({ detail }: { detail: CaseDetail }) {
+function CaseDetailReadOnly({ detail, tasks, tasksError }: { detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null }) {
   return (
     <div className="detail-sections">
       <section aria-labelledby="case-info-title">
@@ -1188,8 +1208,39 @@ function CaseDetailReadOnly({ detail }: { detail: CaseDetail }) {
         </dl>
       </section>
 
+      <CaseTasksSection tasks={tasks} error={tasksError} />
+
       <RelatedContactsSection contacts={detail.relatedContacts ?? []} />
     </div>
+  );
+}
+
+function CaseTasksSection({ tasks, error }: { tasks: CaseTaskListItem[]; error: string | null }) {
+  const navigate = useNavigate();
+
+  return (
+    <section aria-labelledby="case-tasks-title">
+      <h2 id="case-tasks-title">Case Tasks</h2>
+      {error && <p className="status error" role="alert">{error}</p>}
+      {!error && tasks.length === 0 && <p className="status">No tasks are linked to this case yet.</p>}
+      {!error && tasks.length > 0 && (
+        <div className="table-wrap">
+          <table className="results-table case-tasks-table">
+            <thead><tr><th>Task</th><th>Status</th><th>Priority</th><th>Due date</th><th>Assigned user</th><th>Completed date</th></tr></thead>
+            <tbody>{tasks.map((task) => (
+              <tr key={task.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/tasks/${task.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/tasks/${task.id}`); } }}>
+                <td>{task.title || `Task ${task.id}`}</td>
+                <td>{task.completedAt ? 'Completed' : 'Open'}</td>
+                <td>{task.priorityId ? `Priority ${task.priorityId}` : '—'}</td>
+                <td>{formatDate(task.dueAt)}</td>
+                <td>{task.assignedUserDisplayName || '—'}</td>
+                <td>{formatDate(task.completedAt)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
