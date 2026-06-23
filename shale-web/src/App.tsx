@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
@@ -10,13 +11,55 @@ interface AuthState {
 }
 
 const navigationItems = [
-  { path: '/my-shale', label: 'My Shale' },
-  { path: '/cases', label: 'Cases' },
-  { path: '/contacts', label: 'Contacts' },
-  { path: '/organizations', label: 'Organizations' },
-  { path: '/team', label: 'Team' },
-  { path: '/settings', label: 'Settings' },
+  { path: '/my-shale', label: 'My Shale', activePrefixes: ['/my-shale', '/tasks'] },
+  { path: '/cases', label: 'Cases', activePrefixes: ['/cases'] },
+  { path: '/contacts', label: 'Contacts', activePrefixes: ['/contacts'] },
+  { path: '/organizations', label: 'Organizations', activePrefixes: ['/organizations'] },
+  { path: '/team', label: 'Team', activePrefixes: ['/team'] },
+  { path: '/settings', label: 'Settings', activePrefixes: ['/settings'] },
 ];
+
+const MISSING_VALUE = '—';
+
+
+function isMissing(value: string | number | null | undefined): boolean {
+  return value === null || value === undefined || String(value).trim() === '';
+}
+
+function displayValue(value: string | number | null | undefined, fallback = MISSING_VALUE): string {
+  return isMissing(value) ? fallback : String(value);
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (isMissing(value)) {
+    return MISSING_VALUE;
+  }
+
+  const text = String(value);
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  const date = dateOnlyMatch
+    ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+    : new Date(text);
+
+  if (Number.isNaN(date.getTime())) {
+    return text;
+  }
+
+  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
+}
+
+function PageHeader({ eyebrow, title, titleId, lede, action }: { eyebrow: string; title: string; titleId?: string; lede?: string; action?: ReactNode }) {
+  return (
+    <div className="page-heading-row">
+      <div>
+        <p className="eyebrow">{eyebrow}</p>
+        <h1 id={titleId}>{title}</h1>
+        {lede && <p className="lede">{lede}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
 
 function displayNameFor(user: AuthenticatedUser): string {
   return user.displayName || [user.nameFirst, user.nameLast].filter(Boolean).join(' ') || user.email || `User ${user.userId}`;
@@ -148,6 +191,7 @@ function SettingsPage({ accessToken, user }: { accessToken: string | null; user:
           <p className="eyebrow">Settings</p>
           <h1>Settings</h1>
           <p className="lede">Read-only account and tenant settings for the signed-in Shale session.</p>
+          <span className="inline-beta-badge">Read-only beta</span>
         </div>
       </div>
 
@@ -336,6 +380,8 @@ function redirectPathFrom(state: unknown): string {
 }
 
 function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
+  const location = useLocation();
+
   if (!user) {
     return null;
   }
@@ -347,11 +393,12 @@ function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null
           <span className="brand-mark" aria-hidden="true">S</span>
           <span>Shale</span>
         </div>
+        <span className="beta-badge">Read-only beta</span>
         <nav className="nav-list">
           {navigationItems.map((item) => (
-            <NavLink key={item.path} to={item.path} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            <Link key={item.path} to={item.path} className={item.activePrefixes.some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`)) ? 'nav-link active' : 'nav-link'}>
               {item.label}
-            </NavLink>
+            </Link>
           ))}
         </nav>
       </aside>
@@ -361,6 +408,7 @@ function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null
           <div>
             <p className="eyebrow">Signed in</p>
             <p className="user-name">{displayNameFor(user)}</p>
+            <p className="user-meta">{displayValue(user.email, 'Email not provided')}</p>
           </div>
           <button type="button" onClick={onLogout}>Logout</button>
         </header>
@@ -377,9 +425,7 @@ function MyShalePage({ accessToken, user }: { accessToken: string | null; user: 
   return (
     <section className="dashboard-page" aria-labelledby="my-shale-title">
       <div className="dashboard-header">
-        <p className="eyebrow">Dashboard</p>
-        <h1 id="my-shale-title">My Shale</h1>
-        <p className="lede">Welcome{user ? `, ${displayNameFor(user)}` : ''}. Here is your read-only Shale summary.</p>
+        <PageHeader eyebrow="Dashboard" title="My Shale" titleId="my-shale-title" lede={`Welcome${user ? `, ${displayNameFor(user)}` : ''}. Here is your read-only Shale summary.`} />
       </div>
       <MyCasesSection accessToken={accessToken} />
       <MyTasksSection accessToken={accessToken} />
@@ -427,7 +473,7 @@ function MyCasesTable({ cases }: { cases: CaseSearchResult[] }) {
         <thead><tr><th>Case name</th><th>Status</th><th>Responsible attorney</th><th>Statute of limitations</th></tr></thead>
         <tbody>{cases.map((item) => (
           <tr key={item.caseId} className="clickable-row" tabIndex={0} onClick={() => navigate(`/cases/${item.caseId}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/cases/${item.caseId}`); } }}>
-            <td>{item.caseName || `Case ${item.caseId}`}</td><td>{item.caseStatus || '—'}</td><td>{item.responsibleAttorney || '—'}</td><td>{item.solDate ?? '—'}</td>
+            <td>{item.caseName || `Case ${item.caseId}`}</td><td>{item.caseStatus || '—'}</td><td>{item.responsibleAttorney || '—'}</td><td>{formatDate(item.solDate)}</td>
           </tr>
         ))}</tbody>
       </table>
@@ -475,7 +521,7 @@ function MyTasksTable({ tasks }: { tasks: CaseTaskListItem[] }) {
         <thead><tr><th>Task</th><th>Case</th><th>Due date</th><th>Priority</th><th>Status</th></tr></thead>
         <tbody>{tasks.map((task) => (
           <tr key={task.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/tasks/${task.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/tasks/${task.id}`); } }}>
-            <td>{task.title || `Task ${task.id}`}</td><td>{task.caseName || '—'}</td><td>{task.dueAt ?? '—'}</td><td>{task.priorityId ? `Priority ${task.priorityId}` : '—'}</td><td>{task.completedAt ? 'Completed' : 'Open'}</td>
+            <td>{task.title || `Task ${task.id}`}</td><td>{task.caseName || '—'}</td><td>{formatDate(task.dueAt)}</td><td>{task.priorityId ? `Priority ${task.priorityId}` : '—'}</td><td>{task.completedAt ? 'Completed' : 'Open'}</td>
           </tr>
         ))}</tbody>
       </table>
@@ -525,7 +571,7 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="cases-page" aria-labelledby="cases-title">
-      <h1 id="cases-title">Cases</h1>
+      <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search and open read-only case records." />
       <form className="search-form" onSubmit={handleSearch}>
         <label htmlFor="case-search">Search cases</label>
         <div className="search-row">
@@ -583,13 +629,13 @@ function CaseResultsTable({ results }: { results: CaseSearchResult[] }) {
               }}
             >
               <td>{result.caseId}</td>
-              <td>{result.caseNumber}</td>
-              <td>{result.caseName}</td>
-              <td>{result.caseStatus}</td>
-              <td>{result.responsibleAttorney}</td>
-              <td>{result.practiceArea}</td>
-              <td>{result.intakeDate ?? '—'}</td>
-              <td>{result.client}</td>
+              <td>{displayValue(result.caseNumber)}</td>
+              <td>{displayValue(result.caseName, `Case ${result.caseId}`)}</td>
+              <td>{displayValue(result.caseStatus)}</td>
+              <td>{displayValue(result.responsibleAttorney)}</td>
+              <td>{displayValue(result.practiceArea)}</td>
+              <td>{formatDate(result.intakeDate)}</td>
+              <td>{displayValue(result.client)}</td>
             </tr>
           ))}
         </tbody>
@@ -640,7 +686,7 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="contacts-page" aria-labelledby="contacts-title">
-      <h1 id="contacts-title">Contacts</h1>
+      <PageHeader eyebrow="Search" title="Contacts" titleId="contacts-title" lede="Search and open read-only contact records." />
       <form className="search-form" onSubmit={handleSearch}>
         <label htmlFor="contact-search">Search contacts</label>
         <div className="search-row">
@@ -748,7 +794,7 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="organizations-page" aria-labelledby="organizations-title">
-      <h1 id="organizations-title">Organizations</h1>
+      <PageHeader eyebrow="Search" title="Organizations" titleId="organizations-title" lede="Search and open read-only organization records." />
       <form className="search-form" onSubmit={handleSearch}>
         <label htmlFor="organization-search">Search organizations</label>
         <div className="search-row">
@@ -827,12 +873,7 @@ function TeamPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="team-page" aria-labelledby="team-title">
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">Directory</p>
-          <h1 id="team-title">Team</h1>
-        </div>
-      </div>
+      <PageHeader eyebrow="Directory" title="Team" titleId="team-title" lede="Browse your read-only team directory." />
 
       <div className="results-area" aria-live="polite">
         {isLoading && <p className="status">Loading team members…</p>}
@@ -1023,8 +1064,8 @@ function TaskDetailReadOnly({ detail }: { detail: TaskDetail }) {
           <DetailItem label="Priority" value={detail.priorityId ? `Priority ${detail.priorityId}` : null} />
           <DetailItem label="Assigned To" value={detail.assignedUserDisplayName} />
           <DetailItem label="Created By" value={detail.createdByDisplayName} />
-          <DetailItem label="Due Date" value={detail.dueAt} />
-          <DetailItem label="Completed Date" value={detail.completedAt} />
+          <DetailItem label="Due Date" value={formatDate(detail.dueAt)} />
+          <DetailItem label="Completed Date" value={formatDate(detail.completedAt)} />
           <DetailItem label="Description" value={detail.description} preserveWhitespace />
         </dl>
       </section>
@@ -1133,10 +1174,10 @@ function CaseDetailReadOnly({ detail }: { detail: CaseDetail }) {
       <section aria-labelledby="important-dates-title">
         <h2 id="important-dates-title">Important Dates</h2>
         <dl className="detail-list compact">
-          <DetailItem label="Intake Date" value={detail.callerDate} />
-          <DetailItem label="Date of Injury" value={detail.dateOfInjury} />
-          <DetailItem label="Statute of Limitations" value={detail.statuteOfLimitations} />
-          <DetailItem label="Tort Notice Deadline" value={detail.tortNoticeDeadline} />
+          <DetailItem label="Intake Date" value={formatDate(detail.callerDate)} />
+          <DetailItem label="Date of Injury" value={formatDate(detail.dateOfInjury)} />
+          <DetailItem label="Statute of Limitations" value={formatDate(detail.statuteOfLimitations)} />
+          <DetailItem label="Tort Notice Deadline" value={formatDate(detail.tortNoticeDeadline)} />
         </dl>
       </section>
 
@@ -1316,7 +1357,7 @@ function RelatedOrganizationCasesTable({ cases }: { cases: OrganizationDetail['r
   return (
     <div className="table-wrap"><table className="results-table"><thead><tr><th>Case name</th><th>Role</th><th>Side</th><th>Responsible attorney</th><th>Intake date</th><th>Statute of limitations</th></tr></thead><tbody>{cases.map((item) => (
       <tr key={item.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/cases/${item.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/cases/${item.id}`); } }}>
-        <td>{item.name || `Case ${item.id}`}</td><td>{item.partyRoleName || '—'}</td><td>{item.side || '—'}</td><td>{item.responsibleAttorneyName || '—'}</td><td>{item.intakeDate ?? '—'}</td><td>{item.statuteOfLimitationsDate ?? '—'}</td>
+        <td>{item.name || `Case ${item.id}`}</td><td>{item.partyRoleName || '—'}</td><td>{item.side || '—'}</td><td>{item.responsibleAttorneyName || '—'}</td><td>{formatDate(item.intakeDate)}</td><td>{formatDate(item.statuteOfLimitationsDate)}</td>
       </tr>
     ))}</tbody></table></div>
   );
@@ -1324,11 +1365,11 @@ function RelatedOrganizationCasesTable({ cases }: { cases: OrganizationDetail['r
 
 
 function DetailItem({ label, value, preserveWhitespace = false }: { label: string; value: string | number | null | undefined; preserveWhitespace?: boolean }) {
-  const displayValue = value === null || value === undefined || value === '' ? '—' : String(value);
+  const renderedValue = displayValue(value);
   return (
     <div>
       <dt>{label}</dt>
-      <dd className={preserveWhitespace ? 'preserve-whitespace' : undefined}>{displayValue}</dd>
+      <dd className={preserveWhitespace ? 'preserve-whitespace' : undefined}>{renderedValue}</dd>
     </div>
   );
 }
