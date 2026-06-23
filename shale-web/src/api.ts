@@ -174,6 +174,7 @@ export interface CaseDetail {
   caseName: string;
   description: string;
   caseStatus: string;
+  responsibleAttorney: string | null;
   practiceAreaId: number | null;
   callerDate: string | null;
   dateOfInjury: string | null;

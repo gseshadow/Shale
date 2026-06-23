@@ -1184,7 +1184,7 @@ function CaseDetailReadOnly({ detail }: { detail: CaseDetail }) {
       <section aria-labelledby="assignments-title">
         <h2 id="assignments-title">Assignments</h2>
         <dl className="detail-list compact">
-          <DetailItem label="Responsible Attorney" value="Not currently returned by the case-detail endpoint." />
+          <DetailItem label="Responsible Attorney" value={detail.responsibleAttorney} />
         </dl>
       </section>
     </div>

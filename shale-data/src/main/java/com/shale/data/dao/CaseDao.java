@@ -2301,7 +2301,12 @@ public final class CaseDao {
 				  c.ReceivedUpdates,
 				  c.UpdatedAt,
 				  c.RowVer,
-				  current_status.CurrentStatusName
+				  current_status.CurrentStatusName,
+				  LTRIM(RTRIM(
+				    COALESCE(ra_user.name_first, '') +
+				    CASE WHEN COALESCE(ra_user.name_first, '') = '' OR COALESCE(ra_user.name_last, '') = '' THEN '' ELSE ' ' END +
+				    COALESCE(ra_user.name_last, '')
+				  )) AS ResponsibleAttorneyName
 				FROM %s c
 				OUTER APPLY (
 				    SELECT TOP (1) s.Name AS CurrentStatusName
@@ -2314,12 +2319,27 @@ public final class CaseDao {
 				      cs.CreatedAt DESC,
 				      cs.Id DESC
 				) current_status
+				OUTER APPLY (
+				    SELECT TOP (1) cu.UserId
+				    FROM %s cu
+				    WHERE cu.CaseId = c.Id
+				      AND cu.RoleId = ?
+				    ORDER BY
+				      cu.IsPrimary DESC,
+				      cu.UpdatedAt DESC,
+				      cu.Id DESC
+				) responsible_attorney
+				LEFT JOIN %s ra_user
+				  ON ra_user.id = responsible_attorney.UserId
+				 AND ra_user.ShaleClientId = c.ShaleClientId
+				 AND COALESCE(ra_user.is_deleted, 0) = 0
 				WHERE c.Id = ?
 				  AND %s;
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"));
+				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"));
 
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setLong(1, caseId);
+			ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setLong(2, caseId);
 			try (ResultSet rs = ps.executeQuery()) {
 				if (!rs.next()) {
 					return null;
@@ -2336,6 +2356,7 @@ public final class CaseDao {
 				rs.getString("Name"),
 				rs.getString("Description"),
 				rs.getString("CurrentStatusName"),
+				rs.getString("ResponsibleAttorneyName"),
 				getNullableInt(rs, "PracticeAreaId"),
 				toLocalDate(rs.getDate("CallerDate")),
 				rs.getString("CallerTime"),
