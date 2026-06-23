@@ -13,6 +13,7 @@ public record CaseStatusHistoryDto(
 		String lifecycleKey,
 		String systemKey,
 		boolean closed,
+		String notes,
 		LocalDateTime effectiveDate,
 		LocalDateTime endDate,
 		LocalDateTime createdAt,

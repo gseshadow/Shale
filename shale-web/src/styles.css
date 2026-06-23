@@ -538,3 +538,69 @@ input {
 .case-update-note {
   margin: 0;
 }
+
+.status-timeline-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.status-timeline-card {
+  --status-accent: #2f80b7;
+  align-items: start;
+  border: 1px solid #dbe4ed;
+  border-left: 5px solid var(--status-accent);
+  border-radius: 14px;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: auto 1fr;
+  padding: 1rem;
+}
+
+.status-timeline-marker {
+  background: var(--status-accent);
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-accent) 16%, transparent);
+  height: 0.8rem;
+  margin-top: 0.35rem;
+  width: 0.8rem;
+}
+
+.status-timeline-body {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.status-timeline-heading,
+.status-timeline-dates {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.status-timeline-name {
+  color: #1d4f73;
+  font-weight: 800;
+}
+
+.status-current-pill {
+  background: #eaf5fb;
+  border: 1px solid #bdd4e4;
+  border-radius: 999px;
+  color: #1d4f73;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.status-timeline-dates {
+  color: #526071;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.status-timeline-notes {
+  color: #2d3748;
+  margin: 0;
+}

@@ -180,6 +180,23 @@ export interface CaseUpdate {
   createdByDisplayName: string;
 }
 
+export interface CaseStatusHistoryItem {
+  caseStatusId: number;
+  statusId: number;
+  statusName: string;
+  color: string | null;
+  lifecycleKey: string | null;
+  systemKey: string | null;
+  closed: boolean;
+  notes: string | null;
+  effectiveDate: string | null;
+  endDate: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  primary: boolean;
+  current: boolean;
+}
+
 export interface CaseRelatedContact {
   id: number;
   displayName: string | null;
@@ -205,6 +222,7 @@ export interface CaseDetail {
   tortNoticeDeadline: string | null;
   summary: string;
   relatedContacts: CaseRelatedContact[];
+  statusHistory: CaseStatusHistoryItem[];
 }
 
 export class ApiError extends Error {
