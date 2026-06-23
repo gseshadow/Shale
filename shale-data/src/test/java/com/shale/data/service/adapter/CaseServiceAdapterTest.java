@@ -142,7 +142,7 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
-		public List<CaseUpdateDto> listCaseUpdates(long caseId) {
+		public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
 			lastCaseUpdatesCaseId = caseId;
 			return caseUpdates;
 		}

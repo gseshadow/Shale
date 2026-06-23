@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
@@ -269,6 +270,28 @@ class ApiReadControllerTest {
     }
 
     @Test
+    void caseUpdatesReachServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/cases/501/updates")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(901))
+                .andExpect(jsonPath("$[0].caseId").value(501))
+                .andExpect(jsonPath("$[0].noteText").value("Called client."))
+                .andExpect(jsonPath("$[0].createdByDisplayName").value("Ada Attorney"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.updatesCaseId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.updatesShaleClientId);
+    }
+
+    @Test
     void contactSearchReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
         MockMvc devMockMvc = developmentMockMvc(
@@ -463,6 +486,8 @@ class ApiReadControllerTest {
         private int assignedUserId;
         private int assignedShaleClientId;
         private int assignedLimit;
+        private long updatesCaseId;
+        private int updatesShaleClientId;
 
         @Override
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
@@ -496,8 +521,12 @@ class ApiReadControllerTest {
         }
 
         @Override
-        public List<com.shale.core.dto.CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
-            throw new AssertionError("listCaseUpdates should not be called");
+        public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
+            this.updatesCaseId = caseId;
+            this.updatesShaleClientId = shaleClientId;
+            return List.of(new CaseUpdateDto(901L, caseId, "Called client.",
+                    LocalDateTime.of(2026, 6, 12, 15, 30),
+                    null, 31, "Ada Attorney"));
         }
 
         @Override
@@ -765,6 +794,13 @@ class ApiReadControllerTest {
         mockMvc.perform(get("/api/cases/123/tasks"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/cases/123/tasks"));
+    }
+
+    @Test
+    void caseUpdatesRouteFailsClosedUntilServerSessionContextExists() throws Exception {
+        mockMvc.perform(get("/api/cases/123/updates"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.path").value("/api/cases/123/updates"));
     }
 
     @Test

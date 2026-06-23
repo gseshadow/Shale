@@ -13,6 +13,7 @@ import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
@@ -121,6 +122,14 @@ public final class ApiReadController {
         long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         return taskServicePort.listCaseTasks(safeCaseId, shaleClientId);
+    }
+
+    @Operation(summary = "List case updates", description = "Returns notes/updates for one tenant-scoped case.")
+    @GetMapping("/api/cases/{caseId:\\d+}/updates")
+    public List<CaseUpdateDto> listCaseUpdates(@PathVariable("caseId") long caseId) {
+        long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return caseServicePort.listCaseUpdates(safeCaseId, shaleClientId);
     }
 
     @Operation(summary = "Get task detail", description = "Returns one tenant-scoped task detail record.")
