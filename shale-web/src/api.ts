@@ -168,6 +168,17 @@ export interface ContactDetail {
   phone: string | null;
 }
 
+export interface CaseRelatedContact {
+  id: number;
+  displayName: string | null;
+  roleId: number | null;
+  roleName: string | null;
+  side: string | null;
+  primary: boolean;
+  email: string | null;
+  phone: string | null;
+}
+
 export interface CaseDetail {
   caseId: number;
   caseNumber: string | null;
@@ -181,6 +192,7 @@ export interface CaseDetail {
   statuteOfLimitations: string | null;
   tortNoticeDeadline: string | null;
   summary: string;
+  relatedContacts: CaseRelatedContact[];
 }
 
 export class ApiError extends Error {

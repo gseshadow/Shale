@@ -228,6 +228,7 @@ public final class CaseDao {
 			String displayName,
 			Integer roleId,
 			String roleName,
+			String side,
 			boolean primary,
 			String email,
 			String phone
@@ -2344,12 +2345,12 @@ public final class CaseDao {
 				if (!rs.next()) {
 					return null;
 				}
-				return mapCaseDetail(rs);
+				return mapCaseDetail(rs, listRelatedContacts(con, caseId, requireCurrentShaleClientId(con)));
 			}
 		}
 	}
 
-	private static com.shale.core.dto.CaseDetailDto mapCaseDetail(ResultSet rs) throws SQLException {
+	private static com.shale.core.dto.CaseDetailDto mapCaseDetail(ResultSet rs, List<com.shale.core.dto.CaseDetailDto.RelatedContactDto> relatedContacts) throws SQLException {
 		return new com.shale.core.dto.CaseDetailDto(
 				rs.getLong("Id"),
 				rs.getString("CaseNumber"),
@@ -2386,7 +2387,8 @@ public final class CaseDao {
 				rs.getString("Summary"),
 				rs.getString("ReceivedUpdates"),
 				toLocalDateTime(rs.getTimestamp("UpdatedAt")),
-				rs.getBytes("RowVer")
+				rs.getBytes("RowVer"),
+				relatedContacts
 		);
 	}
 
@@ -3249,6 +3251,90 @@ public final class CaseDao {
 		}
 	}
 
+	private List<com.shale.core.dto.CaseDetailDto.RelatedContactDto> listRelatedContacts(Connection con, long caseId, int shaleClientId) throws SQLException {
+		boolean hasIsDeleted = contactsHasIsDeletedColumn(con);
+		String sql = relatedContactsSql(hasIsDeleted);
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, shaleClientId);
+
+			List<com.shale.core.dto.CaseDetailDto.RelatedContactDto> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new com.shale.core.dto.CaseDetailDto.RelatedContactDto(
+							rs.getInt("Id"),
+							rs.getString("DisplayName"),
+							(Integer) rs.getObject("RoleId"),
+							rs.getString("RoleName"),
+							rs.getString("Side"),
+							rs.getBoolean("IsPrimary"),
+							rs.getString("Email"),
+							rs.getString("Phone")));
+				}
+			}
+			return out;
+		}
+	}
+
+	private static String relatedContactsSql(boolean includeContactSoftDeleteFilter) {
+		String baseSql = """
+				SELECT
+				  ct.Id,
+				  LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )) AS DisplayName,
+				  cc.Role AS RoleId,
+				  NULLIF(LTRIM(RTRIM(COALESCE(r.Name, ''))), '') AS RoleName,
+				  NULLIF(LTRIM(RTRIM(COALESCE(cc.Side, ''))), '') AS Side,
+				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
+				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				FROM dbo.CaseContacts cc
+				INNER JOIN dbo.Cases c
+				  ON c.Id = cc.CaseId
+				INNER JOIN dbo.Contacts ct
+				  ON ct.Id = cc.ContactId
+				LEFT JOIN dbo.Roles r
+				  ON r.Id = cc.Role
+				 AND r.ShaleClientId = c.ShaleClientId
+				WHERE cc.CaseId = ?
+				  AND c.ShaleClientId = ?
+				  AND ct.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND NULLIF(LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )), '') IS NOT NULL
+				""";
+
+		String orderSql = """
+				ORDER BY DisplayName ASC, cc.Role ASC, ct.Id ASC;
+				""";
+
+		return includeContactSoftDeleteFilter
+				? baseSql + "\n  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)\n" + orderSql
+				: baseSql + "\n" + orderSql;
+	}
+
 	public List<RelatedContactRow> findRelatedContacts(long caseId) {
 		if (caseId <= 0) {
 			throw new IllegalArgumentException("caseId must be > 0");
@@ -3271,6 +3357,7 @@ public final class CaseDao {
 				  )) AS DisplayName,
 				  cc.Role AS RoleId,
 				  NULLIF(LTRIM(RTRIM(COALESCE(r.Name, ''))), '') AS RoleName,
+				  NULLIF(LTRIM(RTRIM(COALESCE(cc.Side, ''))), '') AS Side,
 				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
 				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
 				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
@@ -3326,6 +3413,7 @@ public final class CaseDao {
 								rs.getString("DisplayName"),
 								(Integer) rs.getObject("RoleId"),
 								rs.getString("RoleName"),
+								rs.getString("Side"),
 								rs.getBoolean("IsPrimary"),
 								rs.getString("Email"),
 								rs.getString("Phone")));

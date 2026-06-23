@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseSearchResult, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseSearchResult, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1187,8 +1187,39 @@ function CaseDetailReadOnly({ detail }: { detail: CaseDetail }) {
           <DetailItem label="Responsible Attorney" value={detail.responsibleAttorney} />
         </dl>
       </section>
+
+      <RelatedContactsSection contacts={detail.relatedContacts ?? []} />
     </div>
   );
+}
+
+function RelatedContactsSection({ contacts }: { contacts: CaseRelatedContact[] }) {
+  return (
+    <section aria-labelledby="related-contacts-title">
+      <h2 id="related-contacts-title">Related Contacts</h2>
+      {contacts.length === 0 ? (
+        <p className="status">No related contacts are linked to this case yet.</p>
+      ) : (
+        <div className="related-contact-grid">
+          {contacts.map((contact) => (
+            <Link className="related-contact-card" key={contact.id} to={`/contacts/${contact.id}`}>
+              <span className="related-contact-name">{contact.displayName || 'Unnamed contact'}</span>
+              <span className="related-contact-meta">
+                {formatRelatedContactMeta(contact)}
+              </span>
+              <span className="related-contact-detail">Email: {contact.email || '—'}</span>
+              <span className="related-contact-detail">Phone: {contact.phone || '—'}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function formatRelatedContactMeta(contact: CaseRelatedContact): string {
+  const parts = [contact.roleName, contact.side, contact.primary ? 'Primary' : null].filter(Boolean);
+  return parts.length > 0 ? parts.join(' • ') : 'Related contact';
 }
 
 function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
