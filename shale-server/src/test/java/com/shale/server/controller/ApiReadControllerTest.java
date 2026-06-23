@@ -239,7 +239,8 @@ class ApiReadControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.caseId").value(501))
                 .andExpect(jsonPath("$.caseName").value("Smith v. Example"))
-                .andExpect(jsonPath("$.caseNumber").value("CASE-501"));
+                .andExpect(jsonPath("$.caseNumber").value("CASE-501"))
+                .andExpect(jsonPath("$.responsibleAttorney").value("Ada Attorney"));
 
         org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.detailCaseId);
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.detailShaleClientId);
@@ -467,7 +468,7 @@ class ApiReadControllerTest {
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
             this.detailCaseId = caseId;
             this.detailShaleClientId = shaleClientId;
-            return Optional.of(new CaseDetailDto(caseId, "CASE-501", "Smith v. Example", "Detail", "Open", 10,
+            return Optional.of(new CaseDetailDto(caseId, "CASE-501", "Smith v. Example", "Detail", "Open", "Ada Attorney", 10,
                     null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null, LocalDateTime.of(2026, 1, 1, 0, 0), new byte[] {1}));

@@ -415,3 +415,67 @@ input {
 .settings-table {
   min-width: 720px;
 }
+
+.beta-badge,
+.inline-beta-badge {
+  align-self: flex-start;
+  background: rgba(213, 235, 247, 0.14);
+  border: 1px solid rgba(213, 235, 247, 0.32);
+  border-radius: 999px;
+  color: #d5ebf7;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.65rem;
+  text-transform: uppercase;
+}
+
+.inline-beta-badge {
+  background: #eaf5fb;
+  border-color: #bdd4e4;
+  color: #1d4f73;
+  display: inline-flex;
+  margin-top: 0.25rem;
+}
+
+.user-meta {
+  color: #526071;
+  font-size: 0.85rem;
+  margin: 0.2rem 0 0;
+}
+
+.cases-page,
+.contacts-page,
+.organizations-page,
+.team-page,
+.team-member-detail-page {
+  background: white;
+  border: 1px solid #dbe4ed;
+  border-radius: 18px;
+  display: grid;
+  gap: 1.5rem;
+  padding: 2rem;
+}
+
+.detail-sections > section {
+  background: #fbfdff;
+  border: 1px solid #dbe4ed;
+  border-radius: 18px;
+  padding: 1.5rem;
+}
+
+.results-table td {
+  max-width: 280px;
+  overflow-wrap: anywhere;
+}
+
+.results-table tbody tr:nth-child(even) {
+  background: #fbfdff;
+}
+
+.search-form label {
+  color: #526071;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
