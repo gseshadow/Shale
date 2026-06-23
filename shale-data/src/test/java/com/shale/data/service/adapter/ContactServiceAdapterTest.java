@@ -2,6 +2,7 @@ package com.shale.data.service.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -38,10 +39,29 @@ class ContactServiceAdapterTest {
 		assertFalse(detail.isPresent());
 	}
 
+	@Test
+	void getContactDetailUsesDirectoryContactShapeForReadOnlyApiDto() {
+		FakeContactGateway gateway = new FakeContactGateway(List.of(
+				new ContactDao.DirectoryContactRow(1, "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555")));
+		ContactServiceAdapter adapter = new ContactServiceAdapter(gateway);
+
+		Optional<ContactDetail> detail = adapter.getContactDetail(1, 42);
+
+		assertTrue(detail.isPresent());
+		assertEquals(new ContactDetail(1, 42, "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555"),
+				detail.orElseThrow());
+		assertEquals(1, gateway.lastDetailContactId);
+		assertEquals(42, gateway.lastDetailShaleClientId);
+		assertFalse(gateway.fullDetailLookupCalled);
+	}
+
 	private static final class FakeContactGateway implements ContactServiceAdapter.ContactGateway {
 		private final List<ContactDao.DirectoryContactRow> rows;
 		private int lastSearchShaleClientId;
 		private String lastSearchQuery;
+		private int lastDetailContactId;
+		private int lastDetailShaleClientId;
+		private boolean fullDetailLookupCalled;
 
 		private FakeContactGateway(List<ContactDao.DirectoryContactRow> rows) {
 			this.rows = rows;
@@ -55,7 +75,18 @@ class ContactServiceAdapterTest {
 		}
 
 		@Override
+		public ContactDao.DirectoryContactRow findDirectoryContactById(int contactId, int shaleClientId) {
+			lastDetailContactId = contactId;
+			lastDetailShaleClientId = shaleClientId;
+			return rows.stream()
+					.filter(row -> row.id() == contactId)
+					.findFirst()
+					.orElse(null);
+		}
+
+		@Override
 		public ContactDao.ContactDetailRow findById(int contactId, int shaleClientId) {
+			fullDetailLookupCalled = true;
 			return null;
 		}
 

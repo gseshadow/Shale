@@ -8,18 +8,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+@ExtendWith(OutputCaptureExtension.class)
 class RequestScopedDbSessionProviderTest {
 
     @Test
@@ -32,7 +37,7 @@ class RequestScopedDbSessionProviderTest {
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class, provider::requireConnection);
 
-        assertEquals(501, error.getStatusCode().value());
+        assertEquals(401, error.getStatusCode().value());
         assertEquals(0, runtimeConnectionProvider.calls);
     }
 
@@ -53,6 +58,53 @@ class RequestScopedDbSessionProviderTest {
         assertEquals(1, runtimeConnectionProvider.calls);
         assertEquals(19, runtimeConnectionProvider.principal.userId());
         assertEquals(29, runtimeConnectionProvider.principal.shaleClientId());
+    }
+
+    @Test
+    void requestScopedProviderLogsSanitizedRootCauseWhenRuntimeConnectionFails(CapturedOutput output) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "19");
+        request.addHeader(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "29");
+        RequestScopedDbSessionProvider provider = new RequestScopedDbSessionProvider(
+                new DevelopmentHeaderServerSessionResolver(),
+                fixedRequest(request),
+                principal -> {
+                    SQLException root = new SQLException(
+                            "Login failed for jdbc:sqlserver://db.example.test:1433;database=shale;password=secret123");
+                    throw new SQLException("outer connection failure", root);
+                });
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class, provider::requireConnection);
+
+        assertEquals(503, error.getStatusCode().value());
+        assertEquals("Unable to open request-scoped runtime database connection.", error.getReason());
+        assertTrue(output.toString().contains("java.sql.SQLException"));
+        assertTrue(output.toString().contains("Login failed for jdbc:<redacted>"));
+        assertTrue(!output.toString().contains("secret123"));
+        assertTrue(!output.toString().contains("db.example.test"));
+    }
+
+    @Test
+    void runtimeSessionProviderLogsSanitizedRootCauseWhenInitializationFails(CapturedOutput output) throws Exception {
+        DataSource dataSource = (DataSource) Proxy.newProxyInstance(
+                DataSource.class.getClassLoader(),
+                new Class<?>[] {DataSource.class},
+                (proxy, method, args) -> {
+                    if ("getConnection".equals(method.getName())) {
+                        throw new SQLException("Could not connect using jdbc:sqlserver://runtime.example.test;pwd=topsecret");
+                    }
+                    return null;
+                });
+        RuntimeSessionServiceConnectionProvider provider = new RuntimeSessionServiceConnectionProvider(dataSource);
+
+        SQLException error = assertThrows(SQLException.class, () -> provider.openConnection(new ServerPrincipal(11, 13, null)));
+
+        assertTrue(error.getMessage().contains("jdbc:sqlserver://runtime.example.test"));
+        assertTrue(output.toString().contains("Runtime session service connection initialization failed"));
+        assertTrue(output.toString().contains("java.sql.SQLException"));
+        assertTrue(output.toString().contains("jdbc:<redacted>"));
+        assertTrue(!output.toString().contains("runtime.example.test"));
+        assertTrue(!output.toString().contains("topsecret"));
     }
 
     @Test

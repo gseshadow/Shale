@@ -50,8 +50,19 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit) {
+		int resolvedLimit = limit <= 0 ? 25 : limit;
+		return caseGateway.listAssignedCasesForBoard(assignedUserId).stream()
+				.limit(resolvedLimit)
+				.map(CaseDao.CaseRow::id)
+				.map(caseGateway::getOverview)
+				.filter(Objects::nonNull)
+				.toList();
+	}
+
+	@Override
 	public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
-		return caseGateway.listCaseUpdates(caseId);
+		return caseGateway.listCaseUpdates(caseId, shaleClientId);
 	}
 
 	@Override
@@ -60,8 +71,18 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive) {
+		return caseGateway.listTenantCaseStatuses(shaleClientId, includeInactive);
+	}
+
+	@Override
 	public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
 		return caseGateway.listPracticeAreas(shaleClientId, includeInactive);
+	}
+
+	@Override
+	public List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive) {
+		return caseGateway.listTenantPracticeAreas(shaleClientId, includeInactive);
 	}
 
 	@Override
@@ -132,13 +153,19 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		List<CaseDao.CaseRow> searchCasesByName(String query);
 
-		List<CaseUpdateDto> listCaseUpdates(long caseId);
+		List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId);
+
+		List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
 		void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId);
 
 		List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
 
+		List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive);
+
 		List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive);
+
+		List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive);
 
 		PracticeAreaDto createPracticeArea(int shaleClientId, String name, String color, boolean active, String systemKey);
 
@@ -178,8 +205,13 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		}
 
 		@Override
-		public List<CaseUpdateDto> listCaseUpdates(long caseId) {
-			return caseDao.listCaseUpdates(caseId);
+		public List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId) {
+			return caseDao.listAssignedCasesForBoard(assignedUserId);
+		}
+
+		@Override
+		public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
+			return caseDao.listCaseUpdates(caseId, shaleClientId);
 		}
 
 		@Override
@@ -193,8 +225,18 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		}
 
 		@Override
+		public List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive) {
+			return caseDao.listTenantCaseStatuses(shaleClientId, includeInactive);
+		}
+
+		@Override
 		public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
 			return caseDao.listPracticeAreas(shaleClientId, includeInactive);
+		}
+
+		@Override
+		public List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive) {
+			return caseDao.listTenantPracticeAreas(shaleClientId, includeInactive);
 		}
 
 		@Override

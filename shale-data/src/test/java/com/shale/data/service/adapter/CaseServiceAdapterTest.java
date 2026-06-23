@@ -137,7 +137,12 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
-		public List<CaseUpdateDto> listCaseUpdates(long caseId) {
+		public List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId) {
+			return List.of();
+		}
+
+		@Override
+		public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
 			lastCaseUpdatesCaseId = caseId;
 			return caseUpdates;
 		}
@@ -148,7 +153,17 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
+		public List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive) {
+			return List.of();
+		}
+
+		@Override
 		public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
+			return List.of();
+		}
+
+		@Override
+		public List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive) {
 			return List.of();
 		}
 

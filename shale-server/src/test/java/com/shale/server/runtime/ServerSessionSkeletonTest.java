@@ -48,8 +48,8 @@ class ServerSessionSkeletonTest {
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class, state::requireShaleClientId);
 
-        assertEquals(501, error.getStatusCode().value());
-        assertTrue(error.getReason().contains("TODO: server auth/session context is not wired yet"));
+        assertEquals(401, error.getStatusCode().value());
+        assertTrue(error.getReason().contains("Authentication is required"));
     }
 
     @Test

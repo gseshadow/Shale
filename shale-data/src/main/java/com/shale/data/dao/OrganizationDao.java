@@ -120,7 +120,6 @@ public final class OrganizationDao {
 				FROM %s o
 				LEFT JOIN %s ot
 				  ON ot.OrganizationTypeId = o.OrganizationTypeId
-				 AND ot.ShaleClientId = o.ShaleClientId
 				WHERE o.ShaleClientId = ?
 				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 				  AND (
@@ -186,7 +185,6 @@ public final class OrganizationDao {
 				FROM %s o
 				LEFT JOIN %s ot
 				  ON ot.OrganizationTypeId = o.OrganizationTypeId
-				 AND ot.ShaleClientId = o.ShaleClientId
 				WHERE o.ShaleClientId = ?
 				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 				  AND (? = '' OR o.Name LIKE ?)
@@ -272,7 +270,6 @@ public final class OrganizationDao {
 				FROM %s o
 				LEFT JOIN %s ot
 				  ON ot.OrganizationTypeId = o.OrganizationTypeId
-				 AND ot.ShaleClientId = o.ShaleClientId
 				WHERE o.ShaleClientId = ?
 				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
 				  AND (? = '' OR o.Name LIKE ?)
@@ -338,7 +335,6 @@ public final class OrganizationDao {
 				FROM %s o
 				LEFT JOIN %s ot
 				  ON ot.OrganizationTypeId = o.OrganizationTypeId
-				 AND ot.ShaleClientId = o.ShaleClientId
 				WHERE o.Id = ?
 				  AND o.ShaleClientId = ?
 				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL);
@@ -803,13 +799,11 @@ public final class OrganizationDao {
 		String sql = """
 				SELECT ot.OrganizationTypeId, ot.Name
 				FROM %s ot
-				WHERE ot.ShaleClientId = ?
 				ORDER BY ot.Name ASC, ot.OrganizationTypeId ASC;
 				""".formatted(ORGANIZATION_TYPES_TABLE);
 
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, requireCurrentShaleClientId(con));
 
 			List<OrganizationTypeRow> out = new ArrayList<>();
 			try (ResultSet rs = ps.executeQuery()) {

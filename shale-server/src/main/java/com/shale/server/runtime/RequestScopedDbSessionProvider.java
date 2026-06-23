@@ -3,6 +3,8 @@ package com.shale.server.runtime;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -20,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
  * it still fails closed before any database access.</p>
  */
 public final class RequestScopedDbSessionProvider implements DbSessionProvider {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RequestScopedDbSessionProvider.class);
     private final ServerSessionResolver sessionResolver;
     private final ObjectProvider<HttpServletRequest> currentRequest;
     private final RuntimeConnectionProvider runtimeConnectionProvider;
@@ -37,11 +40,12 @@ public final class RequestScopedDbSessionProvider implements DbSessionProvider {
     public Connection requireConnection() {
         ServerSessionContext context = sessionResolver.resolve(currentRequest.getIfAvailable());
         if (context == null || context.principal().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, ServerRuntimeSessionState.NOT_IMPLEMENTED_MESSAGE);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ServerRuntimeSessionState.AUTHENTICATION_REQUIRED_MESSAGE);
         }
         try {
             return runtimeConnectionProvider.openConnection(context.principal().orElseThrow());
         } catch (SQLException e) {
+            RuntimeConnectionFailureLog.log(LOGGER, "Request-scoped runtime database connection", e);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "Unable to open request-scoped runtime database connection.", e);
         }

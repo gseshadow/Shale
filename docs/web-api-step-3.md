@@ -116,6 +116,8 @@ In the default profile these endpoints remain blocked because no principal is re
 
 This is still not browser/mobile authentication: no JWTs, browser session cookies, Azure auth, durable sessions, or token validation have been implemented.
 
+For exact local Windows CMD commands to run and verify the temporary `dev` read API, see [Web/API Local Smoke Test for `shale-server`](web-api-local-smoke-test.md).
+
 ## Intended future flow
 
 1. Browser/mobile authenticates with a server endpoint.

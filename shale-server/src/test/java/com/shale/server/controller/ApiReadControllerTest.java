@@ -20,17 +20,25 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.NotificationServicePort;
+import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.NotificationServicePort.CalendarEventNotificationCommand;
 import com.shale.core.service.NotificationServicePort.NotificationSummary;
 import com.shale.core.service.NotificationServicePort.TaskActionNotificationCommand;
 import com.shale.core.service.NotificationServicePort.TaskDueDateNotificationCommand;
 import com.shale.core.service.NotificationServicePort.TaskNotificationCommand;
 import com.shale.core.service.TaskServicePort;
+import com.shale.core.service.UserServicePort;
+import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
+import com.shale.server.runtime.InMemoryTokenRevocationStore;
+import com.shale.server.runtime.ServerPrincipal;
 import com.shale.server.runtime.ServerRuntimeSessionState;
+import com.shale.server.runtime.ShaleAuthTokenService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -44,6 +52,8 @@ class ApiReadControllerTest {
                 unusedPort(TaskServicePort.class),
                 unusedPort(ContactServicePort.class),
                 unusedPort(NotificationServicePort.class),
+                unusedPort(OrganizationServicePort.class),
+                unusedPort(UserServicePort.class),
                 new ServerRuntimeSessionState());
 
         mockMvc = MockMvcBuilders
@@ -74,7 +84,30 @@ class ApiReadControllerTest {
                 taskServicePort,
                 contactServicePort,
                 notificationServicePort,
+                unusedPort(OrganizationServicePort.class),
+                unusedPort(UserServicePort.class),
                 new ServerRuntimeSessionState(new DevelopmentHeaderServerSessionResolver(), currentRequestProvider()));
+        return MockMvcBuilders
+                .standaloneSetup(apiReadController)
+                .setControllerAdvice(new ApiExceptionHandler())
+                .build();
+    }
+
+
+    private static MockMvc tokenMockMvc(
+            ShaleAuthTokenService tokenService,
+            CaseServicePort caseServicePort,
+            TaskServicePort taskServicePort,
+            ContactServicePort contactServicePort,
+            NotificationServicePort notificationServicePort) {
+        ApiReadController apiReadController = new ApiReadController(
+                caseServicePort,
+                taskServicePort,
+                contactServicePort,
+                notificationServicePort,
+                unusedPort(OrganizationServicePort.class),
+                unusedPort(UserServicePort.class),
+                new ServerRuntimeSessionState(new BearerTokenServerSessionResolver(tokenService, new InMemoryTokenRevocationStore()), currentRequestProvider()));
         return MockMvcBuilders
                 .standaloneSetup(apiReadController)
                 .setControllerAdvice(new ApiExceptionHandler())
@@ -105,6 +138,93 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(25, caseServicePort.searchLimit);
     }
 
+
+    @Test
+    void protectedCaseSearchAcceptsRealBearerTokenPrincipal() throws Exception {
+        ShaleAuthTokenService tokenService = new ShaleAuthTokenService(
+                "test-auth-token-secret-that-is-long-enough", 3600, java.time.Clock.systemUTC());
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc tokenMockMvc = tokenMockMvc(
+                tokenService,
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+        String token = tokenService.issue(new ServerPrincipal(31, 41, "ada@example.test"));
+
+        tokenMockMvc.perform(get("/api/cases/search")
+                .param("query", "smith")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].caseId").value(501));
+
+        org.junit.jupiter.api.Assertions.assertEquals("smith", caseServicePort.searchQuery);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.searchShaleClientId);
+    }
+
+    @Test
+    void assignedCasesRouteDoesNotFallThroughToCaseIdRoute() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/cases/assigned")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].caseId").value(501));
+
+        org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.assignedUserId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.assignedShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(25, caseServicePort.assignedLimit);
+        org.junit.jupiter.api.Assertions.assertEquals(0L, caseServicePort.detailCaseId);
+    }
+
+    @Test
+    void assignedTasksRouteReachesAssignedTaskService() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/tasks/assigned")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(701))
+                .andExpect(jsonPath("$[0].title").value("Review records"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.assignedUserId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.assignedShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(0L, taskServicePort.caseId);
+    }
+
+    @Test
+    void taskDetailReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/tasks/701")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(701))
+                .andExpect(jsonPath("$.title").value("Review records"))
+                .andExpect(jsonPath("$.caseId").value(501));
+
+        org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.detailTaskId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.detailShaleClientId);
+    }
+
     @Test
     void caseDetailReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
@@ -120,7 +240,8 @@ class ApiReadControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.caseId").value(501))
                 .andExpect(jsonPath("$.caseName").value("Smith v. Example"))
-                .andExpect(jsonPath("$.caseNumber").value("CASE-501"));
+                .andExpect(jsonPath("$.caseNumber").value("CASE-501"))
+                .andExpect(jsonPath("$.responsibleAttorney").value("Ada Attorney"));
 
         org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.detailCaseId);
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.detailShaleClientId);
@@ -149,6 +270,28 @@ class ApiReadControllerTest {
     }
 
     @Test
+    void caseUpdatesReachServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/cases/501/updates")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(901))
+                .andExpect(jsonPath("$[0].caseId").value(501))
+                .andExpect(jsonPath("$[0].noteText").value("Called client."))
+                .andExpect(jsonPath("$[0].createdByDisplayName").value("Ada Attorney"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.updatesCaseId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.updatesShaleClientId);
+    }
+
+    @Test
     void contactSearchReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
         MockMvc devMockMvc = developmentMockMvc(
@@ -172,6 +315,46 @@ class ApiReadControllerTest {
     }
 
     @Test
+    void contactDetailReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                unusedPort(TaskServicePort.class),
+                contactServicePort,
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/contacts/801")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(801))
+                .andExpect(jsonPath("$.shaleClientId").value(41))
+                .andExpect(jsonPath("$.displayName").value("Ada Lovelace"))
+                .andExpect(jsonPath("$.email").value("ada@example.test"))
+                .andExpect(jsonPath("$.phone").value("555-0100"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(801, contactServicePort.contactId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, contactServicePort.detailShaleClientId);
+    }
+
+    @Test
+    void missingContactDetailReturnsNotFoundWithDevelopmentHeaders() throws Exception {
+        RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                unusedPort(TaskServicePort.class),
+                contactServicePort,
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/contacts/404")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.path").value("/api/contacts/404"));
+    }
+
+    @Test
     void unreadNotificationsReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingNotificationServicePort notificationServicePort = new RecordingNotificationServicePort();
         MockMvc devMockMvc = developmentMockMvc(
@@ -190,6 +373,79 @@ class ApiReadControllerTest {
 
         org.junit.jupiter.api.Assertions.assertEquals(31, notificationServicePort.userId);
         org.junit.jupiter.api.Assertions.assertEquals(41, notificationServicePort.shaleClientId);
+    }
+
+    @Test
+    void caseSearchPageReturnsPageContractWithDevelopmentHeaders() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/cases/search-page")
+                .param("query", "smith")
+                .param("page", "1")
+                .param("size", "1")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].caseId").value(502))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.total").doesNotExist());
+
+        org.junit.jupiter.api.Assertions.assertEquals("smith", caseServicePort.searchQuery);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.searchShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(2, caseServicePort.searchLimit);
+    }
+
+    @Test
+    void contactSearchPageReturnsPageContractWithDevelopmentHeaders() throws Exception {
+        RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                unusedPort(TaskServicePort.class),
+                contactServicePort,
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/contacts/search-page")
+                .param("query", "ada")
+                .param("page", "0")
+                .param("size", "1")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(801))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.total").doesNotExist());
+
+        org.junit.jupiter.api.Assertions.assertEquals("ada", contactServicePort.query);
+        org.junit.jupiter.api.Assertions.assertEquals(41, contactServicePort.shaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(1, contactServicePort.limit);
+    }
+
+    @Test
+    void invalidSearchInputReturnsStandardizedBadRequestBeforeDbAccess() throws Exception {
+        mockMvc.perform(get("/api/cases/search").param("query", "x".repeat(101)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Search query must be 100 characters or fewer."))
+                .andExpect(jsonPath("$.path").value("/api/cases/search"));
+    }
+
+    @Test
+    void invalidCaseIdReturnsStandardizedBadRequestBeforeDbAccess() throws Exception {
+        mockMvc.perform(get("/api/cases/0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("caseId must be positive."))
+                .andExpect(jsonPath("$.path").value("/api/cases/0"));
     }
 
     private static ObjectProvider<HttpServletRequest> currentRequestProvider() {
@@ -227,12 +483,17 @@ class ApiReadControllerTest {
         private int searchLimit;
         private long detailCaseId;
         private int detailShaleClientId;
+        private int assignedUserId;
+        private int assignedShaleClientId;
+        private int assignedLimit;
+        private long updatesCaseId;
+        private int updatesShaleClientId;
 
         @Override
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
             this.detailCaseId = caseId;
             this.detailShaleClientId = shaleClientId;
-            return Optional.of(new CaseDetailDto(caseId, "CASE-501", "Smith v. Example", "Detail", "Open", 10,
+            return Optional.of(new CaseDetailDto(caseId, "CASE-501", "Smith v. Example", "Detail", "Open", "Ada Attorney", 10,
                     null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null, LocalDateTime.of(2026, 1, 1, 0, 0), new byte[] {1}));
@@ -248,12 +509,69 @@ class ApiReadControllerTest {
             this.searchQuery = query;
             this.searchShaleClientId = shaleClientId;
             this.searchLimit = limit;
+            return List.of(caseOverview(), secondCaseOverview());
+        }
+
+        @Override
+        public List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit) {
+            this.assignedUserId = assignedUserId;
+            this.assignedShaleClientId = shaleClientId;
+            this.assignedLimit = limit;
             return List.of(caseOverview());
         }
 
         @Override
-        public List<com.shale.core.dto.CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
-            throw new AssertionError("listCaseUpdates should not be called");
+        public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
+            this.updatesCaseId = caseId;
+            this.updatesShaleClientId = shaleClientId;
+            return List.of(new CaseUpdateDto(901L, caseId, "Called client.",
+                    LocalDateTime.of(2026, 6, 12, 15, 30),
+                    null, 31, "Ada Attorney"));
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
+            throw new AssertionError("listCaseStatuses should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive) {
+            throw new AssertionError("listTenantCaseStatuses should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
+            throw new AssertionError("listPracticeAreas should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive) {
+            throw new AssertionError("listTenantPracticeAreas should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.PracticeAreaDto createPracticeArea(PracticeAreaCommand command) {
+            throw new AssertionError("createPracticeArea should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.PracticeAreaDto updatePracticeArea(PracticeAreaCommand command) {
+            throw new AssertionError("updatePracticeArea should not be called");
+        }
+
+        @Override
+        public void deactivatePracticeArea(int shaleClientId, int practiceAreaId) {
+            throw new AssertionError("deactivatePracticeArea should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseStatusDto createCaseStatus(CaseStatusCommand command) {
+            throw new AssertionError("createCaseStatus should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseStatusDto updateCaseStatus(CaseStatusCommand command) {
+            throw new AssertionError("updateCaseStatus should not be called");
         }
 
         @Override
@@ -266,8 +584,21 @@ class ApiReadControllerTest {
             throw new AssertionError("updateCaseCoreDetails should not be called");
         }
 
+        @Override
+        public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
+            throw new AssertionError("reorderCaseStatuses should not be called");
+        }
+
         private static CaseOverviewDto caseOverview() {
-            return new CaseOverviewDto(501L, "CASE-501", "Smith v. Example", "Open", 1, "#00AA00",
+            return caseOverview(501L, "CASE-501");
+        }
+
+        private static CaseOverviewDto secondCaseOverview() {
+            return caseOverview(502L, "CASE-502");
+        }
+
+        private static CaseOverviewDto caseOverview(long caseId, String caseNumber) {
+            return new CaseOverviewDto(caseId, caseNumber, "Smith v. Example", "Open", 1, "#00AA00",
                     31, "Ada Attorney", "#111111", 10, "PI", "#222222",
                     null, null, null, null, null, null, "Caller", "Client", List.of(),
                     "Opposing", List.of("Ada Attorney"), "Overview");
@@ -277,6 +608,10 @@ class ApiReadControllerTest {
     private static final class RecordingTaskServicePort implements TaskServicePort {
         private long caseId;
         private int shaleClientId;
+        private int assignedUserId;
+        private int assignedShaleClientId;
+        private long detailTaskId;
+        private int detailShaleClientId;
 
         @Override
         public List<CaseTaskListItemDto> listCaseTasks(long caseId, int shaleClientId) {
@@ -291,12 +626,23 @@ class ApiReadControllerTest {
 
         @Override
         public List<CaseTaskListItemDto> listAssignedTasks(int assignedUserId, int shaleClientId) {
-            throw new AssertionError("listAssignedTasks should not be called");
+            this.assignedUserId = assignedUserId;
+            this.assignedShaleClientId = shaleClientId;
+            return List.of(new CaseTaskListItemDto(701L, shaleClientId, 501L, "Smith v. Example",
+                    "Open", "#00AA00", "#222222", "Ada Attorney", "#111111", false, "Review records", "Read intake packet",
+                    1, "#FFAA00", LocalDateTime.of(2026, 1, 2, 12, 0), null,
+                    assignedUserId, "Ada Attorney", "#111111", 32, "Case Creator",
+                    LocalDateTime.of(2026, 1, 1, 9, 0), LocalDateTime.of(2026, 1, 1, 10, 0), false));
         }
 
         @Override
-        public Optional<com.shale.core.dto.TaskDetailDto> getTaskDetail(long taskId, int shaleClientId) {
-            throw new AssertionError("getTaskDetail should not be called");
+        public Optional<TaskDetailDto> getTaskDetail(long taskId, int shaleClientId) {
+            this.detailTaskId = taskId;
+            this.detailShaleClientId = shaleClientId;
+            return Optional.of(new TaskDetailDto(taskId, shaleClientId, 501L, "Smith v. Example",
+                    "Ada Attorney", "#111111", false, "Review records", "Read intake packet",
+                    LocalDateTime.of(2026, 1, 2, 12, 0), 2, 1, null,
+                    31, "Ada Attorney", "#111111", "Case Creator"));
         }
 
         @Override
@@ -334,6 +680,8 @@ class ApiReadControllerTest {
         private int shaleClientId;
         private String query;
         private int limit;
+        private int contactId;
+        private int detailShaleClientId;
 
         @Override
         public List<ContactSummary> searchContacts(int shaleClientId, String query, int limit) {
@@ -345,7 +693,13 @@ class ApiReadControllerTest {
 
         @Override
         public Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId) {
-            throw new AssertionError("getContactDetail should not be called");
+            this.contactId = contactId;
+            this.detailShaleClientId = shaleClientId;
+            if (contactId == 404) {
+                return Optional.empty();
+            }
+            return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada", "Lovelace",
+                    "Ada Lovelace", "ada@example.test", "555-0100"));
         }
 
         @Override
@@ -413,108 +767,6 @@ class ApiReadControllerTest {
     }
 
     @Test
-    void unreadNotificationsReachesServiceLayerWithDevelopmentHeaders() throws Exception {
-        RecordingNotificationServicePort notificationServicePort = new RecordingNotificationServicePort();
-        ApiReadController apiReadController = new ApiReadController(
-                unusedPort(CaseServicePort.class),
-                unusedPort(TaskServicePort.class),
-                unusedPort(ContactServicePort.class),
-                notificationServicePort,
-                new ServerRuntimeSessionState(new DevelopmentHeaderServerSessionResolver(), currentRequestProvider()));
-        MockMvc devMockMvc = MockMvcBuilders
-                .standaloneSetup(apiReadController)
-                .setControllerAdvice(new ApiExceptionHandler())
-                .build();
-
-        devMockMvc.perform(get("/api/notifications/unread")
-                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
-                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].userId").value(31))
-                .andExpect(jsonPath("$[0].shaleClientId").value(41))
-                .andExpect(jsonPath("$[0].title").value("Development proof notification"));
-
-        org.junit.jupiter.api.Assertions.assertEquals(31, notificationServicePort.userId);
-        org.junit.jupiter.api.Assertions.assertEquals(41, notificationServicePort.shaleClientId);
-    }
-
-    private static ObjectProvider<HttpServletRequest> currentRequestProvider() {
-        return new ObjectProvider<>() {
-            @Override
-            public HttpServletRequest getObject(Object... args) {
-                return getIfAvailable();
-            }
-
-            @Override
-            public HttpServletRequest getIfAvailable() {
-                var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
-                if (attributes instanceof org.springframework.web.context.request.ServletRequestAttributes servletAttributes) {
-                    return servletAttributes.getRequest();
-                }
-                return null;
-            }
-
-            @Override
-            public HttpServletRequest getIfUnique() {
-                return getIfAvailable();
-            }
-
-            @Override
-            public HttpServletRequest getObject() {
-                return getIfAvailable();
-            }
-        };
-    }
-
-    private static final class RecordingNotificationServicePort implements NotificationServicePort {
-        private int shaleClientId;
-        private int userId;
-
-        @Override
-        public List<NotificationSummary> listUnreadNotifications(int shaleClientId, int userId) {
-            this.shaleClientId = shaleClientId;
-            this.userId = userId;
-            return List.of(new NotificationSummary(100L, shaleClientId, userId, "INFO",
-                    "Development proof notification", "Request context reached service layer.", Instant.EPOCH));
-        }
-
-        @Override
-        public void markRead(int shaleClientId, int userId, long notificationId) {
-            throw new AssertionError("markRead should not be called");
-        }
-
-        @Override
-        public void dismiss(int shaleClientId, int userId, long notificationId) {
-            throw new AssertionError("dismiss should not be called");
-        }
-
-        @Override
-        public Optional<Long> createTaskAssignedNotification(TaskNotificationCommand command) {
-            throw new AssertionError("createTaskAssignedNotification should not be called");
-        }
-
-        @Override
-        public Optional<Long> createTaskNoteAddedNotification(TaskNotificationCommand command) {
-            throw new AssertionError("createTaskNoteAddedNotification should not be called");
-        }
-
-        @Override
-        public Optional<Long> createTaskDueDateNotification(TaskDueDateNotificationCommand command) {
-            throw new AssertionError("createTaskDueDateNotification should not be called");
-        }
-
-        @Override
-        public Optional<Long> createTaskActionNotification(TaskActionNotificationCommand command) {
-            throw new AssertionError("createTaskActionNotification should not be called");
-        }
-
-        @Override
-        public Optional<Long> createCalendarEventAssignedNotification(CalendarEventNotificationCommand command) {
-            throw new AssertionError("createCalendarEventAssignedNotification should not be called");
-        }
-    }
-
-    @Test
     void healthStillReturnsOk() throws Exception {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
@@ -524,37 +776,44 @@ class ApiReadControllerTest {
     @Test
     void caseSearchFailsClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/cases/search").param("query", "smith"))
-                .andExpect(status().isNotImplemented())
-                .andExpect(jsonPath("$.error").value("not_implemented"))
-                .andExpect(jsonPath("$.message", containsString("TODO: server auth/session context is not wired yet")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.message", containsString("Authentication is required")))
                 .andExpect(jsonPath("$.path").value("/api/cases/search"));
     }
 
     @Test
     void caseDetailRouteFailsClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/cases/123"))
-                .andExpect(status().isNotImplemented())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/cases/123"));
     }
 
     @Test
     void caseTasksRouteFailsClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/cases/123/tasks"))
-                .andExpect(status().isNotImplemented())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/cases/123/tasks"));
+    }
+
+    @Test
+    void caseUpdatesRouteFailsClosedUntilServerSessionContextExists() throws Exception {
+        mockMvc.perform(get("/api/cases/123/updates"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.path").value("/api/cases/123/updates"));
     }
 
     @Test
     void contactSearchFailsClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/contacts/search").param("query", "ada"))
-                .andExpect(status().isNotImplemented())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/contacts/search"));
     }
 
     @Test
     void unreadNotificationsFailClosedUntilServerSessionContextExists() throws Exception {
         mockMvc.perform(get("/api/notifications/unread"))
-                .andExpect(status().isNotImplemented())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.path").value("/api/notifications/unread"));
     }
 }

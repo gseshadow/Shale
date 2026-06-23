@@ -3,6 +3,7 @@ package com.shale.core.dto;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Detail DTO for a case used by the Case view edit workflow.
@@ -14,6 +15,7 @@ public final class CaseDetailDto {
 	private final String caseName;
 	private final String description;
 	private final String caseStatus;
+	private final String responsibleAttorney;
 
 	private final Integer practiceAreaId;
 
@@ -52,6 +54,8 @@ public final class CaseDetailDto {
 
 	private final LocalDateTime updatedAt;
 	private final byte[] rowVer;
+	private final List<RelatedContactDto> relatedContacts;
+	private final List<CaseStatusHistoryDto> statusHistory;
 
 	public CaseDetailDto(long caseId,
 			String caseNumber,
@@ -88,11 +92,156 @@ public final class CaseDetailDto {
 			String receivedUpdates,
 			LocalDateTime updatedAt,
 			byte[] rowVer) {
+		this(caseId, caseNumber, caseName, description, caseStatus, null, practiceAreaId,
+				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
+				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
+				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
+				officePrinterCode, medicalRecordsReceived, feeAgreementSigned, dateFeeAgreementSigned,
+				nonEngagementLetterSent, dateNonEngagementLetterSent, acceptedChronology,
+				acceptedConsultantExpertSearch, acceptedTestifyingExpertSearch,
+				acceptedMedicalLiterature, acceptedDetail, deniedChronology, deniedDetail,
+				summary, receivedUpdates, updatedAt, rowVer);
+	}
+
+	public CaseDetailDto(long caseId,
+			String caseNumber,
+			String caseName,
+			String description,
+			String caseStatus,
+			String responsibleAttorney,
+			Integer practiceAreaId,
+			LocalDate callerDate,
+			String callerTime,
+			LocalDate acceptedDate,
+			LocalDate closedDate,
+			LocalDate deniedDate,
+			LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			LocalDate discoveryDeadline,
+			String clientEstate,
+			String officePrinterCode,
+			Boolean medicalRecordsReceived,
+			Boolean feeAgreementSigned,
+			LocalDate dateFeeAgreementSigned,
+			Boolean nonEngagementLetterSent,
+			LocalDate dateNonEngagementLetterSent,
+			Boolean acceptedChronology,
+			Boolean acceptedConsultantExpertSearch,
+			Boolean acceptedTestifyingExpertSearch,
+			Boolean acceptedMedicalLiterature,
+			String acceptedDetail,
+			Boolean deniedChronology,
+			String deniedDetail,
+			String summary,
+			String receivedUpdates,
+			LocalDateTime updatedAt,
+			byte[] rowVer) {
+		this(caseId, caseNumber, caseName, description, caseStatus, responsibleAttorney, practiceAreaId,
+				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
+				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
+				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
+				officePrinterCode, medicalRecordsReceived, feeAgreementSigned, dateFeeAgreementSigned,
+				nonEngagementLetterSent, dateNonEngagementLetterSent, acceptedChronology,
+				acceptedConsultantExpertSearch, acceptedTestifyingExpertSearch,
+				acceptedMedicalLiterature, acceptedDetail, deniedChronology, deniedDetail,
+				summary, receivedUpdates, updatedAt, rowVer, List.of(), List.of());
+	}
+
+	public CaseDetailDto(long caseId,
+			String caseNumber,
+			String caseName,
+			String description,
+			String caseStatus,
+			String responsibleAttorney,
+			Integer practiceAreaId,
+			LocalDate callerDate,
+			String callerTime,
+			LocalDate acceptedDate,
+			LocalDate closedDate,
+			LocalDate deniedDate,
+			LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			LocalDate discoveryDeadline,
+			String clientEstate,
+			String officePrinterCode,
+			Boolean medicalRecordsReceived,
+			Boolean feeAgreementSigned,
+			LocalDate dateFeeAgreementSigned,
+			Boolean nonEngagementLetterSent,
+			LocalDate dateNonEngagementLetterSent,
+			Boolean acceptedChronology,
+			Boolean acceptedConsultantExpertSearch,
+			Boolean acceptedTestifyingExpertSearch,
+			Boolean acceptedMedicalLiterature,
+			String acceptedDetail,
+			Boolean deniedChronology,
+			String deniedDetail,
+			String summary,
+			String receivedUpdates,
+			LocalDateTime updatedAt,
+			byte[] rowVer,
+			List<RelatedContactDto> relatedContacts) {
+		this(caseId, caseNumber, caseName, description, caseStatus, responsibleAttorney, practiceAreaId,
+				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
+				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
+				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
+				officePrinterCode, medicalRecordsReceived, feeAgreementSigned, dateFeeAgreementSigned,
+				nonEngagementLetterSent, dateNonEngagementLetterSent, acceptedChronology,
+				acceptedConsultantExpertSearch, acceptedTestifyingExpertSearch,
+				acceptedMedicalLiterature, acceptedDetail, deniedChronology, deniedDetail,
+				summary, receivedUpdates, updatedAt, rowVer, relatedContacts, List.of());
+	}
+
+	public CaseDetailDto(long caseId,
+			String caseNumber,
+			String caseName,
+			String description,
+			String caseStatus,
+			String responsibleAttorney,
+			Integer practiceAreaId,
+			LocalDate callerDate,
+			String callerTime,
+			LocalDate acceptedDate,
+			LocalDate closedDate,
+			LocalDate deniedDate,
+			LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			LocalDate discoveryDeadline,
+			String clientEstate,
+			String officePrinterCode,
+			Boolean medicalRecordsReceived,
+			Boolean feeAgreementSigned,
+			LocalDate dateFeeAgreementSigned,
+			Boolean nonEngagementLetterSent,
+			LocalDate dateNonEngagementLetterSent,
+			Boolean acceptedChronology,
+			Boolean acceptedConsultantExpertSearch,
+			Boolean acceptedTestifyingExpertSearch,
+			Boolean acceptedMedicalLiterature,
+			String acceptedDetail,
+			Boolean deniedChronology,
+			String deniedDetail,
+			String summary,
+			String receivedUpdates,
+			LocalDateTime updatedAt,
+			byte[] rowVer,
+			List<RelatedContactDto> relatedContacts,
+			List<CaseStatusHistoryDto> statusHistory) {
 		this.caseId = caseId;
 		this.caseNumber = caseNumber;
 		this.caseName = caseName == null ? "" : caseName;
 		this.description = description == null ? "" : description;
 		this.caseStatus = caseStatus == null ? "" : caseStatus;
+		this.responsibleAttorney = responsibleAttorney == null ? "" : responsibleAttorney;
 		this.practiceAreaId = practiceAreaId;
 		this.callerDate = callerDate;
 		this.callerTime = callerTime == null ? "" : callerTime;
@@ -123,6 +272,8 @@ public final class CaseDetailDto {
 		this.receivedUpdates = receivedUpdates == null ? "" : receivedUpdates;
 		this.updatedAt = updatedAt;
 		this.rowVer = rowVer == null ? new byte[0] : Arrays.copyOf(rowVer, rowVer.length);
+		this.relatedContacts = relatedContacts == null ? List.of() : List.copyOf(relatedContacts);
+		this.statusHistory = statusHistory == null ? List.of() : List.copyOf(statusHistory);
 	}
 
 	public long getCaseId() { return caseId; }
@@ -130,6 +281,7 @@ public final class CaseDetailDto {
 	public String getCaseName() { return caseName; }
 	public String getDescription() { return description; }
 	public String getCaseStatus() { return caseStatus; }
+	public String getResponsibleAttorney() { return responsibleAttorney; }
 	public Integer getPracticeAreaId() { return practiceAreaId; }
 	public LocalDate getCallerDate() { return callerDate; }
 	public String getCallerTime() { return callerTime; }
@@ -159,8 +311,21 @@ public final class CaseDetailDto {
 	public String getSummary() { return summary; }
 	public String getReceivedUpdates() { return receivedUpdates; }
 	public LocalDateTime getUpdatedAt() { return updatedAt; }
+	public List<RelatedContactDto> getRelatedContacts() { return relatedContacts; }
+	public List<CaseStatusHistoryDto> getStatusHistory() { return statusHistory; }
 
 	public byte[] getRowVer() {
 		return Arrays.copyOf(rowVer, rowVer.length);
+	}
+
+	public record RelatedContactDto(
+			int id,
+			String displayName,
+			Integer roleId,
+			String roleName,
+			String side,
+			boolean primary,
+			String email,
+			String phone) {
 	}
 }

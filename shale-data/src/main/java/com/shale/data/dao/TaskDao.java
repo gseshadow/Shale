@@ -332,17 +332,17 @@ public final class TaskDao {
                             rs.getString("CasePracticeAreaColor"),
                             rs.getString("CaseResponsibleAttorney"),
                             rs.getString("CaseResponsibleAttorneyColor"),
-                            (Boolean) rs.getObject("CaseNonEngagementLetterSent"),
+                            getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
                             rs.getString("Title"),
                             rs.getString("Description"),
-                            (Integer) rs.getObject("PriorityId"),
+                            getNullableInt(rs, "PriorityId"),
                             rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
                             toLocalDateTime(rs.getTimestamp("CompletedAt")),
-                            (Integer) rs.getObject("AssignedUserId"),
+                            getNullableInt(rs, "AssignedUserId"),
                             rs.getString("AssignedUserDisplayName"),
                             rs.getString("AssignedUserColor"),
-                            (Integer) rs.getObject("CreatedByUserId"),
+                            getNullableInt(rs, "CreatedByUserId"),
                             rs.getString("CreatedByDisplayName"),
                             toLocalDateTime(rs.getTimestamp("CreatedAt")),
                             toLocalDateTime(rs.getTimestamp("UpdatedAt")),
@@ -513,17 +513,17 @@ public final class TaskDao {
                             rs.getString("CasePracticeAreaColor"),
                             rs.getString("CaseResponsibleAttorney"),
                             rs.getString("CaseResponsibleAttorneyColor"),
-                            (Boolean) rs.getObject("CaseNonEngagementLetterSent"),
+                            getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
                             rs.getString("Title"),
                             rs.getString("Description"),
-                            (Integer) rs.getObject("PriorityId"),
+                            getNullableInt(rs, "PriorityId"),
                             rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
                             toLocalDateTime(rs.getTimestamp("CompletedAt")),
-                            (Integer) rs.getObject("AssignedUserId"),
+                            getNullableInt(rs, "AssignedUserId"),
                             rs.getString("AssignedUserDisplayName"),
                             rs.getString("AssignedUserColor"),
-                            (Integer) rs.getObject("CreatedByUserId"),
+                            getNullableInt(rs, "CreatedByUserId"),
                             rs.getString("CreatedByDisplayName"),
                             toLocalDateTime(rs.getTimestamp("CreatedAt")),
                             toLocalDateTime(rs.getTimestamp("UpdatedAt")),
@@ -615,11 +615,11 @@ public final class TaskDao {
                             rs.getLong("Id"), rs.getInt("ShaleClientId"), rs.getLong("CaseId"), rs.getString("CaseName"),
                             rs.getString("CasePrimaryStatusName"), rs.getString("CasePrimaryStatusColor"), rs.getString("CasePracticeAreaColor"),
                             rs.getString("CaseResponsibleAttorney"), rs.getString("CaseResponsibleAttorneyColor"),
-                            (Boolean) rs.getObject("CaseNonEngagementLetterSent"), rs.getString("Title"), rs.getString("Description"),
-                            (Integer) rs.getObject("PriorityId"), rs.getString("PriorityColorHex"),
+                            getNullableBoolean(rs, "CaseNonEngagementLetterSent"), rs.getString("Title"), rs.getString("Description"),
+                            getNullableInt(rs, "PriorityId"), rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")), toLocalDateTime(rs.getTimestamp("CompletedAt")),
-                            (Integer) rs.getObject("AssignedUserId"), rs.getString("AssignedUserDisplayName"), rs.getString("AssignedUserColor"),
-                            (Integer) rs.getObject("CreatedByUserId"), rs.getString("CreatedByDisplayName"),
+                            getNullableInt(rs, "AssignedUserId"), rs.getString("AssignedUserDisplayName"), rs.getString("AssignedUserColor"),
+                            getNullableInt(rs, "CreatedByUserId"), rs.getString("CreatedByDisplayName"),
                             toLocalDateTime(rs.getTimestamp("CreatedAt")), toLocalDateTime(rs.getTimestamp("UpdatedAt")), rs.getBoolean("IsDeleted")));
                 }
                 return out;
@@ -738,7 +738,7 @@ public final class TaskDao {
                             rs.getString("CaseName"),
                             rs.getString("CaseResponsibleAttorney"),
                             rs.getString("CaseResponsibleAttorneyColor"),
-                            (Boolean) rs.getObject("CaseNonEngagementLetterSent"),
+                            getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
                             rs.getString("Title"),
                             rs.getString("Description"),
                             rs.getString("PriorityColorHex"),
@@ -746,7 +746,7 @@ public final class TaskDao {
                             (Integer) rs.getObject("PrioritySortOrder"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
                             toLocalDateTime(rs.getTimestamp("CompletedAt")),
-                            (Integer) rs.getObject("AssignedUserId"),
+                            getNullableInt(rs, "AssignedUserId"),
                             rs.getString("AssignedUserDisplayName"),
                             rs.getString("AssignedUserColor"),
                             toLocalDateTime(rs.getTimestamp("CreatedAt")),
@@ -803,7 +803,7 @@ public final class TaskDao {
                             rs.getLong("Id"), rs.getInt("ShaleClientId"), rs.getLong("CaseId"), rs.getString("CaseName"),
                             rs.getString("Title"), rs.getString("Description"), rs.getString("StatusName"),
                             toLocalDateTime(rs.getTimestamp("DueAt")), toLocalDateTime(rs.getTimestamp("CompletedAt")),
-                            (Integer) rs.getObject("AssignedUserId"), rs.getString("AssignedUserDisplayName")));
+                            getNullableInt(rs, "AssignedUserId"), rs.getString("AssignedUserDisplayName")));
                 }
                 return out;
             }
@@ -838,21 +838,18 @@ public final class TaskDao {
                   assignment.UserId AS AssignedUserId,
                   assignment.DisplayName AS AssignedUserDisplayName,
                   assignment.Color AS AssignedUserColor,
-                  creator.DisplayName AS CreatedByDisplayName
+                  LTRIM(RTRIM(
+                    COALESCE(createdByUser.name_first, '') +
+                    CASE WHEN COALESCE(createdByUser.name_first, '') = '' OR COALESCE(createdByUser.name_last, '') = '' THEN '' ELSE ' ' END +
+                    COALESCE(createdByUser.name_last, '')
+                  )) AS CreatedByDisplayName
                 FROM dbo.Tasks t
                 INNER JOIN dbo.Cases c
                   ON c.Id = t.CaseId
                  AND c.ShaleClientId = t.ShaleClientId
-                LEFT JOIN dbo.Users createdBy
-                  ON createdBy.Id = t.CreatedByUserId
-                 AND createdBy.ShaleClientId = t.ShaleClientId
-                OUTER APPLY (
-                  SELECT LTRIM(RTRIM(
-                    COALESCE(createdBy.name_first, '') +
-                    CASE WHEN COALESCE(createdBy.name_first, '') = '' OR COALESCE(createdBy.name_last, '') = '' THEN '' ELSE ' ' END +
-                    COALESCE(createdBy.name_last, '')
-                  )) AS DisplayName
-                ) creator
+                LEFT JOIN dbo.Users createdByUser
+                  ON createdByUser.Id = t.CreatedByUserId
+                 AND createdByUser.ShaleClientId = t.ShaleClientId
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -909,14 +906,14 @@ public final class TaskDao {
                         rs.getString("CaseName"),
                         rs.getString("CaseResponsibleAttorney"),
                         rs.getString("CaseResponsibleAttorneyColor"),
-                        (Boolean) rs.getObject("CaseNonEngagementLetterSent"),
+                        getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
                         rs.getString("Title"),
                         rs.getString("Description"),
                         toLocalDateTime(rs.getTimestamp("DueAt")),
-                        (Integer) rs.getObject("StatusId"),
-                        (Integer) rs.getObject("PriorityId"),
+                        getNullableInt(rs, "StatusId"),
+                        getNullableInt(rs, "PriorityId"),
                         toLocalDateTime(rs.getTimestamp("CompletedAt")),
-                        (Integer) rs.getObject("AssignedUserId"),
+                        getNullableInt(rs, "AssignedUserId"),
                         rs.getString("AssignedUserDisplayName"),
                         rs.getString("AssignedUserColor"),
                         rs.getString("CreatedByDisplayName"));
@@ -1304,7 +1301,7 @@ public final class TaskDao {
                             toLocalDateTime(rs.getTimestamp("DueAt")),
                             toLocalDateTime(rs.getTimestamp("CompletedAt")),
                             rs.getBoolean("IsDeleted"),
-                            (Integer) rs.getObject("AssignedUserId")));
+                            getNullableInt(rs, "AssignedUserId")));
                 }
                 return rows;
             }
@@ -2548,6 +2545,31 @@ public final class TaskDao {
                 return rs.next() && rs.getInt(1) == 1;
             }
         }
+    }
+
+    private static Integer getNullableInt(ResultSet rs, String col) throws SQLException {
+        Object value = rs.getObject(col);
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return Integer.valueOf(value.toString());
+    }
+
+    private static Boolean getNullableBoolean(ResultSet rs, String col) throws SQLException {
+        Object value = rs.getObject(col);
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        if (value instanceof Number number) {
+            return number.intValue() != 0;
+        }
+        return Boolean.valueOf(value.toString());
     }
 
     private static LocalDateTime toLocalDateTime(Timestamp timestamp) {

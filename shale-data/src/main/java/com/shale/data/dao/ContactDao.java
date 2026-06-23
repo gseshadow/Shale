@@ -226,6 +226,68 @@ public final class ContactDao {
         }
     }
 
+    public DirectoryContactRow findDirectoryContactById(int contactId, int shaleClientId) {
+        long started = System.nanoTime();
+        if (contactId <= 0) {
+            throw new IllegalArgumentException("contactId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+
+            ContactSchema schema = ContactSchema.load(con);
+            logDetectedCoreColumns(schema);
+
+            String sql = """
+                    SELECT
+                      c.Id,
+                      %s,
+                      %s,
+                      %s AS DisplayName,
+                      %s,
+                      %s
+                    FROM dbo.Contacts c
+                    WHERE c.Id = ?
+                      AND c.%s = ?
+                      AND NULLIF(LTRIM(RTRIM(%s)), '') IS NOT NULL
+                    %s;
+                    """.formatted(
+                    optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
+                    optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
+                    displayNameExpression(schema, "c"),
+                    optionalColumnExpression(schema.emailColumn(), "c", "Email"),
+                    optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    schema.tenantColumn(),
+                    displayNameExpression(schema, "c"),
+                    activeFilter(schema.deletedColumn(), "c"));
+
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setInt(1, contactId);
+                ps.setInt(2, shaleClientId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        logPerf("contacts.directory.detail.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " found=false", started);
+                        return null;
+                    }
+                    DirectoryContactRow row = new DirectoryContactRow(
+                            rs.getInt("Id"),
+                            rs.getString("FirstName"),
+                            rs.getString("LastName"),
+                            rs.getString("DisplayName"),
+                            rs.getString("Email"),
+                            rs.getString("Phone"));
+                    logPerf("contacts.directory.detail.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " found=true", started);
+                    return row;
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load directory contact by id (id=" + contactId + ")", e);
+        }
+    }
+
     public PagedResult<ContactCardSummaryRow> findDirectoryContactsPage(int shaleClientId, int page, int pageSize, String searchQuery) {
         long started = System.nanoTime();
         if (shaleClientId <= 0) {
