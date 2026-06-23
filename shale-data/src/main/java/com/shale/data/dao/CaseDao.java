@@ -2345,12 +2345,16 @@ public final class CaseDao {
 				if (!rs.next()) {
 					return null;
 				}
-				return mapCaseDetail(rs, listRelatedContacts(con, caseId, requireCurrentShaleClientId(con)));
+				return mapCaseDetail(rs,
+						listRelatedContacts(con, caseId, requireCurrentShaleClientId(con)),
+						listCaseStatusHistory(con, caseId));
 			}
 		}
 	}
 
-	private static com.shale.core.dto.CaseDetailDto mapCaseDetail(ResultSet rs, List<com.shale.core.dto.CaseDetailDto.RelatedContactDto> relatedContacts) throws SQLException {
+	private static com.shale.core.dto.CaseDetailDto mapCaseDetail(ResultSet rs,
+			List<com.shale.core.dto.CaseDetailDto.RelatedContactDto> relatedContacts,
+			List<CaseStatusHistoryDto> statusHistory) throws SQLException {
 		return new com.shale.core.dto.CaseDetailDto(
 				rs.getLong("Id"),
 				rs.getString("CaseNumber"),
@@ -2388,7 +2392,8 @@ public final class CaseDao {
 				rs.getString("ReceivedUpdates"),
 				toLocalDateTime(rs.getTimestamp("UpdatedAt")),
 				rs.getBytes("RowVer"),
-				relatedContacts
+				relatedContacts,
+				statusHistory
 		);
 	}
 
@@ -5000,7 +5005,7 @@ public final class CaseDao {
 		}
 	}
 
-	public List<CaseStatusHistoryDto> listCaseStatusHistory(long caseId) {
+	private List<CaseStatusHistoryDto> listCaseStatusHistory(Connection con, long caseId) throws SQLException {
 		String sql = """
 				SELECT
 				  cs.Id AS CaseStatusId,
@@ -5010,6 +5015,7 @@ public final class CaseDao {
 				  s.IsClosed,
 				  s.LifecycleKey,
 				  s.SystemKey,
+				  cs.Notes,
 				  cs.EffectiveDate,
 				  cs.EndDate,
 				  cs.CreatedAt,
@@ -5024,31 +5030,69 @@ public final class CaseDao {
 				  cs.Id ASC;
 				""";
 
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId);
+			try (ResultSet rs = ps.executeQuery()) {
+				return mapCaseStatusHistory(rs);
+			}
+		}
+	}
+
+	public List<CaseStatusHistoryDto> listCaseStatusHistory(long caseId) {
+		String sql = """
+				SELECT
+				  cs.Id AS CaseStatusId,
+				  cs.StatusId,
+				  s.Name AS StatusName,
+				  s.Color AS StatusColor,
+				  s.IsClosed,
+				  s.LifecycleKey,
+				  s.SystemKey,
+				  cs.EffectiveDate,
+				  cs.EndDate,
+				  cs.CreatedAt,
+				  cs.UpdatedAt,
+				  cs.IsPrimary,
+				  cs.Notes
+				FROM dbo.CaseStatuses cs
+				INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+				WHERE cs.CaseId = ?
+				ORDER BY
+				  cs.EffectiveDate ASC,
+				  cs.CreatedAt ASC,
+				  cs.Id ASC;
+				""";
+
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId);
 			try (ResultSet rs = ps.executeQuery()) {
-				List<CaseStatusHistoryDto> out = new ArrayList<>();
-				while (rs.next()) {
-					out.add(new CaseStatusHistoryDto(
-						rs.getLong("CaseStatusId"),
-						rs.getInt("StatusId"),
-						rs.getString("StatusName"),
-						rs.getString("StatusColor"),
-						rs.getString("LifecycleKey"),
-						rs.getString("SystemKey"),
-						rs.getBoolean("IsClosed"),
-						toLocalDateTime(rs.getTimestamp("EffectiveDate")),
-						toLocalDateTime(rs.getTimestamp("EndDate")),
-						toLocalDateTime(rs.getTimestamp("CreatedAt")),
-						toLocalDateTime(rs.getTimestamp("UpdatedAt")),
-						rs.getBoolean("IsPrimary")));
-				}
-				return out;
+				return mapCaseStatusHistory(rs);
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load case status history (caseId=" + caseId + ")", e);
 		}
+	}
+
+	private static List<CaseStatusHistoryDto> mapCaseStatusHistory(ResultSet rs) throws SQLException {
+		List<CaseStatusHistoryDto> out = new ArrayList<>();
+		while (rs.next()) {
+			out.add(new CaseStatusHistoryDto(
+				rs.getLong("CaseStatusId"),
+				rs.getInt("StatusId"),
+				rs.getString("StatusName"),
+				rs.getString("StatusColor"),
+				rs.getString("LifecycleKey"),
+				rs.getString("SystemKey"),
+				rs.getBoolean("IsClosed"),
+				rs.getString("Notes"),
+				toLocalDateTime(rs.getTimestamp("EffectiveDate")),
+				toLocalDateTime(rs.getTimestamp("EndDate")),
+				toLocalDateTime(rs.getTimestamp("CreatedAt")),
+				toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+				rs.getBoolean("IsPrimary")));
+		}
+		return out;
 	}
 
 	public static String normalizeLifecycleKey(String lifecycleKey) {

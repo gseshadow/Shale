@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1247,11 +1247,57 @@ function CaseDetailReadOnly({ detail, tasks, tasksError, updates, updatesError }
 
       <CaseTasksSection tasks={tasks} error={tasksError} />
 
+      <StatusTimelineSection history={detail.statusHistory ?? []} />
+
       <RelatedContactsSection contacts={detail.relatedContacts ?? []} />
 
       <CaseUpdatesSection updates={updates} error={updatesError} />
     </div>
   );
+}
+
+function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }) {
+  const sortedHistory = [...history].sort((left, right) => {
+    const leftDate = left.effectiveDate ? Date.parse(left.effectiveDate) : Number.MAX_SAFE_INTEGER;
+    const rightDate = right.effectiveDate ? Date.parse(right.effectiveDate) : Number.MAX_SAFE_INTEGER;
+    return leftDate - rightDate || left.caseStatusId - right.caseStatusId;
+  });
+
+  return (
+    <section aria-labelledby="status-timeline-title">
+      <h2 id="status-timeline-title">Status Timeline</h2>
+      {sortedHistory.length === 0 ? (
+        <p className="status">No status history has been recorded for this case yet.</p>
+      ) : (
+        <div className="status-timeline-list">
+          {sortedHistory.map((item) => {
+            const accentColor = normalizeStatusColor(item.color);
+            return (
+              <article className="status-timeline-card" key={item.caseStatusId} style={{ '--status-accent': accentColor } as CSSProperties}>
+                <div className="status-timeline-marker" aria-hidden="true" />
+                <div className="status-timeline-body">
+                  <div className="status-timeline-heading">
+                    <span className="status-timeline-name">{item.statusName || `Status ${item.statusId}`}</span>
+                    {(item.current || !item.endDate) && <span className="status-current-pill">Current / Open</span>}
+                  </div>
+                  <div className="status-timeline-dates">
+                    <span>Effective {formatDateTime(item.effectiveDate)}</span>
+                    <span>Ends {item.endDate ? formatDateTime(item.endDate) : 'Current / open'}</span>
+                  </div>
+                  {item.notes && <p className="status-timeline-notes preserve-whitespace">{item.notes}</p>}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function normalizeStatusColor(color: string | null | undefined): string {
+  const trimmed = color?.trim();
+  return trimmed && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(trimmed) ? trimmed : '#2f80b7';
 }
 
 function CaseTasksSection({ tasks, error }: { tasks: CaseTaskListItem[]; error: string | null }) {
