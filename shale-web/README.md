@@ -55,6 +55,11 @@ VITE_SHALE_API_BASE_URL=https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azu
 
 Do not include `/api/auth/login` or any other path in `VITE_SHALE_API_BASE_URL`; use only the API origin.
 
+
+## Deployment plan
+
+The 5P-4 read-only beta build/deploy runbook is documented in [docs/shale-web-deployment.md](../docs/shale-web-deployment.md). It recommends Azure Static Web Apps for the first beta, documents the required `VITE_SHALE_API_BASE_URL` build setting, and lists the Azure API CORS update needed for the deployed frontend origin.
+
 ## Required Azure CORS setting
 
 Local browser login requires the Azure App Service to allow the Vite development origin:
