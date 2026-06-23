@@ -2667,57 +2667,61 @@ public final class CaseDao {
 
 	private List<CaseUpdateDto> listCaseUpdatesInternal(long caseId, Integer shaleClientId) {
 		String tenantPredicate = shaleClientId == null ? "" : "\n  AND cu.ShaleClientId = ?";
-		String sql = """
-				SELECT
-				  cu.Id,
-				  cu.CaseId,
-				  cu.NoteText,
-				  cu.CreatedAt,
-				  cu.UpdatedAt,
-				  cu.CreatedByUserId,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS CreatedByDisplayName
-				FROM dbo.CaseUpdates cu
-				LEFT JOIN dbo.Users u
-				  ON u.Id = cu.CreatedByUserId
-				 AND u.ShaleClientId = cu.ShaleClientId
-				 AND COALESCE(u.is_deleted, 0) = 0
-				WHERE cu.CaseId = ?%s
-				  AND ISNULL(cu.IsDeleted, 0) = 0
-				  AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-				ORDER BY cu.CreatedAt DESC, cu.Id DESC;
-				""".formatted(tenantPredicate);
+		try (Connection con = db.requireConnection()) {
+			String userDeletedColumn = resolveUsersDeletedColumn(con);
+			String userDeletedPredicate = userDeletedColumn == null || userDeletedColumn.isBlank()
+					? ""
+					: "\n AND " + activeFilter(userDeletedColumn, "u");
+			String sql = """
+					SELECT
+					  cu.Id,
+					  cu.CaseId,
+					  cu.NoteText,
+					  cu.CreatedAt,
+					  cu.UpdatedAt,
+					  cu.CreatedByUserId,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS CreatedByDisplayName
+					FROM dbo.CaseUpdates cu
+					LEFT JOIN dbo.Users u
+					  ON u.Id = cu.CreatedByUserId
+					 AND u.ShaleClientId = cu.ShaleClientId%s
+					WHERE cu.CaseId = ?%s
+					  AND ISNULL(cu.IsDeleted, 0) = 0
+					  AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					ORDER BY cu.CreatedAt DESC, cu.Id DESC;
+					""".formatted(userDeletedPredicate, tenantPredicate);
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
 
-			ps.setLong(1, caseId);
-			if (shaleClientId != null) {
-				ps.setInt(2, shaleClientId);
-			}
-
-			try (ResultSet rs = ps.executeQuery()) {
-				List<CaseUpdateDto> out = new ArrayList<>();
-				while (rs.next()) {
-					Integer createdByUserId = getNullableInt(rs, "CreatedByUserId");
-					String displayName = safeUserDisplayName(
-							rs.getString("CreatedByDisplayName"),
-							createdByUserId
-					);
-					out.add(new CaseUpdateDto(
-							rs.getLong("Id"),
-							rs.getLong("CaseId"),
-							rs.getString("NoteText"),
-							toLocalDateTime(rs.getTimestamp("CreatedAt")),
-							toLocalDateTime(rs.getTimestamp("UpdatedAt")),
-							createdByUserId,
-							displayName
-					));
+				ps.setLong(1, caseId);
+				if (shaleClientId != null) {
+					ps.setInt(2, shaleClientId);
 				}
-				return out;
+
+				try (ResultSet rs = ps.executeQuery()) {
+					List<CaseUpdateDto> out = new ArrayList<>();
+					while (rs.next()) {
+						Integer createdByUserId = getNullableInt(rs, "CreatedByUserId");
+						String displayName = safeUserDisplayName(
+								rs.getString("CreatedByDisplayName"),
+								createdByUserId
+						);
+						out.add(new CaseUpdateDto(
+								rs.getLong("Id"),
+								rs.getLong("CaseId"),
+								rs.getString("NoteText"),
+								toLocalDateTime(rs.getTimestamp("CreatedAt")),
+								toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+								createdByUserId,
+								displayName
+						));
+					}
+					return out;
+				}
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list case updates (caseId=" + caseId + ")", e);
@@ -6869,6 +6873,10 @@ public final class CaseDao {
 
 	private static String resolveCaseUsersDeletedColumn(Connection con) throws SQLException {
 		return existingColumn(con, CASE_USERS_TABLE, List.of("IsDeleted", "is_deleted"));
+	}
+
+	private static String resolveUsersDeletedColumn(Connection con) throws SQLException {
+		return existingColumn(con, USERS_TABLE, List.of("IsDeleted", "is_deleted"));
 	}
 
 	private static String membershipExistsFilter(Integer restrictToUserId, String caseUsersDeletedColumn) {
