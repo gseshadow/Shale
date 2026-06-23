@@ -228,6 +228,7 @@ public final class CaseDao {
 			String displayName,
 			Integer roleId,
 			String roleName,
+			String side,
 			boolean primary,
 			String email,
 			String phone
@@ -2344,12 +2345,12 @@ public final class CaseDao {
 				if (!rs.next()) {
 					return null;
 				}
-				return mapCaseDetail(rs);
+				return mapCaseDetail(rs, listRelatedContacts(con, caseId, requireCurrentShaleClientId(con)));
 			}
 		}
 	}
 
-	private static com.shale.core.dto.CaseDetailDto mapCaseDetail(ResultSet rs) throws SQLException {
+	private static com.shale.core.dto.CaseDetailDto mapCaseDetail(ResultSet rs, List<com.shale.core.dto.CaseDetailDto.RelatedContactDto> relatedContacts) throws SQLException {
 		return new com.shale.core.dto.CaseDetailDto(
 				rs.getLong("Id"),
 				rs.getString("CaseNumber"),
@@ -2386,7 +2387,8 @@ public final class CaseDao {
 				rs.getString("Summary"),
 				rs.getString("ReceivedUpdates"),
 				toLocalDateTime(rs.getTimestamp("UpdatedAt")),
-				rs.getBytes("RowVer")
+				rs.getBytes("RowVer"),
+				relatedContacts
 		);
 	}
 
@@ -2653,50 +2655,73 @@ public final class CaseDao {
 	}
 
 	public List<CaseUpdateDto> listCaseUpdates(long caseId) {
-		String sql = """
-				SELECT
-				  cu.Id,
-				  cu.CaseId,
-				  cu.NoteText,
-				  cu.CreatedAt,
-				  cu.UpdatedAt,
-				  cu.CreatedByUserId,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS CreatedByDisplayName
-				FROM dbo.CaseUpdates cu
-				LEFT JOIN dbo.Users u ON u.Id = cu.CreatedByUserId
-				WHERE cu.CaseId = ?
-				  AND ISNULL(cu.IsDeleted, 0) = 0
-				ORDER BY cu.CreatedAt DESC, cu.Id DESC;
-				""";
+		return listCaseUpdatesInternal(caseId, null);
+	}
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+	public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
+		if (shaleClientId <= 0) {
+			throw new IllegalArgumentException("shaleClientId must be > 0");
+		}
+		return listCaseUpdatesInternal(caseId, shaleClientId);
+	}
 
-			ps.setLong(1, caseId);
+	private List<CaseUpdateDto> listCaseUpdatesInternal(long caseId, Integer shaleClientId) {
+		String tenantPredicate = shaleClientId == null ? "" : "\n  AND cu.ShaleClientId = ?";
+		try (Connection con = db.requireConnection()) {
+			String userDeletedColumn = resolveUsersDeletedColumn(con);
+			String userDeletedPredicate = userDeletedColumn == null || userDeletedColumn.isBlank()
+					? ""
+					: "\n AND " + activeFilter(userDeletedColumn, "u");
+			String sql = """
+					SELECT
+					  cu.Id,
+					  cu.CaseId,
+					  cu.NoteText,
+					  cu.CreatedAt,
+					  cu.UpdatedAt,
+					  cu.CreatedByUserId,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS CreatedByDisplayName
+					FROM dbo.CaseUpdates cu
+					LEFT JOIN dbo.Users u
+					  ON u.Id = cu.CreatedByUserId
+					 AND u.ShaleClientId = cu.ShaleClientId%s
+					WHERE cu.CaseId = ?%s
+					  AND ISNULL(cu.IsDeleted, 0) = 0
+					  AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					ORDER BY cu.CreatedAt DESC, cu.Id DESC;
+					""".formatted(userDeletedPredicate, tenantPredicate);
 
-			try (ResultSet rs = ps.executeQuery()) {
-				List<CaseUpdateDto> out = new ArrayList<>();
-				while (rs.next()) {
-					Integer createdByUserId = getNullableInt(rs, "CreatedByUserId");
-					String displayName = safeUserDisplayName(
-							rs.getString("CreatedByDisplayName"),
-							createdByUserId
-					);
-					out.add(new CaseUpdateDto(
-							rs.getLong("Id"),
-							rs.getLong("CaseId"),
-							rs.getString("NoteText"),
-							toLocalDateTime(rs.getTimestamp("CreatedAt")),
-							toLocalDateTime(rs.getTimestamp("UpdatedAt")),
-							createdByUserId,
-							displayName
-					));
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+
+				ps.setLong(1, caseId);
+				if (shaleClientId != null) {
+					ps.setInt(2, shaleClientId);
 				}
-				return out;
+
+				try (ResultSet rs = ps.executeQuery()) {
+					List<CaseUpdateDto> out = new ArrayList<>();
+					while (rs.next()) {
+						Integer createdByUserId = getNullableInt(rs, "CreatedByUserId");
+						String displayName = safeUserDisplayName(
+								rs.getString("CreatedByDisplayName"),
+								createdByUserId
+						);
+						out.add(new CaseUpdateDto(
+								rs.getLong("Id"),
+								rs.getLong("CaseId"),
+								rs.getString("NoteText"),
+								toLocalDateTime(rs.getTimestamp("CreatedAt")),
+								toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+								createdByUserId,
+								displayName
+						));
+					}
+					return out;
+				}
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list case updates (caseId=" + caseId + ")", e);
@@ -3249,6 +3274,110 @@ public final class CaseDao {
 		}
 	}
 
+	private List<com.shale.core.dto.CaseDetailDto.RelatedContactDto> listRelatedContacts(Connection con, long caseId, int shaleClientId) throws SQLException {
+		boolean hasIsDeleted = contactsHasIsDeletedColumn(con);
+		String sql = relatedCasePartyContactsSql(hasIsDeleted);
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int idx = 1;
+			ps.setLong(idx++, caseId);
+			ps.setInt(idx++, shaleClientId);
+			ps.setInt(idx++, shaleClientId);
+
+			List<com.shale.core.dto.CaseDetailDto.RelatedContactDto> out = new ArrayList<>();
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new com.shale.core.dto.CaseDetailDto.RelatedContactDto(
+							rs.getInt("Id"),
+							rs.getString("DisplayName"),
+							(Integer) rs.getObject("RoleId"),
+							rs.getString("RoleName"),
+							rs.getString("Side"),
+							rs.getBoolean("IsPrimary"),
+							rs.getString("Email"),
+							rs.getString("Phone")));
+				}
+			}
+			return out;
+		}
+	}
+
+	private static String relatedCasePartyContactsSql(boolean includeContactSoftDeleteFilter) {
+		String baseSql = """
+				SELECT
+				  ct.Id,
+				  LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )) AS DisplayName,
+				  CAST(cp.PartyRoleId AS int) AS RoleId,
+				  NULLIF(LTRIM(RTRIM(COALESCE(pr.Name, ''))), '') AS RoleName,
+				  NULLIF(LTRIM(RTRIM(COALESCE(cp.Side, ''))), '') AS Side,
+				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
+				  COALESCE(
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), ''),
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailWork, ''))), ''),
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailOther, ''))), '')
+				  ) AS Email,
+				  COALESCE(
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), ''),
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneHome, ''))), ''),
+				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneWork, ''))), '')
+				  ) AS Phone
+				FROM dbo.CaseParties cp
+				INNER JOIN dbo.Cases c
+				  ON c.Id = cp.CaseId
+				INNER JOIN dbo.PartyRoles pr
+				  ON pr.Id = cp.PartyRoleId
+				INNER JOIN dbo.Contacts ct
+				  ON ct.Id = cp.ContactId
+				WHERE cp.CaseId = ?
+				  AND c.ShaleClientId = ?
+				  AND ct.ShaleClientId = ?
+				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  AND NULLIF(LTRIM(RTRIM(
+				    CASE
+				      WHEN (NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL)
+				        OR (NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL)
+				      THEN
+				        COALESCE(ct.FirstName, '') +
+				        CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END +
+				        COALESCE(ct.LastName, '')
+				      ELSE
+				        COALESCE(ct.Name, '')
+				    END
+				  )), '') IS NOT NULL
+				""";
+
+		String orderSql = """
+				ORDER BY
+				  COALESCE(cp.IsPrimary, 0) DESC,
+				  CASE cp.Side
+				    WHEN '%s' THEN 0
+				    WHEN '%s' THEN 1
+				    WHEN '%s' THEN 2
+				    ELSE 3
+				  END,
+				  DisplayName ASC,
+				  cp.Id ASC;
+				""".formatted(
+					PARTY_SIDE_KEY_REPRESENTED,
+					PARTY_SIDE_KEY_OPPOSING,
+					PARTY_SIDE_KEY_NEUTRAL);
+
+		return includeContactSoftDeleteFilter
+				? baseSql + "\n  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)\n" + orderSql
+				: baseSql + "\n" + orderSql;
+	}
+
+
 	public List<RelatedContactRow> findRelatedContacts(long caseId) {
 		if (caseId <= 0) {
 			throw new IllegalArgumentException("caseId must be > 0");
@@ -3271,6 +3400,7 @@ public final class CaseDao {
 				  )) AS DisplayName,
 				  cc.Role AS RoleId,
 				  NULLIF(LTRIM(RTRIM(COALESCE(r.Name, ''))), '') AS RoleName,
+				  NULLIF(LTRIM(RTRIM(COALESCE(cc.Side, ''))), '') AS Side,
 				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
 				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
 				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
@@ -3326,6 +3456,7 @@ public final class CaseDao {
 								rs.getString("DisplayName"),
 								(Integer) rs.getObject("RoleId"),
 								rs.getString("RoleName"),
+								rs.getString("Side"),
 								rs.getBoolean("IsPrimary"),
 								rs.getString("Email"),
 								rs.getString("Phone")));
@@ -6742,6 +6873,10 @@ public final class CaseDao {
 
 	private static String resolveCaseUsersDeletedColumn(Connection con) throws SQLException {
 		return existingColumn(con, CASE_USERS_TABLE, List.of("IsDeleted", "is_deleted"));
+	}
+
+	private static String resolveUsersDeletedColumn(Connection con) throws SQLException {
+		return existingColumn(con, USERS_TABLE, List.of("IsDeleted", "is_deleted"));
 	}
 
 	private static String membershipExistsFilter(Integer restrictToUserId, String caseUsersDeletedColumn) {
