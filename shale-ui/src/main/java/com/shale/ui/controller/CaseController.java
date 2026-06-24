@@ -1605,22 +1605,35 @@ public class CaseController {
 							return primaryCompare;
 						return safeText(a.getDisplayName()).compareToIgnoreCase(safeText(b.getDisplayName()));
 					})
-					.map(party -> createOverviewPartyRow(formatOverviewPartyRelationshipMeta(toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId()), party.isPrimary()), safeText(party.getDisplayName())))
+					.map(this::createOverviewPartyRow)
 					.forEach(ovPartiesBox.getChildren()::add);
 		}
 	}
 
 	private Node createOverviewPartyRow(String role, String name) {
-		Label roleLabel = new Label(safeText(role).isBlank() ? "—" : role);
+		return createOverviewPartyRowContent(role, new Label(safeText(name).isBlank() ? "—" : name));
+	}
+
+	private Node createOverviewPartyRow(CasePartyDto party) {
+		String role = formatOverviewPartyRelationshipMeta(
+				toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId()),
+				party.isPrimary());
+		Node card = createPartyEntityCard(party, 300, PartyRenderMode.READ_ONLY_MINI);
+		return createOverviewPartyRowContent(role, card);
+	}
+
+	private Node createOverviewPartyRowContent(String role, Node valueNode) {
+		Label roleLabel = new Label(safeText(role).isBlank() ? "—" : role.replace(" · ", " • "));
 		roleLabel.getStyleClass().add("case-overview-party-role");
 		roleLabel.setMinWidth(170);
 		roleLabel.setPrefWidth(170);
-		Label nameLabel = new Label(safeText(name).isBlank() ? "—" : name);
-		nameLabel.getStyleClass().add("case-overview-party-name");
-		nameLabel.setWrapText(true);
-		HBox row = new HBox(14, roleLabel, nameLabel);
+		if (valueNode instanceof Label label) {
+			label.getStyleClass().add("case-overview-party-name");
+			label.setWrapText(true);
+		}
+		HBox row = new HBox(14, roleLabel, valueNode);
 		row.getStyleClass().add("case-overview-party-row");
-		HBox.setHgrow(nameLabel, Priority.ALWAYS);
+		HBox.setHgrow(valueNode, Priority.ALWAYS);
 		return row;
 	}
 
@@ -1736,9 +1749,7 @@ public class CaseController {
 					null,
 					null
 			);
-			OrganizationCardFactory.Variant variant = (mode == PartyRenderMode.READ_ONLY_MINI)
-					? OrganizationCardFactory.Variant.MINI
-					: OrganizationCardFactory.Variant.COMPACT;
+			OrganizationCardFactory.Variant variant = OrganizationCardFactory.Variant.COMPACT;
 			OrganizationCard card = factory.create(model, variant);
 			card.setSuppressPlaceholderLines(true);
 			card.setMinWidth(partiesCardWidth);
@@ -1760,9 +1771,7 @@ public class CaseController {
 					null,
 					null
 			);
-			ContactCardFactory.Variant variant = (mode == PartyRenderMode.READ_ONLY_MINI)
-					? ContactCardFactory.Variant.MINI
-					: ContactCardFactory.Variant.COMPACT;
+			ContactCardFactory.Variant variant = ContactCardFactory.Variant.COMPACT;
 			ContactCard card = factory.create(model, variant);
 			card.setSuppressPlaceholderLines(true);
 			card.setMinWidth(partiesCardWidth);
@@ -3579,12 +3588,13 @@ public class CaseController {
 		for (CaseDao.StatusRow row : statuses) {
 			options.put(safeText(row.name()).isBlank() ? "Status #" + row.id() : row.name(), row);
 		}
-		ChoiceDialog<String> dialog = new ChoiceDialog<>(currentOverview == null ? null : currentOverview.getCaseStatus(), options.keySet());
-		dialog.setTitle("Edit Case Status");
-		dialog.setHeaderText("Edit Case Status");
-		dialog.setContentText("Current: " + (currentOverview == null ? "—" : safeText(currentOverview.getCaseStatus())) + "\nNew status:");
-		dialog.initOwner(dialogOwner(changeStatusButton));
-		dialog.showAndWait().map(options::get).ifPresent(row -> saveStatusField(row.id()));
+		showChoiceFieldDialog(
+				"Edit Case Status",
+				"Case Status",
+				currentOverview == null ? "—" : safeText(currentOverview.getCaseStatus()),
+				currentOverview == null ? null : currentOverview.getCaseStatus(),
+				options.keySet(),
+				changeStatusButton).map(options::get).ifPresent(row -> saveStatusField(row.id()));
 	}
 
 	private void onEditPracticeAreaField() {
@@ -3595,12 +3605,13 @@ public class CaseController {
 		for (CaseDao.PracticeAreaRow row : areas) {
 			options.put(safeText(row.name()).isBlank() ? "Practice Area #" + row.id() : row.name(), row);
 		}
-		ChoiceDialog<String> dialog = new ChoiceDialog<>(currentOverview == null ? null : currentOverview.getPracticeArea(), options.keySet());
-		dialog.setTitle("Edit Practice Area");
-		dialog.setHeaderText("Edit Practice Area");
-		dialog.setContentText("Current: " + (currentOverview == null ? "—" : safeText(currentOverview.getPracticeArea())) + "\nNew practice area:");
-		dialog.initOwner(dialogOwner(changePracticeAreaButton));
-		dialog.showAndWait().map(options::get).ifPresent(row -> savePracticeAreaField(row.id()));
+		showChoiceFieldDialog(
+				"Edit Practice Area",
+				"Practice Area",
+				currentOverview == null ? "—" : safeText(currentOverview.getPracticeArea()),
+				currentOverview == null ? null : currentOverview.getPracticeArea(),
+				options.keySet(),
+				changePracticeAreaButton).map(options::get).ifPresent(row -> savePracticeAreaField(row.id()));
 	}
 
 	private void onEditResponsibleAttorneyField() {
@@ -3611,12 +3622,44 @@ public class CaseController {
 		for (CaseDao.UserRow row : users) {
 			options.put(safeText(row.displayName()).isBlank() ? "User #" + row.id() : row.displayName(), row);
 		}
-		ChoiceDialog<String> dialog = new ChoiceDialog<>(currentOverview == null ? null : currentOverview.getResponsibleAttorney(), options.keySet());
-		dialog.setTitle("Edit Responsible Attorney");
-		dialog.setHeaderText("Edit Responsible Attorney");
-		dialog.setContentText("Current: " + (currentOverview == null ? "—" : safeText(currentOverview.getResponsibleAttorney())) + "\nNew responsible attorney:");
-		dialog.initOwner(dialogOwner(changeResponsibleAttorneyButton));
-		dialog.showAndWait().map(options::get).ifPresent(row -> saveResponsibleAttorneyField(row.id()));
+		showChoiceFieldDialog(
+				"Edit Responsible Attorney",
+				"Responsible Attorney",
+				currentOverview == null ? "—" : safeText(currentOverview.getResponsibleAttorney()),
+				currentOverview == null ? null : currentOverview.getResponsibleAttorney(),
+				options.keySet(),
+				changeResponsibleAttorneyButton).map(options::get).ifPresent(row -> saveResponsibleAttorneyField(row.id()));
+	}
+
+	private Optional<String> showChoiceFieldDialog(String title, String fieldLabel, String currentValue, String selectedValue, java.util.Collection<String> options, Button ownerButton) {
+		Dialog<String> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveType);
+		ChoiceBox<String> choice = new ChoiceBox<>();
+		choice.getItems().addAll(options == null ? List.of() : options);
+		if (selectedValue != null && choice.getItems().contains(selectedValue)) {
+			choice.getSelectionModel().select(selectedValue);
+		} else if (!choice.getItems().isEmpty()) {
+			choice.getSelectionModel().select(0);
+		}
+		choice.setMaxWidth(Double.MAX_VALUE);
+		Label currentLabel = new Label(safeText(currentValue).isBlank() ? "—" : currentValue);
+		currentLabel.getStyleClass().add("field-edit-current-value");
+		VBox content = new VBox(10,
+				new Label("Current " + fieldLabel),
+				currentLabel,
+				new Label("New " + fieldLabel),
+				choice);
+		content.getStyleClass().add("field-edit-dialog-body");
+		dialog.getDialogPane().setContent(content);
+		Node saveButtonNode = dialog.getDialogPane().lookupButton(saveType);
+		if (saveButtonNode != null) {
+			saveButtonNode.disableProperty().bind(choice.valueProperty().isNull());
+		}
+		dialog.setResultConverter(button -> button == saveType ? choice.getValue() : null);
+		return dialog.showAndWait();
 	}
 
 	private boolean ensureTenantAndCaseForFieldDialog(String fieldLabel) {
@@ -3951,10 +3994,10 @@ public class CaseController {
 
 		for (var r : filtered) {
 			String name = safeText(r.displayName()).isBlank() ? "—" : r.displayName();
-			Label member = new Label(name);
-			member.getStyleClass().add("case-overview-party-name");
-			Tooltip.install(member, new Tooltip(roleLabel(r.roleId())));
-			teamFlow.getChildren().add(member);
+			UserCardModel model = new UserCardModel(userId, name, r.color(), r.initials());
+			Node card = userCardFactory.create(model, Variant.COMPACT);
+			Tooltip.install(card, new Tooltip(roleLabel(r.roleId())));
+			teamFlow.getChildren().add(card);
 		}
 		PerfLog.logDone("RENDER", "panel=team page=case_view caseId=" + caseId + " childCount=" + teamFlow.getChildren().size(), renderStartNanos);
 	}
@@ -3977,12 +4020,6 @@ public class CaseController {
 		Integer tenantId = appState.getShaleClientId();
 		if (tenantId == null || tenantId <= 0) {
 			showError("No tenant is selected.");
-			return;
-		}
-
-		// Only allow team edits while in edit mode (matches your "draft" behavior)
-		if (!editMode) {
-			showError("Click Edit before changing the team.");
 			return;
 		}
 
@@ -4031,18 +4068,7 @@ public class CaseController {
 							attorneyIds
 					);
 
-					dlg.showAndWaitForResult().ifPresent(res ->
-					{
-						// ✅ update draft only
-						draftTeamAssignments = res.assignments().stream()
-								.map(a -> new CaseDao.TeamAssignmentRow(a.userId(), a.roleId()))
-								.toList();
-
-						// ✅ render immediately from draft
-						renderTeamFromDraft();
-
-						// Optional: mark page dirty visually if you want (not required)
-					});
+					dlg.showAndWaitForResult().ifPresent(res -> saveTeamAssignments(activeCaseId, res.assignments()));
 				});
 
 			} catch (Exception ex) {
@@ -4053,6 +4079,30 @@ public class CaseController {
 				});
 			}
 		}, "case-team-editor-load-" + activeCaseId).start();
+	}
+
+	private void saveTeamAssignments(long activeCaseId, List<TeamEditorDialog.TeamAssignment> assignments) {
+		setBusy(true);
+		new Thread(() -> {
+			try {
+				List<CaseDao.TeamAssignmentRow> desired = (assignments == null ? List.<TeamEditorDialog.TeamAssignment>of() : assignments).stream()
+						.map(a -> new CaseDao.TeamAssignmentRow(a.userId(), a.roleId()))
+						.toList();
+				caseDao.replaceCaseTeamAssignments(activeCaseId, desired);
+				addTeamChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId());
+				runOnFx(() -> {
+					setBusy(false);
+					clearError();
+					publishCaseFieldUpdated(activeCaseId, "teamChanged", 1);
+					reloadCurrentCaseForViewMode();
+				});
+			} catch (Exception ex) {
+				runOnFx(() -> {
+					setBusy(false);
+					showError("Failed to save team. " + ex.getMessage());
+				});
+			}
+		}, "case-team-save-" + activeCaseId).start();
 	}
 
 	private void renderTeamFromDraft() {
@@ -4491,7 +4541,7 @@ public class CaseController {
 		if (assignedUserHost != null)
 			assignedUserHost.getChildren().setAll(headerCard);
 		if (ovResponsibleAttorneyHost != null)
-			ovResponsibleAttorneyHost.getChildren().setAll(createOverviewInlineValue(displayName, null));
+			ovResponsibleAttorneyHost.getChildren().setAll(userCardFactory.create(model, Variant.COMPACT));
 	}
 
 	private void renderPrimaryStatusMini(Integer statusId, String statusName, String statusColorCss) {

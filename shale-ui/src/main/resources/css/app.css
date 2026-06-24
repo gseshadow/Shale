@@ -1572,3 +1572,127 @@
     -fx-background-color: rgba(48, 121, 214, 0.10);
     -fx-text-fill: #275fa8;
 }
+
+/* Case Overview polish overrides */
+.case-overview-surface {
+    -fx-background-color: #F8FAFD;
+    -fx-border-color: rgba(88, 124, 166, 0.18);
+    -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.10), 14, 0.16, 0, 2);
+}
+
+.case-overview-section-line {
+    -fx-background-color: rgba(62, 120, 190, 0.42);
+    -fx-min-height: 1;
+    -fx-pref-height: 1;
+    -fx-max-height: 1;
+}
+
+.case-overview-row-label,
+.case-overview-row-value,
+.case-overview-row-value-host,
+.case-overview-party-row {
+    -fx-border-color: transparent transparent rgba(75, 103, 138, 0.13) transparent;
+}
+
+.case-overview-row-label {
+    -fx-text-fill: rgba(24, 53, 83, 0.76);
+}
+
+.case-overview-row-value,
+.case-overview-row-value-host,
+.case-overview-party-name {
+    -fx-text-fill: #132f4c;
+}
+
+.case-overview-row-label:hover,
+.case-overview-row-value:hover,
+.case-overview-row-value-host:hover,
+.case-overview-party-row:hover {
+    -fx-background-color: rgba(72, 128, 198, 0.045);
+}
+
+.button.case-overview-edit-button {
+    -fx-opacity: 0.42;
+    -fx-text-fill: rgba(24, 53, 83, 0.62);
+}
+
+.button.case-overview-edit-button:hover,
+.button.case-overview-edit-button:focused {
+    -fx-opacity: 1.0;
+    -fx-background-color: rgba(48, 121, 214, 0.11);
+    -fx-text-fill: #275fa8;
+}
+
+.case-overview-party-row .contact-card,
+.case-overview-party-row .organization-card,
+.case-overview-row-value-host .user-card,
+.case-overview-row-value-host .contact-card,
+.case-overview-row-value-host .organization-card {
+    -fx-effect: null;
+}
+
+/* Compact, light field-edit dialogs used by Overview edit popups. */
+.dialog-pane.secondary-window-shell,
+.secondary-window-shell {
+    -fx-background-color: #F8FAFD;
+    -fx-border-color: rgba(78, 112, 154, 0.20);
+}
+
+.dialog-pane.secondary-window-shell > .header-panel,
+.secondary-window-header {
+    -fx-background-color: linear-gradient(to bottom, #F7FAFC, #EEF5FB);
+    -fx-background-radius: 14 14 0 0;
+    -fx-padding: 6 10 6 12;
+    -fx-min-height: 52;
+    -fx-pref-height: 54;
+}
+
+.secondary-window-title {
+    -fx-text-fill: #173653;
+    -fx-font-size: 14px;
+    -fx-font-weight: 800;
+}
+
+.secondary-window-close {
+    -fx-text-fill: rgba(23, 54, 83, 0.72);
+}
+
+.dialog-pane.secondary-window-shell > .content,
+.dialog-pane.secondary-window-shell > .button-bar {
+    -fx-background-color: #F8FAFD;
+}
+
+.dialog-pane.secondary-window-shell > .button-bar {
+    -fx-padding: 8 14 14 14;
+}
+
+.field-edit-dialog-body {
+    -fx-padding: 14 16 8 16;
+    -fx-background-color: #F8FAFD;
+}
+
+.field-edit-dialog-body .label {
+    -fx-text-fill: #173653;
+    -fx-font-weight: 700;
+}
+
+.field-edit-current-value {
+    -fx-padding: 8 10 8 10;
+    -fx-background-color: rgba(232, 240, 249, 0.72);
+    -fx-background-radius: 8;
+    -fx-text-fill: #132f4c;
+    -fx-font-weight: 600;
+}
+
+.dialog-pane.secondary-window-shell .button {
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
+    -fx-padding: 7 13 7 13;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+
+.dialog-pane.secondary-window-shell .button:default {
+    -fx-background-color: linear-gradient(to bottom, #4a83d2, #315fba);
+    -fx-text-fill: white;
+}
