@@ -1579,12 +1579,49 @@ public class CaseController {
 		ovPartiesBox.getChildren().clear();
 		List<CasePartyDto> safeParties = caseParties == null ? List.of() : caseParties;
 		if (safeParties.isEmpty()) {
-			Label empty = new Label("No parties added.");
-			empty.setStyle("-fx-opacity: 0.75;");
-			ovPartiesBox.getChildren().add(empty);
+			ovPartiesBox.getChildren().add(createOverviewPartyRow("—", "No parties added."));
 			return;
 		}
-		renderPartyGroups(ovPartiesBox, safeParties, PartyRenderMode.READ_ONLY_MINI, 190, true);
+
+		Map<String, List<CasePartyDto>> grouped = safeParties.stream()
+				.filter(Objects::nonNull)
+				.collect(Collectors.groupingBy(
+						p -> normalizedPartySideKey(p.getSide()),
+						LinkedHashMap::new,
+						Collectors.toList()));
+		Map<String, String> sideLabelsByKey = loadPartySideLabelMap();
+		for (String sideKey : List.of("represented", "opposing", "neutral", "unclassified")) {
+			List<CasePartyDto> group = grouped.get(sideKey);
+			if (group == null || group.isEmpty()) {
+				continue;
+			}
+			Label heading = new Label(toPartySideLabel(sideLabelsByKey, sideKey));
+			heading.getStyleClass().add("case-overview-party-side");
+			ovPartiesBox.getChildren().add(heading);
+			group.stream()
+					.sorted((a, b) -> {
+						int primaryCompare = Boolean.compare(b.isPrimary(), a.isPrimary());
+						if (primaryCompare != 0)
+							return primaryCompare;
+						return safeText(a.getDisplayName()).compareToIgnoreCase(safeText(b.getDisplayName()));
+					})
+					.map(party -> createOverviewPartyRow(formatOverviewPartyRelationshipMeta(toPartyRoleLabel(party.getPartyRoleName(), party.getPartyRoleId()), party.isPrimary()), safeText(party.getDisplayName())))
+					.forEach(ovPartiesBox.getChildren()::add);
+		}
+	}
+
+	private Node createOverviewPartyRow(String role, String name) {
+		Label roleLabel = new Label(safeText(role).isBlank() ? "—" : role);
+		roleLabel.getStyleClass().add("case-overview-party-role");
+		roleLabel.setMinWidth(170);
+		roleLabel.setPrefWidth(170);
+		Label nameLabel = new Label(safeText(name).isBlank() ? "—" : name);
+		nameLabel.getStyleClass().add("case-overview-party-name");
+		nameLabel.setWrapText(true);
+		HBox row = new HBox(14, roleLabel, nameLabel);
+		row.getStyleClass().add("case-overview-party-row");
+		HBox.setHgrow(nameLabel, Priority.ALWAYS);
+		return row;
 	}
 
 	private void renderPartyGroups(VBox target, List<CasePartyDto> parties, PartyRenderMode mode, double entityCardWidth, boolean compactHeadings) {
@@ -3912,26 +3949,12 @@ public class CaseController {
 			return;
 		}
 
-		if (userCardFactory == null) {
-			userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
-			{
-			} : onOpenUser);
-		}
-
 		for (var r : filtered) {
-			Integer userId = r.userId();
 			String name = safeText(r.displayName()).isBlank() ? "—" : r.displayName();
-			String color = r.color();
-			String initials = r.initials();
-
-			UserCardModel model = new UserCardModel(userId, name, color, initials);
-			var card = userCardFactory.create(model, Variant.MINI);
-
-			Label role = new Label(roleLabel(r.roleId()));
-			role.getStyleClass().add("muted");
-
-			VBox wrap = new VBox(4, card, role);
-			teamFlow.getChildren().add(wrap);
+			Label member = new Label(name);
+			member.getStyleClass().add("case-overview-party-name");
+			Tooltip.install(member, new Tooltip(roleLabel(r.roleId())));
+			teamFlow.getChildren().add(member);
 		}
 		PerfLog.logDone("RENDER", "panel=team page=case_view caseId=" + caseId + " childCount=" + teamFlow.getChildren().size(), renderStartNanos);
 	}
@@ -4464,12 +4487,11 @@ public class CaseController {
 		);
 
 		var headerCard = userCardFactory.create(model, Variant.MINI);
-		var overviewCard = userCardFactory.create(model, Variant.MINI);
 
 		if (assignedUserHost != null)
 			assignedUserHost.getChildren().setAll(headerCard);
 		if (ovResponsibleAttorneyHost != null)
-			ovResponsibleAttorneyHost.getChildren().setAll(overviewCard);
+			ovResponsibleAttorneyHost.getChildren().setAll(createOverviewInlineValue(displayName, null));
 	}
 
 	private void renderPrimaryStatusMini(Integer statusId, String statusName, String statusColorCss) {
@@ -4487,12 +4509,11 @@ public class CaseController {
 		);
 
 		var headerCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
-		var overviewCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
 
 		if (statusHost != null)
 			statusHost.getChildren().setAll(headerCard);
 		if (ovCaseStatusHost != null)
-			ovCaseStatusHost.getChildren().setAll(overviewCard);
+			ovCaseStatusHost.getChildren().setAll(createOverviewInlineValue(statusName, statusColorCss));
 	}
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {
@@ -4512,9 +4533,26 @@ public class CaseController {
 				colorHex
 		);
 
-		ovPracticeAreaHost.getChildren().setAll(
-				practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI)
-		);
+		ovPracticeAreaHost.getChildren().setAll(createOverviewInlineValue(name, colorHex));
+	}
+
+	private Node createOverviewInlineValue(String value, String colorCss) {
+		String display = safeText(value).trim();
+		Label label = new Label(display.isBlank() ? "—" : display);
+		label.getStyleClass().add("case-overview-row-value");
+		label.setWrapText(true);
+		if (safeText(colorCss).isBlank()) {
+			return label;
+		}
+		Region dot = new Region();
+		dot.setMinSize(9, 9);
+		dot.setPrefSize(9, 9);
+		dot.setMaxSize(9, 9);
+		dot.setStyle("-fx-background-radius: 999; -fx-background-color: " + ColorUtil.toCssBackgroundColor(colorCss) + ";");
+		HBox row = new HBox(6, dot, label);
+		row.setAlignment(Pos.CENTER_LEFT);
+		row.getStyleClass().add("case-overview-row-value-host");
+		return row;
 	}
 
 	private void renderDetailsStatusMini(Integer statusId, String statusName, String statusColorCss) {
