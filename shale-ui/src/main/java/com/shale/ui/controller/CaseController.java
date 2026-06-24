@@ -632,7 +632,8 @@ public class CaseController {
 			List<CaseDao.SelectableContactRow> contacts,
 			List<CaseDao.SelectableOrganizationRow> organizations,
 			List<PartySideOption> sideOptions,
-			List<OrganizationDao.OrganizationTypeRow> organizationTypes) {
+			List<OrganizationDao.OrganizationTypeRow> organizationTypes
+	) {
 	}
 
 	private record CallerPartySelection(Integer contactId, String displayName) {
@@ -816,7 +817,8 @@ public class CaseController {
 					.addListener((obs, oldV, newV) -> refreshCaseTasks());
 		}
 		if (caseTasksShowCompletedButton != null) {
-			caseTasksShowCompletedButton.setOnAction(e -> {
+			caseTasksShowCompletedButton.setOnAction(e ->
+			{
 				showCompletedCaseTasks = !showCompletedCaseTasks;
 				updateCaseTaskCompletionToggleLabel();
 				renderTasksSection();
@@ -852,7 +854,8 @@ public class CaseController {
 		ensureStyleClass(area, "detail-large-text");
 		Text measurer = new Text();
 		measurer.fontProperty().bind(area.fontProperty());
-		Runnable recomputeHeight = () -> {
+		Runnable recomputeHeight = () ->
+		{
 			String text = area.getText();
 			measurer.setText((text == null || text.isEmpty()) ? " " : text);
 			Insets insets = area.getInsets();
@@ -876,7 +879,8 @@ public class CaseController {
 		if (caseRootPane == null) {
 			return;
 		}
-		caseRootPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
+		caseRootPane.sceneProperty().addListener((obs, oldScene, newScene) ->
+		{
 			if (newScene == null) {
 				unsubscribeLiveCaseUpdates();
 			} else {
@@ -1199,10 +1203,12 @@ public class CaseController {
 			return;
 		}
 		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				List<CaseStatusHistoryDto> history = caseDao.listCaseStatusHistory(activeCaseId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId != null && caseId.longValue() == activeCaseId) {
 						renderStatusTimeline(history);
 					}
@@ -1599,7 +1605,8 @@ public class CaseController {
 			heading.getStyleClass().add("case-overview-party-side");
 			ovPartiesBox.getChildren().add(heading);
 			group.stream()
-					.sorted((a, b) -> {
+					.sorted((a, b) ->
+					{
 						int primaryCompare = Boolean.compare(b.isPrimary(), a.isPrimary());
 						if (primaryCompare != 0)
 							return primaryCompare;
@@ -1828,15 +1835,15 @@ public class CaseController {
 					label = toPartySideLabel(Map.of(), key);
 				out.add(new PartySideOption(label, key));
 			}
-				if (out.isEmpty()) {
-					List<PartySideOption> defaults = defaultPartySideOptions();
-					cachedPartySideOptions = defaults;
-					return defaults;
-				}
-				out.add(new PartySideOption("Unaffiliated", null));
-				List<PartySideOption> loaded = List.copyOf(out);
-				cachedPartySideOptions = loaded;
-				return loaded;
+			if (out.isEmpty()) {
+				List<PartySideOption> defaults = defaultPartySideOptions();
+				cachedPartySideOptions = defaults;
+				return defaults;
+			}
+			out.add(new PartySideOption("Unaffiliated", null));
+			List<PartySideOption> loaded = List.copyOf(out);
+			cachedPartySideOptions = loaded;
+			return loaded;
 		} catch (Exception ignored) {
 			List<PartySideOption> defaults = defaultPartySideOptions();
 			cachedPartySideOptions = defaults;
@@ -1858,7 +1865,8 @@ public class CaseController {
 		if (tenantId <= 0 || caseDao == null) {
 			return List.of();
 		}
-		return statusesByTenantCache.computeIfAbsent(tenantId, key -> {
+		return statusesByTenantCache.computeIfAbsent(tenantId, key ->
+		{
 			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(key);
 			return statuses == null ? List.of() : List.copyOf(statuses);
 		});
@@ -1868,7 +1876,8 @@ public class CaseController {
 		if (tenantId <= 0 || caseDao == null) {
 			return List.of();
 		}
-		return practiceAreasByTenantCache.computeIfAbsent(tenantId, key -> {
+		return practiceAreasByTenantCache.computeIfAbsent(tenantId, key ->
+		{
 			List<CaseDao.PracticeAreaRow> areas = caseDao.listPracticeAreasForTenant(key);
 			return areas == null ? List.of() : List.copyOf(areas);
 		});
@@ -1919,7 +1928,8 @@ public class CaseController {
 			return;
 		final long activeCaseId = caseId.longValue();
 		setPartyDialogLoading(true);
-		loadPartyDialogDataAsync(activeCaseId, data -> {
+		loadPartyDialogDataAsync(activeCaseId, data ->
+		{
 			setPartyDialogLoading(false);
 			PartyAddWorkflowDialog.AddPartyDraft draft = showAddPartyWizardDialog(data);
 			if (draft == null)
@@ -1955,7 +1965,8 @@ public class CaseController {
 			return;
 		final long activeCaseId = caseId.longValue();
 		setPartyDialogLoading(true);
-		loadPartyDialogDataAsync(activeCaseId, data -> {
+		loadPartyDialogDataAsync(activeCaseId, data ->
+		{
 			setPartyDialogLoading(false);
 			PartyEditorResult result = showPartyEditorDialog(party, data);
 			if (result == null)
@@ -1993,10 +2004,12 @@ public class CaseController {
 	}
 
 	private void loadPartyDialogDataAsync(long activeCaseId, Consumer<PartyDialogData> onLoaded) {
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				PartyDialogData data = loadPartyDialogData(activeCaseId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId == null || caseId.longValue() != activeCaseId) {
 						return;
 					}
@@ -2005,7 +2018,8 @@ public class CaseController {
 					}
 				});
 			} catch (Exception ex) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					setPartyDialogLoading(false);
 					showError("Failed to load party options. " + ex.getMessage());
 				});
@@ -2106,7 +2120,7 @@ public class CaseController {
 		ChoiceBox<PartyEntityOption> entityChoice = new ChoiceBox<>();
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
-			sideChoice.getItems().addAll(data == null ? List.of() : data.sideOptions());
+		sideChoice.getItems().addAll(data == null ? List.of() : data.sideOptions());
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override
 			public String toString(PartySideOption object) {
@@ -2496,7 +2510,8 @@ public class CaseController {
 		}
 
 		final int activeCaseId = caseId;
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			List<TaskPriorityOptionDto> priorities;
 			try {
 				priorities = caseTaskService.loadActivePriorities(shaleClientId);
@@ -2515,7 +2530,8 @@ public class CaseController {
 				return;
 			}
 
-			runOnFx(() -> {
+			runOnFx(() ->
+			{
 				Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
 						taskDialogOwner(),
 						priorities,
@@ -2577,159 +2593,159 @@ public class CaseController {
 	}
 
 	private void showTaskDetailPopup(Long taskId) {
-	    long clickReceivedAt = PerfLog.start();
-	    PerfLog.log("TASK_DETAIL_TIMING", "click_received", "context=CASE_TASKS taskId=" + taskId);
-	    if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
-	        return;
-	    }
+		long clickReceivedAt = PerfLog.start();
+		PerfLog.log("TASK_DETAIL_TIMING", "click_received", "context=CASE_TASKS taskId=" + taskId);
+		if (taskId == null || taskId <= 0 || caseTaskService == null || appState == null) {
+			return;
+		}
 
-	    Integer shaleClientId = appState.getShaleClientId();
-	    Integer currentUserId = appState.getUserId();
-	    if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
-	        showTaskActionError("You must be signed in to edit tasks.");
-	        return;
-	    }
-	    if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
-	        PerfLog.log("TASK_DETAIL_TIMING", "open_skipped_in_flight", "context=CASE_TASKS taskId=" + taskId);
-	        return;
-	    }
-        Optional<CaseTaskListItemDto> summary = findCaseTaskById(taskId);
-        TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
-                taskId,
-                summary.map(CaseTaskListItemDto::caseId).orElse(0L),
-                summary.map(CaseTaskListItemDto::caseName).orElse(""),
-                summary.map(CaseTaskListItemDto::caseResponsibleAttorney).orElse(""),
-                summary.map(CaseTaskListItemDto::caseResponsibleAttorneyColor).orElse(""),
-                summary.map(CaseTaskListItemDto::caseNonEngagementLetterSent).orElse(null),
-                summary.map(CaseTaskListItemDto::title).orElse(""),
-                summary.map(CaseTaskListItemDto::description).orElse(""),
-                summary.map(CaseTaskListItemDto::dueAt).orElse(null),
-                null,
-                null,
-                summary.map(CaseTaskListItemDto::createdByDisplayName).orElse(""),
-                List.of(),
-                List.of(),
-                List.of(),
-                summary.map(item -> item.completedAt() != null).orElse(false));
-        PerfLog.logElapsed("TASK_DETAIL_TIMING", "shell_stage_created", "context=CASE_TASKS taskId=" + taskId, PerfLog.elapsedMs(clickReceivedAt));
-		    try {
-		    	auditTaskRead(taskId);
-		        Optional<TaskDetailDialog.TaskDetailResult> result =
-		                TaskDetailDialog.showAndWait(
-	                        "CASE_TASKS",
-	                        clickReceivedAt,
-	                        taskDialogOwner(),
-	                        model,
-	                        List.of(),
-	                        List.of(),
-	                        id -> {
-	                            TaskDetailDto detail = caseTaskService.loadTaskDetail(id, shaleClientId);
-	                            List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
-	                            List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
-	                            if (detail == null) {
-	                                throw new IllegalStateException("Task was not found or may have been deleted.");
-	                            }
-	                            return new TaskDetailDialog.CoreTaskHydration(detail, statuses, priorities);
-	                        },
-	                        id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
-	                        id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
-	                                .map(member -> new TaskDetailDialog.AssignedTeamMember(
-	                                        member.userId(),
-	                                        member.displayName(),
-	                                        member.color()))
-	                                .toList(),
-	                        id -> caseTaskService.loadTaskActivity(id, shaleClientId).stream()
-	                                .map(item -> new TaskDetailDialog.TaskActivityEntry(
-	                                        item.title(),
-	                                        item.body(),
-	                                        item.actorDisplayName(),
-	                                        item.occurredAt()))
-	                                .toList(),
-	                        id -> caseTaskService.loadTaskNotes(id, shaleClientId).stream()
-	                                .map(note -> new TaskDetailDialog.TaskNoteEntry(
-	                                        note.id(),
-	                                        note.userId(),
-	                                        note.userDisplayName(),
-	                                        note.body(),
-	                                        note.createdAt(),
-	                                        note.updatedAt(),
-	                                        note.userId() == currentUserId))
-	                                .toList(),
-	                        new TaskDetailDialog.AssignmentEditor() {
-	                                        @Override
-	                                        public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
-	                                            caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-	                                            return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-	                                                    .map(member -> new TaskDetailDialog.AssignedTeamMember(
-	                                                            member.userId(),
-	                                                            member.displayName(),
-	                                                            member.color()))
-	                                                    .toList();
-	                                        }
+		Integer shaleClientId = appState.getShaleClientId();
+		Integer currentUserId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
+			showTaskActionError("You must be signed in to edit tasks.");
+			return;
+		}
+		if (!taskDetailDialogInFlight.compareAndSet(false, true)) {
+			PerfLog.log("TASK_DETAIL_TIMING", "open_skipped_in_flight", "context=CASE_TASKS taskId=" + taskId);
+			return;
+		}
+		Optional<CaseTaskListItemDto> summary = findCaseTaskById(taskId);
+		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+				taskId,
+				summary.map(CaseTaskListItemDto::caseId).orElse(0L),
+				summary.map(CaseTaskListItemDto::caseName).orElse(""),
+				summary.map(CaseTaskListItemDto::caseResponsibleAttorney).orElse(""),
+				summary.map(CaseTaskListItemDto::caseResponsibleAttorneyColor).orElse(""),
+				summary.map(CaseTaskListItemDto::caseNonEngagementLetterSent).orElse(null),
+				summary.map(CaseTaskListItemDto::title).orElse(""),
+				summary.map(CaseTaskListItemDto::description).orElse(""),
+				summary.map(CaseTaskListItemDto::dueAt).orElse(null),
+				null,
+				null,
+				summary.map(CaseTaskListItemDto::createdByDisplayName).orElse(""),
+				List.of(),
+				List.of(),
+				List.of(),
+				summary.map(item -> item.completedAt() != null).orElse(false));
+		PerfLog.logElapsed("TASK_DETAIL_TIMING", "shell_stage_created", "context=CASE_TASKS taskId=" + taskId, PerfLog.elapsedMs(clickReceivedAt));
+		try {
+			auditTaskRead(taskId);
+			Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+					"CASE_TASKS",
+					clickReceivedAt,
+					taskDialogOwner(),
+					model,
+					List.of(),
+					List.of(),
+					id ->
+					{
+						TaskDetailDto detail = caseTaskService.loadTaskDetail(id, shaleClientId);
+						List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
+						List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
+						if (detail == null) {
+							throw new IllegalStateException("Task was not found or may have been deleted.");
+						}
+						return new TaskDetailDialog.CoreTaskHydration(detail, statuses, priorities);
+					},
+					id -> caseTaskService.loadAssignableUsersForTask(id, shaleClientId),
+					id -> caseTaskService.loadAssignedUsersForTask(id, shaleClientId).stream()
+							.map(member -> new TaskDetailDialog.AssignedTeamMember(
+									member.userId(),
+									member.displayName(),
+									member.color()))
+							.toList(),
+					id -> caseTaskService.loadTaskActivity(id, shaleClientId).stream()
+							.map(item -> new TaskDetailDialog.TaskActivityEntry(
+									item.title(),
+									item.body(),
+									item.actorDisplayName(),
+									item.occurredAt()))
+							.toList(),
+					id -> caseTaskService.loadTaskNotes(id, shaleClientId).stream()
+							.map(note -> new TaskDetailDialog.TaskNoteEntry(
+									note.id(),
+									note.userId(),
+									note.userDisplayName(),
+									note.body(),
+									note.createdAt(),
+									note.updatedAt(),
+									note.userId() == currentUserId))
+							.toList(),
+					new TaskDetailDialog.AssignmentEditor() {
+						@Override
+						public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
+							caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+							return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+									.map(member -> new TaskDetailDialog.AssignedTeamMember(
+											member.userId(),
+											member.displayName(),
+											member.color()))
+									.toList();
+						}
 
-	                                        @Override
-	                                        public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
-	                                            caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
-	                                            return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
-	                                                    .map(member -> new TaskDetailDialog.AssignedTeamMember(
-	                                                            member.userId(),
-	                                                            member.displayName(),
-	                                                            member.color()))
-	                                                    .toList();
-	                                        }
-	                        },
-                            new TaskDetailDialog.NotesEditor() {
-                                                @Override
-                                                public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
-                                                    caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
-                                                    return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
-                                                            .map(note -> new TaskDetailDialog.TaskNoteEntry(
-                                                                    note.id(),
-                                                                    note.userId(),
-                                                                    note.userDisplayName(),
-                                                                    note.body(),
-                                                                    note.createdAt(),
-                                                                    note.updatedAt(),
-                                                                    note.userId() == currentUserId))
-                                                            .toList();
-                                                }
+						@Override
+						public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
+							caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+							return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
+									.map(member -> new TaskDetailDialog.AssignedTeamMember(
+											member.userId(),
+											member.displayName(),
+											member.color()))
+									.toList();
+						}
+					},
+					new TaskDetailDialog.NotesEditor() {
+						@Override
+						public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
+							caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
+							return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+									.map(note -> new TaskDetailDialog.TaskNoteEntry(
+											note.id(),
+											note.userId(),
+											note.userDisplayName(),
+											note.body(),
+											note.createdAt(),
+											note.updatedAt(),
+											note.userId() == currentUserId))
+									.toList();
+						}
 
-                                                @Override
-                                                public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
-                                                    caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
-                                                    return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
-                                                            .map(note -> new TaskDetailDialog.TaskNoteEntry(
-                                                                    note.id(),
-                                                                    note.userId(),
-                                                                    note.userDisplayName(),
-                                                                    note.body(),
-                                                                    note.createdAt(),
-                                                                    note.updatedAt(),
-                                                                    note.userId() == currentUserId))
-                                                            .toList();
-                                                }
-                            },
-                            onOpenUser,
-	                        onOpenCase);
-	        if (result.isEmpty()) {
-	            return;
-	        }
-	        TaskDetailDialog.TaskDetailResult action = result.get();
-	        if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
-	            deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
-	            return;
-	        }
-	        TaskDetailDialog.SaveTaskPayload payload = action.payload();
-	        if (payload == null) {
-	            return;
-	        }
-	        saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
-	    } catch (Exception ex) {
-	        logTaskActionException("load-detail", ex);
-	        showTaskActionError("Failed to load task details. " + rootCauseMessage(ex));
-	    } finally {
-	        taskDetailDialogInFlight.set(false);
-	    }
+						@Override
+						public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
+							caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
+							return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+									.map(note -> new TaskDetailDialog.TaskNoteEntry(
+											note.id(),
+											note.userId(),
+											note.userDisplayName(),
+											note.body(),
+											note.createdAt(),
+											note.updatedAt(),
+											note.userId() == currentUserId))
+									.toList();
+						}
+					},
+					onOpenUser,
+					onOpenCase);
+			if (result.isEmpty()) {
+				return;
+			}
+			TaskDetailDialog.TaskDetailResult action = result.get();
+			if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
+				deleteTaskFromDetail(taskId, shaleClientId, currentUserId);
+				return;
+			}
+			TaskDetailDialog.SaveTaskPayload payload = action.payload();
+			if (payload == null) {
+				return;
+			}
+			saveTaskFromDetail(taskId, shaleClientId, currentUserId, payload);
+		} catch (Exception ex) {
+			logTaskActionException("load-detail", ex);
+			showTaskActionError("Failed to load task details. " + rootCauseMessage(ex));
+		} finally {
+			taskDetailDialogInFlight.set(false);
+		}
 	}
 
 	private void auditTaskRead(Long taskId) {
@@ -2769,7 +2785,8 @@ public class CaseController {
 	}
 
 	private void deleteTaskFromDetail(long taskId, int shaleClientId, int currentUserId) {
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 				runOnFx(this::refreshCaseTasks);
@@ -2945,11 +2962,13 @@ public class CaseController {
 			return;
 		}
 		final long activeCaseId = caseId.longValue();
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				CaseOverviewDto overview = caseDao.getOverview(activeCaseId);
 				CaseDetailDto detail = caseDao.getDetail(activeCaseId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId == null || caseId.longValue() != activeCaseId) {
 						return;
 					}
@@ -2988,10 +3007,12 @@ public class CaseController {
 			return;
 		}
 		final int activeCaseId = caseId;
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				List<CaseTaskService.TaskActivityItem> events = caseTaskService.loadCaseTaskActivity(activeCaseId, shaleClientId);
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					if (caseId == null || caseId != activeCaseId) {
 						return;
 					}
@@ -3459,25 +3480,29 @@ public class CaseController {
 	// Change actions
 	// ----------------------------
 
-
 	private void onEditCaseNameField() {
-		showTextFieldDialog("Edit Case Name", "Case name", currentOverview == null ? "" : currentOverview.getCaseName(), true, value -> saveCoreOverviewField("name", value, null, null));
+		showTextFieldDialog("Edit Case Name", "Case name", currentOverview == null ? "" : currentOverview.getCaseName(), true, value -> saveCoreOverviewField("name", value, null,
+				null));
 	}
 
 	private void onEditCaseNumberField() {
-		showTextFieldDialog("Edit Case Number", "Case number", currentOverview == null ? "" : currentOverview.getCaseNumber(), false, value -> saveCoreOverviewField("caseNumber", value, null, null));
+		showTextFieldDialog("Edit Case Number", "Case number", currentOverview == null ? "" : currentOverview.getCaseNumber(), false, value -> saveCoreOverviewField("caseNumber",
+				value, null, null));
 	}
 
 	private void onEditDescriptionField() {
-		showTextAreaDialog("Edit Description", "Description / summary notes", currentOverview == null ? "" : currentOverview.getDescription(), value -> saveCoreOverviewField("description", value, null, null));
+		showTextAreaDialog("Edit Description", "Description / summary notes", currentOverview == null ? "" : currentOverview.getDescription(), value -> saveCoreOverviewField(
+				"description", value, null, null));
 	}
 
 	private void onEditIncidentDateField() {
-		showDateFieldDialog("Edit Incident Date", "Incident date", currentOverview == null ? null : currentOverview.getIncidentDate(), value -> saveCoreOverviewField("incidentDate", null, value, null));
+		showDateFieldDialog("Edit Incident Date", "Incident date", currentOverview == null ? null : currentOverview.getIncidentDate(), value -> saveCoreOverviewField(
+				"incidentDate", null, value, null));
 	}
 
 	private void onEditSolDateField() {
-		showDateFieldDialog("Edit SOL Date", "SOL date", currentOverview == null ? null : currentOverview.getSolDate(), value -> saveCoreOverviewField("solDate", null, null, value));
+		showDateFieldDialog("Edit SOL Date", "SOL date", currentOverview == null ? null : currentOverview.getSolDate(), value -> saveCoreOverviewField("solDate", null, null,
+				value));
 	}
 
 	private void showTextFieldDialog(String title, String label, String currentValue, boolean required, Consumer<String> onSave) {
@@ -3494,7 +3519,8 @@ public class CaseController {
 		VBox box = new VBox(8, new Label(label), new Label("Current: " + (safeText(currentValue).isBlank() ? "—" : safeText(currentValue))), field, error);
 		dialog.getDialogPane().setContent(box);
 		Node save = dialog.getDialogPane().lookupButton(saveType);
-		save.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+		save.addEventFilter(javafx.event.ActionEvent.ACTION, e ->
+		{
 			if (required && safeText(field.getText()).trim().isBlank()) {
 				error.setText(label + " is required.");
 				error.setVisible(true);
@@ -3540,7 +3566,8 @@ public class CaseController {
 		long activeCaseId = caseId.longValue();
 		setBusy(true);
 		clearError();
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				CaseDetailDto latest = caseDao.getDetail(activeCaseId);
 				if (latest == null || latest.getRowVer() == null || latest.getRowVer().length == 0) {
@@ -3551,27 +3578,35 @@ public class CaseController {
 				String description = "description".equals(field) ? safeText(textValue) : latest.getDescription();
 				LocalDate injury = "incidentDate".equals(field) ? incidentDate : latest.getDateOfInjury();
 				LocalDate sol = "solDate".equals(field) ? solDate : latest.getStatuteOfLimitations();
-				CaseDetailDto updated = caseDao.updateCase(activeCaseId, name, number, description, injury, sol, latest.getRowVer(), appState == null ? null : appState.getUserId());
+				CaseDetailDto updated = caseDao.updateCase(activeCaseId, name, number, description, injury, sol, latest.getRowVer(), appState == null ? null
+						: appState.getUserId());
 				if (updated == null) {
-					runOnFx(() -> { setBusy(false); showError("This case was updated elsewhere. Reload and try again."); reloadCurrentCaseForViewMode(); });
+					runOnFx(() ->
+					{
+						setBusy(false);
+						showError("This case was updated elsewhere. Reload and try again.");
+						reloadCurrentCaseForViewMode();
+					});
 					return;
 				}
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					applyCurrentDetailSnapshot(updated);
 					applyDetail(updated);
 					setBusy(false);
 					publishCaseFieldUpdated(activeCaseId, field, switch (field) {
-						case "name" -> name;
-						case "caseNumber" -> number;
-						case "description" -> description;
-						case "incidentDate" -> injury == null ? null : injury.toString();
-						case "solDate" -> sol == null ? null : sol.toString();
-						default -> null;
+					case "name" -> name;
+					case "caseNumber" -> number;
+					case "description" -> description;
+					case "incidentDate" -> injury == null ? null : injury.toString();
+					case "solDate" -> sol == null ? null : sol.toString();
+					default -> null;
 					});
 					reloadCurrentCaseForViewMode();
 				});
 			} catch (Exception ex) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					setBusy(false);
 					showError("Failed to save " + field + ". " + ex.getMessage());
 				});
@@ -3579,9 +3614,9 @@ public class CaseController {
 		}, "case-field-save-" + activeCaseId + "-" + field).start();
 	}
 
-
 	private void onEditStatusField() {
-		if (!ensureTenantAndCaseForFieldDialog("status")) return;
+		if (!ensureTenantAndCaseForFieldDialog("status"))
+			return;
 		int tenantId = appState.getShaleClientId();
 		List<CaseDao.StatusRow> statuses = statusesForTenantCached(tenantId);
 		Map<String, CaseDao.StatusRow> options = new LinkedHashMap<>();
@@ -3598,7 +3633,8 @@ public class CaseController {
 	}
 
 	private void onEditPracticeAreaField() {
-		if (!ensureTenantAndCaseForFieldDialog("practice area")) return;
+		if (!ensureTenantAndCaseForFieldDialog("practice area"))
+			return;
 		int tenantId = appState.getShaleClientId();
 		List<CaseDao.PracticeAreaRow> areas = practiceAreasForTenantCached(tenantId);
 		Map<String, CaseDao.PracticeAreaRow> options = new LinkedHashMap<>();
@@ -3615,7 +3651,8 @@ public class CaseController {
 	}
 
 	private void onEditResponsibleAttorneyField() {
-		if (!ensureTenantAndCaseForFieldDialog("responsible attorney")) return;
+		if (!ensureTenantAndCaseForFieldDialog("responsible attorney"))
+			return;
 		int tenantId = appState.getShaleClientId();
 		List<CaseDao.UserRow> users = caseDao.listUsersForTenant(tenantId);
 		Map<String, CaseDao.UserRow> options = new LinkedHashMap<>();
@@ -3631,7 +3668,8 @@ public class CaseController {
 				changeResponsibleAttorneyButton).map(options::get).ifPresent(row -> saveResponsibleAttorneyField(row.id()));
 	}
 
-	private Optional<String> showChoiceFieldDialog(String title, String fieldLabel, String currentValue, String selectedValue, java.util.Collection<String> options, Button ownerButton) {
+	private Optional<String> showChoiceFieldDialog(String title, String fieldLabel, String currentValue, String selectedValue, java.util.Collection<String> options,
+			Button ownerButton) {
 		Dialog<String> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, title);
 		dialog.initOwner(dialogOwner(ownerButton));
@@ -3673,15 +3711,29 @@ public class CaseController {
 	private void saveStatusField(int statusId) {
 		long activeCaseId = caseId.longValue();
 		setBusy(true);
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				Integer oldStatusId = currentOverview == null ? null : currentOverview.getPrimaryStatusId();
 				String oldStatusName = currentOverview == null ? null : currentOverview.getCaseStatus();
 				caseDao.setPrimaryStatus(activeCaseId, statusId, null);
 				CaseDetailDto latest = caseDao.getDetail(activeCaseId);
 				addStatusChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId(), oldStatusId, oldStatusName, statusId, null);
-				runOnFx(() -> { applyCurrentDetailSnapshot(latest); applyDetail(latest); setBusy(false); publishCaseFieldUpdated(activeCaseId, "primaryStatusId", statusId); reloadCurrentCaseForViewMode(); });
-			} catch (Exception ex) { runOnFx(() -> { setBusy(false); showError("Failed to save status. " + ex.getMessage()); }); }
+				runOnFx(() ->
+				{
+					applyCurrentDetailSnapshot(latest);
+					applyDetail(latest);
+					setBusy(false);
+					publishCaseFieldUpdated(activeCaseId, "primaryStatusId", statusId);
+					reloadCurrentCaseForViewMode();
+				});
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					setBusy(false);
+					showError("Failed to save status. " + ex.getMessage());
+				});
+			}
 		}, "case-status-field-save-" + activeCaseId).start();
 	}
 
@@ -3689,28 +3741,52 @@ public class CaseController {
 		long activeCaseId = caseId.longValue();
 		int tenantId = appState.getShaleClientId();
 		setBusy(true);
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				Integer oldId = currentOverview == null ? null : currentOverview.getPracticeAreaId();
 				String oldName = currentOverview == null ? null : currentOverview.getPracticeArea();
 				caseDao.setPracticeArea(activeCaseId, tenantId, practiceAreaId);
 				addPracticeAreaChangedTimelineEvent(activeCaseId, tenantId, appState.getUserId(), oldId, oldName, practiceAreaId, null);
-				runOnFx(() -> { setBusy(false); publishCaseFieldUpdated(activeCaseId, "practiceAreaId", practiceAreaId); reloadCurrentCaseForViewMode(); });
-			} catch (Exception ex) { runOnFx(() -> { setBusy(false); showError("Failed to save practice area. " + ex.getMessage()); }); }
+				runOnFx(() ->
+				{
+					setBusy(false);
+					publishCaseFieldUpdated(activeCaseId, "practiceAreaId", practiceAreaId);
+					reloadCurrentCaseForViewMode();
+				});
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					setBusy(false);
+					showError("Failed to save practice area. " + ex.getMessage());
+				});
+			}
 		}, "case-practice-area-field-save-" + activeCaseId).start();
 	}
 
 	private void saveResponsibleAttorneyField(int userId) {
 		long activeCaseId = caseId.longValue();
 		setBusy(true);
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				Integer oldId = currentOverview == null ? null : currentOverview.getResponsibleAttorneyUserId();
 				String oldName = currentOverview == null ? null : currentOverview.getResponsibleAttorney();
 				caseDao.setResponsibleAttorney(activeCaseId, userId);
 				addResponsibleAttorneyChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId(), oldId, oldName, userId, null);
-				runOnFx(() -> { setBusy(false); publishCaseFieldUpdated(activeCaseId, "responsibleAttorneyUserId", userId); reloadCurrentCaseForViewMode(); });
-			} catch (Exception ex) { runOnFx(() -> { setBusy(false); showError("Failed to save responsible attorney. " + ex.getMessage()); }); }
+				runOnFx(() ->
+				{
+					setBusy(false);
+					publishCaseFieldUpdated(activeCaseId, "responsibleAttorneyUserId", userId);
+					reloadCurrentCaseForViewMode();
+				});
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					setBusy(false);
+					showError("Failed to save responsible attorney. " + ex.getMessage());
+				});
+			}
 		}, "case-responsible-attorney-field-save-" + activeCaseId).start();
 	}
 
@@ -3994,7 +4070,7 @@ public class CaseController {
 
 		for (var r : filtered) {
 			String name = safeText(r.displayName()).isBlank() ? "—" : r.displayName();
-			UserCardModel model = new UserCardModel(userId, name, r.color(), r.initials());
+			UserCardModel model = new UserCardModel(r.userId(), name, r.color(), r.initials());
 			Node card = userCardFactory.create(model, Variant.COMPACT);
 			Tooltip.install(card, new Tooltip(roleLabel(r.roleId())));
 			teamFlow.getChildren().add(card);
@@ -4083,21 +4159,24 @@ public class CaseController {
 
 	private void saveTeamAssignments(long activeCaseId, List<TeamEditorDialog.TeamAssignment> assignments) {
 		setBusy(true);
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				List<CaseDao.TeamAssignmentRow> desired = (assignments == null ? List.<TeamEditorDialog.TeamAssignment>of() : assignments).stream()
 						.map(a -> new CaseDao.TeamAssignmentRow(a.userId(), a.roleId()))
 						.toList();
 				caseDao.replaceCaseTeamAssignments(activeCaseId, desired);
 				addTeamChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId());
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					setBusy(false);
 					clearError();
 					publishCaseFieldUpdated(activeCaseId, "teamChanged", 1);
 					reloadCurrentCaseForViewMode();
 				});
 			} catch (Exception ex) {
-				runOnFx(() -> {
+				runOnFx(() ->
+				{
 					setBusy(false);
 					showError("Failed to save team. " + ex.getMessage());
 				});
@@ -4221,9 +4300,10 @@ public class CaseController {
 		String searchQuery = safeText(caseUpdatesSearchField == null ? null : caseUpdatesSearchField.getText())
 				.trim()
 				.toLowerCase(java.util.Locale.ROOT);
-		List<CaseUpdateDto> visibleUpdates = caseUpdates == null ? List.of() : caseUpdates.stream()
-				.filter(dto -> caseUpdateMatchesSearch(dto, searchQuery))
-				.toList();
+		List<CaseUpdateDto> visibleUpdates = caseUpdates == null ? List.of()
+				: caseUpdates.stream()
+						.filter(dto -> caseUpdateMatchesSearch(dto, searchQuery))
+						.toList();
 
 		if (visibleUpdates.isEmpty()) {
 			Label empty = new Label(searchQuery.isBlank() ? "No updates yet." : "No updates found.");
@@ -6470,40 +6550,40 @@ public class CaseController {
 					|| patch.detailsTouched();
 		}
 
-			private void handleStructuralReload(LivePatchData patch) {
-				runOnFx(() ->
-				{
-					if (patch == null || patch.deleted()) {
-						reloadCurrentCaseForViewMode();
-						hideRemoteUpdateBanner();
-						return;
-					}
-
-					boolean partyRelated = patch.patchedPrimaryCallerContactId() != null
-							|| patch.clientAssignmentsPatched()
-							|| patch.patchedPrimaryOpposingCounselContactId() != null;
-					boolean teamRelated = patch.teamChanged();
-					boolean overviewOrDetailsRelated = patch.patchedPrimaryStatusId() != null
-							|| patch.patchedPracticeAreaId() != null
-							|| patch.patchedResponsibleAttorneyUserId() != null
-							|| patch.detailsTouched()
-							|| partyRelated;
-
-					if (partyRelated) {
-						refreshPartiesSectionAsync();
-					}
-					if (teamRelated) {
-						loadTeamSectionAsync();
-					}
-					if (overviewOrDetailsRelated) {
-						refreshOverviewAndDetailsAfterStructuralPatchAsync();
-					}
-					if (!partyRelated && !teamRelated && !overviewOrDetailsRelated) {
-						reloadCurrentCaseForViewMode();
-					}
+		private void handleStructuralReload(LivePatchData patch) {
+			runOnFx(() ->
+			{
+				if (patch == null || patch.deleted()) {
+					reloadCurrentCaseForViewMode();
 					hideRemoteUpdateBanner();
-				});
-			}
+					return;
+				}
+
+				boolean partyRelated = patch.patchedPrimaryCallerContactId() != null
+						|| patch.clientAssignmentsPatched()
+						|| patch.patchedPrimaryOpposingCounselContactId() != null;
+				boolean teamRelated = patch.teamChanged();
+				boolean overviewOrDetailsRelated = patch.patchedPrimaryStatusId() != null
+						|| patch.patchedPracticeAreaId() != null
+						|| patch.patchedResponsibleAttorneyUserId() != null
+						|| patch.detailsTouched()
+						|| partyRelated;
+
+				if (partyRelated) {
+					refreshPartiesSectionAsync();
+				}
+				if (teamRelated) {
+					loadTeamSectionAsync();
+				}
+				if (overviewOrDetailsRelated) {
+					refreshOverviewAndDetailsAfterStructuralPatchAsync();
+				}
+				if (!partyRelated && !teamRelated && !overviewOrDetailsRelated) {
+					reloadCurrentCaseForViewMode();
+				}
+				hideRemoteUpdateBanner();
+			});
+		}
 
 		private boolean hasInlineSimplePatch(LivePatchData patch) {
 			return patch.patchedName() != null || patch.patchedNumber() != null || patch.patchedDescription() != null
@@ -7929,11 +8009,11 @@ public class CaseController {
 
 			toggleDetailField(detNameValue, detNameEditor, enabled);
 			toggleDetailField(detCaseNumberValue, detCaseNumberEditor, enabled);
-				setVisibleManaged(detCaseStatusValue, !enabled);
-				setVisibleManaged(detCaseStatusEditorRow, enabled);
-				setVisibleManaged(detPracticeAreaIdValue, !enabled);
-				setVisibleManaged(detPracticeAreaEditorRow, enabled);
-				toggleDetailTextDisplayField(detDescriptionValue, detDescriptionEditor, enabled);
+			setVisibleManaged(detCaseStatusValue, !enabled);
+			setVisibleManaged(detCaseStatusEditorRow, enabled);
+			setVisibleManaged(detPracticeAreaIdValue, !enabled);
+			setVisibleManaged(detPracticeAreaEditorRow, enabled);
+			toggleDetailTextDisplayField(detDescriptionValue, detDescriptionEditor, enabled);
 			toggleDetailField(detCallerDateValue, detCallerDateEditor, enabled);
 			toggleDetailField(detCallerTimeValue, detCallerTimeEditor, enabled);
 			toggleDetailField(detAcceptedDateValue, detAcceptedDateEditor, enabled);
@@ -7956,20 +8036,20 @@ public class CaseController {
 			toggleDetailField(detAcceptedConsultantExpertSearchValue, detAcceptedConsultantExpertSearchEditor, enabled);
 			toggleDetailField(detAcceptedTestifyingExpertSearchValue, detAcceptedTestifyingExpertSearchEditor, enabled);
 			toggleDetailField(detAcceptedMedicalLiteratureValue, detAcceptedMedicalLiteratureEditor, enabled);
-				toggleDetailField(detAcceptedDetailValue, detAcceptedDetailEditor, enabled);
-				toggleDetailField(detDeniedChronologyValue, detDeniedChronologyEditor, enabled);
-				toggleDetailField(detDeniedDetailValue, detDeniedDetailEditor, enabled);
-				toggleDetailTextDisplayField(detSummaryValue, detSummaryEditor, enabled);
-				toggleDetailField(detReceivedUpdatesValue, detReceivedUpdatesEditor, enabled);
-			}
+			toggleDetailField(detAcceptedDetailValue, detAcceptedDetailEditor, enabled);
+			toggleDetailField(detDeniedChronologyValue, detDeniedChronologyEditor, enabled);
+			toggleDetailField(detDeniedDetailValue, detDeniedDetailEditor, enabled);
+			toggleDetailTextDisplayField(detSummaryValue, detSummaryEditor, enabled);
+			toggleDetailField(detReceivedUpdatesValue, detReceivedUpdatesEditor, enabled);
+		}
 
-			private void toggleDetailTextDisplayField(Label valueNode, TextArea editorNode, boolean editEnabled) {
-				setVisibleManaged(valueNode, !editEnabled);
-				setVisibleManaged(editorNode, editEnabled);
-				if (editEnabled) {
-					ReadOnlyTextDisplaySupport.apply(editorNode, true);
-				}
+		private void toggleDetailTextDisplayField(Label valueNode, TextArea editorNode, boolean editEnabled) {
+			setVisibleManaged(valueNode, !editEnabled);
+			setVisibleManaged(editorNode, editEnabled);
+			if (editEnabled) {
+				ReadOnlyTextDisplaySupport.apply(editorNode, true);
 			}
+		}
 
 		private void toggleDetailField(Label valueNode, javafx.scene.control.Control editorNode, boolean editEnabled) {
 			if (editorNode instanceof TextInputControl textInput) {
