@@ -1700,3 +1700,81 @@
     -fx-background-color: linear-gradient(to bottom, #4a83d2, #315fba);
     -fx-text-fill: white;
 }
+
+/* Subtle section regions inside Case Overview. */
+.case-overview-list {
+    -fx-spacing: 16;
+}
+
+.case-overview-section-region {
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: #E3EAF4;
+    -fx-border-width: 1;
+    -fx-padding: 10 12 10 12;
+}
+
+.case-overview-section-region-case-details {
+    -fx-background-color: #F5F9FE;
+}
+
+.case-overview-section-region-parties {
+    -fx-background-color: #F6FBF7;
+}
+
+.case-overview-section-region-practice-team {
+    -fx-background-color: #FFF8F2;
+}
+
+.case-overview-section-header {
+    -fx-padding: 0 0 6 0;
+}
+
+.case-overview-section-accent {
+    -fx-min-width: 4;
+    -fx-pref-width: 4;
+    -fx-max-width: 4;
+    -fx-min-height: 18;
+    -fx-pref-height: 18;
+    -fx-background-radius: 999;
+}
+
+.case-overview-section-accent-case-details {
+    -fx-background-color: rgba(48, 121, 214, 0.70);
+}
+
+.case-overview-section-accent-parties {
+    -fx-background-color: rgba(32, 150, 129, 0.68);
+}
+
+.case-overview-section-accent-practice-team {
+    -fx-background-color: rgba(224, 148, 44, 0.70);
+}
+
+.case-overview-section-icon {
+    -fx-font-size: 18px;
+    -fx-font-weight: 900;
+}
+
+.case-overview-section-title {
+    -fx-font-size: 14.5px;
+    -fx-font-weight: 900;
+}
+
+.case-overview-row-label {
+    -fx-padding: 9 0 9 8;
+}
+
+.case-overview-row-value,
+.case-overview-row-value-host {
+    -fx-padding: 9 0 9 0;
+}
+
+.case-overview-party-side {
+    -fx-padding: 7 0 2 8;
+}
+
+.case-overview-party-role,
+.case-overview-party-name {
+    -fx-padding: 7 0 7 8;
+}
