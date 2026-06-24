@@ -54,8 +54,11 @@
 			<!-- OVERVIEW PANE -->
 			<ScrollPane fx:id="overviewScrollPane" fitToWidth="true"
 				hbarPolicy="NEVER" styleClass="surface-scroll">
-				<VBox fx:id="overviewPane" spacing="10" maxWidth="980"
-					styleClass="case-main-surface case-overview-surface">
+				<VBox fx:id="overviewPane" spacing="10" maxWidth="980">
+					<styleClass>
+						<String fx:value="case-main-surface" />
+						<String fx:value="case-overview-surface" />
+					</styleClass>
 					<padding>
 						<Insets top="12" right="12" bottom="12" left="12" />
 					</padding>
