@@ -1575,13 +1575,13 @@
 
 /* Case Overview polish overrides */
 .case-overview-surface {
-    -fx-background-color: #F8FAFD;
+    -fx-background-color: #EDF3F8;
     -fx-background-insets: 0;
     -fx-background-radius: 14;
     -fx-border-radius: 14;
-    -fx-border-color: rgba(88, 124, 166, 0.24);
+    -fx-border-color: rgba(88, 124, 166, 0.22);
     -fx-border-width: 1;
-    -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.16), 18, 0.18, 0, 3);
+    -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.14), 18, 0.16, 0, 3);
 }
 
 .case-overview-section-line {
@@ -1709,9 +1709,10 @@
 .case-overview-section-region {
     -fx-background-radius: 12;
     -fx-border-radius: 12;
-    -fx-border-color: #E3EAF4;
+    -fx-border-color: #EAF0F6;
     -fx-border-width: 1;
     -fx-padding: 10 12 10 12;
+    -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.07), 7, 0.10, 0, 1);
 }
 
 .case-overview-section-region-case-details {
