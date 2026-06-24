@@ -119,6 +119,7 @@
     -fx-border-color: transparent;
 }
 
+.shale-surface,
 .case-right-pane {
     -fx-background-color: rgba(242, 248, 255, 0.64);
     -fx-background-radius: 12;
@@ -1471,4 +1472,310 @@
 
 .button.calendar-disclosure-toggle:pressed {
     -fx-background-color: rgba(17, 37, 66, 0.14);
+}
+
+.case-overview-list {
+    -fx-padding: 12 0 6 0;
+}
+
+.case-overview-section {
+    -fx-padding: 0 0 10 0;
+}
+
+.case-overview-section-header {
+    -fx-padding: 0 0 8 0;
+}
+
+.case-overview-section-icon {
+    -fx-text-fill: #356bb7;
+    -fx-font-size: 17px;
+    -fx-font-weight: 800;
+}
+
+.case-overview-section-title {
+    -fx-text-fill: #183553;
+    -fx-font-size: 14px;
+    -fx-font-weight: 800;
+}
+
+.case-overview-section-line {
+    -fx-background-color: rgba(48, 121, 214, 0.70);
+    -fx-min-height: 1.2;
+    -fx-pref-height: 1.2;
+    -fx-max-height: 1.2;
+}
+
+.case-overview-rows,
+.case-overview-party-list {
+    -fx-background-color: transparent;
+}
+
+.case-overview-row-label {
+    -fx-padding: 11 0 11 8;
+    -fx-text-fill: rgba(24, 53, 83, 0.72);
+    -fx-font-size: 12px;
+    -fx-border-color: transparent transparent rgba(17, 37, 66, 0.10) transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.case-overview-row-value,
+.case-overview-row-value-host {
+    -fx-padding: 11 0 11 0;
+    -fx-text-fill: #183553;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-border-color: transparent transparent rgba(17, 37, 66, 0.10) transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.case-overview-party-side {
+    -fx-padding: 9 0 3 8;
+    -fx-text-fill: #183553;
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+}
+
+.case-overview-party-row {
+    -fx-padding: 0;
+    -fx-border-color: transparent transparent rgba(17, 37, 66, 0.10) transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.case-overview-party-role {
+    -fx-padding: 9 0 9 8;
+    -fx-text-fill: rgba(24, 53, 83, 0.74);
+    -fx-font-size: 12px;
+}
+
+.case-overview-party-name {
+    -fx-padding: 9 0 9 0;
+    -fx-text-fill: #183553;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.button.case-overview-edit-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: rgba(24, 53, 83, 0.70);
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+    -fx-padding: 4 6 4 6;
+    -fx-min-width: 28;
+    -fx-pref-width: 28;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.button.case-overview-edit-button:hover {
+    -fx-background-color: rgba(48, 121, 214, 0.10);
+    -fx-text-fill: #275fa8;
+}
+
+/* Case Overview polish overrides */
+.case-overview-surface {
+    -fx-background-insets: 0;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(88, 124, 166, 0.22);
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.14), 18, 0.16, 0, 3);
+}
+
+.case-overview-section-line {
+    -fx-background-color: rgba(62, 120, 190, 0.42);
+    -fx-min-height: 1;
+    -fx-pref-height: 1;
+    -fx-max-height: 1;
+}
+
+.case-overview-row-label,
+.case-overview-row-value,
+.case-overview-row-value-host,
+.case-overview-party-row {
+    -fx-border-color: transparent transparent rgba(75, 103, 138, 0.13) transparent;
+}
+
+.case-overview-row-label {
+    -fx-text-fill: rgba(24, 53, 83, 0.76);
+}
+
+.case-overview-row-value,
+.case-overview-row-value-host,
+.case-overview-party-name {
+    -fx-text-fill: #132f4c;
+}
+
+.case-overview-row-label:hover,
+.case-overview-row-value:hover,
+.case-overview-row-value-host:hover,
+.case-overview-party-row:hover {
+    -fx-background-color: rgba(72, 128, 198, 0.045);
+}
+
+.button.case-overview-edit-button {
+    -fx-opacity: 0.42;
+    -fx-text-fill: rgba(24, 53, 83, 0.62);
+}
+
+.button.case-overview-edit-button:hover,
+.button.case-overview-edit-button:focused {
+    -fx-opacity: 1.0;
+    -fx-background-color: rgba(48, 121, 214, 0.11);
+    -fx-text-fill: #275fa8;
+}
+
+.case-overview-party-row .contact-card,
+.case-overview-party-row .organization-card,
+.case-overview-row-value-host .user-card,
+.case-overview-row-value-host .contact-card,
+.case-overview-row-value-host .organization-card {
+    -fx-effect: null;
+}
+
+/* Compact, light field-edit dialogs used by Overview edit popups. */
+.dialog-pane.secondary-window-shell,
+.secondary-window-shell {
+    -fx-background-color: #F8FAFD;
+    -fx-border-color: rgba(78, 112, 154, 0.20);
+}
+
+.dialog-pane.secondary-window-shell > .header-panel,
+.secondary-window-header {
+    -fx-background-color: linear-gradient(to bottom, #F7FAFC, #EEF5FB);
+    -fx-background-radius: 14 14 0 0;
+    -fx-padding: 6 10 6 12;
+    -fx-min-height: 52;
+    -fx-pref-height: 54;
+}
+
+.secondary-window-title {
+    -fx-text-fill: #173653;
+    -fx-font-size: 14px;
+    -fx-font-weight: 800;
+}
+
+.secondary-window-close {
+    -fx-text-fill: rgba(23, 54, 83, 0.72);
+}
+
+.dialog-pane.secondary-window-shell > .content,
+.dialog-pane.secondary-window-shell > .button-bar {
+    -fx-background-color: #F8FAFD;
+}
+
+.dialog-pane.secondary-window-shell > .button-bar {
+    -fx-padding: 8 14 14 14;
+}
+
+.field-edit-dialog-body {
+    -fx-padding: 14 16 8 16;
+    -fx-background-color: #F8FAFD;
+}
+
+.field-edit-dialog-body .label {
+    -fx-text-fill: #173653;
+    -fx-font-weight: 700;
+}
+
+.field-edit-current-value {
+    -fx-padding: 8 10 8 10;
+    -fx-background-color: rgba(232, 240, 249, 0.72);
+    -fx-background-radius: 8;
+    -fx-text-fill: #132f4c;
+    -fx-font-weight: 600;
+}
+
+.dialog-pane.secondary-window-shell .button {
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
+    -fx-padding: 7 13 7 13;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+
+.dialog-pane.secondary-window-shell .button:default {
+    -fx-background-color: linear-gradient(to bottom, #4a83d2, #315fba);
+    -fx-text-fill: white;
+}
+
+/* Subtle section regions inside Case Overview. */
+.case-overview-list {
+    -fx-spacing: 16;
+}
+
+.case-overview-section-region {
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: #EAF0F6;
+    -fx-border-width: 1;
+    -fx-padding: 10 12 10 12;
+    -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.07), 7, 0.10, 0, 1);
+}
+
+.case-overview-section-region-case-details {
+    -fx-background-color: #F5F9FE;
+}
+
+.case-overview-section-region-parties {
+    -fx-background-color: #F6FBF7;
+}
+
+.case-overview-section-region-practice-team {
+    -fx-background-color: #FFF8F2;
+}
+
+.case-overview-section-header {
+    -fx-padding: 0 0 6 0;
+}
+
+.case-overview-section-accent {
+    -fx-min-width: 4;
+    -fx-pref-width: 4;
+    -fx-max-width: 4;
+    -fx-min-height: 18;
+    -fx-pref-height: 18;
+    -fx-background-radius: 999;
+}
+
+.case-overview-section-accent-case-details {
+    -fx-background-color: rgba(48, 121, 214, 0.70);
+}
+
+.case-overview-section-accent-parties {
+    -fx-background-color: rgba(32, 150, 129, 0.68);
+}
+
+.case-overview-section-accent-practice-team {
+    -fx-background-color: rgba(224, 148, 44, 0.70);
+}
+
+.case-overview-section-icon {
+    -fx-font-size: 18px;
+    -fx-font-weight: 900;
+}
+
+.case-overview-section-title {
+    -fx-font-size: 14.5px;
+    -fx-font-weight: 900;
+}
+
+.case-overview-row-label {
+    -fx-padding: 9 0 9 8;
+}
+
+.case-overview-row-value,
+.case-overview-row-value-host {
+    -fx-padding: 9 0 9 0;
+}
+
+.case-overview-party-side {
+    -fx-padding: 7 0 2 8;
+}
+
+.case-overview-party-role,
+.case-overview-party-name {
+    -fx-padding: 7 0 7 8;
 }
