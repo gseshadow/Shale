@@ -119,6 +119,7 @@
     -fx-border-color: transparent;
 }
 
+.shale-surface,
 .case-right-pane {
     -fx-background-color: rgba(242, 248, 255, 0.64);
     -fx-background-radius: 12;
@@ -1575,7 +1576,6 @@
 
 /* Case Overview polish overrides */
 .case-overview-surface {
-    -fx-background-color: #EDF3F8;
     -fx-background-insets: 0;
     -fx-background-radius: 14;
     -fx-border-radius: 14;
