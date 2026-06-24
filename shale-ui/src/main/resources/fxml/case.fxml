@@ -56,7 +56,7 @@
 				hbarPolicy="NEVER" styleClass="surface-scroll">
 				<VBox fx:id="overviewPane" spacing="10" maxWidth="980">
 					<styleClass>
-						<String fx:value="case-main-surface" />
+						<String fx:value="shale-surface" />
 						<String fx:value="case-overview-surface" />
 					</styleClass>
 					<padding>
