@@ -3992,14 +3992,7 @@ public class CaseController {
 			return;
 		}
 
-		if (userCardFactory == null) {
-			userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
-			{
-			} : onOpenUser);
-		}
-
 		for (var r : filtered) {
-			Integer userId = r.userId();
 			String name = safeText(r.displayName()).isBlank() ? "—" : r.displayName();
 			UserCardModel model = new UserCardModel(userId, name, r.color(), r.initials());
 			Node card = userCardFactory.create(model, Variant.COMPACT);
