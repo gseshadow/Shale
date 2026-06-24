@@ -1,0 +1,57 @@
+/*
+ * Shale Design Foundation - Entity Cards
+ *
+ * Entity Card is the shared visual contract for case cards, compact case cards,
+ * contact cards, organization cards, user cards, task cards, notification
+ * related-object cards, and search result cards. Phase A only establishes the
+ * naming contract; existing card classes/factories are not replaced.
+ */
+
+.shale-entity-card {
+    -fx-background-color: rgba(248,250,252,0.96);
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(74, 104, 138, 0.24);
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4);
+}
+
+.shale-entity-card-full {
+    -fx-padding: 16;
+    -fx-spacing: 12;
+}
+
+.shale-entity-card-compact {
+    -fx-padding: 12;
+    -fx-spacing: 8;
+}
+
+.shale-entity-card-inline {
+    -fx-padding: 8 10 8 10;
+    -fx-spacing: 6;
+}
+
+.shale-entity-card-selectable {
+    -fx-border-color: rgba(74, 104, 138, 0.34);
+}
+
+.shale-entity-card-clickable {
+    -fx-cursor: hand;
+}
+
+.shale-entity-card-clickable:hover,
+.shale-entity-card-selectable:hover {
+    -fx-background-color: rgba(255,255,255,0.985);
+    -fx-border-color: rgba(74, 104, 138, 0.34);
+    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.18), 24, 0.2, 0, 8);
+}
+
+.shale-entity-card-embedded {
+    -fx-background-color: rgba(232, 241, 251, 0.62);
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: rgba(15, 35, 66, 0.16);
+    -fx-border-width: 1;
+    -fx-padding: 10;
+    -fx-spacing: 6;
+}

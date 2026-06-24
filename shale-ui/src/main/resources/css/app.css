@@ -1,3 +1,8 @@
+@import "foundation/colors.css";
+@import "foundation/surfaces.css";
+@import "foundation/density.css";
+@import "foundation/cards.css";
+
 .root {
     -fx-font-size: 14px;
     -fx-background-color:

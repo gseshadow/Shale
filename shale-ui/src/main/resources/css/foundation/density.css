@@ -1,0 +1,49 @@
+/*
+ * Shale Design Foundation - Density
+ *
+ * Additive density primitives for future opt-in use. These classes define the
+ * conceptual spacing scale only and are not applied to existing components in
+ * Phase A, preserving current visuals.
+ */
+
+.root {
+    /* Comfortable: default reading/workflow density for full cards and forms. */
+    -shale-density-comfortable-padding: 16;
+    -shale-density-comfortable-gap: 12;
+    -shale-density-comfortable-card-spacing: 12;
+    -shale-density-comfortable-embedded-card-spacing: 10;
+
+    /* Compact: list/card density for secondary workflows. */
+    -shale-density-compact-padding: 12;
+    -shale-density-compact-gap: 8;
+    -shale-density-compact-card-spacing: 8;
+    -shale-density-compact-embedded-card-spacing: 6;
+
+    /* Dense: metadata/inline density; typography should remain legible. */
+    -shale-density-dense-padding: 8;
+    -shale-density-dense-gap: 6;
+    -shale-density-dense-card-spacing: 6;
+    -shale-density-dense-embedded-card-spacing: 4;
+}
+
+.shale-density-comfortable {
+    -fx-padding: 16;
+    -fx-spacing: 12;
+}
+
+.shale-density-compact {
+    -fx-padding: 12;
+    -fx-spacing: 8;
+}
+
+.shale-density-dense {
+    -fx-padding: 8;
+    -fx-spacing: 6;
+}
+
+.shale-density-card-comfortable { -fx-spacing: 12; }
+.shale-density-card-compact { -fx-spacing: 8; }
+.shale-density-card-dense { -fx-spacing: 6; }
+.shale-density-embedded-comfortable { -fx-spacing: 10; }
+.shale-density-embedded-compact { -fx-spacing: 6; }
+.shale-density-embedded-dense { -fx-spacing: 4; }

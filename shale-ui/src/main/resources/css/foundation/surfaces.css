@@ -1,0 +1,78 @@
+/*
+ * Shale Design Foundation - Surfaces
+ *
+ * Documents the current surface hierarchy as additive opt-in primitives.
+ * Existing screen-specific classes remain authoritative until later phases.
+ */
+
+/* 1. Application Background: root radial blue/teal shell behind the app. */
+.shale-surface-application-background {
+    -fx-background-color: radial-gradient(center 70% 20%, radius 120%, #4cc3b5 0%, #2b6a82 35%, #1b2b4a 70%, #0e1023 100%);
+}
+
+/* 2. Shell Surface: transparent layout shell. */
+.shale-surface-shell {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+/* 3. Navigation Surface: translucent navigation rail/sidebar. */
+.shale-surface-navigation {
+    -fx-background-color: rgba(238, 248, 255, 0.08);
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(223, 240, 255, 0.18);
+    -fx-border-width: 1;
+}
+
+/* 4. Content Surface: primary light content plane. */
+.shale-surface-content {
+    -fx-background-color: rgba(242, 248, 255, 0.64);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(15, 35, 66, 0.16);
+    -fx-border-width: 1;
+}
+
+/* 5. Section Surface: grouped section panel. */
+.shale-surface-section {
+    -fx-background-color: rgba(232, 241, 251, 0.62);
+    -fx-background-radius: 10;
+}
+
+/* 6. Card Surface: base card plane. */
+.shale-surface-card {
+    -fx-background-color: rgba(248,250,252,0.96);
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(74, 104, 138, 0.24);
+    -fx-border-width: 1;
+}
+
+/* 7. Elevated Card Surface: card plane plus current card elevation. */
+.shale-surface-card-elevated {
+    -fx-background-color: rgba(248,250,252,0.96);
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(74, 104, 138, 0.24);
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4);
+}
+
+/* 8. Dialog Surface: modal/dialog content panel. */
+.shale-surface-dialog {
+    -fx-background-color: rgba(245, 249, 253, 0.78);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(15, 34, 65, 0.18);
+    -fx-border-width: 1;
+}
+
+/* 9. Overlay Surface: translucent glass layer. */
+.shale-surface-overlay {
+    -fx-background-color: rgba(236, 246, 255, 0.16);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(223, 239, 255, 0.24);
+    -fx-border-width: 1;
+}
