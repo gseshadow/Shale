@@ -68,6 +68,7 @@ Review:
 Review:
 
 * `architecture/development-rules.md`
+* `architecture/design-system.md`
 
 ### Live Updates
 
@@ -139,6 +140,9 @@ Required:
 Read:
 
 * `architecture/development-rules.md`
+* `architecture/design-system.md`
+
+This applies to tasks that change JavaFX UI, React UI, CSS, FXML, shared components, dialogs, cards, buttons, styling, layout, or design.
 
 Required:
 
@@ -147,6 +151,7 @@ Required:
 * Reuse existing navigation patterns.
 * Reuse existing dialogs and controls when practical.
 * Follow existing controller/service patterns.
+* Preserve the Shale design system and visual identity.
 
 Do not create duplicate implementations when an existing component already solves the problem.
 
