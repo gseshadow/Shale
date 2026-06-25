@@ -22,6 +22,8 @@
     -shale-color-card-surface: rgba(248,250,252,0.96);
     -shale-color-card-hover-surface: rgba(255,255,255,0.985);
     -shale-color-card-border: rgba(74, 104, 138, 0.24);
+    -shale-color-card-hover-border: rgba(74, 104, 138, 0.34);
+    -shale-color-card-embedded-surface: rgba(232, 241, 251, 0.62);
     -shale-color-dialog-surface: rgba(245, 249, 253, 0.78);
     -shale-color-dialog-border: rgba(15, 34, 65, 0.18);
     -shale-color-strong-panel-border: rgba(16, 34, 62, 0.18);
@@ -49,6 +51,7 @@
 .shale-color-bg-section { -fx-background-color: -shale-color-section-surface; }
 .shale-color-bg-card { -fx-background-color: -shale-color-card-surface; }
 .shale-color-bg-card-hover { -fx-background-color: -shale-color-card-hover-surface; }
+.shale-color-bg-card-embedded { -fx-background-color: -shale-color-card-embedded-surface; }
 .shale-color-bg-dialog { -fx-background-color: -shale-color-dialog-surface; }
 .shale-color-text-primary { -fx-text-fill: -shale-color-text-primary; }
 .shale-color-text-secondary { -fx-text-fill: -shale-color-text-secondary; }

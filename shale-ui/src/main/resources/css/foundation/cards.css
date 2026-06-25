@@ -3,54 +3,78 @@
  *
  * Entity Card is the shared visual contract for case cards, compact case cards,
  * contact cards, organization cards, user cards, task cards, notification
- * related-object cards, and search result cards. Phase A only establishes the
- * naming contract; existing card classes/factories are not replaced.
+ * related-object cards, and search result cards. It is not a replacement Java
+ * component and does not replace existing card factories or style class names.
  */
 
-.shale-entity-card {
-    -fx-background-color: rgba(248,250,252,0.96);
+/*
+ * Card Surface
+ * Base card plane shared by CSS cards and CardSurfaceStyles.java. Keep these
+ * values synchronized with foundation/colors.css and CardSurfaceStyles.
+ */
+.shale-entity-card,
+.shale-card-surface {
+    -fx-background-color: -shale-color-card-surface;
     -fx-background-radius: 14;
     -fx-border-radius: 14;
-    -fx-border-color: rgba(74, 104, 138, 0.24);
+    -fx-border-color: -shale-color-card-border;
     -fx-border-width: 1;
     -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4);
 }
 
+/* Elevated Card Surface: default card surface with current card elevation. */
+.shale-elevated-card-surface {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4);
+}
+
+/* Entity Card full variant: comfortable full-size entity summaries. */
 .shale-entity-card-full {
     -fx-padding: 16;
     -fx-spacing: 12;
 }
 
+/* Entity Card compact variant: compact list/grid entity summaries. */
 .shale-entity-card-compact {
     -fx-padding: 12;
     -fx-spacing: 8;
 }
 
+/* Entity Card inline variant: small inline relationship previews. */
 .shale-entity-card-inline {
     -fx-padding: 8 10 8 10;
     -fx-spacing: 6;
 }
 
+/* Entity Card selectable variant: same card, selectable affordance border. */
 .shale-entity-card-selectable {
-    -fx-border-color: rgba(74, 104, 138, 0.34);
+    -fx-border-color: -shale-color-card-hover-border;
 }
 
+/* Entity Card clickable variant: same card, pointer affordance only. */
 .shale-entity-card-clickable {
     -fx-cursor: hand;
 }
 
+/* Shared hover state for selectable/clickable entity cards. */
 .shale-entity-card-clickable:hover,
 .shale-entity-card-selectable:hover {
-    -fx-background-color: rgba(255,255,255,0.985);
-    -fx-border-color: rgba(74, 104, 138, 0.34);
+    -fx-background-color: -shale-color-card-hover-surface;
+    -fx-border-color: -shale-color-card-hover-border;
     -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.18), 24, 0.2, 0, 8);
 }
 
-.shale-entity-card-embedded {
-    -fx-background-color: rgba(232, 241, 251, 0.62);
+/* Entity Card embedded variant: nested/related-card surface. */
+.shale-entity-card-embedded,
+.shale-embedded-card-surface {
+    -fx-background-color: -shale-color-card-embedded-surface;
     -fx-background-radius: 10;
     -fx-border-radius: 10;
-    -fx-border-color: rgba(15, 35, 66, 0.16);
+    -fx-border-color: -shale-color-border;
     -fx-border-width: 1;
     -fx-padding: 10;
     -fx-spacing: 6;
