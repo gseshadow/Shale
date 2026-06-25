@@ -31,6 +31,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.layout.GridPane;
 import javafx.scene.shape.Circle;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.component.factory.StatusIndicatorFactory;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -370,17 +371,12 @@ public final class SettingsController {
 
 		HBox header = new HBox(10);
 		header.setAlignment(Pos.CENTER_LEFT);
-		Circle swatch = new Circle(7);
-		swatch.getStyleClass().add("shale-indicator-dot");
-		swatch.setStyle("-fx-background-color: transparent; -fx-fill: " + ColorUtil.toCssBackgroundColor(row.color()) + "; -fx-stroke: rgba(0,0,0,0.18); -fx-stroke-width: 1;");
 		Label name = new Label(row.getName());
 		name.getStyleClass().add("app-dialog-field-label");
-		Label preview = new Label(row.getName());
-		preview.getStyleClass().add("shale-indicator-status-pill");
-		preview.setStyle("-fx-background-color: " + ColorUtil.toCssBackgroundColor(row.color()) + ";");
+		Node preview = StatusIndicatorFactory.createStatusPill(row.getName(), row.color());
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		header.getChildren().addAll(swatch, name, spacer, preview);
+		header.getChildren().addAll(name, spacer, preview);
 
 		HBox metadata = new HBox(6);
 		metadata.setAlignment(Pos.CENTER_LEFT);

@@ -48,6 +48,8 @@ import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
+import com.shale.ui.component.factory.StatusIndicatorFactory;
+import com.shale.ui.component.factory.StatusIndicatorFactory.PillSize;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ClientAssignmentDialog;
@@ -1270,7 +1272,7 @@ public class CaseController {
 	private Node buildStatusTimelineSegment(CaseStatusHistoryDto item) {
 		String color = ColorUtil.toCssBackgroundColor(item.color());
 		String name = safeText(item.statusName()).isBlank() ? "Status #" + item.statusId() : safeText(item.statusName());
-		String textColor = readableTextColor(item.color());
+		String textColor = ColorUtil.readableTextColor(item.color());
 		String borderColor = item.current() ? "rgba(20,35,55,0.62)" : "rgba(0,0,0,0.14)";
 		boolean completed = !item.current() && item.endDate() != null;
 
@@ -1292,7 +1294,7 @@ public class CaseController {
 				+ (item.current() ? "bold" : "600") + ";");
 
 		HBox pill = new HBox(8, check, label);
-		pill.getStyleClass().addAll("shale-indicator-status-pill", "shale-indicator-current");
+		pill.getStyleClass().addAll("shale-status-pill", "shale-status-pill-large");
 		pill.setAlignment(Pos.CENTER);
 		pill.setMinHeight(38);
 		pill.setMaxHeight(38);
@@ -1331,18 +1333,6 @@ public class CaseController {
 			duration = Math.max(0, ChronoUnit.DAYS.between(item.effectiveDate().toLocalDate(), end.toLocalDate())) + " days";
 		}
 		return name + "\nEntered: " + entered + "\nExited: " + exited + "\nDuration: " + duration;
-	}
-
-	private static String readableTextColor(String storedColor) {
-		Color color = ColorUtil.toFxColor(storedColor);
-		double luminance = 0.2126 * linearized(color.getRed())
-				+ 0.7152 * linearized(color.getGreen())
-				+ 0.0722 * linearized(color.getBlue());
-		return luminance > 0.48 ? "#172033" : "white";
-	}
-
-	private static double linearized(double channel) {
-		return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
 	}
 
 	private static String formatTimelineDateTime(LocalDateTime value) {
@@ -4672,12 +4662,12 @@ public class CaseController {
 				statusColorCss
 		);
 
-		var headerCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
+		var headerBadge = StatusIndicatorFactory.createStatusBadge(statusName, statusColorCss);
 
 		if (statusHost != null)
-			statusHost.getChildren().setAll(headerCard);
+			statusHost.getChildren().setAll(headerBadge);
 		if (ovCaseStatusHost != null)
-			ovCaseStatusHost.getChildren().setAll(createOverviewInlineValue(statusName, statusColorCss));
+			ovCaseStatusHost.getChildren().setAll(StatusIndicatorFactory.createStatusPill(statusName, statusColorCss, PillSize.LARGE));
 	}
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {
@@ -4727,11 +4717,7 @@ public class CaseController {
 			{
 			} : onOpenStatus);
 		}
-		StatusCardModel model = new StatusCardModel(statusId,
-				(statusName == null || statusName.isBlank()) ? "—" : statusName,
-				null,
-				statusColorCss);
-		detCaseStatusHost.getChildren().setAll(statusCardFactory.create(model, StatusCardFactory.Variant.MINI));
+		detCaseStatusHost.getChildren().setAll(StatusIndicatorFactory.createStatusBadge(statusName, statusColorCss));
 	}
 
 	private void renderDetailsPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {

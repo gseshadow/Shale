@@ -63,6 +63,22 @@ public final class ColorUtil {
 		return normalized == null ? "—" : "#" + normalized;
 	}
 
+	public static String readableTextColor(String storedColor) {
+		return readableTextColor(toFxColor(storedColor));
+	}
+
+	public static String readableTextColor(Color color) {
+		Color resolved = color == null ? Color.WHITE : color;
+		double luminance = 0.2126 * linearized(resolved.getRed())
+				+ 0.7152 * linearized(resolved.getGreen())
+				+ 0.0722 * linearized(resolved.getBlue());
+		return luminance > 0.48 ? "#172033" : "white";
+	}
+
+	private static double linearized(double channel) {
+		return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+	}
+
 	private static String toHex(double channel) {
 		int value = (int) Math.round(channel * 255.0);
 		value = Math.max(0, Math.min(255, value));
