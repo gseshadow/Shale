@@ -234,6 +234,22 @@ The primary display treatment for case status. A Status Pill is a rounded filled
 
 The form/input representation for choosing or filtering status. Use Status Selector for Edit Case Status dialogs, status filters, combo boxes, choice boxes, and dropdowns. Preserve native control behavior and accessibility. Dropdown items may include a small color dot when safe, but they do not need to mirror display pills exactly. If the current selected status is shown outside the control, use a Status Badge or Status Pill according to the surrounding visual density.
 
+#### Practice Area Indicators
+
+Practice area has three official visual representations. Always preserve the database-driven practice-area color and choose the smallest representation that fits the surrounding density. Practice area indicators are display primitives only; tenant/global ownership, loading, edit, deactivate/remove behavior, and persistence remain in the existing practice-area management flow.
+
+##### Practice Area Badge
+
+A compact metadata indicator made of a small practice-area-colored dot and the practice-area name. Use Practice Area Badge in small metadata areas, tables/lists, and dense places where a filled capsule would add too much visual weight. The badge is display-only and should not imply selector or edit behavior.
+
+##### Practice Area Pill
+
+The primary practice-area display treatment. A Practice Area Pill is a rounded filled capsule using the practice-area color from the database and readable foreground text selected for contrast. Use Practice Area Pill for the Case View Practice Area field, Settings Practice Area card preview, future practice-area filters/cards, and case cards when a visible practice-area treatment is appropriate. The pill should be visually related to Status Pill through radius, padding, and weight, but its meaning comes from the practice-area name and DB-driven color rather than status lifecycle semantics.
+
+##### Practice Area Selector
+
+The form/input representation for choosing or filtering practice area. Use Practice Area Selector for edit-practice-area dialogs, combo boxes, choice boxes, dropdowns, and filters. Preserve native control behavior and accessibility. Selector items may include a small color dot when safe, but they do not need to look exactly like display pills. If the current selected practice area is shown outside the control, use a Practice Area Badge or Practice Area Pill according to the surrounding visual density.
+
 ### Entity Pill
 
 A compact chip for people, assignees, related entities, and metadata.

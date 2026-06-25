@@ -32,6 +32,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.shape.Circle;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.component.factory.StatusIndicatorFactory;
+import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -269,8 +270,7 @@ public final class SettingsController {
 		name.getStyleClass().add("app-dialog-field-label");
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		Label preview = metadataPill("Preview");
-		if (!colorCss.isBlank()) preview.setStyle("-fx-background-color: " + colorCss + "; -fx-text-fill: " + ColorUtil.readableTextColor(row.getColor()) + ";");
+		Label preview = PracticeAreaIndicatorFactory.createPracticeAreaPill(row.getName(), row.getColor(), PracticeAreaIndicatorFactory.PillSize.COMPACT);
 		header.getChildren().addAll(dot, name, spacer, preview);
 
 		HBox metadata = new HBox(6);
