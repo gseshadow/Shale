@@ -67,6 +67,25 @@
     -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4);
 }
 
+/* Card Hover Surface: current hover state for clickable/selectable cards. */
+.shale-surface-card-hover {
+    -fx-background-color: -shale-color-card-hover-surface;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: -shale-color-card-hover-border;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.18), 24, 0.2, 0, 8);
+}
+
+/* Embedded Card Surface: nested/related-card plane. */
+.shale-surface-card-embedded {
+    -fx-background-color: -shale-color-card-embedded-surface;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: -shale-color-border;
+    -fx-border-width: 1;
+}
+
 /* 8. Dialog Surface: modal/dialog content panel. */
 .shale-surface-dialog {
     -fx-background-color: -shale-color-dialog-surface;
