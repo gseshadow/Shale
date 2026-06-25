@@ -23,8 +23,14 @@ import javafx.scene.control.Button;
 import javafx.scene.Node;
 import javafx.scene.paint.Color;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.geometry.Pos;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.GridPane;
+import javafx.scene.shape.Circle;
+import com.shale.ui.util.ColorUtil;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -61,17 +67,7 @@ public final class SettingsController {
 	@FXML
 	private VBox caseStatusAdministrationSection;
 	@FXML
-	private TableView<CaseStatusViewRow> caseStatusesTable;
-	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusNameColumn;
-	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusClosedColumn;
-	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusLifecycleKeyColumn;
-	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusSystemKeyColumn;
-	@FXML
-	private TableColumn<CaseStatusViewRow, Integer> statusSortOrderColumn;
+	private VBox caseStatusCardsContainer;
 	@FXML
 	private Label caseStatusSettingsStatusLabel;
 	@FXML
@@ -119,11 +115,12 @@ public final class SettingsController {
 	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
+	private final List<CaseStatusViewRow> caseStatusRows = new ArrayList<>();
+	private CaseStatusViewRow selectedCaseStatusRow;
 
 	@FXML
 	private void initialize() {
 		fxmlReady = true;
-		configureCaseStatusesTable();
 		configurePracticeAreasTable();
 		configureUserManagementTable();
 		updateAdminControlsVisibility();
@@ -331,45 +328,118 @@ public final class SettingsController {
 	@FXML
 	private void onMoveCaseStatusDown() { if (requireAdminLookupManagement("Case Statuses")) moveSelectedStatus(1); }
 
-	private void configureCaseStatusesTable() {
-		if (caseStatusesTable == null) return;
-		statusNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
-		statusClosedColumn.setCellValueFactory(new PropertyValueFactory<>("closedState"));
-		statusSortOrderColumn.setCellValueFactory(new PropertyValueFactory<>("sortOrder"));
-		statusLifecycleKeyColumn.setCellValueFactory(new PropertyValueFactory<>("lifecycleKey"));
-		statusSystemKeyColumn.setCellValueFactory(new PropertyValueFactory<>("systemKey"));
-	}
-
 	private void loadCaseStatuses() {
-		if (caseService == null || caseStatusesTable == null) return;
+		if (caseService == null || caseStatusCardsContainer == null) return;
 		if (!requireAdminLookupManagement("Case Statuses")) {
-			caseStatusesTable.getItems().clear();
+			caseStatusRows.clear();
+			selectedCaseStatusRow = null;
+			caseStatusCardsContainer.getChildren().clear();
 			return;
 		}
 		try {
 			List<CaseStatusViewRow> rows = new ArrayList<>();
 			for (CaseStatusDto status : caseService.listCaseStatuses(requireTenantId(), true)) rows.add(new CaseStatusViewRow(status));
-			caseStatusesTable.getItems().setAll(rows);
+			caseStatusRows.clear();
+			caseStatusRows.addAll(rows);
+			selectedCaseStatusRow = rows.stream()
+					.filter(row -> selectedCaseStatusRow != null && row.id() == selectedCaseStatusRow.id())
+					.findFirst()
+					.orElse(null);
+			renderCaseStatusCards();
 			setCaseStatusMessage(rows.isEmpty() ? "No case statuses are configured for this tenant." : "");
 		} catch (RuntimeException ex) {
 			setCaseStatusMessage("Failed to load case statuses. " + rootMessage(ex));
 		}
 	}
 
+	private void renderCaseStatusCards() {
+		if (caseStatusCardsContainer == null) return;
+		caseStatusCardsContainer.getChildren().clear();
+		for (int i = 0; i < caseStatusRows.size(); i++) {
+			caseStatusCardsContainer.getChildren().add(buildCaseStatusCard(caseStatusRows.get(i), i));
+		}
+	}
+
+	private VBox buildCaseStatusCard(CaseStatusViewRow row, int index) {
+		VBox card = new VBox(8);
+		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
+		if (selectedCaseStatusRow != null && selectedCaseStatusRow.id() == row.id()) {
+			card.getStyleClass().add("case-status-card-selected");
+		}
+		card.setOnMouseClicked(event -> selectCaseStatusRow(row));
+
+		HBox header = new HBox(10);
+		header.setAlignment(Pos.CENTER_LEFT);
+		Circle swatch = new Circle(7);
+		swatch.getStyleClass().add("shale-indicator-dot");
+		swatch.setStyle("-fx-background-color: transparent; -fx-fill: " + ColorUtil.toCssBackgroundColor(row.color()) + "; -fx-stroke: rgba(0,0,0,0.18); -fx-stroke-width: 1;");
+		Label name = new Label(row.getName());
+		name.getStyleClass().add("app-dialog-field-label");
+		Label preview = new Label(row.getName());
+		preview.getStyleClass().add("shale-indicator-status-pill");
+		preview.setStyle("-fx-background-color: " + ColorUtil.toCssBackgroundColor(row.color()) + ";");
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		header.getChildren().addAll(swatch, name, spacer, preview);
+
+		HBox metadata = new HBox(6);
+		metadata.setAlignment(Pos.CENTER_LEFT);
+		metadata.getChildren().addAll(
+				metadataPill(row.getClosedState()),
+				metadataPill("Sort " + row.getSortOrder()),
+				metadataPill(row.scopeLabel()));
+		if (!row.getLifecycleKey().isBlank()) metadata.getChildren().add(metadataPill("Lifecycle: " + row.getLifecycleKey()));
+		if (!row.getSystemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.getSystemKey()));
+
+		HBox actions = new HBox(8);
+		actions.setAlignment(Pos.CENTER_LEFT);
+		Button edit = cardButton("Edit", "app-toolbar-button-neutral");
+		edit.setOnAction(event -> { selectCaseStatusRow(row); onEditCaseStatus(); event.consume(); });
+		Button up = cardButton("Move Up", "app-toolbar-button-neutral");
+		up.setDisable(index == 0);
+		up.setOnAction(event -> { selectCaseStatusRow(row); moveSelectedStatus(-1); event.consume(); });
+		Button down = cardButton("Move Down", "app-toolbar-button-neutral");
+		down.setDisable(index >= caseStatusRows.size() - 1);
+		down.setOnAction(event -> { selectCaseStatusRow(row); moveSelectedStatus(1); event.consume(); });
+		Label restriction = new Label(row.global() ? "Global/default status: editing creates a tenant override; reordering requires tenant-specific status." : "Tenant-specific/custom status.");
+		restriction.getStyleClass().add("search-summary-text");
+		actions.getChildren().addAll(edit, up, down, restriction);
+
+		card.getChildren().addAll(header, metadata, actions);
+		return card;
+	}
+
+	private Label metadataPill(String text) {
+		Label label = new Label(text == null || text.isBlank() ? "—" : text);
+		label.getStyleClass().addAll("shale-indicator-chip");
+		return label;
+	}
+
+	private Button cardButton(String text, String roleClass) {
+		Button button = new Button(text);
+		button.getStyleClass().addAll("app-toolbar-button", roleClass, "app-toolbar-button-compact");
+		return button;
+	}
+
+	private void selectCaseStatusRow(CaseStatusViewRow row) {
+		selectedCaseStatusRow = row;
+		renderCaseStatusCards();
+	}
+
 	private void moveSelectedStatus(int delta) {
 		if (!requireAdminLookupManagement("Case Statuses")) return;
 		CaseStatusViewRow selected = selectedStatusRow();
 		if (selected == null) return;
-		int index = caseStatusesTable.getItems().indexOf(selected);
+		int index = caseStatusRows.indexOf(selected);
 		int otherIndex = index + delta;
-		if (otherIndex < 0 || otherIndex >= caseStatusesTable.getItems().size()) return;
-		CaseStatusViewRow other = caseStatusesTable.getItems().get(otherIndex);
+		if (otherIndex < 0 || otherIndex >= caseStatusRows.size()) return;
+		CaseStatusViewRow other = caseStatusRows.get(otherIndex);
 		try {
 			caseService.reorderCaseStatuses(requireTenantId(), selected.id(), other.id());
+			selectedCaseStatusRow = selected;
 			loadCaseStatuses();
-			caseStatusesTable.getSelectionModel().select(otherIndex);
 		} catch (RuntimeException ex) {
-			AppDialogs.showError(caseStatusesTable.getScene().getWindow(), "Case Statuses", rootMessage(ex));
+			AppDialogs.showError(caseStatusCardsContainer.getScene().getWindow(), "Case Statuses", rootMessage(ex));
 		}
 	}
 
@@ -413,9 +483,8 @@ public final class SettingsController {
 	}
 
 	private CaseStatusViewRow selectedStatusRow() {
-		CaseStatusViewRow selected = caseStatusesTable == null ? null : caseStatusesTable.getSelectionModel().getSelectedItem();
-		if (selected == null) setCaseStatusMessage("Select a case status first.");
-		return selected;
+		if (selectedCaseStatusRow == null) setCaseStatusMessage("Select a case status first.");
+		return selectedCaseStatusRow;
 	}
 
 	private boolean requireAdminLookupManagement(String sectionName) {
@@ -703,6 +772,9 @@ public final class SettingsController {
 		public Integer getSortOrder() { return status.sortOrder(); }
 		public String getLifecycleKey() { return safe(status.lifecycleKey()); }
 		public String getSystemKey() { return safe(status.systemKey()); }
+		public String color() { return status.color(); }
+		public boolean global() { return status.shaleClientId() == null; }
+		public String scopeLabel() { return global() ? "Global/default" : "Tenant/custom"; }
 		CaseStatusDto status() { return status; }
 	}
 
