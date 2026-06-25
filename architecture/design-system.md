@@ -218,6 +218,22 @@ A danger action for deletion, removal, cancellation with destructive impact, or 
 
 A semantic lifecycle/status label. Status colors may be system-defined or database-driven, but the pill form should remain consistent.
 
+### Case Status Indicators
+
+Case status has three official visual representations. Use the smallest representation that communicates the status without adding unnecessary visual weight, and always preserve the database-driven status color.
+
+#### Status Badge
+
+A compact metadata indicator made of a small status-colored dot and the status name. Use Status Badge beside the case name, in Case Details fields, tables/lists, compact metadata rows, and other areas where a filled capsule would compete with nearby content. The badge is display-only and should not imply form input behavior.
+
+#### Status Pill
+
+The primary display treatment for case status. A Status Pill is a rounded filled capsule using the status color from the database and readable foreground text selected for contrast. Use Status Pill for the Case View current status display, status timeline segments, full and compact case cards, Settings Case Status previews, My Shale cards, and statistics/drill-down cards where a prominent status marker is appropriate.
+
+#### Status Selector
+
+The form/input representation for choosing or filtering status. Use Status Selector for Edit Case Status dialogs, status filters, combo boxes, choice boxes, and dropdowns. Preserve native control behavior and accessibility. Dropdown items may include a small color dot when safe, but they do not need to mirror display pills exactly. If the current selected status is shown outside the control, use a Status Badge or Status Pill according to the surrounding visual density.
+
 ### Entity Pill
 
 A compact chip for people, assignees, related entities, and metadata.
