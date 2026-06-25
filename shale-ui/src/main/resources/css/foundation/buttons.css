@@ -1,0 +1,103 @@
+/*
+ * Shale Design Foundation - Buttons
+ *
+ * Additive button/action foundation for Phase B.3. These tokens and optional
+ * utility classes alias the current shared app.css button values so existing
+ * controls can align to the foundation without a visual redesign.
+ */
+
+.root {
+    /* Primary Button: default prominent action used by pill and toolbar actions. */
+    -shale-button-primary-background: linear-gradient(to bottom, rgba(116, 154, 212, 0.92), rgba(66, 109, 182, 0.94));
+    -shale-button-primary-hover-background: linear-gradient(to bottom, rgba(132, 171, 227, 0.95), rgba(79, 123, 196, 0.96));
+    -shale-button-primary-pressed-background: linear-gradient(to bottom, rgba(72, 112, 176, 0.96), rgba(56, 92, 155, 0.98));
+    -shale-button-primary-border: rgba(237, 245, 255, 0.36);
+    -shale-button-primary-hover-border: rgba(245, 250, 255, 0.52);
+    -shale-button-primary-pressed-border: rgba(218, 232, 252, 0.44);
+    -shale-button-primary-text: #f9fbff;
+
+    /* Secondary Button: neutral action used by non-primary toolbar/dialog actions. */
+    -shale-button-secondary-background: linear-gradient(to bottom, rgba(63, 90, 132, 0.78), rgba(36, 57, 90, 0.84));
+    -shale-button-secondary-hover-background: linear-gradient(to bottom, rgba(77, 107, 151, 0.82), rgba(45, 69, 106, 0.88));
+    -shale-button-secondary-pressed-background: linear-gradient(to bottom, rgba(50, 74, 112, 0.86), rgba(31, 50, 80, 0.92));
+    -shale-button-secondary-border: rgba(232, 242, 255, 0.26);
+    -shale-button-secondary-hover-border: rgba(238, 246, 255, 0.38);
+    -shale-button-secondary-pressed-border: rgba(214, 229, 249, 0.42);
+    -shale-button-secondary-text: #f9fbff;
+
+    /* Destructive Button: removal/cancel-danger action. */
+    -shale-button-destructive-background: linear-gradient(to bottom, rgba(220, 94, 94, 0.94), rgba(178, 55, 55, 0.96));
+    -shale-button-destructive-hover-background: linear-gradient(to bottom, rgba(234, 110, 110, 0.96), rgba(194, 70, 70, 0.98));
+    -shale-button-destructive-pressed-background: linear-gradient(to bottom, rgba(191, 64, 64, 0.98), rgba(153, 44, 44, 1.0));
+    -shale-button-destructive-border: rgba(255, 231, 231, 0.42);
+    -shale-button-destructive-hover-border: rgba(255, 240, 240, 0.56);
+    -shale-button-destructive-pressed-border: rgba(255, 220, 220, 0.40);
+    -shale-button-destructive-text: white;
+
+    /* Dialog Button aliases retain current dialog-specific visual values. */
+    -shale-button-dialog-primary-background: linear-gradient(to bottom, #4a83d2, #315fba);
+    -shale-button-dialog-primary-hover-background: linear-gradient(to bottom, #5a92e2, #3b6aca);
+    -shale-button-dialog-secondary-background: rgba(17, 37, 66, 0.08);
+    -shale-button-dialog-secondary-hover-background: rgba(17, 37, 66, 0.12);
+    -shale-button-dialog-secondary-border: rgba(17, 37, 66, 0.16);
+    -shale-button-dialog-secondary-text: #112542;
+    -shale-button-dialog-danger-background: linear-gradient(to bottom, #d45b5b, #b53d3d);
+    -shale-button-dialog-danger-hover-background: linear-gradient(to bottom, #e16d6d, #c14a4a);
+
+    /* Disabled Action and Focus Ring. */
+    -shale-button-disabled-background: rgba(105, 130, 170, 0.82);
+    -shale-button-disabled-border: rgba(255, 255, 255, 0.18);
+    -shale-button-focus-ring: rgba(123, 178, 255, 0.45);
+    -shale-button-focus-border: rgba(236, 245, 255, 0.72);
+}
+
+/* Hierarchy documentation / optional opt-in utility classes. */
+
+/* Primary Button */
+.shale-button-primary {
+    -fx-background-color: -shale-button-primary-background;
+    -fx-border-color: -shale-button-primary-border;
+    -fx-text-fill: -shale-button-primary-text;
+}
+
+/* Secondary Button */
+.shale-button-secondary {
+    -fx-background-color: -shale-button-secondary-background;
+    -fx-border-color: -shale-button-secondary-border;
+    -fx-text-fill: -shale-button-secondary-text;
+}
+
+/* Destructive Button */
+.shale-button-destructive {
+    -fx-background-color: -shale-button-destructive-background;
+    -fx-border-color: -shale-button-destructive-border;
+    -fx-text-fill: -shale-button-destructive-text;
+}
+
+/* Toolbar Button */
+.shale-button-toolbar {
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-padding: 10 16 10 16;
+}
+
+/* Pill Button */
+.shale-button-pill {
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-padding: 10 16 10 16;
+}
+
+/* Icon Button */
+.shale-button-icon {
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-padding: 0;
+    -fx-alignment: center;
+}
+
+/* Radius and padding primitives. */
+.shale-button-radius-standard { -fx-background-radius: 10; -fx-border-radius: 10; }
+.shale-button-radius-pill { -fx-background-radius: 999; -fx-border-radius: 999; }
+.shale-button-padding-compact { -fx-padding: 4 10 4 10; }
+.shale-button-padding-standard { -fx-padding: 10 16 10 16; }
