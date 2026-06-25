@@ -17,19 +17,19 @@
       spacing="12"
       styleClass="content-root shell-transparent">
     <children>
-        <HBox spacing="8" alignment="CENTER_LEFT">
+        <HBox spacing="8" alignment="CENTER_LEFT" styleClass="shale-filter-panel">
             <children>
-                <Button fx:id="todayButton" text="Today" onAction="#onToday" styleClass="app-toolbar-button app-toolbar-button-compact" />
-                <Button fx:id="prevWeekButton" text="◀" onAction="#onPreviousWeek" styleClass="app-toolbar-button app-toolbar-button-compact" />
-                <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="app-toolbar-button app-toolbar-button-compact" />
-                <Label fx:id="weekRangeLabel" styleClass="search-section-title" />
+                <Button fx:id="todayButton" text="Today" onAction="#onToday" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                <Button fx:id="prevWeekButton" text="◀" onAction="#onPreviousWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                <Label fx:id="weekRangeLabel" styleClass="search-section-title shale-toolbar-heading" />
                 <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" styleClass="app-toolbar-button app-toolbar-button-compact" />
-                <ChoiceBox fx:id="viewModeChoice" styleClass="app-toolbar-select" />
-                <TextField fx:id="searchTextField" promptText="Search" prefWidth="180" />
-                <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="170" styleClass="app-toolbar-select" />
-                <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="150" styleClass="app-toolbar-select" />
-                <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" styleClass="app-toolbar-button app-toolbar-button-compact" />
+                <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
+                <ChoiceBox fx:id="viewModeChoice" styleClass="shale-filter-combo" />
+                <TextField fx:id="searchTextField" promptText="Search" prefWidth="180" styleClass="shale-search-field" />
+                <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="170" styleClass="shale-filter-combo" />
+                <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="150" styleClass="shale-filter-combo" />
+                <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
             </children>
         </HBox>
 
