@@ -28,7 +28,7 @@
 			<StackPane fx:id="sectionContentStack" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308" VBox.vgrow="ALWAYS">
 
 				<VBox fx:id="overviewSectionPane" spacing="10" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
-					<Label fx:id="overviewLoadingLabel" text="Loading your overview..." managed="false" visible="false" styleClass="lane-empty-state" />
+					<Label fx:id="overviewLoadingLabel" text="Loading your overview..." managed="false" visible="false" styleClass="shale-loading-placeholder" />
 					<ScrollPane fx:id="overviewScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
 						vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
 						<content>
@@ -47,12 +47,13 @@
 							<HBox spacing="8" alignment="CENTER_LEFT">
 								<Label text="My Tasks" styleClass="page-heading" />
 								<Region HBox.hgrow="ALWAYS" />
-								<HBox spacing="6" alignment="CENTER_RIGHT" styleClass="my-tasks-view-toggle-group">
+								<HBox spacing="6" alignment="CENTER_RIGHT" styleClass="my-tasks-view-toggle-group shale-segmented-control">
 									<Button fx:id="myTasksBoardViewButton" text="Board">
 										<styleClass>
 											<String fx:value="app-toolbar-button" />
 											<String fx:value="app-toolbar-button-neutral" />
 											<String fx:value="my-tasks-view-toggle" />
+											<String fx:value="shale-segment" />
 										</styleClass>
 									</Button>
 									<Button fx:id="myTasksGridViewButton" text="Grid">
@@ -60,6 +61,7 @@
 											<String fx:value="app-toolbar-button" />
 											<String fx:value="app-toolbar-button-neutral" />
 											<String fx:value="my-tasks-view-toggle" />
+											<String fx:value="shale-segment" />
 										</styleClass>
 									</Button>
 								</HBox>
@@ -79,12 +81,12 @@
 										<Label text="Task View" />
 										<ChoiceBox fx:id="myTasksSourceChoice" prefWidth="170">
 											<styleClass>
-												<String fx:value="app-toolbar-select" />
+												<String fx:value="shale-filter-combo" />
 											</styleClass>
 										</ChoiceBox>
 										<ChoiceBox fx:id="myTasksSortChoice" prefWidth="170">
 											<styleClass>
-												<String fx:value="app-toolbar-select" />
+												<String fx:value="shale-filter-combo" />
 											</styleClass>
 										</ChoiceBox>
 										<Button fx:id="myTasksShowCompletedButton" text="Show Completed">
@@ -95,7 +97,7 @@
 										</Button>
 										<ChoiceBox fx:id="myTasksPriorityFilterChoice" prefWidth="190">
 											<styleClass>
-												<String fx:value="app-toolbar-select" />
+												<String fx:value="shale-filter-combo" />
 											</styleClass>
 										</ChoiceBox>
 									</HBox>
@@ -114,23 +116,23 @@
 										<Label text="Cases" />
 										<ChoiceBox fx:id="myTasksCaseFilterChoice" prefWidth="180">
 											<styleClass>
-												<String fx:value="app-toolbar-select" />
+												<String fx:value="shale-filter-combo" />
 											</styleClass>
 										</ChoiceBox>
 										<ChoiceBox fx:id="myTasksColumnOrderChoice" prefWidth="220">
 											<styleClass>
-												<String fx:value="app-toolbar-select" />
+												<String fx:value="shale-filter-combo" />
 											</styleClass>
 										</ChoiceBox>
 									</HBox>
 								</VBox>
 							</HBox>
 							<HBox spacing="8" alignment="CENTER_LEFT">
-								<TextField fx:id="myTasksSearchField" promptText="Search my tasks…" HBox.hgrow="ALWAYS" />
+								<TextField fx:id="myTasksSearchField" promptText="Search my tasks…" HBox.hgrow="ALWAYS" styleClass="shale-search-field" />
 							</HBox>
 						</VBox>
-						<Label fx:id="myTasksLoadingLabel" text="Loading your tasks..." managed="false" visible="false" styleClass="lane-empty-state" />
-						<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" />
+						<Label fx:id="myTasksLoadingLabel" text="Loading your tasks..." managed="false" visible="false" styleClass="shale-loading-placeholder" />
+						<Label fx:id="myTasksEmptyLabel" text="No tasks assigned to you." managed="false" visible="false" styleClass="shale-empty-state" />
 						<ScrollPane fx:id="myTasksScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
 							vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
 							<content>
@@ -167,22 +169,22 @@
 										</styleClass>
 									</Label>
 									<HBox spacing="8" alignment="CENTER_LEFT">
-										<TextField fx:id="myCasesBoardSearchField" promptText="Search case name or case number…" HBox.hgrow="ALWAYS" />
+										<TextField fx:id="myCasesBoardSearchField" promptText="Search case name or case number…" HBox.hgrow="ALWAYS" styleClass="shale-search-field" />
 										<ChoiceBox fx:id="myCasesBoardStatusFilterChoice" prefWidth="200">
 											<styleClass>
-												<String fx:value="app-toolbar-select" />
+												<String fx:value="shale-filter-combo" />
 											</styleClass>
 										</ChoiceBox>
 										<ChoiceBox fx:id="myCasesBoardSortChoice" prefWidth="220">
 											<styleClass>
-												<String fx:value="app-toolbar-select" />
+												<String fx:value="shale-filter-combo" />
 											</styleClass>
 										</ChoiceBox>
 									</HBox>
 								</VBox>
 							</HBox>
-							<Label fx:id="myCasesLoadingLabel" text="Loading your cases..." managed="false" visible="false" styleClass="lane-empty-state" />
-							<Label fx:id="myCasesBoardEmptyLabel" text="No cases assigned to you." managed="false" visible="false" />
+							<Label fx:id="myCasesLoadingLabel" text="Loading your cases..." managed="false" visible="false" styleClass="shale-loading-placeholder" />
+							<Label fx:id="myCasesBoardEmptyLabel" text="No cases assigned to you." managed="false" visible="false" styleClass="shale-empty-state" />
 							<ScrollPane fx:id="myCasesBoardScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
 								vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
 								<content>
