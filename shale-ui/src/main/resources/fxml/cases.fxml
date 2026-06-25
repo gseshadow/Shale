@@ -10,14 +10,16 @@
 	fx:controller="com.shale.ui.controller.CasesController" styleClass="app-shell" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 
 	<top>
-		<HBox spacing="10" styleClass="cases-filter-bar strong-panel">
+		<HBox spacing="10" styleClass="cases-filter-bar strong-panel shale-filter-panel">
 			<padding>
 				<Insets top="10" right="10" bottom="10" left="10" />
 			</padding>
-			<ToggleButton fx:id="cardsViewToggle" text="Cards" selected="true" />
-			<ToggleButton fx:id="gridViewToggle" text="List" />
+			<HBox styleClass="shale-segmented-control">
+				<ToggleButton fx:id="cardsViewToggle" text="Cards" selected="true" styleClass="shale-segment" />
+				<ToggleButton fx:id="gridViewToggle" text="List" styleClass="shale-segment" />
+			</HBox>
 			<TextField fx:id="casesSearchField"
-				promptText="Search cases…" HBox.hgrow="ALWAYS" />
+				promptText="Search cases…" HBox.hgrow="ALWAYS" styleClass="shale-search-field" />
 			<MenuButton fx:id="statusFilterMenuButton" text="Status (8/8)">
 				<styleClass>
 					<String fx:value="menu-button" />
@@ -55,7 +57,7 @@
 					</FlowPane>
 				</content>
 			</ScrollPane>
-			<TableView fx:id="casesTable" visible="false" managed="false" minHeight="0.0" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308" AnchorPane.topAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" styleClass="cases-content-surface" />
+			<TableView fx:id="casesTable" visible="false" managed="false" minHeight="0.0" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308" AnchorPane.topAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" styleClass="cases-content-surface shale-table" />
 		</AnchorPane>
 	</center>
 

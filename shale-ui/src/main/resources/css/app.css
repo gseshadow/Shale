@@ -4,6 +4,9 @@
 @import "foundation/buttons.css";
 @import "foundation/density.css";
 @import "foundation/cards.css";
+@import "foundation/forms.css";
+@import "foundation/tables.css";
+@import "foundation/toolbars.css";
 
 .root {
     -fx-font-size: 14px;
