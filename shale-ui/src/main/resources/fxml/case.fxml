@@ -57,6 +57,7 @@
 				<VBox fx:id="overviewPane" spacing="10" maxWidth="980">
 					<styleClass>
 						<String fx:value="shale-surface" />
+						<String fx:value="shale-surface-content" />
 						<String fx:value="case-overview-surface" />
 					</styleClass>
 					<padding>
@@ -71,12 +72,16 @@
 							<styleClass>
 								<String fx:value="app-toolbar-button" />
 								<String fx:value="app-toolbar-button-danger" />
+								<String fx:value="shale-button-destructive" />
+								<String fx:value="shale-button-toolbar" />
 							</styleClass>
 						</Button>
 						<Button fx:id="editButton" text="Edit" visible="false" managed="false">
 							<styleClass>
 								<String fx:value="app-toolbar-button" />
 								<String fx:value="app-toolbar-button-neutral" />
+								<String fx:value="shale-button-secondary" />
+								<String fx:value="shale-button-toolbar" />
 							</styleClass>
 						</Button>
 						<MenuButton fx:id="generateSummaryMenuButton"
@@ -84,6 +89,8 @@
 							<styleClass>
 								<String fx:value="app-toolbar-button" />
 								<String fx:value="app-toolbar-button-primary" />
+								<String fx:value="shale-button-primary" />
+								<String fx:value="shale-button-toolbar" />
 							</styleClass>
 							<items>
 								<MenuItem fx:id="generateSummaryHtmlMenuItem"
@@ -107,6 +114,8 @@
 							<styleClass>
 								<String fx:value="app-toolbar-button" />
 								<String fx:value="app-toolbar-button-primary" />
+								<String fx:value="shale-button-primary" />
+								<String fx:value="shale-button-toolbar" />
 							</styleClass>
 						</Button>
 						<Button fx:id="cancelButton" text="Cancel" visible="false"
@@ -114,6 +123,8 @@
 							<styleClass>
 								<String fx:value="app-toolbar-button" />
 								<String fx:value="app-toolbar-button-neutral" />
+								<String fx:value="shale-button-secondary" />
+								<String fx:value="shale-button-toolbar" />
 							</styleClass>
 						</Button>
 					</HBox>
@@ -134,6 +145,7 @@
 					<VBox spacing="16" maxWidth="1.7976931348623157E308" styleClass="case-overview-list">
 						<VBox spacing="5">
 							<styleClass>
+								<String fx:value="shale-surface-section" />
 								<String fx:value="case-overview-section" />
 								<String fx:value="case-overview-section-region" />
 								<String fx:value="case-overview-section-region-case-details" />
@@ -141,6 +153,7 @@
 							<HBox spacing="8" alignment="CENTER_LEFT" styleClass="case-overview-section-header">
 								<Region>
 									<styleClass>
+										<String fx:value="shale-indicator-practice-area" />
 										<String fx:value="case-overview-section-accent" />
 										<String fx:value="case-overview-section-accent-case-details" />
 									</styleClass>
@@ -204,6 +217,7 @@
 
 						<VBox spacing="5">
 							<styleClass>
+								<String fx:value="shale-surface-section" />
 								<String fx:value="case-overview-section" />
 								<String fx:value="case-overview-section-region" />
 								<String fx:value="case-overview-section-region-parties" />
@@ -211,6 +225,7 @@
 							<HBox spacing="8" alignment="CENTER_LEFT" styleClass="case-overview-section-header">
 								<Region>
 									<styleClass>
+										<String fx:value="shale-indicator-practice-area" />
 										<String fx:value="case-overview-section-accent" />
 										<String fx:value="case-overview-section-accent-parties" />
 									</styleClass>
@@ -225,6 +240,7 @@
 
 						<VBox spacing="5">
 							<styleClass>
+								<String fx:value="shale-surface-section" />
 								<String fx:value="case-overview-section" />
 								<String fx:value="case-overview-section-region" />
 								<String fx:value="case-overview-section-region-practice-team" />
@@ -232,6 +248,7 @@
 							<HBox spacing="8" alignment="CENTER_LEFT" styleClass="case-overview-section-header">
 								<Region>
 									<styleClass>
+										<String fx:value="shale-indicator-practice-area" />
 										<String fx:value="case-overview-section-accent" />
 										<String fx:value="case-overview-section-accent-practice-team" />
 									</styleClass>

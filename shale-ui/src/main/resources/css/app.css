@@ -1515,13 +1515,13 @@
 }
 
 .case-overview-section-title {
-    -fx-text-fill: #183553;
+    -fx-text-fill: -shale-color-text-primary;
     -fx-font-size: 14px;
     -fx-font-weight: 800;
 }
 
 .case-overview-section-line {
-    -fx-background-color: rgba(48, 121, 214, 0.70);
+    -fx-background-color: -shale-color-primary-accent;
     -fx-min-height: 1.2;
     -fx-pref-height: 1.2;
     -fx-max-height: 1.2;
@@ -1543,7 +1543,7 @@
 .case-overview-row-value,
 .case-overview-row-value-host {
     -fx-padding: 11 0 11 0;
-    -fx-text-fill: #183553;
+    -fx-text-fill: -shale-color-text-primary;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
     -fx-border-color: transparent transparent rgba(17, 37, 66, 0.10) transparent;
@@ -1552,7 +1552,7 @@
 
 .case-overview-party-side {
     -fx-padding: 9 0 3 8;
-    -fx-text-fill: #183553;
+    -fx-text-fill: -shale-color-text-primary;
     -fx-font-size: 12px;
     -fx-font-weight: 800;
 }
@@ -1571,7 +1571,7 @@
 
 .case-overview-party-name {
     -fx-padding: 9 0 9 0;
-    -fx-text-fill: #183553;
+    -fx-text-fill: -shale-color-text-primary;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
 }
@@ -1601,7 +1601,7 @@
     -fx-background-insets: 0;
     -fx-background-radius: 14;
     -fx-border-radius: 14;
-    -fx-border-color: rgba(88, 124, 166, 0.22);
+    -fx-border-color: -shale-color-card-border;
     -fx-border-width: 1;
     -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.14), 18, 0.16, 0, 3);
 }
@@ -1617,7 +1617,7 @@
 .case-overview-row-value,
 .case-overview-row-value-host,
 .case-overview-party-row {
-    -fx-border-color: transparent transparent rgba(75, 103, 138, 0.13) transparent;
+    -fx-border-color: transparent transparent -shale-color-border transparent;
 }
 
 .case-overview-row-label {
@@ -1627,7 +1627,7 @@
 .case-overview-row-value,
 .case-overview-row-value-host,
 .case-overview-party-name {
-    -fx-text-fill: #132f4c;
+    -fx-text-fill: -shale-color-text-primary;
 }
 
 .case-overview-row-label:hover,
@@ -1706,7 +1706,7 @@
     -fx-padding: 8 10 8 10;
     -fx-background-color: rgba(232, 240, 249, 0.72);
     -fx-background-radius: 8;
-    -fx-text-fill: #132f4c;
+    -fx-text-fill: -shale-color-text-primary;
     -fx-font-weight: 600;
 }
 
@@ -1723,7 +1723,7 @@
     -fx-text-fill: white;
 }
 
-/* Subtle section regions inside Case Overview. */
+/* Case Overview composes section regions from foundation section-surface primitives while retaining scoped compatibility selectors for its three subtle tints. */
 .case-overview-list {
     -fx-spacing: 16;
 }
@@ -1731,22 +1731,22 @@
 .case-overview-section-region {
     -fx-background-radius: 12;
     -fx-border-radius: 12;
-    -fx-border-color: #EAF0F6;
+    -fx-border-color: -shale-color-border;
     -fx-border-width: 1;
     -fx-padding: 10 12 10 12;
     -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.07), 7, 0.10, 0, 1);
 }
 
 .case-overview-section-region-case-details {
-    -fx-background-color: #F5F9FE;
+    -fx-background-color: derive(-shale-color-content-surface, 18%);
 }
 
 .case-overview-section-region-parties {
-    -fx-background-color: #F6FBF7;
+    -fx-background-color: derive(-shale-indicator-success-background, 72%);
 }
 
 .case-overview-section-region-practice-team {
-    -fx-background-color: #FFF8F2;
+    -fx-background-color: derive(-shale-indicator-warning-background, 55%);
 }
 
 .case-overview-section-header {
@@ -1763,11 +1763,11 @@
 }
 
 .case-overview-section-accent-case-details {
-    -fx-background-color: rgba(48, 121, 214, 0.70);
+    -fx-background-color: -shale-color-primary-accent;
 }
 
 .case-overview-section-accent-parties {
-    -fx-background-color: rgba(32, 150, 129, 0.68);
+    -fx-background-color: -shale-color-success;
 }
 
 .case-overview-section-accent-practice-team {

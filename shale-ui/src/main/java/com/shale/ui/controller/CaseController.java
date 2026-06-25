@@ -1292,6 +1292,7 @@ public class CaseController {
 				+ (item.current() ? "bold" : "600") + ";");
 
 		HBox pill = new HBox(8, check, label);
+		pill.getStyleClass().addAll("shale-indicator-status-pill", "shale-indicator-current");
 		pill.setAlignment(Pos.CENTER);
 		pill.setMinHeight(38);
 		pill.setMaxHeight(38);
@@ -1565,7 +1566,7 @@ public class CaseController {
 
 		VBox card = new VBox(content);
 		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().add("secondary-panel");
+		card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
 		return card;
 	}
 
@@ -1738,7 +1739,7 @@ public class CaseController {
 
 			card.getChildren().setAll(row);
 			card.setPadding(new Insets(8, 10, 8, 10));
-			card.getStyleClass().add("secondary-panel");
+			card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
 		} else {
 			card.setPadding(new Insets(1, 0, 1, 0));
 		}
@@ -3092,7 +3093,7 @@ public class CaseController {
 
 		VBox card = new VBox(content);
 		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().add("secondary-panel");
+		card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
 		return card;
 	}
 
@@ -4502,7 +4503,7 @@ public class CaseController {
 
 		VBox card = new VBox(4, topRow, metadataLabel, bodyBox);
 		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().add("secondary-panel");
+		card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
 		return card;
 	}
 

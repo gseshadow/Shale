@@ -284,11 +284,11 @@ public class CaseCard extends VBox {
 	 */
 
 	private void buildUi() {
-		getStyleClass().add("case-card");
-		practiceAreaBar.getStyleClass().add("case-card__practice-area-bar");
+		getStyleClass().addAll("case-card", "shale-entity-card", "shale-entity-card-clickable");
+		practiceAreaBar.getStyleClass().addAll("case-card__practice-area-bar", "shale-indicator-practice-area");
 		bodyPane.getStyleClass().add("case-card__body");
 		bottomRow.getStyleClass().add("case-card__bottom-row");
-		statusLabel.getStyleClass().add("case-card__status-label");
+		statusLabel.getStyleClass().addAll("case-card__status-label", "shale-indicator-status-pill");
 		attorneyMiniCard.getStyleClass().add("case-card__attorney-mini-card");
 		setBackgroundCssColor(null);
 		intakeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.78);");
