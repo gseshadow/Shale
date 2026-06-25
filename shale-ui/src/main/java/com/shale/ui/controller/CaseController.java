@@ -47,6 +47,7 @@ import com.shale.ui.document.GeneratedDocument;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
+import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
 import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.StatusIndicatorFactory.PillSize;
@@ -4687,7 +4688,7 @@ public class CaseController {
 				colorHex
 		);
 
-		ovPracticeAreaHost.getChildren().setAll(createOverviewInlineValue(name, colorHex));
+		ovPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.LARGE));
 	}
 
 	private Node createOverviewInlineValue(String value, String colorCss) {
@@ -4731,7 +4732,7 @@ public class CaseController {
 		PracticeAreaCardModel model = new PracticeAreaCardModel(practiceAreaId,
 				(name == null || name.isBlank()) ? "—" : name,
 				colorHex);
-		detPracticeAreaHost.getChildren().setAll(practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI));
+		detPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.COMPACT));
 	}
 
 	private static Boolean parseNullableBooleanStorage(String raw) {
