@@ -26,7 +26,8 @@
     -fx-spacing: 0;
 }
 
-.toggle-button.shale-segment {
+.toggle-button.shale-segment,
+.button.shale-segment {
     -fx-min-height: 32;
     -fx-pref-height: 32;
     -fx-padding: 6 14 6 14;
@@ -41,12 +42,14 @@
     -fx-cursor: hand;
 }
 
-.toggle-button.shale-segment:hover {
+.toggle-button.shale-segment:hover,
+.button.shale-segment:hover {
     -fx-background-color: rgba(255, 255, 255, 0.96);
     -fx-border-color: rgba(74, 104, 138, 0.24);
 }
 
-.toggle-button.shale-segment:pressed {
+.toggle-button.shale-segment:pressed,
+.button.shale-segment:pressed {
     -fx-background-color: rgba(232, 241, 251, 0.92);
 }
 
@@ -66,6 +69,26 @@
     -fx-border-color: -shale-button-primary-pressed-border;
 }
 
-.toggle-button.shale-segment:focused {
+.toggle-button.shale-segment:focused,
+.button.shale-segment:focused {
     -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 8, 0.18, 0, 0);
+}
+
+/* Empty State: shared placeholder copy for loading/empty list regions. */
+.shale-empty-state,
+.label.shale-empty-state {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 12px;
+    -fx-padding: 10 8 10 8;
+    -fx-font-style: italic;
+}
+
+/* Loading Placeholder: same footprint as empty state with slightly stronger text. */
+.shale-loading-placeholder,
+.label.shale-loading-placeholder {
+    -fx-text-fill: -shale-color-text-secondary;
+    -fx-font-size: 12px;
+    -fx-padding: 10 8 10 8;
+    -fx-font-style: italic;
+    -fx-font-weight: 700;
 }

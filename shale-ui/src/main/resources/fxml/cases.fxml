@@ -30,7 +30,7 @@
 			<ChoiceBox fx:id="casesSortChoice" prefWidth="220">
 				<styleClass>
 					<String fx:value="choice-box" />
-					<String fx:value="app-toolbar-select" />
+					<String fx:value="shale-filter-combo" />
 				</styleClass>
 			</ChoiceBox>
 			<MenuButton fx:id="columnMenuButton" text="Customize Columns">

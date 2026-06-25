@@ -33,7 +33,7 @@
             </children>
         </HBox>
 
-        <Label fx:id="calendarLoadingLabel" text="Loading week..." styleClass="lane-empty-state" visible="false" managed="false" />
+        <Label fx:id="calendarLoadingLabel" text="Loading week..." styleClass="shale-loading-placeholder" visible="false" managed="false" />
         <Label fx:id="calendarErrorLabel" styleClass="error" visible="false" managed="false" />
 
         <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="shell-transparent">
