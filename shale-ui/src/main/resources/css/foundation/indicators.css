@@ -1,0 +1,159 @@
+/*
+ * Shale Design Foundation - Indicators
+ *
+ * Reusable visual indicator hierarchy:
+ * 1. Status Pill: lifecycle/status labels; may receive database-driven colors.
+ * 2. Entity Pill: attorney/user labels and compact entity chips.
+ * 3. Severity Badge: warning/error/critical notification labels.
+ * 4. Count Badge: numeric lane, task, and result counters.
+ * 5. Dot Indicator: unread, status, calendar-now, and presence/accent dots.
+ * 6. Practice Area Indicator: practice-area color accents; may receive DB colors.
+ * 7. Selected/Current Indicator: selected, active, current, and beta/current badges.
+ *
+ * Tokens intentionally alias current app.css values so existing selectors can
+ * adopt the foundation without changing visuals, layouts, status logic, or
+ * practice-area color logic.
+ */
+
+.root {
+    /* Neutral/default indicator colors */
+    -shale-indicator-neutral-background: rgba(16, 36, 66, 0.10);
+    -shale-indicator-neutral-background-strong: rgba(16, 36, 66, 0.12);
+    -shale-indicator-neutral-border: rgba(18, 41, 74, 0.14);
+    -shale-indicator-neutral-text: -shale-color-text-primary;
+    -shale-indicator-muted-text: -shale-color-text-muted;
+    -shale-indicator-count-text-on-dark: rgba(225, 236, 251, 0.86);
+    -shale-indicator-count-text-on-dark-inline: rgba(208, 223, 246, 0.90);
+
+    /* Status/entity/practice defaults; DB-driven values continue to override where applied inline. */
+    -shale-indicator-status-pill-background: #F1F5F9;
+    -shale-indicator-status-pill-text: -shale-color-text-primary;
+    -shale-indicator-entity-pill-background: rgba(16, 36, 66, 0.10);
+    -shale-indicator-entity-pill-text: -shale-color-text-primary;
+    -shale-indicator-practice-area-color: #CBD5E1;
+    -shale-indicator-practice-area-background: rgba(224, 148, 44, 0.70);
+
+    /* Severity and intent indicators */
+    -shale-indicator-info-background: rgba(79, 127, 191, 0.15);
+    -shale-indicator-info-border: rgba(79, 127, 191, 0.24);
+    -shale-indicator-info-text: #244d82;
+    -shale-indicator-success-background: rgba(34, 139, 86, 0.16);
+    -shale-indicator-success-border: rgba(34, 139, 86, 0.32);
+    -shale-indicator-success-text: rgba(20, 95, 58, 1.0);
+    -shale-indicator-warning-background: rgba(214, 143, 36, 0.14);
+    -shale-indicator-warning-border: rgba(214, 143, 36, 0.30);
+    -shale-indicator-warning-text: #7a4f12;
+    -shale-indicator-warning-icon-background: rgba(214, 143, 36, 0.16);
+    -shale-indicator-warning-icon-border: rgba(214, 143, 36, 0.32);
+    -shale-indicator-error-background: rgba(195, 56, 56, 0.15);
+    -shale-indicator-error-border: rgba(195, 56, 56, 0.34);
+    -shale-indicator-error-text: #8d2727;
+    -shale-indicator-error-icon-background: rgba(195, 56, 56, 0.17);
+
+    /* Dot/selected/current indicators */
+    -shale-indicator-unread-background: #2e6fb6;
+    -shale-indicator-unread-strong-background: #c62828;
+    -shale-indicator-selected-background: rgba(84, 130, 195, 0.28);
+    -shale-indicator-selected-border: #9fc4ff;
+    -shale-indicator-selected-text: #f8fbff;
+    -shale-indicator-current-background: rgba(232, 240, 249, 0.72);
+    -shale-indicator-current-text: #132f4c;
+}
+
+/* Status Pill: lifecycle/status labels; DB colors may be applied inline. */
+.shale-indicator-status-pill {
+    -fx-padding: 2 8 2 8;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-background-color: -shale-indicator-status-pill-background;
+    -fx-text-fill: -shale-indicator-status-pill-text;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+}
+
+/* Entity Pill: attorney/user labels and compact chips. */
+.shale-indicator-entity-pill,
+.shale-indicator-chip {
+    -fx-padding: 2 8 2 8;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-background-color: -shale-indicator-entity-pill-background;
+    -fx-text-fill: -shale-indicator-entity-pill-text;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+/* Severity Badge: notification severity labels. */
+.shale-indicator-severity-badge {
+    -fx-font-size: 9px;
+    -fx-font-weight: 900;
+    -fx-padding: 2 6 2 6;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+}
+
+/* Count Badge: compact numeric lane and task counts. */
+.shale-indicator-count-badge {
+    -fx-text-fill: -shale-indicator-muted-text;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+/* Badge: neutral reusable small label. */
+.shale-indicator-badge {
+    -fx-background-color: -shale-indicator-neutral-background;
+    -fx-background-radius: 8;
+    -fx-padding: 1 6 1 6;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
+/* Dot Indicator: unread/status/current dots. */
+.shale-indicator-dot,
+.shale-indicator-unread {
+    -fx-background-color: -shale-indicator-unread-background;
+    -fx-background-radius: 999;
+}
+
+/* Practice Area Indicator: color accents, often database-driven. */
+.shale-indicator-practice-area {
+    -fx-background-color: -shale-indicator-practice-area-background;
+    -fx-background-radius: 999;
+}
+
+/* Selected/Current Indicator: active/current state labels. */
+.shale-indicator-selected,
+.shale-indicator-current {
+    -fx-background-color: -shale-indicator-selected-background;
+    -fx-border-color: -shale-indicator-selected-border;
+    -fx-text-fill: -shale-indicator-selected-text;
+}
+
+.shale-indicator-current-value {
+    -fx-background-color: -shale-indicator-current-background;
+    -fx-text-fill: -shale-indicator-current-text;
+}
+
+.shale-indicator-success {
+    -fx-background-color: -shale-indicator-success-background;
+    -fx-border-color: -shale-indicator-success-border;
+    -fx-text-fill: -shale-indicator-success-text;
+}
+
+.shale-indicator-warning {
+    -fx-background-color: -shale-indicator-warning-background;
+    -fx-border-color: -shale-indicator-warning-border;
+    -fx-text-fill: -shale-indicator-warning-text;
+}
+
+.shale-indicator-error {
+    -fx-background-color: -shale-indicator-error-background;
+    -fx-border-color: -shale-indicator-error-border;
+    -fx-text-fill: -shale-indicator-error-text;
+}
+
+.shale-indicator-neutral {
+    -fx-background-color: -shale-indicator-neutral-background;
+    -fx-border-color: -shale-indicator-neutral-border;
+    -fx-text-fill: -shale-indicator-neutral-text;
+}
