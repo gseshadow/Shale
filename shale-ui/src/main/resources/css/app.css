@@ -19,7 +19,13 @@
 .title { -fx-font-size: 20px; -fx-font-weight: bold; }
 .error { -fx-text-fill: #c62828; }
 
-/* Surface hierarchy */
+/*
+ * Surface hierarchy entry point.
+ * app.css remains the stable stylesheet loaded by scenes/dialogs, while broad
+ * reusable containers below now compose from foundation surface/color tokens.
+ * Screen-specific sections, cards, buttons, and dialogs remain on their
+ * existing selectors until their later migration phases.
+ */
 .app-shell {
     -fx-border-color: transparent;
 }
@@ -30,26 +36,26 @@
 }
 
 .glass-container {
-    -fx-background-color: rgba(238, 247, 255, 0.10);
+    -fx-background-color: -shale-color-glass-container-surface;
     -fx-background-radius: 14;
     -fx-border-radius: 14;
-    -fx-border-color: rgba(222, 239, 255, 0.18);
+    -fx-border-color: -shale-color-glass-container-border;
     -fx-border-width: 1;
 }
 
 .glass-panel {
-    -fx-background-color: rgba(236, 246, 255, 0.16);
+    -fx-background-color: -shale-color-overlay-surface;
     -fx-background-radius: 12;
     -fx-border-radius: 12;
-    -fx-border-color: rgba(223, 239, 255, 0.24);
+    -fx-border-color: -shale-color-overlay-border;
     -fx-border-width: 1;
 }
 
 .strong-panel {
-    -fx-background-color: rgba(245, 249, 253, 0.78);
+    -fx-background-color: -shale-color-dialog-surface;
     -fx-background-radius: 12;
     -fx-border-radius: 12;
-    -fx-border-color: rgba(16, 34, 62, 0.18);
+    -fx-border-color: -shale-color-strong-panel-border;
     -fx-border-width: 1;
 }
 
@@ -112,10 +118,10 @@
 .nav-rail,
 .sidebar,
 .case-nav-pane {
-    -fx-background-color: rgba(238, 248, 255, 0.08);
+    -fx-background-color: -shale-color-navigation-surface;
     -fx-background-radius: 14;
     -fx-border-radius: 14;
-    -fx-border-color: rgba(223, 240, 255, 0.18);
+    -fx-border-color: -shale-color-navigation-border;
     -fx-border-width: 1;
 }
 
@@ -126,10 +132,10 @@
 
 .shale-surface,
 .case-right-pane {
-    -fx-background-color: rgba(242, 248, 255, 0.64);
+    -fx-background-color: -shale-color-content-surface;
     -fx-background-radius: 12;
     -fx-border-radius: 12;
-    -fx-border-color: rgba(15, 35, 66, 0.16);
+    -fx-border-color: -shale-color-border;
     -fx-border-width: 1;
 }
 

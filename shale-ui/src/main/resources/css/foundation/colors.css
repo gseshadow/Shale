@@ -12,11 +12,19 @@
     -shale-color-application-background-mid: #2b6a82;
     -shale-color-application-background-end: #0e1023;
     -shale-color-navigation-surface: rgba(238, 248, 255, 0.08);
+    -shale-color-navigation-border: rgba(223, 240, 255, 0.18);
+    -shale-color-glass-container-surface: rgba(238, 247, 255, 0.10);
+    -shale-color-glass-container-border: rgba(222, 239, 255, 0.18);
+    -shale-color-overlay-surface: rgba(236, 246, 255, 0.16);
+    -shale-color-overlay-border: rgba(223, 239, 255, 0.24);
     -shale-color-content-surface: rgba(242, 248, 255, 0.64);
     -shale-color-section-surface: rgba(232, 241, 251, 0.62);
     -shale-color-card-surface: rgba(248,250,252,0.96);
     -shale-color-card-hover-surface: rgba(255,255,255,0.985);
+    -shale-color-card-border: rgba(74, 104, 138, 0.24);
     -shale-color-dialog-surface: rgba(245, 249, 253, 0.78);
+    -shale-color-dialog-border: rgba(15, 34, 65, 0.18);
+    -shale-color-strong-panel-border: rgba(16, 34, 62, 0.18);
 
     /* Intent colors */
     -shale-color-primary-accent: #4b7fce;
