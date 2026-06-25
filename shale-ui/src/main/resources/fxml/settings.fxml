@@ -73,20 +73,9 @@
                 <Label text="Case Statuses" styleClass="search-section-title"/>
                 <Label text="Manage the case statuses available for this tenant."
                        styleClass="search-summary-text" wrapText="true"/>
-                <TableView fx:id="caseStatusesTable" prefHeight="260" styleClass="shale-table">
-                    <columns>
-                        <TableColumn fx:id="statusNameColumn" text="Status name" prefWidth="180"/>
-                        <TableColumn fx:id="statusClosedColumn" text="Open/Closed" prefWidth="120"/>
-                        <TableColumn fx:id="statusSortOrderColumn" text="Sort Order" prefWidth="100"/>
-                        <TableColumn fx:id="statusLifecycleKeyColumn" text="Lifecycle Key" prefWidth="140"/>
-                        <TableColumn fx:id="statusSystemKeyColumn" text="System Key" prefWidth="140"/>
-                    </columns>
-                </TableView>
+                <VBox fx:id="caseStatusCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
                 <HBox spacing="8">
                     <Button text="Add Status" onAction="#onAddCaseStatus" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact"/>
-                    <Button text="Edit Status" onAction="#onEditCaseStatus" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact"/>
-                    <Button text="Move Up" onAction="#onMoveCaseStatusUp" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact"/>
-                    <Button text="Move Down" onAction="#onMoveCaseStatusDown" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact"/>
                     <Label fx:id="caseStatusSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
             </VBox>
