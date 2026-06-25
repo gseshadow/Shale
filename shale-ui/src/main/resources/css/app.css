@@ -1,5 +1,6 @@
 @import "foundation/colors.css";
 @import "foundation/surfaces.css";
+@import "foundation/indicators.css";
 @import "foundation/buttons.css";
 @import "foundation/density.css";
 @import "foundation/cards.css";
@@ -578,13 +579,13 @@
 }
 
 .label.lane-task-count {
-    -fx-text-fill: rgba(225, 236, 251, 0.86);
+    -fx-text-fill: -shale-indicator-count-text-on-dark;
     -fx-font-size: 11px;
     -fx-font-weight: 700;
 }
 
 .label.lane-task-count-inline {
-    -fx-text-fill: rgba(208, 223, 246, 0.9);
+    -fx-text-fill: -shale-indicator-count-text-on-dark-inline;
     -fx-font-size: 11px;
     -fx-font-weight: 700;
     -fx-padding: 0 0 1 0;
@@ -1020,7 +1021,7 @@
 }
 
 .notification-bell-button-unread {
-    -fx-background-color: #c62828;
+    -fx-background-color: -shale-indicator-unread-strong-background;
     -fx-text-fill: white;
 }
 
@@ -1132,7 +1133,7 @@
     -fx-min-height: 8px;
     -fx-pref-width: 8px;
     -fx-pref-height: 8px;
-    -fx-background-color: #2e6fb6;
+    -fx-background-color: -shale-indicator-unread-background;
     -fx-background-radius: 999;
 }
 
@@ -1146,30 +1147,30 @@
     -fx-pref-width: 30px;
     -fx-pref-height: 30px;
     -fx-alignment: center;
-    -fx-background-color: rgba(79, 127, 191, 0.15);
+    -fx-background-color: -shale-indicator-info-background;
     -fx-background-radius: 999;
-    -fx-border-color: rgba(79, 127, 191, 0.24);
+    -fx-border-color: -shale-indicator-info-border;
     -fx-border-radius: 999;
     -fx-font-size: 14px;
     -fx-text-fill: #244d82;
 }
 
 .notification-icon-info {
-    -fx-background-color: rgba(79, 127, 191, 0.15);
-    -fx-border-color: rgba(79, 127, 191, 0.24);
-    -fx-text-fill: #244d82;
+    -fx-background-color: -shale-indicator-info-background;
+    -fx-border-color: -shale-indicator-info-border;
+    -fx-text-fill: -shale-indicator-info-text;
 }
 
 .notification-icon-warning {
-    -fx-background-color: rgba(214, 143, 36, 0.16);
-    -fx-border-color: rgba(214, 143, 36, 0.32);
-    -fx-text-fill: #7a4f12;
+    -fx-background-color: -shale-indicator-warning-icon-background;
+    -fx-border-color: -shale-indicator-warning-icon-border;
+    -fx-text-fill: -shale-indicator-warning-text;
 }
 
 .notification-icon-critical {
-    -fx-background-color: rgba(195, 56, 56, 0.17);
-    -fx-border-color: rgba(195, 56, 56, 0.34);
-    -fx-text-fill: #8d2727;
+    -fx-background-color: -shale-indicator-error-icon-background;
+    -fx-border-color: -shale-indicator-error-border;
+    -fx-text-fill: -shale-indicator-error-text;
 }
 
 .notification-row-main {
@@ -1208,15 +1209,15 @@
 }
 
 .notification-row-severity-warning {
-    -fx-background-color: rgba(214, 143, 36, 0.14);
-    -fx-border-color: rgba(214, 143, 36, 0.30);
-    -fx-text-fill: #7a4f12;
+    -fx-background-color: -shale-indicator-warning-background;
+    -fx-border-color: -shale-indicator-warning-border;
+    -fx-text-fill: -shale-indicator-warning-text;
 }
 
 .notification-row-severity-critical {
-    -fx-background-color: rgba(195, 56, 56, 0.15);
-    -fx-border-color: rgba(195, 56, 56, 0.34);
-    -fx-text-fill: #8d2727;
+    -fx-background-color: -shale-indicator-error-background;
+    -fx-border-color: -shale-indicator-error-border;
+    -fx-text-fill: -shale-indicator-error-text;
 }
 
 .notification-row-expand,
@@ -1360,7 +1361,7 @@
 }
 
 .calendar-event-badge {
-    -fx-background-color: rgba(16, 36, 66, 0.1);
+    -fx-background-color: -shale-indicator-neutral-background;
     -fx-background-radius: 8;
     -fx-padding: 1 6 1 6;
     -fx-font-size: 10px;
@@ -1372,7 +1373,7 @@
 }
 
 .calendar-event-category-badge {
-    -fx-background-color: rgba(16, 36, 66, 0.12);
+    -fx-background-color: -shale-indicator-neutral-background-strong;
 }
 
 .label.calendar-event-time {
@@ -1767,7 +1768,7 @@
 }
 
 .case-overview-section-accent-practice-team {
-    -fx-background-color: rgba(224, 148, 44, 0.70);
+    -fx-background-color: -shale-indicator-practice-area-background;
 }
 
 .case-overview-section-icon {
