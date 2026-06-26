@@ -11,6 +11,7 @@ import javafx.util.Duration;
 
 import com.shale.data.dao.OrganizationDao.DirectoryOrganizationRow;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.ui.component.ScrollableListRegion;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.navigation.SceneManager;
@@ -23,7 +24,6 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 
@@ -37,7 +37,7 @@ public final class OrganizationsController {
 	@FXML
 	private javafx.scene.control.Button addOrganizationButton;
 	@FXML
-	private ScrollPane organizationsScroll;
+	private ScrollableListRegion organizationsListRegion;
 	@FXML
 	private FlowPane organizationsFlow;
 	@FXML
@@ -155,10 +155,10 @@ public final class OrganizationsController {
 	}
 
 	private void wireInfiniteScroll() {
-		if (organizationsScroll == null) {
+		if (organizationsListRegion == null) {
 			return;
 		}
-		organizationsScroll.vvalueProperty().addListener((obs, oldV, newV) -> {
+		organizationsListRegion.getScrollPane().vvalueProperty().addListener((obs, oldV, newV) -> {
 			if (newV != null && newV.doubleValue() >= 0.95) {
 				loadNextPage();
 			}
@@ -305,9 +305,8 @@ public final class OrganizationsController {
 		} else {
 			UiStateLabels.hide(organizationsEmptyStateLabel);
 		}
-		if (organizationsScroll != null) {
-			organizationsScroll.setVisible(!empty);
-			organizationsScroll.setManaged(!empty);
+		if (organizationsListRegion != null) {
+			organizationsListRegion.showEmpty(empty);
 		}
 	}
 
@@ -315,12 +314,15 @@ public final class OrganizationsController {
 		if (loadingStateVisible) {
 			UiStateLabels.showLoading(organizationsLoadingStateLabel);
 			UiStateLabels.hide(organizationsEmptyStateLabel);
-			if (organizationsScroll != null) {
-				organizationsScroll.setVisible(false);
-				organizationsScroll.setManaged(false);
+			if (organizationsListRegion != null) {
+				organizationsListRegion.showLoading(true);
 			}
 		} else {
-			UiStateLabels.hide(organizationsLoadingStateLabel);
+			if (organizationsListRegion != null) {
+				organizationsListRegion.showLoading(false);
+			} else {
+				UiStateLabels.hide(organizationsLoadingStateLabel);
+			}
 		}
 	}
 

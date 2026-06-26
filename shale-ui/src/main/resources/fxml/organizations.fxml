@@ -3,6 +3,7 @@
 <?import java.lang.String?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import com.shale.ui.component.ScrollableListRegion?>
 <?import javafx.geometry.Insets?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
@@ -27,29 +28,26 @@
 	</top>
 
 	<center>
-		<StackPane>
-			<children>
-				<ScrollPane fx:id="organizationsScroll" fitToWidth="true"
-					pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
-					<content>
-						<FlowPane fx:id="organizationsFlow" hgap="16" vgap="16"
-							prefWrapLength="1040" styleClass="cases-content-surface glass-panel">
-							<padding>
-								<Insets top="16" right="16" bottom="16" left="16" />
-							</padding>
-						</FlowPane>
-					</content>
-				</ScrollPane>
-
+		<ScrollableListRegion fx:id="organizationsListRegion">
+			<content>
+				<FlowPane fx:id="organizationsFlow" hgap="16" vgap="16"
+					prefWrapLength="1040" styleClass="cases-content-surface glass-panel">
+					<padding>
+						<Insets top="16" right="16" bottom="16" left="16" />
+					</padding>
+				</FlowPane>
+			</content>
+			<emptyLabel>
 				<Label fx:id="organizationsEmptyStateLabel"
 					text="No organizations to display yet." styleClass="shale-empty-state"
 					visible="false" managed="false" />
-
+			</emptyLabel>
+			<loadingLabel>
 				<Label fx:id="organizationsLoadingStateLabel"
 					text="Loading organizations…" styleClass="shale-loading-placeholder"
 					visible="false" managed="false" />
-			</children>
-		</StackPane>
+			</loadingLabel>
+		</ScrollableListRegion>
 	</center>
 
 </BorderPane>
