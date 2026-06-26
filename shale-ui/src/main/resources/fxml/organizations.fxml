@@ -42,7 +42,11 @@
 				</ScrollPane>
 
 				<Label fx:id="organizationsEmptyStateLabel"
-					text="No organizations to display yet."
+					text="No organizations to display yet." styleClass="shale-empty-state"
+					visible="false" managed="false" />
+
+				<Label fx:id="organizationsLoadingStateLabel"
+					text="Loading organizations…" styleClass="shale-loading-placeholder"
 					visible="false" managed="false" />
 			</children>
 		</StackPane>

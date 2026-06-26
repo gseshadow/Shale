@@ -21,6 +21,7 @@ import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.UiStateLabels;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -495,16 +496,18 @@ public final class SearchController {
 			flowPane.setVisible(!empty);
 			flowPane.setManaged(!empty);
 		}
-		if (emptyLabel != null) {
-			emptyLabel.setVisible(empty);
-			emptyLabel.setManaged(empty);
+		if (empty) {
+			UiStateLabels.showEmpty(emptyLabel);
+		} else {
+			UiStateLabels.hide(emptyLabel);
 		}
 	}
 
 	private void updateLoadingState(boolean loading) {
-		if (searchLoadingLabel != null) {
-			searchLoadingLabel.setVisible(loading);
-			searchLoadingLabel.setManaged(loading);
+		if (loading) {
+			UiStateLabels.showLoading(searchLoadingLabel);
+		} else {
+			UiStateLabels.hide(searchLoadingLabel);
 		}
 	}
 

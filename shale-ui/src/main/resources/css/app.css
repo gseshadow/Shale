@@ -14,6 +14,16 @@
 .title { -fx-font-size: 20px; -fx-font-weight: bold; }
 .error { -fx-text-fill: #c62828; }
 
+
+/* Standard state labels */
+.label.shale-empty-state,
+.label.shale-loading-placeholder {
+    -fx-text-fill: rgba(17, 37, 66, 0.72);
+    -fx-font-size: 12px;
+    -fx-padding: 10 8 10 8;
+    -fx-font-style: italic;
+}
+
 /* Surface hierarchy */
 .app-shell {
     -fx-border-color: transparent;

@@ -6,6 +6,7 @@ import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.UiStateLabels;
 
 import javafx.application.Platform;
 import javafx.animation.PauseTransition;
@@ -261,9 +262,10 @@ public final class ContactsController {
     }
 
     private void updateEmptyState(boolean empty) {
-        if (contactsEmptyStateLabel != null) {
-            contactsEmptyStateLabel.setVisible(empty);
-            contactsEmptyStateLabel.setManaged(empty);
+        if (empty) {
+            UiStateLabels.showEmpty(contactsEmptyStateLabel);
+        } else {
+            UiStateLabels.hide(contactsEmptyStateLabel);
         }
         if (contactsScroll != null) {
             contactsScroll.setVisible(!empty);
@@ -272,13 +274,11 @@ public final class ContactsController {
     }
 
     private void updateLoadingState(boolean loadingStateVisible) {
-        if (contactsLoadingStateLabel != null) {
-            contactsLoadingStateLabel.setVisible(loadingStateVisible);
-            contactsLoadingStateLabel.setManaged(loadingStateVisible);
-        }
-        if (loadingStateVisible && contactsEmptyStateLabel != null) {
-            contactsEmptyStateLabel.setVisible(false);
-            contactsEmptyStateLabel.setManaged(false);
+        if (loadingStateVisible) {
+            UiStateLabels.showLoading(contactsLoadingStateLabel);
+            UiStateLabels.hide(contactsEmptyStateLabel);
+        } else {
+            UiStateLabels.hide(contactsLoadingStateLabel);
         }
         if (loadingStateVisible && contactsScroll != null) {
             contactsScroll.setVisible(false);
