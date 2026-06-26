@@ -10,12 +10,14 @@ import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
+import com.shale.ui.util.MetadataChipFactory;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
@@ -257,6 +259,9 @@ public final class SettingsController {
 		practiceAreaColorColumn.setCellValueFactory(new PropertyValueFactory<>("color"));
 		practiceAreaActiveColumn.setCellValueFactory(new PropertyValueFactory<>("activeState"));
 		practiceAreaSystemKeyColumn.setCellValueFactory(new PropertyValueFactory<>("systemKey"));
+		practiceAreaColorColumn.setCellFactory(column -> metadataChipCell());
+		practiceAreaActiveColumn.setCellFactory(column -> metadataChipCell());
+		practiceAreaSystemKeyColumn.setCellFactory(column -> metadataChipCell());
 	}
 
 	private void loadPracticeAreas() {
@@ -361,6 +366,27 @@ public final class SettingsController {
 		statusSortOrderColumn.setCellValueFactory(new PropertyValueFactory<>("sortOrder"));
 		statusLifecycleKeyColumn.setCellValueFactory(new PropertyValueFactory<>("lifecycleKey"));
 		statusSystemKeyColumn.setCellValueFactory(new PropertyValueFactory<>("systemKey"));
+		statusClosedColumn.setCellFactory(column -> metadataChipCell());
+		statusSortOrderColumn.setCellFactory(column -> metadataChipCell());
+		statusLifecycleKeyColumn.setCellFactory(column -> metadataChipCell());
+		statusSystemKeyColumn.setCellFactory(column -> metadataChipCell());
+	}
+
+	private static <S, T> TableCell<S, T> metadataChipCell() {
+		return new TableCell<>() {
+			@Override
+			protected void updateItem(T item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty) {
+					setText(null);
+					setGraphic(null);
+					return;
+				}
+				String text = item == null ? null : String.valueOf(item);
+				setText(null);
+				setGraphic(MetadataChipFactory.compact(text, text));
+			}
+		};
 	}
 
 	private void loadCaseStatuses() {
