@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.ContactDao.ContactCardSummaryRow;
+import com.shale.ui.component.ScrollableListRegion;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.state.AppState;
@@ -33,6 +34,8 @@ public final class ContactsController {
 
     @FXML
     private TextField contactsSearchField;
+    @FXML
+    private ScrollableListRegion contactsListRegion;
     @FXML
     private ScrollPane contactsScroll;
     @FXML
@@ -94,6 +97,9 @@ public final class ContactsController {
     }
 
     private void wireInfiniteScroll() {
+        if (contactsScroll == null && contactsListRegion != null) {
+            contactsScroll = contactsListRegion.getScrollPane();
+        }
         if (contactsScroll == null) {
             return;
         }
@@ -262,6 +268,11 @@ public final class ContactsController {
     }
 
     private void updateEmptyState(boolean empty) {
+        if (contactsListRegion != null) {
+            contactsListRegion.showEmpty(empty);
+            return;
+        }
+
         if (empty) {
             UiStateLabels.showEmpty(contactsEmptyStateLabel);
         } else {
@@ -274,6 +285,11 @@ public final class ContactsController {
     }
 
     private void updateLoadingState(boolean loadingStateVisible) {
+        if (contactsListRegion != null) {
+            contactsListRegion.showLoading(loadingStateVisible);
+            return;
+        }
+
         if (loadingStateVisible) {
             UiStateLabels.showLoading(contactsLoadingStateLabel);
             UiStateLabels.hide(contactsEmptyStateLabel);
