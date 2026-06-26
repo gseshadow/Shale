@@ -39,11 +39,11 @@
                 </ScrollPane>
 
                 <Label fx:id="contactsEmptyStateLabel"
-                    text="No contacts to display yet."
+                    text="No contacts to display yet." styleClass="shale-empty-state"
                     visible="false" managed="false" />
 
                 <Label fx:id="contactsLoadingStateLabel"
-                    text="Loading contacts…"
+                    text="Loading contacts…" styleClass="shale-loading-placeholder"
                     visible="false" managed="false" />
             </children>
         </StackPane>
