@@ -10,22 +10,21 @@ import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
-import com.shale.ui.util.MetadataChipFactory;
+import com.shale.ui.util.LookupAdministrationTableFactory;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Dialog;
-import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.PasswordField;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.control.Button;
 import javafx.scene.Node;
 import javafx.scene.paint.Color;
-import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -254,14 +253,12 @@ public final class SettingsController {
 	}
 
 	private void configurePracticeAreasTable() {
-		if (practiceAreasTable == null) return;
-		practiceAreaNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
-		practiceAreaColorColumn.setCellValueFactory(new PropertyValueFactory<>("color"));
-		practiceAreaActiveColumn.setCellValueFactory(new PropertyValueFactory<>("activeState"));
-		practiceAreaSystemKeyColumn.setCellValueFactory(new PropertyValueFactory<>("systemKey"));
-		practiceAreaColorColumn.setCellFactory(column -> metadataChipCell());
-		practiceAreaActiveColumn.setCellFactory(column -> metadataChipCell());
-		practiceAreaSystemKeyColumn.setCellFactory(column -> metadataChipCell());
+		LookupAdministrationTableFactory.configurePracticeAreaTable(
+				practiceAreasTable,
+				practiceAreaNameColumn,
+				practiceAreaColorColumn,
+				practiceAreaActiveColumn,
+				practiceAreaSystemKeyColumn);
 	}
 
 	private void loadPracticeAreas() {
@@ -360,33 +357,13 @@ public final class SettingsController {
 	private void onMoveCaseStatusDown() { if (requireAdminLookupManagement("Case Statuses")) moveSelectedStatus(1); }
 
 	private void configureCaseStatusesTable() {
-		if (caseStatusesTable == null) return;
-		statusNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
-		statusClosedColumn.setCellValueFactory(new PropertyValueFactory<>("closedState"));
-		statusSortOrderColumn.setCellValueFactory(new PropertyValueFactory<>("sortOrder"));
-		statusLifecycleKeyColumn.setCellValueFactory(new PropertyValueFactory<>("lifecycleKey"));
-		statusSystemKeyColumn.setCellValueFactory(new PropertyValueFactory<>("systemKey"));
-		statusClosedColumn.setCellFactory(column -> metadataChipCell());
-		statusSortOrderColumn.setCellFactory(column -> metadataChipCell());
-		statusLifecycleKeyColumn.setCellFactory(column -> metadataChipCell());
-		statusSystemKeyColumn.setCellFactory(column -> metadataChipCell());
-	}
-
-	private static <S, T> TableCell<S, T> metadataChipCell() {
-		return new TableCell<>() {
-			@Override
-			protected void updateItem(T item, boolean empty) {
-				super.updateItem(item, empty);
-				if (empty) {
-					setText(null);
-					setGraphic(null);
-					return;
-				}
-				String text = item == null ? null : String.valueOf(item);
-				setText(null);
-				setGraphic(MetadataChipFactory.compact(text, text));
-			}
-		};
+		LookupAdministrationTableFactory.configureCaseStatusTable(
+				caseStatusesTable,
+				statusNameColumn,
+				statusClosedColumn,
+				statusSortOrderColumn,
+				statusLifecycleKeyColumn,
+				statusSystemKeyColumn);
 	}
 
 	private void loadCaseStatuses() {
