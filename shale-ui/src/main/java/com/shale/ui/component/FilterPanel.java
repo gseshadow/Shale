@@ -48,6 +48,7 @@ public class FilterPanel extends HBox {
 		clearPanelHgrow(this.left);
 		this.left = left;
 		if (left != null) {
+			allowHorizontalGrowth(left);
 			HBox.setHgrow(left, Priority.ALWAYS);
 		}
 		rebuildChildren();
@@ -78,6 +79,13 @@ public class FilterPanel extends HBox {
 	private static void clearPanelHgrow(Node node) {
 		if (node != null && HBox.getHgrow(node) == Priority.ALWAYS) {
 			HBox.setHgrow(node, null);
+		}
+	}
+
+	private static void allowHorizontalGrowth(Node node) {
+		if (node instanceof Region region) {
+			region.setMinWidth(0);
+			region.setMaxWidth(Double.MAX_VALUE);
 		}
 	}
 }
