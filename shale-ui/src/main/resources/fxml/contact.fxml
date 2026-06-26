@@ -76,12 +76,16 @@
             </padding>
 
             <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll">
-                <HBox spacing="16" maxWidth="1240" alignment="TOP_LEFT">
+                <GridPane hgap="16" maxWidth="1240" alignment="TOP_LEFT">
+                    <columnConstraints>
+                        <ColumnConstraints percentWidth="63" hgrow="ALWAYS" fillWidth="true" />
+                        <ColumnConstraints percentWidth="37" hgrow="ALWAYS" fillWidth="true" />
+                    </columnConstraints>
                     <padding>
                         <Insets top="12" right="12" bottom="12" left="12" />
                     </padding>
 
-                    <VBox spacing="10" styleClass="case-main-surface" maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS">
+                    <VBox spacing="10" styleClass="case-main-surface" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0">
                         <padding>
                             <Insets top="12" right="12" bottom="12" left="12" />
                         </padding>
@@ -135,7 +139,7 @@
                         </GridPane>
                     </VBox>
 
-                    <VBox prefWidth="320" minWidth="280" maxWidth="360" spacing="8" styleClass="secondary-panel">
+                    <VBox minWidth="340" maxWidth="1.7976931348623157E308" spacing="8" styleClass="secondary-panel" GridPane.columnIndex="1">
                         <HBox spacing="8" alignment="CENTER_LEFT">
                             <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                             <Region HBox.hgrow="ALWAYS" />
@@ -145,7 +149,7 @@
                             <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
                         </StackPane>
                     </VBox>
-                </HBox>
+                </GridPane>
             </ScrollPane>
         </StackPane>
     </center>
