@@ -17,6 +17,7 @@ import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.UiRuntimeBridge.EntityUpdatedEvent;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.UiStateLabels;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -41,6 +42,8 @@ public final class OrganizationsController {
 	private FlowPane organizationsFlow;
 	@FXML
 	private Label organizationsEmptyStateLabel;
+	@FXML
+	private Label organizationsLoadingStateLabel;
 
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
@@ -210,7 +213,11 @@ public final class OrganizationsController {
 		final long queryStarted = PerfLog.start();
 		if (pageToLoad == 0) { pageLoadStartedNanos = queryStarted; }
 		PerfLog.log("organizations.search", "queued", "generation=" + generationAtSubmit + " page=" + pageToLoad + " pageSize=" + pageSize + " queryLength=" + search.length());
-		rerender();
+		if (loaded.isEmpty()) {
+			updateLoadingState(true);
+		} else {
+			rerender();
+		}
 
 		dbExec.submit(() -> {
 			try {
@@ -268,6 +275,7 @@ public final class OrganizationsController {
 				.toList();
 
 		organizationsFlow.getChildren().setAll(cards);
+		updateLoadingState(false);
 		updateEmptyState(loaded.isEmpty());
 		PerfLog.logDone("organizations.render", "cards=" + cards.size() + " loaded=" + loaded.size() + " loading=" + loading + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
 	}
@@ -292,13 +300,27 @@ public final class OrganizationsController {
 	}
 
 	private void updateEmptyState(boolean empty) {
-		if (organizationsEmptyStateLabel != null) {
-			organizationsEmptyStateLabel.setVisible(empty);
-			organizationsEmptyStateLabel.setManaged(empty);
+		if (empty) {
+			UiStateLabels.showEmpty(organizationsEmptyStateLabel);
+		} else {
+			UiStateLabels.hide(organizationsEmptyStateLabel);
 		}
 		if (organizationsScroll != null) {
 			organizationsScroll.setVisible(!empty);
 			organizationsScroll.setManaged(!empty);
+		}
+	}
+
+	private void updateLoadingState(boolean loadingStateVisible) {
+		if (loadingStateVisible) {
+			UiStateLabels.showLoading(organizationsLoadingStateLabel);
+			UiStateLabels.hide(organizationsEmptyStateLabel);
+			if (organizationsScroll != null) {
+				organizationsScroll.setVisible(false);
+				organizationsScroll.setManaged(false);
+			}
+		} else {
+			UiStateLabels.hide(organizationsLoadingStateLabel);
 		}
 	}
 

@@ -39,7 +39,7 @@
 				</ScrollPane>
 
 				<Label fx:id="teamEmptyStateLabel"
-					text="No team members to display yet."
+					text="No team members to display yet." styleClass="shale-empty-state"
 					visible="false" managed="false" />
 			</children>
 		</StackPane>

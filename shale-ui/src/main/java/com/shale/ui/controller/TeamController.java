@@ -6,6 +6,7 @@ import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.UiStateLabels;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -198,9 +199,10 @@ public final class TeamController {
 	}
 
 	private void updateEmptyState(boolean empty) {
-		if (teamEmptyStateLabel != null) {
-			teamEmptyStateLabel.setVisible(empty);
-			teamEmptyStateLabel.setManaged(empty);
+		if (empty) {
+			UiStateLabels.showEmpty(teamEmptyStateLabel);
+		} else {
+			UiStateLabels.hide(teamEmptyStateLabel);
 		}
 		if (teamScroll != null) {
 			teamScroll.setVisible(!empty);
