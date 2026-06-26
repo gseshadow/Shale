@@ -82,11 +82,7 @@
                         <TableColumn fx:id="statusSystemKeyColumn" text="System Key" prefWidth="140"/>
                     </columns>
                 </TableView>
-                <HBox spacing="8">
-                    <Button text="Add Status" onAction="#onAddCaseStatus" styleClass="button-primary"/>
-                    <Button text="Edit Status" onAction="#onEditCaseStatus" styleClass="button-secondary"/>
-                    <Button text="Move Up" onAction="#onMoveCaseStatusUp" styleClass="button-secondary"/>
-                    <Button text="Move Down" onAction="#onMoveCaseStatusDown" styleClass="button-secondary"/>
+                <HBox fx:id="caseStatusActionRow" spacing="8">
                     <Label fx:id="caseStatusSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
             </VBox>
@@ -107,10 +103,7 @@
                         <TableColumn fx:id="practiceAreaSystemKeyColumn" text="System Key" prefWidth="160"/>
                     </columns>
                 </TableView>
-                <HBox spacing="8">
-                    <Button text="Add Practice Area" onAction="#onAddPracticeArea" styleClass="button-primary"/>
-                    <Button text="Edit Practice Area" onAction="#onEditPracticeArea" styleClass="button-secondary"/>
-                    <Button text="Remove Practice Area" onAction="#onRemovePracticeArea" styleClass="button-secondary"/>
+                <HBox fx:id="practiceAreaActionRow" spacing="8">
                     <Label fx:id="practiceAreaSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
             </VBox>
