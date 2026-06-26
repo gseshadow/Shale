@@ -1811,3 +1811,25 @@
 .case-overview-party-name {
     -fx-padding: 7 0 7 8;
 }
+
+/* Reusable dashboard/report statistic card primitive. */
+.statistic-card {
+    -fx-padding: 12 14 12 14;
+    -fx-min-width: 150;
+}
+
+.statistic-card-title {
+    -fx-text-fill: rgba(17, 37, 66, 0.76);
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+}
+
+.statistic-card-value {
+    -fx-text-fill: #112542;
+    -fx-font-size: 24px;
+    -fx-font-weight: 900;
+}
+
+.statistic-card-subtitle {
+    -fx-font-size: 11px;
+}
