@@ -472,7 +472,7 @@ public final class ContactViewController {
                 row.nonEngagementLetterSent()));
         if (card instanceof Region region) {
             region.setMaxWidth(Double.MAX_VALUE);
-            region.setPrefWidth(300);
+            region.setPrefWidth(380);
         }
         Label relationshipMeta = new Label(formatRelationshipMeta(row.partyRoleName(), row.side(), row.primary()));
         relationshipMeta.getStyleClass().add("muted");
