@@ -4,6 +4,7 @@ import com.shale.core.dto.CaseStatusReportRowDto;
 import com.shale.core.dto.ReportCaseDetailRowDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.data.dao.CaseDao;
+import com.shale.ui.component.StatisticCard;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ColorUtil;
 import javafx.application.Platform;
@@ -54,6 +55,9 @@ public final class ReportsController {
     @FXML private TableColumn<CaseStatusReportRowDto, String> caseStatusColumn;
     @FXML private TableColumn<CaseStatusReportRowDto, Number> caseCountColumn;
     @FXML private PieChart statusPieChart;
+    @FXML private StatisticCard totalCasesCard;
+    @FXML private StatisticCard visibleStatusesCard;
+    @FXML private StatisticCard largestStatusCard;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "reports-loader");
@@ -185,6 +189,7 @@ public final class ReportsController {
     private void applyRows(List<CaseStatusReportRowDto> rows) {
         List<CaseStatusReportRowDto> safeRows = rows == null ? List.of() : rows;
         statusReportTable.setItems(FXCollections.observableArrayList(safeRows));
+        updateSummaryMetrics(safeRows);
         statusPieChart.getData().clear();
         reportRowsBySliceName.clear();
         long total = safeRows.stream().mapToLong(CaseStatusReportRowDto::caseCount).sum();
@@ -355,6 +360,32 @@ public final class ReportsController {
         statusReportTable.setItems(FXCollections.observableArrayList());
         statusPieChart.getData().clear();
         reportRowsBySliceName.clear();
+        updateSummaryMetrics(List.of());
+    }
+
+    private void updateSummaryMetrics(List<CaseStatusReportRowDto> rows) {
+        List<CaseStatusReportRowDto> safeRows = rows == null ? List.of() : rows;
+        long total = safeRows.stream().mapToLong(CaseStatusReportRowDto::caseCount).sum();
+        long nonZeroStatuses = safeRows.stream().filter(row -> row.caseCount() > 0).count();
+        CaseStatusReportRowDto largest = safeRows.stream()
+                .filter(row -> row.caseCount() > 0)
+                .max((left, right) -> Long.compare(left.caseCount(), right.caseCount()))
+                .orElse(null);
+        if (totalCasesCard != null) {
+            totalCasesCard.setTitle("Total cases");
+            totalCasesCard.setValue(Long.toString(total));
+            totalCasesCard.setSubtitle(dateRangeLabel(startDatePicker == null ? null : startDatePicker.getValue(), endDatePicker == null ? null : endDatePicker.getValue()));
+        }
+        if (visibleStatusesCard != null) {
+            visibleStatusesCard.setTitle("Statuses shown");
+            visibleStatusesCard.setValue(Long.toString(nonZeroStatuses));
+            visibleStatusesCard.setSubtitle(selectedStatusIds().size() + " selected");
+        }
+        if (largestStatusCard != null) {
+            largestStatusCard.setTitle("Largest status");
+            largestStatusCard.setValue(largest == null ? "—" : Long.toString(largest.caseCount()));
+            largestStatusCard.setSubtitle(largest == null ? "No cases in current filter" : largest.caseStatus());
+        }
     }
 
     private void setLoading(boolean loading) {
