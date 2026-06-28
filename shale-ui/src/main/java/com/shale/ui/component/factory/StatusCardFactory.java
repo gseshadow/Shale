@@ -38,12 +38,8 @@ public class StatusCardFactory {
         // If your ColorUtil already accepts "0xRRGGBBAA", keep using it.
         String css = ColorUtil.toCssBackgroundColor(model.colorCss());
 
-        // Dot always uses the status color (so white still shows due to stroke).
-        card.setDotCssColor(css);
-
-        // Background: keep subtle so readability is consistent (recommended).
-        // If you'd rather fill the pill with the status color, replace with `css`.
-        card.setBackgroundCssColor("rgba(0,0,0,0.06)");
+        card.setBackgroundCssColor(css);
+        card.setTextCssColor(ColorUtil.readableTextColor(model.colorCss()));
 
         switch (variant) {
         case FULL -> card.applyFull();

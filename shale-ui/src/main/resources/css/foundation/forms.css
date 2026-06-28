@@ -1,0 +1,111 @@
+/*
+ * Shale Design Foundation - Shared Form Controls
+ *
+ * Reusable control styling for filters and toolbars. These classes are opt-in
+ * so screen layout and behavior remain unchanged while JavaFX default-looking
+ * controls can share the Shale visual language.
+ */
+
+.root {
+    -shale-control-surface: rgba(248, 250, 252, 0.96);
+    -shale-control-surface-hover: rgba(255, 255, 255, 0.99);
+    -shale-control-surface-pressed: rgba(232, 241, 251, 0.92);
+    -shale-control-border: rgba(15, 35, 66, 0.18);
+    -shale-control-border-hover: rgba(74, 104, 138, 0.34);
+    -shale-control-focus-border: rgba(75, 127, 206, 0.72);
+    -shale-control-prompt-text: rgba(17, 37, 66, 0.56);
+}
+
+.shale-search-field,
+.text-field.shale-search-field {
+    -fx-min-height: 36;
+    -fx-pref-height: 36;
+    -fx-padding: 8 14 8 14;
+    -fx-background-color: -shale-control-surface;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-color: -shale-control-border;
+    -fx-border-width: 1;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-prompt-text-fill: -shale-control-prompt-text;
+    -fx-font-weight: 600;
+}
+
+.text-field.shale-search-field:hover {
+    -fx-background-color: -shale-control-surface-hover;
+    -fx-border-color: -shale-control-border-hover;
+}
+
+.text-field.shale-search-field:focused {
+    -fx-background-color: -shale-control-surface-hover;
+    -fx-border-color: -shale-control-focus-border;
+    -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 10, 0.2, 0, 0);
+}
+
+.shale-filter-combo,
+.combo-box.shale-filter-combo,
+.choice-box.shale-filter-combo,
+.date-picker.shale-date-picker {
+    -fx-min-height: 36;
+    -fx-pref-height: 36;
+    -fx-padding: 0;
+    -fx-background-color: -shale-control-surface;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-color: -shale-control-border;
+    -fx-border-width: 1;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-cursor: hand;
+}
+
+.combo-box.shale-filter-combo > .list-cell,
+.choice-box.shale-filter-combo > .label {
+    -fx-padding: 0 22 0 14;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-weight: 700;
+}
+
+.combo-box.shale-filter-combo > .arrow-button,
+.choice-box.shale-filter-combo > .open-button,
+.date-picker.shale-date-picker > .arrow-button {
+    -fx-padding: 0 14 0 8;
+    -fx-min-width: 34;
+    -fx-background-color: transparent;
+}
+
+.combo-box.shale-filter-combo > .arrow-button > .arrow,
+.choice-box.shale-filter-combo > .open-button > .arrow,
+.date-picker.shale-date-picker > .arrow-button > .arrow {
+    -fx-background-color: -shale-color-text-primary;
+}
+
+.combo-box.shale-filter-combo:hover,
+.choice-box.shale-filter-combo:hover,
+.date-picker.shale-date-picker:hover {
+    -fx-background-color: -shale-control-surface-hover;
+    -fx-border-color: -shale-control-border-hover;
+}
+
+.combo-box.shale-filter-combo:focused,
+.combo-box.shale-filter-combo:showing,
+.choice-box.shale-filter-combo:focused,
+.choice-box.shale-filter-combo:showing,
+.date-picker.shale-date-picker:focused,
+.date-picker.shale-date-picker:showing {
+    -fx-background-color: -shale-control-surface-hover;
+    -fx-border-color: -shale-control-focus-border;
+    -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 10, 0.2, 0, 0);
+}
+
+.date-picker.shale-date-picker > .text-field {
+    -fx-min-height: 34;
+    -fx-pref-height: 34;
+    -fx-padding: 7 10 7 14;
+    -fx-background-color: transparent;
+    -fx-background-radius: 999 0 0 999;
+    -fx-border-color: transparent;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-prompt-text-fill: -shale-control-prompt-text;
+    -fx-font-weight: 600;
+}

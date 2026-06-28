@@ -55,8 +55,8 @@
             <Separator/>
 
             <HBox spacing="10">
-                <Button text="Apply" onAction="#onApplyNotificationPreferences" styleClass="button-primary"/>
-                <Button text="Reset" onAction="#onResetNotificationPreferences" styleClass="button-secondary"/>
+                <Button text="Apply" onAction="#onApplyNotificationPreferences" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact"/>
+                <Button text="Reset" onAction="#onResetNotificationPreferences" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact"/>
                 <Label fx:id="notificationSettingsStatusLabel" styleClass="search-summary-text" wrapText="true">
                     <HBox.margin>
                         <Insets left="8"/>
@@ -73,15 +73,7 @@
                 <Label text="Case Statuses" styleClass="search-section-title"/>
                 <Label text="Manage the case statuses available for this tenant."
                        styleClass="search-summary-text" wrapText="true"/>
-                <TableView fx:id="caseStatusesTable" prefHeight="260">
-                    <columns>
-                        <TableColumn fx:id="statusNameColumn" text="Status name" prefWidth="180"/>
-                        <TableColumn fx:id="statusClosedColumn" text="Open/Closed" prefWidth="120"/>
-                        <TableColumn fx:id="statusSortOrderColumn" text="Sort Order" prefWidth="100"/>
-                        <TableColumn fx:id="statusLifecycleKeyColumn" text="Lifecycle Key" prefWidth="140"/>
-                        <TableColumn fx:id="statusSystemKeyColumn" text="System Key" prefWidth="140"/>
-                    </columns>
-                </TableView>
+                <VBox fx:id="caseStatusCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
                 <HBox fx:id="caseStatusActionRow" spacing="8">
                     <Label fx:id="caseStatusSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
@@ -95,14 +87,7 @@
                 <Label text="Practice Areas" styleClass="search-section-title"/>
                 <Label text="Manage the practice areas available for this tenant."
                        styleClass="search-summary-text" wrapText="true"/>
-                <TableView fx:id="practiceAreasTable" prefHeight="240">
-                    <columns>
-                        <TableColumn fx:id="practiceAreaNameColumn" text="Name" prefWidth="220"/>
-                        <TableColumn fx:id="practiceAreaColorColumn" text="Color" prefWidth="120"/>
-                        <TableColumn fx:id="practiceAreaActiveColumn" text="Active/Inactive" prefWidth="130"/>
-                        <TableColumn fx:id="practiceAreaSystemKeyColumn" text="System Key" prefWidth="160"/>
-                    </columns>
-                </TableView>
+                <VBox fx:id="practiceAreaCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
                 <HBox fx:id="practiceAreaActionRow" spacing="8">
                     <Label fx:id="practiceAreaSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
@@ -117,7 +102,7 @@
                 <Label text="Manage users for the current tenant. Tenant id is applied from your signed-in session."
                        styleClass="search-summary-text" wrapText="true"/>
                 <CheckBox fx:id="showInactiveUsersCheck" text="Show inactive users" onAction="#onToggleInactiveUsers"/>
-                <TableView fx:id="userManagementTable" prefHeight="260">
+                <TableView fx:id="userManagementTable" prefHeight="260" styleClass="shale-table">
                     <columns>
                         <TableColumn fx:id="userNameColumn" text="Name" prefWidth="180"/>
                         <TableColumn fx:id="userEmailColumn" text="Email" prefWidth="220"/>
@@ -128,10 +113,10 @@
                     </columns>
                 </TableView>
                 <HBox spacing="8">
-                    <Button text="Add User" onAction="#onAddUser" styleClass="button-primary"/>
-                    <Button fx:id="deactivateUserButton" text="Deactivate User" onAction="#onDeactivateUser" styleClass="button-secondary" disable="true"/>
-                    <Button fx:id="reactivateUserButton" text="Reactivate User" onAction="#onReactivateUser" styleClass="button-secondary" disable="true"/>
-                    <Button fx:id="resetPasswordButton" text="Reset Password" onAction="#onResetUserPassword" styleClass="button-secondary" disable="true"/>
+                    <Button text="Add User" onAction="#onAddUser" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact"/>
+                    <Button fx:id="deactivateUserButton" text="Deactivate User" onAction="#onDeactivateUser" styleClass="app-toolbar-button app-toolbar-button-danger app-toolbar-button-compact" disable="true"/>
+                    <Button fx:id="reactivateUserButton" text="Reactivate User" onAction="#onReactivateUser" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" disable="true"/>
+                    <Button fx:id="resetPasswordButton" text="Reset Password" onAction="#onResetUserPassword" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" disable="true"/>
                     <Label fx:id="userManagementStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
             </VBox>
@@ -143,7 +128,7 @@
                 <Label text="Audit" styleClass="app-dialog-field-label"/>
                 <Button fx:id="viewAuditLogButton"
                         text="View Audit Log"
-                        styleClass="button-secondary"
+                        styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact"
                         onAction="#onViewAuditLog"/>
             </VBox>
         </VBox>

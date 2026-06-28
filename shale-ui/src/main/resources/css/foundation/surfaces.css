@@ -1,0 +1,105 @@
+/*
+ * Shale Design Foundation - Surfaces
+ *
+ * Documents the current surface hierarchy as additive opt-in primitives.
+ * Existing screen-specific classes remain authoritative until later phases.
+ */
+
+/* 1. Application Background: root radial blue/teal shell behind the app. */
+.shale-surface-application-background {
+    -fx-background-color: radial-gradient(center 70% 20%, radius 120%, #4cc3b5 0%, #2b6a82 35%, #1b2b4a 70%, #0e1023 100%);
+}
+
+/*
+ * Surface layering model (current app hierarchy):
+ * Application Background -> Shell Surface -> Navigation Surface -> Content Surface
+ * -> Section Surface -> Card Surface -> Dialog Surface -> Overlay Surface.
+ * These primitives alias existing app.css values so Phase B can compose broad
+ * containers from tokens without changing screen-specific styling or visuals.
+ */
+
+/* 2. Shell Surface: transparent layout shell. */
+.shale-surface-shell {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+/* 3. Navigation Surface: translucent navigation rail/sidebar. */
+.shale-surface-navigation {
+    -fx-background-color: -shale-color-navigation-surface;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: -shale-color-navigation-border;
+    -fx-border-width: 1;
+}
+
+/* 4. Content Surface: primary light content plane. */
+.shale-surface-content {
+    -fx-background-color: -shale-color-content-surface;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: -shale-color-border;
+    -fx-border-width: 1;
+}
+
+/* 5. Section Surface: grouped section panel. */
+.shale-surface-section {
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 10;
+}
+
+/* 6. Card Surface: base card plane. */
+.shale-surface-card {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-width: 1;
+}
+
+/* 7. Elevated Card Surface: card plane plus current card elevation. */
+.shale-surface-card-elevated {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4);
+}
+
+/* Card Hover Surface: current hover state for clickable/selectable cards. */
+.shale-surface-card-hover {
+    -fx-background-color: -shale-color-card-hover-surface;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: -shale-color-card-hover-border;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.18), 24, 0.2, 0, 8);
+}
+
+/* Embedded Card Surface: nested/related-card plane. */
+.shale-surface-card-embedded {
+    -fx-background-color: -shale-color-card-embedded-surface;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: -shale-color-border;
+    -fx-border-width: 1;
+}
+
+/* 8. Dialog Surface: modal/dialog content panel. */
+.shale-surface-dialog {
+    -fx-background-color: -shale-color-dialog-surface;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: -shale-color-dialog-border;
+    -fx-border-width: 1;
+}
+
+/* 9. Overlay Surface: translucent glass layer. */
+.shale-surface-overlay {
+    -fx-background-color: -shale-color-overlay-surface;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: -shale-color-overlay-border;
+    -fx-border-width: 1;
+}

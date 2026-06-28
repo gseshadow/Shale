@@ -10,14 +10,14 @@
         <VBox spacing="10" styleClass="strong-panel">
             <padding><Insets top="10" right="10" bottom="10" left="10" /></padding>
             <Label text="Case Status Report" styleClass="page-heading" />
-            <HBox spacing="10" alignment="CENTER_LEFT">
+            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="shale-filter-panel">
                 <Label text="Start date" />
-                <DatePicker fx:id="startDatePicker" />
+                <DatePicker fx:id="startDatePicker" styleClass="shale-date-picker" />
                 <Label text="End date" />
-                <DatePicker fx:id="endDatePicker" />
-                <MenuButton fx:id="statusFilterMenuButton" text="Statuses (0/0)" />
-                <Button fx:id="refreshButton" text="Apply" onAction="#onRefresh" />
-                <Button fx:id="showAllResultsButton" text="Show all results" onAction="#onShowAllResults" />
+                <DatePicker fx:id="endDatePicker" styleClass="shale-date-picker" />
+                <MenuButton fx:id="statusFilterMenuButton" text="Statuses (0/0)" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                <Button fx:id="refreshButton" text="Apply" onAction="#onRefresh" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
+                <Button fx:id="showAllResultsButton" text="Show all results" onAction="#onShowAllResults" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
                 <Label fx:id="statusLabel" styleClass="search-summary-text" />
             </HBox>
             <HBox fx:id="summaryMetricsBox" spacing="10" alignment="CENTER_LEFT">
@@ -29,7 +29,7 @@
     </top>
     <center>
         <SplitPane dividerPositions="0.48">
-            <TableView fx:id="statusReportTable">
+            <TableView fx:id="statusReportTable" styleClass="shale-table">
                 <columns>
                     <TableColumn fx:id="caseStatusColumn" text="Case Status" prefWidth="260" />
                     <TableColumn fx:id="caseCountColumn" text="Case Count" prefWidth="140" />

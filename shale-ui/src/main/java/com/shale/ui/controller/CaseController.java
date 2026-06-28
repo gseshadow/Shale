@@ -47,7 +47,10 @@ import com.shale.ui.document.GeneratedDocument;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
+import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
 import com.shale.ui.component.factory.StatusCardFactory;
+import com.shale.ui.component.factory.StatusIndicatorFactory;
+import com.shale.ui.component.factory.StatusIndicatorFactory.PillSize;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ClientAssignmentDialog;
@@ -237,6 +240,10 @@ public class CaseController {
 	@FXML
 	private DatePicker ovIncidentDateEditor;
 	@FXML
+	private Label ovDateOfMedicalNegligenceValue;
+	@FXML
+	private DatePicker ovDateOfMedicalNegligenceEditor;
+	@FXML
 	private Label ovSolDateValue;
 	@FXML
 	private DatePicker ovSolDateEditor;
@@ -262,6 +269,8 @@ public class CaseController {
 	private Button editDescriptionButton;
 	@FXML
 	private Button editIncidentDateButton;
+	@FXML
+	private Button editDateOfMedicalNegligenceButton;
 	@FXML
 	private Button editSolDateButton;
 	@FXML
@@ -777,6 +786,8 @@ public class CaseController {
 			editDescriptionButton.setOnAction(e -> onEditDescriptionField());
 		if (editIncidentDateButton != null)
 			editIncidentDateButton.setOnAction(e -> onEditIncidentDateField());
+		if (editDateOfMedicalNegligenceButton != null)
+			editDateOfMedicalNegligenceButton.setOnAction(e -> onEditDateOfMedicalNegligenceField());
 		if (editSolDateButton != null)
 			editSolDateButton.setOnAction(e -> onEditSolDateField());
 		if (editPartiesButton != null)
@@ -1209,6 +1220,10 @@ public class CaseController {
 			ovIncidentDateValue.setText(formatDate(null));
 		if (ovIncidentDateEditor != null)
 			ovIncidentDateEditor.setValue(null);
+		if (ovDateOfMedicalNegligenceValue != null)
+			ovDateOfMedicalNegligenceValue.setText(formatDate(null));
+		if (ovDateOfMedicalNegligenceEditor != null)
+			ovDateOfMedicalNegligenceEditor.setValue(null);
 		if (ovSolDateValue != null)
 			ovSolDateValue.setText(formatDate(null));
 		if (ovSolDateEditor != null)
@@ -1345,7 +1360,7 @@ public class CaseController {
 	private Node buildStatusTimelineSegment(CaseStatusHistoryDto item) {
 		String color = ColorUtil.toCssBackgroundColor(item.color());
 		String name = safeText(item.statusName()).isBlank() ? "Status #" + item.statusId() : safeText(item.statusName());
-		String textColor = readableTextColor(item.color());
+		String textColor = ColorUtil.readableTextColor(item.color());
 		String borderColor = item.current() ? "rgba(20,35,55,0.62)" : "rgba(0,0,0,0.14)";
 		boolean completed = !item.current() && item.endDate() != null;
 
@@ -1367,6 +1382,7 @@ public class CaseController {
 				+ (item.current() ? "bold" : "600") + ";");
 
 		HBox pill = new HBox(8, check, label);
+		pill.getStyleClass().addAll("shale-status-pill", "shale-status-pill-large");
 		pill.setAlignment(Pos.CENTER);
 		pill.setMinHeight(38);
 		pill.setMaxHeight(38);
@@ -1405,18 +1421,6 @@ public class CaseController {
 			duration = Math.max(0, ChronoUnit.DAYS.between(item.effectiveDate().toLocalDate(), end.toLocalDate())) + " days";
 		}
 		return name + "\nEntered: " + entered + "\nExited: " + exited + "\nDuration: " + duration;
-	}
-
-	private static String readableTextColor(String storedColor) {
-		Color color = ColorUtil.toFxColor(storedColor);
-		double luminance = 0.2126 * linearized(color.getRed())
-				+ 0.7152 * linearized(color.getGreen())
-				+ 0.0722 * linearized(color.getBlue());
-		return luminance > 0.48 ? "#172033" : "white";
-	}
-
-	private static double linearized(double channel) {
-		return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
 	}
 
 	private static String formatTimelineDateTime(LocalDateTime value) {
@@ -1640,7 +1644,7 @@ public class CaseController {
 
 		VBox card = new VBox(content);
 		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().add("secondary-panel");
+		card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
 		return card;
 	}
 
@@ -1813,7 +1817,7 @@ public class CaseController {
 
 			card.getChildren().setAll(row);
 			card.setPadding(new Insets(8, 10, 8, 10));
-			card.getStyleClass().add("secondary-panel");
+			card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
 		} else {
 			card.setPadding(new Insets(1, 0, 1, 0));
 		}
@@ -3167,7 +3171,7 @@ public class CaseController {
 
 		VBox card = new VBox(content);
 		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().add("secondary-panel");
+		card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
 		return card;
 	}
 
@@ -3430,6 +3434,8 @@ public class CaseController {
 				ovDescriptionEditor.setDisable(busy);
 			if (ovIncidentDateEditor != null)
 				ovIncidentDateEditor.setDisable(busy);
+			if (ovDateOfMedicalNegligenceEditor != null)
+				ovDateOfMedicalNegligenceEditor.setDisable(busy);
 			if (ovSolDateEditor != null)
 				ovSolDateEditor.setDisable(busy);
 			if (reloadRemoteButton != null)
@@ -3452,6 +3458,8 @@ public class CaseController {
 				editDescriptionButton.setDisable(busy);
 			if (editIncidentDateButton != null)
 				editIncidentDateButton.setDisable(busy);
+			if (editDateOfMedicalNegligenceButton != null)
+				editDateOfMedicalNegligenceButton.setDisable(busy);
 			if (editSolDateButton != null)
 				editSolDateButton.setDisable(busy);
 			if (editPartiesButton != null)
@@ -3587,6 +3595,11 @@ public class CaseController {
 				"incidentDate", null, value, null));
 	}
 
+	private void onEditDateOfMedicalNegligenceField() {
+		showDateFieldDialog("Edit Date of Medical Negligence", "Date of medical negligence", current == null ? null : current.getDateOfMedicalNegligence(),
+				value -> saveDetailDateOverviewField("dateOfMedicalNegligence", value));
+	}
+
 	private void onEditSolDateField() {
 		showDateFieldDialog("Edit SOL Date", "SOL date", currentOverview == null ? null : currentOverview.getSolDate(), value -> saveCoreOverviewField("solDate", null, null,
 				value));
@@ -3643,6 +3656,18 @@ public class CaseController {
 		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
 		dialog.setResultConverter(button -> button == saveType ? picker.getValue() : null);
 		dialog.showAndWait().ifPresent(onSave);
+	}
+
+	private void saveDetailDateOverviewField(String field, LocalDate value) {
+		if (!"dateOfMedicalNegligence".equals(field))
+			return;
+		CaseDetailsDraft draft = CaseDetailsDraft.from(current, currentOverview);
+		draft.dateOfMedicalNegligence = value;
+		detailsDraft = draft;
+		detailsBaseline = CaseDetailsDraft.from(current, currentOverview);
+		detailsEditRowVer = cloneRowVer(latestCaseRowVer != null ? latestCaseRowVer : (current == null ? null : current.getRowVer()));
+		detailsEditor.renderEditors(draft);
+		detailsSaveCoordinator.save();
 	}
 
 	private void saveCoreOverviewField(String field, String textValue, LocalDate incidentDate, LocalDate solDate) {
@@ -4556,7 +4581,7 @@ public class CaseController {
 
 		VBox card = new VBox(4, topRow, metadataLabel, bodyBox);
 		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().add("secondary-panel");
+		card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
 		return card;
 	}
 
@@ -4725,12 +4750,12 @@ public class CaseController {
 				statusColorCss
 		);
 
-		var headerCard = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
+		var headerBadge = StatusIndicatorFactory.createStatusBadge(statusName, statusColorCss);
 
 		if (statusHost != null)
-			statusHost.getChildren().setAll(headerCard);
+			statusHost.getChildren().setAll(headerBadge);
 		if (ovCaseStatusHost != null)
-			ovCaseStatusHost.getChildren().setAll(createOverviewInlineValue(statusName, statusColorCss));
+			ovCaseStatusHost.getChildren().setAll(StatusIndicatorFactory.createStatusPill(statusName, statusColorCss, PillSize.LARGE));
 	}
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {
@@ -4750,7 +4775,7 @@ public class CaseController {
 				colorHex
 		);
 
-		ovPracticeAreaHost.getChildren().setAll(createOverviewInlineValue(name, colorHex));
+		ovPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.LARGE));
 	}
 
 	private Node createOverviewInlineValue(String value, String colorCss) {
@@ -4780,11 +4805,7 @@ public class CaseController {
 			{
 			} : onOpenStatus);
 		}
-		StatusCardModel model = new StatusCardModel(statusId,
-				(statusName == null || statusName.isBlank()) ? "—" : statusName,
-				null,
-				statusColorCss);
-		detCaseStatusHost.getChildren().setAll(statusCardFactory.create(model, StatusCardFactory.Variant.MINI));
+		detCaseStatusHost.getChildren().setAll(StatusIndicatorFactory.createStatusBadge(statusName, statusColorCss));
 	}
 
 	private void renderDetailsPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {
@@ -4798,7 +4819,7 @@ public class CaseController {
 		PracticeAreaCardModel model = new PracticeAreaCardModel(practiceAreaId,
 				(name == null || name.isBlank()) ? "—" : name,
 				colorHex);
-		detPracticeAreaHost.getChildren().setAll(practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI));
+		detPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.COMPACT));
 	}
 
 	private static Boolean parseNullableBooleanStorage(String raw) {
@@ -5231,6 +5252,10 @@ public class CaseController {
 				ovCaseNumberValue.setText(safeText(detail.getCaseNumber()));
 			if (!editMode && ovDescriptionValue != null)
 				ovDescriptionValue.setText(safeText(detail.getDescription()));
+			if (!editMode && ovDateOfMedicalNegligenceValue != null)
+				ovDateOfMedicalNegligenceValue.setText(formatDate(detail.getDateOfMedicalNegligence()));
+			if (!editMode && ovDateOfMedicalNegligenceEditor != null)
+				ovDateOfMedicalNegligenceEditor.setValue(detail.getDateOfMedicalNegligence());
 			if (statusLabel != null)
 				statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
 			renderLastUpdated(detail.getUpdatedAt());
@@ -5324,11 +5349,15 @@ public class CaseController {
 				ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
 			if (ovIncidentDateValue != null)
 				ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
+			if (ovDateOfMedicalNegligenceValue != null)
+				ovDateOfMedicalNegligenceValue.setText(formatDate(current == null ? null : current.getDateOfMedicalNegligence()));
 			if (ovSolDateValue != null)
 				ovSolDateValue.setText(formatDate(dto.getSolDate()));
 			if (!editSafeOnly) {
 				if (ovIncidentDateEditor != null && !editMode)
 					ovIncidentDateEditor.setValue(dto.getIncidentDate());
+				if (ovDateOfMedicalNegligenceEditor != null && !editMode)
+					ovDateOfMedicalNegligenceEditor.setValue(current == null ? null : current.getDateOfMedicalNegligence());
 				if (ovSolDateEditor != null && !editMode)
 					ovSolDateEditor.setValue(dto.getSolDate());
 			}
@@ -5400,6 +5429,8 @@ public class CaseController {
 
 			setVisibleManaged(ovIncidentDateValue, true);
 			setVisibleManaged(ovIncidentDateEditor, false);
+			setVisibleManaged(ovDateOfMedicalNegligenceValue, true);
+			setVisibleManaged(ovDateOfMedicalNegligenceEditor, false);
 			setVisibleManaged(ovSolDateValue, true);
 			setVisibleManaged(ovSolDateEditor, false);
 
@@ -5410,6 +5441,7 @@ public class CaseController {
 			setVisibleManaged(editCaseNumberButton, true);
 			setVisibleManaged(editDescriptionButton, true);
 			setVisibleManaged(editIncidentDateButton, true);
+			setVisibleManaged(editDateOfMedicalNegligenceButton, true);
 			setVisibleManaged(editSolDateButton, true);
 			setVisibleManaged(editPartiesButton, true);
 
@@ -5460,6 +5492,8 @@ public class CaseController {
 			draftSolDate = (currentOverview == null ? null : currentOverview.getSolDate());
 			if (ovIncidentDateEditor != null)
 				ovIncidentDateEditor.setValue(draftIncidentDate);
+			if (ovDateOfMedicalNegligenceEditor != null)
+				ovDateOfMedicalNegligenceEditor.setValue(current == null ? null : current.getDateOfMedicalNegligence());
 			if (ovSolDateEditor != null)
 				ovSolDateEditor.setValue(draftSolDate);
 		}

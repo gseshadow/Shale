@@ -284,11 +284,11 @@ public class CaseCard extends VBox {
 	 */
 
 	private void buildUi() {
-		getStyleClass().add("case-card");
-		practiceAreaBar.getStyleClass().add("case-card__practice-area-bar");
+		getStyleClass().addAll("case-card", "shale-entity-card", "shale-entity-card-clickable");
+		practiceAreaBar.getStyleClass().addAll("case-card__practice-area-bar", "shale-indicator-practice-area");
 		bodyPane.getStyleClass().add("case-card__body");
 		bottomRow.getStyleClass().add("case-card__bottom-row");
-		statusLabel.getStyleClass().add("case-card__status-label");
+		statusLabel.getStyleClass().addAll("case-card__status-label", "shale-status-pill", "shale-status-pill-compact");
 		attorneyMiniCard.getStyleClass().add("case-card__attorney-mini-card");
 		setBackgroundCssColor(null);
 		intakeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.78);");
@@ -373,7 +373,7 @@ public class CaseCard extends VBox {
 				-fx-border-radius: 999;
 				-fx-border-width: 1;
 				-fx-padding: 3 8 3 8;
-				""".formatted(statusLabelBaseStyle, readableTextColor(statusColorCss), statusColorCss));
+				""".formatted(statusLabelBaseStyle, com.shale.ui.util.ColorUtil.readableTextColor(statusColorCss), statusColorCss));
 		attorneyMiniCard.setBackgroundCssColor(attorneyColorCss);
 	}
 

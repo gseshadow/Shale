@@ -1,0 +1,94 @@
+/* Shale Design Foundation - Toolbars, Filters, and Segmented Controls */
+
+.shale-filter-panel {
+    -fx-padding: 10;
+    -fx-background-color: -shale-color-dialog-surface;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: -shale-color-strong-panel-border;
+    -fx-border-width: 1;
+}
+
+.shale-toolbar-heading,
+.label.shale-toolbar-heading {
+    -fx-font-size: 15px;
+    -fx-font-weight: 900;
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.shale-segmented-control {
+    -fx-padding: 2;
+    -fx-background-color: rgba(17, 37, 66, 0.08);
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-color: rgba(17, 37, 66, 0.14);
+    -fx-border-width: 1;
+    -fx-spacing: 0;
+}
+
+.toggle-button.shale-segment,
+.button.shale-segment {
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-padding: 6 14 6 14;
+    -fx-background-color: rgba(248, 250, 252, 0.86);
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-color: transparent;
+    -fx-border-width: 1;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+    -fx-cursor: hand;
+}
+
+.toggle-button.shale-segment:hover,
+.button.shale-segment:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.96);
+    -fx-border-color: rgba(74, 104, 138, 0.24);
+}
+
+.toggle-button.shale-segment:pressed,
+.button.shale-segment:pressed {
+    -fx-background-color: rgba(232, 241, 251, 0.92);
+}
+
+.toggle-button.shale-segment:selected {
+    -fx-background-color: -shale-button-primary-background;
+    -fx-border-color: -shale-button-primary-border;
+    -fx-text-fill: -shale-button-primary-text;
+}
+
+.toggle-button.shale-segment:selected:hover {
+    -fx-background-color: -shale-button-primary-hover-background;
+    -fx-border-color: -shale-button-primary-hover-border;
+}
+
+.toggle-button.shale-segment:selected:pressed {
+    -fx-background-color: -shale-button-primary-pressed-background;
+    -fx-border-color: -shale-button-primary-pressed-border;
+}
+
+.toggle-button.shale-segment:focused,
+.button.shale-segment:focused {
+    -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 8, 0.18, 0, 0);
+}
+
+/* Empty State: shared placeholder copy for loading/empty list regions. */
+.shale-empty-state,
+.label.shale-empty-state {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 12px;
+    -fx-padding: 10 8 10 8;
+    -fx-font-style: italic;
+}
+
+/* Loading Placeholder: same footprint as empty state with slightly stronger text. */
+.shale-loading-placeholder,
+.label.shale-loading-placeholder {
+    -fx-text-fill: -shale-color-text-secondary;
+    -fx-font-size: 12px;
+    -fx-padding: 10 8 10 8;
+    -fx-font-style: italic;
+    -fx-font-weight: 700;
+}

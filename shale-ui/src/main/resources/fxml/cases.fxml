@@ -62,7 +62,7 @@
 					</FlowPane>
 				</content>
 			</ScrollPane>
-			<TableView fx:id="casesTable" visible="false" managed="false" minHeight="0.0" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308" AnchorPane.topAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" styleClass="cases-content-surface" />
+			<TableView fx:id="casesTable" visible="false" managed="false" minHeight="0.0" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308" AnchorPane.topAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" styleClass="cases-content-surface shale-table" />
 		</AnchorPane>
 	</center>
 

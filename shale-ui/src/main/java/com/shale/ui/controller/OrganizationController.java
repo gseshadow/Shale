@@ -32,6 +32,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -82,6 +83,19 @@ public final class OrganizationController {
 	@FXML private TextField countryEditor;
 	@FXML private Label notesValue;
 	@FXML private TextArea notesEditor;
+	@FXML private Button editNameButton;
+	@FXML private Button editTypeButton;
+	@FXML private Button editPhoneButton;
+	@FXML private Button editFaxButton;
+	@FXML private Button editEmailButton;
+	@FXML private Button editWebsiteButton;
+	@FXML private Button editAddress1Button;
+	@FXML private Button editAddress2Button;
+	@FXML private Button editCityButton;
+	@FXML private Button editStateButton;
+	@FXML private Button editPostalCodeButton;
+	@FXML private Button editCountryButton;
+	@FXML private Button editNotesButton;
 
 	private Integer organizationId;
 	private OrganizationDao organizationDao;
@@ -124,7 +138,9 @@ public final class OrganizationController {
 	private void initialize() {
 		if (editButton != null) {
 			editButton.setOnAction(e -> onEdit());
+			setVisibleManaged(editButton, false);
 		}
+		initializeInlineEditButtons();
 		if (saveButton != null) {
 			saveButton.setOnAction(e -> onSave());
 		}
@@ -173,6 +189,45 @@ public final class OrganizationController {
 
 		subscribeLiveOrganizationUpdates();
 		Platform.runLater(this::loadOrganization);
+	}
+
+	private void initializeInlineEditButtons() {
+		configureInlineEditButton(editNameButton, "Name", nameEditor);
+		configureInlineEditButton(editTypeButton, "Organization Type", typeEditor);
+		configureInlineEditButton(editPhoneButton, "Phone", phoneEditor);
+		configureInlineEditButton(editFaxButton, "Fax", faxEditor);
+		configureInlineEditButton(editEmailButton, "Email", emailEditor);
+		configureInlineEditButton(editWebsiteButton, "Website", websiteEditor);
+		configureInlineEditButton(editAddress1Button, "Address1", address1Editor);
+		configureInlineEditButton(editAddress2Button, "Address2", address2Editor);
+		configureInlineEditButton(editCityButton, "City", cityEditor);
+		configureInlineEditButton(editStateButton, "State", stateEditor);
+		configureInlineEditButton(editPostalCodeButton, "Postal Code", postalCodeEditor);
+		configureInlineEditButton(editCountryButton, "Country", countryEditor);
+		configureInlineEditButton(editNotesButton, "Notes", notesEditor);
+	}
+
+	private void configureInlineEditButton(Button button, String fieldLabel, Node editor) {
+		if (button == null) {
+			return;
+		}
+		button.setTooltip(new Tooltip("Edit " + fieldLabel));
+		button.setOnAction(e -> beginInlineEdit(editor));
+	}
+
+	private void beginInlineEdit(Node editor) {
+		if (currentOrganization == null) {
+			return;
+		}
+		if (!editMode) {
+			onEdit();
+		}
+		if (editor != null) {
+			editor.requestFocus();
+			if (editor instanceof TextInputControl textInput) {
+				textInput.selectAll();
+			}
+		}
 	}
 
 	private void loadOrganization() {
@@ -640,11 +695,15 @@ public final class OrganizationController {
 				row.statuteOfLimitationsDate(),
 				row.responsibleAttorneyName(),
 				row.responsibleAttorneyColor(),
-				row.nonEngagementLetterSent()
-		));
+				row.nonEngagementLetterSent(),
+				row.primaryStatusName(),
+				row.primaryStatusColor(),
+				row.practiceAreaColor()
+		), CaseCardFactory.Variant.FULL);
 		if (card instanceof Region region) {
 			region.setMaxWidth(Double.MAX_VALUE);
-			region.setPrefWidth(330);
+			region.setPrefWidth(380);
+			region.setMaxWidth(420);
 		}
 		Label relationshipMeta = new Label(formatRelationshipMeta(row.partyRoleName(), row.side(), row.primary()));
 		relationshipMeta.getStyleClass().add("muted");
@@ -698,7 +757,7 @@ public final class OrganizationController {
 
 	private void setEditMode(boolean enabled) {
 		this.editMode = enabled;
-		setVisibleManaged(editButton, !enabled);
+		setVisibleManaged(editButton, false);
 		setVisibleManaged(saveButton, enabled);
 		setVisibleManaged(cancelButton, enabled);
 		refreshAdminActions();
@@ -730,6 +789,17 @@ public final class OrganizationController {
 		}
 		if (deleteOrganizationButton != null) {
 			deleteOrganizationButton.setDisable(busy);
+		}
+		setInlineEditButtonsDisabled(busy);
+	}
+
+	private void setInlineEditButtonsDisabled(boolean disabled) {
+		for (Button button : List.of(editNameButton, editTypeButton, editPhoneButton, editFaxButton, editEmailButton,
+				editWebsiteButton, editAddress1Button, editAddress2Button, editCityButton, editStateButton,
+				editPostalCodeButton, editCountryButton, editNotesButton)) {
+			if (button != null) {
+				button.setDisable(disabled);
+			}
 		}
 	}
 

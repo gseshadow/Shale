@@ -10,7 +10,6 @@ import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
-import com.shale.ui.util.LookupAdministrationTableFactory;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ButtonType;
@@ -21,13 +20,20 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.PasswordField;
-import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.control.Button;
 import javafx.scene.Node;
 import javafx.scene.paint.Color;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.geometry.Pos;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
+import javafx.scene.shape.Circle;
+import com.shale.ui.util.ColorUtil;
+import com.shale.ui.component.factory.StatusIndicatorFactory;
+import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -64,17 +70,7 @@ public final class SettingsController {
 	@FXML
 	private VBox caseStatusAdministrationSection;
 	@FXML
-	private TableView<CaseStatusViewRow> caseStatusesTable;
-	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusNameColumn;
-	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusClosedColumn;
-	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusLifecycleKeyColumn;
-	@FXML
-	private TableColumn<CaseStatusViewRow, String> statusSystemKeyColumn;
-	@FXML
-	private TableColumn<CaseStatusViewRow, Integer> statusSortOrderColumn;
+	private VBox caseStatusCardsContainer;
 	@FXML
 	private HBox caseStatusActionRow;
 	@FXML
@@ -82,15 +78,7 @@ public final class SettingsController {
 	@FXML
 	private VBox practiceAreaAdministrationSection;
 	@FXML
-	private TableView<PracticeAreaViewRow> practiceAreasTable;
-	@FXML
-	private TableColumn<PracticeAreaViewRow, String> practiceAreaNameColumn;
-	@FXML
-	private TableColumn<PracticeAreaViewRow, String> practiceAreaColorColumn;
-	@FXML
-	private TableColumn<PracticeAreaViewRow, String> practiceAreaActiveColumn;
-	@FXML
-	private TableColumn<PracticeAreaViewRow, String> practiceAreaSystemKeyColumn;
+	private VBox practiceAreaCardsContainer;
 	@FXML
 	private HBox practiceAreaActionRow;
 	@FXML
@@ -126,13 +114,15 @@ public final class SettingsController {
 	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
+	private final List<CaseStatusViewRow> caseStatusRows = new ArrayList<>();
+	private final List<PracticeAreaViewRow> practiceAreaRows = new ArrayList<>();
+	private CaseStatusViewRow selectedCaseStatusRow;
+	private PracticeAreaViewRow selectedPracticeAreaRow;
 
 	@FXML
 	private void initialize() {
 		fxmlReady = true;
 		configureLookupActionRows();
-		configureCaseStatusesTable();
-		configurePracticeAreasTable();
 		configureUserManagementTable();
 		updateAdminControlsVisibility();
 		if (notificationPreferencesService != null) {
@@ -248,33 +238,88 @@ public final class SettingsController {
 			loadPracticeAreas();
 			setPracticeAreaMessage("Practice area removed from new selections. Existing cases keep their value.");
 		} catch (RuntimeException ex) {
-			AppDialogs.showError(practiceAreasTable.getScene().getWindow(), "Practice Areas", rootMessage(ex));
+			AppDialogs.showError(practiceAreaCardsContainer.getScene().getWindow(), "Practice Areas", rootMessage(ex));
 		}
 	}
 
-	private void configurePracticeAreasTable() {
-		LookupAdministrationTableFactory.configurePracticeAreaTable(
-				practiceAreasTable,
-				practiceAreaNameColumn,
-				practiceAreaColorColumn,
-				practiceAreaActiveColumn,
-				practiceAreaSystemKeyColumn);
-	}
 
 	private void loadPracticeAreas() {
-		if (caseService == null || practiceAreasTable == null) return;
+		if (caseService == null || practiceAreaCardsContainer == null) return;
 		if (!requireAdminLookupManagement("Practice Areas")) {
-			practiceAreasTable.getItems().clear();
+			practiceAreaRows.clear();
+			selectedPracticeAreaRow = null;
+			practiceAreaCardsContainer.getChildren().clear();
 			return;
 		}
 		try {
 			List<PracticeAreaViewRow> rows = new ArrayList<>();
 			for (PracticeAreaDto area : caseService.listPracticeAreas(requireTenantId(), true)) rows.add(new PracticeAreaViewRow(area));
-			practiceAreasTable.getItems().setAll(rows);
+			practiceAreaRows.clear();
+			practiceAreaRows.addAll(rows);
+			selectedPracticeAreaRow = rows.stream()
+					.filter(row -> selectedPracticeAreaRow != null && row.id() == selectedPracticeAreaRow.id())
+					.findFirst()
+					.orElse(null);
+			renderPracticeAreaCards();
 			setPracticeAreaMessage(rows.isEmpty() ? "No practice areas are configured for this tenant." : "");
 		} catch (RuntimeException ex) {
 			setPracticeAreaMessage("Failed to load practice areas. " + rootMessage(ex));
 		}
+	}
+
+	private void renderPracticeAreaCards() {
+		if (practiceAreaCardsContainer == null) return;
+		practiceAreaCardsContainer.getChildren().clear();
+		for (PracticeAreaViewRow row : practiceAreaRows) {
+			practiceAreaCardsContainer.getChildren().add(buildPracticeAreaCard(row));
+		}
+	}
+
+	private VBox buildPracticeAreaCard(PracticeAreaViewRow row) {
+		VBox card = new VBox(8);
+		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
+		if (selectedPracticeAreaRow != null && selectedPracticeAreaRow.id() == row.id()) {
+			card.getStyleClass().add("practice-area-card-selected");
+		}
+		card.setOnMouseClicked(event -> selectPracticeAreaRow(row));
+
+		HBox header = new HBox(10);
+		header.setAlignment(Pos.CENTER_LEFT);
+		Circle dot = new Circle(6);
+		dot.getStyleClass().addAll("shale-indicator-dot", "shale-indicator-practice-area");
+		String colorCss = safe(ColorUtil.toCssBackgroundColorOrNull(row.getColor()));
+		if (!colorCss.isBlank()) dot.setStyle("-fx-background-color: " + colorCss + "; -fx-fill: " + colorCss + ";");
+		Label name = new Label(row.getName());
+		name.getStyleClass().add("app-dialog-field-label");
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		Label preview = PracticeAreaIndicatorFactory.createPracticeAreaPill(row.getName(), row.getColor(), PracticeAreaIndicatorFactory.PillSize.COMPACT);
+		header.getChildren().addAll(dot, name, spacer, preview);
+
+		HBox metadata = new HBox(6);
+		metadata.setAlignment(Pos.CENTER_LEFT);
+		metadata.getChildren().addAll(metadataPill(row.getActiveState()), metadataPill(row.scopeLabel()));
+		if (!row.getSystemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.getSystemKey()));
+		if (row.deleted()) metadata.getChildren().add(metadataPill("Deleted"));
+		if (!row.getColor().isBlank()) metadata.getChildren().add(metadataPill(row.getColor()));
+
+		HBox actions = new HBox(8);
+		actions.setAlignment(Pos.CENTER_LEFT);
+		Button edit = cardButton("Edit", "app-toolbar-button-neutral");
+		edit.setOnAction(event -> { selectPracticeAreaRow(row); onEditPracticeArea(); event.consume(); });
+		Button remove = cardButton("Remove", "app-toolbar-button-danger");
+		remove.setOnAction(event -> { selectPracticeAreaRow(row); onRemovePracticeArea(); event.consume(); });
+		Label restriction = new Label(row.global() ? "Global/default practice area: editing creates or updates a tenant-scoped override when supported." : "Tenant-specific/custom practice area.");
+		restriction.getStyleClass().add("search-summary-text");
+		actions.getChildren().addAll(edit, remove, restriction);
+
+		card.getChildren().addAll(header, metadata, actions);
+		return card;
+	}
+
+	private void selectPracticeAreaRow(PracticeAreaViewRow row) {
+		selectedPracticeAreaRow = row;
+		renderPracticeAreaCards();
 	}
 
 	private Optional<PracticeAreaInput> showPracticeAreaDialog(PracticeAreaDto existing) {
@@ -307,9 +352,8 @@ public final class SettingsController {
 	}
 
 	private PracticeAreaViewRow selectedPracticeAreaRow() {
-		PracticeAreaViewRow selected = practiceAreasTable == null ? null : practiceAreasTable.getSelectionModel().getSelectedItem();
-		if (selected == null) setPracticeAreaMessage("Select a practice area first.");
-		return selected;
+		if (selectedPracticeAreaRow == null) setPracticeAreaMessage("Select a practice area first.");
+		return selectedPracticeAreaRow;
 	}
 
 	@FXML
@@ -356,46 +400,114 @@ public final class SettingsController {
 	@FXML
 	private void onMoveCaseStatusDown() { if (requireAdminLookupManagement("Case Statuses")) moveSelectedStatus(1); }
 
-	private void configureCaseStatusesTable() {
-		LookupAdministrationTableFactory.configureCaseStatusTable(
-				caseStatusesTable,
-				statusNameColumn,
-				statusClosedColumn,
-				statusSortOrderColumn,
-				statusLifecycleKeyColumn,
-				statusSystemKeyColumn);
-	}
 
 	private void loadCaseStatuses() {
-		if (caseService == null || caseStatusesTable == null) return;
+		if (caseService == null || caseStatusCardsContainer == null) return;
 		if (!requireAdminLookupManagement("Case Statuses")) {
-			caseStatusesTable.getItems().clear();
+			caseStatusRows.clear();
+			selectedCaseStatusRow = null;
+			caseStatusCardsContainer.getChildren().clear();
 			return;
 		}
 		try {
 			List<CaseStatusViewRow> rows = new ArrayList<>();
 			for (CaseStatusDto status : caseService.listCaseStatuses(requireTenantId(), true)) rows.add(new CaseStatusViewRow(status));
-			caseStatusesTable.getItems().setAll(rows);
+			caseStatusRows.clear();
+			caseStatusRows.addAll(rows);
+			selectedCaseStatusRow = rows.stream()
+					.filter(row -> selectedCaseStatusRow != null && row.id() == selectedCaseStatusRow.id())
+					.findFirst()
+					.orElse(null);
+			renderCaseStatusCards();
 			setCaseStatusMessage(rows.isEmpty() ? "No case statuses are configured for this tenant." : "");
 		} catch (RuntimeException ex) {
 			setCaseStatusMessage("Failed to load case statuses. " + rootMessage(ex));
 		}
 	}
 
+	private void renderCaseStatusCards() {
+		if (caseStatusCardsContainer == null) return;
+		caseStatusCardsContainer.getChildren().clear();
+		for (int i = 0; i < caseStatusRows.size(); i++) {
+			caseStatusCardsContainer.getChildren().add(buildCaseStatusCard(caseStatusRows.get(i), i));
+		}
+	}
+
+	private VBox buildCaseStatusCard(CaseStatusViewRow row, int index) {
+		VBox card = new VBox(8);
+		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
+		if (selectedCaseStatusRow != null && selectedCaseStatusRow.id() == row.id()) {
+			card.getStyleClass().add("case-status-card-selected");
+		}
+		card.setOnMouseClicked(event -> selectCaseStatusRow(row));
+
+		HBox header = new HBox(10);
+		header.setAlignment(Pos.CENTER_LEFT);
+		Label name = new Label(row.getName());
+		name.getStyleClass().add("app-dialog-field-label");
+		Node preview = StatusIndicatorFactory.createStatusPill(row.getName(), row.color());
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		header.getChildren().addAll(name, spacer, preview);
+
+		HBox metadata = new HBox(6);
+		metadata.setAlignment(Pos.CENTER_LEFT);
+		metadata.getChildren().addAll(
+				metadataPill(row.getClosedState()),
+				metadataPill("Sort " + row.getSortOrder()),
+				metadataPill(row.scopeLabel()));
+		if (!row.getLifecycleKey().isBlank()) metadata.getChildren().add(metadataPill("Lifecycle: " + row.getLifecycleKey()));
+		if (!row.getSystemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.getSystemKey()));
+
+		HBox actions = new HBox(8);
+		actions.setAlignment(Pos.CENTER_LEFT);
+		Button edit = cardButton("Edit", "app-toolbar-button-neutral");
+		edit.setOnAction(event -> { selectCaseStatusRow(row); onEditCaseStatus(); event.consume(); });
+		Button up = cardButton("Move Up", "app-toolbar-button-neutral");
+		up.setDisable(index == 0);
+		up.setOnAction(event -> { selectCaseStatusRow(row); moveSelectedStatus(-1); event.consume(); });
+		Button down = cardButton("Move Down", "app-toolbar-button-neutral");
+		down.setDisable(index >= caseStatusRows.size() - 1);
+		down.setOnAction(event -> { selectCaseStatusRow(row); moveSelectedStatus(1); event.consume(); });
+		Label restriction = new Label(row.global() ? "Global/default status: editing creates a tenant override; reordering requires tenant-specific status." : "Tenant-specific/custom status.");
+		restriction.getStyleClass().add("search-summary-text");
+		actions.getChildren().addAll(edit, up, down, restriction);
+
+		card.getChildren().addAll(header, metadata, actions);
+		return card;
+	}
+
+	private Label metadataPill(String text) {
+		Label label = new Label(text == null || text.isBlank() ? "—" : text);
+		label.getStyleClass().addAll("shale-indicator-chip");
+		return label;
+	}
+
+	private Button cardButton(String text, String roleClass) {
+		Button button = new Button(text);
+		button.getStyleClass().addAll("app-toolbar-button", roleClass, "app-toolbar-button-compact");
+		return button;
+	}
+
+	private void selectCaseStatusRow(CaseStatusViewRow row) {
+		selectedCaseStatusRow = row;
+		renderCaseStatusCards();
+	}
+
 	private void moveSelectedStatus(int delta) {
 		if (!requireAdminLookupManagement("Case Statuses")) return;
 		CaseStatusViewRow selected = selectedStatusRow();
 		if (selected == null) return;
-		int index = caseStatusesTable.getItems().indexOf(selected);
+		int index = caseStatusRows.indexOf(selected);
 		int otherIndex = index + delta;
-		if (otherIndex < 0 || otherIndex >= caseStatusesTable.getItems().size()) return;
-		CaseStatusViewRow other = caseStatusesTable.getItems().get(otherIndex);
+		if (otherIndex < 0 || otherIndex >= caseStatusRows.size()) return;
+		CaseStatusViewRow other = caseStatusRows.get(otherIndex);
 		try {
 			caseService.reorderCaseStatuses(requireTenantId(), selected.id(), other.id());
+			selectedCaseStatusRow = selected;
 			loadCaseStatuses();
-			caseStatusesTable.getSelectionModel().select(otherIndex);
 		} catch (RuntimeException ex) {
-			AppDialogs.showError(caseStatusesTable.getScene().getWindow(), "Case Statuses", rootMessage(ex));
+			AppDialogs.showError(caseStatusCardsContainer.getScene().getWindow(), "Case Statuses", rootMessage(ex));
 		}
 	}
 
@@ -439,9 +551,8 @@ public final class SettingsController {
 	}
 
 	private CaseStatusViewRow selectedStatusRow() {
-		CaseStatusViewRow selected = caseStatusesTable == null ? null : caseStatusesTable.getSelectionModel().getSelectedItem();
-		if (selected == null) setCaseStatusMessage("Select a case status first.");
-		return selected;
+		if (selectedCaseStatusRow == null) setCaseStatusMessage("Select a case status first.");
+		return selectedCaseStatusRow;
 	}
 
 	private boolean requireAdminLookupManagement(String sectionName) {
@@ -729,6 +840,9 @@ public final class SettingsController {
 		public Integer getSortOrder() { return status.sortOrder(); }
 		public String getLifecycleKey() { return safe(status.lifecycleKey()); }
 		public String getSystemKey() { return safe(status.systemKey()); }
+		public String color() { return status.color(); }
+		public boolean global() { return status.shaleClientId() == null; }
+		public String scopeLabel() { return global() ? "Global/default" : "Tenant/custom"; }
 		CaseStatusDto status() { return status; }
 	}
 
@@ -757,6 +871,10 @@ public final class SettingsController {
 		public String getColor() { return safe(practiceArea.color()); }
 		public String getActiveState() { return practiceArea.active() && !practiceArea.deleted() ? "Active" : "Inactive"; }
 		public String getSystemKey() { return safe(practiceArea.systemKey()); }
+		public boolean deleted() { return practiceArea.deleted(); }
+		public boolean active() { return practiceArea.active(); }
+		public boolean global() { return practiceArea.shaleClientId() == null; }
+		public String scopeLabel() { return global() ? "Global/default" : "Tenant/custom"; }
 		PracticeAreaDto practiceArea() { return practiceArea; }
 	}
 
