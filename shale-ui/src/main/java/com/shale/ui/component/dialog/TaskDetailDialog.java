@@ -26,6 +26,7 @@ import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.WindowSizingUtil;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -473,14 +474,17 @@ public final class TaskDetailDialog {
         VBox body = new VBox(16, heading, message, contentColumns, actions);
         body.setPadding(new Insets(22, 24, 22, 24));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, "Task Details", stage::close, body);
-        root.setMinWidth(860);
-        root.setPrefWidth(980);
-        root.setMinHeight(620);
+        double dialogWidth = WindowSizingUtil.cappedModalWidth(owner, 980);
+        double dialogHeight = WindowSizingUtil.cappedModalHeight(owner, 720);
+        root.setMinWidth(Math.min(860, dialogWidth));
+        root.setPrefWidth(dialogWidth);
+        root.setMinHeight(Math.min(620, dialogHeight));
 
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(
                 TaskDetailDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
+        WindowSizingUtil.sizeModalStage(stage, owner, dialogWidth, dialogHeight);
         String context = safe(timingContext).isBlank() ? "UNKNOWN" : timingContext;
         PerfLog.logElapsed("TASK_DETAIL_TIMING", "dialog_creation", "context=" + context + " taskId=" + model.taskId(), elapsedMillis(dialogCreateStartedAt));
         PerfLog.log("TASK_DETAIL_TIMING", "fxml_load", "context=" + context + " taskId=" + model.taskId() + " reason=programmatic-dialog");
