@@ -50,6 +50,7 @@ import com.shale.ui.services.UpdatePollingService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.WindowSizingUtil;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.LoadException;
@@ -845,8 +846,7 @@ public final class SceneManager {
 			dialogScene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			dialog.setScene(dialogScene);
-			dialog.setMinWidth(760);
-			dialog.setMinHeight(720);
+			WindowSizingUtil.sizeModalStage(dialog, stage, 760, 720);
 			dialog.showAndWait();
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to open New Organization dialog", e);
@@ -880,9 +880,7 @@ public final class SceneManager {
 			dialogScene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			dialog.setScene(dialogScene);
-			dialog.setWidth(1180);
-			dialog.setMinWidth(1080);
-			dialog.setMinHeight(760);
+			WindowSizingUtil.sizeModalStage(dialog, stage, 1180, 760);
 			dialog.showAndWait();
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to open New Intake dialog", e);
@@ -1131,7 +1129,7 @@ public final class SceneManager {
 	private void setScene(Parent root, String title) {
 		Scene scene = stage.getScene();
 		if (scene == null) {
-			scene = new Scene(root, 1650, 900);
+			scene = new Scene(root);
 			scene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			stage.setScene(scene);
@@ -1139,6 +1137,9 @@ public final class SceneManager {
 			scene.setRoot(root);
 		}
 		stage.setTitle(title);
+		if (!stage.isShowing()) {
+			WindowSizingUtil.sizeMainStage(stage);
+		}
 		stage.show();
 	}
 

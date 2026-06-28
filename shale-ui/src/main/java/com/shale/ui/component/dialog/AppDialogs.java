@@ -22,6 +22,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.Window;
+import com.shale.ui.util.WindowSizingUtil;
 
 public final class AppDialogs {
 
@@ -68,6 +69,7 @@ public final class AppDialogs {
 		stage.initModality(Modality.WINDOW_MODAL);
 		stage.setTitle(title);
 		stage.setResizable(false);
+		stage.setOnShown(event -> WindowSizingUtil.constrainToVisualBounds(stage, owner));
 		return stage;
 	}
 
@@ -276,6 +278,7 @@ public final class AppDialogs {
 		scene.getStylesheets().add(Objects.requireNonNull(
 				AppDialogs.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
+		WindowSizingUtil.sizeModalStage(stage, owner, minWidth, root.prefHeight(-1));
 		stage.showAndWait();
 		return Optional.ofNullable(result.value);
 	}
