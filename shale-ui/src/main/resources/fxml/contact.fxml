@@ -143,7 +143,7 @@
                         </GridPane>
                     </VBox>
 
-                    <VBox minWidth="340" maxWidth="1.7976931348623157E308" spacing="8" styleClass="secondary-panel" GridPane.columnIndex="1">
+                    <VBox minWidth="430" prefWidth="460" maxWidth="520" spacing="8" styleClass="secondary-panel" GridPane.columnIndex="1">
                         <HBox spacing="8" alignment="CENTER_LEFT">
                             <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                             <Region HBox.hgrow="ALWAYS" />

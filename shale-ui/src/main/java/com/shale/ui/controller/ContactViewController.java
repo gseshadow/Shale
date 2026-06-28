@@ -523,10 +523,14 @@ public final class ContactViewController {
                 row.statuteOfLimitationsDate(),
                 row.responsibleAttorneyName(),
                 row.responsibleAttorneyColor(),
-                row.nonEngagementLetterSent()));
+                row.nonEngagementLetterSent(),
+                row.primaryStatusName(),
+                row.primaryStatusColor(),
+                row.practiceAreaColor()), CaseCardFactory.Variant.FULL);
         if (card instanceof Region region) {
             region.setMaxWidth(Double.MAX_VALUE);
             region.setPrefWidth(380);
+            region.setMaxWidth(420);
         }
         Label relationshipMeta = new Label(formatRelationshipMeta(row.partyRoleName(), row.side(), row.primary()));
         relationshipMeta.getStyleClass().add("muted");
