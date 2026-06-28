@@ -11,18 +11,19 @@ import javafx.util.Duration;
 
 import com.shale.data.dao.OrganizationDao.DirectoryOrganizationRow;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.ui.component.ScrollableListRegion;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.UiRuntimeBridge.EntityUpdatedEvent;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.UiStateLabels;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 
@@ -36,11 +37,13 @@ public final class OrganizationsController {
 	@FXML
 	private javafx.scene.control.Button addOrganizationButton;
 	@FXML
-	private ScrollPane organizationsScroll;
+	private ScrollableListRegion organizationsListRegion;
 	@FXML
 	private FlowPane organizationsFlow;
 	@FXML
 	private Label organizationsEmptyStateLabel;
+	@FXML
+	private Label organizationsLoadingStateLabel;
 
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
@@ -152,10 +155,10 @@ public final class OrganizationsController {
 	}
 
 	private void wireInfiniteScroll() {
-		if (organizationsScroll == null) {
+		if (organizationsListRegion == null) {
 			return;
 		}
-		organizationsScroll.vvalueProperty().addListener((obs, oldV, newV) -> {
+		organizationsListRegion.getScrollPane().vvalueProperty().addListener((obs, oldV, newV) -> {
 			if (newV != null && newV.doubleValue() >= 0.95) {
 				loadNextPage();
 			}
@@ -210,7 +213,11 @@ public final class OrganizationsController {
 		final long queryStarted = PerfLog.start();
 		if (pageToLoad == 0) { pageLoadStartedNanos = queryStarted; }
 		PerfLog.log("organizations.search", "queued", "generation=" + generationAtSubmit + " page=" + pageToLoad + " pageSize=" + pageSize + " queryLength=" + search.length());
-		rerender();
+		if (loaded.isEmpty()) {
+			updateLoadingState(true);
+		} else {
+			rerender();
+		}
 
 		dbExec.submit(() -> {
 			try {
@@ -268,6 +275,7 @@ public final class OrganizationsController {
 				.toList();
 
 		organizationsFlow.getChildren().setAll(cards);
+		updateLoadingState(false);
 		updateEmptyState(loaded.isEmpty());
 		PerfLog.logDone("organizations.render", "cards=" + cards.size() + " loaded=" + loaded.size() + " loading=" + loading + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
 	}
@@ -292,13 +300,29 @@ public final class OrganizationsController {
 	}
 
 	private void updateEmptyState(boolean empty) {
-		if (organizationsEmptyStateLabel != null) {
-			organizationsEmptyStateLabel.setVisible(empty);
-			organizationsEmptyStateLabel.setManaged(empty);
+		if (empty) {
+			UiStateLabels.showEmpty(organizationsEmptyStateLabel);
+		} else {
+			UiStateLabels.hide(organizationsEmptyStateLabel);
 		}
-		if (organizationsScroll != null) {
-			organizationsScroll.setVisible(!empty);
-			organizationsScroll.setManaged(!empty);
+		if (organizationsListRegion != null) {
+			organizationsListRegion.showEmpty(empty);
+		}
+	}
+
+	private void updateLoadingState(boolean loadingStateVisible) {
+		if (loadingStateVisible) {
+			UiStateLabels.showLoading(organizationsLoadingStateLabel);
+			UiStateLabels.hide(organizationsEmptyStateLabel);
+			if (organizationsListRegion != null) {
+				organizationsListRegion.showLoading(true);
+			}
+		} else {
+			if (organizationsListRegion != null) {
+				organizationsListRegion.showLoading(false);
+			} else {
+				UiStateLabels.hide(organizationsLoadingStateLabel);
+			}
 		}
 	}
 

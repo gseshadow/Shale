@@ -24,13 +24,17 @@
 .title { -fx-font-size: 20px; -fx-font-weight: bold; }
 .error { -fx-text-fill: #c62828; }
 
-/*
- * Surface hierarchy entry point.
- * app.css remains the stable stylesheet loaded by scenes/dialogs, while broad
- * reusable containers below now compose from foundation surface/color tokens.
- * Screen-specific sections, cards, buttons, and dialogs remain on their
- * existing selectors until their later migration phases.
- */
+
+/* Standard state labels */
+.label.shale-empty-state,
+.label.shale-loading-placeholder {
+    -fx-text-fill: rgba(17, 37, 66, 0.72);
+    -fx-font-size: 12px;
+    -fx-padding: 10 8 10 8;
+    -fx-font-style: italic;
+}
+
+/* Surface hierarchy */
 .app-shell {
     -fx-border-color: transparent;
 }
@@ -310,6 +314,28 @@
 .app-pill-button-danger:pressed {
     -fx-background-color: -shale-button-destructive-pressed-background;
     -fx-border-color: -shale-button-destructive-pressed-border;
+}
+
+
+/* Neutral design-system metadata chips. */
+.metadata-chip {
+    -fx-background-color: rgba(17, 37, 66, 0.07);
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-color: rgba(17, 37, 66, 0.12);
+    -fx-border-width: 1;
+    -fx-text-fill: rgba(17, 37, 66, 0.76);
+    -fx-font-weight: 700;
+}
+
+.metadata-chip-compact {
+    -fx-padding: 3 8 3 8;
+    -fx-font-size: 11px;
+}
+
+.metadata-chip-small {
+    -fx-padding: 2 7 2 7;
+    -fx-font-size: 10px;
 }
 
 /* App-wide toolbar/action button system (phase rollout by opting in via style class). */
@@ -1802,9 +1828,24 @@
     -fx-padding: 7 0 7 8;
 }
 
-/* Settings lookup card selection state. */
-.case-status-card-selected,
-.practice-area-card-selected {
-    -fx-border-color: -shale-indicator-selected-border;
-    -fx-background-color: -shale-color-card-hover-surface;
+/* Reusable dashboard/report statistic card primitive. */
+.statistic-card {
+    -fx-padding: 12 14 12 14;
+    -fx-min-width: 150;
+}
+
+.statistic-card-title {
+    -fx-text-fill: rgba(17, 37, 66, 0.76);
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+}
+
+.statistic-card-value {
+    -fx-text-fill: #112542;
+    -fx-font-size: 24px;
+    -fx-font-weight: 900;
+}
+
+.statistic-card-subtitle {
+    -fx-font-size: 11px;
 }

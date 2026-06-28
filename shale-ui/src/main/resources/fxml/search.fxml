@@ -7,6 +7,7 @@
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import com.shale.ui.component.SectionRegion?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
     xmlns:fx="http://javafx.com/fxml/1"
@@ -29,73 +30,45 @@
                                 <Label fx:id="searchSummaryLabel" text="Showing search results." styleClass="search-summary-text" />
                             </VBox>
 
-                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
-                                <padding>
-                                    <Insets top="16" right="16" bottom="16" left="16" />
-                                </padding>
-                                <Label text="Cases" styleClass="search-section-title" />
+                            <SectionRegion title="Cases">
                                 <FlowPane fx:id="casesFlow" hgap="16" vgap="16" prefWrapLength="1200" />
-                                <Label fx:id="casesEmptyLabel" text="No matching cases" visible="false" managed="false" />
-                            </VBox>
+                                <Label fx:id="casesEmptyLabel" text="No matching cases" styleClass="shale-empty-state" visible="false" managed="false" />
+                            </SectionRegion>
 
-                            <VBox fx:id="deletedCasesSection" spacing="12" styleClass="case-right-pane strong-panel" visible="false" managed="false">
-                                <padding>
-                                    <Insets top="16" right="16" bottom="16" left="16" />
-                                </padding>
-                                <Label text="Deleted Cases" styleClass="search-section-title" />
+                            <SectionRegion fx:id="deletedCasesSection" title="Deleted Cases" visible="false" managed="false">
                                 <FlowPane fx:id="deletedCasesFlow" hgap="16" vgap="16" prefWrapLength="1200" />
-                                <Label fx:id="deletedCasesEmptyLabel" text="No matching deleted cases" visible="false" managed="false" />
-                            </VBox>
+                                <Label fx:id="deletedCasesEmptyLabel" text="No matching deleted cases" styleClass="shale-empty-state" visible="false" managed="false" />
+                            </SectionRegion>
 
-                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
-                                <padding>
-                                    <Insets top="16" right="16" bottom="16" left="16" />
-                                </padding>
-                                <Label text="Contacts" styleClass="search-section-title" />
+                            <SectionRegion title="Contacts">
                                 <FlowPane fx:id="contactsFlow" hgap="16" vgap="16" prefWrapLength="1040" />
-                                <Label fx:id="contactsEmptyLabel" text="No matching contacts" visible="false" managed="false" />
-                            </VBox>
+                                <Label fx:id="contactsEmptyLabel" text="No matching contacts" styleClass="shale-empty-state" visible="false" managed="false" />
+                            </SectionRegion>
 
-                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
-                                <padding>
-                                    <Insets top="16" right="16" bottom="16" left="16" />
-                                </padding>
-                                <Label text="Organizations" styleClass="search-section-title" />
+                            <SectionRegion title="Organizations">
                                 <FlowPane fx:id="organizationsFlow" hgap="16" vgap="16" prefWrapLength="1040" />
-                                <Label fx:id="organizationsEmptyLabel" text="No matching organizations" visible="false" managed="false" />
-                            </VBox>
+                                <Label fx:id="organizationsEmptyLabel" text="No matching organizations" styleClass="shale-empty-state" visible="false" managed="false" />
+                            </SectionRegion>
 
-                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
-                                <padding>
-                                    <Insets top="16" right="16" bottom="16" left="16" />
-                                </padding>
-                                <Label text="Users" styleClass="search-section-title" />
+                            <SectionRegion title="Users">
                                 <FlowPane fx:id="usersFlow" hgap="16" vgap="16" prefWrapLength="1040" />
-                                <Label fx:id="usersEmptyLabel" text="No matching users" visible="false" managed="false" />
-                            </VBox>
-                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
-                                <padding>
-                                    <Insets top="16" right="16" bottom="16" left="16" />
-                                </padding>
-                                <Label text="Tasks" styleClass="search-section-title" />
+                                <Label fx:id="usersEmptyLabel" text="No matching users" styleClass="shale-empty-state" visible="false" managed="false" />
+                            </SectionRegion>
+                            <SectionRegion title="Tasks">
                                 <FlowPane fx:id="tasksFlow" hgap="16" vgap="16" prefWrapLength="1040" />
-                                <Label fx:id="tasksEmptyLabel" text="No matching tasks" visible="false" managed="false" />
-                            </VBox>
+                                <Label fx:id="tasksEmptyLabel" text="No matching tasks" styleClass="shale-empty-state" visible="false" managed="false" />
+                            </SectionRegion>
 
-                            <VBox spacing="12" styleClass="case-right-pane strong-panel">
-                                <padding>
-                                    <Insets top="16" right="16" bottom="16" left="16" />
-                                </padding>
-                                <Label text="Calendar Events" styleClass="search-section-title" />
+                            <SectionRegion title="Calendar Events">
                                 <FlowPane fx:id="calendarEventsFlow" hgap="16" vgap="16" prefWrapLength="1040" />
-                                <Label fx:id="calendarEventsEmptyLabel" text="No matching calendar events" visible="false" managed="false" />
-                            </VBox>
+                                <Label fx:id="calendarEventsEmptyLabel" text="No matching calendar events" styleClass="shale-empty-state" visible="false" managed="false" />
+                            </SectionRegion>
 
                         </VBox>
                     </content>
                 </ScrollPane>
 
-                <Label fx:id="searchLoadingLabel" text="Loading search results…" visible="false" managed="false" />
+                <Label fx:id="searchLoadingLabel" text="Loading search results…" styleClass="shale-loading-placeholder" visible="false" managed="false" />
             </children>
         </StackPane>
     </center>

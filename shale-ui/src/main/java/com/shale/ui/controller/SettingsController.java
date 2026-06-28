@@ -9,6 +9,8 @@ import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.ActionButtonFactory;
+import com.shale.ui.util.LookupAdministrationTableFactory;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ButtonType;
@@ -19,6 +21,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.PasswordField;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.control.Button;
 import javafx.scene.Node;
 import javafx.scene.paint.Color;
@@ -71,11 +74,15 @@ public final class SettingsController {
 	@FXML
 	private VBox caseStatusCardsContainer;
 	@FXML
+	private HBox caseStatusActionRow;
+	@FXML
 	private Label caseStatusSettingsStatusLabel;
 	@FXML
 	private VBox practiceAreaAdministrationSection;
 	@FXML
 	private VBox practiceAreaCardsContainer;
+	@FXML
+	private HBox practiceAreaActionRow;
 	@FXML
 	private Label practiceAreaSettingsStatusLabel;
 	@FXML
@@ -117,6 +124,9 @@ public final class SettingsController {
 	@FXML
 	private void initialize() {
 		fxmlReady = true;
+		configureLookupActionRows();
+		configureCaseStatusesTable();
+		configurePracticeAreasTable();
 		configureUserManagementTable();
 		updateAdminControlsVisibility();
 		if (notificationPreferencesService != null) {
@@ -180,7 +190,23 @@ public final class SettingsController {
 		onOpenAuditLog.run();
 	}
 
-
+	private void configureLookupActionRows() {
+		if (caseStatusActionRow != null) {
+			caseStatusActionRow.getChildren().setAll(
+					ActionButtonFactory.primary("Add Status", event -> onAddCaseStatus()),
+					ActionButtonFactory.neutral("Edit Status", event -> onEditCaseStatus()),
+					ActionButtonFactory.neutral("Move Up", event -> onMoveCaseStatusUp()),
+					ActionButtonFactory.neutral("Move Down", event -> onMoveCaseStatusDown()),
+					caseStatusSettingsStatusLabel);
+		}
+		if (practiceAreaActionRow != null) {
+			practiceAreaActionRow.getChildren().setAll(
+					ActionButtonFactory.primary("Add Practice Area", event -> onAddPracticeArea()),
+					ActionButtonFactory.neutral("Edit Practice Area", event -> onEditPracticeArea()),
+					ActionButtonFactory.neutral("Remove Practice Area", event -> onRemovePracticeArea()),
+					practiceAreaSettingsStatusLabel);
+		}
+	}
 
 	@FXML
 	private void onAddPracticeArea() {
@@ -218,6 +244,15 @@ public final class SettingsController {
 		} catch (RuntimeException ex) {
 			AppDialogs.showError(practiceAreaCardsContainer.getScene().getWindow(), "Practice Areas", rootMessage(ex));
 		}
+	}
+
+	private void configurePracticeAreasTable() {
+		LookupAdministrationTableFactory.configurePracticeAreaTable(
+				practiceAreasTable,
+				practiceAreaNameColumn,
+				practiceAreaColorColumn,
+				practiceAreaActiveColumn,
+				practiceAreaSystemKeyColumn);
 	}
 
 	private void loadPracticeAreas() {
@@ -376,6 +411,16 @@ public final class SettingsController {
 
 	@FXML
 	private void onMoveCaseStatusDown() { if (requireAdminLookupManagement("Case Statuses")) moveSelectedStatus(1); }
+
+	private void configureCaseStatusesTable() {
+		LookupAdministrationTableFactory.configureCaseStatusTable(
+				caseStatusesTable,
+				statusNameColumn,
+				statusClosedColumn,
+				statusSortOrderColumn,
+				statusLifecycleKeyColumn,
+				statusSystemKeyColumn);
+	}
 
 	private void loadCaseStatuses() {
 		if (caseService == null || caseStatusCardsContainer == null) return;

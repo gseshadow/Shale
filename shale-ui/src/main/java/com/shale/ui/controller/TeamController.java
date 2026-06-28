@@ -2,16 +2,17 @@ package com.shale.ui.controller;
 
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserDao.DirectoryUserRow;
+import com.shale.ui.component.ScrollableListRegion;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.UiStateLabels;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 import javafx.animation.PauseTransition;
@@ -35,7 +36,7 @@ public final class TeamController {
 	@FXML
 	private TextField teamSearchField;
 	@FXML
-	private ScrollPane teamScroll;
+	private ScrollableListRegion teamListRegion;
 	@FXML
 	private FlowPane teamFlow;
 	@FXML
@@ -198,13 +199,15 @@ public final class TeamController {
 	}
 
 	private void updateEmptyState(boolean empty) {
-		if (teamEmptyStateLabel != null) {
-			teamEmptyStateLabel.setVisible(empty);
-			teamEmptyStateLabel.setManaged(empty);
+		if (teamListRegion != null) {
+			teamListRegion.showEmpty(empty);
+			return;
 		}
-		if (teamScroll != null) {
-			teamScroll.setVisible(!empty);
-			teamScroll.setManaged(!empty);
+
+		if (empty) {
+			UiStateLabels.showEmpty(teamEmptyStateLabel);
+		} else {
+			UiStateLabels.hide(teamEmptyStateLabel);
 		}
 	}
 

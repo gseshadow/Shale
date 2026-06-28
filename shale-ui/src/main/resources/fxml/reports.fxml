@@ -2,6 +2,7 @@
 <?import javafx.scene.chart.PieChart?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import com.shale.ui.component.StatisticCard?>
 <?import javafx.geometry.Insets?>
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.shale.ui.controller.ReportsController" styleClass="app-shell">
@@ -18,6 +19,11 @@
                 <Button fx:id="refreshButton" text="Apply" onAction="#onRefresh" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
                 <Button fx:id="showAllResultsButton" text="Show all results" onAction="#onShowAllResults" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
                 <Label fx:id="statusLabel" styleClass="search-summary-text" />
+            </HBox>
+            <HBox fx:id="summaryMetricsBox" spacing="10" alignment="CENTER_LEFT">
+                <StatisticCard fx:id="totalCasesCard" HBox.hgrow="ALWAYS" />
+                <StatisticCard fx:id="visibleStatusesCard" HBox.hgrow="ALWAYS" />
+                <StatisticCard fx:id="largestStatusCard" HBox.hgrow="ALWAYS" />
             </HBox>
         </VBox>
     </top>

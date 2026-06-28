@@ -103,6 +103,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.Node;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -768,6 +769,7 @@ public class CaseController {
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
+		installDetailsInlineEditButtons();
 		wireDetailsReadOnlyAutoSizing();
 		setEditMode(false);
 		detailsEditor.setEditMode(false);
@@ -1060,12 +1062,97 @@ public class CaseController {
 	}
 
 	private void wireDetailsEditButtons() {
-		if (detailsEditButton != null)
+		if (detailsEditButton != null) {
 			detailsEditButton.setOnAction(e -> detailsEditor.beginEdit());
+			setVisibleManaged(detailsEditButton, false);
+		}
 		if (detailsSaveButton != null)
 			detailsSaveButton.setOnAction(e -> onSaveDetails());
 		if (detailsCancelButton != null)
 			detailsCancelButton.setOnAction(e -> detailsEditor.cancelEdit());
+	}
+
+	private void installDetailsInlineEditButtons() {
+		if (detailsPane == null)
+			return;
+		installDetailsInlineEditButtons(detailsPane);
+	}
+
+	private void installDetailsInlineEditButtons(javafx.scene.Parent parent) {
+		for (Node child : parent.getChildrenUnmodifiable()) {
+			if (child instanceof GridPane grid) {
+				prepareDetailsGridForInlineEdits(grid);
+			} else if (child instanceof javafx.scene.Parent nested) {
+				installDetailsInlineEditButtons(nested);
+			}
+		}
+	}
+
+	private void prepareDetailsGridForInlineEdits(GridPane grid) {
+		if (grid.getProperties().putIfAbsent("detailsInlineEditButtonsInstalled", Boolean.TRUE) != null)
+			return;
+		grid.getStyleClass().add("case-overview-rows");
+		if (grid.getColumnConstraints().size() < 3) {
+			ColumnConstraints actions = new ColumnConstraints();
+			actions.setMinWidth(36);
+			actions.setPrefWidth(36);
+			actions.setMaxWidth(36);
+			actions.setHalignment(javafx.geometry.HPos.RIGHT);
+			grid.getColumnConstraints().add(actions);
+		}
+		Map<Integer, Label> labelsByRow = new LinkedHashMap<>();
+		Map<Integer, Node> editableByRow = new LinkedHashMap<>();
+		for (Node node : List.copyOf(grid.getChildren())) {
+			Integer row = GridPane.getRowIndex(node);
+			int rowIndex = row == null ? 0 : row;
+			Integer col = GridPane.getColumnIndex(node);
+			int colIndex = col == null ? 0 : col;
+			if (node instanceof Label label && colIndex == 0) {
+				label.getStyleClass().add("case-overview-row-label");
+				labelsByRow.put(rowIndex, label);
+			} else if (node instanceof Label label && colIndex == 1) {
+				label.getStyleClass().add("case-overview-row-value");
+			} else if (colIndex == 1 && isDetailsEditorNode(node)) {
+				editableByRow.putIfAbsent(rowIndex, node);
+			}
+		}
+		for (Map.Entry<Integer, Node> entry : editableByRow.entrySet()) {
+			int row = entry.getKey();
+			Node editor = entry.getValue();
+			Button edit = createDetailsInlineEditButton(labelsByRow.get(row), editor);
+			grid.add(edit, 2, row);
+		}
+	}
+
+	private boolean isDetailsEditorNode(Node node) {
+		return node instanceof TextInputControl
+				|| node instanceof DatePicker
+				|| node instanceof CheckBox
+				|| node == detCaseStatusEditorRow
+				|| node == detPracticeAreaEditorRow;
+	}
+
+	private Button createDetailsInlineEditButton(Label label, Node editor) {
+		Button edit = new Button("✎");
+		edit.getStyleClass().add("case-overview-edit-button");
+		String field = label == null ? "field" : safeText(label.getText()).replace(":", "").trim();
+		edit.setTooltip(new Tooltip("Edit " + (field.isBlank() ? "field" : field)));
+		edit.setOnAction(e -> {
+			if (!detailsEditMode)
+				detailsEditor.beginEdit();
+			if (editor == detCaseStatusEditorRow) {
+				onDetailsChangeStatus();
+				return;
+			}
+			if (editor == detPracticeAreaEditorRow) {
+				onDetailsChangePracticeArea();
+				return;
+			}
+			if (editor instanceof javafx.scene.control.Control control) {
+				control.requestFocus();
+			}
+		});
+		return edit;
 	}
 
 	// ----------------------------
@@ -8037,7 +8124,7 @@ public class CaseController {
 
 		void setEditMode(boolean enabled) {
 			detailsEditMode = enabled;
-			setVisibleManaged(detailsEditButton, !enabled);
+			setVisibleManaged(detailsEditButton, false);
 			setVisibleManaged(detailsSaveButton, enabled);
 			setVisibleManaged(detailsCancelButton, enabled);
 
