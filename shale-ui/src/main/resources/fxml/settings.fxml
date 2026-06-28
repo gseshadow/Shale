@@ -73,15 +73,7 @@
                 <Label text="Case Statuses" styleClass="search-section-title"/>
                 <Label text="Manage the case statuses available for this tenant."
                        styleClass="search-summary-text" wrapText="true"/>
-                <TableView fx:id="caseStatusesTable" prefHeight="260">
-                    <columns>
-                        <TableColumn fx:id="statusNameColumn" text="Status name" prefWidth="180"/>
-                        <TableColumn fx:id="statusClosedColumn" text="Open/Closed" prefWidth="120"/>
-                        <TableColumn fx:id="statusSortOrderColumn" text="Sort Order" prefWidth="100"/>
-                        <TableColumn fx:id="statusLifecycleKeyColumn" text="Lifecycle Key" prefWidth="140"/>
-                        <TableColumn fx:id="statusSystemKeyColumn" text="System Key" prefWidth="140"/>
-                    </columns>
-                </TableView>
+                <VBox fx:id="caseStatusCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
                 <HBox fx:id="caseStatusActionRow" spacing="8">
                     <Label fx:id="caseStatusSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
@@ -95,14 +87,7 @@
                 <Label text="Practice Areas" styleClass="search-section-title"/>
                 <Label text="Manage the practice areas available for this tenant."
                        styleClass="search-summary-text" wrapText="true"/>
-                <TableView fx:id="practiceAreasTable" prefHeight="240">
-                    <columns>
-                        <TableColumn fx:id="practiceAreaNameColumn" text="Name" prefWidth="220"/>
-                        <TableColumn fx:id="practiceAreaColorColumn" text="Color" prefWidth="120"/>
-                        <TableColumn fx:id="practiceAreaActiveColumn" text="Active/Inactive" prefWidth="130"/>
-                        <TableColumn fx:id="practiceAreaSystemKeyColumn" text="System Key" prefWidth="160"/>
-                    </columns>
-                </TableView>
+                <VBox fx:id="practiceAreaCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
                 <HBox fx:id="practiceAreaActionRow" spacing="8">
                     <Label fx:id="practiceAreaSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
