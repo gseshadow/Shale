@@ -31,13 +31,6 @@
                 <Label fx:id="contactTitleLabel" text="Contact"
                     style="-fx-font-size: 18px; -fx-font-weight: bold;" />
                 <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="editButton" text="Edit">
-                    <styleClass>
-                        <String fx:value="button" />
-                        <String fx:value="app-toolbar-button" />
-                        <String fx:value="app-toolbar-button-neutral" />
-                    </styleClass>
-                </Button>
                 <Button fx:id="saveButton" text="Save" visible="false" managed="false">
                     <styleClass>
                         <String fx:value="button" />
@@ -92,50 +85,61 @@
 
                         <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
 
-                        <GridPane hgap="14" vgap="10" style="-fx-alignment: TOP_LEFT;">
+                        <GridPane hgap="14" vgap="0" styleClass="case-overview-rows">
                             <columnConstraints>
                                 <ColumnConstraints minWidth="160" prefWidth="180" />
                                 <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
+                                <ColumnConstraints minWidth="36" prefWidth="36" maxWidth="36" halignment="RIGHT" />
                             </columnConstraints>
 
-                            <Label text="Display Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
-                            <Label fx:id="displayNameValue" text="—" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+                            <Label text="Display Name" styleClass="case-overview-row-label" GridPane.rowIndex="0" />
+                            <Label fx:id="displayNameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+                            <Button fx:id="editDisplayNameButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="0" GridPane.columnIndex="2" />
 
-                            <Label text="Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
-                            <Label fx:id="nameValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+                            <Label text="Name" styleClass="case-overview-row-label" GridPane.rowIndex="1" />
+                            <Label fx:id="nameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="1" GridPane.columnIndex="1" />
                             <TextField fx:id="nameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+                            <Button fx:id="editNameButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="1" GridPane.columnIndex="2" />
 
-                            <Label text="First Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
-                            <Label fx:id="firstNameValue" text="—" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+                            <Label text="First Name" styleClass="case-overview-row-label" GridPane.rowIndex="2" />
+                            <Label fx:id="firstNameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="2" GridPane.columnIndex="1" />
                             <TextField fx:id="firstNameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+                            <Button fx:id="editFirstNameButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="2" GridPane.columnIndex="2" />
 
-                            <Label text="Last Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
-                            <Label fx:id="lastNameValue" text="—" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+                            <Label text="Last Name" styleClass="case-overview-row-label" GridPane.rowIndex="3" />
+                            <Label fx:id="lastNameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="3" GridPane.columnIndex="1" />
                             <TextField fx:id="lastNameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+                            <Button fx:id="editLastNameButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="3" GridPane.columnIndex="2" />
 
-                            <Label text="Email:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
-                            <Label fx:id="emailValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+                            <Label text="Email" styleClass="case-overview-row-label" GridPane.rowIndex="4" />
+                            <Label fx:id="emailValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="4" GridPane.columnIndex="1" />
                             <TextField fx:id="emailEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+                            <Button fx:id="editEmailButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="4" GridPane.columnIndex="2" />
 
-                            <Label text="Phone:" style="-fx-opacity: 0.8;" GridPane.rowIndex="5" />
-                            <Label fx:id="phoneValue" text="—" wrapText="true" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+                            <Label text="Phone" styleClass="case-overview-row-label" GridPane.rowIndex="5" />
+                            <Label fx:id="phoneValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="5" GridPane.columnIndex="1" />
                             <TextField fx:id="phoneEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+                            <Button fx:id="editPhoneButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="5" GridPane.columnIndex="2" />
 
-                            <Label text="Home Address:" style="-fx-opacity: 0.8;" GridPane.rowIndex="6" />
-                            <Label fx:id="addressHomeValue" text="—" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1" />
+                            <Label text="Home Address" styleClass="case-overview-row-label" GridPane.rowIndex="6" />
+                            <Label fx:id="addressHomeValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="6" GridPane.columnIndex="1" />
                             <TextArea fx:id="addressHomeEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="3" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1" />
+                            <Button fx:id="editAddressHomeButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="6" GridPane.columnIndex="2" />
 
-                            <Label text="Date of Birth:" style="-fx-opacity: 0.8;" GridPane.rowIndex="7" />
-                            <Label fx:id="dateOfBirthValue" text="—" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" />
+                            <Label text="Date of Birth" styleClass="case-overview-row-label" GridPane.rowIndex="7" />
+                            <Label fx:id="dateOfBirthValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="7" GridPane.columnIndex="1" />
                             <DatePicker fx:id="dateOfBirthEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="7" GridPane.columnIndex="1" />
+                            <Button fx:id="editDateOfBirthButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="7" GridPane.columnIndex="2" />
 
-                            <Label text="Condition:" style="-fx-opacity: 0.8;" GridPane.rowIndex="8" />
-                            <Label fx:id="conditionValue" text="—" wrapText="true" GridPane.rowIndex="8" GridPane.columnIndex="1" />
+                            <Label text="Condition" styleClass="case-overview-row-label" GridPane.rowIndex="8" />
+                            <Label fx:id="conditionValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="8" GridPane.columnIndex="1" />
                             <TextArea fx:id="conditionEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" GridPane.rowIndex="8" GridPane.columnIndex="1" />
+                            <Button fx:id="editConditionButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="8" GridPane.columnIndex="2" />
 
-                            <Label text="Deceased:" style="-fx-opacity: 0.8;" GridPane.rowIndex="9" />
-                            <Label fx:id="deceasedValue" text="—" wrapText="true" GridPane.rowIndex="9" GridPane.columnIndex="1" />
+                            <Label text="Deceased" styleClass="case-overview-row-label" GridPane.rowIndex="9" />
+                            <Label fx:id="deceasedValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="9" GridPane.columnIndex="1" />
                             <CheckBox fx:id="deceasedEditor" text="Is Deceased" visible="false" managed="false" GridPane.rowIndex="9" GridPane.columnIndex="1" />
+                            <Button fx:id="editDeceasedButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="9" GridPane.columnIndex="2" />
                         </GridPane>
                     </VBox>
 

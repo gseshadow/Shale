@@ -31,6 +31,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -67,6 +68,16 @@ public final class ContactViewController {
     @FXML private TextArea conditionEditor;
     @FXML private Label deceasedValue;
     @FXML private CheckBox deceasedEditor;
+    @FXML private Button editDisplayNameButton;
+    @FXML private Button editNameButton;
+    @FXML private Button editFirstNameButton;
+    @FXML private Button editLastNameButton;
+    @FXML private Button editEmailButton;
+    @FXML private Button editPhoneButton;
+    @FXML private Button editAddressHomeButton;
+    @FXML private Button editDateOfBirthButton;
+    @FXML private Button editConditionButton;
+    @FXML private Button editDeceasedButton;
 
     private int contactId;
     private ContactDetailService contactDetailService;
@@ -114,7 +125,9 @@ public final class ContactViewController {
     private void initialize() {
         if (editButton != null) {
             editButton.setOnAction(e -> onEdit());
+            setVisibleManaged(editButton, false);
         }
+        initializeInlineEditButtons();
         if (saveButton != null) {
             saveButton.setOnAction(e -> onSave());
         }
@@ -129,6 +142,47 @@ public final class ContactViewController {
         setEditMode(false);
         renderRelatedCases();
         Platform.runLater(this::loadContact);
+    }
+
+    private void initializeInlineEditButtons() {
+        configureInlineEditButton(editDisplayNameButton, "Display Name", nameEditor);
+        configureInlineEditButton(editNameButton, "Name", nameEditor);
+        configureInlineEditButton(editFirstNameButton, "First Name", firstNameEditor);
+        configureInlineEditButton(editLastNameButton, "Last Name", lastNameEditor);
+        configureInlineEditButton(editEmailButton, "Email", emailEditor);
+        configureInlineEditButton(editPhoneButton, "Phone", phoneEditor);
+        configureInlineEditButton(editAddressHomeButton, "Home Address", addressHomeEditor);
+        configureInlineEditButton(editDateOfBirthButton, "Date of Birth", dateOfBirthEditor);
+        configureInlineEditButton(editConditionButton, "Condition", conditionEditor);
+        configureInlineEditButton(editDeceasedButton, "Deceased", deceasedEditor);
+    }
+
+    private void configureInlineEditButton(Button button, String fieldLabel, Node editor) {
+        if (button == null) {
+            return;
+        }
+        button.setTooltip(new Tooltip("Edit " + fieldLabel));
+        button.setOnAction(e -> beginInlineEdit(editor));
+    }
+
+    private void beginInlineEdit(Node editor) {
+        if (!canEditContact()) {
+            setError("You do not have permission to edit this contact.");
+            return;
+        }
+        if (currentContact == null) {
+            setError("Contact details are unavailable.");
+            return;
+        }
+        if (!editMode) {
+            onEdit();
+        }
+        if (editor != null) {
+            editor.requestFocus();
+            if (editor instanceof TextInputControl textInput) {
+                textInput.selectAll();
+            }
+        }
     }
 
     private void loadContact() {
@@ -500,7 +554,7 @@ public final class ContactViewController {
     private void setEditMode(boolean enabled) {
         this.editMode = enabled && canEditContact();
 
-        setVisibleManaged(editButton, canEditContact() && !editMode);
+        setVisibleManaged(editButton, false);
         setVisibleManaged(saveButton, canEditContact() && editMode);
         setVisibleManaged(cancelButton, canEditContact() && editMode);
         refreshDeleteAction();
@@ -514,6 +568,7 @@ public final class ContactViewController {
         toggleField(dateOfBirthValue, dateOfBirthEditor, editMode);
         toggleField(conditionValue, conditionEditor, editMode);
         toggleField(deceasedValue, deceasedEditor, editMode);
+        setInlineEditButtonsDisabled(!canEditContact() || currentContact == null);
     }
 
     private void setBusy(boolean busy) {
@@ -528,6 +583,17 @@ public final class ContactViewController {
         }
         if (deleteContactButton != null) {
             deleteContactButton.setDisable(busy);
+        }
+        setInlineEditButtonsDisabled(busy || !canEditContact() || currentContact == null);
+    }
+
+    private void setInlineEditButtonsDisabled(boolean disabled) {
+        for (Button button : List.of(editDisplayNameButton, editNameButton, editFirstNameButton, editLastNameButton,
+                editEmailButton, editPhoneButton, editAddressHomeButton, editDateOfBirthButton, editConditionButton,
+                editDeceasedButton)) {
+            if (button != null) {
+                button.setDisable(disabled);
+            }
         }
     }
 
