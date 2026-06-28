@@ -90,6 +90,9 @@ public final class ContactDao {
             String responsibleAttorneyName,
             String responsibleAttorneyColor,
             Boolean nonEngagementLetterSent,
+            String primaryStatusName,
+            String primaryStatusColor,
+            String practiceAreaColor,
             String partyRoleName,
             String side,
             boolean primary,
@@ -424,6 +427,9 @@ public final class ContactDao {
                   c.Name,
                   c.CallerDate,
                   c.StatuteOfLimitations,
+                  current_status.CurrentStatusName,
+                  current_status.PrimaryStatusColor,
+                  pa.Color AS PracticeAreaColor,
                   pr.Name AS PartyRoleName,
                   cp.Side,
                   COALESCE(cp.IsPrimary, 0) AS IsPrimary,
@@ -440,6 +446,19 @@ public final class ContactDao {
                   ON c.Id = cp.CaseId
                 INNER JOIN dbo.PartyRoles pr
                   ON pr.Id = cp.PartyRoleId
+                LEFT JOIN dbo.PracticeAreas pa
+                  ON pa.Id = c.PracticeAreaId
+                OUTER APPLY (
+                    SELECT TOP (1) s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
+                    FROM dbo.CaseStatuses cs
+                    INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+                    WHERE cs.CaseId = c.Id
+                    ORDER BY
+                      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
+                      cs.UpdatedAt DESC,
+                      cs.CreatedAt DESC,
+                      cs.Id DESC
+                ) current_status
                 INNER JOIN dbo.Contacts ct
                   ON ct.Id = cp.ContactId
                 OUTER APPLY (
@@ -484,6 +503,9 @@ public final class ContactDao {
                                 rs.getString("ResponsibleAttorneyName"),
                                 rs.getString("ResponsibleAttorneyColor"),
                                 (Boolean) rs.getObject("NonEngagementLetterSent"),
+                                rs.getString("CurrentStatusName"),
+                                rs.getString("PrimaryStatusColor"),
+                                rs.getString("PracticeAreaColor"),
                                 rs.getString("PartyRoleName"),
                                 rs.getString("Side"),
                                 rs.getBoolean("IsPrimary"),

@@ -1029,10 +1029,14 @@ public final class UserController {
 				row.statuteOfLimitationsDate(),
 				row.responsibleAttorneyName(),
 				row.responsibleAttorneyColor(),
-				row.nonEngagementLetterSent()));
+				row.nonEngagementLetterSent(),
+				row.primaryStatusName(),
+				row.primaryStatusColor(),
+				row.practiceAreaColor()), CaseCardFactory.Variant.FULL);
 		if (card instanceof Region region) {
 			region.setMaxWidth(Double.MAX_VALUE);
-			region.setPrefWidth(340);
+			region.setPrefWidth(380);
+			region.setMaxWidth(420);
 		}
 		return card;
 	}
