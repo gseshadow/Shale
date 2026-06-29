@@ -207,7 +207,7 @@ public final class ApiReadController {
     public List<PracticeAreaDto> listPracticeAreas() {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         requireCurrentUserAdmin(shaleClientId);
-        return caseServicePort.listTenantPracticeAreas(shaleClientId, true);
+        return caseServicePort.listPracticeAreas(shaleClientId, true);
     }
 
     @Operation(summary = "List team members", description = "Returns visible users for the authenticated tenant.")
