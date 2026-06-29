@@ -221,8 +221,21 @@ export interface CaseDetail {
   statuteOfLimitations: string | null;
   tortNoticeDeadline: string | null;
   summary: string;
+  updatedAt: string | null;
+  rowVer: string;
   relatedContacts: CaseRelatedContact[];
   statusHistory: CaseStatusHistoryItem[];
+}
+
+export interface UpdateCaseCoreDetailsRequest {
+  name: string;
+  caseNumber: string | null;
+  description: string | null;
+  summary: string | null;
+  dateOfInjury: string | null;
+  statuteOfLimitations: string | null;
+  tortNoticeDeadline: string | null;
+  rowVer: string;
 }
 
 export class ApiError extends Error {
@@ -308,6 +321,15 @@ export async function searchCases(accessToken: string, query: string): Promise<C
 }
 
 
+async function parseApiError(response: Response, fallbackMessage: string): Promise<ApiError> {
+  try {
+    const payload = await response.json() as { message?: string };
+    return new ApiError(payload.message || fallbackMessage, response.status);
+  } catch {
+    return new ApiError(fallbackMessage, response.status);
+  }
+}
+
 export async function getCaseDetail(accessToken: string, caseId: number): Promise<CaseDetail> {
   const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}`, {
     method: 'GET',
@@ -328,6 +350,24 @@ export async function getCaseDetail(accessToken: string, caseId: number): Promis
   return response.json() as Promise<CaseDetail>;
 }
 
+
+export async function updateCaseCoreDetails(accessToken: string, caseId: number, request: UpdateCaseCoreDetailsRequest): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw await parseApiError(response, 'Shale could not save the case detail.');
+  }
+
+  return response.json() as Promise<CaseDetail>;
+}
 
 export async function listAssignedCases(accessToken: string): Promise<CaseSearchResult[]> {
   const response = await fetch(`${apiBaseUrl()}/api/cases/assigned`, {

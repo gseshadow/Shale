@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseCoreDetails, UpdateCaseCoreDetailsRequest } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1153,6 +1153,10 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
   const [updatesError, setUpdatesError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValues, setEditValues] = useState<CaseCoreEditValues | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(numericCaseId) || numericCaseId <= 0) {
@@ -1195,6 +1199,9 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
 
         if (caseResult.status === 'fulfilled') {
           setCaseDetail(caseResult.value);
+          setEditValues(caseCoreValuesFromDetail(caseResult.value));
+          setIsEditing(false);
+          setEditError(null);
         } else {
           setCaseDetail(null);
           setCaseTasks([]);
@@ -1228,6 +1235,54 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
     };
   }, [accessToken, numericCaseId]);
 
+  const handleEdit = () => {
+    if (!caseDetail) {
+      return;
+    }
+    setEditValues(caseCoreValuesFromDetail(caseDetail));
+    setEditError(null);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditValues(caseDetail ? caseCoreValuesFromDetail(caseDetail) : null);
+    setEditError(null);
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!accessToken || !caseDetail || !editValues) {
+      return;
+    }
+    const validationError = validateCaseCoreEdit(editValues);
+    if (validationError) {
+      setEditError(validationError);
+      return;
+    }
+    const request: UpdateCaseCoreDetailsRequest = {
+      name: editValues.caseName.trim(),
+      caseNumber: caseDetail.caseNumber,
+      description: normalizeEditableText(editValues.description),
+      summary: normalizeEditableText(editValues.summary),
+      dateOfInjury: normalizeEditableDate(editValues.dateOfInjury),
+      statuteOfLimitations: normalizeEditableDate(editValues.statuteOfLimitations),
+      tortNoticeDeadline: normalizeEditableDate(editValues.tortNoticeDeadline),
+      rowVer: caseDetail.rowVer,
+    };
+    setIsSaving(true);
+    setEditError(null);
+    try {
+      const updated = await updateCaseCoreDetails(accessToken, caseDetail.caseId, request);
+      setCaseDetail(updated);
+      setEditValues(caseCoreValuesFromDetail(updated));
+      setIsEditing(false);
+    } catch (saveError) {
+      setEditError(saveError instanceof Error ? saveError.message : 'Case detail could not be saved.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const title = caseDetail?.caseName || 'Case Detail';
 
   return (
@@ -1247,34 +1302,86 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
 
       {isLoading && <p className="status">Loading case detail…</p>}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} tasks={caseTasks} tasksError={tasksError} updates={caseUpdates} updatesError={updatesError} />}
+      {!isLoading && !error && caseDetail && (
+        <CaseDetailReadOnly
+          detail={caseDetail}
+          tasks={caseTasks}
+          tasksError={tasksError}
+          updates={caseUpdates}
+          updatesError={updatesError}
+          isEditing={isEditing}
+          editValues={editValues}
+          editError={editError}
+          isSaving={isSaving}
+          onEdit={handleEdit}
+          onCancelEdit={handleCancelEdit}
+          onSaveEdit={handleSaveEdit}
+          onEditValuesChange={setEditValues}
+        />
+      )}
     </section>
   );
 }
 
-function CaseDetailReadOnly({ detail, tasks, tasksError, updates, updatesError }: { detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null }) {
+interface CaseCoreEditValues {
+  caseName: string;
+  description: string;
+  summary: string;
+  dateOfInjury: string;
+  statuteOfLimitations: string;
+  tortNoticeDeadline: string;
+}
+
+function CaseDetailReadOnly({ detail, tasks, tasksError, updates, updatesError, isEditing, editValues, editError, isSaving, onEdit, onCancelEdit, onSaveEdit, onEditValuesChange }: { detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; isEditing: boolean; editValues: CaseCoreEditValues | null; editError: string | null; isSaving: boolean; onEdit: () => void; onCancelEdit: () => void; onSaveEdit: () => void; onEditValuesChange: (values: CaseCoreEditValues) => void }) {
+  const values = editValues ?? caseCoreValuesFromDetail(detail);
+  const updateField = (field: keyof CaseCoreEditValues, value: string) => onEditValuesChange({ ...values, [field]: value });
   return (
     <div className="detail-sections">
       <section aria-labelledby="case-info-title">
-        <h2 id="case-info-title">Case Information</h2>
-        <dl className="detail-list">
-          <DetailItem label="Case Name" value={detail.caseName} />
-          <DetailItem label="Case Number" value={detail.caseNumber} />
-          <DetailItem label="Status" value={detail.caseStatus} />
-          <DetailItem label="Practice Area" value={detail.practiceAreaId ? `Practice Area ID ${detail.practiceAreaId}` : null} />
-          <DetailItem label="Description" value={detail.description} preserveWhitespace />
-          <DetailItem label="Summary" value={detail.summary} preserveWhitespace />
-        </dl>
+        <div className="section-heading-row">
+          <h2 id="case-info-title">Case Information</h2>
+          {!isEditing ? <button className="button-link" type="button" onClick={onEdit}>Edit</button> : (
+            <div className="edit-actions">
+              <button className="button-link" type="button" onClick={onCancelEdit} disabled={isSaving}>Cancel</button>
+              <button className="button-link primary" type="button" onClick={onSaveEdit} disabled={isSaving}>{isSaving ? 'Saving…' : 'Save'}</button>
+            </div>
+          )}
+        </div>
+        {editError && <p className="status error" role="alert">{editError}</p>}
+        {!isEditing ? (
+          <dl className="detail-list">
+            <DetailItem label="Case Name" value={detail.caseName} />
+            <DetailItem label="Case Number" value={detail.caseNumber} />
+            <DetailItem label="Status" value={detail.caseStatus} />
+            <DetailItem label="Practice Area" value={detail.practiceAreaId ? `Practice Area ID ${detail.practiceAreaId}` : null} />
+            <DetailItem label="Description" value={detail.description} preserveWhitespace />
+            <DetailItem label="Summary" value={detail.summary} preserveWhitespace />
+          </dl>
+        ) : (
+          <div className="edit-form-grid">
+            <label>Case Name<input value={values.caseName} onChange={(event) => updateField('caseName', event.target.value)} disabled={isSaving} /></label>
+            <label>Description<textarea value={values.description} onChange={(event) => updateField('description', event.target.value)} disabled={isSaving} rows={4} /></label>
+            <label>Summary<textarea value={values.summary} onChange={(event) => updateField('summary', event.target.value)} disabled={isSaving} rows={4} /></label>
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="important-dates-title">
         <h2 id="important-dates-title">Important Dates</h2>
-        <dl className="detail-list compact">
-          <DetailItem label="Intake Date" value={formatDate(detail.callerDate)} />
-          <DetailItem label="Date of Injury" value={formatDate(detail.dateOfInjury)} />
-          <DetailItem label="Statute of Limitations" value={formatDate(detail.statuteOfLimitations)} />
-          <DetailItem label="Tort Notice Deadline" value={formatDate(detail.tortNoticeDeadline)} />
-        </dl>
+        {!isEditing ? (
+          <dl className="detail-list compact">
+            <DetailItem label="Intake Date" value={formatDate(detail.callerDate)} />
+            <DetailItem label="Date of Injury" value={formatDate(detail.dateOfInjury)} />
+            <DetailItem label="Statute of Limitations" value={formatDate(detail.statuteOfLimitations)} />
+            <DetailItem label="Tort Notice Deadline" value={formatDate(detail.tortNoticeDeadline)} />
+          </dl>
+        ) : (
+          <div className="edit-form-grid compact">
+            <label>Date of Injury<input type="date" value={values.dateOfInjury} onChange={(event) => updateField('dateOfInjury', event.target.value)} disabled={isSaving} /></label>
+            <label>Statute of Limitations<input type="date" value={values.statuteOfLimitations} onChange={(event) => updateField('statuteOfLimitations', event.target.value)} disabled={isSaving} /></label>
+            <label>Tort Notice Deadline<input type="date" value={values.tortNoticeDeadline} onChange={(event) => updateField('tortNoticeDeadline', event.target.value)} disabled={isSaving} /></label>
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="assignments-title">
@@ -1293,6 +1400,34 @@ function CaseDetailReadOnly({ detail, tasks, tasksError, updates, updatesError }
       <CaseUpdatesSection updates={updates} error={updatesError} />
     </div>
   );
+}
+
+function caseCoreValuesFromDetail(detail: CaseDetail): CaseCoreEditValues {
+  return {
+    caseName: detail.caseName ?? '',
+    description: detail.description ?? '',
+    summary: detail.summary ?? '',
+    dateOfInjury: detail.dateOfInjury ?? '',
+    statuteOfLimitations: detail.statuteOfLimitations ?? '',
+    tortNoticeDeadline: detail.tortNoticeDeadline ?? '',
+  };
+}
+
+function validateCaseCoreEdit(values: CaseCoreEditValues): string | null {
+  if (!values.caseName.trim()) {
+    return 'Case name is required.';
+  }
+  return null;
+}
+
+function normalizeEditableText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? value : null;
+}
+
+function normalizeEditableDate(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
 function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }) {

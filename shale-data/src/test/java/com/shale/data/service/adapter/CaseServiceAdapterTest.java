@@ -56,8 +56,8 @@ class CaseServiceAdapterTest {
 		byte[] rowVer = new byte[] {1, 2, 3};
 
 		CaseDetailDto actual = adapter.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
-				99, 42, 5, "Updated", "C-1", "description", LocalDate.of(2026, 1, 2),
-				LocalDate.of(2026, 2, 3), rowVer));
+				99, 42, 5, "Updated", "C-1", "description", "summary", LocalDate.of(2026, 1, 2),
+				LocalDate.of(2026, 2, 3), LocalDate.of(2026, 3, 4), rowVer));
 
 		assertSame(updated, actual);
 		assertEquals(99, gateway.lastUpdateCaseId);
@@ -65,7 +65,9 @@ class CaseServiceAdapterTest {
 		assertEquals("C-1", gateway.lastUpdateCaseNumber);
 		assertEquals("description", gateway.lastUpdateDescription);
 		assertEquals(LocalDate.of(2026, 1, 2), gateway.lastUpdateIncidentDate);
+		assertEquals("summary", gateway.lastUpdateSummary);
 		assertEquals(LocalDate.of(2026, 2, 3), gateway.lastUpdateSolDate);
+		assertEquals(LocalDate.of(2026, 3, 4), gateway.lastUpdateTortDate);
 		assertArrayEquals(rowVer, gateway.lastUpdateRowVer);
 		assertEquals(5, gateway.lastUpdateActorUserId);
 	}
@@ -136,6 +138,8 @@ class CaseServiceAdapterTest {
 		private String lastUpdateDescription;
 		private LocalDate lastUpdateIncidentDate;
 		private LocalDate lastUpdateSolDate;
+		private LocalDate lastUpdateTortDate;
+		private String lastUpdateSummary;
 		private byte[] lastUpdateRowVer;
 		private Integer lastUpdateActorUserId;
 
@@ -145,7 +149,7 @@ class CaseServiceAdapterTest {
 
 		@Override
 		public CaseDetailDto getDetail(long caseId) {
-			return null;
+			return detail(caseId, "Current");
 		}
 
 		@Override
@@ -226,14 +230,26 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
-		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId) {
+		public CaseDetailDto updateCaseDetails(long caseId, String name, String caseNumber, Integer practiceAreaId,
+				String description, LocalDate callerDate, String callerTime, LocalDate acceptedDate,
+				LocalDate closedDate, LocalDate deniedDate, LocalDate dateOfMedicalNegligence,
+				LocalDate dateMedicalNegligenceWasDiscovered, LocalDate dateOfInjury,
+				LocalDate statuteOfLimitations, LocalDate tortNoticeDeadline, LocalDate discoveryDeadline,
+				String clientEstate, String officePrinterCode, Boolean medicalRecordsReceived,
+				Boolean feeAgreementSigned, LocalDate dateFeeAgreementSigned, Boolean nonEngagementLetterSent,
+				LocalDate dateNonEngagementLetterSent, Boolean acceptedChronology,
+				Boolean acceptedConsultantExpertSearch, Boolean acceptedTestifyingExpertSearch,
+				Boolean acceptedMedicalLiterature, String acceptedDetail, Boolean deniedChronology,
+				String deniedDetail, String summary, String receivedUpdates, byte[] expectedRowVer,
+				Integer actorUserId) {
 			lastUpdateCaseId = caseId;
 			lastUpdateName = name;
 			lastUpdateCaseNumber = caseNumber;
 			lastUpdateDescription = description;
-			lastUpdateIncidentDate = incidentDate;
-			lastUpdateSolDate = solDate;
+			lastUpdateIncidentDate = dateOfInjury;
+			lastUpdateSolDate = statuteOfLimitations;
+			lastUpdateTortDate = tortNoticeDeadline;
+			lastUpdateSummary = summary;
 			lastUpdateRowVer = expectedRowVer;
 			lastUpdateActorUserId = actorUserId;
 			return updatedCase;

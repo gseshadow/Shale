@@ -186,13 +186,43 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override
 	public CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command) {
 		Objects.requireNonNull(command, "command");
-		return caseGateway.updateCase(
+		CaseDetailDto current = caseGateway.getDetail(command.caseId());
+		if (current == null) {
+			return null;
+		}
+		return caseGateway.updateCaseDetails(
 				command.caseId(),
 				command.caseName(),
 				command.caseNumber(),
+				current.getPracticeAreaId(),
 				command.description(),
+				current.getCallerDate(),
+				current.getCallerTime(),
+				current.getAcceptedDate(),
+				current.getClosedDate(),
+				current.getDeniedDate(),
+				current.getDateOfMedicalNegligence(),
+				current.getDateMedicalNegligenceWasDiscovered(),
 				command.dateOfInjury(),
 				command.statuteOfLimitations(),
+				command.tortNoticeDeadline(),
+				current.getDiscoveryDeadline(),
+				current.getClientEstate(),
+				current.getOfficePrinterCode(),
+				current.getMedicalRecordsReceived(),
+				current.getFeeAgreementSigned(),
+				current.getDateFeeAgreementSigned(),
+				current.getNonEngagementLetterSent(),
+				current.getDateNonEngagementLetterSent(),
+				current.getAcceptedChronology(),
+				current.getAcceptedConsultantExpertSearch(),
+				current.getAcceptedTestifyingExpertSearch(),
+				current.getAcceptedMedicalLiterature(),
+				current.getAcceptedDetail(),
+				current.getDeniedChronology(),
+				current.getDeniedDetail(),
+				command.summary(),
+				current.getReceivedUpdates(),
 				command.expectedRowVer(),
 				command.actorUserId());
 	}
@@ -231,8 +261,18 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
-		CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId);
+		CaseDetailDto updateCaseDetails(long caseId, String name, String caseNumber, Integer practiceAreaId,
+				String description, LocalDate callerDate, String callerTime, LocalDate acceptedDate,
+				LocalDate closedDate, LocalDate deniedDate, LocalDate dateOfMedicalNegligence,
+				LocalDate dateMedicalNegligenceWasDiscovered, LocalDate dateOfInjury,
+				LocalDate statuteOfLimitations, LocalDate tortNoticeDeadline, LocalDate discoveryDeadline,
+				String clientEstate, String officePrinterCode, Boolean medicalRecordsReceived,
+				Boolean feeAgreementSigned, LocalDate dateFeeAgreementSigned, Boolean nonEngagementLetterSent,
+				LocalDate dateNonEngagementLetterSent, Boolean acceptedChronology,
+				Boolean acceptedConsultantExpertSearch, Boolean acceptedTestifyingExpertSearch,
+				Boolean acceptedMedicalLiterature, String acceptedDetail, Boolean deniedChronology,
+				String deniedDetail, String summary, String receivedUpdates, byte[] expectedRowVer,
+				Integer actorUserId);
 	}
 
 	private record DaoCaseGateway(CaseDao caseDao) implements CaseGateway {
@@ -322,9 +362,26 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		}
 
 		@Override
-		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId) {
-			return caseDao.updateCase(caseId, name, caseNumber, description, incidentDate, solDate, expectedRowVer, actorUserId);
+		public CaseDetailDto updateCaseDetails(long caseId, String name, String caseNumber, Integer practiceAreaId,
+				String description, LocalDate callerDate, String callerTime, LocalDate acceptedDate,
+				LocalDate closedDate, LocalDate deniedDate, LocalDate dateOfMedicalNegligence,
+				LocalDate dateMedicalNegligenceWasDiscovered, LocalDate dateOfInjury,
+				LocalDate statuteOfLimitations, LocalDate tortNoticeDeadline, LocalDate discoveryDeadline,
+				String clientEstate, String officePrinterCode, Boolean medicalRecordsReceived,
+				Boolean feeAgreementSigned, LocalDate dateFeeAgreementSigned, Boolean nonEngagementLetterSent,
+				LocalDate dateNonEngagementLetterSent, Boolean acceptedChronology,
+				Boolean acceptedConsultantExpertSearch, Boolean acceptedTestifyingExpertSearch,
+				Boolean acceptedMedicalLiterature, String acceptedDetail, Boolean deniedChronology,
+				String deniedDetail, String summary, String receivedUpdates, byte[] expectedRowVer,
+				Integer actorUserId) {
+			return caseDao.updateCaseDetails(caseId, name, caseNumber, practiceAreaId, description, callerDate,
+					callerTime, acceptedDate, closedDate, deniedDate, dateOfMedicalNegligence,
+					dateMedicalNegligenceWasDiscovered, dateOfInjury, statuteOfLimitations,
+					tortNoticeDeadline, discoveryDeadline, clientEstate, officePrinterCode,
+					medicalRecordsReceived, feeAgreementSigned, dateFeeAgreementSigned, nonEngagementLetterSent,
+					dateNonEngagementLetterSent, acceptedChronology, acceptedConsultantExpertSearch,
+					acceptedTestifyingExpertSearch, acceptedMedicalLiterature, acceptedDetail, deniedChronology,
+					deniedDetail, summary, receivedUpdates, expectedRowVer, actorUserId);
 		}
 	}
 }

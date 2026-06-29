@@ -1,11 +1,16 @@
 package com.shale.server.controller;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.Base64;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -114,6 +119,31 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         return caseServicePort.getCaseDetail(safeCaseId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found."));
+    }
+
+    @Operation(summary = "Update case core details", description = "Updates the limited editable case detail fields for the authenticated tenant.")
+    @PatchMapping("/api/cases/{caseId:\\d+}")
+    public Object updateCaseCoreDetails(@PathVariable("caseId") long caseId, @RequestBody CaseCoreDetailsRequest request) {
+        long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
+        CaseCoreDetailsRequest safeRequest = requireValidCaseCoreDetails(request);
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        var updated = caseServicePort.updateCaseCoreDetails(new CaseServicePort.UpdateCaseCoreDetailsCommand(
+                safeCaseId,
+                shaleClientId,
+                userId,
+                safeRequest.name().trim(),
+                safeRequest.caseNumber(),
+                nullIfBlank(safeRequest.description()),
+                nullIfBlank(safeRequest.summary()),
+                parseDate(safeRequest.dateOfInjury(), "dateOfInjury"),
+                parseDate(safeRequest.statuteOfLimitations(), "statuteOfLimitations"),
+                parseDate(safeRequest.tortNoticeDeadline(), "tortNoticeDeadline"),
+                decodeRowVer(safeRequest.rowVer())));
+        if (updated == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Case was changed by another user. Refresh and try again.");
+        }
+        return updated;
     }
 
     @Operation(summary = "List case tasks", description = "Returns tasks for one tenant-scoped case.")
@@ -241,6 +271,71 @@ public final class ApiReadController {
         if (!currentUser.admin()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access is required.");
         }
+    }
+
+    private static CaseCoreDetailsRequest requireValidCaseCoreDetails(CaseCoreDetailsRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Case update body is required.");
+        }
+        if (request.name() == null || request.name().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Case name is required.");
+        }
+        requireMaxLength(request.name().trim(), 400, "Case name");
+        requireMaxLength(request.description(), 8000, "Description");
+        requireMaxLength(request.summary(), 8000, "Summary");
+        parseDate(request.dateOfInjury(), "dateOfInjury");
+        parseDate(request.statuteOfLimitations(), "statuteOfLimitations");
+        parseDate(request.tortNoticeDeadline(), "tortNoticeDeadline");
+        decodeRowVer(request.rowVer());
+        return request;
+    }
+
+    private static void requireMaxLength(String value, int maxLength, String fieldName) {
+        if (value != null && value.length() > maxLength) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " is too long.");
+        }
+    }
+
+    private static LocalDate parseDate(String value, String fieldName) {
+        String trimmed = value == null ? "" : value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(trimmed);
+        } catch (DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " must be an ISO date.");
+        }
+    }
+
+    private static byte[] decodeRowVer(String rowVer) {
+        if (rowVer == null || rowVer.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "rowVer is required.");
+        }
+        try {
+            byte[] decoded = Base64.getDecoder().decode(rowVer.trim());
+            if (decoded.length == 0) {
+                throw new IllegalArgumentException("empty row version");
+            }
+            return decoded;
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "rowVer is not valid.");
+        }
+    }
+
+    private static String nullIfBlank(String value) {
+        return value == null || value.trim().isEmpty() ? null : value;
+    }
+
+    public record CaseCoreDetailsRequest(
+            String name,
+            String caseNumber,
+            String description,
+            String summary,
+            String dateOfInjury,
+            String statuteOfLimitations,
+            String tortNoticeDeadline,
+            String rowVer) {
     }
 
     private static <T> List<T> slice(List<T> fetched, int page, int size) {

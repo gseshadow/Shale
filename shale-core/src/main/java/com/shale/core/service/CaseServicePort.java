@@ -98,8 +98,10 @@ public interface CaseServicePort {
 			String caseName,
 			String caseNumber,
 			String description,
+			String summary,
 			LocalDate dateOfInjury,
 			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
 			byte[] expectedRowVer) {
 	}
 }
