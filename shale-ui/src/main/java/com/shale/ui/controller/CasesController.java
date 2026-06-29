@@ -1,5 +1,10 @@
 package com.shale.ui.controller;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -11,6 +16,14 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CreationHelper;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.data.dao.CaseDao;
@@ -55,6 +68,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
@@ -81,7 +95,23 @@ public final class CasesController {
 	@FXML
 	private MenuButton columnMenuButton;
 	@FXML
+	private MenuButton exportMenuButton;
+	@FXML
 	private TableView<CaseCardVm> casesTable;
+
+	private static final List<ExportColumn> EXPORT_COLUMNS = List.of(
+			new ExportColumn("Case Name", vm -> vm.name),
+			new ExportColumn("Client", vm -> vm.clientName),
+			new ExportColumn("Intake Date / Caller Date", vm -> formatDate(vm.intakeDate)),
+			new ExportColumn("Case Status", vm -> vm.primaryStatusName),
+			new ExportColumn("Opposing Parties", vm -> vm.opposingPartiesName),
+			new ExportColumn("Latest Case Update", vm -> vm.latestCaseUpdate),
+			new ExportColumn("Description", vm -> vm.description),
+			new ExportColumn("Date of Incident", vm -> formatDate(vm.dateOfIncident)),
+			new ExportColumn("Statute of Limitations", vm -> formatDate(vm.solDate)),
+			new ExportColumn("Tort Claims Notice Deadline", vm -> formatDate(vm.tortClaimsNoticeDeadline)),
+			new ExportColumn("Responsible Attorney", vm -> vm.responsibleAttorney)
+	);
 
 	// NEW: FlowPane layout (add these IDs in FXML)
 	@FXML
@@ -187,6 +217,7 @@ public final class CasesController {
 		initializeGridColumns();
 		initializeGridRowActions();
 		initializeStatusFilter();
+		initializeExportMenu();
 
 		Platform.runLater(() ->
 		{
@@ -208,6 +239,15 @@ public final class CasesController {
 		}
 
 		subscribeLiveCaseUpdates();
+	}
+
+	private void initializeExportMenu() {
+		if (exportMenuButton == null) return;
+		MenuItem exportXlsx = new MenuItem("Export to .xlsx");
+		exportXlsx.setOnAction(e -> exportCases(ExportFormat.XLSX));
+		MenuItem exportCsv = new MenuItem("Export to .csv");
+		exportCsv.setOnAction(e -> exportCases(ExportFormat.CSV));
+		exportMenuButton.getItems().setAll(exportXlsx, exportCsv);
 	}
 
 	private void initializeViewToggle() {
@@ -436,6 +476,126 @@ public final class CasesController {
 	private void showActionError(String message) {
 		Alert alert = new Alert(Alert.AlertType.ERROR, message);
 		alert.initOwner(dialogOwner());
+		alert.showAndWait();
+	}
+
+	private void exportCases(ExportFormat format) {
+		List<CaseCardVm> rows = currentExportRows();
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle(format == ExportFormat.XLSX ? "Export Cases to XLSX" : "Export Cases to CSV");
+		chooser.setInitialFileName(format == ExportFormat.XLSX ? "cases-export.xlsx" : "cases-export.csv");
+		FileChooser.ExtensionFilter filter = format == ExportFormat.XLSX
+				? new FileChooser.ExtensionFilter("Excel Workbook (*.xlsx)", "*.xlsx")
+				: new FileChooser.ExtensionFilter("CSV UTF-8 (*.csv)", "*.csv");
+		chooser.getExtensionFilters().setAll(filter);
+		File file = chooser.showSaveDialog(dialogOwner());
+		if (file == null) {
+			return;
+		}
+
+		try {
+			if (format == ExportFormat.XLSX) {
+				writeXlsx(file, rows);
+			} else {
+				writeCsv(file, rows);
+			}
+			showExportSuccess(file);
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			showExportError(file, ex);
+		}
+	}
+
+	private List<CaseCardVm> currentExportRows() {
+		if (isGridViewActive() && casesTable != null && casesTable.getItems() != null) {
+			return List.copyOf(casesTable.getItems());
+		}
+		return List.copyOf(loaded);
+	}
+
+	private void writeCsv(File file, List<CaseCardVm> rows) throws IOException {
+		try (BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
+			writeCsvLine(writer, EXPORT_COLUMNS.stream().map(ExportColumn::header).toList());
+			for (CaseCardVm row : rows) {
+				writeCsvLine(writer, EXPORT_COLUMNS.stream().map(column -> column.value(row)).toList());
+			}
+		}
+	}
+
+	private void writeCsvLine(BufferedWriter writer, List<String> values) throws IOException {
+		for (int i = 0; i < values.size(); i++) {
+			if (i > 0) {
+				writer.write(',');
+			}
+			writer.write(escapeCsv(values.get(i)));
+		}
+		writer.newLine();
+	}
+
+	private static String escapeCsv(String value) {
+		String safeValue = safe(value);
+		boolean needsQuotes = safeValue.indexOf(',') >= 0
+				|| safeValue.indexOf('"') >= 0
+				|| safeValue.indexOf('\n') >= 0
+				|| safeValue.indexOf('\r') >= 0;
+		if (!needsQuotes) {
+			return safeValue;
+		}
+		return "\"" + safeValue.replace("\"", "\"\"") + "\"";
+	}
+
+	private void writeXlsx(File file, List<CaseCardVm> rows) throws IOException {
+		try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+			Sheet sheet = workbook.createSheet("Cases");
+			CreationHelper creationHelper = workbook.getCreationHelper();
+			CellStyle headerStyle = workbook.createCellStyle();
+			Font headerFont = workbook.createFont();
+			headerFont.setBold(true);
+			headerStyle.setFont(headerFont);
+			CellStyle textStyle = workbook.createCellStyle();
+			textStyle.setDataFormat(creationHelper.createDataFormat().getFormat("@"));
+
+			Row header = sheet.createRow(0);
+			for (int columnIndex = 0; columnIndex < EXPORT_COLUMNS.size(); columnIndex++) {
+				Cell cell = header.createCell(columnIndex);
+				cell.setCellValue(EXPORT_COLUMNS.get(columnIndex).header());
+				cell.setCellStyle(headerStyle);
+			}
+
+			for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+				Row sheetRow = sheet.createRow(rowIndex + 1);
+				CaseCardVm vm = rows.get(rowIndex);
+				for (int columnIndex = 0; columnIndex < EXPORT_COLUMNS.size(); columnIndex++) {
+					Cell cell = sheetRow.createCell(columnIndex);
+					cell.setCellStyle(textStyle);
+					cell.setCellValue(EXPORT_COLUMNS.get(columnIndex).value(vm));
+				}
+			}
+
+			for (int columnIndex = 0; columnIndex < EXPORT_COLUMNS.size(); columnIndex++) {
+				sheet.autoSizeColumn(columnIndex);
+			}
+
+			try (var output = Files.newOutputStream(file.toPath())) {
+				workbook.write(output);
+			}
+		}
+	}
+
+	private void showExportSuccess(File file) {
+		Alert alert = new Alert(Alert.AlertType.INFORMATION, "Cases exported to:\n" + file.getAbsolutePath());
+		alert.initOwner(dialogOwner());
+		alert.setTitle("Export Complete");
+		alert.setHeaderText("Export complete");
+		alert.showAndWait();
+	}
+
+	private void showExportError(File file, Exception ex) {
+		Alert alert = new Alert(Alert.AlertType.ERROR, "Unable to export cases to:\n" + file.getAbsolutePath()
+				+ "\n\n" + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
+		alert.initOwner(dialogOwner());
+		alert.setTitle("Export Failed");
+		alert.setHeaderText("Export failed");
 		alert.showAndWait();
 	}
 
@@ -1014,6 +1174,17 @@ public final class CasesController {
 
 	private static String safe(String s) {
 		return s == null ? "" : s;
+	}
+
+	private enum ExportFormat {
+		XLSX,
+		CSV
+	}
+
+	private record ExportColumn(String header, java.util.function.Function<CaseCardVm, String> valueFactory) {
+		String value(CaseCardVm vm) {
+			return safe(valueFactory.apply(vm));
+		}
 	}
 
 	// Simple view-model for the card (keeps rendering logic separate from DAO record)
