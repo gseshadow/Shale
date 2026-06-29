@@ -242,7 +242,7 @@ function SettingsPage({ accessToken, user }: { accessToken: string | null; user:
     return () => {
       isCurrent = false;
     };
-  }, [accessToken, user?.isAdmin]);
+  }, [accessToken, user?.isAdmin, user?.shaleClientId]);
 
   return (
     <section className="settings-page">

@@ -71,6 +71,27 @@ class CaseServiceAdapterTest {
 	}
 
 	@Test
+	void listPracticeAreasReturnsEffectiveTenantOverlayOnly() {
+		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
+		gateway.practiceAreas = List.of(
+				new PracticeAreaDto(101, "Medical Malpractice", "#111111", true, false, "medical_malpractice", null),
+				new PracticeAreaDto(102, "Personal Injury", "#222222", true, false, "personal_injury", null),
+				new PracticeAreaDto(103, "Sexual Assault", "#333333", true, false, "sexual_assault", null),
+				new PracticeAreaDto(201, "Tenant Medical", "#aaaaaa", true, false, " medical_malpractice ", 7),
+				new PracticeAreaDto(202, "Tenant Personal", "#bbbbbb", true, false, "personal_injury", 7),
+				new PracticeAreaDto(203, "Other Tenant Sexual", "#cccccc", true, false, "sexual_assault", 8));
+		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
+
+		List<PracticeAreaDto> actual = adapter.listPracticeAreas(7, true);
+
+		assertEquals(List.of(103, 201, 202), actual.stream().map(PracticeAreaDto::id).sorted().toList());
+		assertEquals(List.of(), actual.stream()
+				.filter(area -> area.shaleClientId() != null && area.shaleClientId() != 7)
+				.map(PracticeAreaDto::id)
+				.toList());
+	}
+
+	@Test
 	void caseStatusCommandsDelegateRealStatusColumns() {
 		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
 		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
@@ -108,6 +129,7 @@ class CaseServiceAdapterTest {
 		private String lastNoteText;
 		private Integer lastNoteCreatedByUserId;
 		private CaseDetailDto updatedCase;
+		private List<PracticeAreaDto> practiceAreas = List.of();
 		private long lastUpdateCaseId;
 		private String lastUpdateName;
 		private String lastUpdateCaseNumber;
@@ -159,7 +181,7 @@ class CaseServiceAdapterTest {
 
 		@Override
 		public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
-			return List.of();
+			return practiceAreas;
 		}
 
 		@Override

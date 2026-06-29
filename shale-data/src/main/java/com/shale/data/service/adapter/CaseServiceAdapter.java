@@ -1,7 +1,12 @@
 package com.shale.data.service.adapter;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -77,7 +82,53 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 	@Override
 	public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {
-		return caseGateway.listPracticeAreas(shaleClientId, includeInactive);
+		return resolveEffectivePracticeAreas(caseGateway.listPracticeAreas(shaleClientId, includeInactive), shaleClientId);
+	}
+
+	static List<PracticeAreaDto> resolveEffectivePracticeAreas(List<PracticeAreaDto> rows, int shaleClientId) {
+		if (rows == null || rows.isEmpty() || shaleClientId <= 0) {
+			return List.of();
+		}
+
+		Map<String, PracticeAreaDto> keyed = new LinkedHashMap<>();
+		List<PracticeAreaDto> unkeyed = new ArrayList<>();
+		for (PracticeAreaDto area : rows) {
+			if (area == null) {
+				continue;
+			}
+			Integer areaTenantId = area.shaleClientId();
+			if (areaTenantId != null && areaTenantId != shaleClientId) {
+				continue;
+			}
+
+			String systemKey = normalizeSystemKey(area.systemKey());
+			if (systemKey == null) {
+				unkeyed.add(area);
+				continue;
+			}
+
+			PracticeAreaDto existing = keyed.get(systemKey);
+			boolean tenantRow = areaTenantId != null && areaTenantId == shaleClientId;
+			boolean existingTenantRow = existing != null
+					&& existing.shaleClientId() != null
+					&& existing.shaleClientId() == shaleClientId;
+			if (existing == null || (tenantRow && !existingTenantRow)) {
+				keyed.put(systemKey, area);
+			}
+		}
+
+		List<PracticeAreaDto> effective = new ArrayList<>(keyed.size() + unkeyed.size());
+		effective.addAll(keyed.values());
+		effective.addAll(unkeyed);
+		effective.sort(Comparator
+				.comparing((PracticeAreaDto area) -> area.name() == null ? "" : area.name(), String.CASE_INSENSITIVE_ORDER)
+				.thenComparingInt(PracticeAreaDto::id));
+		return List.copyOf(effective);
+	}
+
+	private static String normalizeSystemKey(String systemKey) {
+		String normalized = systemKey == null ? "" : systemKey.trim().toLowerCase(Locale.ROOT);
+		return normalized.isBlank() ? null : normalized;
 	}
 
 	@Override
