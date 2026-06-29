@@ -141,7 +141,7 @@ function AppRoutes() {
         element={authState.user ? <Navigate to="/my-shale" replace /> : <LoginPage isVerifying={authState.isVerifying} onLogin={handleLogin} />}
       />
       <Route element={<ProtectedRoute authState={authState} />}>
-        <Route element={<AuthenticatedShell user={authState.user} onLogout={handleLogout} />}>
+        <Route element={<AppShell user={authState.user} onLogout={handleLogout} />}>
           <Route path="/my-shale" element={<MyShalePage accessToken={authState.accessToken} user={authState.user} />} />
           <Route path="/cases" element={<CasesPage accessToken={authState.accessToken} />} />
           <Route path="/cases/:caseId" element={<CaseDetailPage accessToken={authState.accessToken} />} />
@@ -439,7 +439,7 @@ function redirectPathFrom(state: unknown): string {
   return typeof pathname === 'string' ? pathname : '/my-shale';
 }
 
-function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
+function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
   const location = useLocation();
 
   if (!user) {
@@ -454,13 +454,7 @@ function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null
           <span>Shale</span>
         </div>
         <span className="beta-badge">Read-only beta</span>
-        <nav className="nav-list">
-          {navigationItems.map((item) => (
-            <Link key={item.path} to={item.path} className={item.activePrefixes.some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`)) ? 'nav-link active' : 'nav-link'}>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <PrimaryNavigation locationPathname={location.pathname} />
       </aside>
 
       <div className="content-column">
@@ -473,10 +467,28 @@ function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null
           <button type="button" onClick={onLogout}>Logout</button>
         </header>
         <main className="page-content">
-          <Outlet />
+          <div className="content-container">
+            <Outlet />
+          </div>
         </main>
+        <PrimaryNavigation locationPathname={location.pathname} variant="mobile" />
       </div>
     </div>
+  );
+}
+
+function PrimaryNavigation({ locationPathname, variant = 'sidebar' }: { locationPathname: string; variant?: 'sidebar' | 'mobile' }) {
+  return (
+    <nav className={variant === 'mobile' ? 'mobile-nav-list' : 'nav-list'} aria-label={variant === 'mobile' ? 'Primary mobile navigation' : undefined}>
+      {navigationItems.map((item) => {
+        const isActive = item.activePrefixes.some((prefix) => locationPathname === prefix || locationPathname.startsWith(`${prefix}/`));
+        return (
+          <Link key={item.path} to={item.path} className={isActive ? 'nav-link active' : 'nav-link'} aria-current={isActive ? 'page' : undefined}>
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
