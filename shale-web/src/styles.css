@@ -526,3 +526,61 @@ input:focus-visible {
     align-items: end;
   }
 }
+
+.section-heading-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  justify-content: space-between;
+}
+
+.section-heading-row h2 {
+  margin-bottom: 0;
+}
+
+.case-update-form {
+  background: #f7fbfe;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  margin-bottom: 1rem;
+  padding: clamp(1rem, 4vw, 1.25rem);
+}
+
+textarea {
+  border: 1px solid #c9d4df;
+  border-radius: 14px;
+  font: inherit;
+  line-height: 1.55;
+  min-height: 9rem;
+  min-width: 0;
+  padding: .9rem 1rem;
+  resize: vertical;
+  width: 100%;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+.button-link:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+
+@media (max-width: 640px) {
+  .section-heading-row,
+  .form-actions {
+    display: grid;
+  }
+
+  .section-heading-row button,
+  .form-actions button {
+    width: 100%;
+  }
+}
