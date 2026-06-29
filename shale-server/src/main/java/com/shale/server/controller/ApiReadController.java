@@ -1,5 +1,8 @@
 package com.shale.server.controller;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -28,6 +31,7 @@ import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.OrganizationServicePort.OrganizationDetail;
 import com.shale.core.service.OrganizationServicePort.OrganizationSummary;
 import com.shale.core.service.TaskServicePort;
+import com.shale.core.service.TaskServicePort.CreateTaskCommand;
 import com.shale.core.service.UserServicePort;
 import com.shale.core.service.UserServicePort.UserDetail;
 import com.shale.core.service.UserServicePort.UserSummary;
@@ -43,6 +47,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @SecurityRequirement(name = "bearerAuth")
 public final class ApiReadController {
     public record AddCaseUpdateRequest(String noteText) {
+    }
+
+    public record CreateCaseTaskRequest(String title, String description, String dueDate) {
     }
 
     private static final int DEFAULT_SEARCH_LIMIT = 25;
@@ -127,6 +134,30 @@ public final class ApiReadController {
     public List<CaseTaskListItemDto> listCaseTasks(@PathVariable("caseId") long caseId) {
         long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
         int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return taskServicePort.listCaseTasks(safeCaseId, shaleClientId);
+    }
+
+
+    @Operation(summary = "Create case task", description = "Creates a task linked to one tenant-scoped case using the authenticated user as creator.")
+    @PostMapping("/api/cases/{caseId:\\d+}/tasks")
+    public List<CaseTaskListItemDto> createCaseTask(
+            @PathVariable("caseId") long caseId,
+            @RequestBody CreateCaseTaskRequest request) {
+        long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
+        String title = ApiValidation.taskTitle(request == null ? null : request.title());
+        String description = ApiValidation.optionalTaskDescription(request == null ? null : request.description());
+        LocalDateTime dueAt = parseOptionalDueDate(request == null ? null : request.dueDate());
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        taskServicePort.createTaskWithDefaultStatus(new CreateTaskCommand(
+                safeCaseId,
+                shaleClientId,
+                userId,
+                title,
+                description,
+                dueAt,
+                null,
+                null));
         return taskServicePort.listCaseTasks(safeCaseId, shaleClientId);
     }
 
@@ -252,6 +283,18 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         return notificationServicePort.listUnreadNotifications(shaleClientId, userId);
+    }
+
+    private static LocalDateTime parseOptionalDueDate(String dueDate) {
+        String safeDueDate = ApiValidation.optionalDateText(dueDate, "dueDate");
+        if (safeDueDate == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(safeDueDate).atStartOfDay();
+        } catch (DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Due date must use YYYY-MM-DD format.");
+        }
     }
 
     private void requireCurrentUserAdmin(int shaleClientId) {

@@ -12,6 +12,8 @@ final class ApiValidation {
     private static final int MAX_EMAIL_LENGTH = 254;
     private static final int MAX_PASSWORD_LENGTH = 1024;
     private static final int MAX_NOTE_TEXT_LENGTH = 10_000;
+    private static final int MAX_TASK_TITLE_LENGTH = 255;
+    private static final int MAX_TASK_DESCRIPTION_LENGTH = 10_000;
 
     private ApiValidation() {
     }
@@ -47,6 +49,39 @@ final class ApiValidation {
             throw badRequest("Note text must be 10000 characters or fewer.");
         }
         return safeNoteText;
+    }
+
+    static String taskTitle(String title) {
+        String safeTitle = title == null ? "" : title.trim();
+        if (safeTitle.isEmpty()) {
+            throw badRequest("Task title is required.");
+        }
+        if (safeTitle.length() > MAX_TASK_TITLE_LENGTH) {
+            throw badRequest("Task title must be 255 characters or fewer.");
+        }
+        return safeTitle;
+    }
+
+    static String optionalTaskDescription(String description) {
+        String safeDescription = description == null ? "" : description.trim();
+        if (safeDescription.isEmpty()) {
+            return null;
+        }
+        if (safeDescription.length() > MAX_TASK_DESCRIPTION_LENGTH) {
+            throw badRequest("Task description must be 10000 characters or fewer.");
+        }
+        return safeDescription;
+    }
+
+    static String optionalDateText(String dateText, String fieldName) {
+        String safeDateText = dateText == null ? "" : dateText.trim();
+        if (safeDateText.isEmpty()) {
+            return null;
+        }
+        if (!safeDateText.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            throw badRequest(fieldName + " must use YYYY-MM-DD format.");
+        }
+        return safeDateText;
     }
 
     static long positiveId(long id, String fieldName) {
