@@ -161,6 +161,45 @@ function AppRoutes() {
   );
 }
 
+function normalizeSettingsKey(value: string | null | undefined): string | null {
+  const normalized = (value ?? '').trim().toLowerCase();
+  return normalized || null;
+}
+
+function practiceAreaLogicalKey(area: PracticeAreaSetting): string {
+  const systemKey = normalizeSettingsKey(area.systemKey);
+  if (systemKey) {
+    return `system:${systemKey}`;
+  }
+
+  const nameKey = normalizeSettingsKey(area.name);
+  return nameKey ? `name:${nameKey}` : `id:${area.id}`;
+}
+
+function mergeEffectivePracticeAreas(rows: PracticeAreaSetting[], shaleClientId: number): PracticeAreaSetting[] {
+  const byLogicalKey = new Map<string, PracticeAreaSetting>();
+
+  for (const area of rows) {
+    if (area.shaleClientId !== null && area.shaleClientId !== shaleClientId) {
+      continue;
+    }
+
+    const key = practiceAreaLogicalKey(area);
+    const existing = byLogicalKey.get(key);
+    const isTenantRow = area.shaleClientId === shaleClientId;
+    const existingIsTenantRow = existing?.shaleClientId === shaleClientId;
+
+    if (!existing || (isTenantRow && !existingIsTenantRow)) {
+      byLogicalKey.set(key, area);
+    }
+  }
+
+  return Array.from(byLogicalKey.values()).sort((left, right) => {
+    const byName = (left.name ?? '').localeCompare(right.name ?? '', undefined, { sensitivity: 'base' });
+    return byName || left.id - right.id;
+  });
+}
+
 
 function SettingsPage({ accessToken, user }: { accessToken: string | null; user: AuthenticatedUser | null }) {
   const [caseStatuses, setCaseStatuses] = useState<CaseStatusSetting[]>([]);
@@ -184,7 +223,7 @@ function SettingsPage({ accessToken, user }: { accessToken: string | null; user:
       .then(([statusRows, practiceAreaRows]) => {
         if (isCurrent) {
           setCaseStatuses(statusRows);
-          setPracticeAreas(practiceAreaRows);
+          setPracticeAreas(mergeEffectivePracticeAreas(practiceAreaRows, user.shaleClientId));
         }
       })
       .catch((caught) => {
