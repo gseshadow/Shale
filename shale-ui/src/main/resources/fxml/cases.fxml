@@ -41,6 +41,13 @@
 							<String fx:value="app-toolbar-button-neutral" />
 						</styleClass>
 					</MenuButton>
+					<MenuButton fx:id="exportMenuButton" text="Export...">
+						<styleClass>
+							<String fx:value="menu-button" />
+							<String fx:value="app-toolbar-button" />
+							<String fx:value="app-toolbar-button-neutral" />
+						</styleClass>
+					</MenuButton>
 				</HBox>
 			</left>
 			<right>
