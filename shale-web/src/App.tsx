@@ -420,6 +420,39 @@ function EntityCard({ title, subtitle, eyebrow, badges, metadata, onClick, ariaL
   );
 }
 
+
+function BackLink({ to, children, ariaLabel }: { to: string; children: ReactNode; ariaLabel?: string }) {
+  return <Link className="back-link" to={to} aria-label={ariaLabel}>{children}</Link>;
+}
+
+function DetailShell({ children, className, titleId }: { children: ReactNode; className: string; titleId: string }) {
+  return <section className={`detail-shell ${className}`} aria-labelledby={titleId}>{children}</section>;
+}
+
+function DetailHeader({ eyebrow, title, titleId, backTo, backLabel, children }: { eyebrow: string; title: string; titleId: string; backTo: string; backLabel: string; children?: ReactNode }) {
+  return (
+    <header className="detail-header">
+      <BackLink to={backTo} ariaLabel={backLabel}>{backLabel}</BackLink>
+      <div className="detail-header-main">
+        <div className="detail-title-block">
+          <p className="eyebrow">{eyebrow}</p>
+          <h1 id={titleId}>{title}</h1>
+        </div>
+        {children && <div className="detail-header-meta">{children}</div>}
+      </div>
+    </header>
+  );
+}
+
+function DetailSection({ title, titleId, children, className }: { title: string; titleId: string; children: ReactNode; className?: string }) {
+  return (
+    <section className={className ? `detail-section ${className}` : 'detail-section'} aria-labelledby={titleId}>
+      <h2 id={titleId}>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
 function ProtectedRoute({ authState }: { authState: AuthState }) {
   const location = useLocation();
 
@@ -1071,14 +1104,13 @@ function TeamMemberDetailPage({ accessToken }: { accessToken: string | null }) {
   const title = member ? teamMemberName(member) : 'Team Member Detail';
 
   return (
-    <section className="team-member-detail-page" aria-labelledby="team-member-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb"><Link to="/team">Team</Link><span aria-hidden="true">›</span><span>{title}</span></nav>
-      <div className="page-heading-row"><div><p className="eyebrow">Team Member Detail</p><h1 id="team-member-detail-title">{title}</h1></div><Link className="button-link" to="/team">Back to Team</Link></div>
+    <DetailShell className="team-member-detail-page" titleId="team-member-detail-title">
+      <DetailHeader eyebrow="Team Member Detail" title={title} titleId="team-member-detail-title" backTo="/team" backLabel="Back to Team" />
       {isLoading && <p className="status">Loading team member detail…</p>}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !member && <p className="status">No team member detail was found.</p>}
       {!isLoading && !error && member && <TeamMemberReadOnly member={member} />}
-    </section>
+    </DetailShell>
   );
 }
 
@@ -1159,25 +1191,14 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
   const title = taskDetail?.title || 'Task Detail';
 
   return (
-    <section className="task-detail-page" aria-labelledby="task-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to="/my-shale">My Shale</Link>
-        <span aria-hidden="true">›</span>
-        <span>{title}</span>
-      </nav>
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">Task Detail</p>
-          <h1 id="task-detail-title">{title}</h1>
-        </div>
-        <Link className="button-link" to="/my-shale">Back to My Shale</Link>
-      </div>
+    <DetailShell className="task-detail-page" titleId="task-detail-title">
+      <DetailHeader eyebrow="Task Detail" title={title} titleId="task-detail-title" backTo="/my-shale" backLabel="Back to My Shale" />
 
       {isLoading && <p className="status">Loading task detail…</p>}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !taskDetail && <p className="status">No task detail was found.</p>}
       {!isLoading && !error && taskDetail && <TaskDetailReadOnly detail={taskDetail} />}
-    </section>
+    </DetailShell>
   );
 }
 
@@ -1299,24 +1320,15 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
   const title = caseDetail?.caseName || 'Case Detail';
 
   return (
-    <section className="case-detail-page" aria-labelledby="case-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to="/cases">Cases</Link>
-        <span aria-hidden="true">›</span>
-        <span>{title}</span>
-      </nav>
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">Case Detail</p>
-          <h1 id="case-detail-title">{title}</h1>
-        </div>
-        <Link className="button-link" to="/cases">Back to Cases</Link>
-      </div>
+    <DetailShell className="case-detail-page" titleId="case-detail-title">
+      <DetailHeader eyebrow="Case Detail" title={title} titleId="case-detail-title" backTo="/cases" backLabel="Back to Cases">
+        {caseDetail?.caseStatus && <StatusPill tone="info">{caseDetail.caseStatus}</StatusPill>}
+      </DetailHeader>
 
       {isLoading && <p className="status">Loading case detail…</p>}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} tasks={caseTasks} tasksError={tasksError} updates={caseUpdates} updatesError={updatesError} />}
-    </section>
+    </DetailShell>
   );
 }
 
@@ -1534,25 +1546,14 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
   const title = contactDetail?.displayName || 'Contact Detail';
 
   return (
-    <section className="contact-detail-page" aria-labelledby="contact-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to="/contacts">Contacts</Link>
-        <span aria-hidden="true">›</span>
-        <span>{title}</span>
-      </nav>
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">Contact Detail</p>
-          <h1 id="contact-detail-title">{title}</h1>
-        </div>
-        <Link className="button-link" to="/contacts">Back to Contacts</Link>
-      </div>
+    <DetailShell className="contact-detail-page" titleId="contact-detail-title">
+      <DetailHeader eyebrow="Contact Detail" title={title} titleId="contact-detail-title" backTo="/contacts" backLabel="Back to Contacts" />
 
       {isLoading && <p className="status">Loading contact detail…</p>}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !contactDetail && <p className="status">No contact detail was found.</p>}
       {!isLoading && !error && contactDetail && <ContactDetailReadOnly detail={contactDetail} />}
-    </section>
+    </DetailShell>
   );
 }
 
@@ -1615,14 +1616,13 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
   const title = organizationDetail?.name || 'Organization Detail';
 
   return (
-    <section className="organization-detail-page" aria-labelledby="organization-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb"><Link to="/organizations">Organizations</Link><span aria-hidden="true">›</span><span>{title}</span></nav>
-      <div className="page-heading-row"><div><p className="eyebrow">Organization Detail</p><h1 id="organization-detail-title">{title}</h1></div><Link className="button-link" to="/organizations">Back to Organizations</Link></div>
+    <DetailShell className="organization-detail-page" titleId="organization-detail-title">
+      <DetailHeader eyebrow="Organization Detail" title={title} titleId="organization-detail-title" backTo="/organizations" backLabel="Back to Organizations" />
       {isLoading && <p className="status">Loading organization detail…</p>}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !organizationDetail && <p className="status">No organization detail was found.</p>}
       {!isLoading && !error && organizationDetail && <OrganizationDetailReadOnly detail={organizationDetail} />}
-    </section>
+    </DetailShell>
   );
 }
 
