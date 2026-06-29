@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
@@ -334,24 +334,89 @@ function SettingsTable({ title, emptyText, headers, rows }: { title: string; emp
     <div className="settings-subcard">
       <h3>{title}</h3>
       {rows.length === 0 ? (
-        <p className="status">{emptyText}</p>
+        <EmptyState message={emptyText} />
       ) : (
-        <div className="table-wrap">
-          <table className="results-table settings-table">
-            <thead>
-              <tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr>
-            </thead>
-            <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={`${title}-${rowIndex}`}>
-                  {row.map((cell, cellIndex) => <td key={`${title}-${rowIndex}-${cellIndex}`}>{cell}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <EntityList ariaLabel={title}>
+          {rows.map((row, rowIndex) => {
+            const [primary, secondary, ...rest] = row;
+            return (
+              <EntityCard
+                key={`${title}-${rowIndex}`}
+                title={displayValue(primary, `${title} ${rowIndex + 1}`)}
+                subtitle={secondary ? `${headers[1]}: ${secondary}` : undefined}
+                metadata={(
+                  <MetadataGrid>
+                    {rest.map((cell, restIndex) => (
+                      <MetadataRow key={`${title}-${rowIndex}-${restIndex}`} label={headers[restIndex + 2] ?? 'Value'} value={cell} />
+                    ))}
+                  </MetadataGrid>
+                )}
+              />
+            );
+          })}
+        </EntityList>
       )}
     </div>
+  );
+}
+
+function LoadingState({ message }: { message: string }) {
+  return <p className="status loading-state">{message}</p>;
+}
+
+function EmptyState({ message }: { message: string }) {
+  return <p className="status empty-state">{message}</p>;
+}
+
+function StatusPill({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'success' | 'warning' | 'info' }) {
+  return <span className={`status-pill status-pill-${tone}`}>{children}</span>;
+}
+
+function MetadataRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="metadata-row">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function MetadataGrid({ children }: { children: ReactNode }) {
+  return <dl className="metadata-grid">{children}</dl>;
+}
+
+function EntityList({ children, ariaLabel }: { children: ReactNode; ariaLabel: string }) {
+  return <div className="entity-list" role="list" aria-label={ariaLabel}>{children}</div>;
+}
+
+function EntityCard({ title, subtitle, eyebrow, badges, metadata, onClick, ariaLabel }: { title: ReactNode; subtitle?: ReactNode; eyebrow?: ReactNode; badges?: ReactNode; metadata?: ReactNode; onClick?: () => void; ariaLabel?: string }) {
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (!onClick) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick();
+    }
+  }
+
+  return (
+    <article
+      className={onClick ? 'entity-card entity-card-clickable' : 'entity-card'}
+      role="listitem"
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      aria-label={ariaLabel}
+    >
+      <div className="entity-card-header">
+        <div className="entity-card-title-block">
+          {eyebrow && <p className="entity-card-eyebrow">{eyebrow}</p>}
+          <h3 className="entity-card-title">{title}</h3>
+          {subtitle && <p className="entity-card-subtitle">{subtitle}</p>}
+        </div>
+        {badges && <div className="entity-card-badges">{badges}</div>}
+      </div>
+      {metadata && <div className="entity-card-metadata">{metadata}</div>}
+    </article>
   );
 }
 
@@ -529,27 +594,35 @@ function MyCasesSection({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="dashboard-section" aria-labelledby="my-cases-title">
       <h2 id="my-cases-title">My Cases</h2>
-      {isLoading && <p className="status">Loading your cases…</p>}
+      {isLoading && <LoadingState message="Loading your cases…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && cases.length === 0 && <p className="status">No assigned cases were found.</p>}
-      {!isLoading && !error && cases.length > 0 && <MyCasesTable cases={cases} />}
+      {!isLoading && !error && cases.length === 0 && <EmptyState message="No assigned cases were found." />}
+      {!isLoading && !error && cases.length > 0 && <MyCasesList cases={cases} />}
     </section>
   );
 }
 
-function MyCasesTable({ cases }: { cases: CaseSearchResult[] }) {
+function MyCasesList({ cases }: { cases: CaseSearchResult[] }) {
   const navigate = useNavigate();
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead><tr><th>Case name</th><th>Status</th><th>Responsible attorney</th><th>Statute of limitations</th></tr></thead>
-        <tbody>{cases.map((item) => (
-          <tr key={item.caseId} className="clickable-row" tabIndex={0} onClick={() => navigate(`/cases/${item.caseId}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/cases/${item.caseId}`); } }}>
-            <td>{item.caseName || `Case ${item.caseId}`}</td><td>{item.caseStatus || '—'}</td><td>{item.responsibleAttorney || '—'}</td><td>{formatDate(item.solDate)}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Assigned cases">
+      {cases.map((item) => (
+        <EntityCard
+          key={item.caseId}
+          title={displayValue(item.caseName, `Case ${item.caseId}`)}
+          subtitle={displayValue(item.caseNumber, `Case ID ${item.caseId}`)}
+          badges={<StatusPill tone="info">{displayValue(item.caseStatus, 'Status not set')}</StatusPill>}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Responsible attorney" value={displayValue(item.responsibleAttorney)} />
+              <MetadataRow label="Statute of limitations" value={formatDate(item.solDate)} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/cases/${item.caseId}`)}
+          ariaLabel={`Open case ${displayValue(item.caseName, `Case ${item.caseId}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
 
@@ -577,27 +650,35 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="dashboard-section" aria-labelledby="my-tasks-title">
       <h2 id="my-tasks-title">My Tasks</h2>
-      {isLoading && <p className="status">Loading your tasks…</p>}
+      {isLoading && <LoadingState message="Loading your tasks…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && tasks.length === 0 && <p className="status">No assigned tasks were found.</p>}
-      {!isLoading && !error && tasks.length > 0 && <MyTasksTable tasks={tasks} />}
+      {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
+      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} />}
     </section>
   );
 }
 
-function MyTasksTable({ tasks }: { tasks: CaseTaskListItem[] }) {
+function MyTasksList({ tasks }: { tasks: CaseTaskListItem[] }) {
   const navigate = useNavigate();
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead><tr><th>Task</th><th>Case</th><th>Due date</th><th>Priority</th><th>Status</th></tr></thead>
-        <tbody>{tasks.map((task) => (
-          <tr key={task.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/tasks/${task.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/tasks/${task.id}`); } }}>
-            <td>{task.title || `Task ${task.id}`}</td><td>{task.caseName || '—'}</td><td>{formatDate(task.dueAt)}</td><td>{task.priorityId ? `Priority ${task.priorityId}` : '—'}</td><td>{task.completedAt ? 'Completed' : 'Open'}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Assigned tasks">
+      {tasks.map((task) => (
+        <EntityCard
+          key={task.id}
+          title={displayValue(task.title, `Task ${task.id}`)}
+          subtitle={displayValue(task.caseName, 'No related case')}
+          badges={<StatusPill tone={task.completedAt ? 'success' : 'warning'}>{task.completedAt ? 'Completed' : 'Open'}</StatusPill>}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Due date" value={formatDate(task.dueAt)} />
+              <MetadataRow label="Priority" value={task.priorityId ? `Priority ${task.priorityId}` : MISSING_VALUE} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/tasks/${task.id}`)}
+          ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
 
@@ -659,60 +740,40 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
       </form>
 
       <div className="results-area" aria-live="polite">
-        {isLoading && <p className="status">Loading case results…</p>}
+        {isLoading && <LoadingState message="Loading case results…" />}
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-        {!isLoading && !error && hasSearched && results.length === 0 && <p className="status">No cases matched your search.</p>}
-        {!isLoading && !error && results.length > 0 && <CaseResultsTable results={results} />}
+        {!isLoading && !error && hasSearched && results.length === 0 && <EmptyState message="No cases matched your search." />}
+        {!isLoading && !error && results.length > 0 && <CaseResultsList results={results} />}
       </div>
     </section>
   );
 }
 
-function CaseResultsTable({ results }: { results: CaseSearchResult[] }) {
+function CaseResultsList({ results }: { results: CaseSearchResult[] }) {
   const navigate = useNavigate();
 
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead>
-          <tr>
-            <th>Case ID</th>
-            <th>Case number</th>
-            <th>Case name</th>
-            <th>Status</th>
-            <th>Responsible attorney</th>
-            <th>Practice area</th>
-            <th>Intake date</th>
-            <th>Client</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((result) => (
-            <tr
-              key={result.caseId}
-              className="clickable-row"
-              tabIndex={0}
-              onClick={() => navigate(`/cases/${result.caseId}`)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate(`/cases/${result.caseId}`);
-                }
-              }}
-            >
-              <td>{result.caseId}</td>
-              <td>{displayValue(result.caseNumber)}</td>
-              <td>{displayValue(result.caseName, `Case ${result.caseId}`)}</td>
-              <td>{displayValue(result.caseStatus)}</td>
-              <td>{displayValue(result.responsibleAttorney)}</td>
-              <td>{displayValue(result.practiceArea)}</td>
-              <td>{formatDate(result.intakeDate)}</td>
-              <td>{displayValue(result.client)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Case search results">
+      {results.map((result) => (
+        <EntityCard
+          key={result.caseId}
+          eyebrow={`Case ID ${result.caseId}`}
+          title={displayValue(result.caseName, `Case ${result.caseId}`)}
+          subtitle={displayValue(result.caseNumber, 'Case number not set')}
+          badges={<StatusPill tone="info">{displayValue(result.caseStatus, 'Status not set')}</StatusPill>}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Responsible attorney" value={displayValue(result.responsibleAttorney)} />
+              <MetadataRow label="Practice area" value={displayValue(result.practiceArea)} />
+              <MetadataRow label="Intake date" value={formatDate(result.intakeDate)} />
+              <MetadataRow label="Client" value={displayValue(result.client)} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/cases/${result.caseId}`)}
+          ariaLabel={`Open case ${displayValue(result.caseName, `Case ${result.caseId}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
 
@@ -774,55 +835,38 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
       </form>
 
       <div className="results-area" aria-live="polite">
-        {isLoading && <p className="status">Loading contact results…</p>}
+        {isLoading && <LoadingState message="Loading contact results…" />}
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-        {!isLoading && !error && hasSearched && results.length === 0 && <p className="status">No contacts matched your search.</p>}
-        {!isLoading && !error && results.length > 0 && <ContactResultsTable results={results} />}
+        {!isLoading && !error && hasSearched && results.length === 0 && <EmptyState message="No contacts matched your search." />}
+        {!isLoading && !error && results.length > 0 && <ContactResultsList results={results} />}
       </div>
     </section>
   );
 }
 
-function ContactResultsTable({ results }: { results: ContactSearchResult[] }) {
+function ContactResultsList({ results }: { results: ContactSearchResult[] }) {
   const navigate = useNavigate();
 
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead>
-          <tr>
-            <th>Contact ID</th>
-            <th>Display name</th>
-            <th>Email</th>
-            <th>Phone</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((result) => (
-            <tr
-              key={result.id}
-              className="clickable-row"
-              tabIndex={0}
-              onClick={() => navigate(`/contacts/${result.id}`)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate(`/contacts/${result.id}`);
-                }
-              }}
-            >
-              <td>{result.id}</td>
-              <td>{result.displayName || `Contact ${result.id}`}</td>
-              <td>{result.email || '—'}</td>
-              <td>{result.phone || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Contact search results">
+      {results.map((result) => (
+        <EntityCard
+          key={result.id}
+          eyebrow={`Contact ID ${result.id}`}
+          title={displayValue(result.displayName, `Contact ${result.id}`)}
+          subtitle={displayValue(result.email, 'Email not provided')}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Phone" value={displayValue(result.phone)} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/contacts/${result.id}`)}
+          ariaLabel={`Open contact ${displayValue(result.displayName, `Contact ${result.id}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
-
 
 function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
   const [query, setQuery] = useState('');
@@ -882,42 +926,41 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
       </form>
 
       <div className="results-area" aria-live="polite">
-        {isLoading && <p className="status">Loading organization results…</p>}
+        {isLoading && <LoadingState message="Loading organization results…" />}
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-        {!isLoading && !error && hasSearched && results.length === 0 && <p className="status">No organizations matched your search.</p>}
-        {!isLoading && !error && results.length > 0 && <OrganizationResultsTable results={results} />}
+        {!isLoading && !error && hasSearched && results.length === 0 && <EmptyState message="No organizations matched your search." />}
+        {!isLoading && !error && results.length > 0 && <OrganizationResultsList results={results} />}
       </div>
     </section>
   );
 }
 
-function OrganizationResultsTable({ results }: { results: OrganizationSearchResult[] }) {
+function OrganizationResultsList({ results }: { results: OrganizationSearchResult[] }) {
   const navigate = useNavigate();
 
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead>
-          <tr><th>Organization ID</th><th>Name</th><th>Type</th><th>Email</th><th>Phone</th><th>Website</th><th>Location</th></tr>
-        </thead>
-        <tbody>
-          {results.map((result) => (
-            <tr key={result.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/organizations/${result.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/organizations/${result.id}`); } }}>
-              <td>{result.id}</td>
-              <td>{result.name || `Organization ${result.id}`}</td>
-              <td>{result.organizationTypeName || '—'}</td>
-              <td>{result.email || '—'}</td>
-              <td>{result.phone || '—'}</td>
-              <td>{result.website || '—'}</td>
-              <td>{[result.city, result.state].filter(Boolean).join(', ') || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Organization search results">
+      {results.map((result) => (
+        <EntityCard
+          key={result.id}
+          eyebrow={`Organization ID ${result.id}`}
+          title={displayValue(result.name, `Organization ${result.id}`)}
+          subtitle={displayValue(result.organizationTypeName, 'Organization type not set')}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Email" value={displayValue(result.email)} />
+              <MetadataRow label="Phone" value={displayValue(result.phone)} />
+              <MetadataRow label="Website" value={displayValue(result.website)} />
+              <MetadataRow label="Location" value={[result.city, result.state].filter(Boolean).join(', ') || MISSING_VALUE} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/organizations/${result.id}`)}
+          ariaLabel={`Open organization ${displayValue(result.name, `Organization ${result.id}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
-
 
 function TeamPage({ accessToken }: { accessToken: string | null }) {
   const [members, setMembers] = useState<TeamMemberSummary[]>([]);
@@ -948,28 +991,41 @@ function TeamPage({ accessToken }: { accessToken: string | null }) {
       <PageHeader eyebrow="Directory" title="Team" titleId="team-title" lede="Browse your read-only team directory." />
 
       <div className="results-area" aria-live="polite">
-        {isLoading && <p className="status">Loading team members…</p>}
+        {isLoading && <LoadingState message="Loading team members…" />}
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-        {!isLoading && !error && members.length === 0 && <p className="status">No team members were found.</p>}
-        {!isLoading && !error && members.length > 0 && <TeamMembersTable members={members} />}
+        {!isLoading && !error && members.length === 0 && <EmptyState message="No team members were found." />}
+        {!isLoading && !error && members.length > 0 && <TeamMembersList members={members} />}
       </div>
     </section>
   );
 }
 
-function TeamMembersTable({ members }: { members: TeamMemberSummary[] }) {
+function TeamMembersList({ members }: { members: TeamMemberSummary[] }) {
   const navigate = useNavigate();
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead><tr><th>Name</th><th>Email</th><th>Initials</th><th>Color</th><th>Attorney</th><th>Admin</th></tr></thead>
-        <tbody>{members.map((member) => (
-          <tr key={member.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/team/${member.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/team/${member.id}`); } }}>
-            <td>{teamMemberName(member)}</td><td>{member.email || '—'}</td><td>{member.initials || '—'}</td><td><ColorSwatch color={member.color} /></td><td>{yesNo(member.attorney)}</td><td>{yesNo(member.admin)}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Team members">
+      {members.map((member) => (
+        <EntityCard
+          key={member.id}
+          title={teamMemberName(member)}
+          subtitle={displayValue(member.email, 'Email not provided')}
+          badges={(
+            <>
+              {member.attorney && <StatusPill tone="info">Attorney</StatusPill>}
+              {member.admin && <StatusPill tone="success">Admin</StatusPill>}
+            </>
+          )}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Initials" value={displayValue(member.initials)} />
+              <MetadataRow label="Color" value={<ColorSwatch color={member.color} />} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/team/${member.id}`)}
+          ariaLabel={`Open team member ${teamMemberName(member)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
 
@@ -1358,23 +1414,27 @@ function CaseTasksSection({ tasks, error }: { tasks: CaseTaskListItem[]; error: 
     <section aria-labelledby="case-tasks-title">
       <h2 id="case-tasks-title">Case Tasks</h2>
       {error && <p className="status error" role="alert">{error}</p>}
-      {!error && tasks.length === 0 && <p className="status">No tasks are linked to this case yet.</p>}
+      {!error && tasks.length === 0 && <EmptyState message="No tasks are linked to this case yet." />}
       {!error && tasks.length > 0 && (
-        <div className="table-wrap">
-          <table className="results-table case-tasks-table">
-            <thead><tr><th>Task</th><th>Status</th><th>Priority</th><th>Due date</th><th>Assigned user</th><th>Completed date</th></tr></thead>
-            <tbody>{tasks.map((task) => (
-              <tr key={task.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/tasks/${task.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/tasks/${task.id}`); } }}>
-                <td>{task.title || `Task ${task.id}`}</td>
-                <td>{task.completedAt ? 'Completed' : 'Open'}</td>
-                <td>{task.priorityId ? `Priority ${task.priorityId}` : '—'}</td>
-                <td>{formatDate(task.dueAt)}</td>
-                <td>{task.assignedUserDisplayName || '—'}</td>
-                <td>{formatDate(task.completedAt)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
+        <EntityList ariaLabel="Case tasks">
+          {tasks.map((task) => (
+            <EntityCard
+              key={task.id}
+              title={displayValue(task.title, `Task ${task.id}`)}
+              subtitle={displayValue(task.assignedUserDisplayName, 'Unassigned')}
+              badges={<StatusPill tone={task.completedAt ? 'success' : 'warning'}>{task.completedAt ? 'Completed' : 'Open'}</StatusPill>}
+              metadata={(
+                <MetadataGrid>
+                  <MetadataRow label="Priority" value={task.priorityId ? `Priority ${task.priorityId}` : MISSING_VALUE} />
+                  <MetadataRow label="Due date" value={formatDate(task.dueAt)} />
+                  <MetadataRow label="Completed date" value={formatDate(task.completedAt)} />
+                </MetadataGrid>
+              )}
+              onClick={() => navigate(`/tasks/${task.id}`)}
+              ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
+            />
+          ))}
+        </EntityList>
       )}
     </section>
   );
@@ -1586,24 +1646,36 @@ function OrganizationDetailReadOnly({ detail }: { detail: OrganizationDetail }) 
       {detail.relatedCases.length > 0 && (
         <section aria-labelledby="related-cases-title">
           <h2 id="related-cases-title">Related Cases</h2>
-          <RelatedOrganizationCasesTable cases={detail.relatedCases} />
+          <RelatedOrganizationCasesList cases={detail.relatedCases} />
         </section>
       )}
     </div>
   );
 }
 
-function RelatedOrganizationCasesTable({ cases }: { cases: OrganizationDetail['relatedCases'] }) {
+function RelatedOrganizationCasesList({ cases }: { cases: OrganizationDetail['relatedCases'] }) {
   const navigate = useNavigate();
   return (
-    <div className="table-wrap"><table className="results-table"><thead><tr><th>Case name</th><th>Role</th><th>Side</th><th>Responsible attorney</th><th>Intake date</th><th>Statute of limitations</th></tr></thead><tbody>{cases.map((item) => (
-      <tr key={item.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/cases/${item.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/cases/${item.id}`); } }}>
-        <td>{item.name || `Case ${item.id}`}</td><td>{item.partyRoleName || '—'}</td><td>{item.side || '—'}</td><td>{item.responsibleAttorneyName || '—'}</td><td>{formatDate(item.intakeDate)}</td><td>{formatDate(item.statuteOfLimitationsDate)}</td>
-      </tr>
-    ))}</tbody></table></div>
+    <EntityList ariaLabel="Related organization cases">
+      {cases.map((item) => (
+        <EntityCard
+          key={item.id}
+          title={displayValue(item.name, `Case ${item.id}`)}
+          subtitle={[item.partyRoleName, item.side].filter(Boolean).join(' • ') || 'Related case'}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Responsible attorney" value={displayValue(item.responsibleAttorneyName)} />
+              <MetadataRow label="Intake date" value={formatDate(item.intakeDate)} />
+              <MetadataRow label="Statute of limitations" value={formatDate(item.statuteOfLimitationsDate)} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/cases/${item.id}`)}
+          ariaLabel={`Open related case ${displayValue(item.name, `Case ${item.id}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
-
 
 function DetailItem({ label, value, preserveWhitespace = false }: { label: string; value: string | number | null | undefined; preserveWhitespace?: boolean }) {
   const renderedValue = displayValue(value);
