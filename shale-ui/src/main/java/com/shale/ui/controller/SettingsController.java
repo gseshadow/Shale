@@ -10,6 +10,7 @@ import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ButtonType;
@@ -41,6 +42,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class SettingsController {
 	@FXML
@@ -118,6 +121,15 @@ public final class SettingsController {
 	private final List<PracticeAreaViewRow> practiceAreaRows = new ArrayList<>();
 	private CaseStatusViewRow selectedCaseStatusRow;
 	private PracticeAreaViewRow selectedPracticeAreaRow;
+	private int caseStatusLoadGeneration;
+	private int practiceAreaLoadGeneration;
+	private int userManagementLoadGeneration;
+
+	private final ExecutorService settingsLoadExecutor = Executors.newFixedThreadPool(3, runnable -> {
+		Thread thread = new Thread(runnable, "settings-section-loader");
+		thread.setDaemon(true);
+		return thread;
+	});
 
 	@FXML
 	private void initialize() {
@@ -128,13 +140,7 @@ public final class SettingsController {
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
-		if (caseService != null && isAdminUser()) {
-			loadCaseStatuses();
-			loadPracticeAreas();
-		}
-		if (userDao != null && isAdminUser()) {
-			loadManagedUsers();
-		}
+		loadAdminSectionsAsync();
 	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao) {
@@ -146,11 +152,7 @@ public final class SettingsController {
 		if (fxmlReady) {
 			loadFromPreferences();
 			updateAdminControlsVisibility();
-			if (isAdminUser()) {
-				loadCaseStatuses();
-				loadPracticeAreas();
-				loadManagedUsers();
-			}
+			loadAdminSectionsAsync();
 		}
 	}
 
@@ -186,6 +188,56 @@ public final class SettingsController {
 		onOpenAuditLog.run();
 	}
 
+	private void loadAdminSectionsAsync() {
+		if (!fxmlReady || !isAdminUser()) return;
+		loadCaseStatusesAsync(null);
+		loadPracticeAreasAsync(null);
+		loadManagedUsersAsync(null);
+	}
+
+	private void setCaseStatusLoadingState(String message) {
+		if (caseStatusCardsContainer != null) caseStatusCardsContainer.getChildren().setAll(loadingLabel(message));
+		setCaseStatusMessage(message);
+	}
+
+	private void applyCaseStatusRows(int generation, List<CaseStatusViewRow> rows, String successMessage) {
+		if (generation != caseStatusLoadGeneration) return;
+		Integer selectedId = selectedCaseStatusRow == null ? null : selectedCaseStatusRow.id();
+		caseStatusRows.clear();
+		caseStatusRows.addAll(rows);
+		selectedCaseStatusRow = rows.stream()
+				.filter(row -> selectedId != null && row.id() == selectedId)
+				.findFirst()
+				.orElse(null);
+		renderCaseStatusCards();
+		setCaseStatusMessage(successMessage != null && !successMessage.isBlank() ? successMessage : rows.isEmpty() ? "No case statuses are configured for this tenant." : "");
+	}
+
+	private void setPracticeAreaLoadingState(String message) {
+		if (practiceAreaCardsContainer != null) practiceAreaCardsContainer.getChildren().setAll(loadingLabel(message));
+		setPracticeAreaMessage(message);
+	}
+
+	private void applyPracticeAreaRows(int generation, List<PracticeAreaViewRow> rows, String successMessage) {
+		if (generation != practiceAreaLoadGeneration) return;
+		Integer selectedId = selectedPracticeAreaRow == null ? null : selectedPracticeAreaRow.id();
+		practiceAreaRows.clear();
+		practiceAreaRows.addAll(rows);
+		selectedPracticeAreaRow = rows.stream()
+				.filter(row -> selectedId != null && row.id() == selectedId)
+				.findFirst()
+				.orElse(null);
+		renderPracticeAreaCards();
+		setPracticeAreaMessage(successMessage != null && !successMessage.isBlank() ? successMessage : rows.isEmpty() ? "No practice areas are configured for this tenant." : "");
+	}
+
+	private Label loadingLabel(String message) {
+		Label label = new Label(message);
+		label.getStyleClass().add("search-summary-text");
+		label.setWrapText(true);
+		return label;
+	}
+
 	private void configureLookupActionRows() {
 		if (caseStatusActionRow != null) {
 			caseStatusActionRow.getChildren().setAll(
@@ -210,8 +262,7 @@ public final class SettingsController {
 		showPracticeAreaDialog(null).ifPresent(input -> {
 			caseService.createPracticeArea(new CaseServicePort.PracticeAreaCommand(
 					null, requireTenantId(), input.name(), input.color(), input.active(), input.systemKey()));
-			loadPracticeAreas();
-			setPracticeAreaMessage("Practice area added.");
+			loadPracticeAreasAsync("Practice area added.");
 		});
 	}
 
@@ -223,8 +274,7 @@ public final class SettingsController {
 		showPracticeAreaDialog(selected.practiceArea()).ifPresent(input -> {
 			caseService.updatePracticeArea(new CaseServicePort.PracticeAreaCommand(
 					selected.id(), requireTenantId(), input.name(), input.color(), input.active(), input.systemKey()));
-			loadPracticeAreas();
-			setPracticeAreaMessage("Practice area updated.");
+			loadPracticeAreasAsync("Practice area updated.");
 		});
 	}
 
@@ -235,8 +285,7 @@ public final class SettingsController {
 		if (selected == null) return;
 		try {
 			caseService.deactivatePracticeArea(requireTenantId(), selected.id());
-			loadPracticeAreas();
-			setPracticeAreaMessage("Practice area removed from new selections. Existing cases keep their value.");
+			loadPracticeAreasAsync("Practice area removed from new selections. Existing cases keep their value.");
 		} catch (RuntimeException ex) {
 			AppDialogs.showError(practiceAreaCardsContainer.getScene().getWindow(), "Practice Areas", rootMessage(ex));
 		}
@@ -244,6 +293,10 @@ public final class SettingsController {
 
 
 	private void loadPracticeAreas() {
+		loadPracticeAreasAsync(null);
+	}
+
+	private void loadPracticeAreasAsync(String successMessage) {
 		if (caseService == null || practiceAreaCardsContainer == null) return;
 		if (!requireAdminLookupManagement("Practice Areas")) {
 			practiceAreaRows.clear();
@@ -251,20 +304,31 @@ public final class SettingsController {
 			practiceAreaCardsContainer.getChildren().clear();
 			return;
 		}
+		final int generation = ++practiceAreaLoadGeneration;
+		final int tenantId;
 		try {
-			List<PracticeAreaViewRow> rows = new ArrayList<>();
-			for (PracticeAreaDto area : caseService.listPracticeAreas(requireTenantId(), true)) rows.add(new PracticeAreaViewRow(area));
-			practiceAreaRows.clear();
-			practiceAreaRows.addAll(rows);
-			selectedPracticeAreaRow = rows.stream()
-					.filter(row -> selectedPracticeAreaRow != null && row.id() == selectedPracticeAreaRow.id())
-					.findFirst()
-					.orElse(null);
-			renderPracticeAreaCards();
-			setPracticeAreaMessage(rows.isEmpty() ? "No practice areas are configured for this tenant." : "");
+			tenantId = requireTenantId();
 		} catch (RuntimeException ex) {
-			setPracticeAreaMessage("Failed to load practice areas. " + rootMessage(ex));
+			setPracticeAreaMessage(rootMessage(ex));
+			return;
 		}
+		setPracticeAreaLoadingState("Loading practice areas…");
+		settingsLoadExecutor.submit(() -> {
+			try {
+				List<PracticeAreaViewRow> rows = new ArrayList<>();
+				for (PracticeAreaDto area : caseService.listPracticeAreas(tenantId, true)) rows.add(new PracticeAreaViewRow(area));
+				Platform.runLater(() -> applyPracticeAreaRows(generation, rows, successMessage));
+			} catch (RuntimeException ex) {
+				System.err.println("Failed to load Settings practice areas: " + rootMessage(ex));
+				Platform.runLater(() -> {
+					if (generation != practiceAreaLoadGeneration) return;
+					practiceAreaRows.clear();
+					selectedPracticeAreaRow = null;
+					practiceAreaCardsContainer.getChildren().clear();
+					setPracticeAreaMessage("Failed to load practice areas. " + rootMessage(ex));
+				});
+			}
+		});
 	}
 
 	private void renderPracticeAreaCards() {
@@ -369,8 +433,7 @@ public final class SettingsController {
 					input.color(),
 					input.lifecycleKey(),
 					input.systemKey()));
-			loadCaseStatuses();
-			setCaseStatusMessage("Case status added.");
+			loadCaseStatusesAsync("Case status added.");
 		});
 	}
 
@@ -389,8 +452,7 @@ public final class SettingsController {
 					input.color(),
 					input.lifecycleKey(),
 					input.systemKey()));
-			loadCaseStatuses();
-			setCaseStatusMessage("Case status updated.");
+			loadCaseStatusesAsync("Case status updated.");
 		});
 	}
 
@@ -402,6 +464,10 @@ public final class SettingsController {
 
 
 	private void loadCaseStatuses() {
+		loadCaseStatusesAsync(null);
+	}
+
+	private void loadCaseStatusesAsync(String successMessage) {
 		if (caseService == null || caseStatusCardsContainer == null) return;
 		if (!requireAdminLookupManagement("Case Statuses")) {
 			caseStatusRows.clear();
@@ -409,20 +475,31 @@ public final class SettingsController {
 			caseStatusCardsContainer.getChildren().clear();
 			return;
 		}
+		final int generation = ++caseStatusLoadGeneration;
+		final int tenantId;
 		try {
-			List<CaseStatusViewRow> rows = new ArrayList<>();
-			for (CaseStatusDto status : caseService.listCaseStatuses(requireTenantId(), true)) rows.add(new CaseStatusViewRow(status));
-			caseStatusRows.clear();
-			caseStatusRows.addAll(rows);
-			selectedCaseStatusRow = rows.stream()
-					.filter(row -> selectedCaseStatusRow != null && row.id() == selectedCaseStatusRow.id())
-					.findFirst()
-					.orElse(null);
-			renderCaseStatusCards();
-			setCaseStatusMessage(rows.isEmpty() ? "No case statuses are configured for this tenant." : "");
+			tenantId = requireTenantId();
 		} catch (RuntimeException ex) {
-			setCaseStatusMessage("Failed to load case statuses. " + rootMessage(ex));
+			setCaseStatusMessage(rootMessage(ex));
+			return;
 		}
+		setCaseStatusLoadingState("Loading case statuses…");
+		settingsLoadExecutor.submit(() -> {
+			try {
+				List<CaseStatusViewRow> rows = new ArrayList<>();
+				for (CaseStatusDto status : caseService.listCaseStatuses(tenantId, true)) rows.add(new CaseStatusViewRow(status));
+				Platform.runLater(() -> applyCaseStatusRows(generation, rows, successMessage));
+			} catch (RuntimeException ex) {
+				System.err.println("Failed to load Settings case statuses: " + rootMessage(ex));
+				Platform.runLater(() -> {
+					if (generation != caseStatusLoadGeneration) return;
+					caseStatusRows.clear();
+					selectedCaseStatusRow = null;
+					caseStatusCardsContainer.getChildren().clear();
+					setCaseStatusMessage("Failed to load case statuses. " + rootMessage(ex));
+				});
+			}
+		});
 	}
 
 	private void renderCaseStatusCards() {
@@ -505,7 +582,7 @@ public final class SettingsController {
 		try {
 			caseService.reorderCaseStatuses(requireTenantId(), selected.id(), other.id());
 			selectedCaseStatusRow = selected;
-			loadCaseStatuses();
+			loadCaseStatusesAsync(null);
 		} catch (RuntimeException ex) {
 			AppDialogs.showError(caseStatusCardsContainer.getScene().getWindow(), "Case Statuses", rootMessage(ex));
 		}
@@ -632,7 +709,7 @@ public final class SettingsController {
 		showAddUserDialog().ifPresent(request -> {
 			try {
 				userDao.createUser(request);
-				loadManagedUsers();
+				loadManagedUsersAsync(null);
 				AppDialogs.showInfo(null, "Add User", "User added.");
 			} catch (RuntimeException ex) {
 				AppDialogs.showError(null, "Add User", rootMessage(ex));
@@ -707,7 +784,7 @@ public final class SettingsController {
 	}
 
 	@FXML
-	private void onToggleInactiveUsers() { loadManagedUsers(); }
+	private void onToggleInactiveUsers() { loadManagedUsersAsync(null); }
 
 	@FXML
 	private void onDeactivateUser() {
@@ -717,7 +794,7 @@ public final class SettingsController {
 		if (!confirmed) return;
 		try {
 			userDao.deactivateUser(selected.id());
-			loadManagedUsers();
+			loadManagedUsersAsync("User deactivated.");
 			setUserManagementMessage("User deactivated.");
 		} catch (RuntimeException ex) {
 			AppDialogs.showError(null, "Deactivate User", rootMessage(ex));
@@ -730,7 +807,7 @@ public final class SettingsController {
 		if (selected == null) return;
 		try {
 			userDao.reactivateUser(selected.id());
-			loadManagedUsers();
+			loadManagedUsersAsync("User reactivated.");
 			setUserManagementMessage("User reactivated.");
 		} catch (RuntimeException ex) {
 			AppDialogs.showError(null, "Reactivate User", rootMessage(ex));
@@ -796,17 +873,36 @@ public final class SettingsController {
 	}
 
 	private void loadManagedUsers() {
+		loadManagedUsersAsync(null);
+	}
+
+	private void loadManagedUsersAsync(String successMessage) {
 		if (userDao == null || userManagementTable == null || !isAdminUser()) return;
-		try {
-			boolean includeInactive = showInactiveUsersCheck != null && showInactiveUsersCheck.isSelected();
-			List<UserManagementViewRow> rows = new ArrayList<>();
-			for (UserDao.UserManagementRow row : userDao.listUsersForManagement(includeInactive)) rows.add(new UserManagementViewRow(row));
-			userManagementTable.getItems().setAll(rows);
-			updateUserActionButtons(userManagementTable.getSelectionModel().getSelectedItem());
-			setUserManagementMessage(rows.isEmpty() ? "No users found for this tenant." : "");
-		} catch (RuntimeException ex) {
-			setUserManagementMessage("Failed to load users. " + rootMessage(ex));
-		}
+		final int generation = ++userManagementLoadGeneration;
+		boolean includeInactive = showInactiveUsersCheck != null && showInactiveUsersCheck.isSelected();
+		userManagementTable.getItems().clear();
+		updateUserActionButtons(null);
+		setUserManagementMessage("Loading users…");
+		settingsLoadExecutor.submit(() -> {
+			try {
+				List<UserManagementViewRow> rows = new ArrayList<>();
+				for (UserDao.UserManagementRow row : userDao.listUsersForManagement(includeInactive)) rows.add(new UserManagementViewRow(row));
+				Platform.runLater(() -> {
+					if (generation != userManagementLoadGeneration) return;
+					userManagementTable.getItems().setAll(rows);
+					updateUserActionButtons(userManagementTable.getSelectionModel().getSelectedItem());
+					setUserManagementMessage(successMessage != null && !successMessage.isBlank() ? successMessage : rows.isEmpty() ? "No users found for this tenant." : "");
+				});
+			} catch (RuntimeException ex) {
+				System.err.println("Failed to load Settings users: " + rootMessage(ex));
+				Platform.runLater(() -> {
+					if (generation != userManagementLoadGeneration) return;
+					userManagementTable.getItems().clear();
+					updateUserActionButtons(null);
+					setUserManagementMessage("Failed to load users. " + rootMessage(ex));
+				});
+			}
+		});
 	}
 
 	private UserManagementViewRow selectedManagedUser() {
@@ -957,11 +1053,6 @@ public final class SettingsController {
 		if (userAdministrationSection != null) {
 			userAdministrationSection.setVisible(visible);
 			userAdministrationSection.setManaged(visible);
-		}
-		if (visible) {
-			loadCaseStatuses();
-			loadPracticeAreas();
-			loadManagedUsers();
 		}
 	}
 }
