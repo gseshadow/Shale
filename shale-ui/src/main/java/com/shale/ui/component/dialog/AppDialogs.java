@@ -22,10 +22,12 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.Window;
+import com.shale.ui.util.DialogSizingUtil;
 import com.shale.ui.util.WindowSizingUtil;
 
 public final class AppDialogs {
-	private static final double DEFAULT_DIALOG_MIN_WIDTH = 460;
+	private static final double CONFIRMATION_DIALOG_MIN_WIDTH = 480;
+	private static final double CONFIRMATION_DIALOG_MIN_HEIGHT = 220;
 
 	private AppDialogs() {
 	}
@@ -231,9 +233,10 @@ public final class AppDialogs {
 		VBox root = new VBox(18);
 		root.getStyleClass().add("app-dialog-root");
 		root.setPadding(new Insets(18));
-		double safeMinWidth = Math.max(DEFAULT_DIALOG_MIN_WIDTH, minWidth);
+		double safeMinWidth = Math.max(CONFIRMATION_DIALOG_MIN_WIDTH, minWidth);
 		root.setMinWidth(safeMinWidth);
 		root.setPrefWidth(safeMinWidth);
+		root.setMinHeight(CONFIRMATION_DIALOG_MIN_HEIGHT);
 
 		if (!isBlank(heading) || !isBlank(message)) {
 			VBox headerBox = new VBox(8);
@@ -281,7 +284,12 @@ public final class AppDialogs {
 		scene.getStylesheets().add(Objects.requireNonNull(
 				AppDialogs.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
-		WindowSizingUtil.sizeModalStage(stage, owner, safeMinWidth, root.prefHeight(safeMinWidth), safeMinWidth, 0);
+		DialogSizingUtil.applyConfirmationDialogSizing(
+				stage,
+				owner,
+				root,
+				safeMinWidth,
+				CONFIRMATION_DIALOG_MIN_HEIGHT);
 		stage.showAndWait();
 		return Optional.ofNullable(result.value);
 	}
