@@ -36,20 +36,38 @@ public final class WindowSizingUtil {
     }
 
     public static void sizeModalStage(Stage stage, Window owner, double preferredWidth, double preferredHeight) {
+        sizeModalStage(stage, owner, preferredWidth, preferredHeight, 0, 0);
+    }
+
+    public static void sizeModalStage(
+            Stage stage,
+            Window owner,
+            double preferredWidth,
+            double preferredHeight,
+            double minimumWidth,
+            double minimumHeight) {
         if (stage == null) {
             return;
         }
         Rectangle2D visualBounds = getScreenForWindow(owner).getVisualBounds();
         double maxWidth = Math.min(DIALOG_MAX_WIDTH, visualBounds.getWidth() * MODAL_SCREEN_RATIO);
         double maxHeight = Math.min(DIALOG_MAX_HEIGHT, visualBounds.getHeight() * MODAL_SCREEN_RATIO);
+        double safeMinWidth = clamp(minimumWidth, 0, maxWidth);
+        double safeMinHeight = clamp(minimumHeight, 0, maxHeight);
         if (hasUsableSize(owner)) {
-            maxWidth = Math.min(maxWidth, owner.getWidth() * MODAL_OWNER_RATIO);
-            maxHeight = Math.min(maxHeight, owner.getHeight() * MODAL_OWNER_RATIO);
+            double ownerMaxWidth = owner.getWidth() * MODAL_OWNER_RATIO;
+            double ownerMaxHeight = owner.getHeight() * MODAL_OWNER_RATIO;
+            if (ownerMaxWidth >= safeMinWidth) {
+                maxWidth = Math.min(maxWidth, ownerMaxWidth);
+            }
+            if (ownerMaxHeight >= safeMinHeight) {
+                maxHeight = Math.min(maxHeight, ownerMaxHeight);
+            }
         }
-        double width = clamp(preferredWidth, 0, maxWidth);
-        double height = clamp(preferredHeight, 0, maxHeight);
-        stage.setMinWidth(Math.min(stage.getMinWidth(), width));
-        stage.setMinHeight(Math.min(stage.getMinHeight(), height));
+        double width = clamp(preferredWidth, safeMinWidth, maxWidth);
+        double height = clamp(preferredHeight, safeMinHeight, maxHeight);
+        stage.setMinWidth(Math.min(safeMinWidth, width));
+        stage.setMinHeight(Math.min(safeMinHeight, height));
         stage.setWidth(width);
         stage.setHeight(height);
         centerModal(stage, owner, visualBounds, width, height);
