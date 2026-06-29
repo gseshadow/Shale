@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -71,15 +71,51 @@ function formatDateTime(value: string | null | undefined): string {
 
 function PageHeader({ eyebrow, title, titleId, lede, action }: { eyebrow: string; title: string; titleId?: string; lede?: string; action?: ReactNode }) {
   return (
-    <div className="page-heading-row">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1 id={titleId}>{title}</h1>
-        {lede && <p className="lede">{lede}</p>}
+    <header className="page-header">
+      <div className="page-heading-row">
+        <div className="page-title-block">
+          <p className="eyebrow">{eyebrow}</p>
+          <h1 id={titleId}>{title}</h1>
+          {lede && <p className="lede">{lede}</p>}
+        </div>
+        {action && <ToolbarActions>{action}</ToolbarActions>}
       </div>
-      {action}
-    </div>
+    </header>
   );
+}
+
+function ToolbarActions({ children }: { children: ReactNode }) {
+  return <div className="toolbar-actions">{children}</div>;
+}
+
+function ActionButton({ children, type = 'button', disabled = false, onClick }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean; onClick?: () => void }) {
+  return <button className="action-button" type={type} disabled={disabled} onClick={onClick}>{children}</button>;
+}
+
+function SecondaryButton({ children, type = 'button', disabled = false, onClick }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean; onClick?: () => void }) {
+  return <button className="secondary-button" type={type} disabled={disabled} onClick={onClick}>{children}</button>;
+}
+
+function SearchBar({ id, label, value, placeholder, isLoading, loadingLabel = 'Searching…', submitLabel = 'Search', onChange, onSubmit }: { id: string; label: string; value: string; placeholder: string; isLoading?: boolean; loadingLabel?: string; submitLabel?: string; onChange: (value: string) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  return (
+    <form className="search-form filter-bar" onSubmit={onSubmit} role="search">
+      <label className="search-label" htmlFor={id}>{label}</label>
+      <div className="search-row">
+        <input
+          id={id}
+          type="search"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+        />
+        <ActionButton type="submit" disabled={isLoading}>{isLoading ? loadingLabel : submitLabel}</ActionButton>
+      </div>
+    </form>
+  );
+}
+
+function FilterBar({ children, label = 'Filters and actions' }: { children: ReactNode; label?: string }) {
+  return <div className="filter-bar" aria-label={label}>{children}</div>;
 }
 
 function displayNameFor(user: AuthenticatedUser): string {
@@ -141,11 +177,11 @@ function AppRoutes() {
         element={authState.user ? <Navigate to="/my-shale" replace /> : <LoginPage isVerifying={authState.isVerifying} onLogin={handleLogin} />}
       />
       <Route element={<ProtectedRoute authState={authState} />}>
-        <Route element={<AuthenticatedShell user={authState.user} onLogout={handleLogout} />}>
+        <Route element={<AppShell user={authState.user} onLogout={handleLogout} />}>
           <Route path="/my-shale" element={<MyShalePage accessToken={authState.accessToken} user={authState.user} />} />
           <Route path="/cases" element={<CasesPage accessToken={authState.accessToken} />} />
           <Route path="/cases/:caseId" element={<CaseDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/tasks" element={<PlaceholderPage title="Tasks" />} />
+          <Route path="/tasks" element={<TasksPage accessToken={authState.accessToken} />} />
           <Route path="/tasks/:taskId" element={<TaskDetailPage accessToken={authState.accessToken} />} />
           <Route path="/contacts" element={<ContactsPage accessToken={authState.accessToken} />} />
           <Route path="/contacts/:contactId" element={<ContactDetailPage accessToken={authState.accessToken} />} />
@@ -246,14 +282,12 @@ function SettingsPage({ accessToken, user }: { accessToken: string | null; user:
 
   return (
     <section className="settings-page">
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">Settings</p>
-          <h1>Settings</h1>
-          <p className="lede">Read-only account and tenant settings for the signed-in Shale session.</p>
-          <span className="inline-beta-badge">Read-only beta</span>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Settings"
+        title="Settings"
+        lede="Read-only account and tenant settings for the signed-in Shale session."
+        action={<span className="inline-beta-badge">Read-only beta</span>}
+      />
 
       <div className="detail-sections">
         <section className="settings-card">
@@ -334,24 +368,122 @@ function SettingsTable({ title, emptyText, headers, rows }: { title: string; emp
     <div className="settings-subcard">
       <h3>{title}</h3>
       {rows.length === 0 ? (
-        <p className="status">{emptyText}</p>
+        <EmptyState message={emptyText} />
       ) : (
-        <div className="table-wrap">
-          <table className="results-table settings-table">
-            <thead>
-              <tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr>
-            </thead>
-            <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={`${title}-${rowIndex}`}>
-                  {row.map((cell, cellIndex) => <td key={`${title}-${rowIndex}-${cellIndex}`}>{cell}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <EntityList ariaLabel={title}>
+          {rows.map((row, rowIndex) => {
+            const [primary, secondary, ...rest] = row;
+            return (
+              <EntityCard
+                key={`${title}-${rowIndex}`}
+                title={displayValue(primary, `${title} ${rowIndex + 1}`)}
+                subtitle={secondary ? `${headers[1]}: ${secondary}` : undefined}
+                metadata={(
+                  <MetadataGrid>
+                    {rest.map((cell, restIndex) => (
+                      <MetadataRow key={`${title}-${rowIndex}-${restIndex}`} label={headers[restIndex + 2] ?? 'Value'} value={cell} />
+                    ))}
+                  </MetadataGrid>
+                )}
+              />
+            );
+          })}
+        </EntityList>
       )}
     </div>
+  );
+}
+
+function LoadingState({ message }: { message: string }) {
+  return <p className="status loading-state">{message}</p>;
+}
+
+function EmptyState({ message }: { message: string }) {
+  return <p className="status empty-state">{message}</p>;
+}
+
+function StatusPill({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'success' | 'warning' | 'info' }) {
+  return <span className={`status-pill status-pill-${tone}`}>{children}</span>;
+}
+
+function MetadataRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="metadata-row">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function MetadataGrid({ children }: { children: ReactNode }) {
+  return <dl className="metadata-grid">{children}</dl>;
+}
+
+function EntityList({ children, ariaLabel }: { children: ReactNode; ariaLabel: string }) {
+  return <div className="entity-list" role="list" aria-label={ariaLabel}>{children}</div>;
+}
+
+function EntityCard({ title, subtitle, eyebrow, badges, metadata, onClick, ariaLabel }: { title: ReactNode; subtitle?: ReactNode; eyebrow?: ReactNode; badges?: ReactNode; metadata?: ReactNode; onClick?: () => void; ariaLabel?: string }) {
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (!onClick) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick();
+    }
+  }
+
+  return (
+    <article
+      className={onClick ? 'entity-card entity-card-clickable' : 'entity-card'}
+      role="listitem"
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      aria-label={ariaLabel}
+    >
+      <div className="entity-card-header">
+        <div className="entity-card-title-block">
+          {eyebrow && <p className="entity-card-eyebrow">{eyebrow}</p>}
+          <h3 className="entity-card-title">{title}</h3>
+          {subtitle && <p className="entity-card-subtitle">{subtitle}</p>}
+        </div>
+        {badges && <div className="entity-card-badges">{badges}</div>}
+      </div>
+      {metadata && <div className="entity-card-metadata">{metadata}</div>}
+    </article>
+  );
+}
+
+
+function BackLink({ to, children, ariaLabel }: { to: string; children: ReactNode; ariaLabel?: string }) {
+  return <Link className="back-link" to={to} aria-label={ariaLabel}>{children}</Link>;
+}
+
+function DetailShell({ children, className, titleId }: { children: ReactNode; className: string; titleId: string }) {
+  return <section className={`detail-shell ${className}`} aria-labelledby={titleId}>{children}</section>;
+}
+
+function DetailHeader({ eyebrow, title, titleId, backTo, backLabel, children }: { eyebrow: string; title: string; titleId: string; backTo: string; backLabel: string; children?: ReactNode }) {
+  return (
+    <header className="detail-header">
+      <BackLink to={backTo} ariaLabel={backLabel}>{backLabel}</BackLink>
+      <div className="detail-header-main">
+        <div className="detail-title-block">
+          <p className="eyebrow">{eyebrow}</p>
+          <h1 id={titleId}>{title}</h1>
+        </div>
+        {children && <div className="detail-header-meta">{children}</div>}
+      </div>
+    </header>
+  );
+}
+
+function DetailSection({ title, titleId, children, className }: { title: string; titleId: string; children: ReactNode; className?: string }) {
+  return (
+    <section className={className ? `detail-section ${className}` : 'detail-section'} aria-labelledby={titleId}>
+      <h2 id={titleId}>{title}</h2>
+      {children}
+    </section>
   );
 }
 
@@ -439,7 +571,7 @@ function redirectPathFrom(state: unknown): string {
   return typeof pathname === 'string' ? pathname : '/my-shale';
 }
 
-function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
+function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
   const location = useLocation();
 
   if (!user) {
@@ -454,13 +586,7 @@ function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null
           <span>Shale</span>
         </div>
         <span className="beta-badge">Read-only beta</span>
-        <nav className="nav-list">
-          {navigationItems.map((item) => (
-            <Link key={item.path} to={item.path} className={item.activePrefixes.some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`)) ? 'nav-link active' : 'nav-link'}>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <PrimaryNavigation locationPathname={location.pathname} />
       </aside>
 
       <div className="content-column">
@@ -473,10 +599,28 @@ function AuthenticatedShell({ user, onLogout }: { user: AuthenticatedUser | null
           <button type="button" onClick={onLogout}>Logout</button>
         </header>
         <main className="page-content">
-          <Outlet />
+          <div className="content-container">
+            <Outlet />
+          </div>
         </main>
+        <PrimaryNavigation locationPathname={location.pathname} variant="mobile" />
       </div>
     </div>
+  );
+}
+
+function PrimaryNavigation({ locationPathname, variant = 'sidebar' }: { locationPathname: string; variant?: 'sidebar' | 'mobile' }) {
+  return (
+    <nav className={variant === 'mobile' ? 'mobile-nav-list' : 'nav-list'} aria-label={variant === 'mobile' ? 'Primary mobile navigation' : undefined}>
+      {navigationItems.map((item) => {
+        const isActive = item.activePrefixes.some((prefix) => locationPathname === prefix || locationPathname.startsWith(`${prefix}/`));
+        return (
+          <Link key={item.path} to={item.path} className={isActive ? 'nav-link active' : 'nav-link'} aria-current={isActive ? 'page' : undefined}>
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -517,27 +661,35 @@ function MyCasesSection({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="dashboard-section" aria-labelledby="my-cases-title">
       <h2 id="my-cases-title">My Cases</h2>
-      {isLoading && <p className="status">Loading your cases…</p>}
+      {isLoading && <LoadingState message="Loading your cases…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && cases.length === 0 && <p className="status">No assigned cases were found.</p>}
-      {!isLoading && !error && cases.length > 0 && <MyCasesTable cases={cases} />}
+      {!isLoading && !error && cases.length === 0 && <EmptyState message="No assigned cases were found." />}
+      {!isLoading && !error && cases.length > 0 && <MyCasesList cases={cases} />}
     </section>
   );
 }
 
-function MyCasesTable({ cases }: { cases: CaseSearchResult[] }) {
+function MyCasesList({ cases }: { cases: CaseSearchResult[] }) {
   const navigate = useNavigate();
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead><tr><th>Case name</th><th>Status</th><th>Responsible attorney</th><th>Statute of limitations</th></tr></thead>
-        <tbody>{cases.map((item) => (
-          <tr key={item.caseId} className="clickable-row" tabIndex={0} onClick={() => navigate(`/cases/${item.caseId}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/cases/${item.caseId}`); } }}>
-            <td>{item.caseName || `Case ${item.caseId}`}</td><td>{item.caseStatus || '—'}</td><td>{item.responsibleAttorney || '—'}</td><td>{formatDate(item.solDate)}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Assigned cases">
+      {cases.map((item) => (
+        <EntityCard
+          key={item.caseId}
+          title={displayValue(item.caseName, `Case ${item.caseId}`)}
+          subtitle={displayValue(item.caseNumber, `Case ID ${item.caseId}`)}
+          badges={<StatusPill tone="info">{displayValue(item.caseStatus, 'Status not set')}</StatusPill>}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Responsible attorney" value={displayValue(item.responsibleAttorney)} />
+              <MetadataRow label="Statute of limitations" value={formatDate(item.solDate)} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/cases/${item.caseId}`)}
+          ariaLabel={`Open case ${displayValue(item.caseName, `Case ${item.caseId}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
 
@@ -565,27 +717,103 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="dashboard-section" aria-labelledby="my-tasks-title">
       <h2 id="my-tasks-title">My Tasks</h2>
-      {isLoading && <p className="status">Loading your tasks…</p>}
+      {isLoading && <LoadingState message="Loading your tasks…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && tasks.length === 0 && <p className="status">No assigned tasks were found.</p>}
-      {!isLoading && !error && tasks.length > 0 && <MyTasksTable tasks={tasks} />}
+      {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
+      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} />}
     </section>
   );
 }
 
-function MyTasksTable({ tasks }: { tasks: CaseTaskListItem[] }) {
+function MyTasksList({ tasks }: { tasks: CaseTaskListItem[] }) {
   const navigate = useNavigate();
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead><tr><th>Task</th><th>Case</th><th>Due date</th><th>Priority</th><th>Status</th></tr></thead>
-        <tbody>{tasks.map((task) => (
-          <tr key={task.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/tasks/${task.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/tasks/${task.id}`); } }}>
-            <td>{task.title || `Task ${task.id}`}</td><td>{task.caseName || '—'}</td><td>{formatDate(task.dueAt)}</td><td>{task.priorityId ? `Priority ${task.priorityId}` : '—'}</td><td>{task.completedAt ? 'Completed' : 'Open'}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Assigned tasks">
+      {tasks.map((task) => (
+        <EntityCard
+          key={task.id}
+          title={displayValue(task.title, `Task ${task.id}`)}
+          subtitle={displayValue(task.caseName, 'No related case')}
+          badges={<StatusPill tone={task.completedAt ? 'success' : 'warning'}>{task.completedAt ? 'Completed' : 'Open'}</StatusPill>}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Due date" value={formatDate(task.dueAt)} />
+              <MetadataRow label="Priority" value={task.priorityId ? `Priority ${task.priorityId}` : MISSING_VALUE} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/tasks/${task.id}`)}
+          ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
+        />
+      ))}
+    </EntityList>
+  );
+}
+
+
+function TasksPage({ accessToken }: { accessToken: string | null }) {
+  const [tasks, setTasks] = useState<CaseTaskListItem[]>([]);
+  const [query, setQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    listAssignedTasks(accessToken)
+      .then((items) => isCurrent && setTasks(items))
+      .catch((caught) => isCurrent && setError(caught instanceof Error ? caught.message : 'Your tasks could not be loaded.'))
+      .finally(() => isCurrent && setIsLoading(false));
+
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  const filteredTasks = useMemo(() => {
+    const trimmedQuery = query.trim().toLowerCase();
+    if (!trimmedQuery) {
+      return tasks;
+    }
+
+    return tasks.filter((task) => [
+      task.title,
+      task.caseName,
+      task.assignedUserDisplayName,
+      task.completedAt ? 'completed' : 'open',
+    ].some((value) => value?.toLowerCase().includes(trimmedQuery)));
+  }, [tasks, query]);
+
+  function handleTaskSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+  }
+
+  return (
+    <section className="tasks-page" aria-labelledby="tasks-title">
+      <PageHeader eyebrow="Tasks" title="Tasks" titleId="tasks-title" lede="Search your assigned read-only tasks." />
+      <SearchBar
+        id="task-search"
+        label="Search tasks"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleTaskSearch}
+        placeholder="Search by task, case, assignee, or status"
+        submitLabel="Filter"
+      />
+
+      <div className="results-area" aria-live="polite">
+        {isLoading && <LoadingState message="Loading your tasks…" />}
+        {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+        {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
+        {!isLoading && !error && tasks.length > 0 && filteredTasks.length === 0 && <EmptyState message="No tasks matched your search." />}
+        {!isLoading && !error && filteredTasks.length > 0 && <MyTasksList tasks={filteredTasks} />}
+      </div>
+    </section>
   );
 }
 
@@ -632,75 +860,51 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="cases-page" aria-labelledby="cases-title">
       <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search and open read-only case records." />
-      <form className="search-form" onSubmit={handleSearch}>
-        <label htmlFor="case-search">Search cases</label>
-        <div className="search-row">
-          <input
-            id="case-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Enter a case name, number, or client"
-          />
-          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching…' : 'Search'}</button>
-        </div>
-      </form>
+      <SearchBar
+        id="case-search"
+        label="Search cases"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleSearch}
+        placeholder="Enter a case name, number, or client"
+        isLoading={isLoading}
+      />
 
       <div className="results-area" aria-live="polite">
-        {isLoading && <p className="status">Loading case results…</p>}
+        {isLoading && <LoadingState message="Loading case results…" />}
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-        {!isLoading && !error && hasSearched && results.length === 0 && <p className="status">No cases matched your search.</p>}
-        {!isLoading && !error && results.length > 0 && <CaseResultsTable results={results} />}
+        {!isLoading && !error && hasSearched && results.length === 0 && <EmptyState message="No cases matched your search." />}
+        {!isLoading && !error && results.length > 0 && <CaseResultsList results={results} />}
       </div>
     </section>
   );
 }
 
-function CaseResultsTable({ results }: { results: CaseSearchResult[] }) {
+function CaseResultsList({ results }: { results: CaseSearchResult[] }) {
   const navigate = useNavigate();
 
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead>
-          <tr>
-            <th>Case ID</th>
-            <th>Case number</th>
-            <th>Case name</th>
-            <th>Status</th>
-            <th>Responsible attorney</th>
-            <th>Practice area</th>
-            <th>Intake date</th>
-            <th>Client</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((result) => (
-            <tr
-              key={result.caseId}
-              className="clickable-row"
-              tabIndex={0}
-              onClick={() => navigate(`/cases/${result.caseId}`)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate(`/cases/${result.caseId}`);
-                }
-              }}
-            >
-              <td>{result.caseId}</td>
-              <td>{displayValue(result.caseNumber)}</td>
-              <td>{displayValue(result.caseName, `Case ${result.caseId}`)}</td>
-              <td>{displayValue(result.caseStatus)}</td>
-              <td>{displayValue(result.responsibleAttorney)}</td>
-              <td>{displayValue(result.practiceArea)}</td>
-              <td>{formatDate(result.intakeDate)}</td>
-              <td>{displayValue(result.client)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Case search results">
+      {results.map((result) => (
+        <EntityCard
+          key={result.caseId}
+          eyebrow={`Case ID ${result.caseId}`}
+          title={displayValue(result.caseName, `Case ${result.caseId}`)}
+          subtitle={displayValue(result.caseNumber, 'Case number not set')}
+          badges={<StatusPill tone="info">{displayValue(result.caseStatus, 'Status not set')}</StatusPill>}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Responsible attorney" value={displayValue(result.responsibleAttorney)} />
+              <MetadataRow label="Practice area" value={displayValue(result.practiceArea)} />
+              <MetadataRow label="Intake date" value={formatDate(result.intakeDate)} />
+              <MetadataRow label="Client" value={displayValue(result.client)} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/cases/${result.caseId}`)}
+          ariaLabel={`Open case ${displayValue(result.caseName, `Case ${result.caseId}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
 
@@ -747,70 +951,49 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="contacts-page" aria-labelledby="contacts-title">
       <PageHeader eyebrow="Search" title="Contacts" titleId="contacts-title" lede="Search and open read-only contact records." />
-      <form className="search-form" onSubmit={handleSearch}>
-        <label htmlFor="contact-search">Search contacts</label>
-        <div className="search-row">
-          <input
-            id="contact-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Enter a contact name, email, or phone"
-          />
-          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching…' : 'Search'}</button>
-        </div>
-      </form>
+      <SearchBar
+        id="contact-search"
+        label="Search contacts"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleSearch}
+        placeholder="Enter a contact name, email, or phone"
+        isLoading={isLoading}
+      />
 
       <div className="results-area" aria-live="polite">
-        {isLoading && <p className="status">Loading contact results…</p>}
+        {isLoading && <LoadingState message="Loading contact results…" />}
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-        {!isLoading && !error && hasSearched && results.length === 0 && <p className="status">No contacts matched your search.</p>}
-        {!isLoading && !error && results.length > 0 && <ContactResultsTable results={results} />}
+        {!isLoading && !error && hasSearched && results.length === 0 && <EmptyState message="No contacts matched your search." />}
+        {!isLoading && !error && results.length > 0 && <ContactResultsList results={results} />}
       </div>
     </section>
   );
 }
 
-function ContactResultsTable({ results }: { results: ContactSearchResult[] }) {
+function ContactResultsList({ results }: { results: ContactSearchResult[] }) {
   const navigate = useNavigate();
 
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead>
-          <tr>
-            <th>Contact ID</th>
-            <th>Display name</th>
-            <th>Email</th>
-            <th>Phone</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((result) => (
-            <tr
-              key={result.id}
-              className="clickable-row"
-              tabIndex={0}
-              onClick={() => navigate(`/contacts/${result.id}`)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate(`/contacts/${result.id}`);
-                }
-              }}
-            >
-              <td>{result.id}</td>
-              <td>{result.displayName || `Contact ${result.id}`}</td>
-              <td>{result.email || '—'}</td>
-              <td>{result.phone || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Contact search results">
+      {results.map((result) => (
+        <EntityCard
+          key={result.id}
+          eyebrow={`Contact ID ${result.id}`}
+          title={displayValue(result.displayName, `Contact ${result.id}`)}
+          subtitle={displayValue(result.email, 'Email not provided')}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Phone" value={displayValue(result.phone)} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/contacts/${result.id}`)}
+          ariaLabel={`Open contact ${displayValue(result.displayName, `Contact ${result.id}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
-
 
 function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
   const [query, setQuery] = useState('');
@@ -855,60 +1038,56 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="organizations-page" aria-labelledby="organizations-title">
       <PageHeader eyebrow="Search" title="Organizations" titleId="organizations-title" lede="Search and open read-only organization records." />
-      <form className="search-form" onSubmit={handleSearch}>
-        <label htmlFor="organization-search">Search organizations</label>
-        <div className="search-row">
-          <input
-            id="organization-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Enter an organization name"
-          />
-          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching…' : 'Search'}</button>
-        </div>
-      </form>
+      <SearchBar
+        id="organization-search"
+        label="Search organizations"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleSearch}
+        placeholder="Enter an organization name"
+        isLoading={isLoading}
+      />
 
       <div className="results-area" aria-live="polite">
-        {isLoading && <p className="status">Loading organization results…</p>}
+        {isLoading && <LoadingState message="Loading organization results…" />}
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-        {!isLoading && !error && hasSearched && results.length === 0 && <p className="status">No organizations matched your search.</p>}
-        {!isLoading && !error && results.length > 0 && <OrganizationResultsTable results={results} />}
+        {!isLoading && !error && hasSearched && results.length === 0 && <EmptyState message="No organizations matched your search." />}
+        {!isLoading && !error && results.length > 0 && <OrganizationResultsList results={results} />}
       </div>
     </section>
   );
 }
 
-function OrganizationResultsTable({ results }: { results: OrganizationSearchResult[] }) {
+function OrganizationResultsList({ results }: { results: OrganizationSearchResult[] }) {
   const navigate = useNavigate();
 
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead>
-          <tr><th>Organization ID</th><th>Name</th><th>Type</th><th>Email</th><th>Phone</th><th>Website</th><th>Location</th></tr>
-        </thead>
-        <tbody>
-          {results.map((result) => (
-            <tr key={result.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/organizations/${result.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/organizations/${result.id}`); } }}>
-              <td>{result.id}</td>
-              <td>{result.name || `Organization ${result.id}`}</td>
-              <td>{result.organizationTypeName || '—'}</td>
-              <td>{result.email || '—'}</td>
-              <td>{result.phone || '—'}</td>
-              <td>{result.website || '—'}</td>
-              <td>{[result.city, result.state].filter(Boolean).join(', ') || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Organization search results">
+      {results.map((result) => (
+        <EntityCard
+          key={result.id}
+          eyebrow={`Organization ID ${result.id}`}
+          title={displayValue(result.name, `Organization ${result.id}`)}
+          subtitle={displayValue(result.organizationTypeName, 'Organization type not set')}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Email" value={displayValue(result.email)} />
+              <MetadataRow label="Phone" value={displayValue(result.phone)} />
+              <MetadataRow label="Website" value={displayValue(result.website)} />
+              <MetadataRow label="Location" value={[result.city, result.state].filter(Boolean).join(', ') || MISSING_VALUE} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/organizations/${result.id}`)}
+          ariaLabel={`Open organization ${displayValue(result.name, `Organization ${result.id}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
 
-
 function TeamPage({ accessToken }: { accessToken: string | null }) {
   const [members, setMembers] = useState<TeamMemberSummary[]>([]);
+  const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -931,33 +1110,76 @@ function TeamPage({ accessToken }: { accessToken: string | null }) {
     return () => { isCurrent = false; };
   }, [accessToken]);
 
+  const filteredMembers = useMemo(() => {
+    const trimmedQuery = query.trim().toLowerCase();
+    if (!trimmedQuery) {
+      return members;
+    }
+
+    return members.filter((member) => [
+      teamMemberName(member),
+      member.email,
+      member.phone,
+      member.initials,
+      member.attorney ? 'attorney' : null,
+      member.admin ? 'admin' : null,
+    ].some((value) => value?.toLowerCase().includes(trimmedQuery)));
+  }, [members, query]);
+
+  function handleTeamSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+  }
+
   return (
     <section className="team-page" aria-labelledby="team-title">
       <PageHeader eyebrow="Directory" title="Team" titleId="team-title" lede="Browse your read-only team directory." />
+      <SearchBar
+        id="team-search"
+        label="Search team"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleTeamSearch}
+        placeholder="Search by name, email, initials, or role"
+        submitLabel="Filter"
+      />
 
       <div className="results-area" aria-live="polite">
-        {isLoading && <p className="status">Loading team members…</p>}
+        {isLoading && <LoadingState message="Loading team members…" />}
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-        {!isLoading && !error && members.length === 0 && <p className="status">No team members were found.</p>}
-        {!isLoading && !error && members.length > 0 && <TeamMembersTable members={members} />}
+        {!isLoading && !error && members.length === 0 && <EmptyState message="No team members were found." />}
+        {!isLoading && !error && members.length > 0 && filteredMembers.length === 0 && <EmptyState message="No team members matched your search." />}
+        {!isLoading && !error && filteredMembers.length > 0 && <TeamMembersList members={filteredMembers} />}
       </div>
     </section>
   );
 }
 
-function TeamMembersTable({ members }: { members: TeamMemberSummary[] }) {
+function TeamMembersList({ members }: { members: TeamMemberSummary[] }) {
   const navigate = useNavigate();
   return (
-    <div className="table-wrap">
-      <table className="results-table">
-        <thead><tr><th>Name</th><th>Email</th><th>Initials</th><th>Color</th><th>Attorney</th><th>Admin</th></tr></thead>
-        <tbody>{members.map((member) => (
-          <tr key={member.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/team/${member.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/team/${member.id}`); } }}>
-            <td>{teamMemberName(member)}</td><td>{member.email || '—'}</td><td>{member.initials || '—'}</td><td><ColorSwatch color={member.color} /></td><td>{yesNo(member.attorney)}</td><td>{yesNo(member.admin)}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-    </div>
+    <EntityList ariaLabel="Team members">
+      {members.map((member) => (
+        <EntityCard
+          key={member.id}
+          title={teamMemberName(member)}
+          subtitle={displayValue(member.email, 'Email not provided')}
+          badges={(
+            <>
+              {member.attorney && <StatusPill tone="info">Attorney</StatusPill>}
+              {member.admin && <StatusPill tone="success">Admin</StatusPill>}
+            </>
+          )}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Initials" value={displayValue(member.initials)} />
+              <MetadataRow label="Color" value={<ColorSwatch color={member.color} />} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/team/${member.id}`)}
+          ariaLabel={`Open team member ${teamMemberName(member)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
 
@@ -1003,14 +1225,13 @@ function TeamMemberDetailPage({ accessToken }: { accessToken: string | null }) {
   const title = member ? teamMemberName(member) : 'Team Member Detail';
 
   return (
-    <section className="team-member-detail-page" aria-labelledby="team-member-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb"><Link to="/team">Team</Link><span aria-hidden="true">›</span><span>{title}</span></nav>
-      <div className="page-heading-row"><div><p className="eyebrow">Team Member Detail</p><h1 id="team-member-detail-title">{title}</h1></div><Link className="button-link" to="/team">Back to Team</Link></div>
-      {isLoading && <p className="status">Loading team member detail…</p>}
+    <DetailShell className="team-member-detail-page" titleId="team-member-detail-title">
+      <DetailHeader eyebrow="Team Member Detail" title={title} titleId="team-member-detail-title" backTo="/team" backLabel="Back to Team" />
+      {isLoading && <LoadingState message="Loading team member detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && !member && <p className="status">No team member detail was found.</p>}
+      {!isLoading && !error && !member && <EmptyState message="No team member detail was found." />}
       {!isLoading && !error && member && <TeamMemberReadOnly member={member} />}
-    </section>
+    </DetailShell>
   );
 }
 
@@ -1091,25 +1312,14 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
   const title = taskDetail?.title || 'Task Detail';
 
   return (
-    <section className="task-detail-page" aria-labelledby="task-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to="/my-shale">My Shale</Link>
-        <span aria-hidden="true">›</span>
-        <span>{title}</span>
-      </nav>
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">Task Detail</p>
-          <h1 id="task-detail-title">{title}</h1>
-        </div>
-        <Link className="button-link" to="/my-shale">Back to My Shale</Link>
-      </div>
+    <DetailShell className="task-detail-page" titleId="task-detail-title">
+      <DetailHeader eyebrow="Task Detail" title={title} titleId="task-detail-title" backTo="/my-shale" backLabel="Back to My Shale" />
 
-      {isLoading && <p className="status">Loading task detail…</p>}
+      {isLoading && <LoadingState message="Loading task detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && !taskDetail && <p className="status">No task detail was found.</p>}
+      {!isLoading && !error && !taskDetail && <EmptyState message="No task detail was found." />}
       {!isLoading && !error && taskDetail && <TaskDetailReadOnly detail={taskDetail} />}
-    </section>
+    </DetailShell>
   );
 }
 
@@ -1231,28 +1441,32 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
   const title = caseDetail?.caseName || 'Case Detail';
 
   return (
-    <section className="case-detail-page" aria-labelledby="case-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to="/cases">Cases</Link>
-        <span aria-hidden="true">›</span>
-        <span>{title}</span>
-      </nav>
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">Case Detail</p>
-          <h1 id="case-detail-title">{title}</h1>
-        </div>
-        <Link className="button-link" to="/cases">Back to Cases</Link>
-      </div>
+    <DetailShell className="case-detail-page" titleId="case-detail-title">
+      <DetailHeader eyebrow="Case Detail" title={title} titleId="case-detail-title" backTo="/cases" backLabel="Back to Cases">
+        {caseDetail?.caseStatus && <StatusPill tone="info">{caseDetail.caseStatus}</StatusPill>}
+      </DetailHeader>
 
-      {isLoading && <p className="status">Loading case detail…</p>}
+      {isLoading && <LoadingState message="Loading case detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} tasks={caseTasks} tasksError={tasksError} updates={caseUpdates} updatesError={updatesError} />}
-    </section>
+      {!isLoading && !error && caseDetail && (
+        <CaseDetailReadOnly
+          accessToken={accessToken}
+          detail={caseDetail}
+          tasks={caseTasks}
+          tasksError={tasksError}
+          updates={caseUpdates}
+          updatesError={updatesError}
+          onTasksChanged={setCaseTasks}
+          onTasksError={setTasksError}
+          onUpdatesChanged={setCaseUpdates}
+          onUpdatesError={setUpdatesError}
+        />
+      )}
+    </DetailShell>
   );
 }
 
-function CaseDetailReadOnly({ detail, tasks, tasksError, updates, updatesError }: { detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null }) {
+function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, updatesError, onTasksChanged, onTasksError, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
   return (
     <div className="detail-sections">
       <section aria-labelledby="case-info-title">
@@ -1284,13 +1498,13 @@ function CaseDetailReadOnly({ detail, tasks, tasksError, updates, updatesError }
         </dl>
       </section>
 
-      <CaseTasksSection tasks={tasks} error={tasksError} />
+      <CaseTasksSection accessToken={accessToken} caseId={detail.caseId} tasks={tasks} error={tasksError} onTasksChanged={onTasksChanged} onTasksError={onTasksError} />
 
       <StatusTimelineSection history={detail.statusHistory ?? []} />
 
       <RelatedContactsSection contacts={detail.relatedContacts ?? []} />
 
-      <CaseUpdatesSection updates={updates} error={updatesError} />
+      <CaseUpdatesSection accessToken={accessToken} caseId={detail.caseId} updates={updates} error={updatesError} onUpdatesChanged={onUpdatesChanged} onUpdatesError={onUpdatesError} />
     </div>
   );
 }
@@ -1306,7 +1520,7 @@ function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }
     <section aria-labelledby="status-timeline-title">
       <h2 id="status-timeline-title">Status Timeline</h2>
       {sortedHistory.length === 0 ? (
-        <p className="status">No status history has been recorded for this case yet.</p>
+        <EmptyState message="No status history has been recorded for this case yet." />
       ) : (
         <div className="status-timeline-list">
           {sortedHistory.map((item) => {
@@ -1339,41 +1553,191 @@ function normalizeStatusColor(color: string | null | undefined): string {
   return trimmed && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(trimmed) ? trimmed : '#2f80b7';
 }
 
-function CaseTasksSection({ tasks, error }: { tasks: CaseTaskListItem[]; error: string | null }) {
+function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, onTasksError }: { accessToken: string | null; caseId: number; tasks: CaseTaskListItem[]; error: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void }) {
   const navigate = useNavigate();
+  const [isAdding, setIsAdding] = useState(false);
+  const [title, setTitle] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [description, setDescription] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const trimmedTitle = title.trim();
+  const trimmedDescription = description.trim();
+
+  function resetForm() {
+    setTitle('');
+    setDueDate('');
+    setDescription('');
+    setSubmitError(null);
+    setIsAdding(false);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmedTitle) {
+      setSubmitError('Enter a task title before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const refreshedTasks = await createCaseTask(accessToken, caseId, {
+        title: trimmedTitle,
+        description: trimmedDescription || undefined,
+        dueDate: dueDate || undefined,
+      });
+      onTasksChanged(refreshedTasks);
+      onTasksError(null);
+      resetForm();
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case task could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <section aria-labelledby="case-tasks-title">
-      <h2 id="case-tasks-title">Case Tasks</h2>
+      <div className="section-heading-row">
+        <h2 id="case-tasks-title">Case Tasks</h2>
+        {!isAdding && <ActionButton onClick={() => setIsAdding(true)}>Add task</ActionButton>}
+      </div>
+
+      {isAdding && (
+        <form className="case-edit-form" onSubmit={handleSubmit}>
+          <label htmlFor="case-task-title">Task title</label>
+          <input
+            id="case-task-title"
+            type="text"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Add a task title…"
+            disabled={isSubmitting}
+            maxLength={255}
+            required
+          />
+          <label htmlFor="case-task-due-date">Due date</label>
+          <input
+            id="case-task-due-date"
+            type="date"
+            value={dueDate}
+            onChange={(event) => setDueDate(event.target.value)}
+            disabled={isSubmitting}
+          />
+          <label htmlFor="case-task-description">Notes</label>
+          <textarea
+            id="case-task-description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Add optional task notes…"
+            rows={4}
+            disabled={isSubmitting}
+          />
+          {submitError && <p className="status error" role="alert">{submitError}</p>}
+          <div className="form-actions">
+            <ActionButton type="submit" disabled={isSubmitting || !trimmedTitle}>{isSubmitting ? 'Saving…' : 'Save task'}</ActionButton>
+            <SecondaryButton disabled={isSubmitting} onClick={resetForm}>Cancel</SecondaryButton>
+          </div>
+        </form>
+      )}
       {error && <p className="status error" role="alert">{error}</p>}
-      {!error && tasks.length === 0 && <p className="status">No tasks are linked to this case yet.</p>}
+      {!error && tasks.length === 0 && <EmptyState message="No tasks are linked to this case yet." />}
       {!error && tasks.length > 0 && (
-        <div className="table-wrap">
-          <table className="results-table case-tasks-table">
-            <thead><tr><th>Task</th><th>Status</th><th>Priority</th><th>Due date</th><th>Assigned user</th><th>Completed date</th></tr></thead>
-            <tbody>{tasks.map((task) => (
-              <tr key={task.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/tasks/${task.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/tasks/${task.id}`); } }}>
-                <td>{task.title || `Task ${task.id}`}</td>
-                <td>{task.completedAt ? 'Completed' : 'Open'}</td>
-                <td>{task.priorityId ? `Priority ${task.priorityId}` : '—'}</td>
-                <td>{formatDate(task.dueAt)}</td>
-                <td>{task.assignedUserDisplayName || '—'}</td>
-                <td>{formatDate(task.completedAt)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
+        <EntityList ariaLabel="Case tasks">
+          {tasks.map((task) => (
+            <EntityCard
+              key={task.id}
+              title={displayValue(task.title, `Task ${task.id}`)}
+              subtitle={displayValue(task.assignedUserDisplayName, 'Unassigned')}
+              badges={<StatusPill tone={task.completedAt ? 'success' : 'warning'}>{task.completedAt ? 'Completed' : 'Open'}</StatusPill>}
+              metadata={(
+                <MetadataGrid>
+                  <MetadataRow label="Priority" value={task.priorityId ? `Priority ${task.priorityId}` : MISSING_VALUE} />
+                  <MetadataRow label="Due date" value={formatDate(task.dueAt)} />
+                  <MetadataRow label="Completed date" value={formatDate(task.completedAt)} />
+                </MetadataGrid>
+              )}
+              onClick={() => navigate(`/tasks/${task.id}`)}
+              ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
+            />
+          ))}
+        </EntityList>
       )}
     </section>
   );
 }
 
-function CaseUpdatesSection({ updates, error }: { updates: CaseUpdate[]; error: string | null }) {
+function CaseUpdatesSection({ accessToken, caseId, updates, error, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; caseId: number; updates: CaseUpdate[]; error: string | null; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const trimmedNote = noteText.trim();
+
+  function resetForm() {
+    setNoteText('');
+    setSubmitError(null);
+    setIsAdding(false);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmedNote) {
+      setSubmitError('Enter an update before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const refreshedUpdates = await addCaseUpdate(accessToken, caseId, trimmedNote);
+      onUpdatesChanged(refreshedUpdates);
+      onUpdatesError(null);
+      resetForm();
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case update could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <section aria-labelledby="case-updates-title">
-      <h2 id="case-updates-title">Case Updates</h2>
+      <div className="section-heading-row">
+        <h2 id="case-updates-title">Case Updates</h2>
+        {!isAdding && <ActionButton onClick={() => setIsAdding(true)}>Add update</ActionButton>}
+      </div>
+
+      {isAdding && (
+        <form className="case-edit-form" onSubmit={handleSubmit}>
+          <label htmlFor="case-update-note">Update note</label>
+          <textarea
+            id="case-update-note"
+            value={noteText}
+            onChange={(event) => setNoteText(event.target.value)}
+            placeholder="Add a case update…"
+            rows={5}
+            disabled={isSubmitting}
+          />
+          {submitError && <p className="status error" role="alert">{submitError}</p>}
+          <div className="form-actions">
+            <ActionButton type="submit" disabled={isSubmitting || !trimmedNote}>{isSubmitting ? 'Saving…' : 'Save update'}</ActionButton>
+            <SecondaryButton disabled={isSubmitting} onClick={resetForm}>Cancel</SecondaryButton>
+          </div>
+        </form>
+      )}
+
       {error && <p className="status error" role="alert">{error}</p>}
-      {!error && updates.length === 0 && <p className="status">No case updates have been added yet.</p>}
+      {!error && updates.length === 0 && <EmptyState message="No case updates have been added yet." />}
       {!error && updates.length > 0 && (
         <div className="case-updates-timeline">
           {updates.map((update) => (
@@ -1396,7 +1760,7 @@ function RelatedContactsSection({ contacts }: { contacts: CaseRelatedContact[] }
     <section aria-labelledby="related-contacts-title">
       <h2 id="related-contacts-title">Related Contacts</h2>
       {contacts.length === 0 ? (
-        <p className="status">No related contacts are linked to this case yet.</p>
+        <EmptyState message="No related contacts are linked to this case yet." />
       ) : (
         <div className="related-contact-grid">
           {contacts.map((contact) => (
@@ -1462,25 +1826,14 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
   const title = contactDetail?.displayName || 'Contact Detail';
 
   return (
-    <section className="contact-detail-page" aria-labelledby="contact-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to="/contacts">Contacts</Link>
-        <span aria-hidden="true">›</span>
-        <span>{title}</span>
-      </nav>
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">Contact Detail</p>
-          <h1 id="contact-detail-title">{title}</h1>
-        </div>
-        <Link className="button-link" to="/contacts">Back to Contacts</Link>
-      </div>
+    <DetailShell className="contact-detail-page" titleId="contact-detail-title">
+      <DetailHeader eyebrow="Contact Detail" title={title} titleId="contact-detail-title" backTo="/contacts" backLabel="Back to Contacts" />
 
-      {isLoading && <p className="status">Loading contact detail…</p>}
+      {isLoading && <LoadingState message="Loading contact detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && !contactDetail && <p className="status">No contact detail was found.</p>}
+      {!isLoading && !error && !contactDetail && <EmptyState message="No contact detail was found." />}
       {!isLoading && !error && contactDetail && <ContactDetailReadOnly detail={contactDetail} />}
-    </section>
+    </DetailShell>
   );
 }
 
@@ -1543,14 +1896,13 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
   const title = organizationDetail?.name || 'Organization Detail';
 
   return (
-    <section className="organization-detail-page" aria-labelledby="organization-detail-title">
-      <nav className="breadcrumb" aria-label="Breadcrumb"><Link to="/organizations">Organizations</Link><span aria-hidden="true">›</span><span>{title}</span></nav>
-      <div className="page-heading-row"><div><p className="eyebrow">Organization Detail</p><h1 id="organization-detail-title">{title}</h1></div><Link className="button-link" to="/organizations">Back to Organizations</Link></div>
-      {isLoading && <p className="status">Loading organization detail…</p>}
+    <DetailShell className="organization-detail-page" titleId="organization-detail-title">
+      <DetailHeader eyebrow="Organization Detail" title={title} titleId="organization-detail-title" backTo="/organizations" backLabel="Back to Organizations" />
+      {isLoading && <LoadingState message="Loading organization detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && !organizationDetail && <p className="status">No organization detail was found.</p>}
+      {!isLoading && !error && !organizationDetail && <EmptyState message="No organization detail was found." />}
       {!isLoading && !error && organizationDetail && <OrganizationDetailReadOnly detail={organizationDetail} />}
-    </section>
+    </DetailShell>
   );
 }
 
@@ -1574,24 +1926,36 @@ function OrganizationDetailReadOnly({ detail }: { detail: OrganizationDetail }) 
       {detail.relatedCases.length > 0 && (
         <section aria-labelledby="related-cases-title">
           <h2 id="related-cases-title">Related Cases</h2>
-          <RelatedOrganizationCasesTable cases={detail.relatedCases} />
+          <RelatedOrganizationCasesList cases={detail.relatedCases} />
         </section>
       )}
     </div>
   );
 }
 
-function RelatedOrganizationCasesTable({ cases }: { cases: OrganizationDetail['relatedCases'] }) {
+function RelatedOrganizationCasesList({ cases }: { cases: OrganizationDetail['relatedCases'] }) {
   const navigate = useNavigate();
   return (
-    <div className="table-wrap"><table className="results-table"><thead><tr><th>Case name</th><th>Role</th><th>Side</th><th>Responsible attorney</th><th>Intake date</th><th>Statute of limitations</th></tr></thead><tbody>{cases.map((item) => (
-      <tr key={item.id} className="clickable-row" tabIndex={0} onClick={() => navigate(`/cases/${item.id}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(`/cases/${item.id}`); } }}>
-        <td>{item.name || `Case ${item.id}`}</td><td>{item.partyRoleName || '—'}</td><td>{item.side || '—'}</td><td>{item.responsibleAttorneyName || '—'}</td><td>{formatDate(item.intakeDate)}</td><td>{formatDate(item.statuteOfLimitationsDate)}</td>
-      </tr>
-    ))}</tbody></table></div>
+    <EntityList ariaLabel="Related organization cases">
+      {cases.map((item) => (
+        <EntityCard
+          key={item.id}
+          title={displayValue(item.name, `Case ${item.id}`)}
+          subtitle={[item.partyRoleName, item.side].filter(Boolean).join(' • ') || 'Related case'}
+          metadata={(
+            <MetadataGrid>
+              <MetadataRow label="Responsible attorney" value={displayValue(item.responsibleAttorneyName)} />
+              <MetadataRow label="Intake date" value={formatDate(item.intakeDate)} />
+              <MetadataRow label="Statute of limitations" value={formatDate(item.statuteOfLimitationsDate)} />
+            </MetadataGrid>
+          )}
+          onClick={() => navigate(`/cases/${item.id}`)}
+          ariaLabel={`Open related case ${displayValue(item.name, `Case ${item.id}`)}`}
+        />
+      ))}
+    </EntityList>
   );
 }
-
 
 function DetailItem({ label, value, preserveWhitespace = false }: { label: string; value: string | number | null | undefined; preserveWhitespace?: boolean }) {
   const renderedValue = displayValue(value);

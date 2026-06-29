@@ -2,6 +2,7 @@ package com.shale.server.controller;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.http.MediaType;
 
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
@@ -32,6 +34,7 @@ import com.shale.core.service.NotificationServicePort.TaskActionNotificationComm
 import com.shale.core.service.NotificationServicePort.TaskDueDateNotificationCommand;
 import com.shale.core.service.NotificationServicePort.TaskNotificationCommand;
 import com.shale.core.service.TaskServicePort;
+import com.shale.core.service.TaskServicePort.CreateTaskCommand;
 import com.shale.core.service.UserServicePort;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
@@ -269,6 +272,58 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.shaleClientId);
     }
 
+
+    @Test
+    void createCaseTaskReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(post("/api/cases/501/tasks")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"  Review records  \",\"description\":\"  Read intake packet  \",\"dueDate\":\"2026-01-02\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(701))
+                .andExpect(jsonPath("$[0].caseId").value(501))
+                .andExpect(jsonPath("$[0].title").value("Review records"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(501L, taskServicePort.createdCommand.caseId());
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.createdCommand.shaleClientId());
+        org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.createdCommand.createdByUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("Review records", taskServicePort.createdCommand.title());
+        org.junit.jupiter.api.Assertions.assertEquals("Read intake packet", taskServicePort.createdCommand.description());
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2026, 1, 2, 0, 0), taskServicePort.createdCommand.dueAt());
+        org.junit.jupiter.api.Assertions.assertNull(taskServicePort.createdCommand.priorityId());
+        org.junit.jupiter.api.Assertions.assertNull(taskServicePort.createdCommand.assignedUserId());
+        org.junit.jupiter.api.Assertions.assertEquals(501L, taskServicePort.caseId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.shaleClientId);
+    }
+
+    @Test
+    void createCaseTaskRejectsBlankTitle() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(post("/api/cases/501/tasks")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"   \",\"dueDate\":\"2026-01-02\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("Task title is required")));
+
+        org.junit.jupiter.api.Assertions.assertNull(taskServicePort.createdCommand);
+    }
+
     @Test
     void caseUpdatesReachServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
@@ -289,6 +344,51 @@ class ApiReadControllerTest {
 
         org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.updatesCaseId);
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.updatesShaleClientId);
+    }
+
+
+    @Test
+    void addCaseUpdateReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(post("/api/cases/501/updates")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"noteText\":\"  Called client.  \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(901))
+                .andExpect(jsonPath("$[0].noteText").value("Called client."));
+
+        org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.addNoteCaseId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.addNoteShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.addNoteActorUserId);
+        org.junit.jupiter.api.Assertions.assertEquals("Called client.", caseServicePort.addNoteText);
+    }
+
+    @Test
+    void addCaseUpdateRejectsBlankNoteText() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(post("/api/cases/501/updates")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"noteText\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("Note text is required")));
+
+        org.junit.jupiter.api.Assertions.assertNull(caseServicePort.addNoteText);
     }
 
     @Test
@@ -488,6 +588,10 @@ class ApiReadControllerTest {
         private int assignedLimit;
         private long updatesCaseId;
         private int updatesShaleClientId;
+        private long addNoteCaseId;
+        private int addNoteShaleClientId;
+        private int addNoteActorUserId;
+        private String addNoteText;
 
         @Override
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
@@ -576,7 +680,10 @@ class ApiReadControllerTest {
 
         @Override
         public void addCaseNote(AddCaseNoteCommand command) {
-            throw new AssertionError("addCaseNote should not be called");
+            this.addNoteCaseId = command.caseId();
+            this.addNoteShaleClientId = command.shaleClientId();
+            this.addNoteActorUserId = command.actorUserId();
+            this.addNoteText = command.noteText();
         }
 
         @Override
@@ -612,6 +719,7 @@ class ApiReadControllerTest {
         private int assignedShaleClientId;
         private long detailTaskId;
         private int detailShaleClientId;
+        private CreateTaskCommand createdCommand;
 
         @Override
         public List<CaseTaskListItemDto> listCaseTasks(long caseId, int shaleClientId) {
@@ -657,7 +765,8 @@ class ApiReadControllerTest {
 
         @Override
         public long createTaskWithDefaultStatus(CreateTaskCommand command) {
-            throw new AssertionError("createTaskWithDefaultStatus should not be called");
+            this.createdCommand = command;
+            return 701L;
         }
 
         @Override
