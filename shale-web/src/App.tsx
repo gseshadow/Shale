@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1456,6 +1456,8 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
           tasksError={tasksError}
           updates={caseUpdates}
           updatesError={updatesError}
+          onTasksChanged={setCaseTasks}
+          onTasksError={setTasksError}
           onUpdatesChanged={setCaseUpdates}
           onUpdatesError={setUpdatesError}
         />
@@ -1464,7 +1466,7 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
   );
 }
 
-function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, updatesError, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
+function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, updatesError, onTasksChanged, onTasksError, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
   return (
     <div className="detail-sections">
       <section aria-labelledby="case-info-title">
@@ -1496,7 +1498,7 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
         </dl>
       </section>
 
-      <CaseTasksSection tasks={tasks} error={tasksError} />
+      <CaseTasksSection accessToken={accessToken} caseId={detail.caseId} tasks={tasks} error={tasksError} onTasksChanged={onTasksChanged} onTasksError={onTasksError} />
 
       <StatusTimelineSection history={detail.statusHistory ?? []} />
 
@@ -1551,12 +1553,98 @@ function normalizeStatusColor(color: string | null | undefined): string {
   return trimmed && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(trimmed) ? trimmed : '#2f80b7';
 }
 
-function CaseTasksSection({ tasks, error }: { tasks: CaseTaskListItem[]; error: string | null }) {
+function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, onTasksError }: { accessToken: string | null; caseId: number; tasks: CaseTaskListItem[]; error: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void }) {
   const navigate = useNavigate();
+  const [isAdding, setIsAdding] = useState(false);
+  const [title, setTitle] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [description, setDescription] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const trimmedTitle = title.trim();
+  const trimmedDescription = description.trim();
+
+  function resetForm() {
+    setTitle('');
+    setDueDate('');
+    setDescription('');
+    setSubmitError(null);
+    setIsAdding(false);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmedTitle) {
+      setSubmitError('Enter a task title before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const refreshedTasks = await createCaseTask(accessToken, caseId, {
+        title: trimmedTitle,
+        description: trimmedDescription || undefined,
+        dueDate: dueDate || undefined,
+      });
+      onTasksChanged(refreshedTasks);
+      onTasksError(null);
+      resetForm();
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case task could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <section aria-labelledby="case-tasks-title">
-      <h2 id="case-tasks-title">Case Tasks</h2>
+      <div className="section-heading-row">
+        <h2 id="case-tasks-title">Case Tasks</h2>
+        {!isAdding && <ActionButton onClick={() => setIsAdding(true)}>Add task</ActionButton>}
+      </div>
+
+      {isAdding && (
+        <form className="case-edit-form" onSubmit={handleSubmit}>
+          <label htmlFor="case-task-title">Task title</label>
+          <input
+            id="case-task-title"
+            type="text"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Add a task title…"
+            disabled={isSubmitting}
+            maxLength={255}
+            required
+          />
+          <label htmlFor="case-task-due-date">Due date</label>
+          <input
+            id="case-task-due-date"
+            type="date"
+            value={dueDate}
+            onChange={(event) => setDueDate(event.target.value)}
+            disabled={isSubmitting}
+          />
+          <label htmlFor="case-task-description">Notes</label>
+          <textarea
+            id="case-task-description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Add optional task notes…"
+            rows={4}
+            disabled={isSubmitting}
+          />
+          {submitError && <p className="status error" role="alert">{submitError}</p>}
+          <div className="form-actions">
+            <ActionButton type="submit" disabled={isSubmitting || !trimmedTitle}>{isSubmitting ? 'Saving…' : 'Save task'}</ActionButton>
+            <SecondaryButton disabled={isSubmitting} onClick={resetForm}>Cancel</SecondaryButton>
+          </div>
+        </form>
+      )}
       {error && <p className="status error" role="alert">{error}</p>}
       {!error && tasks.length === 0 && <EmptyState message="No tasks are linked to this case yet." />}
       {!error && tasks.length > 0 && (
@@ -1630,7 +1718,7 @@ function CaseUpdatesSection({ accessToken, caseId, updates, error, onUpdatesChan
       </div>
 
       {isAdding && (
-        <form className="case-update-form" onSubmit={handleSubmit}>
+        <form className="case-edit-form" onSubmit={handleSubmit}>
           <label htmlFor="case-update-note">Update note</label>
           <textarea
             id="case-update-note"

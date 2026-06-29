@@ -539,7 +539,7 @@ input:focus-visible {
   margin-bottom: 0;
 }
 
-.case-update-form {
+.case-edit-form {
   background: #f7fbfe;
   border: 1px solid var(--border-strong);
   border-radius: 16px;
@@ -547,16 +547,26 @@ input:focus-visible {
   padding: clamp(1rem, 4vw, 1.25rem);
 }
 
+input[type="text"],
+input[type="date"],
 textarea {
   border: 1px solid #c9d4df;
   border-radius: 14px;
   font: inherit;
   line-height: 1.55;
-  min-height: 9rem;
   min-width: 0;
   padding: .9rem 1rem;
-  resize: vertical;
   width: 100%;
+}
+
+input[type="text"],
+input[type="date"] {
+  min-height: 2.75rem;
+}
+
+textarea {
+  min-height: 9rem;
+  resize: vertical;
 }
 
 input:focus-visible,
