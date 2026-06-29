@@ -19,17 +19,44 @@ import javafx.scene.paint.Color;
 final class SettingsControllerLifecycleTest {
 
     @Test
-    void initializeLoadsCaseStatusesWhenServiceWasInjectedBeforeFxmlInjection() throws Exception {
+    void initializeLoadsAdminSectionsAsynchronouslyWhenServiceWasInjectedBeforeFxmlInjection() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
         String initialize = methodSource(source, "initialize");
+        String loadAdminSections = methodSource(source, "loadAdminSectionsAsync");
 
-        assertTrue(initialize.contains("if (caseService != null && isAdminUser())"),
-                "SceneManager injects SettingsController dependencies through the controller factory before FXML initialize(); initialize must only load lookup-management lists for admins.");
-        assertTrue(initialize.contains("loadCaseStatuses();"),
-                "SettingsController.initialize() should populate Settings > Case Statuses for admins when service injection already happened.");
-        assertTrue(initialize.contains("loadPracticeAreas();"),
-                "SettingsController.initialize() should populate Settings > Practice Areas for admins when service injection already happened.");
+        assertTrue(initialize.contains("loadAdminSectionsAsync();"),
+                "SceneManager injects SettingsController dependencies through the controller factory before FXML initialize(); initialize should start non-blocking section hydration.");
+        assertTrue(loadAdminSections.contains("if (!fxmlReady || !isAdminUser()) return;"),
+                "Settings async hydration must preserve admin-only lookup-management visibility and service access.");
+        assertTrue(loadAdminSections.contains("loadCaseStatusesAsync(null);"),
+                "SettingsController.initialize() should asynchronously populate Settings > Case Statuses for admins when service injection already happened.");
+        assertTrue(loadAdminSections.contains("loadPracticeAreasAsync(null);"),
+                "SettingsController.initialize() should asynchronously populate Settings > Practice Areas for admins when service injection already happened.");
+        assertTrue(loadAdminSections.contains("loadManagedUsersAsync(null);"),
+                "SettingsController.initialize() should asynchronously populate Settings > User Management for admins when service injection already happened.");
     }
+    @Test
+    void settingsSectionHydrationUsesBackgroundExecutorAndStaleResultGuards() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+
+        assertTrue(source.contains("Executors.newFixedThreadPool(3"),
+                "Independent Settings sections should hydrate on a background executor instead of the JavaFX application thread.");
+        assertTrue(source.contains("settingsLoadExecutor.submit"),
+                "Settings service/DAO calls should be submitted to the background executor.");
+        assertTrue(source.contains("Platform.runLater(() -> applyCaseStatusRows"),
+                "Case Status UI application must happen on the JavaFX application thread.");
+        assertTrue(source.contains("Platform.runLater(() -> applyPracticeAreaRows"),
+                "Practice Area UI application must happen on the JavaFX application thread.");
+        assertTrue(source.contains("Platform.runLater(() -> {"),
+                "User-management UI application must happen on the JavaFX application thread.");
+        assertTrue(source.contains("if (generation != caseStatusLoadGeneration) return;"),
+                "Case Status async results need stale-result protection.");
+        assertTrue(source.contains("if (generation != practiceAreaLoadGeneration) return;"),
+                "Practice Area async results need stale-result protection.");
+        assertTrue(source.contains("if (generation != userManagementLoadGeneration) return;"),
+                "User Management async results need stale-result protection.");
+    }
+
 
     @Test
     void statusColorRoundTripsDatabaseHexFormat() {

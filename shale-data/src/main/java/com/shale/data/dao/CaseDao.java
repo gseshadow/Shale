@@ -5681,24 +5681,85 @@ public final class CaseDao {
 			String sql = """
 					SELECT Id, ShaleClientId, Name, Color, IsActive, IsDeleted, %s
 					FROM dbo.PracticeAreas
-					WHERE (ShaleClientId = ? OR ShaleClientId IS NULL)
+					WHERE (ShaleClientId IS NULL OR ShaleClientId = ?)
 					%s
-					ORDER BY CASE WHEN ShaleClientId = ? THEN 0 ELSE 1 END, Name, Id;
+					ORDER BY CASE WHEN ShaleClientId = ? THEN 1 ELSE 0 END, Name, Id;
 					""".formatted(systemKeySelect, activeFilter);
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				ps.setInt(1, shaleClientId);
 				ps.setInt(2, shaleClientId);
 				try (ResultSet rs = ps.executeQuery()) {
-					List<PracticeAreaDto> out = new ArrayList<>();
+					List<PracticeAreaDto> globalAreas = new ArrayList<>();
+					List<PracticeAreaDto> tenantAreas = new ArrayList<>();
 					while (rs.next()) {
-						out.add(mapPracticeAreaDto(rs));
+						PracticeAreaDto area = mapPracticeAreaDto(rs);
+						if (area.shaleClientId() == null) {
+							globalAreas.add(area);
+						} else if (area.shaleClientId() == shaleClientId) {
+							tenantAreas.add(area);
+						}
 					}
-					return out;
+					return resolveEffectivePracticeAreas(globalAreas, tenantAreas);
 				}
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list practice areas (clientId=" + shaleClientId + ")", e);
 		}
+	}
+
+	static List<PracticeAreaDto> resolveEffectivePracticeAreas(List<PracticeAreaDto> globalAreas, List<PracticeAreaDto> tenantAreas) {
+		Map<String, PracticeAreaDto> byLogicalKey = new LinkedHashMap<>();
+		List<PracticeAreaDto> unkeyed = new ArrayList<>();
+		if (globalAreas != null) {
+			for (PracticeAreaDto area : globalAreas) {
+				if (area == null) continue;
+				String logicalKey = practiceAreaLogicalKey(area);
+				if (logicalKey == null) {
+					unkeyed.add(area);
+				} else {
+					byLogicalKey.putIfAbsent(logicalKey, area);
+				}
+			}
+		}
+		if (tenantAreas != null) {
+			for (PracticeAreaDto area : tenantAreas) {
+				if (area == null) continue;
+				String logicalKey = practiceAreaLogicalKey(area);
+				if (logicalKey == null) {
+					unkeyed.add(area);
+				} else {
+					byLogicalKey.put(logicalKey, area);
+				}
+			}
+		}
+		List<PracticeAreaDto> merged = new ArrayList<>(byLogicalKey.size() + unkeyed.size());
+		merged.addAll(byLogicalKey.values());
+		merged.addAll(unkeyed);
+		merged.sort((a, b) -> {
+			if (a == b) return 0;
+			if (a == null) return 1;
+			if (b == null) return -1;
+			String aName = a.name() == null ? "" : a.name();
+			String bName = b.name() == null ? "" : b.name();
+			int byName = aName.compareToIgnoreCase(bName);
+			if (byName != 0) return byName;
+			return Integer.compare(a.id(), b.id());
+		});
+		return merged;
+	}
+
+	private static String practiceAreaLogicalKey(PracticeAreaDto area) {
+		String systemKey = normalizeSystemKey(area.systemKey());
+		if (systemKey != null) {
+			return "system:" + systemKey;
+		}
+		String nameKey = normalizePracticeAreaNameKey(area.name());
+		return nameKey == null ? null : "name:" + nameKey;
+	}
+
+	private static String normalizePracticeAreaNameKey(String name) {
+		String trimmed = name == null ? "" : name.trim();
+		return trimmed.isBlank() ? null : trimmed.toLowerCase(Locale.ROOT);
 	}
 
 	public List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive) {
