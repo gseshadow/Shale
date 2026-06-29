@@ -71,15 +71,51 @@ function formatDateTime(value: string | null | undefined): string {
 
 function PageHeader({ eyebrow, title, titleId, lede, action }: { eyebrow: string; title: string; titleId?: string; lede?: string; action?: ReactNode }) {
   return (
-    <div className="page-heading-row">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1 id={titleId}>{title}</h1>
-        {lede && <p className="lede">{lede}</p>}
+    <header className="page-header">
+      <div className="page-heading-row">
+        <div className="page-title-block">
+          <p className="eyebrow">{eyebrow}</p>
+          <h1 id={titleId}>{title}</h1>
+          {lede && <p className="lede">{lede}</p>}
+        </div>
+        {action && <ToolbarActions>{action}</ToolbarActions>}
       </div>
-      {action}
-    </div>
+    </header>
   );
+}
+
+function ToolbarActions({ children }: { children: ReactNode }) {
+  return <div className="toolbar-actions">{children}</div>;
+}
+
+function ActionButton({ children, type = 'button', disabled = false }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean }) {
+  return <button className="action-button" type={type} disabled={disabled}>{children}</button>;
+}
+
+function SecondaryButton({ children, type = 'button', disabled = false, onClick }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean; onClick?: () => void }) {
+  return <button className="secondary-button" type={type} disabled={disabled} onClick={onClick}>{children}</button>;
+}
+
+function SearchBar({ id, label, value, placeholder, isLoading, loadingLabel = 'Searching…', submitLabel = 'Search', onChange, onSubmit }: { id: string; label: string; value: string; placeholder: string; isLoading?: boolean; loadingLabel?: string; submitLabel?: string; onChange: (value: string) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  return (
+    <form className="search-form filter-bar" onSubmit={onSubmit} role="search">
+      <label className="search-label" htmlFor={id}>{label}</label>
+      <div className="search-row">
+        <input
+          id={id}
+          type="search"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+        />
+        <ActionButton type="submit" disabled={isLoading}>{isLoading ? loadingLabel : submitLabel}</ActionButton>
+      </div>
+    </form>
+  );
+}
+
+function FilterBar({ children, label = 'Filters and actions' }: { children: ReactNode; label?: string }) {
+  return <div className="filter-bar" aria-label={label}>{children}</div>;
 }
 
 function displayNameFor(user: AuthenticatedUser): string {
@@ -145,7 +181,7 @@ function AppRoutes() {
           <Route path="/my-shale" element={<MyShalePage accessToken={authState.accessToken} user={authState.user} />} />
           <Route path="/cases" element={<CasesPage accessToken={authState.accessToken} />} />
           <Route path="/cases/:caseId" element={<CaseDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/tasks" element={<PlaceholderPage title="Tasks" />} />
+          <Route path="/tasks" element={<TasksPage accessToken={authState.accessToken} />} />
           <Route path="/tasks/:taskId" element={<TaskDetailPage accessToken={authState.accessToken} />} />
           <Route path="/contacts" element={<ContactsPage accessToken={authState.accessToken} />} />
           <Route path="/contacts/:contactId" element={<ContactDetailPage accessToken={authState.accessToken} />} />
@@ -246,14 +282,12 @@ function SettingsPage({ accessToken, user }: { accessToken: string | null; user:
 
   return (
     <section className="settings-page">
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">Settings</p>
-          <h1>Settings</h1>
-          <p className="lede">Read-only account and tenant settings for the signed-in Shale session.</p>
-          <span className="inline-beta-badge">Read-only beta</span>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Settings"
+        title="Settings"
+        lede="Read-only account and tenant settings for the signed-in Shale session."
+        action={<span className="inline-beta-badge">Read-only beta</span>}
+      />
 
       <div className="detail-sections">
         <section className="settings-card">
@@ -715,6 +749,74 @@ function MyTasksList({ tasks }: { tasks: CaseTaskListItem[] }) {
   );
 }
 
+
+function TasksPage({ accessToken }: { accessToken: string | null }) {
+  const [tasks, setTasks] = useState<CaseTaskListItem[]>([]);
+  const [query, setQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setError('Your Shale session is not available. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    listAssignedTasks(accessToken)
+      .then((items) => isCurrent && setTasks(items))
+      .catch((caught) => isCurrent && setError(caught instanceof Error ? caught.message : 'Your tasks could not be loaded.'))
+      .finally(() => isCurrent && setIsLoading(false));
+
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  const filteredTasks = useMemo(() => {
+    const trimmedQuery = query.trim().toLowerCase();
+    if (!trimmedQuery) {
+      return tasks;
+    }
+
+    return tasks.filter((task) => [
+      task.title,
+      task.caseName,
+      task.assignedUserDisplayName,
+      task.completedAt ? 'completed' : 'open',
+    ].some((value) => value?.toLowerCase().includes(trimmedQuery)));
+  }, [tasks, query]);
+
+  function handleTaskSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+  }
+
+  return (
+    <section className="tasks-page" aria-labelledby="tasks-title">
+      <PageHeader eyebrow="Tasks" title="Tasks" titleId="tasks-title" lede="Search your assigned read-only tasks." />
+      <SearchBar
+        id="task-search"
+        label="Search tasks"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleTaskSearch}
+        placeholder="Search by task, case, assignee, or status"
+        submitLabel="Filter"
+      />
+
+      <div className="results-area" aria-live="polite">
+        {isLoading && <LoadingState message="Loading your tasks…" />}
+        {!isLoading && error && <p className="status error" role="alert">{error}</p>}
+        {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
+        {!isLoading && !error && tasks.length > 0 && filteredTasks.length === 0 && <EmptyState message="No tasks matched your search." />}
+        {!isLoading && !error && filteredTasks.length > 0 && <MyTasksList tasks={filteredTasks} />}
+      </div>
+    </section>
+  );
+}
+
 function CasesPage({ accessToken }: { accessToken: string | null }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CaseSearchResult[]>([]);
@@ -758,19 +860,15 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="cases-page" aria-labelledby="cases-title">
       <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search and open read-only case records." />
-      <form className="search-form" onSubmit={handleSearch}>
-        <label htmlFor="case-search">Search cases</label>
-        <div className="search-row">
-          <input
-            id="case-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Enter a case name, number, or client"
-          />
-          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching…' : 'Search'}</button>
-        </div>
-      </form>
+      <SearchBar
+        id="case-search"
+        label="Search cases"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleSearch}
+        placeholder="Enter a case name, number, or client"
+        isLoading={isLoading}
+      />
 
       <div className="results-area" aria-live="polite">
         {isLoading && <LoadingState message="Loading case results…" />}
@@ -853,19 +951,15 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="contacts-page" aria-labelledby="contacts-title">
       <PageHeader eyebrow="Search" title="Contacts" titleId="contacts-title" lede="Search and open read-only contact records." />
-      <form className="search-form" onSubmit={handleSearch}>
-        <label htmlFor="contact-search">Search contacts</label>
-        <div className="search-row">
-          <input
-            id="contact-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Enter a contact name, email, or phone"
-          />
-          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching…' : 'Search'}</button>
-        </div>
-      </form>
+      <SearchBar
+        id="contact-search"
+        label="Search contacts"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleSearch}
+        placeholder="Enter a contact name, email, or phone"
+        isLoading={isLoading}
+      />
 
       <div className="results-area" aria-live="polite">
         {isLoading && <LoadingState message="Loading contact results…" />}
@@ -944,19 +1038,15 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="organizations-page" aria-labelledby="organizations-title">
       <PageHeader eyebrow="Search" title="Organizations" titleId="organizations-title" lede="Search and open read-only organization records." />
-      <form className="search-form" onSubmit={handleSearch}>
-        <label htmlFor="organization-search">Search organizations</label>
-        <div className="search-row">
-          <input
-            id="organization-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Enter an organization name"
-          />
-          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching…' : 'Search'}</button>
-        </div>
-      </form>
+      <SearchBar
+        id="organization-search"
+        label="Search organizations"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleSearch}
+        placeholder="Enter an organization name"
+        isLoading={isLoading}
+      />
 
       <div className="results-area" aria-live="polite">
         {isLoading && <LoadingState message="Loading organization results…" />}
@@ -997,6 +1087,7 @@ function OrganizationResultsList({ results }: { results: OrganizationSearchResul
 
 function TeamPage({ accessToken }: { accessToken: string | null }) {
   const [members, setMembers] = useState<TeamMemberSummary[]>([]);
+  const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -1019,15 +1110,45 @@ function TeamPage({ accessToken }: { accessToken: string | null }) {
     return () => { isCurrent = false; };
   }, [accessToken]);
 
+  const filteredMembers = useMemo(() => {
+    const trimmedQuery = query.trim().toLowerCase();
+    if (!trimmedQuery) {
+      return members;
+    }
+
+    return members.filter((member) => [
+      teamMemberName(member),
+      member.email,
+      member.phone,
+      member.initials,
+      member.attorney ? 'attorney' : null,
+      member.admin ? 'admin' : null,
+    ].some((value) => value?.toLowerCase().includes(trimmedQuery)));
+  }, [members, query]);
+
+  function handleTeamSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+  }
+
   return (
     <section className="team-page" aria-labelledby="team-title">
       <PageHeader eyebrow="Directory" title="Team" titleId="team-title" lede="Browse your read-only team directory." />
+      <SearchBar
+        id="team-search"
+        label="Search team"
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleTeamSearch}
+        placeholder="Search by name, email, initials, or role"
+        submitLabel="Filter"
+      />
 
       <div className="results-area" aria-live="polite">
         {isLoading && <LoadingState message="Loading team members…" />}
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
         {!isLoading && !error && members.length === 0 && <EmptyState message="No team members were found." />}
-        {!isLoading && !error && members.length > 0 && <TeamMembersList members={members} />}
+        {!isLoading && !error && members.length > 0 && filteredMembers.length === 0 && <EmptyState message="No team members matched your search." />}
+        {!isLoading && !error && filteredMembers.length > 0 && <TeamMembersList members={filteredMembers} />}
       </div>
     </section>
   );
@@ -1106,9 +1227,9 @@ function TeamMemberDetailPage({ accessToken }: { accessToken: string | null }) {
   return (
     <DetailShell className="team-member-detail-page" titleId="team-member-detail-title">
       <DetailHeader eyebrow="Team Member Detail" title={title} titleId="team-member-detail-title" backTo="/team" backLabel="Back to Team" />
-      {isLoading && <p className="status">Loading team member detail…</p>}
+      {isLoading && <LoadingState message="Loading team member detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && !member && <p className="status">No team member detail was found.</p>}
+      {!isLoading && !error && !member && <EmptyState message="No team member detail was found." />}
       {!isLoading && !error && member && <TeamMemberReadOnly member={member} />}
     </DetailShell>
   );
@@ -1194,9 +1315,9 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
     <DetailShell className="task-detail-page" titleId="task-detail-title">
       <DetailHeader eyebrow="Task Detail" title={title} titleId="task-detail-title" backTo="/my-shale" backLabel="Back to My Shale" />
 
-      {isLoading && <p className="status">Loading task detail…</p>}
+      {isLoading && <LoadingState message="Loading task detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && !taskDetail && <p className="status">No task detail was found.</p>}
+      {!isLoading && !error && !taskDetail && <EmptyState message="No task detail was found." />}
       {!isLoading && !error && taskDetail && <TaskDetailReadOnly detail={taskDetail} />}
     </DetailShell>
   );
@@ -1325,7 +1446,7 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
         {caseDetail?.caseStatus && <StatusPill tone="info">{caseDetail.caseStatus}</StatusPill>}
       </DetailHeader>
 
-      {isLoading && <p className="status">Loading case detail…</p>}
+      {isLoading && <LoadingState message="Loading case detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} tasks={caseTasks} tasksError={tasksError} updates={caseUpdates} updatesError={updatesError} />}
     </DetailShell>
@@ -1386,7 +1507,7 @@ function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }
     <section aria-labelledby="status-timeline-title">
       <h2 id="status-timeline-title">Status Timeline</h2>
       {sortedHistory.length === 0 ? (
-        <p className="status">No status history has been recorded for this case yet.</p>
+        <EmptyState message="No status history has been recorded for this case yet." />
       ) : (
         <div className="status-timeline-list">
           {sortedHistory.map((item) => {
@@ -1457,7 +1578,7 @@ function CaseUpdatesSection({ updates, error }: { updates: CaseUpdate[]; error: 
     <section aria-labelledby="case-updates-title">
       <h2 id="case-updates-title">Case Updates</h2>
       {error && <p className="status error" role="alert">{error}</p>}
-      {!error && updates.length === 0 && <p className="status">No case updates have been added yet.</p>}
+      {!error && updates.length === 0 && <EmptyState message="No case updates have been added yet." />}
       {!error && updates.length > 0 && (
         <div className="case-updates-timeline">
           {updates.map((update) => (
@@ -1480,7 +1601,7 @@ function RelatedContactsSection({ contacts }: { contacts: CaseRelatedContact[] }
     <section aria-labelledby="related-contacts-title">
       <h2 id="related-contacts-title">Related Contacts</h2>
       {contacts.length === 0 ? (
-        <p className="status">No related contacts are linked to this case yet.</p>
+        <EmptyState message="No related contacts are linked to this case yet." />
       ) : (
         <div className="related-contact-grid">
           {contacts.map((contact) => (
@@ -1549,9 +1670,9 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
     <DetailShell className="contact-detail-page" titleId="contact-detail-title">
       <DetailHeader eyebrow="Contact Detail" title={title} titleId="contact-detail-title" backTo="/contacts" backLabel="Back to Contacts" />
 
-      {isLoading && <p className="status">Loading contact detail…</p>}
+      {isLoading && <LoadingState message="Loading contact detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && !contactDetail && <p className="status">No contact detail was found.</p>}
+      {!isLoading && !error && !contactDetail && <EmptyState message="No contact detail was found." />}
       {!isLoading && !error && contactDetail && <ContactDetailReadOnly detail={contactDetail} />}
     </DetailShell>
   );
@@ -1618,9 +1739,9 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
   return (
     <DetailShell className="organization-detail-page" titleId="organization-detail-title">
       <DetailHeader eyebrow="Organization Detail" title={title} titleId="organization-detail-title" backTo="/organizations" backLabel="Back to Organizations" />
-      {isLoading && <p className="status">Loading organization detail…</p>}
+      {isLoading && <LoadingState message="Loading organization detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && !organizationDetail && <p className="status">No organization detail was found.</p>}
+      {!isLoading && !error && !organizationDetail && <EmptyState message="No organization detail was found." />}
       {!isLoading && !error && organizationDetail && <OrganizationDetailReadOnly detail={organizationDetail} />}
     </DetailShell>
   );
