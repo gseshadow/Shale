@@ -25,6 +25,7 @@ import javafx.stage.Window;
 import com.shale.ui.util.WindowSizingUtil;
 
 public final class AppDialogs {
+	private static final double DEFAULT_DIALOG_MIN_WIDTH = 460;
 
 	private AppDialogs() {
 	}
@@ -230,7 +231,9 @@ public final class AppDialogs {
 		VBox root = new VBox(18);
 		root.getStyleClass().add("app-dialog-root");
 		root.setPadding(new Insets(18));
-		root.setMinWidth(minWidth);
+		double safeMinWidth = Math.max(DEFAULT_DIALOG_MIN_WIDTH, minWidth);
+		root.setMinWidth(safeMinWidth);
+		root.setPrefWidth(safeMinWidth);
 
 		if (!isBlank(heading) || !isBlank(message)) {
 			VBox headerBox = new VBox(8);
@@ -278,7 +281,7 @@ public final class AppDialogs {
 		scene.getStylesheets().add(Objects.requireNonNull(
 				AppDialogs.class.getResource("/css/app.css")).toExternalForm());
 		stage.setScene(scene);
-		WindowSizingUtil.sizeModalStage(stage, owner, minWidth, root.prefHeight(-1));
+		WindowSizingUtil.sizeModalStage(stage, owner, safeMinWidth, root.prefHeight(safeMinWidth), safeMinWidth, 0);
 		stage.showAndWait();
 		return Optional.ofNullable(result.value);
 	}
