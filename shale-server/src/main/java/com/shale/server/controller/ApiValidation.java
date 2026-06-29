@@ -11,6 +11,7 @@ final class ApiValidation {
     private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_EMAIL_LENGTH = 254;
     private static final int MAX_PASSWORD_LENGTH = 1024;
+    private static final int MAX_NOTE_TEXT_LENGTH = 10_000;
 
     private ApiValidation() {
     }
@@ -35,6 +36,17 @@ final class ApiValidation {
             throw badRequest("Search query must be 100 characters or fewer.");
         }
         return safeQuery;
+    }
+
+    static String noteText(String noteText) {
+        String safeNoteText = noteText == null ? "" : noteText.trim();
+        if (safeNoteText.isEmpty()) {
+            throw badRequest("Note text is required.");
+        }
+        if (safeNoteText.length() > MAX_NOTE_TEXT_LENGTH) {
+            throw badRequest("Note text must be 10000 characters or fewer.");
+        }
+        return safeNoteText;
     }
 
     static long positiveId(long id, String fieldName) {

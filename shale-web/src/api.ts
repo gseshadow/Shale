@@ -377,6 +377,24 @@ export async function listCaseTasks(accessToken: string, caseId: number): Promis
   return response.json() as Promise<CaseTaskListItem[]>;
 }
 
+export async function addCaseUpdate(accessToken: string, caseId: number, noteText: string): Promise<CaseUpdate[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/updates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ noteText }),
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not add the case update.', response.status);
+  }
+
+  return response.json() as Promise<CaseUpdate[]>;
+}
+
 export async function listCaseUpdates(accessToken: string, caseId: number): Promise<CaseUpdate[]> {
   const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/updates`, {
     method: 'GET',

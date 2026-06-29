@@ -2,6 +2,7 @@ package com.shale.server.controller;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.http.MediaType;
 
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
@@ -291,6 +293,51 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.updatesShaleClientId);
     }
 
+
+    @Test
+    void addCaseUpdateReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(post("/api/cases/501/updates")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"noteText\":\"  Called client.  \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(901))
+                .andExpect(jsonPath("$[0].noteText").value("Called client."));
+
+        org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.addNoteCaseId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.addNoteShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.addNoteActorUserId);
+        org.junit.jupiter.api.Assertions.assertEquals("Called client.", caseServicePort.addNoteText);
+    }
+
+    @Test
+    void addCaseUpdateRejectsBlankNoteText() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(post("/api/cases/501/updates")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"noteText\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("Note text is required")));
+
+        org.junit.jupiter.api.Assertions.assertNull(caseServicePort.addNoteText);
+    }
+
     @Test
     void contactSearchReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
@@ -488,6 +535,10 @@ class ApiReadControllerTest {
         private int assignedLimit;
         private long updatesCaseId;
         private int updatesShaleClientId;
+        private long addNoteCaseId;
+        private int addNoteShaleClientId;
+        private int addNoteActorUserId;
+        private String addNoteText;
 
         @Override
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
@@ -576,7 +627,10 @@ class ApiReadControllerTest {
 
         @Override
         public void addCaseNote(AddCaseNoteCommand command) {
-            throw new AssertionError("addCaseNote should not be called");
+            this.addNoteCaseId = command.caseId();
+            this.addNoteShaleClientId = command.shaleClientId();
+            this.addNoteActorUserId = command.actorUserId();
+            this.addNoteText = command.noteText();
         }
 
         @Override

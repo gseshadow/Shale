@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -88,8 +88,8 @@ function ToolbarActions({ children }: { children: ReactNode }) {
   return <div className="toolbar-actions">{children}</div>;
 }
 
-function ActionButton({ children, type = 'button', disabled = false }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean }) {
-  return <button className="action-button" type={type} disabled={disabled}>{children}</button>;
+function ActionButton({ children, type = 'button', disabled = false, onClick }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean; onClick?: () => void }) {
+  return <button className="action-button" type={type} disabled={disabled} onClick={onClick}>{children}</button>;
 }
 
 function SecondaryButton({ children, type = 'button', disabled = false, onClick }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean; onClick?: () => void }) {
@@ -1448,12 +1448,23 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
 
       {isLoading && <LoadingState message="Loading case detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && caseDetail && <CaseDetailReadOnly detail={caseDetail} tasks={caseTasks} tasksError={tasksError} updates={caseUpdates} updatesError={updatesError} />}
+      {!isLoading && !error && caseDetail && (
+        <CaseDetailReadOnly
+          accessToken={accessToken}
+          detail={caseDetail}
+          tasks={caseTasks}
+          tasksError={tasksError}
+          updates={caseUpdates}
+          updatesError={updatesError}
+          onUpdatesChanged={setCaseUpdates}
+          onUpdatesError={setUpdatesError}
+        />
+      )}
     </DetailShell>
   );
 }
 
-function CaseDetailReadOnly({ detail, tasks, tasksError, updates, updatesError }: { detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null }) {
+function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, updatesError, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
   return (
     <div className="detail-sections">
       <section aria-labelledby="case-info-title">
@@ -1491,7 +1502,7 @@ function CaseDetailReadOnly({ detail, tasks, tasksError, updates, updatesError }
 
       <RelatedContactsSection contacts={detail.relatedContacts ?? []} />
 
-      <CaseUpdatesSection updates={updates} error={updatesError} />
+      <CaseUpdatesSection accessToken={accessToken} caseId={detail.caseId} updates={updates} error={updatesError} onUpdatesChanged={onUpdatesChanged} onUpdatesError={onUpdatesError} />
     </div>
   );
 }
@@ -1573,10 +1584,70 @@ function CaseTasksSection({ tasks, error }: { tasks: CaseTaskListItem[]; error: 
   );
 }
 
-function CaseUpdatesSection({ updates, error }: { updates: CaseUpdate[]; error: string | null }) {
+function CaseUpdatesSection({ accessToken, caseId, updates, error, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; caseId: number; updates: CaseUpdate[]; error: string | null; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const trimmedNote = noteText.trim();
+
+  function resetForm() {
+    setNoteText('');
+    setSubmitError(null);
+    setIsAdding(false);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmedNote) {
+      setSubmitError('Enter an update before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const refreshedUpdates = await addCaseUpdate(accessToken, caseId, trimmedNote);
+      onUpdatesChanged(refreshedUpdates);
+      onUpdatesError(null);
+      resetForm();
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case update could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <section aria-labelledby="case-updates-title">
-      <h2 id="case-updates-title">Case Updates</h2>
+      <div className="section-heading-row">
+        <h2 id="case-updates-title">Case Updates</h2>
+        {!isAdding && <ActionButton onClick={() => setIsAdding(true)}>Add update</ActionButton>}
+      </div>
+
+      {isAdding && (
+        <form className="case-update-form" onSubmit={handleSubmit}>
+          <label htmlFor="case-update-note">Update note</label>
+          <textarea
+            id="case-update-note"
+            value={noteText}
+            onChange={(event) => setNoteText(event.target.value)}
+            placeholder="Add a case update…"
+            rows={5}
+            disabled={isSubmitting}
+          />
+          {submitError && <p className="status error" role="alert">{submitError}</p>}
+          <div className="form-actions">
+            <ActionButton type="submit" disabled={isSubmitting || !trimmedNote}>{isSubmitting ? 'Saving…' : 'Save update'}</ActionButton>
+            <SecondaryButton disabled={isSubmitting} onClick={resetForm}>Cancel</SecondaryButton>
+          </div>
+        </form>
+      )}
+
       {error && <p className="status error" role="alert">{error}</p>}
       {!error && updates.length === 0 && <EmptyState message="No case updates have been added yet." />}
       {!error && updates.length > 0 && (
