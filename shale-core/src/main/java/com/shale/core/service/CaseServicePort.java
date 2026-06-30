@@ -94,6 +94,13 @@ public interface CaseServicePort {
 			String systemKey) {
 	}
 
+	record UpdateCaseStatusCommand(
+			long caseId,
+			int shaleClientId,
+			int actorUserId,
+			int statusId) {
+	}
+
 	record UpdateCaseAssignmentCommand(
 			long caseId,
 			int shaleClientId,
