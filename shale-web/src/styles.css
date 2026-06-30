@@ -570,6 +570,7 @@ input[type="text"],
 input[type="date"],
 input[type="email"],
 input[type="tel"],
+input[type="url"],
 textarea {
   border: 1px solid #c9d4df;
   border-radius: 14px;
@@ -583,7 +584,8 @@ textarea {
 input[type="text"],
 input[type="date"],
 input[type="email"],
-input[type="tel"] {
+input[type="tel"],
+input[type="url"] {
   min-height: 2.75rem;
 }
 

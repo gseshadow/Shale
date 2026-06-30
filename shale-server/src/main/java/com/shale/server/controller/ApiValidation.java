@@ -18,6 +18,7 @@ final class ApiValidation {
     private static final int MAX_CASE_DESCRIPTION_LENGTH = 10_000;
     private static final int MAX_CASE_SUMMARY_LENGTH = 10_000;
     private static final int MAX_CONTACT_NAME_LENGTH = 255;
+    private static final int MAX_ORGANIZATION_NAME_LENGTH = 255;
 
     private ApiValidation() {
     }
@@ -91,6 +92,21 @@ final class ApiValidation {
             throw badRequest("Task title must be 255 characters or fewer.");
         }
         return safeTitle;
+    }
+
+    static String organizationName(String value) {
+        String safeValue = value == null ? "" : value.trim();
+        if (safeValue.isEmpty()) {
+            throw badRequest("Organization name is required.");
+        }
+        if (safeValue.length() > MAX_ORGANIZATION_NAME_LENGTH) {
+            throw badRequest("Organization name must be 255 characters or fewer.");
+        }
+        return safeValue;
+    }
+
+    static String optionalOrganizationText(String value, String fieldName, int maxLength) {
+        return optionalContactText(value, fieldName, maxLength);
     }
 
     static String optionalContactNamePart(String value, String fieldName) {
