@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseCoreDetails, updateContactDetails, updateOrganizationDetails } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusLookup, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1527,7 +1527,7 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
 
       <CaseTasksSection accessToken={accessToken} caseId={detail.caseId} tasks={tasks} error={tasksError} onTasksChanged={onTasksChanged} onTasksError={onTasksError} />
 
-      <StatusTimelineSection history={detail.statusHistory ?? []} />
+      <StatusTimelineSection accessToken={accessToken} detail={detail} history={detail.statusHistory ?? []} onDetailChanged={onDetailChanged} />
 
       <RelatedContactsSection contacts={detail.relatedContacts ?? []} />
 
@@ -1613,7 +1613,8 @@ function toDateInputValue(value: string | null | undefined): string {
   return match ? match[1] : '';
 }
 
-function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }) {
+function StatusTimelineSection({ accessToken, detail, history, onDetailChanged }: { accessToken: string | null; detail: CaseDetail; history: CaseStatusHistoryItem[]; onDetailChanged: (detail: CaseDetail) => void }) {
+  const [isEditingStatus, setIsEditingStatus] = useState(false);
   const sortedHistory = [...history].sort((left, right) => {
     const leftDate = left.effectiveDate ? Date.parse(left.effectiveDate) : Number.MAX_SAFE_INTEGER;
     const rightDate = right.effectiveDate ? Date.parse(right.effectiveDate) : Number.MAX_SAFE_INTEGER;
@@ -1622,7 +1623,11 @@ function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }
 
   return (
     <section aria-labelledby="status-timeline-title">
-      <h2 id="status-timeline-title">Status Timeline</h2>
+      <div className="section-heading-row">
+        <h2 id="status-timeline-title">Status Timeline</h2>
+        {!isEditingStatus && <ActionButton onClick={() => setIsEditingStatus(true)}>Edit status</ActionButton>}
+      </div>
+      {isEditingStatus && <CaseStatusEditForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingStatus(false); }} onCancel={() => setIsEditingStatus(false)} />}
       {sortedHistory.length === 0 ? (
         <EmptyState message="No status history has been recorded for this case yet." />
       ) : (
@@ -1649,6 +1654,85 @@ function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }
         </div>
       )}
     </section>
+  );
+}
+
+function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const currentStatusId = detail.statusHistory?.find((item) => item.current || !item.endDate)?.statusId ?? null;
+  const [statuses, setStatuses] = useState<CaseStatusSetting[]>([]);
+  const [selectedStatusId, setSelectedStatusId] = useState(currentStatusId == null ? '' : String(currentStatusId));
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isLoadingLookup, setIsLoadingLookup] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setLookupError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    let isCurrent = true;
+    setIsLoadingLookup(true);
+    setLookupError(null);
+    listCaseStatusLookup(accessToken)
+      .then((rows) => { if (isCurrent) setStatuses(rows); })
+      .catch((caught) => { if (isCurrent) setLookupError(caught instanceof Error ? caught.message : 'Case status options could not be loaded.'); })
+      .finally(() => { if (isCurrent) setIsLoadingLookup(false); });
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const numericStatusId = Number(selectedStatusId);
+    if (!Number.isInteger(numericStatusId) || numericStatusId <= 0) {
+      setSubmitError('Choose a status before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await updateCaseStatus(accessToken, detail.caseId, numericStatusId);
+      onSaved(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case status could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form status-edit-form" onSubmit={handleSubmit}>
+      <fieldset disabled={isSubmitting || isLoadingLookup}>
+        <legend>Choose the current case status</legend>
+        {isLoadingLookup && <p className="status">Loading status options…</p>}
+        {lookupError && <p className="status error" role="alert">{lookupError}</p>}
+        {!isLoadingLookup && !lookupError && statuses.length === 0 && <EmptyState message="No case statuses are available for this tenant." />}
+        <div className="status-choice-list">
+          {statuses.map((status) => {
+            const value = String(status.id);
+            const color = normalizeStatusColor(status.color);
+            return (
+              <label className="status-choice-card" key={status.id} style={{ '--status-accent': color } as CSSProperties}>
+                <input type="radio" name="case-status" value={value} checked={selectedStatusId === value} onChange={(event) => setSelectedStatusId(event.target.value)} />
+                <span className="status-choice-body">
+                  <span className="status-choice-name">{status.name || `Status ${status.id}`}</span>
+                  {status.closed && <span className="status-current-pill">Closed lifecycle</span>}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || isLoadingLookup || !!lookupError || !selectedStatusId}>{isSubmitting ? 'Saving…' : 'Save status'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
   );
 }
 

@@ -47,6 +47,7 @@ public interface CaseServicePort {
 
 	CaseStatusDto updateCaseStatus(CaseStatusCommand command);
 
+	CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command);
 
 	void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
@@ -89,6 +90,13 @@ public interface CaseServicePort {
 			String color,
 			String lifecycleKey,
 			String systemKey) {
+	}
+
+	record UpdateCaseStatusCommand(
+			long caseId,
+			int shaleClientId,
+			int actorUserId,
+			int statusId) {
 	}
 
 	record UpdateCaseCoreDetailsCommand(

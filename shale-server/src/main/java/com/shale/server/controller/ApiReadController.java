@@ -26,6 +26,7 @@ import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseStatusCommand;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactDetail;
 import com.shale.core.service.ContactServicePort.ContactSummary;
@@ -65,6 +66,9 @@ public final class ApiReadController {
             String tortNoticeDeadline,
             String summary,
             String expectedRowVer) {
+    }
+
+    public record UpdateCaseStatusRequest(Integer statusId) {
     }
 
     public record UpdateContactRequest(
@@ -259,6 +263,34 @@ public final class ApiReadController {
         int userId = runtimeSessionState.requireUserId();
         caseServicePort.addCaseNote(new AddCaseNoteCommand(safeCaseId, shaleClientId, userId, noteText));
         return caseServicePort.listCaseUpdates(safeCaseId, shaleClientId);
+    }
+
+
+    @Operation(summary = "List effective case statuses", description = "Returns active effective case statuses available to the authenticated tenant for case status changes.")
+    @GetMapping("/api/lookups/case-statuses")
+    public List<CaseStatusDto> listCaseStatusLookup() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return caseServicePort.listCaseStatuses(shaleClientId, false);
+    }
+
+    @Operation(summary = "Update case status", description = "Changes the current status for one tenant-scoped case and returns the refreshed case detail.")
+    @PatchMapping("/api/cases/{caseId:\\d+}/status")
+    public CaseDetailDto updateCaseStatus(
+            @PathVariable("caseId") long caseId,
+            @RequestBody UpdateCaseStatusRequest request) {
+        long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
+        int statusId = Math.toIntExact(ApiValidation.positiveId(request == null || request.statusId() == null ? 0 : request.statusId(), "statusId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        CaseDetailDto updated = caseServicePort.updateCaseCurrentStatus(new UpdateCaseStatusCommand(
+                safeCaseId,
+                shaleClientId,
+                userId,
+                statusId));
+        if (updated == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found.");
+        }
+        return updated;
     }
 
     @Operation(summary = "Get task detail", description = "Returns one tenant-scoped task detail record.")
