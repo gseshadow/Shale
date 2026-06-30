@@ -3,6 +3,7 @@ package com.shale.server.controller;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -224,6 +225,30 @@ class ApiReadControllerTest {
                 .andExpect(jsonPath("$.title").value("Review records"))
                 .andExpect(jsonPath("$.caseId").value(501));
 
+        org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.detailTaskId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.detailShaleClientId);
+    }
+
+
+    @Test
+    void completeTaskRouteReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(patch("/api/tasks/701/complete")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(701))
+                .andExpect(jsonPath("$.title").value("Review records"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.completedTaskId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.completedShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.completedActorUserId);
         org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.detailTaskId);
         org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.detailShaleClientId);
     }
@@ -719,6 +744,9 @@ class ApiReadControllerTest {
         private int assignedShaleClientId;
         private long detailTaskId;
         private int detailShaleClientId;
+        private long completedTaskId;
+        private int completedShaleClientId;
+        private int completedActorUserId;
         private CreateTaskCommand createdCommand;
 
         @Override
@@ -772,6 +800,13 @@ class ApiReadControllerTest {
         @Override
         public void updateTask(UpdateTaskCommand command) {
             throw new AssertionError("updateTask should not be called");
+        }
+
+        @Override
+        public void completeTask(long taskId, int shaleClientId, int actorUserId) {
+            this.completedTaskId = taskId;
+            this.completedShaleClientId = shaleClientId;
+            this.completedActorUserId = actorUserId;
         }
 
         @Override

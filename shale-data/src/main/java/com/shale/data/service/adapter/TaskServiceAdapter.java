@@ -88,6 +88,15 @@ public final class TaskServiceAdapter implements TaskServicePort {
 	}
 
 	@Override
+	public void completeTask(long taskId, int shaleClientId, int actorUserId) {
+		TaskDetailDto current = taskGateway.findTaskDetail(taskId, shaleClientId);
+		if (current == null) {
+			throw new IllegalArgumentException("Task not found: " + taskId);
+		}
+		taskGateway.markTaskCompleted(taskId, shaleClientId);
+	}
+
+	@Override
 	public void assignTask(long taskId, int shaleClientId, int userId, int assignedByUserId) {
 		taskGateway.addTaskAssignment(taskId, shaleClientId, userId, assignedByUserId);
 	}
@@ -116,6 +125,8 @@ public final class TaskServiceAdapter implements TaskServicePort {
 		void updateTask(long taskId, int shaleClientId, String title, String description,
 				java.time.LocalDateTime dueAt, Integer statusId, Integer priorityId,
 				boolean completed, Integer updatedByUserId);
+
+		void markTaskCompleted(long taskId, int shaleClientId);
 
 		void removeTaskAssignment(long taskId, int shaleClientId, int userId);
 	}
@@ -166,6 +177,11 @@ public final class TaskServiceAdapter implements TaskServicePort {
 				java.time.LocalDateTime dueAt, Integer statusId, Integer priorityId,
 				boolean completed, Integer updatedByUserId) {
 			taskDao.updateTask(taskId, shaleClientId, title, description, dueAt, statusId, priorityId, completed, updatedByUserId);
+		}
+
+		@Override
+		public void markTaskCompleted(long taskId, int shaleClientId) {
+			taskDao.markTaskCompleted(taskId, shaleClientId);
 		}
 
 		@Override

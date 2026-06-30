@@ -37,6 +37,8 @@ public interface TaskServicePort {
 
 	void updateTask(UpdateTaskCommand command);
 
+	void completeTask(long taskId, int shaleClientId, int actorUserId);
+
 	void assignTask(long taskId, int shaleClientId, int userId, int assignedByUserId);
 
 	void removeTaskAssignment(long taskId, int shaleClientId, int userId, int actorUserId);
