@@ -39,6 +39,7 @@ import com.shale.core.service.OrganizationServicePort.OrganizationSummary;
 import com.shale.core.service.OrganizationServicePort.UpdateOrganizationCommand;
 import com.shale.core.service.TaskServicePort;
 import com.shale.core.service.TaskServicePort.CreateTaskCommand;
+import com.shale.core.service.TaskServicePort.UpdateTaskCommand;
 import com.shale.core.service.UserServicePort;
 import com.shale.core.service.UserServicePort.UserDetail;
 import com.shale.core.service.UserServicePort.UserSummary;
@@ -73,6 +74,9 @@ public final class ApiReadController {
     }
 
     public record UpdateCaseStatusRequest(Integer statusId) {
+    }
+
+    public record UpdateTaskRequest(String title, String description, String dueDate, Integer priorityId) {
     }
 
     public record UpdateContactRequest(
@@ -327,6 +331,37 @@ public final class ApiReadController {
     public TaskDetailDto getTask(@PathVariable("taskId") long taskId) {
         long safeTaskId = ApiValidation.positiveId(taskId, "taskId");
         int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
+    }
+
+
+    @Operation(summary = "Update task detail", description = "Updates supported tenant-scoped task fields and returns the refreshed task detail.")
+    @PatchMapping("/api/tasks/{taskId:\\d+}")
+    public TaskDetailDto updateTask(
+            @PathVariable("taskId") long taskId,
+            @RequestBody UpdateTaskRequest request) {
+        long safeTaskId = ApiValidation.positiveId(taskId, "taskId");
+        String title = ApiValidation.taskTitle(request == null ? null : request.title());
+        String description = ApiValidation.optionalTaskDescription(request == null ? null : request.description());
+        LocalDateTime dueAt = parseOptionalDueDate(request == null ? null : request.dueDate());
+        Integer priorityId = request == null ? null : request.priorityId();
+        if (priorityId != null) {
+            priorityId = Math.toIntExact(ApiValidation.positiveId(priorityId, "priorityId"));
+        }
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        TaskDetailDto current = taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
+        taskServicePort.updateTask(new UpdateTaskCommand(
+                safeTaskId,
+                shaleClientId,
+                userId,
+                title,
+                description,
+                dueAt,
+                current.statusId(),
+                priorityId));
         return taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
     }

@@ -534,6 +534,35 @@ export async function listCaseUpdates(accessToken: string, caseId: number): Prom
   return response.json() as Promise<CaseUpdate[]>;
 }
 
+export interface UpdateTaskPayload {
+  title: string;
+  description?: string;
+  dueDate?: string;
+  priorityId?: number | null;
+}
+
+export async function updateTaskDetail(accessToken: string, taskId: number, payload: UpdateTaskPayload): Promise<TaskDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that task.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not update the task.', response.status);
+  }
+
+  return response.json() as Promise<TaskDetail>;
+}
+
 export async function completeTask(accessToken: string, taskId: number): Promise<TaskDetail> {
   const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}/complete`, {
     method: 'PATCH',

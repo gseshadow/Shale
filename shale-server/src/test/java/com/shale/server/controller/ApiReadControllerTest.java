@@ -278,6 +278,35 @@ class ApiReadControllerTest {
 
 
     @Test
+    void updateTaskRouteReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(patch("/api/tasks/701")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Updated task\",\"description\":\"Updated notes\",\"dueDate\":\"2026-03-04\",\"priorityId\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(701));
+
+        org.junit.jupiter.api.Assertions.assertNotNull(taskServicePort.updatedCommand);
+        org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.updatedCommand.taskId());
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.updatedCommand.shaleClientId());
+        org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.updatedCommand.actorUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("Updated task", taskServicePort.updatedCommand.title());
+        org.junit.jupiter.api.Assertions.assertEquals("Updated notes", taskServicePort.updatedCommand.description());
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2026, 3, 4, 0, 0), taskServicePort.updatedCommand.dueAt());
+        org.junit.jupiter.api.Assertions.assertEquals(2, taskServicePort.updatedCommand.statusId());
+        org.junit.jupiter.api.Assertions.assertEquals(1, taskServicePort.updatedCommand.priorityId());
+    }
+
+
+    @Test
     void completeTaskRouteReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
         MockMvc devMockMvc = developmentMockMvc(
@@ -831,6 +860,7 @@ class ApiReadControllerTest {
         private int completedShaleClientId;
         private int completedActorUserId;
         private CreateTaskCommand createdCommand;
+        private TaskServicePort.UpdateTaskCommand updatedCommand;
 
         @Override
         public List<CaseTaskListItemDto> listCaseTasks(long caseId, int shaleClientId) {
@@ -882,7 +912,7 @@ class ApiReadControllerTest {
 
         @Override
         public void updateTask(UpdateTaskCommand command) {
-            throw new AssertionError("updateTask should not be called");
+            this.updatedCommand = command;
         }
 
         @Override

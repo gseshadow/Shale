@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaLookups, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateContactDetails, updateOrganizationDetails } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -638,7 +638,6 @@ function MyCasesSection({ accessToken }: { accessToken: string | null }) {
   const [cases, setCases] = useState<CaseSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -694,7 +693,6 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
   const [tasks, setTasks] = useState<CaseTaskListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -776,7 +774,6 @@ function TasksPage({ accessToken }: { accessToken: string | null }) {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -1111,7 +1108,6 @@ function TeamPage({ accessToken }: { accessToken: string | null }) {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -1210,7 +1206,6 @@ function TeamMemberDetailPage({ accessToken }: { accessToken: string | null }) {
   const [member, setMember] = useState<TeamMemberDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!Number.isInteger(numericUserId) || numericUserId <= 0) {
       setMember(null);
@@ -1297,6 +1292,7 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
   const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(numericTaskId) || numericTaskId <= 0) {
@@ -1318,7 +1314,7 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
     setError(null);
 
     getTaskDetail(accessToken, numericTaskId)
-      .then((detail) => isCurrent && setTaskDetail(detail))
+      .then((detail) => { if (isCurrent) { setTaskDetail(detail); setIsEditing(false); } })
       .catch((caught) => {
         if (isCurrent) {
           setTaskDetail(null);
@@ -1339,26 +1335,43 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
       {isLoading && <LoadingState message="Loading task detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !taskDetail && <EmptyState message="No task detail was found." />}
-      {!isLoading && !error && taskDetail && <TaskDetailReadOnly detail={taskDetail} />}
+      {!isLoading && !error && taskDetail && (
+        <TaskDetailReadOnly
+          accessToken={accessToken}
+          detail={taskDetail}
+          isEditing={isEditing}
+          onEdit={() => { setError(null); setIsEditing(true); }}
+          onCancel={() => setIsEditing(false)}
+          onTaskChanged={(updated) => { setTaskDetail(updated); setIsEditing(false); }}
+          onError={setError}
+        />
+      )}
     </DetailShell>
   );
 }
 
-function TaskDetailReadOnly({ detail }: { detail: TaskDetail }) {
+function TaskDetailReadOnly({ accessToken, detail, isEditing, onEdit, onCancel, onTaskChanged, onError }: { accessToken: string | null; detail: TaskDetail; isEditing: boolean; onEdit: () => void; onCancel: () => void; onTaskChanged: (detail: TaskDetail) => void; onError: (message: string | null) => void }) {
   return (
     <div className="detail-sections">
       <section aria-labelledby="task-info-title">
-        <h2 id="task-info-title">Task Information</h2>
-        <dl className="detail-list">
-          <DetailItem label="Task Name" value={detail.title} />
-          <DetailItem label="Status" value={detail.statusId ? `Status ${detail.statusId}` : null} />
-          <DetailItem label="Priority" value={detail.priorityId ? `Priority ${detail.priorityId}` : null} />
-          <DetailItem label="Assigned To" value={detail.assignedUserDisplayName} />
-          <DetailItem label="Created By" value={detail.createdByDisplayName} />
-          <DetailItem label="Due Date" value={formatDate(detail.dueAt)} />
-          <DetailItem label="Completed Date" value={formatDate(detail.completedAt)} />
-          <DetailItem label="Description" value={detail.description} preserveWhitespace />
-        </dl>
+        <div className="section-heading-row">
+          <h2 id="task-info-title">Task Information</h2>
+          {!isEditing && <SecondaryButton onClick={onEdit}>Edit task</SecondaryButton>}
+        </div>
+        {isEditing ? (
+          <TaskEditForm accessToken={accessToken} detail={detail} onCancel={onCancel} onTaskChanged={onTaskChanged} onError={onError} />
+        ) : (
+          <dl className="detail-list">
+            <DetailItem label="Task Name" value={detail.title} />
+            <DetailItem label="Status" value={detail.statusId ? `Status ${detail.statusId}` : null} />
+            <DetailItem label="Priority" value={detail.priorityId ? `Priority ${detail.priorityId}` : null} />
+            <DetailItem label="Assigned To" value={detail.assignedUserDisplayName} />
+            <DetailItem label="Created By" value={detail.createdByDisplayName} />
+            <DetailItem label="Due Date" value={formatDate(detail.dueAt)} />
+            <DetailItem label="Completed Date" value={formatDate(detail.completedAt)} />
+            <DetailItem label="Description" value={detail.description} preserveWhitespace />
+          </dl>
+        )}
       </section>
 
       {detail.caseId > 0 && (
@@ -1371,6 +1384,60 @@ function TaskDetailReadOnly({ detail }: { detail: TaskDetail }) {
         </section>
       )}
     </div>
+  );
+}
+
+function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }: { accessToken: string | null; detail: TaskDetail; onCancel: () => void; onTaskChanged: (detail: TaskDetail) => void; onError: (message: string | null) => void }) {
+  const [title, setTitle] = useState(detail.title ?? '');
+  const [description, setDescription] = useState(detail.description ?? '');
+  const [dueDate, setDueDate] = useState(toDateInputValue(detail.dueAt));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitError(null);
+    onError(null);
+    const safeTitle = title.trim();
+    if (!safeTitle) {
+      setSubmitError('Task name is required.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const updated = await updateTaskDetail(accessToken, detail.id, {
+        title: safeTitle,
+        description: description.trim() || undefined,
+        dueDate: dueDate || undefined,
+        priorityId: detail.priorityId,
+      });
+      onTaskChanged(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Task detail could not be updated.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit}>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <label htmlFor="task-title">Task name</label>
+      <input id="task-title" type="text" value={title} onChange={(event) => { setTitle(event.target.value); setSubmitError(null); }} disabled={isSubmitting} maxLength={255} required />
+      <label htmlFor="task-due-date">Due date</label>
+      <input id="task-due-date" type="date" value={dueDate} onChange={(event) => { setDueDate(event.target.value); setSubmitError(null); }} disabled={isSubmitting} />
+      <label htmlFor="task-description">Description</label>
+      <textarea id="task-description" value={description} onChange={(event) => { setDescription(event.target.value); setSubmitError(null); }} disabled={isSubmitting} rows={5} maxLength={10000} />
+      <p className="form-help">Status changes stay with the existing Complete action.</p>
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : 'Save task'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
   );
 }
 
@@ -2093,6 +2160,7 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
   const [contactDetail, setContactDetail] = useState<ContactDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(numericContactId) || numericContactId <= 0) {
@@ -2253,6 +2321,7 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
   const [organizationDetail, setOrganizationDetail] = useState<OrganizationDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(numericOrganizationId) || numericOrganizationId <= 0) {
