@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, createContact, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1029,6 +1029,8 @@ function ContactResultsList({ results }: { results: ContactSearchResult[] }) {
 }
 
 function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
+  const navigate = useNavigate();
+  const [isCreating, setIsCreating] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<OrganizationSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -1070,7 +1072,16 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="organizations-page" aria-labelledby="organizations-title">
-      <PageHeader eyebrow="Search" title="Organizations" titleId="organizations-title" lede="Search and open read-only organization records." />
+      <PageHeader eyebrow="Search" title="Organizations" titleId="organizations-title" lede="Search, open, and create organization records."
+        action={!isCreating ? <ActionButton onClick={() => setIsCreating(true)}>New organization</ActionButton> : undefined}
+      />
+      {isCreating && (
+        <OrganizationCreateForm
+          accessToken={accessToken}
+          onCreated={(created) => navigate(`/organizations/${created.id}`)}
+          onCancel={() => setIsCreating(false)}
+        />
+      )}
       <SearchBar
         id="organization-search"
         label="Search organizations"
@@ -2457,6 +2468,99 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       {submitError && <p className="status error" role="alert">{submitError}</p>}
       <div className="form-actions">
         <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Save contact'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
+  );
+}
+
+
+function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: OrganizationDetail) => void; onCancel: () => void }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [fax, setFax] = useState('');
+  const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState('');
+  const [address1, setAddress1] = useState('');
+  const [address2, setAddress2] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [country, setCountry] = useState('');
+  const [notes, setNotes] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasRequiredName = Boolean(name.trim());
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hasRequiredName) {
+      setSubmitError('Enter an organization name before saving.');
+      return;
+    }
+    if (email.trim() && !email.includes('@')) {
+      setSubmitError('Enter a valid email address.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const created = await createOrganization(accessToken, {
+        name: name.trim(),
+        phone: phone.trim() || null,
+        fax: fax.trim() || null,
+        email: email.trim() || null,
+        website: website.trim() || null,
+        address1: address1.trim() || null,
+        address2: address2.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        postalCode: postalCode.trim() || null,
+        country: country.trim() || null,
+        notes: notes.trim() || null,
+      });
+      onCreated(created);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Organization could not be created.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit} aria-label="Create organization">
+      <label htmlFor="new-organization-name">Organization name</label>
+      <input id="new-organization-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="organization" maxLength={255} required />
+      <label htmlFor="new-organization-email">Email</label>
+      <input id="new-organization-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" maxLength={254} />
+      <label htmlFor="new-organization-phone">Phone</label>
+      <input id="new-organization-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" maxLength={100} />
+      <label htmlFor="new-organization-fax">Fax</label>
+      <input id="new-organization-fax" type="tel" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} maxLength={100} />
+      <label htmlFor="new-organization-website">Website</label>
+      <input id="new-organization-website" type="url" value={website} onChange={(event) => setWebsite(event.target.value)} disabled={isSubmitting} autoComplete="url" maxLength={500} />
+      <label htmlFor="new-organization-address1">Address line 1</label>
+      <input id="new-organization-address1" type="text" value={address1} onChange={(event) => setAddress1(event.target.value)} disabled={isSubmitting} autoComplete="address-line1" maxLength={500} />
+      <label htmlFor="new-organization-address2">Address line 2</label>
+      <input id="new-organization-address2" type="text" value={address2} onChange={(event) => setAddress2(event.target.value)} disabled={isSubmitting} autoComplete="address-line2" maxLength={500} />
+      <label htmlFor="new-organization-city">City</label>
+      <input id="new-organization-city" type="text" value={city} onChange={(event) => setCity(event.target.value)} disabled={isSubmitting} autoComplete="address-level2" maxLength={200} />
+      <label htmlFor="new-organization-state">State</label>
+      <input id="new-organization-state" type="text" value={state} onChange={(event) => setState(event.target.value)} disabled={isSubmitting} autoComplete="address-level1" maxLength={100} />
+      <label htmlFor="new-organization-postal-code">Zip</label>
+      <input id="new-organization-postal-code" type="text" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} disabled={isSubmitting} autoComplete="postal-code" maxLength={100} />
+      <label htmlFor="new-organization-country">Country</label>
+      <input id="new-organization-country" type="text" value={country} onChange={(event) => setCountry(event.target.value)} disabled={isSubmitting} autoComplete="country-name" maxLength={100} />
+      <label htmlFor="new-organization-notes">Notes</label>
+      <textarea id="new-organization-notes" value={notes} onChange={(event) => setNotes(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Create organization'}</ActionButton>
         <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
       </div>
     </form>
