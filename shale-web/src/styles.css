@@ -591,6 +591,12 @@ button:focus-visible,
   outline-offset: 3px;
 }
 
+.form-help {
+  color: var(--text-muted);
+  font-size: .92rem;
+  margin: .25rem 0 1rem;
+}
+
 .form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -599,7 +605,13 @@ button:focus-visible,
 
 @media (max-width: 640px) {
   .section-heading-row,
-  .form-actions {
+  .form-help {
+  color: var(--text-muted);
+  font-size: .92rem;
+  margin: .25rem 0 1rem;
+}
+
+.form-actions {
     display: grid;
   }
 

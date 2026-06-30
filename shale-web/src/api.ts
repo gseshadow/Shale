@@ -221,6 +221,7 @@ export interface CaseDetail {
   statuteOfLimitations: string | null;
   tortNoticeDeadline: string | null;
   summary: string;
+  rowVer: string;
   relatedContacts: CaseRelatedContact[];
   statusHistory: CaseStatusHistoryItem[];
 }
@@ -305,6 +306,41 @@ export async function searchCases(accessToken: string, query: string): Promise<C
   }
 
   return response.json() as Promise<CaseSearchResult[]>;
+}
+
+
+export interface UpdateCaseCoreDetailsPayload {
+  caseName: string;
+  description: string;
+  dateOfInjury?: string | null;
+  statuteOfLimitations?: string | null;
+  expectedRowVer: string;
+}
+
+export async function updateCaseCoreDetails(accessToken: string, caseId: number, payload: UpdateCaseCoreDetailsPayload): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/core-details`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that case.', response.status);
+  }
+
+  if (response.status === 409) {
+    throw new ApiError('This case was changed by someone else. Refresh and try again.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the case details.', response.status);
+  }
+
+  return response.json() as Promise<CaseDetail>;
 }
 
 

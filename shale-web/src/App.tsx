@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseCoreDetails } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1485,17 +1485,23 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
           onTasksError={setTasksError}
           onUpdatesChanged={setCaseUpdates}
           onUpdatesError={setUpdatesError}
+          onDetailChanged={setCaseDetail}
         />
       )}
     </DetailShell>
   );
 }
 
-function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, updatesError, onTasksChanged, onTasksError, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
+function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, updatesError, onTasksChanged, onTasksError, onUpdatesChanged, onUpdatesError, onDetailChanged }: { accessToken: string | null; detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void; onDetailChanged: (detail: CaseDetail) => void }) {
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
   return (
     <div className="detail-sections">
       <section aria-labelledby="case-info-title">
-        <h2 id="case-info-title">Case Information</h2>
+        <div className="section-heading-row">
+          <h2 id="case-info-title">Case Information</h2>
+          {!isEditingDetails && <ActionButton onClick={() => setIsEditingDetails(true)}>Edit details</ActionButton>}
+        </div>
+        {isEditingDetails && <CaseCoreDetailsForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingDetails(false); }} onCancel={() => setIsEditingDetails(false)} />}
         <dl className="detail-list">
           <DetailItem label="Case Name" value={detail.caseName} />
           <DetailItem label="Case Number" value={detail.caseNumber} />
@@ -1532,6 +1538,76 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
       <CaseUpdatesSection accessToken={accessToken} caseId={detail.caseId} updates={updates} error={updatesError} onUpdatesChanged={onUpdatesChanged} onUpdatesError={onUpdatesError} />
     </div>
   );
+}
+
+function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const [caseName, setCaseName] = useState(detail.caseName || '');
+  const [description, setDescription] = useState(detail.description || '');
+  const [dateOfInjury, setDateOfInjury] = useState(toDateInputValue(detail.dateOfInjury));
+  const [statuteOfLimitations, setStatuteOfLimitations] = useState(toDateInputValue(detail.statuteOfLimitations));
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const trimmedCaseName = caseName.trim();
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmedCaseName) {
+      setSubmitError('Enter a case name before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    if (!detail.rowVer) {
+      setSubmitError('Case version information is missing. Refresh the case and try again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await updateCaseCoreDetails(accessToken, detail.caseId, {
+        caseName: trimmedCaseName,
+        description,
+        dateOfInjury: dateOfInjury || null,
+        statuteOfLimitations: statuteOfLimitations || null,
+        expectedRowVer: detail.rowVer,
+      });
+      onSaved(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case details could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit}>
+      <label htmlFor="case-core-name">Case name</label>
+      <input id="case-core-name" type="text" value={caseName} onChange={(event) => setCaseName(event.target.value)} disabled={isSubmitting} maxLength={255} required />
+      <label htmlFor="case-core-description">Description</label>
+      <textarea id="case-core-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      <label htmlFor="case-core-injury-date">Date of injury</label>
+      <input id="case-core-injury-date" type="date" value={dateOfInjury} onChange={(event) => setDateOfInjury(event.target.value)} disabled={isSubmitting} />
+      <label htmlFor="case-core-sol-date">Statute of limitations</label>
+      <input id="case-core-sol-date" type="date" value={statuteOfLimitations} onChange={(event) => setStatuteOfLimitations(event.target.value)} disabled={isSubmitting} />
+      <p className="form-help">Tort notice deadline is shown read-only because the current core-details service does not update it yet.</p>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || !trimmedCaseName}>{isSubmitting ? 'Saving…' : 'Save details'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
+  );
+}
+
+function toDateInputValue(value: string | null | undefined): string {
+  if (!value) {
+    return '';
+  }
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+  return match ? match[1] : '';
 }
 
 function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }) {
