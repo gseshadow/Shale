@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -25,13 +26,17 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar.ButtonData;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
+import javafx.scene.paint.Color;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -145,44 +150,57 @@ public final class ContactViewController {
     }
 
     private void initializeInlineEditButtons() {
-        configureInlineEditButton(editDisplayNameButton, "Display Name", nameEditor);
-        configureInlineEditButton(editNameButton, "Name", nameEditor);
-        configureInlineEditButton(editFirstNameButton, "First Name", firstNameEditor);
-        configureInlineEditButton(editLastNameButton, "Last Name", lastNameEditor);
-        configureInlineEditButton(editEmailButton, "Email", emailEditor);
-        configureInlineEditButton(editPhoneButton, "Phone", phoneEditor);
-        configureInlineEditButton(editAddressHomeButton, "Home Address", addressHomeEditor);
-        configureInlineEditButton(editDateOfBirthButton, "Date of Birth", dateOfBirthEditor);
-        configureInlineEditButton(editConditionButton, "Condition", conditionEditor);
-        configureInlineEditButton(editDeceasedButton, "Deceased", deceasedEditor);
+        configureInlineEditButton(editDisplayNameButton, "Display Name",
+                () -> showContactTextFieldDialog("Edit Display Name", "Display Name", currentContact.displayName(), false, editDisplayNameButton,
+                        value -> saveSingleContactField(ContactField.NAME, value)));
+        configureInlineEditButton(editNameButton, "Name",
+                () -> showContactTextFieldDialog("Edit Name", "Name", currentContact.name(), false, editNameButton,
+                        value -> saveSingleContactField(ContactField.NAME, value)));
+        configureInlineEditButton(editFirstNameButton, "First Name",
+                () -> showContactTextFieldDialog("Edit First Name", "First Name", currentContact.firstName(), false, editFirstNameButton,
+                        value -> saveSingleContactField(ContactField.FIRST_NAME, value)));
+        configureInlineEditButton(editLastNameButton, "Last Name",
+                () -> showContactTextFieldDialog("Edit Last Name", "Last Name", currentContact.lastName(), false, editLastNameButton,
+                        value -> saveSingleContactField(ContactField.LAST_NAME, value)));
+        configureInlineEditButton(editEmailButton, "Email",
+                () -> showContactTextFieldDialog("Edit Email", "Email", currentContact.email(), false, editEmailButton,
+                        value -> saveSingleContactField(ContactField.EMAIL, value)));
+        configureInlineEditButton(editPhoneButton, "Phone",
+                () -> showContactTextFieldDialog("Edit Phone", "Phone", currentContact.phone(), false, editPhoneButton,
+                        value -> saveSingleContactField(ContactField.PHONE, value)));
+        configureInlineEditButton(editAddressHomeButton, "Home Address",
+                () -> showContactTextAreaDialog("Edit Home Address", "Home Address", currentContact.addressHome(), editAddressHomeButton,
+                        value -> saveSingleContactField(ContactField.ADDRESS_HOME, value)));
+        configureInlineEditButton(editDateOfBirthButton, "Date of Birth",
+                () -> showContactDateDialog("Edit Date of Birth", "Date of Birth", currentContact.dateOfBirth(), editDateOfBirthButton,
+                        value -> saveSingleContactField(ContactField.DATE_OF_BIRTH, value)));
+        configureInlineEditButton(editConditionButton, "Condition",
+                () -> showContactTextAreaDialog("Edit Condition", "Condition", currentContact.condition(), editConditionButton,
+                        value -> saveSingleContactField(ContactField.CONDITION, value)));
+        configureInlineEditButton(editDeceasedButton, "Deceased",
+                () -> showContactBooleanDialog("Edit Deceased", "Deceased", currentContact.deceased(), editDeceasedButton,
+                        value -> saveSingleContactField(ContactField.DECEASED, value)));
     }
 
-    private void configureInlineEditButton(Button button, String fieldLabel, Node editor) {
+    private void configureInlineEditButton(Button button, String fieldLabel, Runnable editAction) {
         if (button == null) {
             return;
         }
         button.setTooltip(new Tooltip("Edit " + fieldLabel));
-        button.setOnAction(e -> beginInlineEdit(editor));
-    }
-
-    private void beginInlineEdit(Node editor) {
-        if (!canEditContact()) {
-            setError("You do not have permission to edit this contact.");
-            return;
-        }
-        if (currentContact == null) {
-            setError("Contact details are unavailable.");
-            return;
-        }
-        if (!editMode) {
-            onEdit();
-        }
-        if (editor != null) {
-            editor.requestFocus();
-            if (editor instanceof TextInputControl textInput) {
-                textInput.selectAll();
+        button.setOnAction(e -> {
+            if (!canEditContact()) {
+                setError("You do not have permission to edit this contact.");
+                return;
             }
-        }
+            if (currentContact == null) {
+                setError("Contact details are unavailable.");
+                return;
+            }
+            clearError();
+            if (editAction != null) {
+                editAction.run();
+            }
+        });
     }
 
     private void loadContact() {
@@ -262,6 +280,155 @@ public final class ContactViewController {
         clearError();
     }
 
+    private void showContactTextFieldDialog(String title, String label, String currentValue, boolean required, Button ownerButton, Consumer<String> onSave) {
+        Dialog<String> dialog = new Dialog<>();
+        AppDialogs.applySecondaryDialogShell(dialog, title);
+        dialog.initOwner(dialogOwner(ownerButton));
+        ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+
+        TextField field = new TextField(safe(currentValue));
+        Label error = new Label();
+        error.setTextFill(Color.web("#b42318"));
+        error.setVisible(false);
+        error.setManaged(false);
+        dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + displayCurrentValue(currentValue)), field, error));
+
+        Node save = dialog.getDialogPane().lookupButton(saveType);
+        save.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+            if (required && safe(field.getText()).trim().isBlank()) {
+                error.setText(label + " is required.");
+                error.setVisible(true);
+                error.setManaged(true);
+                e.consume();
+            }
+        });
+        installUnsavedContactDialogConfirmation(dialog, () -> !Objects.equals(safeText(currentValue), safeText(field.getText())));
+        dialog.setResultConverter(button -> button == saveType ? field.getText() : null);
+        dialog.showAndWait().ifPresent(onSave);
+    }
+
+    private void showContactTextAreaDialog(String title, String label, String currentValue, Button ownerButton, Consumer<String> onSave) {
+        Dialog<String> dialog = new Dialog<>();
+        AppDialogs.applySecondaryDialogShell(dialog, title);
+        dialog.initOwner(dialogOwner(ownerButton));
+        ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+
+        TextArea area = new TextArea(safe(currentValue));
+        area.setPrefRowCount(8);
+        area.setWrapText(true);
+        dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current value shown below."), area));
+        installUnsavedContactDialogConfirmation(dialog, () -> !Objects.equals(safeText(currentValue), safeText(area.getText())));
+        dialog.setResultConverter(button -> button == saveType ? area.getText() : null);
+        dialog.showAndWait().ifPresent(onSave);
+    }
+
+    private void showContactDateDialog(String title, String label, LocalDate currentValue, Button ownerButton, Consumer<LocalDate> onSave) {
+        Dialog<LocalDate> dialog = new Dialog<>();
+        AppDialogs.applySecondaryDialogShell(dialog, title);
+        dialog.initOwner(dialogOwner(ownerButton));
+        ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+
+        DatePicker picker = new DatePicker(currentValue);
+        dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
+        installUnsavedContactDialogConfirmation(dialog, () -> !Objects.equals(currentValue, picker.getValue()));
+        dialog.setResultConverter(button -> button == saveType ? picker.getValue() : null);
+        dialog.showAndWait().ifPresent(onSave);
+    }
+
+    private void showContactBooleanDialog(String title, String label, boolean currentValue, Button ownerButton, Consumer<Boolean> onSave) {
+        Dialog<Boolean> dialog = new Dialog<>();
+        AppDialogs.applySecondaryDialogShell(dialog, title);
+        dialog.initOwner(dialogOwner(ownerButton));
+        ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+
+        CheckBox box = new CheckBox(label);
+        box.setSelected(currentValue);
+        dialog.getDialogPane().setContent(new VBox(8, new Label("Current: " + booleanLabel(currentValue)), box));
+        installUnsavedContactDialogConfirmation(dialog, () -> currentValue != box.isSelected());
+        dialog.setResultConverter(button -> button == saveType ? box.isSelected() : null);
+        dialog.showAndWait().ifPresent(onSave);
+    }
+
+    private void installUnsavedContactDialogConfirmation(Dialog<?> dialog, java.util.function.BooleanSupplier hasChanges) {
+        Node cancel = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+        if (cancel == null) {
+            return;
+        }
+        cancel.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+            if (hasChanges == null || !hasChanges.getAsBoolean()) {
+                return;
+            }
+            boolean confirmed = AppDialogs.showConfirmation(
+                    dialog.getOwner(),
+                    "Discard Changes?",
+                    "Discard unsaved changes?",
+                    "Canceling will discard the changes in this field.",
+                    "Discard Changes",
+                    AppDialogs.DialogActionKind.DANGER);
+            if (!confirmed) {
+                e.consume();
+            }
+        });
+    }
+
+    private void saveSingleContactField(ContactField field, String value) {
+        saveContactProfile(createUpdateRequest(field, safeText(value), null, null));
+    }
+
+    private void saveSingleContactField(ContactField field, LocalDate value) {
+        saveContactProfile(createUpdateRequest(field, null, value, null));
+    }
+
+    private void saveSingleContactField(ContactField field, Boolean value) {
+        saveContactProfile(createUpdateRequest(field, null, null, Boolean.TRUE.equals(value)));
+    }
+
+    private ContactProfileUpdateRequest createUpdateRequest(ContactField field, String textValue, LocalDate dateValue, Boolean booleanValue) {
+        if (currentContact == null) {
+            return null;
+        }
+        String name = currentContact.name();
+        String firstName = currentContact.firstName();
+        String lastName = currentContact.lastName();
+        String email = currentContact.email();
+        String phone = currentContact.phone();
+        String addressHome = currentContact.addressHome();
+        LocalDate dateOfBirth = currentContact.dateOfBirth();
+        String condition = currentContact.condition();
+        boolean deceased = currentContact.deceased();
+
+        switch (field) {
+            case NAME -> name = textValue;
+            case FIRST_NAME -> firstName = textValue;
+            case LAST_NAME -> lastName = textValue;
+            case EMAIL -> email = textValue;
+            case PHONE -> phone = textValue;
+            case ADDRESS_HOME -> addressHome = textValue;
+            case DATE_OF_BIRTH -> dateOfBirth = dateValue;
+            case CONDITION -> condition = textValue;
+            case DECEASED -> deceased = Boolean.TRUE.equals(booleanValue);
+        }
+
+        return new ContactProfileUpdateRequest(
+                currentContact.id(),
+                currentContact.shaleClientId(),
+                appState == null ? null : appState.getUserId(),
+                name,
+                firstName,
+                lastName,
+                email,
+                phone,
+                addressHome,
+                dateOfBirth,
+                condition,
+                deceased,
+                currentContact.client());
+    }
+
     private void onSave() {
         if (!canEditContact()) {
             setError("You do not have permission to save this contact.");
@@ -272,7 +439,6 @@ public final class ContactViewController {
             return;
         }
 
-        long saveStarted = PerfLog.start();
         ContactProfileUpdateRequest request = new ContactProfileUpdateRequest(
                 currentContact.id(),
                 currentContact.shaleClientId(),
@@ -287,7 +453,20 @@ public final class ContactViewController {
                 safeText(conditionEditor == null ? null : conditionEditor.getText()),
                 deceasedEditor != null && deceasedEditor.isSelected(),
                 currentContact.client());
+        saveContactProfile(request);
+    }
 
+    private void saveContactProfile(ContactProfileUpdateRequest request) {
+        if (!canEditContact()) {
+            setError("You do not have permission to save this contact.");
+            return;
+        }
+        if (request == null || contactDetailService == null) {
+            setError("Contact details are unavailable.");
+            return;
+        }
+
+        long saveStarted = PerfLog.start();
         PerfLog.log("contacts.save", "start", "contactId=" + request.contactId() + " tenantId=" + request.shaleClientId());
         setBusy(true);
         dbExec.submit(() -> {
@@ -676,6 +855,11 @@ public final class ContactViewController {
         return value == null ? "—" : value.toString();
     }
 
+    private static String displayCurrentValue(String value) {
+        String safe = safeText(value);
+        return safe == null ? "—" : safe;
+    }
+
     private static void setVisibleManaged(Node node, boolean visible) {
         if (node == null) {
             return;
@@ -693,5 +877,17 @@ public final class ContactViewController {
         }
         setVisibleManaged(readOnlyNode, !editing);
         setVisibleManaged(editorNode, editing);
+    }
+
+    private enum ContactField {
+        NAME,
+        FIRST_NAME,
+        LAST_NAME,
+        EMAIL,
+        PHONE,
+        ADDRESS_HOME,
+        DATE_OF_BIRTH,
+        CONDITION,
+        DECEASED
     }
 }
