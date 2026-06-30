@@ -30,12 +30,16 @@ import javafx.util.Duration;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar.ButtonData;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ColorPicker;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -47,6 +51,7 @@ import javafx.stage.Window;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ExecutorService;
@@ -95,18 +100,24 @@ public final class UserController {
 
 	@FXML private Label displayNameValue;
 	@FXML private Label firstNameValue;
+	@FXML private Button editFirstNameButton;
 	@FXML private TextField firstNameEditor;
 	@FXML private Label lastNameValue;
+	@FXML private Button editLastNameButton;
 	@FXML private TextField lastNameEditor;
 	@FXML private Label emailValue;
+	@FXML private Button editEmailButton;
 	@FXML private TextField emailEditor;
 	@FXML private Label phoneValue;
+	@FXML private Button editPhoneButton;
 	@FXML private TextField phoneEditor;
 	@FXML private Label initialsValue;
+	@FXML private Button editInitialsButton;
 	@FXML private TextField initialsEditor;
 	@FXML private HBox colorValueContainer;
 	@FXML private Region colorPreview;
 	@FXML private Label colorValue;
+	@FXML private Button editColorButton;
 	@FXML private HBox colorEditorContainer;
 	@FXML private ColorPicker colorEditor;
 	@FXML private Label colorEditorValue;
@@ -185,7 +196,9 @@ public final class UserController {
 	private void initialize() {
 		if (editButton != null) {
 			editButton.setOnAction(e -> onEdit());
+			setVisibleManaged(editButton, false);
 		}
+		initializeInlineEditButtons();
 		if (saveButton != null) {
 			saveButton.setOnAction(e -> onSave());
 		}
@@ -215,6 +228,45 @@ public final class UserController {
 					+ " queryLength=" + normalizedAssignedCaseQuery().length() + " generation=" + generation);
 			assignedCasesFilterDebounce.playFromStart();
 			PerfLog.logDone("FILTER", "panel=assigned_cases page=user_view debounceScheduled=true generation=" + generation, filterStartNanos);
+		});
+	}
+
+	private void initializeInlineEditButtons() {
+		configureTextEditButton(editFirstNameButton, "First Name", UserField.FIRST_NAME);
+		configureTextEditButton(editLastNameButton, "Last Name", UserField.LAST_NAME);
+		configureTextEditButton(editEmailButton, "Email", UserField.EMAIL);
+		configureTextEditButton(editPhoneButton, "Phone", UserField.PHONE);
+		configureTextEditButton(editInitialsButton, "Initials", UserField.INITIALS);
+		configureInlineEditButton(editColorButton, "Color", () -> showUserColorDialog(editColorButton));
+	}
+
+	private void configureTextEditButton(Button button, String fieldLabel, UserField field) {
+		configureInlineEditButton(button, fieldLabel, () -> showUserTextFieldDialog(
+				"Edit " + fieldLabel,
+				fieldLabel,
+				field.value(currentUser),
+				button,
+				value -> saveSingleUserField(field, value)));
+	}
+
+	private void configureInlineEditButton(Button button, String fieldLabel, Runnable editAction) {
+		if (button == null) {
+			return;
+		}
+		button.setTooltip(new Tooltip("Edit " + fieldLabel));
+		button.setOnAction(e -> {
+			if (!canEditCurrentUser()) {
+				setError("You do not have permission to edit this user.");
+				return;
+			}
+			if (currentUser == null) {
+				setError("User details are unavailable.");
+				return;
+			}
+			clearError();
+			if (editAction != null) {
+				editAction.run();
+			}
 		});
 	}
 
@@ -581,6 +633,101 @@ public final class UserController {
 				safeText(initialsEditor == null ? null : initialsEditor.getText()),
 				selectedStoredColor());
 
+		saveUserProfile(request);
+	}
+
+	private void showUserTextFieldDialog(String title, String label, String currentValue, Button ownerButton, Consumer<String> onSave) {
+		Dialog<String> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+
+		TextField field = new TextField(safeText(currentValue));
+		Label error = new Label();
+		error.setTextFill(Color.web("#b42318"));
+		error.setVisible(false);
+		error.setManaged(false);
+		VBox body = new VBox(8,
+				new Label(label),
+				currentValueLabel(currentValue),
+				field,
+				error);
+		body.getStyleClass().add("field-edit-dialog-body");
+		dialog.getDialogPane().setContent(body);
+
+		Node save = dialog.getDialogPane().lookupButton(saveType);
+		save.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+			String validationMessage = validateUserField(label, field.getText());
+			if (!validationMessage.isBlank()) {
+				error.setText(validationMessage);
+				error.setVisible(true);
+				error.setManaged(true);
+				e.consume();
+			}
+		});
+		installUnsavedUserDialogConfirmation(dialog, () -> !Objects.equals(safeText(currentValue), safeText(field.getText())));
+		dialog.setResultConverter(button -> button == saveType ? field.getText() : null);
+		dialog.showAndWait().ifPresent(onSave);
+	}
+
+	private void showUserColorDialog(Button ownerButton) {
+		String currentValue = currentUser == null ? null : currentUser.color();
+		Dialog<String> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, "Edit Color");
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+
+		ColorPicker picker = new ColorPicker(ColorUtil.toFxColor(currentValue));
+		Label selectedValue = new Label(ColorUtil.toDisplayValue(currentValue));
+		picker.setOnAction(e -> selectedValue.setText("#" + ColorUtil.toStoredColor(picker.getValue())));
+		VBox body = new VBox(8, new Label("Color"), currentValueLabel(ColorUtil.toDisplayValue(currentValue)), picker, selectedValue);
+		body.getStyleClass().add("field-edit-dialog-body");
+		dialog.getDialogPane().setContent(body);
+
+		installUnsavedUserDialogConfirmation(dialog,
+				() -> !Objects.equals(safeText(currentValue), safeText(ColorUtil.toStoredColor(picker.getValue()))));
+		dialog.setResultConverter(button -> button == saveType ? ColorUtil.toStoredColor(picker.getValue()) : null);
+		dialog.showAndWait().ifPresent(value -> saveSingleUserField(UserField.COLOR, value));
+	}
+
+	private void installUnsavedUserDialogConfirmation(Dialog<?> dialog, java.util.function.BooleanSupplier hasChanges) {
+		Node cancel = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+		if (cancel == null) {
+			return;
+		}
+		cancel.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+			if (hasChanges == null || !hasChanges.getAsBoolean()) {
+				return;
+			}
+			boolean confirmed = AppDialogs.showConfirmation(
+					dialog.getOwner(),
+					"Discard Changes?",
+					"Discard unsaved changes?",
+					"Canceling will discard the changes in this field.",
+					"Discard Changes",
+					AppDialogs.DialogActionKind.DANGER);
+			if (!confirmed) {
+				e.consume();
+			}
+		});
+	}
+
+	private void saveSingleUserField(UserField field, String value) {
+		if (!canEditCurrentUser()) {
+			setError("You do not have permission to save changes for this user.");
+			return;
+		}
+		if (currentUser == null || userDetailService == null || field == null) {
+			setError("User details are unavailable.");
+			return;
+		}
+		UserProfileUpdateRequest request = field.request(currentUser, value);
+		saveUserProfile(request);
+	}
+
+	private void saveUserProfile(UserProfileUpdateRequest request) {
 		setBusy(true);
 		long saveStartNanos = PerfLog.start();
 		PerfLog.log("SAVE", "start", "page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId());
@@ -597,7 +744,6 @@ public final class UserController {
 					});
 					return;
 				}
-
 				UserDetailRow reloaded = userDetailService.loadUser(request.userId(), request.shaleClientId());
 				Platform.runLater(() -> {
 					setBusy(false);
@@ -1077,10 +1223,16 @@ public final class UserController {
 
 	private void refreshActionVisibility() {
 		boolean canEdit = canEditCurrentUser();
-		setVisibleManaged(editButton, canEdit && !editMode);
+		setVisibleManaged(editButton, false);
 		setVisibleManaged(saveButton, canEdit && editMode);
 		setVisibleManaged(cancelButton, canEdit && editMode);
 		setVisibleManaged(addRoleButton, canManageRoles());
+		setVisibleManaged(editFirstNameButton, canEdit);
+		setVisibleManaged(editLastNameButton, canEdit);
+		setVisibleManaged(editEmailButton, canEdit);
+		setVisibleManaged(editPhoneButton, canEdit);
+		setVisibleManaged(editInitialsButton, canEdit);
+		setVisibleManaged(editColorButton, canEdit);
 	}
 
 	private void setBusy(boolean busy) {
@@ -1095,6 +1247,11 @@ public final class UserController {
 		}
 		if (addRoleButton != null) {
 			addRoleButton.setDisable(busy);
+		}
+		for (Button button : new Button[] { editFirstNameButton, editLastNameButton, editEmailButton, editPhoneButton, editInitialsButton, editColorButton }) {
+			if (button != null) {
+				button.setDisable(busy);
+			}
 		}
 		if (firstNameEditor != null) {
 			firstNameEditor.setDisable(busy);
@@ -1539,6 +1696,23 @@ public final class UserController {
 		}
 	}
 
+	private static Label currentValueLabel(String value) {
+		Label label = new Label("Current: " + fallback(value));
+		label.getStyleClass().add("field-edit-current-value");
+		label.setWrapText(true);
+		return label;
+	}
+
+	private static String validateUserField(String label, String value) {
+		if ("Email".equals(label)) {
+			String email = safeText(value);
+			if (!email.isBlank() && (!email.contains("@") || email.indexOf('@') == 0 || email.endsWith("@"))) {
+				return "Enter a valid email address.";
+			}
+		}
+		return "";
+	}
+
 	private static String displayName(UserDetailRow user) {
 		if (user == null) {
 			return "User";
@@ -1580,6 +1754,60 @@ public final class UserController {
 
 		private boolean matches(int userId, int shaleClientId) {
 			return this.userId == userId && this.shaleClientId == shaleClientId;
+		}
+	}
+
+	private enum UserField {
+		FIRST_NAME {
+			@Override String value(UserDetailRow user) { return user.firstName(); }
+			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+				return base(user, safeText(value), user.lastName(), user.email(), user.phone(), user.initials(), user.color());
+			}
+		},
+		LAST_NAME {
+			@Override String value(UserDetailRow user) { return user.lastName(); }
+			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+				return base(user, user.firstName(), safeText(value), user.email(), user.phone(), user.initials(), user.color());
+			}
+		},
+		EMAIL {
+			@Override String value(UserDetailRow user) { return user.email(); }
+			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+				return base(user, user.firstName(), user.lastName(), safeText(value), user.phone(), user.initials(), user.color());
+			}
+		},
+		PHONE {
+			@Override String value(UserDetailRow user) { return user.phone(); }
+			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+				return base(user, user.firstName(), user.lastName(), user.email(), safeText(value), user.initials(), user.color());
+			}
+		},
+		INITIALS {
+			@Override String value(UserDetailRow user) { return user.initials(); }
+			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+				return base(user, user.firstName(), user.lastName(), user.email(), user.phone(), safeText(value), user.color());
+			}
+		},
+		COLOR {
+			@Override String value(UserDetailRow user) { return user.color(); }
+			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+				return base(user, user.firstName(), user.lastName(), user.email(), user.phone(), user.initials(), safeText(value));
+			}
+		};
+
+		abstract String value(UserDetailRow user);
+		abstract UserProfileUpdateRequest request(UserDetailRow user, String value);
+
+		static UserProfileUpdateRequest base(UserDetailRow user, String firstName, String lastName, String email, String phone, String initials, String color) {
+			return new UserProfileUpdateRequest(
+					user.id(),
+					user.shaleClientId(),
+					safeText(firstName),
+					safeText(lastName),
+					safeText(email),
+					safeText(phone),
+					safeText(initials),
+					color);
 		}
 	}
 

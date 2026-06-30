@@ -120,7 +120,9 @@ public class ContactCard extends HBox {
         nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
         roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
         emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
+        phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
         emailLabel.setWrapText(true);
+        phoneLabel.setWrapText(true);
 
         VBox text = new VBox(4, nameLabel);
         if (roleLabel.isManaged()) {
@@ -128,6 +130,9 @@ public class ContactCard extends HBox {
         }
         if (!(suppressPlaceholderLines && "—".equals(emailLabel.getText()))) {
             text.getChildren().add(emailLabel);
+        }
+        if (!(suppressPlaceholderLines && "—".equals(phoneLabel.getText()))) {
+            text.getChildren().add(phoneLabel);
         }
         getChildren().add(text);
     }

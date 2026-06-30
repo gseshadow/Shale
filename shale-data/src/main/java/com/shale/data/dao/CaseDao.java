@@ -4130,7 +4130,25 @@ public final class CaseDao {
 				      WHEN cp.ContactId IS NOT NULL THEN 'Contact #' + CAST(cp.ContactId AS varchar(32))
 				      ELSE 'Organization #' + CAST(cp.OrganizationId AS varchar(32))
 				    END
-				  ) AS DisplayName
+				  ) AS DisplayName,
+				  CASE
+				    WHEN cp.ContactId IS NOT NULL THEN
+				      COALESCE(
+				        NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), ''),
+				        NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailWork, ''))), ''),
+				        NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailOther, ''))), '')
+				      )
+				    ELSE NULLIF(LTRIM(RTRIM(COALESCE(o.Email, ''))), '')
+				  END AS Email,
+				  CASE
+				    WHEN cp.ContactId IS NOT NULL THEN
+				      COALESCE(
+				        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), ''),
+				        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneHome, ''))), ''),
+				        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneWork, ''))), '')
+				      )
+				    ELSE NULLIF(LTRIM(RTRIM(COALESCE(o.Phone, ''))), '')
+				  END AS Phone
 				FROM dbo.CaseParties cp
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cp.CaseId
@@ -4200,7 +4218,9 @@ public final class CaseDao {
 							toLocalDateTime(rs.getTimestamp("CreatedAt")),
 							toLocalDateTime(rs.getTimestamp("UpdatedAt")),
 							rs.getString("EntityType"),
-							rs.getString("DisplayName")
+							rs.getString("DisplayName"),
+							rs.getString("Email"),
+							rs.getString("Phone")
 					));
 				}
 			}

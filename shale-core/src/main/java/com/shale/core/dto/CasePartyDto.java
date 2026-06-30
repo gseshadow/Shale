@@ -21,6 +21,8 @@ public final class CasePartyDto {
 	private final LocalDateTime updatedAt;
 	private final String entityType;
 	private final String displayName;
+	private final String email;
+	private final String phone;
 
 	public CasePartyDto(long id,
 			long caseId,
@@ -35,7 +37,9 @@ public final class CasePartyDto {
 			LocalDateTime createdAt,
 			LocalDateTime updatedAt,
 			String entityType,
-			String displayName) {
+			String displayName,
+			String email,
+			String phone) {
 		this.id = id;
 		this.caseId = caseId;
 		this.contactId = contactId;
@@ -50,6 +54,8 @@ public final class CasePartyDto {
 		this.updatedAt = updatedAt;
 		this.entityType = entityType == null ? "" : entityType;
 		this.displayName = displayName == null ? "" : displayName;
+		this.email = email == null ? "" : email;
+		this.phone = phone == null ? "" : phone;
 	}
 
 	public long getId() { return id; }
@@ -66,4 +72,6 @@ public final class CasePartyDto {
 	public LocalDateTime getUpdatedAt() { return updatedAt; }
 	public String getEntityType() { return entityType; }
 	public String getDisplayName() { return displayName; }
+	public String getEmail() { return email; }
+	public String getPhone() { return phone; }
 }
