@@ -115,10 +115,16 @@ public final class CreateContactDialog {
         }
         return Optional.of(new ContactDao.CreateContactRequest(
                 shaleClientId,
+                null,
+                null,
                 result.firstName(),
                 result.lastName(),
                 result.email(),
                 result.phone(),
+                null,
+                null,
+                null,
+                false,
                 result.client()));
     }
 
@@ -131,10 +137,16 @@ public final class CreateContactDialog {
         }
         result = new ContactDao.CreateContactRequest(
                 0,
+                null,
+                null,
                 firstName,
                 lastName,
                 normalize(emailField.getText()),
                 normalize(phoneField.getText()),
+                null,
+                null,
+                null,
+                false,
                 clientCheckBox.isSelected());
         stage.close();
     }

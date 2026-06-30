@@ -55,10 +55,16 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		Objects.requireNonNull(command, "command");
 		return contactGateway.createContact(new ContactDao.CreateContactRequest(
 				command.shaleClientId(),
+				command.actorUserId(),
+				command.name(),
 				command.firstName(),
 				command.lastName(),
 				command.email(),
 				command.phone(),
+				command.addressHome(),
+				command.dateOfBirth() == null ? null : java.time.LocalDate.parse(command.dateOfBirth()),
+				command.condition(),
+				command.deceased() == null ? false : command.deceased(),
 				false));
 	}
 

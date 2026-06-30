@@ -80,6 +80,18 @@ public final class ApiReadController {
     public record UpdateTaskRequest(String title, String description, String dueDate, Integer priorityId, Integer assignedUserId) {
     }
 
+    public record CreateContactRequest(
+            String name,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String addressHome,
+            String dateOfBirth,
+            String condition,
+            Boolean deceased) {
+    }
+
     public record UpdateContactRequest(
             String name,
             String firstName,
@@ -389,6 +401,29 @@ public final class ApiReadController {
         taskServicePort.completeTask(safeTaskId, shaleClientId, userId);
         return taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
+    }
+
+
+    @Operation(summary = "Create contact", description = "Creates a tenant-scoped contact for the authenticated user and returns the refreshed contact detail.")
+    @PostMapping("/api/contacts")
+    public ContactDetail createContact(@RequestBody CreateContactRequest request) {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        String firstName = ApiValidation.optionalContactNamePart(request == null ? null : request.firstName(), "First name");
+        String lastName = ApiValidation.optionalContactNamePart(request == null ? null : request.lastName(), "Last name");
+        String displayName = ApiValidation.optionalContactDisplayName(request == null ? null : request.name());
+        if ((firstName == null || firstName.isBlank()) && (lastName == null || lastName.isBlank()) && (displayName == null || displayName.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least a display name, first name, or last name is required.");
+        }
+        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
+        String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
+        String addressHome = ApiValidation.optionalContactText(request == null ? null : request.addressHome(), "Address", 2000);
+        String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
+        String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
+        int contactId = contactServicePort.createContact(new ContactServicePort.CreateContactCommand(
+                shaleClientId, userId, displayName, firstName, lastName, email, phone, addressHome, dateOfBirth, condition, request == null ? null : request.deceased()));
+        return contactServicePort.getContactDetail(contactId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
     }
 
     @Operation(summary = "Get contact detail", description = "Returns one tenant-scoped contact detail record.")

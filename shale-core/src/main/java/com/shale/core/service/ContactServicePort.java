@@ -15,10 +15,6 @@ public interface ContactServicePort {
 
 	Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId);
 
-	/**
-	 * TODO: align this placeholder command with the existing ContactDao
-	 * CreateContactRequest before adding server write endpoints.
-	 */
 	int createContact(CreateContactCommand command);
 
 	/**
@@ -50,10 +46,15 @@ public interface ContactServicePort {
 	record CreateContactCommand(
 			int shaleClientId,
 			int actorUserId,
+			String name,
 			String firstName,
 			String lastName,
 			String email,
-			String phone) {
+			String phone,
+			String addressHome,
+			String dateOfBirth,
+			String condition,
+			Boolean deceased) {
 	}
 
 	record UpdateContactCommand(

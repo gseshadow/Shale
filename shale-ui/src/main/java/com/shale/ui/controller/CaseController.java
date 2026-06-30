@@ -2454,10 +2454,16 @@ public class CaseController {
 			}
 			int contactId = contactDao.createContact(new ContactDao.CreateContactRequest(
 					shaleClientId,
+					null,
+					null,
 					safeText(draft.contactFirstName()),
 					safeText(draft.contactLastName()),
 					null,
 					null,
+					null,
+					null,
+					null,
+					false,
 					false));
 			return Long.valueOf(contactId);
 		}
@@ -6692,10 +6698,16 @@ public class CaseController {
 							throw new IllegalStateException("Cannot create contact without an active tenant.");
 						int createdId = contactDao.createContact(new ContactDao.CreateContactRequest(
 								appState.getShaleClientId(),
+								null,
+								null,
 								firstName,
 								lastName,
 								null,
 								null,
+								null,
+								null,
+								null,
+								false,
 								true));
 						String displayName = ((firstName == null ? "" : firstName) + " " + (lastName == null ? "" : lastName)).trim();
 						if (displayName.isBlank())
