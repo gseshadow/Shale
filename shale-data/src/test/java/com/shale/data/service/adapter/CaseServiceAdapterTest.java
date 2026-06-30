@@ -243,6 +243,10 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
+		public void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId) {
+		}
+
+		@Override
 		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
 				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
 				byte[] expectedRowVer, Integer actorUserId) {

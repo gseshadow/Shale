@@ -2307,7 +2307,8 @@ public final class CaseDao {
 				    COALESCE(ra_user.name_first, '') +
 				    CASE WHEN COALESCE(ra_user.name_first, '') = '' OR COALESCE(ra_user.name_last, '') = '' THEN '' ELSE ' ' END +
 				    COALESCE(ra_user.name_last, '')
-				  )) AS ResponsibleAttorneyName
+				  )) AS ResponsibleAttorneyName,
+				  responsible_attorney.UserId AS ResponsibleAttorneyId
 				FROM %s c
 				OUTER APPLY (
 				    SELECT TOP (1) s.Name AS CurrentStatusName
@@ -2362,6 +2363,7 @@ public final class CaseDao {
 				rs.getString("Description"),
 				rs.getString("CurrentStatusName"),
 				rs.getString("ResponsibleAttorneyName"),
+				getNullableInt(rs, "ResponsibleAttorneyId"),
 				getNullableInt(rs, "PracticeAreaId"),
 				toLocalDate(rs.getDate("CallerDate")),
 				rs.getString("CallerTime"),
@@ -6316,6 +6318,77 @@ public final class CaseDao {
 
 	public PracticeAreaRow findSexualAssaultPracticeAreaForTenant(int shaleClientId) {
 		return findPracticeAreaForTenantBySystemKey(shaleClientId, PRACTICE_AREA_KEY_SEXUAL_ASSAULT);
+	}
+
+	public void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId) {
+		String sql = """
+				BEGIN TRY
+				  BEGIN TRAN;
+
+				  IF NOT EXISTS (
+				    SELECT 1 FROM dbo.Cases c
+				    WHERE c.Id = ?
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  ) THROW 50002, 'Case not found.', 1;
+
+				  IF NOT EXISTS (
+				    SELECT 1 FROM dbo.PracticeAreas pa
+				    WHERE pa.Id = ?
+				      AND (pa.ShaleClientId = ? OR pa.ShaleClientId IS NULL)
+				      AND pa.IsActive = 1
+				      AND pa.IsDeleted = 0
+				  ) THROW 50001, 'Practice area not found for tenant.', 1;
+
+				  IF NOT EXISTS (
+				    SELECT 1 FROM dbo.Users u
+				    WHERE u.id = ?
+				      AND u.ShaleClientId = ?
+				      AND COALESCE(u.is_attorney, 0) = 1
+				      AND COALESCE(u.is_deleted, 0) = 0
+				  ) THROW 50003, 'Responsible attorney not found for tenant.', 1;
+
+				  UPDATE dbo.Cases
+				  SET PracticeAreaId = ?, UpdatedAt = SYSDATETIME()
+				  WHERE Id = ? AND ShaleClientId = ? AND (IsDeleted = 0 OR IsDeleted IS NULL);
+
+				  MERGE dbo.CaseUsers AS target
+				  USING (SELECT ? AS CaseId, ? AS UserId, ? AS RoleId, CAST(1 AS bit) AS IsPrimary) AS src
+				     ON target.CaseId = src.CaseId
+				    AND target.RoleId = src.RoleId
+				    AND target.IsPrimary = src.IsPrimary
+				  WHEN MATCHED THEN
+				      UPDATE SET UserId = src.UserId, UpdatedAt = SYSDATETIME()
+				  WHEN NOT MATCHED THEN
+				      INSERT (CaseId, UserId, RoleId, IsPrimary, Notes, CreatedAt, UpdatedAt)
+				      VALUES (src.CaseId, src.UserId, src.RoleId, CAST(1 AS bit), NULL, SYSDATETIME(), SYSDATETIME());
+
+				  COMMIT;
+				END TRY
+				BEGIN CATCH
+				  IF @@TRANCOUNT > 0 ROLLBACK;
+				  THROW;
+				END CATCH;
+				""";
+
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, practiceAreaId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, responsibleAttorneyUserId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, practiceAreaId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, responsibleAttorneyUserId);
+			ps.setInt(i++, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update case assignment (caseId=" + caseId + ")", e);
+		}
 	}
 
 	public void setResponsibleAttorney(long caseId, int userId) {

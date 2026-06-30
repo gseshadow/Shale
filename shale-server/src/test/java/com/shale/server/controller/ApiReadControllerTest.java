@@ -769,6 +769,11 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command) {
+            return getCaseDetail(command.caseId(), command.shaleClientId()).orElseThrow();
+        }
+
+        @Override
         public CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command) {
             this.updateCaseId = command.caseId();
             this.updateShaleClientId = command.shaleClientId();

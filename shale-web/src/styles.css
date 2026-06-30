@@ -571,6 +571,7 @@ input[type="date"],
 input[type="email"],
 input[type="tel"],
 input[type="url"],
+select,
 textarea {
   border: 1px solid #c9d4df;
   border-radius: 14px;
@@ -585,7 +586,8 @@ input[type="text"],
 input[type="date"],
 input[type="email"],
 input[type="tel"],
-input[type="url"] {
+input[type="url"],
+select {
   min-height: 2.75rem;
 }
 
@@ -595,6 +597,7 @@ textarea {
 }
 
 input:focus-visible,
+select:focus-visible,
 textarea:focus-visible,
 input[type="checkbox"]:focus-visible,
 button:focus-visible,

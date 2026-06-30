@@ -65,6 +65,8 @@ public interface CaseServicePort {
 	 */
 	CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command);
 
+	CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command);
+
 	record AddCaseNoteCommand(
 			long caseId,
 			int shaleClientId,
@@ -92,11 +94,12 @@ public interface CaseServicePort {
 			String systemKey) {
 	}
 
-	record UpdateCaseStatusCommand(
+	record UpdateCaseAssignmentCommand(
 			long caseId,
 			int shaleClientId,
 			int actorUserId,
-			int statusId) {
+			int practiceAreaId,
+			int responsibleAttorneyUserId) {
 	}
 
 	record UpdateCaseCoreDetailsCommand(

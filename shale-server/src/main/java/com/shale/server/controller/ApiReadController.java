@@ -26,7 +26,7 @@ import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
-import com.shale.core.service.CaseServicePort.UpdateCaseStatusCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseAssignmentCommand;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactDetail;
 import com.shale.core.service.ContactServicePort.ContactSummary;
@@ -56,6 +56,9 @@ public final class ApiReadController {
     }
 
     public record CreateCaseTaskRequest(String title, String description, String dueDate) {
+    }
+
+    public record UpdateCaseAssignmentRequest(Integer practiceAreaId, Integer responsibleAttorneyUserId) {
     }
 
     public record UpdateCaseCoreDetailsRequest(
@@ -210,6 +213,31 @@ public final class ApiReadController {
         }
         return updated;
     }
+
+    @Operation(summary = "Update case assignment", description = "Updates assignment/classification fields for one tenant-scoped case and returns the refreshed case detail.")
+    @PatchMapping("/api/cases/{caseId:\\d+}/assignment")
+    public CaseDetailDto updateCaseAssignment(
+            @PathVariable("caseId") long caseId,
+            @RequestBody UpdateCaseAssignmentRequest request) {
+        long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
+        if (request == null || request.practiceAreaId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "practiceAreaId is required.");
+        }
+        if (request.responsibleAttorneyUserId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "responsibleAttorneyUserId is required.");
+        }
+        int practiceAreaId = Math.toIntExact(ApiValidation.positiveId(request.practiceAreaId(), "practiceAreaId"));
+        int responsibleAttorneyUserId = Math.toIntExact(ApiValidation.positiveId(request.responsibleAttorneyUserId(), "responsibleAttorneyUserId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        CaseDetailDto updated = caseServicePort.updateCaseAssignment(new UpdateCaseAssignmentCommand(
+                safeCaseId, shaleClientId, userId, practiceAreaId, responsibleAttorneyUserId));
+        if (updated == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found.");
+        }
+        return updated;
+    }
+
 
     @Operation(summary = "List case tasks", description = "Returns tasks for one tenant-scoped case.")
     @GetMapping("/api/cases/{caseId:\\d+}/tasks")
@@ -427,6 +455,13 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         requireCurrentUserAdmin(shaleClientId);
         return caseServicePort.listTenantCaseStatuses(shaleClientId, true);
+    }
+
+    @Operation(summary = "List practice area lookup values", description = "Returns active practice areas for the authenticated tenant.")
+    @GetMapping("/api/lookups/practice-areas")
+    public List<PracticeAreaDto> listPracticeAreaLookups() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return caseServicePort.listPracticeAreas(shaleClientId, false);
     }
 
     @Operation(summary = "List practice areas", description = "Returns read-only practice area settings for administrators in the authenticated tenant.")
