@@ -218,6 +218,19 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
+		public CaseDao.StatusRow findStatusForTenantById(int shaleClientId, int statusId) {
+			return new CaseDao.StatusRow(statusId, "Open", 10, "#00AA00", null, "open");
+		}
+
+		@Override
+		public void setPrimaryStatus(long caseId, int statusId, String notes) {
+		}
+
+		@Override
+		public void populateLifecycleDateIfNull(long caseId, String lifecycleKey) {
+		}
+
+		@Override
 		public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
 		}
 

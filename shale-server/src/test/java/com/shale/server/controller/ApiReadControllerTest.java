@@ -717,7 +717,7 @@ class ApiReadControllerTest {
 
         @Override
         public List<com.shale.core.dto.CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
-            throw new AssertionError("listCaseStatuses should not be called");
+            return List.of(new com.shale.core.dto.CaseStatusDto(1, "Open", false, 10, "#00AA00", null, "open", null));
         }
 
         @Override
@@ -789,6 +789,14 @@ class ApiReadControllerTest {
                     null, null, null, null, null, null, null, command.dateOfInjury(), command.statuteOfLimitations(), command.tortNoticeDeadline(), null,
                     null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, command.summary(), null, LocalDateTime.of(2026, 1, 2, 0, 0), new byte[] {2});
+        }
+
+        @Override
+        public CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command) {
+            return new CaseDetailDto(command.caseId(), "CASE-501", "Smith v. Example", "Detail", "Closed", "Ada Attorney", 10,
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, LocalDateTime.of(2026, 1, 3, 0, 0), new byte[] {3});
         }
 
         @Override

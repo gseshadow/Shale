@@ -700,6 +700,48 @@ export async function getOrganizationDetail(accessToken: string, organizationId:
 }
 
 
+export async function listCaseStatusLookup(accessToken: string): Promise<CaseStatusSetting[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/lookups/case-statuses`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load case status options.', response.status);
+  }
+
+  return response.json() as Promise<CaseStatusSetting[]>;
+}
+
+export async function updateCaseStatus(accessToken: string, caseId: number, statusId: number): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ statusId }),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Choose a valid case status before saving.', response.status);
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that case.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the case status.', response.status);
+  }
+
+  return response.json() as Promise<CaseDetail>;
+}
+
 export async function listTeamMembers(accessToken: string): Promise<TeamMemberSummary[]> {
   const response = await fetch(`${apiBaseUrl()}/api/users`, {
     method: 'GET',

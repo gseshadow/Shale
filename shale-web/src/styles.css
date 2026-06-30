@@ -644,3 +644,70 @@ button:focus-visible,
     width: 100%;
   }
 }
+
+.status-edit-form fieldset {
+  border: 0;
+  display: grid;
+  gap: .85rem;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.status-edit-form legend {
+  color: var(--text-muted);
+  font-size: .92rem;
+  font-weight: 800;
+  margin-bottom: .35rem;
+}
+
+.status-choice-list {
+  display: grid;
+  gap: .75rem;
+  min-width: 0;
+}
+
+.status-choice-card {
+  --status-accent: #2f80b7;
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--status-accent);
+  border-radius: 14px;
+  cursor: pointer;
+  display: grid;
+  gap: .75rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  padding: .95rem;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.status-choice-card:has(input:checked) {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-accent) 18%, transparent);
+}
+
+.status-choice-card:focus-within {
+  outline: 3px solid color-mix(in srgb, var(--status-accent) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.status-choice-card input {
+  margin-top: .2rem;
+  min-height: 1.2rem;
+  min-width: 1.2rem;
+}
+
+.status-choice-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem .6rem;
+  min-width: 0;
+}
+
+.status-choice-name {
+  color: var(--primary);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}

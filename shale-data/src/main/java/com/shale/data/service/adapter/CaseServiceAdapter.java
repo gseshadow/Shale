@@ -173,6 +173,18 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 
 	@Override
+	public CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command) {
+		Objects.requireNonNull(command, "command");
+		CaseDao.StatusRow status = caseGateway.findStatusForTenantById(command.shaleClientId(), command.statusId());
+		if (status == null) {
+			throw new IllegalArgumentException("Case status is not available for this tenant.");
+		}
+		caseGateway.setPrimaryStatus(command.caseId(), status.id(), null);
+		caseGateway.populateLifecycleDateIfNull(command.caseId(), status.lifecycleKey());
+		return caseGateway.getDetail(command.caseId());
+	}
+
+	@Override
 	public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
 		caseGateway.reorderCaseStatuses(shaleClientId, firstStatusId, secondStatusId);
 	}
@@ -237,6 +249,12 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey);
 
+
+		CaseDao.StatusRow findStatusForTenantById(int shaleClientId, int statusId);
+
+		void setPrimaryStatus(long caseId, int statusId, String notes);
+
+		void populateLifecycleDateIfNull(long caseId, String lifecycleKey);
 
 		void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
@@ -327,6 +345,21 @@ public final class CaseServiceAdapter implements CaseServicePort {
 			return caseDao.updateCaseStatus(shaleClientId, statusId, name, closed, sortOrder, color, lifecycleKey, systemKey);
 		}
 
+
+		@Override
+		public CaseDao.StatusRow findStatusForTenantById(int shaleClientId, int statusId) {
+			return caseDao.findStatusForTenantById(shaleClientId, statusId);
+		}
+
+		@Override
+		public void setPrimaryStatus(long caseId, int statusId, String notes) {
+			caseDao.setPrimaryStatus(caseId, statusId, notes);
+		}
+
+		@Override
+		public void populateLifecycleDateIfNull(long caseId, String lifecycleKey) {
+			caseDao.populateLifecycleDateIfNull(caseId, lifecycleKey);
+		}
 
 		@Override
 		public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {

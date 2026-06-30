@@ -47,6 +47,7 @@ public interface CaseServicePort {
 
 	CaseStatusDto updateCaseStatus(CaseStatusCommand command);
 
+	CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command);
 
 	void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
