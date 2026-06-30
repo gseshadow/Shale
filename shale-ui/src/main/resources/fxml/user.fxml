@@ -87,6 +87,7 @@
                                             <columnConstraints>
                                                 <ColumnConstraints minWidth="96" prefWidth="128" />
                                                 <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
+                                                <ColumnConstraints minWidth="34" prefWidth="34" halignment="RIGHT" />
                                             </columnConstraints>
 
                                             <Label text="Display Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="0" />
@@ -94,22 +95,27 @@
 
                                             <Label text="First Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="1" />
                                             <Label fx:id="firstNameValue" text="—" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+                                            <Button fx:id="editFirstNameButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="1" GridPane.columnIndex="2" />
                                             <TextField fx:id="firstNameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
                                             <Label text="Last Name:" style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
                                             <Label fx:id="lastNameValue" text="—" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+                                            <Button fx:id="editLastNameButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="2" GridPane.columnIndex="2" />
                                             <TextField fx:id="lastNameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="2" GridPane.columnIndex="1" />
 
                                             <Label text="Email:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
                                             <Label fx:id="emailValue" text="—" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+                                            <Button fx:id="editEmailButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="3" GridPane.columnIndex="2" />
                                             <TextField fx:id="emailEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="3" GridPane.columnIndex="1" />
 
                                             <Label text="Phone:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
                                             <Label fx:id="phoneValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+                                            <Button fx:id="editPhoneButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="4" GridPane.columnIndex="2" />
                                             <TextField fx:id="phoneEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="4" GridPane.columnIndex="1" />
 
                                             <Label text="Initials:" style="-fx-opacity: 0.8;" GridPane.rowIndex="5" />
                                             <Label fx:id="initialsValue" text="—" wrapText="true" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+                                            <Button fx:id="editInitialsButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="5" GridPane.columnIndex="2" />
                                             <TextField fx:id="initialsEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="5" GridPane.columnIndex="1" />
 
                                             <Label text="Color:" style="-fx-opacity: 0.8;" GridPane.rowIndex="6" />
@@ -117,6 +123,7 @@
                                                 <Region fx:id="colorPreview" />
                                                 <Label fx:id="colorValue" text="—" wrapText="true" />
                                             </HBox>
+                                            <Button fx:id="editColorButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="6" GridPane.columnIndex="2" />
                                             <HBox fx:id="colorEditorContainer" spacing="10" alignment="CENTER_LEFT" visible="false" managed="false" GridPane.rowIndex="6" GridPane.columnIndex="1">
                                                 <ColorPicker fx:id="colorEditor" />
                                                 <Label fx:id="colorEditorValue" text="—" style="-fx-opacity: 0.8;" />
