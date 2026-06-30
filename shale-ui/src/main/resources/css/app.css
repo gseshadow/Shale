@@ -938,6 +938,13 @@
     -fx-padding: 4 0 0 0;
 }
 
+.app-dialog-action-bar {
+    -fx-padding: 12 24 18 24;
+    -fx-background-color: #F8FAFD;
+    -fx-border-color: rgba(78, 112, 154, 0.20) transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
 .app-dialog-button {
     -fx-background-radius: 10;
     -fx-border-radius: 10;
