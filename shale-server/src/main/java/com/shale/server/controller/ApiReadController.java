@@ -66,6 +66,18 @@ public final class ApiReadController {
             String expectedRowVer) {
     }
 
+    public record UpdateContactRequest(
+            String name,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String addressHome,
+            String dateOfBirth,
+            String condition,
+            Boolean deceased) {
+    }
+
     private static final int DEFAULT_SEARCH_LIMIT = 25;
 
     private final CaseServicePort caseServicePort;
@@ -259,6 +271,33 @@ public final class ApiReadController {
     public ContactDetail getContact(@PathVariable("contactId") int contactId) {
         int safeContactId = Math.toIntExact(ApiValidation.positiveId(contactId, "contactId"));
         int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return contactServicePort.getContactDetail(safeContactId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
+    }
+
+
+    @Operation(summary = "Update contact detail", description = "Updates supported tenant-scoped contact fields and returns the refreshed contact detail.")
+    @PatchMapping("/api/contacts/{contactId:\\d+}")
+    public ContactDetail updateContact(@PathVariable("contactId") int contactId, @RequestBody UpdateContactRequest request) {
+        int safeContactId = Math.toIntExact(ApiValidation.positiveId(contactId, "contactId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        String firstName = ApiValidation.optionalContactNamePart(request == null ? null : request.firstName(), "First name");
+        String lastName = ApiValidation.optionalContactNamePart(request == null ? null : request.lastName(), "Last name");
+        String displayName = ApiValidation.optionalContactDisplayName(request == null ? null : request.name());
+        if ((firstName == null || firstName.isBlank()) && (lastName == null || lastName.isBlank()) && (displayName == null || displayName.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least a display name, first name, or last name is required.");
+        }
+        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
+        String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
+        String addressHome = ApiValidation.optionalContactText(request == null ? null : request.addressHome(), "Address", 2000);
+        String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
+        String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
+        boolean updated = contactServicePort.updateContact(new ContactServicePort.UpdateContactCommand(
+                safeContactId, shaleClientId, userId, displayName, firstName, lastName, email, phone, addressHome, dateOfBirth, condition, request == null ? null : request.deceased()));
+        if (!updated) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found.");
+        }
         return contactServicePort.getContactDetail(safeContactId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
     }

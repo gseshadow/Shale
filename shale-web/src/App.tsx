@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseCoreDetails } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseCoreDetails, updateContactDetails } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1956,25 +1956,114 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
       {isLoading && <LoadingState message="Loading contact detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !contactDetail && <EmptyState message="No contact detail was found." />}
-      {!isLoading && !error && contactDetail && <ContactDetailReadOnly detail={contactDetail} />}
+      {!isLoading && !error && contactDetail && <ContactDetailReadOnly accessToken={accessToken} detail={contactDetail} onDetailChanged={setContactDetail} />}
     </DetailShell>
   );
 }
 
-function ContactDetailReadOnly({ detail }: { detail: ContactDetail }) {
+function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { accessToken: string | null; detail: ContactDetail; onDetailChanged: (detail: ContactDetail) => void }) {
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
   return (
     <div className="detail-sections">
       <section aria-labelledby="contact-info-title">
-        <h2 id="contact-info-title">Contact Information</h2>
+        <div className="section-heading-row">
+          <h2 id="contact-info-title">Contact Information</h2>
+          {!isEditingDetails && <ActionButton onClick={() => setIsEditingDetails(true)}>Edit contact</ActionButton>}
+        </div>
+        {isEditingDetails && <ContactDetailsForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingDetails(false); }} onCancel={() => setIsEditingDetails(false)} />}
         <dl className="detail-list">
           <DetailItem label="Display Name" value={detail.displayName} />
           <DetailItem label="First Name" value={detail.firstName} />
           <DetailItem label="Last Name" value={detail.lastName} />
           <DetailItem label="Email" value={detail.email} />
           <DetailItem label="Phone" value={detail.phone} />
+          <DetailItem label="Home Address" value={detail.addressHome} preserveWhitespace />
+          <DetailItem label="Date of Birth" value={formatDate(detail.dateOfBirth)} />
+          <DetailItem label="Notes" value={detail.condition} preserveWhitespace />
+          <DetailItem label="Deceased" value={detail.deceased ? 'Yes' : 'No'} />
+          <DetailItem label="Client" value={detail.client ? 'Yes' : 'No'} />
         </dl>
       </section>
     </div>
+  );
+}
+
+function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: ContactDetail; onSaved: (detail: ContactDetail) => void; onCancel: () => void }) {
+  const [name, setName] = useState(detail.name || detail.displayName || '');
+  const [firstName, setFirstName] = useState(detail.firstName || '');
+  const [lastName, setLastName] = useState(detail.lastName || '');
+  const [email, setEmail] = useState(detail.email || '');
+  const [phone, setPhone] = useState(detail.phone || '');
+  const [addressHome, setAddressHome] = useState(detail.addressHome || '');
+  const [dateOfBirth, setDateOfBirth] = useState(toDateInputValue(detail.dateOfBirth));
+  const [condition, setCondition] = useState(detail.condition || '');
+  const [deceased, setDeceased] = useState(detail.deceased);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasRequiredName = Boolean(name.trim() || firstName.trim() || lastName.trim());
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hasRequiredName) {
+      setSubmitError('Enter a display name, first name, or last name before saving.');
+      return;
+    }
+    if (email.trim() && !email.includes('@')) {
+      setSubmitError('Enter a valid email address.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await updateContactDetails(accessToken, detail.id, {
+        name: name.trim() || null,
+        firstName: firstName.trim() || null,
+        lastName: lastName.trim() || null,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        addressHome: addressHome.trim() || null,
+        dateOfBirth: dateOfBirth || null,
+        condition: condition.trim() || null,
+        deceased,
+      });
+      onSaved(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Contact details could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit}>
+      <label htmlFor="contact-display-name">Display name</label>
+      <input id="contact-display-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="name" maxLength={255} />
+      <label htmlFor="contact-first-name">First name</label>
+      <input id="contact-first-name" type="text" value={firstName} onChange={(event) => setFirstName(event.target.value)} disabled={isSubmitting} autoComplete="given-name" maxLength={255} />
+      <label htmlFor="contact-last-name">Last name</label>
+      <input id="contact-last-name" type="text" value={lastName} onChange={(event) => setLastName(event.target.value)} disabled={isSubmitting} autoComplete="family-name" maxLength={255} />
+      <label htmlFor="contact-email">Email</label>
+      <input id="contact-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" maxLength={254} />
+      <label htmlFor="contact-phone">Phone</label>
+      <input id="contact-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" maxLength={100} />
+      <label htmlFor="contact-address-home">Home address</label>
+      <textarea id="contact-address-home" value={addressHome} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
+      <label htmlFor="contact-date-of-birth">Date of birth</label>
+      <input id="contact-date-of-birth" type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} disabled={isSubmitting} />
+      <label htmlFor="contact-notes">Notes</label>
+      <textarea id="contact-notes" value={condition} onChange={(event) => setCondition(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      <label className="checkbox-row" htmlFor="contact-deceased"><input id="contact-deceased" type="checkbox" checked={deceased} onChange={(event) => setDeceased(event.target.checked)} disabled={isSubmitting} /> Deceased</label>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Save contact'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
   );
 }
 

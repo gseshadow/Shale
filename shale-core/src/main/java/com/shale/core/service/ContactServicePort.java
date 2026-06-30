@@ -34,11 +34,17 @@ public interface ContactServicePort {
 	record ContactDetail(
 			int id,
 			int shaleClientId,
+			String name,
 			String firstName,
 			String lastName,
 			String displayName,
 			String email,
-			String phone) {
+			String phone,
+			String addressHome,
+			String dateOfBirth,
+			String condition,
+			boolean deceased,
+			boolean client) {
 	}
 
 	record CreateContactCommand(
@@ -54,9 +60,14 @@ public interface ContactServicePort {
 			int contactId,
 			int shaleClientId,
 			int actorUserId,
+			String name,
 			String firstName,
 			String lastName,
 			String email,
-			String phone) {
+			String phone,
+			String addressHome,
+			String dateOfBirth,
+			String condition,
+			Boolean deceased) {
 	}
 }

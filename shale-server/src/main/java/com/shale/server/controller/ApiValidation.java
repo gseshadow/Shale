@@ -17,6 +17,7 @@ final class ApiValidation {
     private static final int MAX_CASE_NAME_LENGTH = 255;
     private static final int MAX_CASE_DESCRIPTION_LENGTH = 10_000;
     private static final int MAX_CASE_SUMMARY_LENGTH = 10_000;
+    private static final int MAX_CONTACT_NAME_LENGTH = 255;
 
     private ApiValidation() {
     }
@@ -90,6 +91,33 @@ final class ApiValidation {
             throw badRequest("Task title must be 255 characters or fewer.");
         }
         return safeTitle;
+    }
+
+    static String optionalContactNamePart(String value, String fieldName) {
+        return optionalContactText(value, fieldName, MAX_CONTACT_NAME_LENGTH);
+    }
+
+    static String optionalContactDisplayName(String value) {
+        return optionalContactText(value, "Display name", MAX_CONTACT_NAME_LENGTH);
+    }
+
+    static String optionalEmail(String value, String fieldName) {
+        String safeValue = optionalContactText(value, fieldName, MAX_EMAIL_LENGTH);
+        if (safeValue != null && !safeValue.contains("@")) {
+            throw badRequest(fieldName + " must be a valid email address.");
+        }
+        return safeValue;
+    }
+
+    static String optionalContactText(String value, String fieldName, int maxLength) {
+        String safeValue = value == null ? "" : value.trim();
+        if (safeValue.isEmpty()) {
+            return null;
+        }
+        if (safeValue.length() > maxLength) {
+            throw badRequest(fieldName + " must be " + maxLength + " characters or fewer.");
+        }
+        return safeValue;
     }
 
     static String optionalTaskDescription(String description) {

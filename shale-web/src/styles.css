@@ -568,6 +568,8 @@ input:focus-visible {
 
 input[type="text"],
 input[type="date"],
+input[type="email"],
+input[type="tel"],
 textarea {
   border: 1px solid #c9d4df;
   border-radius: 14px;
@@ -579,7 +581,9 @@ textarea {
 }
 
 input[type="text"],
-input[type="date"] {
+input[type="date"],
+input[type="email"],
+input[type="tel"] {
   min-height: 2.75rem;
 }
 
@@ -590,6 +594,7 @@ textarea {
 
 input:focus-visible,
 textarea:focus-visible,
+input[type="checkbox"]:focus-visible,
 button:focus-visible,
 .button-link:focus-visible {
   outline: 3px solid var(--focus);
@@ -608,15 +613,24 @@ button:focus-visible,
   gap: .75rem;
 }
 
-@media (max-width: 640px) {
-  .section-heading-row,
-  .form-help {
-  color: var(--text-muted);
-  font-size: .92rem;
+.checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: .65rem;
   margin: .25rem 0 1rem;
 }
 
-.form-actions {
+.checkbox-row input {
+  height: 1.2rem;
+  width: 1.2rem;
+}
+
+@media (max-width: 640px) {
+  .section-heading-row {
+    align-items: stretch;
+  }
+
+  .form-actions {
     display: grid;
   }
 
