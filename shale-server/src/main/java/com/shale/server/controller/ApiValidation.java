@@ -16,6 +16,7 @@ final class ApiValidation {
     private static final int MAX_TASK_DESCRIPTION_LENGTH = 10_000;
     private static final int MAX_CASE_NAME_LENGTH = 255;
     private static final int MAX_CASE_DESCRIPTION_LENGTH = 10_000;
+    private static final int MAX_CASE_SUMMARY_LENGTH = 10_000;
 
     private ApiValidation() {
     }
@@ -70,6 +71,14 @@ final class ApiValidation {
             throw badRequest("Case description must be 10000 characters or fewer.");
         }
         return safeDescription;
+    }
+
+    static String optionalCaseSummary(String summary) {
+        String safeSummary = summary == null ? "" : summary.trim();
+        if (safeSummary.length() > MAX_CASE_SUMMARY_LENGTH) {
+            throw badRequest("Case summary must be 10000 characters or fewer.");
+        }
+        return safeSummary;
     }
 
     static String taskTitle(String title) {
