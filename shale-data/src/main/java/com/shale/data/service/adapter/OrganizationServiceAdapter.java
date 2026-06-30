@@ -72,4 +72,36 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 				organization.getNotes(),
 				relatedCases));
 	}
+	@Override
+	public boolean updateOrganization(UpdateOrganizationCommand command) {
+		Objects.requireNonNull(command, "command");
+		Organization current = organizationDao.findById(command.organizationId());
+		if (current == null) {
+			return false;
+		}
+		Organization updated = Organization.builder()
+				.id(command.organizationId())
+				.shaleClientId(command.shaleClientId())
+				.organizationTypeId(current.getOrganizationTypeId())
+				.organizationTypeName(current.getOrganizationTypeName())
+				.name(command.name())
+				.phone(command.phone())
+				.fax(command.fax())
+				.email(command.email())
+				.website(command.website())
+				.address1(command.address1())
+				.address2(command.address2())
+				.city(command.city())
+				.state(command.state())
+				.postalCode(command.postalCode())
+				.country(command.country())
+				.notes(command.notes())
+				.deleted(current.isDeleted())
+				.createdAt(current.getCreatedAt())
+				.updatedAt(current.getUpdatedAt())
+				.build();
+		organizationDao.update(updated);
+		return true;
+	}
+
 }

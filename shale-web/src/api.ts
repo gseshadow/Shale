@@ -140,6 +140,21 @@ export interface OrganizationRelatedCase {
   notes: string | null;
 }
 
+export interface UpdateOrganizationDetailsRequest {
+  name: string;
+  phone?: string | null;
+  fax?: string | null;
+  email?: string | null;
+  website?: string | null;
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  notes?: string | null;
+}
+
 export interface OrganizationDetail {
   id: number;
   shaleClientId: number;
@@ -608,6 +623,32 @@ export async function searchOrganizations(accessToken: string, query: string): P
   }
 
   return response.json() as Promise<OrganizationSearchResult[]>;
+}
+
+export async function updateOrganizationDetails(accessToken: string, organizationId: number, request: UpdateOrganizationDetailsRequest): Promise<OrganizationDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/organizations/${organizationId}`, {
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Check the organization details and try again.', response.status);
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that organization.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the organization detail.', response.status);
+  }
+
+  return response.json() as Promise<OrganizationDetail>;
 }
 
 export async function getOrganizationDetail(accessToken: string, organizationId: number): Promise<OrganizationDetail> {

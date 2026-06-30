@@ -13,6 +13,8 @@ public interface OrganizationServicePort {
 
 	Optional<OrganizationDetail> getOrganizationDetail(int organizationId, int shaleClientId);
 
+	boolean updateOrganization(UpdateOrganizationCommand command);
+
 	record OrganizationSummary(
 			int id,
 			String name,
@@ -43,6 +45,24 @@ public interface OrganizationServicePort {
 			String country,
 			String notes,
 			List<RelatedCaseSummary> relatedCases) {
+	}
+
+	record UpdateOrganizationCommand(
+			int organizationId,
+			int shaleClientId,
+			int actorUserId,
+			String name,
+			String phone,
+			String fax,
+			String email,
+			String website,
+			String address1,
+			String address2,
+			String city,
+			String state,
+			String postalCode,
+			String country,
+			String notes) {
 	}
 
 	record RelatedCaseSummary(

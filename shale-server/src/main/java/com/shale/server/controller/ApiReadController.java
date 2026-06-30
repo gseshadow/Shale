@@ -34,6 +34,7 @@ import com.shale.core.service.NotificationServicePort.NotificationSummary;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.OrganizationServicePort.OrganizationDetail;
 import com.shale.core.service.OrganizationServicePort.OrganizationSummary;
+import com.shale.core.service.OrganizationServicePort.UpdateOrganizationCommand;
 import com.shale.core.service.TaskServicePort;
 import com.shale.core.service.TaskServicePort.CreateTaskCommand;
 import com.shale.core.service.UserServicePort;
@@ -76,6 +77,21 @@ public final class ApiReadController {
             String dateOfBirth,
             String condition,
             Boolean deceased) {
+    }
+
+    public record UpdateOrganizationRequest(
+            String name,
+            String phone,
+            String fax,
+            String email,
+            String website,
+            String address1,
+            String address2,
+            String city,
+            String state,
+            String postalCode,
+            String country,
+            String notes) {
     }
 
     private static final int DEFAULT_SEARCH_LIMIT = 25;
@@ -341,6 +357,33 @@ public final class ApiReadController {
     public OrganizationDetail getOrganization(@PathVariable("organizationId") int organizationId) {
         int safeOrganizationId = Math.toIntExact(ApiValidation.positiveId(organizationId, "organizationId"));
         int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return organizationServicePort.getOrganizationDetail(safeOrganizationId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
+    }
+
+    @Operation(summary = "Update organization detail", description = "Updates supported tenant-scoped organization fields and returns the refreshed organization detail.")
+    @PatchMapping("/api/organizations/{organizationId:\\d+}")
+    public OrganizationDetail updateOrganization(@PathVariable("organizationId") int organizationId, @RequestBody UpdateOrganizationRequest request) {
+        int safeOrganizationId = Math.toIntExact(ApiValidation.positiveId(organizationId, "organizationId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        String name = ApiValidation.organizationName(request == null ? null : request.name());
+        String phone = ApiValidation.optionalOrganizationText(request == null ? null : request.phone(), "Phone", 100);
+        String fax = ApiValidation.optionalOrganizationText(request == null ? null : request.fax(), "Fax", 100);
+        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
+        String website = ApiValidation.optionalOrganizationText(request == null ? null : request.website(), "Website", 500);
+        String address1 = ApiValidation.optionalOrganizationText(request == null ? null : request.address1(), "Address line 1", 500);
+        String address2 = ApiValidation.optionalOrganizationText(request == null ? null : request.address2(), "Address line 2", 500);
+        String city = ApiValidation.optionalOrganizationText(request == null ? null : request.city(), "City", 200);
+        String state = ApiValidation.optionalOrganizationText(request == null ? null : request.state(), "State", 100);
+        String postalCode = ApiValidation.optionalOrganizationText(request == null ? null : request.postalCode(), "Zip", 100);
+        String country = ApiValidation.optionalOrganizationText(request == null ? null : request.country(), "Country", 100);
+        String notes = ApiValidation.optionalOrganizationText(request == null ? null : request.notes(), "Notes", 10000);
+        boolean updated = organizationServicePort.updateOrganization(new UpdateOrganizationCommand(
+                safeOrganizationId, shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes));
+        if (!updated) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found.");
+        }
         return organizationServicePort.getOrganizationDetail(safeOrganizationId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
     }
