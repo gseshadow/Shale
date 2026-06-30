@@ -26,6 +26,7 @@ import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseStatusCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseAssignmentCommand;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactDetail;
