@@ -61,6 +61,8 @@ public final class ApiReadController {
             String description,
             String dateOfInjury,
             String statuteOfLimitations,
+            String tortNoticeDeadline,
+            String summary,
             String expectedRowVer) {
     }
 
@@ -152,6 +154,8 @@ public final class ApiReadController {
         String description = ApiValidation.optionalCaseDescription(request == null ? null : request.description());
         LocalDate dateOfInjury = parseOptionalIsoDate(request == null ? null : request.dateOfInjury(), "dateOfInjury");
         LocalDate statuteOfLimitations = parseOptionalIsoDate(request == null ? null : request.statuteOfLimitations(), "statuteOfLimitations");
+        LocalDate tortNoticeDeadline = parseOptionalIsoDate(request == null ? null : request.tortNoticeDeadline(), "tortNoticeDeadline");
+        String summary = ApiValidation.optionalCaseSummary(request == null ? null : request.summary());
         byte[] expectedRowVer = parseExpectedRowVer(request == null ? null : request.expectedRowVer());
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
@@ -166,6 +170,8 @@ public final class ApiReadController {
                 description,
                 dateOfInjury,
                 statuteOfLimitations,
+                tortNoticeDeadline,
+                summary,
                 expectedRowVer));
         if (updated == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Case details were changed by someone else. Refresh and try again.");
