@@ -1892,8 +1892,8 @@ public class CaseController {
 					safeText(party.getDisplayName()),
 					null,
 					null,
-					null,
-					null,
+					party.getPhone(),
+					party.getEmail(),
 					null,
 					null,
 					null,
@@ -1923,8 +1923,8 @@ public class CaseController {
 					party.getContactId().intValue(),
 					safeText(party.getDisplayName()),
 					null,
-					null,
-					null
+					party.getEmail(),
+					party.getPhone()
 			);
 			ContactCardFactory.Variant variant = ContactCardFactory.Variant.COMPACT;
 			ContactCard card = factory.create(model, variant);
