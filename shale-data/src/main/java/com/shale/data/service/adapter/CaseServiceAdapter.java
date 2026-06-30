@@ -184,6 +184,13 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command) {
+		Objects.requireNonNull(command, "command");
+		caseGateway.updateCaseAssignment(command.caseId(), command.shaleClientId(), command.practiceAreaId(), command.responsibleAttorneyUserId());
+		return caseGateway.getDetail(command.caseId());
+	}
+
+	@Override
 	public CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command) {
 		Objects.requireNonNull(command, "command");
 		return caseGateway.updateCase(
@@ -232,6 +239,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 
 		void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
+
+		void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId);
 
 		CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
 				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
@@ -322,6 +331,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
 			caseDao.reorderCaseStatuses(shaleClientId, firstStatusId, secondStatusId);
+		}
+
+		@Override
+		public void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId) {
+			caseDao.updateCaseAssignment(caseId, shaleClientId, practiceAreaId, responsibleAttorneyUserId);
 		}
 
 		@Override

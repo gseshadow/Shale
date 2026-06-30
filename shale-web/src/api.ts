@@ -248,6 +248,7 @@ export interface CaseDetail {
   description: string;
   caseStatus: string;
   responsibleAttorney: string | null;
+  responsibleAttorneyId: number | null;
   practiceAreaId: number | null;
   callerDate: string | null;
   dateOfInjury: string | null;
@@ -341,6 +342,33 @@ export async function searchCases(accessToken: string, query: string): Promise<C
   return response.json() as Promise<CaseSearchResult[]>;
 }
 
+
+export interface UpdateCaseAssignmentPayload {
+  practiceAreaId: number;
+  responsibleAttorneyUserId: number;
+}
+
+export async function updateCaseAssignment(accessToken: string, caseId: number, payload: UpdateCaseAssignmentPayload): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/assignment`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that case.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the case assignment.', response.status);
+  }
+
+  return response.json() as Promise<CaseDetail>;
+}
 
 export interface UpdateCaseCoreDetailsPayload {
   caseName: string;
@@ -708,6 +736,22 @@ export async function getTeamMemberDetail(accessToken: string, userId: number): 
   return response.json() as Promise<TeamMemberDetail>;
 }
 
+
+export async function listPracticeAreaLookups(accessToken: string): Promise<PracticeAreaSetting[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/lookups/practice-areas`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load practice areas.', response.status);
+  }
+
+  return response.json() as Promise<PracticeAreaSetting[]>;
+}
 
 export async function listCaseStatusSettings(accessToken: string): Promise<CaseStatusSetting[]> {
   const response = await fetch(`${apiBaseUrl()}/api/settings/case-statuses`, {
