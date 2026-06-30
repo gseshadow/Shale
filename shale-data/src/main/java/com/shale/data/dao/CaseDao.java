@@ -2404,6 +2404,8 @@ public final class CaseDao {
 			String description,
 			LocalDate incidentDate,
 			LocalDate solDate,
+			LocalDate tortNoticeDeadline,
+			String summary,
 			byte[] expectedRowVer,
 			Integer actorUserId) {
 		if (expectedRowVer == null || expectedRowVer.length == 0) {
@@ -2419,6 +2421,8 @@ public final class CaseDao {
 					    Description = ?,
 					    DateOfInjury = ?,
 					    StatuteOfLimitations = ?,
+					    TortNoticeDeadline = ?,
+					    Summary = ?,
 					    UpdatedAt = SYSDATETIME()
 					WHERE Id = ?
 					  AND RowVer = ?
@@ -2439,8 +2443,13 @@ public final class CaseDao {
 					ps.setNull(5, java.sql.Types.DATE);
 				else
 					ps.setDate(5, java.sql.Date.valueOf(solDate));
-				ps.setLong(6, caseId);
-				ps.setBytes(7, expectedRowVer);
+				if (tortNoticeDeadline == null)
+					ps.setNull(6, java.sql.Types.DATE);
+				else
+					ps.setDate(6, java.sql.Date.valueOf(tortNoticeDeadline));
+				ps.setString(7, summary);
+				ps.setLong(8, caseId);
+				ps.setBytes(9, expectedRowVer);
 
 				int rows = ps.executeUpdate();
 				if (rows == 0) {
@@ -2454,6 +2463,8 @@ public final class CaseDao {
 					if (before != null) {
 						phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
 						phiAuditService.auditUpdate(actorUserId, "Cases", "DateOfInjury", caseId, before.getDateOfInjury(), updated.getDateOfInjury());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "TortNoticeDeadline", caseId, before.getTortNoticeDeadline(), updated.getTortNoticeDeadline());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
 					}
 					return updated;
 				}

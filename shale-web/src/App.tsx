@@ -1545,6 +1545,8 @@ function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { acces
   const [description, setDescription] = useState(detail.description || '');
   const [dateOfInjury, setDateOfInjury] = useState(toDateInputValue(detail.dateOfInjury));
   const [statuteOfLimitations, setStatuteOfLimitations] = useState(toDateInputValue(detail.statuteOfLimitations));
+  const [tortNoticeDeadline, setTortNoticeDeadline] = useState(toDateInputValue(detail.tortNoticeDeadline));
+  const [summary, setSummary] = useState(detail.summary || '');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const trimmedCaseName = caseName.trim();
@@ -1572,6 +1574,8 @@ function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { acces
         description,
         dateOfInjury: dateOfInjury || null,
         statuteOfLimitations: statuteOfLimitations || null,
+        tortNoticeDeadline: tortNoticeDeadline || null,
+        summary,
         expectedRowVer: detail.rowVer,
       });
       onSaved(updated);
@@ -1592,7 +1596,10 @@ function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { acces
       <input id="case-core-injury-date" type="date" value={dateOfInjury} onChange={(event) => setDateOfInjury(event.target.value)} disabled={isSubmitting} />
       <label htmlFor="case-core-sol-date">Statute of limitations</label>
       <input id="case-core-sol-date" type="date" value={statuteOfLimitations} onChange={(event) => setStatuteOfLimitations(event.target.value)} disabled={isSubmitting} />
-      <p className="form-help">Tort notice deadline is shown read-only because the current core-details service does not update it yet.</p>
+      <label htmlFor="case-core-tort-notice-date">Tort notice deadline</label>
+      <input id="case-core-tort-notice-date" type="date" value={tortNoticeDeadline} onChange={(event) => setTortNoticeDeadline(event.target.value)} disabled={isSubmitting} />
+      <label htmlFor="case-core-summary">Summary</label>
+      <textarea id="case-core-summary" value={summary} onChange={(event) => setSummary(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
       {submitError && <p className="status error" role="alert">{submitError}</p>}
       <div className="form-actions">
         <ActionButton type="submit" disabled={isSubmitting || !trimmedCaseName}>{isSubmitting ? 'Saving…' : 'Save details'}</ActionButton>

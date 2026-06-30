@@ -193,6 +193,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 				command.description(),
 				command.dateOfInjury(),
 				command.statuteOfLimitations(),
+				command.tortNoticeDeadline(),
+				command.summary(),
 				command.expectedRowVer(),
 				command.actorUserId());
 	}
@@ -232,7 +234,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
 		CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId);
+				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
+				byte[] expectedRowVer, Integer actorUserId);
 	}
 
 	private record DaoCaseGateway(CaseDao caseDao) implements CaseGateway {
@@ -323,8 +326,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		@Override
 		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId) {
-			return caseDao.updateCase(caseId, name, caseNumber, description, incidentDate, solDate, expectedRowVer, actorUserId);
+				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
+				byte[] expectedRowVer, Integer actorUserId) {
+			return caseDao.updateCase(caseId, name, caseNumber, description, incidentDate, solDate, tortNoticeDeadline, summary, expectedRowVer, actorUserId);
 		}
 	}
 }

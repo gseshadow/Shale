@@ -57,7 +57,7 @@ class CaseServiceAdapterTest {
 
 		CaseDetailDto actual = adapter.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
 				99, 42, 5, "Updated", "C-1", "description", LocalDate.of(2026, 1, 2),
-				LocalDate.of(2026, 2, 3), rowVer));
+				LocalDate.of(2026, 2, 3), LocalDate.of(2026, 3, 4), "summary", rowVer));
 
 		assertSame(updated, actual);
 		assertEquals(99, gateway.lastUpdateCaseId);
@@ -66,6 +66,8 @@ class CaseServiceAdapterTest {
 		assertEquals("description", gateway.lastUpdateDescription);
 		assertEquals(LocalDate.of(2026, 1, 2), gateway.lastUpdateIncidentDate);
 		assertEquals(LocalDate.of(2026, 2, 3), gateway.lastUpdateSolDate);
+		assertEquals(LocalDate.of(2026, 3, 4), gateway.lastUpdateTortNoticeDeadline);
+		assertEquals("summary", gateway.lastUpdateSummary);
 		assertArrayEquals(rowVer, gateway.lastUpdateRowVer);
 		assertEquals(5, gateway.lastUpdateActorUserId);
 	}
@@ -136,6 +138,8 @@ class CaseServiceAdapterTest {
 		private String lastUpdateDescription;
 		private LocalDate lastUpdateIncidentDate;
 		private LocalDate lastUpdateSolDate;
+		private LocalDate lastUpdateTortNoticeDeadline;
+		private String lastUpdateSummary;
 		private byte[] lastUpdateRowVer;
 		private Integer lastUpdateActorUserId;
 
@@ -227,13 +231,16 @@ class CaseServiceAdapterTest {
 
 		@Override
 		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId) {
+				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
+				byte[] expectedRowVer, Integer actorUserId) {
 			lastUpdateCaseId = caseId;
 			lastUpdateName = name;
 			lastUpdateCaseNumber = caseNumber;
 			lastUpdateDescription = description;
 			lastUpdateIncidentDate = incidentDate;
 			lastUpdateSolDate = solDate;
+			lastUpdateTortNoticeDeadline = tortNoticeDeadline;
+			lastUpdateSummary = summary;
 			lastUpdateRowVer = expectedRowVer;
 			lastUpdateActorUserId = actorUserId;
 			return updatedCase;

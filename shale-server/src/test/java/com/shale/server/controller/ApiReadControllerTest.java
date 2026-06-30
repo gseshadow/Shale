@@ -227,6 +227,8 @@ class ApiReadControllerTest {
                           "description": "Updated detail",
                           "dateOfInjury": "2026-02-03",
                           "statuteOfLimitations": "2027-02-03",
+                          "tortNoticeDeadline": "2026-08-09",
+                          "summary": "Updated summary",
                           "expectedRowVer": "AQ=="
                         }
                         """)
@@ -235,7 +237,11 @@ class ApiReadControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.caseId").value(501))
                 .andExpect(jsonPath("$.caseName").value("Smith v. Updated"))
-                .andExpect(jsonPath("$.description").value("Updated detail"));
+                .andExpect(jsonPath("$.description").value("Updated detail"))
+                .andExpect(jsonPath("$.tortNoticeDeadline[0]").value(2026))
+                .andExpect(jsonPath("$.tortNoticeDeadline[1]").value(8))
+                .andExpect(jsonPath("$.tortNoticeDeadline[2]").value(9))
+                .andExpect(jsonPath("$.summary").value("Updated summary"));
 
         org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.updateCaseId);
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.updateShaleClientId);
@@ -244,6 +250,8 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("CASE-501", caseServicePort.updateCaseNumber);
         org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2026, 2, 3), caseServicePort.updateDateOfInjury);
         org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2027, 2, 3), caseServicePort.updateStatuteOfLimitations);
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2026, 8, 9), caseServicePort.updateTortNoticeDeadline);
+        org.junit.jupiter.api.Assertions.assertEquals("Updated summary", caseServicePort.updateSummary);
         org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] {1}, caseServicePort.updateExpectedRowVer);
     }
 
@@ -663,6 +671,8 @@ class ApiReadControllerTest {
         private String updateCaseNumber;
         private LocalDate updateDateOfInjury;
         private LocalDate updateStatuteOfLimitations;
+        private LocalDate updateTortNoticeDeadline;
+        private String updateSummary;
         private byte[] updateExpectedRowVer;
 
         @Override
@@ -767,11 +777,13 @@ class ApiReadControllerTest {
             this.updateCaseNumber = command.caseNumber();
             this.updateDateOfInjury = command.dateOfInjury();
             this.updateStatuteOfLimitations = command.statuteOfLimitations();
+            this.updateTortNoticeDeadline = command.tortNoticeDeadline();
+            this.updateSummary = command.summary();
             this.updateExpectedRowVer = command.expectedRowVer();
             return new CaseDetailDto(command.caseId(), command.caseNumber(), command.caseName(), command.description(), "Open", "Ada Attorney", 10,
-                    null, null, null, null, null, null, null, command.dateOfInjury(), command.statuteOfLimitations(), null, null,
+                    null, null, null, null, null, null, null, command.dateOfInjury(), command.statuteOfLimitations(), command.tortNoticeDeadline(), null,
                     null, null, null, null, null, null, null, null, null, null, null,
-                    null, null, null, null, null, LocalDateTime.of(2026, 1, 2, 0, 0), new byte[] {2});
+                    null, null, null, command.summary(), null, LocalDateTime.of(2026, 1, 2, 0, 0), new byte[] {2});
         }
 
         @Override

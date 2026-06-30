@@ -314,6 +314,8 @@ export interface UpdateCaseCoreDetailsPayload {
   description: string;
   dateOfInjury?: string | null;
   statuteOfLimitations?: string | null;
+  tortNoticeDeadline?: string | null;
+  summary: string;
   expectedRowVer: string;
 }
 

@@ -3690,8 +3690,9 @@ public class CaseController {
 				String description = "description".equals(field) ? safeText(textValue) : latest.getDescription();
 				LocalDate injury = "incidentDate".equals(field) ? incidentDate : latest.getDateOfInjury();
 				LocalDate sol = "solDate".equals(field) ? solDate : latest.getStatuteOfLimitations();
-				CaseDetailDto updated = caseDao.updateCase(activeCaseId, name, number, description, injury, sol, latest.getRowVer(), appState == null ? null
-						: appState.getUserId());
+				CaseDetailDto updated = caseDao.updateCase(activeCaseId, name, number, description, injury, sol,
+						latest.getTortNoticeDeadline(), latest.getSummary(), latest.getRowVer(), appState == null ? null
+								: appState.getUserId());
 				if (updated == null) {
 					runOnFx(() ->
 					{
@@ -5592,6 +5593,8 @@ public class CaseController {
 					safeText(current.getDescription()),
 					safeText(current.getCaseNumber()).trim(),
 					currentOverview,
+					current.getTortNoticeDeadline(),
+					current.getSummary(),
 					expectedRowVer
 			);
 
@@ -5833,6 +5836,8 @@ public class CaseController {
 					request.saveDraft().description(),
 					request.desired().desiredIncidentDate(),
 					request.desired().desiredSolDate(),
+					request.baseline().tortNoticeDeadline(),
+					request.baseline().summary(),
 					request.baseline().expectedRowVer(),
 					request.userId()
 			);
@@ -6007,6 +6012,8 @@ public class CaseController {
 			String oldDescription,
 			String oldNumber,
 			CaseOverviewDto baseOverview,
+			LocalDate tortNoticeDeadline,
+			String summary,
 			byte[] expectedRowVer
 	) {
 	}
