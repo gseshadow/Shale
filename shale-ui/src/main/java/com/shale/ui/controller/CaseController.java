@@ -1137,22 +1137,79 @@ public class CaseController {
 		edit.getStyleClass().add("case-overview-edit-button");
 		String field = label == null ? "field" : safeText(label.getText()).replace(":", "").trim();
 		edit.setTooltip(new Tooltip("Edit " + (field.isBlank() ? "field" : field)));
-		edit.setOnAction(e -> {
-			if (!detailsEditMode)
-				detailsEditor.beginEdit();
-			if (editor == detCaseStatusEditorRow) {
-				onDetailsChangeStatus();
-				return;
-			}
-			if (editor == detPracticeAreaEditorRow) {
-				onDetailsChangePracticeArea();
-				return;
-			}
-			if (editor instanceof javafx.scene.control.Control control) {
-				control.requestFocus();
-			}
-		});
+		edit.setOnAction(e -> onEditDetailsField(field, editor, edit));
 		return edit;
+	}
+
+	private void onEditDetailsField(String fieldLabel, Node editor, Button ownerButton) {
+		CaseDetailsDraft base = resolveDetailsViewModel();
+		if (base == null) {
+			showError("Case details are still loading. Please try again.");
+			return;
+		}
+		if (editor == detCaseStatusEditorRow) {
+			onEditStatusField();
+			return;
+		}
+		if (editor == detPracticeAreaEditorRow) {
+			onEditPracticeAreaField();
+			return;
+		}
+		if (editor == detNameEditor) {
+			showDetailsTextFieldDialog("Edit Case Name", "Case Name", base.name, true, ownerButton,
+					value -> saveSingleDetailsField(d -> d.name = value));
+		} else if (editor == detCaseNumberEditor) {
+			showDetailsTextFieldDialog("Edit Case Number", "Case Number", base.caseNumber, false, ownerButton,
+					value -> saveSingleDetailsField(d -> d.caseNumber = value));
+		} else if (editor == detDescriptionEditor) {
+			showDetailsTextAreaDialog("Edit Description", "Description", base.description, ownerButton,
+					value -> saveSingleDetailsField(d -> d.description = value));
+		} else if (editor == detCallerDateEditor) {
+			showDetailsDateDialog("Edit Caller Date", "Caller Date", base.callerDate, ownerButton,
+					value -> saveSingleDetailsField(d -> d.callerDate = value));
+		} else if (editor == detCallerTimeEditor) {
+			showDetailsTextFieldDialog("Edit Caller Time", "Caller Time", base.callerTime, false, ownerButton,
+					value -> saveSingleDetailsField(d -> d.callerTime = value));
+		} else if (editor == detAcceptedDateEditor) {
+			showDetailsDateDialog("Edit Accepted Date", "Accepted Date", base.acceptedDate, ownerButton,
+					value -> saveSingleDetailsField(d -> d.acceptedDate = value));
+		} else if (editor == detClosedDateEditor) {
+			showDetailsDateDialog("Edit Closed Date", "Closed Date", base.closedDate, ownerButton,
+					value -> saveSingleDetailsField(d -> d.closedDate = value));
+		} else if (editor == detDeniedDateEditor) {
+			showDetailsDateDialog("Edit Denied Date", "Denied Date", base.deniedDate, ownerButton,
+					value -> saveSingleDetailsField(d -> d.deniedDate = value));
+		} else if (editor == detDateOfMedicalNegligenceEditor) {
+			showDetailsDateDialog("Edit Date of Medical Negligence", "Date of Medical Negligence", base.dateOfMedicalNegligence, ownerButton,
+					value -> saveSingleDetailsField(d -> d.dateOfMedicalNegligence = value));
+		} else if (editor == detDateMedicalNegligenceWasDiscoveredEditor) {
+			showDetailsDateDialog("Edit Date Medical Negligence Was Discovered", "Date Medical Negligence Was Discovered", base.dateMedicalNegligenceWasDiscovered, ownerButton,
+					value -> saveSingleDetailsField(d -> d.dateMedicalNegligenceWasDiscovered = value));
+		} else if (editor == detDateOfInjuryEditor) {
+			showDetailsDateDialog("Edit Date of Injury", "Date of Injury", base.dateOfInjury, ownerButton,
+					value -> saveSingleDetailsField(d -> d.dateOfInjury = value));
+		} else if (editor == detStatuteOfLimitationsEditor) {
+			showDetailsDateDialog("Edit Statute of Limitations", "Statute of Limitations", base.statuteOfLimitations, ownerButton,
+					value -> saveSingleDetailsField(d -> d.statuteOfLimitations = value));
+		} else if (editor == detTortNoticeDeadlineEditor) {
+			showDetailsDateDialog("Edit Tort Notice Deadline", "Tort Notice Deadline", base.tortNoticeDeadline, ownerButton,
+					value -> saveSingleDetailsField(d -> d.tortNoticeDeadline = value));
+		} else if (editor == detDiscoveryDeadlineEditor) {
+			showDetailsDateDialog("Edit Discovery Deadline", "Discovery Deadline", base.discoveryDeadline, ownerButton,
+					value -> saveSingleDetailsField(d -> d.discoveryDeadline = value));
+		} else if (editor instanceof CheckBox checkBox) {
+			showDetailsBooleanDialog("Edit " + fieldLabel, fieldLabel, checkBox.isSelected(), ownerButton,
+					value -> saveSingleDetailsBooleanField(editor, value));
+		} else if (editor instanceof TextArea) {
+			showDetailsTextAreaDialog("Edit " + fieldLabel, fieldLabel, textFromDetailsDraft(base, editor), ownerButton,
+					value -> saveSingleDetailsTextField(editor, value));
+		} else if (editor instanceof TextInputControl) {
+			showDetailsTextFieldDialog("Edit " + fieldLabel, fieldLabel, textFromDetailsDraft(base, editor), false, ownerButton,
+					value -> saveSingleDetailsTextField(editor, value));
+		} else if (editor instanceof DatePicker) {
+			showDetailsDateDialog("Edit " + fieldLabel, fieldLabel, null, ownerButton,
+					value -> saveSingleDetailsDateField(editor, value));
+		}
 	}
 
 	// ----------------------------
@@ -2397,10 +2454,16 @@ public class CaseController {
 			}
 			int contactId = contactDao.createContact(new ContactDao.CreateContactRequest(
 					shaleClientId,
+					null,
+					null,
 					safeText(draft.contactFirstName()),
 					safeText(draft.contactLastName()),
 					null,
 					null,
+					null,
+					null,
+					null,
+					false,
 					false));
 			return Long.valueOf(contactId);
 		}
@@ -3658,6 +3721,173 @@ public class CaseController {
 		dialog.showAndWait().ifPresent(onSave);
 	}
 
+	private void showDetailsTextFieldDialog(String title, String label, String currentValue, boolean required, Button ownerButton, Consumer<String> onSave) {
+		Dialog<String> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+		TextField field = new TextField(safeText(currentValue));
+		Label error = new Label();
+		error.setTextFill(Color.web("#b42318"));
+		error.setVisible(false);
+		error.setManaged(false);
+		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + displayCurrentValue(currentValue)), field, error));
+		Node save = dialog.getDialogPane().lookupButton(saveType);
+		save.addEventFilter(javafx.event.ActionEvent.ACTION, e ->
+		{
+			if (required && safeText(field.getText()).trim().isBlank()) {
+				error.setText(label + " is required.");
+				error.setVisible(true);
+				error.setManaged(true);
+				e.consume();
+			}
+		});
+		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(safeText(currentValue), safeText(field.getText())));
+		dialog.setResultConverter(button -> button == saveType ? field.getText() : null);
+		dialog.showAndWait().ifPresent(onSave);
+	}
+
+	private void showDetailsTextAreaDialog(String title, String label, String currentValue, Button ownerButton, Consumer<String> onSave) {
+		Dialog<String> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+		TextArea area = new TextArea(safeText(currentValue));
+		area.setPrefRowCount(8);
+		area.setWrapText(true);
+		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current value shown below."), area));
+		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(safeText(currentValue), safeText(area.getText())));
+		dialog.setResultConverter(button -> button == saveType ? area.getText() : null);
+		dialog.showAndWait().ifPresent(onSave);
+	}
+
+	private void showDetailsDateDialog(String title, String label, LocalDate currentValue, Button ownerButton, Consumer<LocalDate> onSave) {
+		Dialog<LocalDate> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+		DatePicker picker = new DatePicker(currentValue);
+		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
+		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(currentValue, picker.getValue()));
+		dialog.setResultConverter(button -> button == saveType ? picker.getValue() : null);
+		dialog.showAndWait().ifPresent(onSave);
+	}
+
+	private void showDetailsBooleanDialog(String title, String label, boolean currentValue, Button ownerButton, Consumer<Boolean> onSave) {
+		Dialog<Boolean> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+		CheckBox box = new CheckBox(label);
+		box.setSelected(currentValue);
+		dialog.getDialogPane().setContent(new VBox(8, new Label("Current: " + boolLabel(currentValue)), box));
+		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> currentValue != box.isSelected());
+		dialog.setResultConverter(button -> button == saveType ? box.isSelected() : null);
+		dialog.showAndWait().ifPresent(onSave);
+	}
+
+	private void installUnsavedDetailsDialogConfirmation(Dialog<?> dialog, ButtonType cancelType, java.util.function.BooleanSupplier hasChanges) {
+		Node cancel = dialog.getDialogPane().lookupButton(cancelType);
+		if (cancel == null)
+			return;
+		cancel.addEventFilter(javafx.event.ActionEvent.ACTION, e ->
+		{
+			if (hasChanges == null || !hasChanges.getAsBoolean())
+				return;
+			boolean confirmed = AppDialogs.showConfirmation(
+					dialog.getOwner(),
+					"Discard Changes?",
+					"Discard unsaved changes?",
+					"Canceling will discard the changes in this field.",
+					"Discard Changes",
+					AppDialogs.DialogActionKind.DANGER);
+			if (!confirmed)
+				e.consume();
+		});
+	}
+
+	private String displayCurrentValue(String value) {
+		String safe = safeText(value);
+		return safe.isBlank() ? "—" : safe;
+	}
+
+	private void saveSingleDetailsField(Consumer<CaseDetailsDraft> mutator) {
+		CaseDetailsDraft draft = CaseDetailsDraft.from(current, currentOverview);
+		if (mutator != null)
+			mutator.accept(draft);
+		detailsDraft = draft;
+		detailsBaseline = CaseDetailsDraft.from(current, currentOverview);
+		detailsEditRowVer = cloneRowVer(latestCaseRowVer != null ? latestCaseRowVer : (current == null ? null : current.getRowVer()));
+		detailsEditor.renderEditors(draft);
+		detailsSaveCoordinator.save();
+	}
+
+	private String textFromDetailsDraft(CaseDetailsDraft d, Node editor) {
+		if (editor == detOfficePrinterCodeEditor)
+			return d.officePrinterCode;
+		if (editor == detAcceptedDetailEditor)
+			return d.acceptedDetail;
+		if (editor == detDeniedDetailEditor)
+			return d.deniedDetail;
+		if (editor == detSummaryEditor)
+			return d.summary;
+		return "";
+	}
+
+	private void saveSingleDetailsTextField(Node editor, String value) {
+		saveSingleDetailsField(d ->
+		{
+			if (editor == detOfficePrinterCodeEditor)
+				d.officePrinterCode = value;
+			else if (editor == detAcceptedDetailEditor)
+				d.acceptedDetail = value;
+			else if (editor == detDeniedDetailEditor)
+				d.deniedDetail = value;
+			else if (editor == detSummaryEditor)
+				d.summary = value;
+		});
+	}
+
+	private void saveSingleDetailsDateField(Node editor, LocalDate value) {
+		saveSingleDetailsField(d ->
+		{
+			if (editor == detDateFeeAgreementSignedEditor)
+				d.dateFeeAgreementSigned = value;
+			else if (editor == detDateNonEngagementLetterSentEditor)
+				d.dateNonEngagementLetterSent = value;
+		});
+	}
+
+	private void saveSingleDetailsBooleanField(Node editor, Boolean value) {
+		saveSingleDetailsField(d ->
+		{
+			if (editor == detClientEstateEditor)
+				d.clientEstate = toNullableBooleanStorage(value);
+			else if (editor == detMedicalRecordsReceivedEditor)
+				d.medicalRecordsReceived = value;
+			else if (editor == detFeeAgreementSignedEditor)
+				d.feeAgreementSigned = value;
+			else if (editor == detNonEngagementLetterSentEditor)
+				d.nonEngagementLetterSent = value;
+			else if (editor == detAcceptedChronologyEditor)
+				d.acceptedChronology = value;
+			else if (editor == detAcceptedConsultantExpertSearchEditor)
+				d.acceptedConsultantExpertSearch = value;
+			else if (editor == detAcceptedTestifyingExpertSearchEditor)
+				d.acceptedTestifyingExpertSearch = value;
+			else if (editor == detAcceptedMedicalLiteratureEditor)
+				d.acceptedMedicalLiterature = value;
+			else if (editor == detDeniedChronologyEditor)
+				d.deniedChronology = value;
+			else if (editor == detReceivedUpdatesEditor)
+				d.receivedUpdates = value;
+		});
+	}
+
 	private void saveDetailDateOverviewField(String field, LocalDate value) {
 		if (!"dateOfMedicalNegligence".equals(field))
 			return;
@@ -3690,8 +3920,9 @@ public class CaseController {
 				String description = "description".equals(field) ? safeText(textValue) : latest.getDescription();
 				LocalDate injury = "incidentDate".equals(field) ? incidentDate : latest.getDateOfInjury();
 				LocalDate sol = "solDate".equals(field) ? solDate : latest.getStatuteOfLimitations();
-				CaseDetailDto updated = caseDao.updateCase(activeCaseId, name, number, description, injury, sol, latest.getRowVer(), appState == null ? null
-						: appState.getUserId());
+				CaseDetailDto updated = caseDao.updateCase(activeCaseId, name, number, description, injury, sol,
+						latest.getTortNoticeDeadline(), latest.getSummary(), latest.getRowVer(), appState == null ? null
+								: appState.getUserId());
 				if (updated == null) {
 					runOnFx(() ->
 					{
@@ -5592,6 +5823,8 @@ public class CaseController {
 					safeText(current.getDescription()),
 					safeText(current.getCaseNumber()).trim(),
 					currentOverview,
+					current.getTortNoticeDeadline(),
+					current.getSummary(),
 					expectedRowVer
 			);
 
@@ -5833,6 +6066,8 @@ public class CaseController {
 					request.saveDraft().description(),
 					request.desired().desiredIncidentDate(),
 					request.desired().desiredSolDate(),
+					request.baseline().tortNoticeDeadline(),
+					request.baseline().summary(),
 					request.baseline().expectedRowVer(),
 					request.userId()
 			);
@@ -6007,6 +6242,8 @@ public class CaseController {
 			String oldDescription,
 			String oldNumber,
 			CaseOverviewDto baseOverview,
+			LocalDate tortNoticeDeadline,
+			String summary,
 			byte[] expectedRowVer
 	) {
 	}
@@ -6461,10 +6698,16 @@ public class CaseController {
 							throw new IllegalStateException("Cannot create contact without an active tenant.");
 						int createdId = contactDao.createContact(new ContactDao.CreateContactRequest(
 								appState.getShaleClientId(),
+								null,
+								null,
 								firstName,
 								lastName,
 								null,
 								null,
+								null,
+								null,
+								null,
+								false,
 								true));
 						String displayName = ((firstName == null ? "" : firstName) + " " + (lastName == null ? "" : lastName)).trim();
 						if (displayName.isBlank())

@@ -3,11 +3,13 @@ package com.shale.server.controller;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.lang.reflect.Proxy;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -207,6 +209,52 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(0L, taskServicePort.caseId);
     }
 
+
+    @Test
+    void updateCaseCoreDetailsUsesSessionTenantAndReturnsUpdatedDetail() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(patch("/api/cases/501/core-details")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "caseName": "Smith v. Updated",
+                          "description": "Updated detail",
+                          "dateOfInjury": "2026-02-03",
+                          "statuteOfLimitations": "2027-02-03",
+                          "tortNoticeDeadline": "2026-08-09",
+                          "summary": "Updated summary",
+                          "expectedRowVer": "AQ=="
+                        }
+                        """)
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caseId").value(501))
+                .andExpect(jsonPath("$.caseName").value("Smith v. Updated"))
+                .andExpect(jsonPath("$.description").value("Updated detail"))
+                .andExpect(jsonPath("$.tortNoticeDeadline[0]").value(2026))
+                .andExpect(jsonPath("$.tortNoticeDeadline[1]").value(8))
+                .andExpect(jsonPath("$.tortNoticeDeadline[2]").value(9))
+                .andExpect(jsonPath("$.summary").value("Updated summary"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.updateCaseId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.updateShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.updateActorUserId);
+        org.junit.jupiter.api.Assertions.assertEquals("Smith v. Updated", caseServicePort.updateCaseName);
+        org.junit.jupiter.api.Assertions.assertEquals("CASE-501", caseServicePort.updateCaseNumber);
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2026, 2, 3), caseServicePort.updateDateOfInjury);
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2027, 2, 3), caseServicePort.updateStatuteOfLimitations);
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2026, 8, 9), caseServicePort.updateTortNoticeDeadline);
+        org.junit.jupiter.api.Assertions.assertEquals("Updated summary", caseServicePort.updateSummary);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] {1}, caseServicePort.updateExpectedRowVer);
+    }
+
     @Test
     void taskDetailReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
@@ -224,6 +272,60 @@ class ApiReadControllerTest {
                 .andExpect(jsonPath("$.title").value("Review records"))
                 .andExpect(jsonPath("$.caseId").value(501));
 
+        org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.detailTaskId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.detailShaleClientId);
+    }
+
+
+    @Test
+    void updateTaskRouteReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(patch("/api/tasks/701")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Updated task\",\"description\":\"Updated notes\",\"dueDate\":\"2026-03-04\",\"priorityId\":1,\"assignedUserId\":31}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(701));
+
+        org.junit.jupiter.api.Assertions.assertNotNull(taskServicePort.updatedCommand);
+        org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.updatedCommand.taskId());
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.updatedCommand.shaleClientId());
+        org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.updatedCommand.actorUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("Updated task", taskServicePort.updatedCommand.title());
+        org.junit.jupiter.api.Assertions.assertEquals("Updated notes", taskServicePort.updatedCommand.description());
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2026, 3, 4, 0, 0), taskServicePort.updatedCommand.dueAt());
+        org.junit.jupiter.api.Assertions.assertEquals(2, taskServicePort.updatedCommand.statusId());
+        org.junit.jupiter.api.Assertions.assertEquals(1, taskServicePort.updatedCommand.priorityId());
+        org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.updatedCommand.assignedUserId());
+    }
+
+
+    @Test
+    void completeTaskRouteReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                taskServicePort,
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(patch("/api/tasks/701/complete")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(701))
+                .andExpect(jsonPath("$.title").value("Review records"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.completedTaskId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.completedShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.completedActorUserId);
         org.junit.jupiter.api.Assertions.assertEquals(701L, taskServicePort.detailTaskId);
         org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.detailShaleClientId);
     }
@@ -414,6 +516,50 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(25, contactServicePort.limit);
     }
 
+
+    @Test
+    void createContactReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                unusedPort(TaskServicePort.class),
+                contactServicePort,
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(post("/api/contacts")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "name":"  Ada Byron  ",
+                          "firstName":" Ada ",
+                          "lastName":" Lovelace ",
+                          "email":" ada@example.test ",
+                          "phone":" 555-0100 ",
+                          "addressHome":" 123 Main ",
+                          "dateOfBirth":"1980-01-02",
+                          "condition":" Notes ",
+                          "deceased":false
+                        }
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(801))
+                .andExpect(jsonPath("$.shaleClientId").value(41))
+                .andExpect(jsonPath("$.displayName").value("Ada Lovelace"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(41, contactServicePort.createdCommand.shaleClientId());
+        org.junit.jupiter.api.Assertions.assertEquals(31, contactServicePort.createdCommand.actorUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("Ada Byron", contactServicePort.createdCommand.name());
+        org.junit.jupiter.api.Assertions.assertEquals("Ada", contactServicePort.createdCommand.firstName());
+        org.junit.jupiter.api.Assertions.assertEquals("Lovelace", contactServicePort.createdCommand.lastName());
+        org.junit.jupiter.api.Assertions.assertEquals("ada@example.test", contactServicePort.createdCommand.email());
+        org.junit.jupiter.api.Assertions.assertEquals("555-0100", contactServicePort.createdCommand.phone());
+        org.junit.jupiter.api.Assertions.assertEquals("123 Main", contactServicePort.createdCommand.addressHome());
+        org.junit.jupiter.api.Assertions.assertEquals("1980-01-02", contactServicePort.createdCommand.dateOfBirth());
+        org.junit.jupiter.api.Assertions.assertEquals("Notes", contactServicePort.createdCommand.condition());
+    }
+
     @Test
     void contactDetailReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
@@ -592,6 +738,16 @@ class ApiReadControllerTest {
         private int addNoteShaleClientId;
         private int addNoteActorUserId;
         private String addNoteText;
+        private long updateCaseId;
+        private int updateShaleClientId;
+        private int updateActorUserId;
+        private String updateCaseName;
+        private String updateCaseNumber;
+        private LocalDate updateDateOfInjury;
+        private LocalDate updateStatuteOfLimitations;
+        private LocalDate updateTortNoticeDeadline;
+        private String updateSummary;
+        private byte[] updateExpectedRowVer;
 
         @Override
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
@@ -625,6 +781,11 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public CaseDetailDto createCase(CaseServicePort.CreateCaseCommand command) {
+            return getCaseDetail(777L, command.shaleClientId()).orElseThrow();
+        }
+
+        @Override
         public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
             this.updatesCaseId = caseId;
             this.updatesShaleClientId = shaleClientId;
@@ -635,7 +796,7 @@ class ApiReadControllerTest {
 
         @Override
         public List<com.shale.core.dto.CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
-            throw new AssertionError("listCaseStatuses should not be called");
+            return List.of(new com.shale.core.dto.CaseStatusDto(1, "Open", false, 10, "#00AA00", null, "open", null));
         }
 
         @Override
@@ -687,8 +848,34 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command) {
+            return getCaseDetail(command.caseId(), command.shaleClientId()).orElseThrow();
+        }
+
+        @Override
         public CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command) {
-            throw new AssertionError("updateCaseCoreDetails should not be called");
+            this.updateCaseId = command.caseId();
+            this.updateShaleClientId = command.shaleClientId();
+            this.updateActorUserId = command.actorUserId();
+            this.updateCaseName = command.caseName();
+            this.updateCaseNumber = command.caseNumber();
+            this.updateDateOfInjury = command.dateOfInjury();
+            this.updateStatuteOfLimitations = command.statuteOfLimitations();
+            this.updateTortNoticeDeadline = command.tortNoticeDeadline();
+            this.updateSummary = command.summary();
+            this.updateExpectedRowVer = command.expectedRowVer();
+            return new CaseDetailDto(command.caseId(), command.caseNumber(), command.caseName(), command.description(), "Open", "Ada Attorney", 10,
+                    null, null, null, null, null, null, null, command.dateOfInjury(), command.statuteOfLimitations(), command.tortNoticeDeadline(), null,
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    null, null, null, command.summary(), null, LocalDateTime.of(2026, 1, 2, 0, 0), new byte[] {2});
+        }
+
+        @Override
+        public CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command) {
+            return new CaseDetailDto(command.caseId(), "CASE-501", "Smith v. Example", "Detail", "Closed", "Ada Attorney", 10,
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, LocalDateTime.of(2026, 1, 3, 0, 0), new byte[] {3});
         }
 
         @Override
@@ -719,7 +906,11 @@ class ApiReadControllerTest {
         private int assignedShaleClientId;
         private long detailTaskId;
         private int detailShaleClientId;
+        private long completedTaskId;
+        private int completedShaleClientId;
+        private int completedActorUserId;
         private CreateTaskCommand createdCommand;
+        private TaskServicePort.UpdateTaskCommand updatedCommand;
 
         @Override
         public List<CaseTaskListItemDto> listCaseTasks(long caseId, int shaleClientId) {
@@ -771,7 +962,14 @@ class ApiReadControllerTest {
 
         @Override
         public void updateTask(UpdateTaskCommand command) {
-            throw new AssertionError("updateTask should not be called");
+            this.updatedCommand = command;
+        }
+
+        @Override
+        public void completeTask(long taskId, int shaleClientId, int actorUserId) {
+            this.completedTaskId = taskId;
+            this.completedShaleClientId = shaleClientId;
+            this.completedActorUserId = actorUserId;
         }
 
         @Override
@@ -791,6 +989,7 @@ class ApiReadControllerTest {
         private int limit;
         private int contactId;
         private int detailShaleClientId;
+        private CreateContactCommand createdCommand;
 
         @Override
         public List<ContactSummary> searchContacts(int shaleClientId, String query, int limit) {
@@ -807,13 +1006,14 @@ class ApiReadControllerTest {
             if (contactId == 404) {
                 return Optional.empty();
             }
-            return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada", "Lovelace",
-                    "Ada Lovelace", "ada@example.test", "555-0100"));
+            return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada Lovelace", "Ada", "Lovelace",
+                    "Ada Lovelace", "ada@example.test", "555-0100", "123 Main", "1980-01-02", "Notes", false, true));
         }
 
         @Override
         public int createContact(CreateContactCommand command) {
-            throw new AssertionError("createContact should not be called");
+            this.createdCommand = command;
+            return 801;
         }
 
         @Override

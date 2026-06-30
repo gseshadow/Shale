@@ -40,7 +40,7 @@ class ContactServiceAdapterTest {
 	}
 
 	@Test
-	void getContactDetailUsesDirectoryContactShapeForReadOnlyApiDto() {
+	void getContactDetailUsesFullContactShapeForApiDto() {
 		FakeContactGateway gateway = new FakeContactGateway(List.of(
 				new ContactDao.DirectoryContactRow(1, "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555")));
 		ContactServiceAdapter adapter = new ContactServiceAdapter(gateway);
@@ -48,11 +48,11 @@ class ContactServiceAdapterTest {
 		Optional<ContactDetail> detail = adapter.getContactDetail(1, 42);
 
 		assertTrue(detail.isPresent());
-		assertEquals(new ContactDetail(1, 42, "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555"),
+		assertEquals(new ContactDetail(1, 42, "Ada Lovelace", "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555", "123 Main", "1815-12-10", "", false, true),
 				detail.orElseThrow());
 		assertEquals(1, gateway.lastDetailContactId);
 		assertEquals(42, gateway.lastDetailShaleClientId);
-		assertFalse(gateway.fullDetailLookupCalled);
+		assertTrue(gateway.fullDetailLookupCalled);
 	}
 
 	private static final class FakeContactGateway implements ContactServiceAdapter.ContactGateway {
@@ -86,8 +86,10 @@ class ContactServiceAdapterTest {
 
 		@Override
 		public ContactDao.ContactDetailRow findById(int contactId, int shaleClientId) {
+			lastDetailContactId = contactId;
+			lastDetailShaleClientId = shaleClientId;
 			fullDetailLookupCalled = true;
-			return null;
+			return rows.stream().anyMatch(row -> row.id() == contactId) ? detailRow() : null;
 		}
 
 		@Override

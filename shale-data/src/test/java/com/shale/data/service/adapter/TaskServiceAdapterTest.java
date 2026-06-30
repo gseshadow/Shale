@@ -57,7 +57,7 @@ class TaskServiceAdapterTest {
 
 		IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
 				() -> adapter.updateTask(new com.shale.core.service.TaskServicePort.UpdateTaskCommand(
-						404, 42, 7, "Title", "Description", null, null, null)));
+						404, 42, 7, "Title", "Description", null, null, null, null)));
 
 		assertEquals("Task not found: 404", error.getMessage());
 	}
@@ -140,7 +140,15 @@ class TaskServiceAdapterTest {
 		}
 
 		@Override
+		public void markTaskCompleted(long taskId, int shaleClientId) {
+		}
+
+		@Override
 		public void removeTaskAssignment(long taskId, int shaleClientId, int userId) {
+		}
+
+		@Override
+		public void replacePrimaryTaskAssignment(long taskId, int shaleClientId, Integer userId, int assignedByUserId) {
 		}
 	}
 }

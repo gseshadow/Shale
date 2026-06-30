@@ -668,7 +668,7 @@ public final class CaseDao {
 				SELECT 1
 				FROM dbo.PracticeAreas
 				WHERE Id = ?
-				  AND ShaleClientId = ?
+				  AND (ShaleClientId = ? OR ShaleClientId IS NULL)
 				  AND IsActive = 1
 				  AND IsDeleted = 0;
 				""";
@@ -682,7 +682,7 @@ public final class CaseDao {
 			}
 		}
 		System.err.println("[IntakeCreate] invalid practice area selection shaleClientId=" + shaleClientId
-				+ " practiceAreaId=" + practiceAreaId + " (no matching tenant-local active PracticeAreas row)");
+				+ " practiceAreaId=" + practiceAreaId + " (no matching effective active PracticeAreas row)");
 		throw new IllegalArgumentException("Selected practice area is invalid for this tenant.");
 	}
 
@@ -761,6 +761,127 @@ public final class CaseDao {
 			int rows = ps.executeUpdate();
 			if (rows != 1)
 				throw new RuntimeException("Failed to create case status.");
+		}
+	}
+
+	public long createBasicCase(
+			int shaleClientId,
+			String caseName,
+			String caseNumber,
+			LocalDate callerDate,
+			int practiceAreaId,
+			int responsibleAttorneyUserId,
+			int statusId,
+			String description,
+			String summary,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			Integer createdByUserId) {
+		if (shaleClientId <= 0)
+			throw new IllegalArgumentException("shaleClientId is required.");
+		if (caseName == null || caseName.trim().isBlank())
+			throw new IllegalArgumentException("caseName is required.");
+		Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+		Connection con = null;
+		try {
+			con = db.requireConnection();
+			con.setAutoCommit(false);
+			validatePracticeAreaForTenant(con, shaleClientId, practiceAreaId);
+			validateResponsibleAttorneyForTenant(con, shaleClientId, responsibleAttorneyUserId);
+			validateStatusForTenant(con, shaleClientId, statusId);
+			long caseId = insertBasicCase(con, shaleClientId, caseName, caseNumber, callerDate, practiceAreaId,
+					description, summary, dateOfInjury, statuteOfLimitations, tortNoticeDeadline, now);
+			insertCaseStatus(con, caseId, statusId, now);
+			insertResponsibleAttorney(con, caseId, responsibleAttorneyUserId, now);
+			con.commit();
+			return caseId;
+		} catch (SQLException e) {
+			if (con != null) {
+				try {
+					con.rollback();
+				} catch (SQLException ignored) {
+				}
+			}
+			throw new RuntimeException("Failed to create case.", e);
+		} finally {
+			if (con != null) {
+				try {
+					con.setAutoCommit(true);
+					con.close();
+				} catch (SQLException ignored) {
+				}
+			}
+		}
+	}
+
+	private long insertBasicCase(Connection con, int shaleClientId, String caseName, String caseNumber,
+			LocalDate callerDate, int practiceAreaId, String description, String summary,
+			LocalDate dateOfInjury, LocalDate statuteOfLimitations, LocalDate tortNoticeDeadline,
+			Timestamp now) throws SQLException {
+		String sql = """
+				INSERT INTO dbo.Cases (
+				  Name, CaseNumber, CallerDate, PracticeAreaId, ClientEstate,
+				  Description, Summary, DateOfInjury, StatuteOfLimitations, TortNoticeDeadline,
+				  FollowUpMeetWithClient, FollowUpNurseReview, FollowUpExpertReview, FollowUpCaseTransferred,
+				  AcceptedChronology, AcceptedConsultantExpertSearch, AcceptedTestifyingExpertSearch, AcceptedMedicalLiterature,
+				  DeniedChronology, FeeAgreementSigned, MedicalRecordsReceived, IsDeleted, CreatedAt, UpdatedAt, ShaleClientId
+				)
+				OUTPUT INSERTED.Id
+				VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?);
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			setNullableString(ps, i++, caseName);
+			setNullableString(ps, i++, caseNumber);
+			setNullableDate(ps, i++, callerDate);
+			ps.setInt(i++, practiceAreaId);
+			setNullableString(ps, i++, description);
+			setNullableString(ps, i++, summary);
+			setNullableDate(ps, i++, dateOfInjury);
+			setNullableDate(ps, i++, statuteOfLimitations);
+			setNullableDate(ps, i++, tortNoticeDeadline);
+			ps.setTimestamp(i++, now);
+			ps.setTimestamp(i++, now);
+			ps.setInt(i++, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next())
+					throw new RuntimeException("Failed to create case.");
+				return rs.getLong(1);
+			}
+		}
+	}
+
+	private void validateResponsibleAttorneyForTenant(Connection con, int shaleClientId, int userId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("""
+				SELECT 1 FROM dbo.Users
+				WHERE id = ? AND ShaleClientId = ? AND COALESCE(is_attorney, 0) = 1 AND COALESCE(is_deleted, 0) = 0;
+				""")) {
+			ps.setInt(1, userId);
+			ps.setInt(2, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) return;
+			}
+		}
+		throw new IllegalArgumentException("Responsible attorney is invalid for this tenant.");
+	}
+
+	private void validateStatusForTenant(Connection con, int shaleClientId, int statusId) throws SQLException {
+		if (findStatusForTenantById(shaleClientId, statusId) == null)
+			throw new IllegalArgumentException("Case status is invalid for this tenant.");
+	}
+
+	private void insertResponsibleAttorney(Connection con, long caseId, int userId, Timestamp now) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("""
+				INSERT INTO dbo.CaseUsers (CaseId, UserId, RoleId, IsPrimary, Notes, CreatedAt, UpdatedAt)
+				VALUES (?, ?, ?, 1, NULL, ?, ?);
+				""")) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, userId);
+			ps.setInt(3, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setTimestamp(4, now);
+			ps.setTimestamp(5, now);
+			ps.executeUpdate();
 		}
 	}
 
@@ -2307,7 +2428,8 @@ public final class CaseDao {
 				    COALESCE(ra_user.name_first, '') +
 				    CASE WHEN COALESCE(ra_user.name_first, '') = '' OR COALESCE(ra_user.name_last, '') = '' THEN '' ELSE ' ' END +
 				    COALESCE(ra_user.name_last, '')
-				  )) AS ResponsibleAttorneyName
+				  )) AS ResponsibleAttorneyName,
+				  responsible_attorney.UserId AS ResponsibleAttorneyId
 				FROM %s c
 				OUTER APPLY (
 				    SELECT TOP (1) s.Name AS CurrentStatusName
@@ -2362,6 +2484,7 @@ public final class CaseDao {
 				rs.getString("Description"),
 				rs.getString("CurrentStatusName"),
 				rs.getString("ResponsibleAttorneyName"),
+				getNullableInt(rs, "ResponsibleAttorneyId"),
 				getNullableInt(rs, "PracticeAreaId"),
 				toLocalDate(rs.getDate("CallerDate")),
 				rs.getString("CallerTime"),
@@ -2404,6 +2527,8 @@ public final class CaseDao {
 			String description,
 			LocalDate incidentDate,
 			LocalDate solDate,
+			LocalDate tortNoticeDeadline,
+			String summary,
 			byte[] expectedRowVer,
 			Integer actorUserId) {
 		if (expectedRowVer == null || expectedRowVer.length == 0) {
@@ -2419,6 +2544,8 @@ public final class CaseDao {
 					    Description = ?,
 					    DateOfInjury = ?,
 					    StatuteOfLimitations = ?,
+					    TortNoticeDeadline = ?,
+					    Summary = ?,
 					    UpdatedAt = SYSDATETIME()
 					WHERE Id = ?
 					  AND RowVer = ?
@@ -2439,8 +2566,13 @@ public final class CaseDao {
 					ps.setNull(5, java.sql.Types.DATE);
 				else
 					ps.setDate(5, java.sql.Date.valueOf(solDate));
-				ps.setLong(6, caseId);
-				ps.setBytes(7, expectedRowVer);
+				if (tortNoticeDeadline == null)
+					ps.setNull(6, java.sql.Types.DATE);
+				else
+					ps.setDate(6, java.sql.Date.valueOf(tortNoticeDeadline));
+				ps.setString(7, summary);
+				ps.setLong(8, caseId);
+				ps.setBytes(9, expectedRowVer);
 
 				int rows = ps.executeUpdate();
 				if (rows == 0) {
@@ -2454,6 +2586,8 @@ public final class CaseDao {
 					if (before != null) {
 						phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
 						phiAuditService.auditUpdate(actorUserId, "Cases", "DateOfInjury", caseId, before.getDateOfInjury(), updated.getDateOfInjury());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "TortNoticeDeadline", caseId, before.getTortNoticeDeadline(), updated.getTortNoticeDeadline());
+						phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
 					}
 					return updated;
 				}
@@ -6305,6 +6439,77 @@ public final class CaseDao {
 
 	public PracticeAreaRow findSexualAssaultPracticeAreaForTenant(int shaleClientId) {
 		return findPracticeAreaForTenantBySystemKey(shaleClientId, PRACTICE_AREA_KEY_SEXUAL_ASSAULT);
+	}
+
+	public void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId) {
+		String sql = """
+				BEGIN TRY
+				  BEGIN TRAN;
+
+				  IF NOT EXISTS (
+				    SELECT 1 FROM dbo.Cases c
+				    WHERE c.Id = ?
+				      AND c.ShaleClientId = ?
+				      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+				  ) THROW 50002, 'Case not found.', 1;
+
+				  IF NOT EXISTS (
+				    SELECT 1 FROM dbo.PracticeAreas pa
+				    WHERE pa.Id = ?
+				      AND (pa.ShaleClientId = ? OR pa.ShaleClientId IS NULL)
+				      AND pa.IsActive = 1
+				      AND pa.IsDeleted = 0
+				  ) THROW 50001, 'Practice area not found for tenant.', 1;
+
+				  IF NOT EXISTS (
+				    SELECT 1 FROM dbo.Users u
+				    WHERE u.id = ?
+				      AND u.ShaleClientId = ?
+				      AND COALESCE(u.is_attorney, 0) = 1
+				      AND COALESCE(u.is_deleted, 0) = 0
+				  ) THROW 50003, 'Responsible attorney not found for tenant.', 1;
+
+				  UPDATE dbo.Cases
+				  SET PracticeAreaId = ?, UpdatedAt = SYSDATETIME()
+				  WHERE Id = ? AND ShaleClientId = ? AND (IsDeleted = 0 OR IsDeleted IS NULL);
+
+				  MERGE dbo.CaseUsers AS target
+				  USING (SELECT ? AS CaseId, ? AS UserId, ? AS RoleId, CAST(1 AS bit) AS IsPrimary) AS src
+				     ON target.CaseId = src.CaseId
+				    AND target.RoleId = src.RoleId
+				    AND target.IsPrimary = src.IsPrimary
+				  WHEN MATCHED THEN
+				      UPDATE SET UserId = src.UserId, UpdatedAt = SYSDATETIME()
+				  WHEN NOT MATCHED THEN
+				      INSERT (CaseId, UserId, RoleId, IsPrimary, Notes, CreatedAt, UpdatedAt)
+				      VALUES (src.CaseId, src.UserId, src.RoleId, CAST(1 AS bit), NULL, SYSDATETIME(), SYSDATETIME());
+
+				  COMMIT;
+				END TRY
+				BEGIN CATCH
+				  IF @@TRANCOUNT > 0 ROLLBACK;
+				  THROW;
+				END CATCH;
+				""";
+
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, practiceAreaId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, responsibleAttorneyUserId);
+			ps.setInt(i++, shaleClientId);
+			ps.setInt(i++, practiceAreaId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, shaleClientId);
+			ps.setLong(i++, caseId);
+			ps.setInt(i++, responsibleAttorneyUserId);
+			ps.setInt(i++, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.executeUpdate();
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to update case assignment (caseId=" + caseId + ")", e);
+		}
 	}
 
 	public void setResponsibleAttorney(long caseId, int userId) {

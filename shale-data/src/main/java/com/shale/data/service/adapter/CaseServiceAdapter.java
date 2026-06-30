@@ -71,6 +71,19 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public CaseDetailDto createCase(CreateCaseCommand command) {
+		Objects.requireNonNull(command, "command");
+		List<CaseStatusDto> statuses = listCaseStatuses(command.shaleClientId(), false);
+		CaseStatusDto initialStatus = statuses.stream()
+				.filter(Objects::nonNull)
+				.filter(status -> !status.closed())
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException("No active non-closed case status is available for this tenant."));
+		long caseId = caseGateway.createBasicCase(command, initialStatus.id());
+		return caseGateway.getDetail(caseId);
+	}
+
+	@Override
 	public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
 		return caseGateway.listCaseStatuses(shaleClientId, includeInactive);
 	}
@@ -173,6 +186,18 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 
 	@Override
+	public CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command) {
+		Objects.requireNonNull(command, "command");
+		CaseDao.StatusRow status = caseGateway.findStatusForTenantById(command.shaleClientId(), command.statusId());
+		if (status == null) {
+			throw new IllegalArgumentException("Case status is not available for this tenant.");
+		}
+		caseGateway.setPrimaryStatus(command.caseId(), status.id(), null);
+		caseGateway.populateLifecycleDateIfNull(command.caseId(), status.lifecycleKey());
+		return caseGateway.getDetail(command.caseId());
+	}
+
+	@Override
 	public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
 		caseGateway.reorderCaseStatuses(shaleClientId, firstStatusId, secondStatusId);
 	}
@@ -181,6 +206,13 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	public void addCaseNote(AddCaseNoteCommand command) {
 		Objects.requireNonNull(command, "command");
 		caseGateway.addCaseNote(command.caseId(), command.shaleClientId(), command.noteText(), command.actorUserId());
+	}
+
+	@Override
+	public CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command) {
+		Objects.requireNonNull(command, "command");
+		caseGateway.updateCaseAssignment(command.caseId(), command.shaleClientId(), command.practiceAreaId(), command.responsibleAttorneyUserId());
+		return caseGateway.getDetail(command.caseId());
 	}
 
 	@Override
@@ -193,6 +225,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 				command.description(),
 				command.dateOfInjury(),
 				command.statuteOfLimitations(),
+				command.tortNoticeDeadline(),
+				command.summary(),
 				command.expectedRowVer(),
 				command.actorUserId());
 	}
@@ -229,10 +263,21 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey);
 
 
+		CaseDao.StatusRow findStatusForTenantById(int shaleClientId, int statusId);
+
+		void setPrimaryStatus(long caseId, int statusId, String notes);
+
+		void populateLifecycleDateIfNull(long caseId, String lifecycleKey);
+
 		void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
+		void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId);
+
 		CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId);
+				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
+				byte[] expectedRowVer, Integer actorUserId);
+
+		long createBasicCase(CreateCaseCommand command, int statusId);
 	}
 
 	private record DaoCaseGateway(CaseDao caseDao) implements CaseGateway {
@@ -317,14 +362,43 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 
 		@Override
+		public CaseDao.StatusRow findStatusForTenantById(int shaleClientId, int statusId) {
+			return caseDao.findStatusForTenantById(shaleClientId, statusId);
+		}
+
+		@Override
+		public void setPrimaryStatus(long caseId, int statusId, String notes) {
+			caseDao.setPrimaryStatus(caseId, statusId, notes);
+		}
+
+		@Override
+		public void populateLifecycleDateIfNull(long caseId, String lifecycleKey) {
+			caseDao.populateLifecycleDateIfNull(caseId, lifecycleKey);
+		}
+
+		@Override
 		public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
 			caseDao.reorderCaseStatuses(shaleClientId, firstStatusId, secondStatusId);
 		}
 
 		@Override
+		public void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId) {
+			caseDao.updateCaseAssignment(caseId, shaleClientId, practiceAreaId, responsibleAttorneyUserId);
+		}
+
+		@Override
 		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, byte[] expectedRowVer, Integer actorUserId) {
-			return caseDao.updateCase(caseId, name, caseNumber, description, incidentDate, solDate, expectedRowVer, actorUserId);
+				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
+				byte[] expectedRowVer, Integer actorUserId) {
+			return caseDao.updateCase(caseId, name, caseNumber, description, incidentDate, solDate, tortNoticeDeadline, summary, expectedRowVer, actorUserId);
+		}
+
+		@Override
+		public long createBasicCase(CreateCaseCommand command, int statusId) {
+			return caseDao.createBasicCase(command.shaleClientId(), command.caseName(), command.caseNumber(),
+					command.callerDate(), command.practiceAreaId(), command.responsibleAttorneyUserId(),
+					statusId, command.description(), command.summary(), command.dateOfInjury(),
+					command.statuteOfLimitations(), command.tortNoticeDeadline(), command.actorUserId());
 		}
 	}
 }

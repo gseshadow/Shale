@@ -1253,6 +1253,133 @@ public final class TaskDao {
         }
     }
 
+    public void replacePrimaryTaskAssignment(long taskId, int shaleClientId, Integer userId, int assignedByUserId) {
+        if (taskId <= 0) {
+            throw new IllegalArgumentException("taskId must be > 0");
+        }
+        if (shaleClientId <= 0) {
+            throw new IllegalArgumentException("shaleClientId must be > 0");
+        }
+        if (userId != null && userId <= 0) {
+            throw new IllegalArgumentException("userId must be > 0 when provided");
+        }
+        if (assignedByUserId <= 0) {
+            throw new IllegalArgumentException("assignedByUserId must be > 0");
+        }
+
+        String sql = """
+                BEGIN TRY
+                  BEGIN TRAN;
+
+                  DECLARE @now datetime2 = SYSDATETIME();
+
+                  IF NOT EXISTS (
+                    SELECT 1
+                    FROM dbo.Tasks t
+                    WHERE t.Id = ?
+                      AND t.ShaleClientId = ?
+                      AND ISNULL(t.IsDeleted, 0) = 0
+                  )
+                  BEGIN
+                    THROW 50001, 'Task not found for tenant.', 1;
+                  END
+
+                  IF ? IS NOT NULL AND NOT EXISTS (
+                    SELECT 1
+                    FROM dbo.Users u
+                    WHERE u.Id = ?
+                      AND u.ShaleClientId = ?
+                      AND ISNULL(u.is_deleted, 0) = 0
+                  )
+                  BEGIN
+                    THROW 50002, 'Assignable user not found for tenant.', 1;
+                  END
+
+                  UPDATE dbo.TaskAssignments
+                  SET IsPrimary = 0
+                  WHERE TaskId = ?
+                    AND ShaleClientId = ?
+                    AND IsPrimary = 1;
+
+                  IF ? IS NOT NULL
+                  BEGIN
+                    IF EXISTS (
+                      SELECT 1
+                      FROM dbo.TaskAssignments
+                      WHERE TaskId = ?
+                        AND ShaleClientId = ?
+                        AND UserId = ?
+                    )
+                    BEGIN
+                      UPDATE dbo.TaskAssignments
+                      SET IsPrimary = 1,
+                          AssignedByUserId = ?,
+                          AssignedAt = @now
+                      WHERE TaskId = ?
+                        AND ShaleClientId = ?
+                        AND UserId = ?;
+                    END
+                    ELSE
+                    BEGIN
+                      INSERT INTO dbo.TaskAssignments (
+                        TaskId,
+                        UserId,
+                        ShaleClientId,
+                        Role,
+                        IsPrimary,
+                        AssignedByUserId,
+                        AssignedAt
+                      )
+                      VALUES (?, ?, ?, ?, 1, ?, @now);
+                    END
+                  END
+
+                  UPDATE dbo.Tasks
+                  SET UpdatedAt = @now
+                  WHERE Id = ?
+                    AND ShaleClientId = ?;
+
+                  COMMIT;
+                END TRY
+                BEGIN CATCH
+                  IF @@TRANCOUNT > 0 ROLLBACK;
+                  THROW;
+                END CATCH;
+                """;
+
+        try (Connection con = db.requireConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            int i = 1;
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            setNullableInt(ps, i++, userId);
+            setNullableInt(ps, i++, userId);
+            ps.setInt(i++, shaleClientId);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            setNullableInt(ps, i++, userId);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            setNullableInt(ps, i++, userId);
+            ps.setInt(i++, assignedByUserId);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            setNullableInt(ps, i++, userId);
+            ps.setLong(i++, taskId);
+            setNullableInt(ps, i++, userId);
+            ps.setInt(i++, shaleClientId);
+            ps.setByte(i++, DEFAULT_PRIMARY_ASSIGNMENT_ROLE);
+            ps.setInt(i++, assignedByUserId);
+            ps.setLong(i++, taskId);
+            ps.setInt(i++, shaleClientId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Failed to replace primary assignment for taskId=" + taskId + " shaleClientId=" + shaleClientId,
+                    e);
+        }
+    }
+
     public List<TaskDueNotificationCandidate> listDueNotificationCandidates(int shaleClientId) {
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
@@ -2118,6 +2245,14 @@ public final class TaskDao {
             return;
         }
         ps.setString(index, value.trim());
+    }
+
+    private static void setNullableInt(PreparedStatement ps, int index, Integer value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, java.sql.Types.INTEGER);
+            return;
+        }
+        ps.setInt(index, value);
     }
 
     private static String safeTaskUpdateUserDisplayName(String displayName, int userId) {

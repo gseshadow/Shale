@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -423,7 +423,7 @@ function EntityList({ children, ariaLabel }: { children: ReactNode; ariaLabel: s
   return <div className="entity-list" role="list" aria-label={ariaLabel}>{children}</div>;
 }
 
-function EntityCard({ title, subtitle, eyebrow, badges, metadata, onClick, ariaLabel }: { title: ReactNode; subtitle?: ReactNode; eyebrow?: ReactNode; badges?: ReactNode; metadata?: ReactNode; onClick?: () => void; ariaLabel?: string }) {
+function EntityCard({ title, subtitle, eyebrow, badges, metadata, actions, onClick, ariaLabel }: { title: ReactNode; subtitle?: ReactNode; eyebrow?: ReactNode; badges?: ReactNode; metadata?: ReactNode; actions?: ReactNode; onClick?: () => void; ariaLabel?: string }) {
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (!onClick) return;
     if (event.key === 'Enter' || event.key === ' ') {
@@ -450,6 +450,7 @@ function EntityCard({ title, subtitle, eyebrow, badges, metadata, onClick, ariaL
         {badges && <div className="entity-card-badges">{badges}</div>}
       </div>
       {metadata && <div className="entity-card-metadata">{metadata}</div>}
+      {actions && <div className="entity-card-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{actions}</div>}
     </article>
   );
 }
@@ -580,38 +581,34 @@ function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout
 
   return (
     <div className="app-layout">
-      <aside className="sidebar" aria-label="Primary navigation">
-        <div className="brand">
+      <header className="topbar">
+        <div className="brand" aria-label="Shale">
           <span className="brand-mark" aria-hidden="true">S</span>
           <span>Shale</span>
         </div>
         <span className="beta-badge">Read-only beta</span>
-        <PrimaryNavigation locationPathname={location.pathname} />
-      </aside>
+        <div className="user-summary">
+          <p className="eyebrow">Signed in</p>
+          <p className="user-name">{displayNameFor(user)}</p>
+          <p className="user-meta">{displayValue(user.email, 'Email not provided')}</p>
+        </div>
+        <button type="button" onClick={onLogout}>Logout</button>
+      </header>
 
-      <div className="content-column">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Signed in</p>
-            <p className="user-name">{displayNameFor(user)}</p>
-            <p className="user-meta">{displayValue(user.email, 'Email not provided')}</p>
-          </div>
-          <button type="button" onClick={onLogout}>Logout</button>
-        </header>
-        <main className="page-content">
-          <div className="content-container">
-            <Outlet />
-          </div>
-        </main>
-        <PrimaryNavigation locationPathname={location.pathname} variant="mobile" />
-      </div>
+      <main className="page-content">
+        <div className="content-container">
+          <Outlet />
+        </div>
+      </main>
+
+      <PrimaryNavigation locationPathname={location.pathname} />
     </div>
   );
 }
 
-function PrimaryNavigation({ locationPathname, variant = 'sidebar' }: { locationPathname: string; variant?: 'sidebar' | 'mobile' }) {
+function PrimaryNavigation({ locationPathname }: { locationPathname: string }) {
   return (
-    <nav className={variant === 'mobile' ? 'mobile-nav-list' : 'nav-list'} aria-label={variant === 'mobile' ? 'Primary mobile navigation' : undefined}>
+    <nav className="bottom-nav-list" aria-label="Primary navigation">
       {navigationItems.map((item) => {
         const isActive = item.activePrefixes.some((prefix) => locationPathname === prefix || locationPathname.startsWith(`${prefix}/`));
         return (
@@ -641,7 +638,6 @@ function MyCasesSection({ accessToken }: { accessToken: string | null }) {
   const [cases, setCases] = useState<CaseSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -697,7 +693,6 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
   const [tasks, setTasks] = useState<CaseTaskListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -720,13 +715,36 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
       {isLoading && <LoadingState message="Loading your tasks…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
-      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} />}
+      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} accessToken={accessToken} onTasksChanged={setTasks} onError={setError} />}
     </section>
   );
 }
 
-function MyTasksList({ tasks }: { tasks: CaseTaskListItem[] }) {
+function mergeCompletedTask(tasks: CaseTaskListItem[], completedTask: TaskDetail): CaseTaskListItem[] {
+  return tasks.map((task) => task.id === completedTask.id ? { ...task, completedAt: completedTask.completedAt } : task);
+}
+
+function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError }: { tasks: CaseTaskListItem[]; allTasks?: CaseTaskListItem[]; accessToken: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onError: (message: string | null) => void }) {
   const navigate = useNavigate();
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
+
+  async function handleCompleteTask(task: CaseTaskListItem) {
+    if (!accessToken) {
+      onError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    setCompletingTaskId(task.id);
+    onError(null);
+    try {
+      const completedTask = await completeTask(accessToken, task.id);
+      onTasksChanged(mergeCompletedTask(allTasks ?? tasks, completedTask));
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : 'Task could not be completed.');
+    } finally {
+      setCompletingTaskId(null);
+    }
+  }
+
   return (
     <EntityList ariaLabel="Assigned tasks">
       {tasks.map((task) => (
@@ -741,6 +759,7 @@ function MyTasksList({ tasks }: { tasks: CaseTaskListItem[] }) {
               <MetadataRow label="Priority" value={task.priorityId ? `Priority ${task.priorityId}` : MISSING_VALUE} />
             </MetadataGrid>
           )}
+          actions={!task.completedAt ? <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton> : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
           onClick={() => navigate(`/tasks/${task.id}`)}
           ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
         />
@@ -755,7 +774,6 @@ function TasksPage({ accessToken }: { accessToken: string | null }) {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -811,7 +829,7 @@ function TasksPage({ accessToken }: { accessToken: string | null }) {
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
         {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
         {!isLoading && !error && tasks.length > 0 && filteredTasks.length === 0 && <EmptyState message="No tasks matched your search." />}
-        {!isLoading && !error && filteredTasks.length > 0 && <MyTasksList tasks={filteredTasks} />}
+        {!isLoading && !error && filteredTasks.length > 0 && <MyTasksList tasks={filteredTasks} allTasks={tasks} accessToken={accessToken} onTasksChanged={setTasks} onError={setError} />}
       </div>
     </section>
   );
@@ -823,6 +841,8 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const navigate = useNavigate();
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -859,7 +879,9 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="cases-page" aria-labelledby="cases-title">
-      <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search and open read-only case records." />
+      <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search, open, and create case records."
+        action={<button type="button" onClick={() => setIsCreating((value) => !value)}>{isCreating ? 'Cancel new case' : 'New case'}</button>} />
+      {isCreating && <NewCaseForm accessToken={accessToken} onCancel={() => setIsCreating(false)} onCreated={(created) => navigate(`/cases/${created.caseId}`)} />}
       <SearchBar
         id="case-search"
         label="Search cases"
@@ -876,6 +898,103 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
         {!isLoading && !error && hasSearched && results.length === 0 && <EmptyState message="No cases matched your search." />}
         {!isLoading && !error && results.length > 0 && <CaseResultsList results={results} />}
       </div>
+    </section>
+  );
+}
+
+function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string | null; onCancel: () => void; onCreated: (created: CaseDetail) => void }) {
+  const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
+  const [attorneys, setAttorneys] = useState<TeamMemberSummary[]>([]);
+  const [caseName, setCaseName] = useState('');
+  const [caseNumber, setCaseNumber] = useState('');
+  const [practiceAreaId, setPracticeAreaId] = useState('');
+  const [responsibleAttorneyUserId, setResponsibleAttorneyUserId] = useState('');
+  const [callerDate, setCallerDate] = useState('');
+  const [dateOfInjury, setDateOfInjury] = useState('');
+  const [statuteOfLimitations, setStatuteOfLimitations] = useState('');
+  const [tortNoticeDeadline, setTortNoticeDeadline] = useState('');
+  const [summary, setSummary] = useState('');
+  const [description, setDescription] = useState('');
+  const [isLoadingLookups, setIsLoadingLookups] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    setIsLoadingLookups(true);
+    Promise.all([listPracticeAreaLookups(accessToken), listTeamMembers(accessToken)])
+      .then(([areas, members]) => {
+        const activeAreas = areas.filter((area) => area.active && !area.deleted);
+        setPracticeAreas(activeAreas);
+        setAttorneys(members.filter((member) => member.attorney));
+      })
+      .catch((caught) => setSubmitError(caught instanceof Error ? caught.message : 'Lookups could not be loaded.'))
+      .finally(() => setIsLoadingLookups(false));
+  }, [accessToken]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const selectedPracticeAreaId = Number(practiceAreaId);
+    const selectedAttorneyId = Number(responsibleAttorneyUserId);
+    if (!caseName.trim()) {
+      setSubmitError('Enter a case name before saving.');
+      return;
+    }
+    if (!Number.isInteger(selectedPracticeAreaId) || selectedPracticeAreaId <= 0) {
+      setSubmitError('Choose a practice area before saving.');
+      return;
+    }
+    if (!Number.isInteger(selectedAttorneyId) || selectedAttorneyId <= 0) {
+      setSubmitError('Choose a responsible attorney before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const created = await createCase(accessToken, {
+        caseName: caseName.trim(),
+        caseNumber: caseNumber.trim() || null,
+        practiceAreaId: selectedPracticeAreaId,
+        responsibleAttorneyUserId: selectedAttorneyId,
+        callerDate: callerDate || null,
+        dateOfInjury: dateOfInjury || null,
+        statuteOfLimitations: statuteOfLimitations || null,
+        tortNoticeDeadline: tortNoticeDeadline || null,
+        summary: summary.trim() || null,
+        description: description.trim() || null,
+      });
+      onCreated(created);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case could not be created.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="settings-subcard" aria-labelledby="new-case-title">
+      <h2 id="new-case-title">New case</h2>
+      <form className="case-edit-form" onSubmit={handleSubmit} aria-label="Create case">
+        <label htmlFor="new-case-name">Case name<input id="new-case-name" value={caseName} onChange={(event) => setCaseName(event.target.value)} disabled={isSubmitting} maxLength={255} required /></label>
+        <label htmlFor="new-case-number">Case number<input id="new-case-number" value={caseNumber} onChange={(event) => setCaseNumber(event.target.value)} disabled={isSubmitting} maxLength={200} /></label>
+        <label htmlFor="new-case-practice-area">Practice area<select id="new-case-practice-area" value={practiceAreaId} onChange={(event) => setPracticeAreaId(event.target.value)} disabled={isSubmitting || isLoadingLookups} required><option value="">Choose a practice area</option>{practiceAreas.map((area) => <option key={area.id} value={area.id}>{displayValue(area.name, `Practice area ${area.id}`)}</option>)}</select></label>
+        <label htmlFor="new-case-attorney">Responsible attorney<select id="new-case-attorney" value={responsibleAttorneyUserId} onChange={(event) => setResponsibleAttorneyUserId(event.target.value)} disabled={isSubmitting || isLoadingLookups} required><option value="">Choose an attorney</option>{attorneys.map((member) => <option key={member.id} value={member.id}>{displayValue(member.displayName, `User ${member.id}`)}</option>)}</select></label>
+        <label htmlFor="new-case-caller-date">Intake date<input id="new-case-caller-date" type="date" value={callerDate} onChange={(event) => setCallerDate(event.target.value)} disabled={isSubmitting} /></label>
+        <label htmlFor="new-case-injury-date">Date of injury<input id="new-case-injury-date" type="date" value={dateOfInjury} onChange={(event) => setDateOfInjury(event.target.value)} disabled={isSubmitting} /></label>
+        <label htmlFor="new-case-sol">Statute of limitations<input id="new-case-sol" type="date" value={statuteOfLimitations} onChange={(event) => setStatuteOfLimitations(event.target.value)} disabled={isSubmitting} /></label>
+        <label htmlFor="new-case-tort">Tort notice deadline<input id="new-case-tort" type="date" value={tortNoticeDeadline} onChange={(event) => setTortNoticeDeadline(event.target.value)} disabled={isSubmitting} /></label>
+        <label htmlFor="new-case-summary">Summary<textarea id="new-case-summary" value={summary} onChange={(event) => setSummary(event.target.value)} disabled={isSubmitting} rows={4} maxLength={10000} /></label>
+        <label htmlFor="new-case-description">Description<textarea id="new-case-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} /></label>
+        {submitError && <p className="status error" role="alert">{submitError}</p>}
+        <div className="form-actions">
+          <button type="submit" disabled={isSubmitting || isLoadingLookups}>{isSubmitting ? 'Creating…' : isLoadingLookups ? 'Loading lookups…' : 'Create case'}</button>
+          <button type="button" className="secondary-button" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
+        </div>
+      </form>
     </section>
   );
 }
@@ -914,6 +1033,8 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const navigate = useNavigate();
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -950,7 +1071,20 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="contacts-page" aria-labelledby="contacts-title">
-      <PageHeader eyebrow="Search" title="Contacts" titleId="contacts-title" lede="Search and open read-only contact records." />
+      <PageHeader
+        eyebrow="Search"
+        title="Contacts"
+        titleId="contacts-title"
+        lede="Search, open, and create contact records."
+        action={!isCreating ? <ActionButton onClick={() => setIsCreating(true)}>New contact</ActionButton> : undefined}
+      />
+      {isCreating && (
+        <ContactCreateForm
+          accessToken={accessToken}
+          onCreated={(created) => navigate(`/contacts/${created.id}`)}
+          onCancel={() => setIsCreating(false)}
+        />
+      )}
       <SearchBar
         id="contact-search"
         label="Search contacts"
@@ -996,6 +1130,8 @@ function ContactResultsList({ results }: { results: ContactSearchResult[] }) {
 }
 
 function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
+  const navigate = useNavigate();
+  const [isCreating, setIsCreating] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<OrganizationSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -1037,7 +1173,16 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="organizations-page" aria-labelledby="organizations-title">
-      <PageHeader eyebrow="Search" title="Organizations" titleId="organizations-title" lede="Search and open read-only organization records." />
+      <PageHeader eyebrow="Search" title="Organizations" titleId="organizations-title" lede="Search, open, and create organization records."
+        action={!isCreating ? <ActionButton onClick={() => setIsCreating(true)}>New organization</ActionButton> : undefined}
+      />
+      {isCreating && (
+        <OrganizationCreateForm
+          accessToken={accessToken}
+          onCreated={(created) => navigate(`/organizations/${created.id}`)}
+          onCancel={() => setIsCreating(false)}
+        />
+      )}
       <SearchBar
         id="organization-search"
         label="Search organizations"
@@ -1090,7 +1235,6 @@ function TeamPage({ accessToken }: { accessToken: string | null }) {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -1189,7 +1333,6 @@ function TeamMemberDetailPage({ accessToken }: { accessToken: string | null }) {
   const [member, setMember] = useState<TeamMemberDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!Number.isInteger(numericUserId) || numericUserId <= 0) {
       setMember(null);
@@ -1276,6 +1419,7 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
   const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(numericTaskId) || numericTaskId <= 0) {
@@ -1297,7 +1441,7 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
     setError(null);
 
     getTaskDetail(accessToken, numericTaskId)
-      .then((detail) => isCurrent && setTaskDetail(detail))
+      .then((detail) => { if (isCurrent) { setTaskDetail(detail); setIsEditing(false); } })
       .catch((caught) => {
         if (isCurrent) {
           setTaskDetail(null);
@@ -1318,26 +1462,43 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
       {isLoading && <LoadingState message="Loading task detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !taskDetail && <EmptyState message="No task detail was found." />}
-      {!isLoading && !error && taskDetail && <TaskDetailReadOnly detail={taskDetail} />}
+      {!isLoading && !error && taskDetail && (
+        <TaskDetailReadOnly
+          accessToken={accessToken}
+          detail={taskDetail}
+          isEditing={isEditing}
+          onEdit={() => { setError(null); setIsEditing(true); }}
+          onCancel={() => setIsEditing(false)}
+          onTaskChanged={(updated) => { setTaskDetail(updated); setIsEditing(false); }}
+          onError={setError}
+        />
+      )}
     </DetailShell>
   );
 }
 
-function TaskDetailReadOnly({ detail }: { detail: TaskDetail }) {
+function TaskDetailReadOnly({ accessToken, detail, isEditing, onEdit, onCancel, onTaskChanged, onError }: { accessToken: string | null; detail: TaskDetail; isEditing: boolean; onEdit: () => void; onCancel: () => void; onTaskChanged: (detail: TaskDetail) => void; onError: (message: string | null) => void }) {
   return (
     <div className="detail-sections">
       <section aria-labelledby="task-info-title">
-        <h2 id="task-info-title">Task Information</h2>
-        <dl className="detail-list">
-          <DetailItem label="Task Name" value={detail.title} />
-          <DetailItem label="Status" value={detail.statusId ? `Status ${detail.statusId}` : null} />
-          <DetailItem label="Priority" value={detail.priorityId ? `Priority ${detail.priorityId}` : null} />
-          <DetailItem label="Assigned To" value={detail.assignedUserDisplayName} />
-          <DetailItem label="Created By" value={detail.createdByDisplayName} />
-          <DetailItem label="Due Date" value={formatDate(detail.dueAt)} />
-          <DetailItem label="Completed Date" value={formatDate(detail.completedAt)} />
-          <DetailItem label="Description" value={detail.description} preserveWhitespace />
-        </dl>
+        <div className="section-heading-row">
+          <h2 id="task-info-title">Task Information</h2>
+          {!isEditing && <SecondaryButton onClick={onEdit}>Edit task</SecondaryButton>}
+        </div>
+        {isEditing ? (
+          <TaskEditForm accessToken={accessToken} detail={detail} onCancel={onCancel} onTaskChanged={onTaskChanged} onError={onError} />
+        ) : (
+          <dl className="detail-list">
+            <DetailItem label="Task Name" value={detail.title} />
+            <DetailItem label="Status" value={detail.statusId ? `Status ${detail.statusId}` : null} />
+            <DetailItem label="Priority" value={detail.priorityId ? `Priority ${detail.priorityId}` : null} />
+            <DetailItem label="Assigned To" value={detail.assignedUserDisplayName} />
+            <DetailItem label="Created By" value={detail.createdByDisplayName} />
+            <DetailItem label="Due Date" value={formatDate(detail.dueAt)} />
+            <DetailItem label="Completed Date" value={formatDate(detail.completedAt)} />
+            <DetailItem label="Description" value={detail.description} preserveWhitespace />
+          </dl>
+        )}
       </section>
 
       {detail.caseId > 0 && (
@@ -1350,6 +1511,113 @@ function TaskDetailReadOnly({ detail }: { detail: TaskDetail }) {
         </section>
       )}
     </div>
+  );
+}
+
+function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }: { accessToken: string | null; detail: TaskDetail; onCancel: () => void; onTaskChanged: (detail: TaskDetail) => void; onError: (message: string | null) => void }) {
+  const [title, setTitle] = useState(detail.title ?? '');
+  const [description, setDescription] = useState(detail.description ?? '');
+  const [dueDate, setDueDate] = useState(toDateInputValue(detail.dueAt));
+  const [priorityId, setPriorityId] = useState(detail.priorityId ? String(detail.priorityId) : '');
+  const [assignedUserId, setAssignedUserId] = useState(detail.assignedUserId ? String(detail.assignedUserId) : '');
+  const [priorities, setPriorities] = useState<TaskPriorityOption[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [isLoadingLookups, setIsLoadingLookups] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setLookupError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    let isCurrent = true;
+    setIsLoadingLookups(true);
+    setLookupError(null);
+    Promise.all([listTaskPriorityLookups(accessToken), listTeamMembers(accessToken)])
+      .then(([priorityOptions, users]) => {
+        if (!isCurrent) return;
+        setPriorities(priorityOptions);
+        setTeamMembers(users);
+      })
+      .catch((caught) => {
+        if (!isCurrent) return;
+        setLookupError(caught instanceof Error ? caught.message : 'Task edit options could not be loaded.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingLookups(false);
+      });
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitError(null);
+    onError(null);
+    const safeTitle = title.trim();
+    if (!safeTitle) {
+      setSubmitError('Task name is required.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    const selectedPriorityId = priorityId ? Number(priorityId) : null;
+    const selectedAssignedUserId = assignedUserId ? Number(assignedUserId) : null;
+    if (selectedPriorityId !== null && (!Number.isInteger(selectedPriorityId) || selectedPriorityId <= 0)) {
+      setSubmitError('Choose a valid task priority before saving.');
+      return;
+    }
+    if (selectedAssignedUserId !== null && (!Number.isInteger(selectedAssignedUserId) || selectedAssignedUserId <= 0)) {
+      setSubmitError('Choose a valid assigned user before saving.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const updated = await updateTaskDetail(accessToken, detail.id, {
+        title: safeTitle,
+        description: description.trim() || undefined,
+        dueDate: dueDate || undefined,
+        priorityId: selectedPriorityId,
+        assignedUserId: selectedAssignedUserId,
+      });
+      onTaskChanged(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Task detail could not be updated.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit}>
+      {isLoadingLookups && <p className="status muted">Loading task options…</p>}
+      {lookupError && <p className="status error" role="alert">{lookupError}</p>}
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <label htmlFor="task-title">Task name</label>
+      <input id="task-title" type="text" value={title} onChange={(event) => { setTitle(event.target.value); setSubmitError(null); }} disabled={isSubmitting} maxLength={255} required />
+      <label htmlFor="task-due-date">Due date</label>
+      <input id="task-due-date" type="date" value={dueDate} onChange={(event) => { setDueDate(event.target.value); setSubmitError(null); }} disabled={isSubmitting} />
+      <label htmlFor="task-priority">Priority</label>
+      <select id="task-priority" value={priorityId} onChange={(event) => { setPriorityId(event.target.value); setSubmitError(null); }} disabled={isSubmitting || isLoadingLookups || priorities.length === 0}>
+        <option value="">{priorities.length === 0 ? 'No priority options available' : 'Choose a priority'}</option>
+        {priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name || `Priority ${priority.id}`}</option>)}
+      </select>
+      <label htmlFor="task-assigned-user">Assigned user</label>
+      <select id="task-assigned-user" value={assignedUserId} onChange={(event) => { setAssignedUserId(event.target.value); setSubmitError(null); }} disabled={isSubmitting || isLoadingLookups}>
+        <option value="">Unassigned</option>
+        {teamMembers.map((member) => <option key={member.id} value={member.id}>{teamMemberName(member)}</option>)}
+      </select>
+      <label htmlFor="task-description">Description</label>
+      <textarea id="task-description" value={description} onChange={(event) => { setDescription(event.target.value); setSubmitError(null); }} disabled={isSubmitting} rows={5} maxLength={10000} />
+      <p className="form-help">Status changes stay with the existing Complete action.</p>
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || isLoadingLookups}>{isSubmitting ? 'Saving…' : 'Save task'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
   );
 }
 
@@ -1460,22 +1728,28 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
           onTasksError={setTasksError}
           onUpdatesChanged={setCaseUpdates}
           onUpdatesError={setUpdatesError}
+          onDetailChanged={setCaseDetail}
         />
       )}
     </DetailShell>
   );
 }
 
-function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, updatesError, onTasksChanged, onTasksError, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
+function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, updatesError, onTasksChanged, onTasksError, onUpdatesChanged, onUpdatesError, onDetailChanged }: { accessToken: string | null; detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void; onDetailChanged: (detail: CaseDetail) => void }) {
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
   return (
     <div className="detail-sections">
       <section aria-labelledby="case-info-title">
-        <h2 id="case-info-title">Case Information</h2>
+        <div className="section-heading-row">
+          <h2 id="case-info-title">Case Information</h2>
+          {!isEditingDetails && <ActionButton onClick={() => setIsEditingDetails(true)}>Edit details</ActionButton>}
+        </div>
+        {isEditingDetails && <CaseCoreDetailsForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingDetails(false); }} onCancel={() => setIsEditingDetails(false)} />}
         <dl className="detail-list">
           <DetailItem label="Case Name" value={detail.caseName} />
           <DetailItem label="Case Number" value={detail.caseNumber} />
           <DetailItem label="Status" value={detail.caseStatus} />
-          <DetailItem label="Practice Area" value={detail.practiceAreaId ? `Practice Area ID ${detail.practiceAreaId}` : null} />
           <DetailItem label="Description" value={detail.description} preserveWhitespace />
           <DetailItem label="Summary" value={detail.summary} preserveWhitespace />
         </dl>
@@ -1492,15 +1766,20 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
       </section>
 
       <section aria-labelledby="assignments-title">
-        <h2 id="assignments-title">Assignments</h2>
+        <div className="section-heading-row">
+          <h2 id="assignments-title">Practice & Team</h2>
+          {!isEditingAssignment && <ActionButton onClick={() => setIsEditingAssignment(true)}>Edit assignment</ActionButton>}
+        </div>
+        {isEditingAssignment && <CaseAssignmentForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingAssignment(false); }} onCancel={() => setIsEditingAssignment(false)} />}
         <dl className="detail-list compact">
+          <DetailItem label="Practice Area" value={detail.practiceAreaId ? `Practice Area ID ${detail.practiceAreaId}` : null} />
           <DetailItem label="Responsible Attorney" value={detail.responsibleAttorney} />
         </dl>
       </section>
 
       <CaseTasksSection accessToken={accessToken} caseId={detail.caseId} tasks={tasks} error={tasksError} onTasksChanged={onTasksChanged} onTasksError={onTasksError} />
 
-      <StatusTimelineSection history={detail.statusHistory ?? []} />
+      <StatusTimelineSection accessToken={accessToken} detail={detail} history={detail.statusHistory ?? []} onDetailChanged={onDetailChanged} />
 
       <RelatedContactsSection contacts={detail.relatedContacts ?? []} />
 
@@ -1509,7 +1788,175 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
   );
 }
 
-function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }) {
+
+function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
+  const [practiceAreaId, setPracticeAreaId] = useState(detail.practiceAreaId ? String(detail.practiceAreaId) : '');
+  const [responsibleAttorneyUserId, setResponsibleAttorneyUserId] = useState(detail.responsibleAttorneyId ? String(detail.responsibleAttorneyId) : '');
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isLoadingLookups, setIsLoadingLookups] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setLookupError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    let isCurrent = true;
+    setIsLoadingLookups(true);
+    setLookupError(null);
+    Promise.all([listPracticeAreaLookups(accessToken), listTeamMembers(accessToken)])
+      .then(([areas, users]) => {
+        if (!isCurrent) return;
+        setPracticeAreas(areas.filter((area) => area.active && !area.deleted));
+        setTeamMembers(users.filter((user) => user.attorney));
+      })
+      .catch((caught) => {
+        if (!isCurrent) return;
+        setLookupError(caught instanceof Error ? caught.message : 'Assignment lookup data could not be loaded.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingLookups(false);
+      });
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    const selectedPracticeAreaId = Number(practiceAreaId);
+    const selectedAttorneyId = Number(responsibleAttorneyUserId);
+    if (!Number.isInteger(selectedPracticeAreaId) || selectedPracticeAreaId <= 0) {
+      setSubmitError('Choose a practice area before saving.');
+      return;
+    }
+    if (!Number.isInteger(selectedAttorneyId) || selectedAttorneyId <= 0) {
+      setSubmitError('Choose a responsible attorney before saving.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await updateCaseAssignment(accessToken, detail.caseId, {
+        practiceAreaId: selectedPracticeAreaId,
+        responsibleAttorneyUserId: selectedAttorneyId,
+      });
+      onSaved(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case assignment could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit}>
+      {isLoadingLookups && <p className="status muted">Loading assignment options…</p>}
+      {lookupError && <p className="status error" role="alert">{lookupError}</p>}
+      <label htmlFor="case-assignment-practice-area">Practice area</label>
+      <select id="case-assignment-practice-area" value={practiceAreaId} onChange={(event) => setPracticeAreaId(event.target.value)} disabled={isSubmitting || isLoadingLookups} required>
+        <option value="">Choose a practice area</option>
+        {practiceAreas.map((area) => <option key={area.id} value={area.id}>{area.name || `Practice Area ${area.id}`}</option>)}
+      </select>
+      <label htmlFor="case-assignment-attorney">Responsible attorney</label>
+      <select id="case-assignment-attorney" value={responsibleAttorneyUserId} onChange={(event) => setResponsibleAttorneyUserId(event.target.value)} disabled={isSubmitting || isLoadingLookups} required>
+        <option value="">Choose a responsible attorney</option>
+        {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.displayName || [member.firstName, member.lastName].filter(Boolean).join(' ') || `User ${member.id}`}</option>)}
+      </select>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || isLoadingLookups || !practiceAreaId || !responsibleAttorneyUserId}>{isSubmitting ? 'Saving…' : 'Save assignment'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
+  );
+}
+
+function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const [caseName, setCaseName] = useState(detail.caseName || '');
+  const [description, setDescription] = useState(detail.description || '');
+  const [dateOfInjury, setDateOfInjury] = useState(toDateInputValue(detail.dateOfInjury));
+  const [statuteOfLimitations, setStatuteOfLimitations] = useState(toDateInputValue(detail.statuteOfLimitations));
+  const [tortNoticeDeadline, setTortNoticeDeadline] = useState(toDateInputValue(detail.tortNoticeDeadline));
+  const [summary, setSummary] = useState(detail.summary || '');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const trimmedCaseName = caseName.trim();
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmedCaseName) {
+      setSubmitError('Enter a case name before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    if (!detail.rowVer) {
+      setSubmitError('Case version information is missing. Refresh the case and try again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await updateCaseCoreDetails(accessToken, detail.caseId, {
+        caseName: trimmedCaseName,
+        description,
+        dateOfInjury: dateOfInjury || null,
+        statuteOfLimitations: statuteOfLimitations || null,
+        tortNoticeDeadline: tortNoticeDeadline || null,
+        summary,
+        expectedRowVer: detail.rowVer,
+      });
+      onSaved(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case details could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit}>
+      <label htmlFor="case-core-name">Case name</label>
+      <input id="case-core-name" type="text" value={caseName} onChange={(event) => setCaseName(event.target.value)} disabled={isSubmitting} maxLength={255} required />
+      <label htmlFor="case-core-description">Description</label>
+      <textarea id="case-core-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      <label htmlFor="case-core-injury-date">Date of injury</label>
+      <input id="case-core-injury-date" type="date" value={dateOfInjury} onChange={(event) => setDateOfInjury(event.target.value)} disabled={isSubmitting} />
+      <label htmlFor="case-core-sol-date">Statute of limitations</label>
+      <input id="case-core-sol-date" type="date" value={statuteOfLimitations} onChange={(event) => setStatuteOfLimitations(event.target.value)} disabled={isSubmitting} />
+      <label htmlFor="case-core-tort-notice-date">Tort notice deadline</label>
+      <input id="case-core-tort-notice-date" type="date" value={tortNoticeDeadline} onChange={(event) => setTortNoticeDeadline(event.target.value)} disabled={isSubmitting} />
+      <label htmlFor="case-core-summary">Summary</label>
+      <textarea id="case-core-summary" value={summary} onChange={(event) => setSummary(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || !trimmedCaseName}>{isSubmitting ? 'Saving…' : 'Save details'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
+  );
+}
+
+function toDateInputValue(value: string | null | undefined): string {
+  if (!value) {
+    return '';
+  }
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+  return match ? match[1] : '';
+}
+
+function StatusTimelineSection({ accessToken, detail, history, onDetailChanged }: { accessToken: string | null; detail: CaseDetail; history: CaseStatusHistoryItem[]; onDetailChanged: (detail: CaseDetail) => void }) {
+  const [isEditingStatus, setIsEditingStatus] = useState(false);
   const sortedHistory = [...history].sort((left, right) => {
     const leftDate = left.effectiveDate ? Date.parse(left.effectiveDate) : Number.MAX_SAFE_INTEGER;
     const rightDate = right.effectiveDate ? Date.parse(right.effectiveDate) : Number.MAX_SAFE_INTEGER;
@@ -1518,7 +1965,11 @@ function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }
 
   return (
     <section aria-labelledby="status-timeline-title">
-      <h2 id="status-timeline-title">Status Timeline</h2>
+      <div className="section-heading-row">
+        <h2 id="status-timeline-title">Status Timeline</h2>
+        {!isEditingStatus && <ActionButton onClick={() => setIsEditingStatus(true)}>Edit status</ActionButton>}
+      </div>
+      {isEditingStatus && <CaseStatusEditForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingStatus(false); }} onCancel={() => setIsEditingStatus(false)} />}
       {sortedHistory.length === 0 ? (
         <EmptyState message="No status history has been recorded for this case yet." />
       ) : (
@@ -1548,6 +1999,85 @@ function StatusTimelineSection({ history }: { history: CaseStatusHistoryItem[] }
   );
 }
 
+function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const currentStatusId = detail.statusHistory?.find((item) => item.current || !item.endDate)?.statusId ?? null;
+  const [statuses, setStatuses] = useState<CaseStatusSetting[]>([]);
+  const [selectedStatusId, setSelectedStatusId] = useState(currentStatusId == null ? '' : String(currentStatusId));
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isLoadingLookup, setIsLoadingLookup] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setLookupError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    let isCurrent = true;
+    setIsLoadingLookup(true);
+    setLookupError(null);
+    listCaseStatusLookup(accessToken)
+      .then((rows) => { if (isCurrent) setStatuses(rows); })
+      .catch((caught) => { if (isCurrent) setLookupError(caught instanceof Error ? caught.message : 'Case status options could not be loaded.'); })
+      .finally(() => { if (isCurrent) setIsLoadingLookup(false); });
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const numericStatusId = Number(selectedStatusId);
+    if (!Number.isInteger(numericStatusId) || numericStatusId <= 0) {
+      setSubmitError('Choose a status before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await updateCaseStatus(accessToken, detail.caseId, numericStatusId);
+      onSaved(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case status could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form status-edit-form" onSubmit={handleSubmit}>
+      <fieldset disabled={isSubmitting || isLoadingLookup}>
+        <legend>Choose the current case status</legend>
+        {isLoadingLookup && <p className="status">Loading status options…</p>}
+        {lookupError && <p className="status error" role="alert">{lookupError}</p>}
+        {!isLoadingLookup && !lookupError && statuses.length === 0 && <EmptyState message="No case statuses are available for this tenant." />}
+        <div className="status-choice-list">
+          {statuses.map((status) => {
+            const value = String(status.id);
+            const color = normalizeStatusColor(status.color);
+            return (
+              <label className="status-choice-card" key={status.id} style={{ '--status-accent': color } as CSSProperties}>
+                <input type="radio" name="case-status" value={value} checked={selectedStatusId === value} onChange={(event) => setSelectedStatusId(event.target.value)} />
+                <span className="status-choice-body">
+                  <span className="status-choice-name">{status.name || `Status ${status.id}`}</span>
+                  {status.closed && <span className="status-current-pill">Closed lifecycle</span>}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || isLoadingLookup || !!lookupError || !selectedStatusId}>{isSubmitting ? 'Saving…' : 'Save status'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
+  );
+}
+
 function normalizeStatusColor(color: string | null | undefined): string {
   const trimmed = color?.trim();
   return trimmed && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(trimmed) ? trimmed : '#2f80b7';
@@ -1561,6 +2091,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
   const [description, setDescription] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
   const trimmedTitle = title.trim();
   const trimmedDescription = description.trim();
 
@@ -1570,6 +2101,24 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
     setDescription('');
     setSubmitError(null);
     setIsAdding(false);
+  }
+
+  async function handleCompleteTask(task: CaseTaskListItem) {
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    setCompletingTaskId(task.id);
+    setSubmitError(null);
+    try {
+      const completedTask = await completeTask(accessToken, task.id);
+      onTasksChanged(mergeCompletedTask(tasks, completedTask));
+      onTasksError(null);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Task could not be completed.');
+    } finally {
+      setCompletingTaskId(null);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1662,6 +2211,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
                   <MetadataRow label="Completed date" value={formatDate(task.completedAt)} />
                 </MetadataGrid>
               )}
+              actions={!task.completedAt ? <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton> : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
               onClick={() => navigate(`/tasks/${task.id}`)}
               ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
             />
@@ -1790,6 +2340,7 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
   const [contactDetail, setContactDetail] = useState<ContactDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(numericContactId) || numericContactId <= 0) {
@@ -1832,25 +2383,288 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
       {isLoading && <LoadingState message="Loading contact detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !contactDetail && <EmptyState message="No contact detail was found." />}
-      {!isLoading && !error && contactDetail && <ContactDetailReadOnly detail={contactDetail} />}
+      {!isLoading && !error && contactDetail && <ContactDetailReadOnly accessToken={accessToken} detail={contactDetail} onDetailChanged={setContactDetail} />}
     </DetailShell>
   );
 }
 
-function ContactDetailReadOnly({ detail }: { detail: ContactDetail }) {
+function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { accessToken: string | null; detail: ContactDetail; onDetailChanged: (detail: ContactDetail) => void }) {
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
   return (
     <div className="detail-sections">
       <section aria-labelledby="contact-info-title">
-        <h2 id="contact-info-title">Contact Information</h2>
+        <div className="section-heading-row">
+          <h2 id="contact-info-title">Contact Information</h2>
+          {!isEditingDetails && <ActionButton onClick={() => setIsEditingDetails(true)}>Edit contact</ActionButton>}
+        </div>
+        {isEditingDetails && <ContactDetailsForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingDetails(false); }} onCancel={() => setIsEditingDetails(false)} />}
         <dl className="detail-list">
           <DetailItem label="Display Name" value={detail.displayName} />
           <DetailItem label="First Name" value={detail.firstName} />
           <DetailItem label="Last Name" value={detail.lastName} />
           <DetailItem label="Email" value={detail.email} />
           <DetailItem label="Phone" value={detail.phone} />
+          <DetailItem label="Home Address" value={detail.addressHome} preserveWhitespace />
+          <DetailItem label="Date of Birth" value={formatDate(detail.dateOfBirth)} />
+          <DetailItem label="Notes" value={detail.condition} preserveWhitespace />
+          <DetailItem label="Deceased" value={detail.deceased ? 'Yes' : 'No'} />
+          <DetailItem label="Client" value={detail.client ? 'Yes' : 'No'} />
         </dl>
       </section>
     </div>
+  );
+}
+
+
+function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: ContactDetail) => void; onCancel: () => void }) {
+  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [addressHome, setAddressHome] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [condition, setCondition] = useState('');
+  const [deceased, setDeceased] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasRequiredName = Boolean(name.trim() || firstName.trim() || lastName.trim());
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hasRequiredName) {
+      setSubmitError('Enter a display name, first name, or last name before saving.');
+      return;
+    }
+    if (email.trim() && !email.includes('@')) {
+      setSubmitError('Enter a valid email address.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const created = await createContact(accessToken, {
+        name: name.trim() || null,
+        firstName: firstName.trim() || null,
+        lastName: lastName.trim() || null,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        addressHome: addressHome.trim() || null,
+        dateOfBirth: dateOfBirth || null,
+        condition: condition.trim() || null,
+        deceased,
+      });
+      onCreated(created);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Contact could not be created.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit} aria-label="Create contact">
+      <label htmlFor="new-contact-display-name">Display name</label>
+      <input id="new-contact-display-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="name" maxLength={255} />
+      <label htmlFor="new-contact-first-name">First name</label>
+      <input id="new-contact-first-name" type="text" value={firstName} onChange={(event) => setFirstName(event.target.value)} disabled={isSubmitting} autoComplete="given-name" maxLength={255} />
+      <label htmlFor="new-contact-last-name">Last name</label>
+      <input id="new-contact-last-name" type="text" value={lastName} onChange={(event) => setLastName(event.target.value)} disabled={isSubmitting} autoComplete="family-name" maxLength={255} />
+      <label htmlFor="new-contact-email">Email</label>
+      <input id="new-contact-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" maxLength={254} />
+      <label htmlFor="new-contact-phone">Phone</label>
+      <input id="new-contact-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" maxLength={100} />
+      <label htmlFor="new-contact-address-home">Home address</label>
+      <textarea id="new-contact-address-home" value={addressHome} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
+      <label htmlFor="new-contact-date-of-birth">Date of birth</label>
+      <input id="new-contact-date-of-birth" type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} disabled={isSubmitting} />
+      <label htmlFor="new-contact-notes">Notes</label>
+      <textarea id="new-contact-notes" value={condition} onChange={(event) => setCondition(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      <label className="checkbox-row" htmlFor="new-contact-deceased"><input id="new-contact-deceased" type="checkbox" checked={deceased} onChange={(event) => setDeceased(event.target.checked)} disabled={isSubmitting} /> Deceased</label>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Create contact'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
+  );
+}
+
+function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: ContactDetail; onSaved: (detail: ContactDetail) => void; onCancel: () => void }) {
+  const [name, setName] = useState(detail.name || detail.displayName || '');
+  const [firstName, setFirstName] = useState(detail.firstName || '');
+  const [lastName, setLastName] = useState(detail.lastName || '');
+  const [email, setEmail] = useState(detail.email || '');
+  const [phone, setPhone] = useState(detail.phone || '');
+  const [addressHome, setAddressHome] = useState(detail.addressHome || '');
+  const [dateOfBirth, setDateOfBirth] = useState(toDateInputValue(detail.dateOfBirth));
+  const [condition, setCondition] = useState(detail.condition || '');
+  const [deceased, setDeceased] = useState(detail.deceased);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasRequiredName = Boolean(name.trim() || firstName.trim() || lastName.trim());
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hasRequiredName) {
+      setSubmitError('Enter a display name, first name, or last name before saving.');
+      return;
+    }
+    if (email.trim() && !email.includes('@')) {
+      setSubmitError('Enter a valid email address.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await updateContactDetails(accessToken, detail.id, {
+        name: name.trim() || null,
+        firstName: firstName.trim() || null,
+        lastName: lastName.trim() || null,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        addressHome: addressHome.trim() || null,
+        dateOfBirth: dateOfBirth || null,
+        condition: condition.trim() || null,
+        deceased,
+      });
+      onSaved(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Contact details could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit}>
+      <label htmlFor="contact-display-name">Display name</label>
+      <input id="contact-display-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="name" maxLength={255} />
+      <label htmlFor="contact-first-name">First name</label>
+      <input id="contact-first-name" type="text" value={firstName} onChange={(event) => setFirstName(event.target.value)} disabled={isSubmitting} autoComplete="given-name" maxLength={255} />
+      <label htmlFor="contact-last-name">Last name</label>
+      <input id="contact-last-name" type="text" value={lastName} onChange={(event) => setLastName(event.target.value)} disabled={isSubmitting} autoComplete="family-name" maxLength={255} />
+      <label htmlFor="contact-email">Email</label>
+      <input id="contact-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" maxLength={254} />
+      <label htmlFor="contact-phone">Phone</label>
+      <input id="contact-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" maxLength={100} />
+      <label htmlFor="contact-address-home">Home address</label>
+      <textarea id="contact-address-home" value={addressHome} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
+      <label htmlFor="contact-date-of-birth">Date of birth</label>
+      <input id="contact-date-of-birth" type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} disabled={isSubmitting} />
+      <label htmlFor="contact-notes">Notes</label>
+      <textarea id="contact-notes" value={condition} onChange={(event) => setCondition(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      <label className="checkbox-row" htmlFor="contact-deceased"><input id="contact-deceased" type="checkbox" checked={deceased} onChange={(event) => setDeceased(event.target.checked)} disabled={isSubmitting} /> Deceased</label>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Save contact'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
+  );
+}
+
+
+function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: OrganizationDetail) => void; onCancel: () => void }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [fax, setFax] = useState('');
+  const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState('');
+  const [address1, setAddress1] = useState('');
+  const [address2, setAddress2] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [country, setCountry] = useState('');
+  const [notes, setNotes] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasRequiredName = Boolean(name.trim());
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hasRequiredName) {
+      setSubmitError('Enter an organization name before saving.');
+      return;
+    }
+    if (email.trim() && !email.includes('@')) {
+      setSubmitError('Enter a valid email address.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const created = await createOrganization(accessToken, {
+        name: name.trim(),
+        phone: phone.trim() || null,
+        fax: fax.trim() || null,
+        email: email.trim() || null,
+        website: website.trim() || null,
+        address1: address1.trim() || null,
+        address2: address2.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        postalCode: postalCode.trim() || null,
+        country: country.trim() || null,
+        notes: notes.trim() || null,
+      });
+      onCreated(created);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Organization could not be created.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit} aria-label="Create organization">
+      <label htmlFor="new-organization-name">Organization name</label>
+      <input id="new-organization-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="organization" maxLength={255} required />
+      <label htmlFor="new-organization-email">Email</label>
+      <input id="new-organization-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" maxLength={254} />
+      <label htmlFor="new-organization-phone">Phone</label>
+      <input id="new-organization-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" maxLength={100} />
+      <label htmlFor="new-organization-fax">Fax</label>
+      <input id="new-organization-fax" type="tel" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} maxLength={100} />
+      <label htmlFor="new-organization-website">Website</label>
+      <input id="new-organization-website" type="url" value={website} onChange={(event) => setWebsite(event.target.value)} disabled={isSubmitting} autoComplete="url" maxLength={500} />
+      <label htmlFor="new-organization-address1">Address line 1</label>
+      <input id="new-organization-address1" type="text" value={address1} onChange={(event) => setAddress1(event.target.value)} disabled={isSubmitting} autoComplete="address-line1" maxLength={500} />
+      <label htmlFor="new-organization-address2">Address line 2</label>
+      <input id="new-organization-address2" type="text" value={address2} onChange={(event) => setAddress2(event.target.value)} disabled={isSubmitting} autoComplete="address-line2" maxLength={500} />
+      <label htmlFor="new-organization-city">City</label>
+      <input id="new-organization-city" type="text" value={city} onChange={(event) => setCity(event.target.value)} disabled={isSubmitting} autoComplete="address-level2" maxLength={200} />
+      <label htmlFor="new-organization-state">State</label>
+      <input id="new-organization-state" type="text" value={state} onChange={(event) => setState(event.target.value)} disabled={isSubmitting} autoComplete="address-level1" maxLength={100} />
+      <label htmlFor="new-organization-postal-code">Zip</label>
+      <input id="new-organization-postal-code" type="text" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} disabled={isSubmitting} autoComplete="postal-code" maxLength={100} />
+      <label htmlFor="new-organization-country">Country</label>
+      <input id="new-organization-country" type="text" value={country} onChange={(event) => setCountry(event.target.value)} disabled={isSubmitting} autoComplete="country-name" maxLength={100} />
+      <label htmlFor="new-organization-notes">Notes</label>
+      <textarea id="new-organization-notes" value={notes} onChange={(event) => setNotes(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Create organization'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
   );
 }
 
@@ -1860,6 +2674,7 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
   const [organizationDetail, setOrganizationDetail] = useState<OrganizationDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(numericOrganizationId) || numericOrganizationId <= 0) {
@@ -1901,16 +2716,22 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
       {isLoading && <LoadingState message="Loading organization detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !organizationDetail && <EmptyState message="No organization detail was found." />}
-      {!isLoading && !error && organizationDetail && <OrganizationDetailReadOnly detail={organizationDetail} />}
+      {!isLoading && !error && organizationDetail && <OrganizationDetailReadOnly accessToken={accessToken} detail={organizationDetail} onDetailChanged={setOrganizationDetail} />}
     </DetailShell>
   );
 }
 
-function OrganizationDetailReadOnly({ detail }: { detail: OrganizationDetail }) {
+function OrganizationDetailReadOnly({ accessToken, detail, onDetailChanged }: { accessToken: string | null; detail: OrganizationDetail; onDetailChanged: (detail: OrganizationDetail) => void }) {
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
   return (
     <div className="detail-sections">
       <section aria-labelledby="organization-info-title">
-        <h2 id="organization-info-title">Organization Information</h2>
+        <div className="section-heading-row">
+          <h2 id="organization-info-title">Organization Information</h2>
+          {!isEditingDetails && <ActionButton onClick={() => setIsEditingDetails(true)}>Edit organization</ActionButton>}
+        </div>
+        {isEditingDetails && <OrganizationDetailsForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingDetails(false); }} onCancel={() => setIsEditingDetails(false)} />}
         <dl className="detail-list">
           <DetailItem label="Organization Name" value={detail.name} />
           <DetailItem label="Organization Type" value={detail.organizationTypeName} />
@@ -1930,6 +2751,98 @@ function OrganizationDetailReadOnly({ detail }: { detail: OrganizationDetail }) 
         </section>
       )}
     </div>
+  );
+}
+
+function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: OrganizationDetail; onSaved: (detail: OrganizationDetail) => void; onCancel: () => void }) {
+  const [name, setName] = useState(detail.name || '');
+  const [phone, setPhone] = useState(detail.phone || '');
+  const [fax, setFax] = useState(detail.fax || '');
+  const [email, setEmail] = useState(detail.email || '');
+  const [website, setWebsite] = useState(detail.website || '');
+  const [address1, setAddress1] = useState(detail.address1 || '');
+  const [address2, setAddress2] = useState(detail.address2 || '');
+  const [city, setCity] = useState(detail.city || '');
+  const [state, setState] = useState(detail.state || '');
+  const [postalCode, setPostalCode] = useState(detail.postalCode || '');
+  const [country, setCountry] = useState(detail.country || '');
+  const [notes, setNotes] = useState(detail.notes || '');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasRequiredName = Boolean(name.trim());
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hasRequiredName) {
+      setSubmitError('Enter an organization name before saving.');
+      return;
+    }
+    if (email.trim() && !email.includes('@')) {
+      setSubmitError('Enter a valid email address.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await updateOrganizationDetails(accessToken, detail.id, {
+        name: name.trim(),
+        phone: phone.trim() || null,
+        fax: fax.trim() || null,
+        email: email.trim() || null,
+        website: website.trim() || null,
+        address1: address1.trim() || null,
+        address2: address2.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        postalCode: postalCode.trim() || null,
+        country: country.trim() || null,
+        notes: notes.trim() || null,
+      });
+      onSaved(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Organization details could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit}>
+      <label htmlFor="organization-name">Organization name</label>
+      <input id="organization-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="organization" maxLength={255} required />
+      <label htmlFor="organization-email">Email</label>
+      <input id="organization-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" maxLength={254} />
+      <label htmlFor="organization-phone">Phone</label>
+      <input id="organization-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" maxLength={100} />
+      <label htmlFor="organization-fax">Fax</label>
+      <input id="organization-fax" type="tel" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} maxLength={100} />
+      <label htmlFor="organization-website">Website</label>
+      <input id="organization-website" type="url" value={website} onChange={(event) => setWebsite(event.target.value)} disabled={isSubmitting} autoComplete="url" maxLength={500} />
+      <label htmlFor="organization-address1">Address line 1</label>
+      <input id="organization-address1" type="text" value={address1} onChange={(event) => setAddress1(event.target.value)} disabled={isSubmitting} autoComplete="address-line1" maxLength={500} />
+      <label htmlFor="organization-address2">Address line 2</label>
+      <input id="organization-address2" type="text" value={address2} onChange={(event) => setAddress2(event.target.value)} disabled={isSubmitting} autoComplete="address-line2" maxLength={500} />
+      <label htmlFor="organization-city">City</label>
+      <input id="organization-city" type="text" value={city} onChange={(event) => setCity(event.target.value)} disabled={isSubmitting} autoComplete="address-level2" maxLength={200} />
+      <label htmlFor="organization-state">State</label>
+      <input id="organization-state" type="text" value={state} onChange={(event) => setState(event.target.value)} disabled={isSubmitting} autoComplete="address-level1" maxLength={100} />
+      <label htmlFor="organization-postal-code">Zip</label>
+      <input id="organization-postal-code" type="text" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} disabled={isSubmitting} autoComplete="postal-code" maxLength={100} />
+      <label htmlFor="organization-country">Country</label>
+      <input id="organization-country" type="text" value={country} onChange={(event) => setCountry(event.target.value)} disabled={isSubmitting} autoComplete="country-name" maxLength={100} />
+      <label htmlFor="organization-notes">Notes</label>
+      <textarea id="organization-notes" value={notes} onChange={(event) => setNotes(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Save organization'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
   );
 }
 

@@ -3,25 +3,33 @@ package com.shale.server.controller;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.Base64;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.TaskDetailDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
+import com.shale.core.service.CaseServicePort.CreateCaseCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseStatusCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseAssignmentCommand;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactDetail;
 import com.shale.core.service.ContactServicePort.ContactSummary;
@@ -30,8 +38,11 @@ import com.shale.core.service.NotificationServicePort.NotificationSummary;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.OrganizationServicePort.OrganizationDetail;
 import com.shale.core.service.OrganizationServicePort.OrganizationSummary;
+import com.shale.core.service.OrganizationServicePort.CreateOrganizationCommand;
+import com.shale.core.service.OrganizationServicePort.UpdateOrganizationCommand;
 import com.shale.core.service.TaskServicePort;
 import com.shale.core.service.TaskServicePort.CreateTaskCommand;
+import com.shale.core.service.TaskServicePort.UpdateTaskCommand;
 import com.shale.core.service.UserServicePort;
 import com.shale.core.service.UserServicePort.UserDetail;
 import com.shale.core.service.UserServicePort.UserSummary;
@@ -50,6 +61,92 @@ public final class ApiReadController {
     }
 
     public record CreateCaseTaskRequest(String title, String description, String dueDate) {
+    }
+
+    public record CreateCaseRequest(
+            String caseName,
+            String caseNumber,
+            Integer practiceAreaId,
+            Integer responsibleAttorneyUserId,
+            String callerDate,
+            String dateOfInjury,
+            String statuteOfLimitations,
+            String tortNoticeDeadline,
+            String summary,
+            String description) {
+    }
+
+    public record UpdateCaseAssignmentRequest(Integer practiceAreaId, Integer responsibleAttorneyUserId) {
+    }
+
+    public record UpdateCaseCoreDetailsRequest(
+            String caseName,
+            String description,
+            String dateOfInjury,
+            String statuteOfLimitations,
+            String tortNoticeDeadline,
+            String summary,
+            String expectedRowVer) {
+    }
+
+    public record UpdateCaseStatusRequest(Integer statusId) {
+    }
+
+    public record UpdateTaskRequest(String title, String description, String dueDate, Integer priorityId, Integer assignedUserId) {
+    }
+
+    public record CreateContactRequest(
+            String name,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String addressHome,
+            String dateOfBirth,
+            String condition,
+            Boolean deceased) {
+    }
+
+    public record UpdateContactRequest(
+            String name,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String addressHome,
+            String dateOfBirth,
+            String condition,
+            Boolean deceased) {
+    }
+
+    public record CreateOrganizationRequest(
+            String name,
+            String phone,
+            String fax,
+            String email,
+            String website,
+            String address1,
+            String address2,
+            String city,
+            String state,
+            String postalCode,
+            String country,
+            String notes) {
+    }
+
+    public record UpdateOrganizationRequest(
+            String name,
+            String phone,
+            String fax,
+            String email,
+            String website,
+            String address1,
+            String address2,
+            String city,
+            String state,
+            String postalCode,
+            String country,
+            String notes) {
     }
 
     private static final int DEFAULT_SEARCH_LIMIT = 25;
@@ -112,6 +209,32 @@ public final class ApiReadController {
         return caseServicePort.listAssignedCases(userId, shaleClientId, DEFAULT_SEARCH_LIMIT);
     }
 
+    @Operation(summary = "Create case", description = "Creates a basic tenant-scoped case and returns the refreshed case detail.")
+    @PostMapping("/api/cases")
+    public CaseDetailDto createCase(@RequestBody CreateCaseRequest request) {
+        String caseName = ApiValidation.caseName(request == null ? null : request.caseName());
+        String caseNumber = ApiValidation.optionalContactText(request == null ? null : request.caseNumber(), "caseNumber", 200);
+        if (request == null || request.practiceAreaId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "practiceAreaId is required.");
+        }
+        if (request.responsibleAttorneyUserId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "responsibleAttorneyUserId is required.");
+        }
+        int practiceAreaId = Math.toIntExact(ApiValidation.positiveId(request.practiceAreaId(), "practiceAreaId"));
+        int responsibleAttorneyUserId = Math.toIntExact(ApiValidation.positiveId(request.responsibleAttorneyUserId(), "responsibleAttorneyUserId"));
+        LocalDate callerDate = parseOptionalIsoDate(request.callerDate(), "callerDate");
+        LocalDate dateOfInjury = parseOptionalIsoDate(request.dateOfInjury(), "dateOfInjury");
+        LocalDate statuteOfLimitations = parseOptionalIsoDate(request.statuteOfLimitations(), "statuteOfLimitations");
+        LocalDate tortNoticeDeadline = parseOptionalIsoDate(request.tortNoticeDeadline(), "tortNoticeDeadline");
+        String summary = ApiValidation.optionalCaseSummary(request.summary());
+        String description = ApiValidation.optionalCaseDescription(request.description());
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        return caseServicePort.createCase(new CreateCaseCommand(shaleClientId, userId, caseName, caseNumber,
+                practiceAreaId, responsibleAttorneyUserId, callerDate, dateOfInjury, statuteOfLimitations,
+                tortNoticeDeadline, summary, description));
+    }
+
     @Operation(summary = "List my tasks", description = "Returns active tasks assigned to the current authenticated user.")
     @GetMapping("/api/tasks/assigned")
     public List<CaseTaskListItemDto> listAssignedTasks() {
@@ -128,6 +251,67 @@ public final class ApiReadController {
         return caseServicePort.getCaseDetail(safeCaseId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found."));
     }
+
+
+    @Operation(summary = "Update case core details", description = "Updates safe core fields for one tenant-scoped case and returns the refreshed case detail.")
+    @PatchMapping("/api/cases/{caseId:\\d+}/core-details")
+    public CaseDetailDto updateCaseCoreDetails(
+            @PathVariable("caseId") long caseId,
+            @RequestBody UpdateCaseCoreDetailsRequest request) {
+        long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
+        String caseName = ApiValidation.caseName(request == null ? null : request.caseName());
+        String description = ApiValidation.optionalCaseDescription(request == null ? null : request.description());
+        LocalDate dateOfInjury = parseOptionalIsoDate(request == null ? null : request.dateOfInjury(), "dateOfInjury");
+        LocalDate statuteOfLimitations = parseOptionalIsoDate(request == null ? null : request.statuteOfLimitations(), "statuteOfLimitations");
+        LocalDate tortNoticeDeadline = parseOptionalIsoDate(request == null ? null : request.tortNoticeDeadline(), "tortNoticeDeadline");
+        String summary = ApiValidation.optionalCaseSummary(request == null ? null : request.summary());
+        byte[] expectedRowVer = parseExpectedRowVer(request == null ? null : request.expectedRowVer());
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        CaseDetailDto current = caseServicePort.getCaseDetail(safeCaseId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found."));
+        CaseDetailDto updated = caseServicePort.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
+                safeCaseId,
+                shaleClientId,
+                userId,
+                caseName,
+                current.getCaseNumber(),
+                description,
+                dateOfInjury,
+                statuteOfLimitations,
+                tortNoticeDeadline,
+                summary,
+                expectedRowVer));
+        if (updated == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Case details were changed by someone else. Refresh and try again.");
+        }
+        return updated;
+    }
+
+    @Operation(summary = "Update case assignment", description = "Updates assignment/classification fields for one tenant-scoped case and returns the refreshed case detail.")
+    @PatchMapping("/api/cases/{caseId:\\d+}/assignment")
+    public CaseDetailDto updateCaseAssignment(
+            @PathVariable("caseId") long caseId,
+            @RequestBody UpdateCaseAssignmentRequest request) {
+        long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
+        if (request == null || request.practiceAreaId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "practiceAreaId is required.");
+        }
+        if (request.responsibleAttorneyUserId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "responsibleAttorneyUserId is required.");
+        }
+        int practiceAreaId = Math.toIntExact(ApiValidation.positiveId(request.practiceAreaId(), "practiceAreaId"));
+        int responsibleAttorneyUserId = Math.toIntExact(ApiValidation.positiveId(request.responsibleAttorneyUserId(), "responsibleAttorneyUserId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        CaseDetailDto updated = caseServicePort.updateCaseAssignment(new UpdateCaseAssignmentCommand(
+                safeCaseId, shaleClientId, userId, practiceAreaId, responsibleAttorneyUserId));
+        if (updated == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found.");
+        }
+        return updated;
+    }
+
 
     @Operation(summary = "List case tasks", description = "Returns tasks for one tenant-scoped case.")
     @GetMapping("/api/cases/{caseId:\\d+}/tasks")
@@ -183,6 +367,41 @@ public final class ApiReadController {
         return caseServicePort.listCaseUpdates(safeCaseId, shaleClientId);
     }
 
+
+    @Operation(summary = "List effective case statuses", description = "Returns active effective case statuses available to the authenticated tenant for case status changes.")
+    @GetMapping("/api/lookups/case-statuses")
+    public List<CaseStatusDto> listCaseStatusLookup() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return caseServicePort.listCaseStatuses(shaleClientId, false);
+    }
+
+    @Operation(summary = "Update case status", description = "Changes the current status for one tenant-scoped case and returns the refreshed case detail.")
+    @PatchMapping("/api/cases/{caseId:\\d+}/status")
+    public CaseDetailDto updateCaseStatus(
+            @PathVariable("caseId") long caseId,
+            @RequestBody UpdateCaseStatusRequest request) {
+        long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
+        int statusId = Math.toIntExact(ApiValidation.positiveId(request == null || request.statusId() == null ? 0 : request.statusId(), "statusId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        CaseDetailDto updated = caseServicePort.updateCaseCurrentStatus(new UpdateCaseStatusCommand(
+                safeCaseId,
+                shaleClientId,
+                userId,
+                statusId));
+        if (updated == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found.");
+        }
+        return updated;
+    }
+
+    @Operation(summary = "List task priorities", description = "Returns active effective task priorities available to the authenticated tenant.")
+    @GetMapping("/api/lookups/task-priorities")
+    public List<TaskPriorityOptionDto> listTaskPriorityLookup() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return taskServicePort.listPriorities(shaleClientId);
+    }
+
     @Operation(summary = "Get task detail", description = "Returns one tenant-scoped task detail record.")
     @GetMapping("/api/tasks/{taskId:\\d+}")
     public TaskDetailDto getTask(@PathVariable("taskId") long taskId) {
@@ -192,11 +411,109 @@ public final class ApiReadController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
     }
 
+
+    @Operation(summary = "Update task detail", description = "Updates supported tenant-scoped task fields and returns the refreshed task detail.")
+    @PatchMapping("/api/tasks/{taskId:\\d+}")
+    public TaskDetailDto updateTask(
+            @PathVariable("taskId") long taskId,
+            @RequestBody UpdateTaskRequest request) {
+        long safeTaskId = ApiValidation.positiveId(taskId, "taskId");
+        String title = ApiValidation.taskTitle(request == null ? null : request.title());
+        String description = ApiValidation.optionalTaskDescription(request == null ? null : request.description());
+        LocalDateTime dueAt = parseOptionalDueDate(request == null ? null : request.dueDate());
+        Integer priorityId = request == null ? null : request.priorityId();
+        if (priorityId != null) {
+            priorityId = Math.toIntExact(ApiValidation.positiveId(priorityId, "priorityId"));
+        }
+        Integer assignedUserId = request == null ? null : request.assignedUserId();
+        if (assignedUserId != null) {
+            assignedUserId = Math.toIntExact(ApiValidation.positiveId(assignedUserId, "assignedUserId"));
+        }
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        TaskDetailDto current = taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
+        taskServicePort.updateTask(new UpdateTaskCommand(
+                safeTaskId,
+                shaleClientId,
+                userId,
+                title,
+                description,
+                dueAt,
+                current.statusId(),
+                priorityId,
+                assignedUserId));
+        return taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
+    }
+
+
+    @Operation(summary = "Complete task", description = "Marks one tenant-scoped task complete for the authenticated user.")
+    @PatchMapping("/api/tasks/{taskId:\\d+}/complete")
+    public TaskDetailDto completeTask(@PathVariable("taskId") long taskId) {
+        long safeTaskId = ApiValidation.positiveId(taskId, "taskId");
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        taskServicePort.completeTask(safeTaskId, shaleClientId, userId);
+        return taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
+    }
+
+
+    @Operation(summary = "Create contact", description = "Creates a tenant-scoped contact for the authenticated user and returns the refreshed contact detail.")
+    @PostMapping("/api/contacts")
+    public ContactDetail createContact(@RequestBody CreateContactRequest request) {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        String firstName = ApiValidation.optionalContactNamePart(request == null ? null : request.firstName(), "First name");
+        String lastName = ApiValidation.optionalContactNamePart(request == null ? null : request.lastName(), "Last name");
+        String displayName = ApiValidation.optionalContactDisplayName(request == null ? null : request.name());
+        if ((firstName == null || firstName.isBlank()) && (lastName == null || lastName.isBlank()) && (displayName == null || displayName.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least a display name, first name, or last name is required.");
+        }
+        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
+        String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
+        String addressHome = ApiValidation.optionalContactText(request == null ? null : request.addressHome(), "Address", 2000);
+        String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
+        String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
+        int contactId = contactServicePort.createContact(new ContactServicePort.CreateContactCommand(
+                shaleClientId, userId, displayName, firstName, lastName, email, phone, addressHome, dateOfBirth, condition, request == null ? null : request.deceased()));
+        return contactServicePort.getContactDetail(contactId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
+    }
+
     @Operation(summary = "Get contact detail", description = "Returns one tenant-scoped contact detail record.")
     @GetMapping("/api/contacts/{contactId:\\d+}")
     public ContactDetail getContact(@PathVariable("contactId") int contactId) {
         int safeContactId = Math.toIntExact(ApiValidation.positiveId(contactId, "contactId"));
         int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return contactServicePort.getContactDetail(safeContactId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
+    }
+
+
+    @Operation(summary = "Update contact detail", description = "Updates supported tenant-scoped contact fields and returns the refreshed contact detail.")
+    @PatchMapping("/api/contacts/{contactId:\\d+}")
+    public ContactDetail updateContact(@PathVariable("contactId") int contactId, @RequestBody UpdateContactRequest request) {
+        int safeContactId = Math.toIntExact(ApiValidation.positiveId(contactId, "contactId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        String firstName = ApiValidation.optionalContactNamePart(request == null ? null : request.firstName(), "First name");
+        String lastName = ApiValidation.optionalContactNamePart(request == null ? null : request.lastName(), "Last name");
+        String displayName = ApiValidation.optionalContactDisplayName(request == null ? null : request.name());
+        if ((firstName == null || firstName.isBlank()) && (lastName == null || lastName.isBlank()) && (displayName == null || displayName.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least a display name, first name, or last name is required.");
+        }
+        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
+        String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
+        String addressHome = ApiValidation.optionalContactText(request == null ? null : request.addressHome(), "Address", 2000);
+        String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
+        String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
+        boolean updated = contactServicePort.updateContact(new ContactServicePort.UpdateContactCommand(
+                safeContactId, shaleClientId, userId, displayName, firstName, lastName, email, phone, addressHome, dateOfBirth, condition, request == null ? null : request.deceased()));
+        if (!updated) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found.");
+        }
         return contactServicePort.getContactDetail(safeContactId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
     }
@@ -227,6 +544,30 @@ public final class ApiReadController {
     }
 
 
+
+    @Operation(summary = "Create organization", description = "Creates a tenant-scoped organization for the authenticated user and returns the refreshed organization detail.")
+    @PostMapping("/api/organizations")
+    public OrganizationDetail createOrganization(@RequestBody CreateOrganizationRequest request) {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        String name = ApiValidation.organizationName(request == null ? null : request.name());
+        String phone = ApiValidation.optionalOrganizationText(request == null ? null : request.phone(), "Phone", 100);
+        String fax = ApiValidation.optionalOrganizationText(request == null ? null : request.fax(), "Fax", 100);
+        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
+        String website = ApiValidation.optionalOrganizationText(request == null ? null : request.website(), "Website", 500);
+        String address1 = ApiValidation.optionalOrganizationText(request == null ? null : request.address1(), "Address line 1", 500);
+        String address2 = ApiValidation.optionalOrganizationText(request == null ? null : request.address2(), "Address line 2", 500);
+        String city = ApiValidation.optionalOrganizationText(request == null ? null : request.city(), "City", 200);
+        String state = ApiValidation.optionalOrganizationText(request == null ? null : request.state(), "State", 100);
+        String postalCode = ApiValidation.optionalOrganizationText(request == null ? null : request.postalCode(), "Zip", 100);
+        String country = ApiValidation.optionalOrganizationText(request == null ? null : request.country(), "Country", 100);
+        String notes = ApiValidation.optionalOrganizationText(request == null ? null : request.notes(), "Notes", 10000);
+        int organizationId = organizationServicePort.createOrganization(new CreateOrganizationCommand(
+                shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes));
+        return organizationServicePort.getOrganizationDetail(organizationId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
+    }
+
     @Operation(summary = "Search organizations", description = "Returns the first matching organizations for the authenticated tenant.")
     @GetMapping("/api/organizations/search")
     public List<OrganizationSummary> searchOrganizations(@RequestParam(name = "query", defaultValue = "") String query) {
@@ -244,6 +585,33 @@ public final class ApiReadController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
     }
 
+    @Operation(summary = "Update organization detail", description = "Updates supported tenant-scoped organization fields and returns the refreshed organization detail.")
+    @PatchMapping("/api/organizations/{organizationId:\\d+}")
+    public OrganizationDetail updateOrganization(@PathVariable("organizationId") int organizationId, @RequestBody UpdateOrganizationRequest request) {
+        int safeOrganizationId = Math.toIntExact(ApiValidation.positiveId(organizationId, "organizationId"));
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        String name = ApiValidation.organizationName(request == null ? null : request.name());
+        String phone = ApiValidation.optionalOrganizationText(request == null ? null : request.phone(), "Phone", 100);
+        String fax = ApiValidation.optionalOrganizationText(request == null ? null : request.fax(), "Fax", 100);
+        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
+        String website = ApiValidation.optionalOrganizationText(request == null ? null : request.website(), "Website", 500);
+        String address1 = ApiValidation.optionalOrganizationText(request == null ? null : request.address1(), "Address line 1", 500);
+        String address2 = ApiValidation.optionalOrganizationText(request == null ? null : request.address2(), "Address line 2", 500);
+        String city = ApiValidation.optionalOrganizationText(request == null ? null : request.city(), "City", 200);
+        String state = ApiValidation.optionalOrganizationText(request == null ? null : request.state(), "State", 100);
+        String postalCode = ApiValidation.optionalOrganizationText(request == null ? null : request.postalCode(), "Zip", 100);
+        String country = ApiValidation.optionalOrganizationText(request == null ? null : request.country(), "Country", 100);
+        String notes = ApiValidation.optionalOrganizationText(request == null ? null : request.notes(), "Notes", 10000);
+        boolean updated = organizationServicePort.updateOrganization(new UpdateOrganizationCommand(
+                safeOrganizationId, shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes));
+        if (!updated) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found.");
+        }
+        return organizationServicePort.getOrganizationDetail(safeOrganizationId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
+    }
+
 
     @Operation(summary = "List case statuses", description = "Returns read-only case status settings for administrators in the authenticated tenant.")
     @GetMapping("/api/settings/case-statuses")
@@ -251,6 +619,13 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         requireCurrentUserAdmin(shaleClientId);
         return caseServicePort.listTenantCaseStatuses(shaleClientId, true);
+    }
+
+    @Operation(summary = "List practice area lookup values", description = "Returns active practice areas for the authenticated tenant.")
+    @GetMapping("/api/lookups/practice-areas")
+    public List<PracticeAreaDto> listPracticeAreaLookups() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return caseServicePort.listPracticeAreas(shaleClientId, false);
     }
 
     @Operation(summary = "List practice areas", description = "Returns read-only practice area settings for administrators in the authenticated tenant.")
@@ -283,6 +658,31 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         return notificationServicePort.listUnreadNotifications(shaleClientId, userId);
+    }
+
+
+    private static LocalDate parseOptionalIsoDate(String dateText, String fieldName) {
+        String safeDateText = ApiValidation.optionalDateText(dateText, fieldName);
+        if (safeDateText == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(safeDateText);
+        } catch (DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " must be a valid calendar date.");
+        }
+    }
+
+    private static byte[] parseExpectedRowVer(String expectedRowVer) {
+        String safeExpectedRowVer = expectedRowVer == null ? "" : expectedRowVer.trim();
+        if (safeExpectedRowVer.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "expectedRowVer is required.");
+        }
+        try {
+            return Base64.getDecoder().decode(safeExpectedRowVer);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "expectedRowVer must be base64 encoded.");
+        }
     }
 
     private static LocalDateTime parseOptionalDueDate(String dueDate) {

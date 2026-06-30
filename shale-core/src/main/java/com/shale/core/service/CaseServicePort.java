@@ -27,6 +27,8 @@ public interface CaseServicePort {
 
 	List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit);
 
+	CaseDetailDto createCase(CreateCaseCommand command);
+
 	List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
 	List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
@@ -47,6 +49,7 @@ public interface CaseServicePort {
 
 	CaseStatusDto updateCaseStatus(CaseStatusCommand command);
 
+	CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command);
 
 	void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
 
@@ -63,6 +66,8 @@ public interface CaseServicePort {
 	 * contract around CaseDao.updateCaseDetails and its row-version semantics.
 	 */
 	CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command);
+
+	CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command);
 
 	record AddCaseNoteCommand(
 			long caseId,
@@ -91,6 +96,21 @@ public interface CaseServicePort {
 			String systemKey) {
 	}
 
+	record UpdateCaseStatusCommand(
+			long caseId,
+			int shaleClientId,
+			int actorUserId,
+			int statusId) {
+	}
+
+	record UpdateCaseAssignmentCommand(
+			long caseId,
+			int shaleClientId,
+			int actorUserId,
+			int practiceAreaId,
+			int responsibleAttorneyUserId) {
+	}
+
 	record UpdateCaseCoreDetailsCommand(
 			long caseId,
 			int shaleClientId,
@@ -100,6 +120,23 @@ public interface CaseServicePort {
 			String description,
 			LocalDate dateOfInjury,
 			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			String summary,
 			byte[] expectedRowVer) {
+	}
+
+	record CreateCaseCommand(
+			int shaleClientId,
+			int actorUserId,
+			String caseName,
+			String caseNumber,
+			int practiceAreaId,
+			int responsibleAttorneyUserId,
+			LocalDate callerDate,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			String summary,
+			String description) {
 	}
 }

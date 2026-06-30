@@ -102,10 +102,16 @@ public final class ContactDao {
 
     public record CreateContactRequest(
             int shaleClientId,
+            Integer actorUserId,
+            String name,
             String firstName,
             String lastName,
             String email,
             String phone,
+            String addressHome,
+            LocalDate dateOfBirth,
+            String condition,
+            boolean deceased,
             boolean client
     ) {
     }
@@ -623,10 +629,11 @@ public final class ContactDao {
         if (request.shaleClientId() <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
+        String normalizedName = normalizeOptional(request.name());
         String normalizedFirstName = normalizeOptional(request.firstName());
         String normalizedLastName = normalizeOptional(request.lastName());
-        if (normalizedFirstName == null && normalizedLastName == null) {
-            throw new IllegalArgumentException("At least a first or last name is required.");
+        if (normalizedName == null && normalizedFirstName == null && normalizedLastName == null) {
+            throw new IllegalArgumentException("At least a display name, first name, or last name is required.");
         }
 
         try (Connection con = db.requireConnection()) {
@@ -639,7 +646,7 @@ public final class ContactDao {
 
             if (schema.nameColumn() != null) {
                 columns.add(schema.nameColumn());
-                values.add(buildDisplayName(normalizedFirstName, normalizedLastName));
+                values.add(normalizedName == null ? buildDisplayName(normalizedFirstName, normalizedLastName) : normalizedName);
             }
             if (schema.firstNameColumn() != null) {
                 columns.add(schema.firstNameColumn());
@@ -656,6 +663,22 @@ public final class ContactDao {
             if (schema.phoneColumn() != null) {
                 columns.add(schema.phoneColumn());
                 values.add(normalizeOptional(request.phone()));
+            }
+            if (schema.addressHomeColumn() != null) {
+                columns.add(schema.addressHomeColumn());
+                values.add(normalizeOptional(request.addressHome()));
+            }
+            if (schema.dateOfBirthColumn() != null) {
+                columns.add(schema.dateOfBirthColumn());
+                values.add(request.dateOfBirth());
+            }
+            if (schema.conditionColumn() != null) {
+                columns.add(schema.conditionColumn());
+                values.add(normalizeOptional(request.condition()));
+            }
+            if (schema.deceasedColumn() != null) {
+                columns.add(schema.deceasedColumn());
+                values.add(request.deceased());
             }
             if (schema.clientColumn() != null) {
                 columns.add(schema.clientColumn());
@@ -696,7 +719,17 @@ public final class ContactDao {
                     if (!rs.next()) {
                         throw new RuntimeException("Failed to create contact.");
                     }
-                    return rs.getInt(1);
+                    int contactId = rs.getInt(1);
+                    if (normalizeOptional(request.condition()) != null) {
+                        phiAuditService.auditUpdate(
+                                request.actorUserId(),
+                                "Contacts",
+                                "Condition",
+                                (long) contactId,
+                                null,
+                                normalizeOptional(request.condition()));
+                    }
+                    return contactId;
                 }
             }
         } catch (SQLException e) {

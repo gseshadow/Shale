@@ -72,4 +72,59 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 				organization.getNotes(),
 				relatedCases));
 	}
+	@Override
+	public int createOrganization(CreateOrganizationCommand command) {
+		Objects.requireNonNull(command, "command");
+		OrganizationDao.OrganizationTypeRow organizationType = organizationDao.findOrganizationTypes().stream()
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException("No organization types are configured."));
+		return organizationDao.create(new OrganizationDao.OrganizationCreateRequest(
+				command.shaleClientId(),
+				organizationType.organizationTypeId(),
+				command.name(),
+				command.phone(),
+				command.fax(),
+				command.email(),
+				command.website(),
+				command.address1(),
+				command.address2(),
+				command.city(),
+				command.state(),
+				command.postalCode(),
+				command.country(),
+				command.notes()));
+	}
+
+	@Override
+	public boolean updateOrganization(UpdateOrganizationCommand command) {
+		Objects.requireNonNull(command, "command");
+		Organization current = organizationDao.findById(command.organizationId());
+		if (current == null) {
+			return false;
+		}
+		Organization updated = Organization.builder()
+				.id(command.organizationId())
+				.shaleClientId(command.shaleClientId())
+				.organizationTypeId(current.getOrganizationTypeId())
+				.organizationTypeName(current.getOrganizationTypeName())
+				.name(command.name())
+				.phone(command.phone())
+				.fax(command.fax())
+				.email(command.email())
+				.website(command.website())
+				.address1(command.address1())
+				.address2(command.address2())
+				.city(command.city())
+				.state(command.state())
+				.postalCode(command.postalCode())
+				.country(command.country())
+				.notes(command.notes())
+				.deleted(current.isDeleted())
+				.createdAt(current.getCreatedAt())
+				.updatedAt(current.getUpdatedAt())
+				.build();
+		organizationDao.update(updated);
+		return true;
+	}
+
 }

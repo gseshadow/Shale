@@ -70,6 +70,13 @@ export interface CaseTaskListItem {
   assignedUserDisplayName?: string | null;
 }
 
+export interface TaskPriorityOption {
+  id: number;
+  name: string | null;
+  sortOrder: number | null;
+  colorHex: string | null;
+}
+
 export interface TaskDetail {
   id: number;
   shaleClientId: number;
@@ -140,6 +147,36 @@ export interface OrganizationRelatedCase {
   notes: string | null;
 }
 
+export interface CreateOrganizationRequest {
+  name: string;
+  phone?: string | null;
+  fax?: string | null;
+  email?: string | null;
+  website?: string | null;
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  notes?: string | null;
+}
+
+export interface UpdateOrganizationDetailsRequest {
+  name: string;
+  phone?: string | null;
+  fax?: string | null;
+  email?: string | null;
+  website?: string | null;
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  notes?: string | null;
+}
+
 export interface OrganizationDetail {
   id: number;
   shaleClientId: number;
@@ -163,11 +200,41 @@ export interface OrganizationDetail {
 export interface ContactDetail {
   id: number;
   shaleClientId: number;
+  name: string | null;
   firstName: string | null;
   lastName: string | null;
   displayName: string | null;
   email: string | null;
   phone: string | null;
+  addressHome: string | null;
+  dateOfBirth: string | null;
+  condition: string | null;
+  deceased: boolean;
+  client: boolean;
+}
+
+export interface CreateContactRequest {
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  addressHome: string | null;
+  dateOfBirth: string | null;
+  condition: string | null;
+  deceased: boolean;
+}
+
+export interface UpdateContactDetailsRequest {
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  addressHome: string | null;
+  dateOfBirth: string | null;
+  condition: string | null;
+  deceased: boolean;
 }
 
 export interface CaseUpdate {
@@ -215,14 +282,29 @@ export interface CaseDetail {
   description: string;
   caseStatus: string;
   responsibleAttorney: string | null;
+  responsibleAttorneyId: number | null;
   practiceAreaId: number | null;
   callerDate: string | null;
   dateOfInjury: string | null;
   statuteOfLimitations: string | null;
   tortNoticeDeadline: string | null;
   summary: string;
+  rowVer: string;
   relatedContacts: CaseRelatedContact[];
   statusHistory: CaseStatusHistoryItem[];
+}
+
+export interface CreateCasePayload {
+  caseName: string;
+  caseNumber?: string | null;
+  practiceAreaId: number;
+  responsibleAttorneyUserId: number;
+  callerDate?: string | null;
+  dateOfInjury?: string | null;
+  statuteOfLimitations?: string | null;
+  tortNoticeDeadline?: string | null;
+  summary?: string | null;
+  description?: string | null;
 }
 
 export class ApiError extends Error {
@@ -305,6 +387,88 @@ export async function searchCases(accessToken: string, query: string): Promise<C
   }
 
   return response.json() as Promise<CaseSearchResult[]>;
+}
+
+export async function createCase(accessToken: string, payload: CreateCasePayload): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not create the case.', response.status);
+  }
+
+  return response.json() as Promise<CaseDetail>;
+}
+
+
+export interface UpdateCaseAssignmentPayload {
+  practiceAreaId: number;
+  responsibleAttorneyUserId: number;
+}
+
+export async function updateCaseAssignment(accessToken: string, caseId: number, payload: UpdateCaseAssignmentPayload): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/assignment`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that case.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the case assignment.', response.status);
+  }
+
+  return response.json() as Promise<CaseDetail>;
+}
+
+export interface UpdateCaseCoreDetailsPayload {
+  caseName: string;
+  description: string;
+  dateOfInjury?: string | null;
+  statuteOfLimitations?: string | null;
+  tortNoticeDeadline?: string | null;
+  summary: string;
+  expectedRowVer: string;
+}
+
+export async function updateCaseCoreDetails(accessToken: string, caseId: number, payload: UpdateCaseCoreDetailsPayload): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/core-details`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that case.', response.status);
+  }
+
+  if (response.status === 409) {
+    throw new ApiError('This case was changed by someone else. Refresh and try again.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the case details.', response.status);
+  }
+
+  return response.json() as Promise<CaseDetail>;
 }
 
 
@@ -435,6 +599,73 @@ export async function listCaseUpdates(accessToken: string, caseId: number): Prom
   return response.json() as Promise<CaseUpdate[]>;
 }
 
+export interface UpdateTaskPayload {
+  title: string;
+  description?: string;
+  dueDate?: string;
+  priorityId?: number | null;
+  assignedUserId?: number | null;
+}
+
+
+export async function listTaskPriorityLookups(accessToken: string): Promise<TaskPriorityOption[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/lookups/task-priorities`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load task priorities.', response.status);
+  }
+
+  return response.json() as Promise<TaskPriorityOption[]>;
+}
+
+export async function updateTaskDetail(accessToken: string, taskId: number, payload: UpdateTaskPayload): Promise<TaskDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that task.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not update the task.', response.status);
+  }
+
+  return response.json() as Promise<TaskDetail>;
+}
+
+export async function completeTask(accessToken: string, taskId: number): Promise<TaskDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}/complete`, {
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that task.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not complete the task.', response.status);
+  }
+
+  return response.json() as Promise<TaskDetail>;
+}
+
 export async function getTaskDetail(accessToken: string, taskId: number): Promise<TaskDetail> {
   const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}`, {
     method: 'GET',
@@ -472,6 +703,55 @@ export async function searchContacts(accessToken: string, query: string): Promis
   return response.json() as Promise<ContactSearchResult[]>;
 }
 
+
+export async function createContact(accessToken: string, request: CreateContactRequest): Promise<ContactDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/contacts`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Check the contact details and try again.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not create the contact.', response.status);
+  }
+
+  return response.json() as Promise<ContactDetail>;
+}
+
+export async function updateContactDetails(accessToken: string, contactId: number, request: UpdateContactDetailsRequest): Promise<ContactDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/contacts/${contactId}`, {
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Check the contact details and try again.', response.status);
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that contact.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the contact detail.', response.status);
+  }
+
+  return response.json() as Promise<ContactDetail>;
+}
+
 export async function getContactDetail(accessToken: string, contactId: number): Promise<ContactDetail> {
   const response = await fetch(`${apiBaseUrl()}/api/contacts/${contactId}`, {
     method: 'GET',
@@ -492,6 +772,29 @@ export async function getContactDetail(accessToken: string, contactId: number): 
   return response.json() as Promise<ContactDetail>;
 }
 
+
+export async function createOrganization(accessToken: string, request: CreateOrganizationRequest): Promise<OrganizationDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/organizations`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Check the organization details and try again.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not create the organization.', response.status);
+  }
+
+  return response.json() as Promise<OrganizationDetail>;
+}
+
 export async function searchOrganizations(accessToken: string, query: string): Promise<OrganizationSearchResult[]> {
   const response = await fetch(`${apiBaseUrl()}/api/organizations/search?query=${encodeURIComponent(query)}`, {
     method: 'GET',
@@ -506,6 +809,32 @@ export async function searchOrganizations(accessToken: string, query: string): P
   }
 
   return response.json() as Promise<OrganizationSearchResult[]>;
+}
+
+export async function updateOrganizationDetails(accessToken: string, organizationId: number, request: UpdateOrganizationDetailsRequest): Promise<OrganizationDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/organizations/${organizationId}`, {
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Check the organization details and try again.', response.status);
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that organization.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the organization detail.', response.status);
+  }
+
+  return response.json() as Promise<OrganizationDetail>;
 }
 
 export async function getOrganizationDetail(accessToken: string, organizationId: number): Promise<OrganizationDetail> {
@@ -528,6 +857,48 @@ export async function getOrganizationDetail(accessToken: string, organizationId:
   return response.json() as Promise<OrganizationDetail>;
 }
 
+
+export async function listCaseStatusLookup(accessToken: string): Promise<CaseStatusSetting[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/lookups/case-statuses`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load case status options.', response.status);
+  }
+
+  return response.json() as Promise<CaseStatusSetting[]>;
+}
+
+export async function updateCaseStatus(accessToken: string, caseId: number, statusId: number): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ statusId }),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Choose a valid case status before saving.', response.status);
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that case.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the case status.', response.status);
+  }
+
+  return response.json() as Promise<CaseDetail>;
+}
 
 export async function listTeamMembers(accessToken: string): Promise<TeamMemberSummary[]> {
   const response = await fetch(`${apiBaseUrl()}/api/users`, {
@@ -565,6 +936,22 @@ export async function getTeamMemberDetail(accessToken: string, userId: number): 
   return response.json() as Promise<TeamMemberDetail>;
 }
 
+
+export async function listPracticeAreaLookups(accessToken: string): Promise<PracticeAreaSetting[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/lookups/practice-areas`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load practice areas.', response.status);
+  }
+
+  return response.json() as Promise<PracticeAreaSetting[]>;
+}
 
 export async function listCaseStatusSettings(accessToken: string): Promise<CaseStatusSetting[]> {
   const response = await fetch(`${apiBaseUrl()}/api/settings/case-statuses`, {

@@ -14,6 +14,11 @@ final class ApiValidation {
     private static final int MAX_NOTE_TEXT_LENGTH = 10_000;
     private static final int MAX_TASK_TITLE_LENGTH = 255;
     private static final int MAX_TASK_DESCRIPTION_LENGTH = 10_000;
+    private static final int MAX_CASE_NAME_LENGTH = 255;
+    private static final int MAX_CASE_DESCRIPTION_LENGTH = 10_000;
+    private static final int MAX_CASE_SUMMARY_LENGTH = 10_000;
+    private static final int MAX_CONTACT_NAME_LENGTH = 255;
+    private static final int MAX_ORGANIZATION_NAME_LENGTH = 255;
 
     private ApiValidation() {
     }
@@ -51,6 +56,33 @@ final class ApiValidation {
         return safeNoteText;
     }
 
+    static String caseName(String caseName) {
+        String safeCaseName = caseName == null ? "" : caseName.trim();
+        if (safeCaseName.isEmpty()) {
+            throw badRequest("Case name is required.");
+        }
+        if (safeCaseName.length() > MAX_CASE_NAME_LENGTH) {
+            throw badRequest("Case name must be 255 characters or fewer.");
+        }
+        return safeCaseName;
+    }
+
+    static String optionalCaseDescription(String description) {
+        String safeDescription = description == null ? "" : description.trim();
+        if (safeDescription.length() > MAX_CASE_DESCRIPTION_LENGTH) {
+            throw badRequest("Case description must be 10000 characters or fewer.");
+        }
+        return safeDescription;
+    }
+
+    static String optionalCaseSummary(String summary) {
+        String safeSummary = summary == null ? "" : summary.trim();
+        if (safeSummary.length() > MAX_CASE_SUMMARY_LENGTH) {
+            throw badRequest("Case summary must be 10000 characters or fewer.");
+        }
+        return safeSummary;
+    }
+
     static String taskTitle(String title) {
         String safeTitle = title == null ? "" : title.trim();
         if (safeTitle.isEmpty()) {
@@ -60,6 +92,48 @@ final class ApiValidation {
             throw badRequest("Task title must be 255 characters or fewer.");
         }
         return safeTitle;
+    }
+
+    static String organizationName(String value) {
+        String safeValue = value == null ? "" : value.trim();
+        if (safeValue.isEmpty()) {
+            throw badRequest("Organization name is required.");
+        }
+        if (safeValue.length() > MAX_ORGANIZATION_NAME_LENGTH) {
+            throw badRequest("Organization name must be 255 characters or fewer.");
+        }
+        return safeValue;
+    }
+
+    static String optionalOrganizationText(String value, String fieldName, int maxLength) {
+        return optionalContactText(value, fieldName, maxLength);
+    }
+
+    static String optionalContactNamePart(String value, String fieldName) {
+        return optionalContactText(value, fieldName, MAX_CONTACT_NAME_LENGTH);
+    }
+
+    static String optionalContactDisplayName(String value) {
+        return optionalContactText(value, "Display name", MAX_CONTACT_NAME_LENGTH);
+    }
+
+    static String optionalEmail(String value, String fieldName) {
+        String safeValue = optionalContactText(value, fieldName, MAX_EMAIL_LENGTH);
+        if (safeValue != null && !safeValue.contains("@")) {
+            throw badRequest(fieldName + " must be a valid email address.");
+        }
+        return safeValue;
+    }
+
+    static String optionalContactText(String value, String fieldName, int maxLength) {
+        String safeValue = value == null ? "" : value.trim();
+        if (safeValue.isEmpty()) {
+            return null;
+        }
+        if (safeValue.length() > maxLength) {
+            throw badRequest(fieldName + " must be " + maxLength + " characters or fewer.");
+        }
+        return safeValue;
     }
 
     static String optionalTaskDescription(String description) {
