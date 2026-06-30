@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseCoreDetails, updateContactDetails, updateOrganizationDetails } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaLookups, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateContactDetails, updateOrganizationDetails } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1490,6 +1490,7 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
 
 function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, updatesError, onTasksChanged, onTasksError, onUpdatesChanged, onUpdatesError, onDetailChanged }: { accessToken: string | null; detail: CaseDetail; tasks: CaseTaskListItem[]; tasksError: string | null; updates: CaseUpdate[]; updatesError: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void; onDetailChanged: (detail: CaseDetail) => void }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
   return (
     <div className="detail-sections">
       <section aria-labelledby="case-info-title">
@@ -1502,7 +1503,6 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
           <DetailItem label="Case Name" value={detail.caseName} />
           <DetailItem label="Case Number" value={detail.caseNumber} />
           <DetailItem label="Status" value={detail.caseStatus} />
-          <DetailItem label="Practice Area" value={detail.practiceAreaId ? `Practice Area ID ${detail.practiceAreaId}` : null} />
           <DetailItem label="Description" value={detail.description} preserveWhitespace />
           <DetailItem label="Summary" value={detail.summary} preserveWhitespace />
         </dl>
@@ -1519,8 +1519,13 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
       </section>
 
       <section aria-labelledby="assignments-title">
-        <h2 id="assignments-title">Assignments</h2>
+        <div className="section-heading-row">
+          <h2 id="assignments-title">Practice & Team</h2>
+          {!isEditingAssignment && <ActionButton onClick={() => setIsEditingAssignment(true)}>Edit assignment</ActionButton>}
+        </div>
+        {isEditingAssignment && <CaseAssignmentForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingAssignment(false); }} onCancel={() => setIsEditingAssignment(false)} />}
         <dl className="detail-list compact">
+          <DetailItem label="Practice Area" value={detail.practiceAreaId ? `Practice Area ID ${detail.practiceAreaId}` : null} />
           <DetailItem label="Responsible Attorney" value={detail.responsibleAttorney} />
         </dl>
       </section>
@@ -1533,6 +1538,96 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
 
       <CaseUpdatesSection accessToken={accessToken} caseId={detail.caseId} updates={updates} error={updatesError} onUpdatesChanged={onUpdatesChanged} onUpdatesError={onUpdatesError} />
     </div>
+  );
+}
+
+
+function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
+  const [practiceAreaId, setPracticeAreaId] = useState(detail.practiceAreaId ? String(detail.practiceAreaId) : '');
+  const [responsibleAttorneyUserId, setResponsibleAttorneyUserId] = useState(detail.responsibleAttorneyId ? String(detail.responsibleAttorneyId) : '');
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isLoadingLookups, setIsLoadingLookups] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setLookupError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    let isCurrent = true;
+    setIsLoadingLookups(true);
+    setLookupError(null);
+    Promise.all([listPracticeAreaLookups(accessToken), listTeamMembers(accessToken)])
+      .then(([areas, users]) => {
+        if (!isCurrent) return;
+        setPracticeAreas(areas.filter((area) => area.active && !area.deleted));
+        setTeamMembers(users.filter((user) => user.attorney));
+      })
+      .catch((caught) => {
+        if (!isCurrent) return;
+        setLookupError(caught instanceof Error ? caught.message : 'Assignment lookup data could not be loaded.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingLookups(false);
+      });
+    return () => { isCurrent = false; };
+  }, [accessToken]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    const selectedPracticeAreaId = Number(practiceAreaId);
+    const selectedAttorneyId = Number(responsibleAttorneyUserId);
+    if (!Number.isInteger(selectedPracticeAreaId) || selectedPracticeAreaId <= 0) {
+      setSubmitError('Choose a practice area before saving.');
+      return;
+    }
+    if (!Number.isInteger(selectedAttorneyId) || selectedAttorneyId <= 0) {
+      setSubmitError('Choose a responsible attorney before saving.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await updateCaseAssignment(accessToken, detail.caseId, {
+        practiceAreaId: selectedPracticeAreaId,
+        responsibleAttorneyUserId: selectedAttorneyId,
+      });
+      onSaved(updated);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case assignment could not be saved.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit}>
+      {isLoadingLookups && <p className="status muted">Loading assignment options…</p>}
+      {lookupError && <p className="status error" role="alert">{lookupError}</p>}
+      <label htmlFor="case-assignment-practice-area">Practice area</label>
+      <select id="case-assignment-practice-area" value={practiceAreaId} onChange={(event) => setPracticeAreaId(event.target.value)} disabled={isSubmitting || isLoadingLookups} required>
+        <option value="">Choose a practice area</option>
+        {practiceAreas.map((area) => <option key={area.id} value={area.id}>{area.name || `Practice Area ${area.id}`}</option>)}
+      </select>
+      <label htmlFor="case-assignment-attorney">Responsible attorney</label>
+      <select id="case-assignment-attorney" value={responsibleAttorneyUserId} onChange={(event) => setResponsibleAttorneyUserId(event.target.value)} disabled={isSubmitting || isLoadingLookups} required>
+        <option value="">Choose a responsible attorney</option>
+        {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.displayName || [member.firstName, member.lastName].filter(Boolean).join(' ') || `User ${member.id}`}</option>)}
+      </select>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || isLoadingLookups || !practiceAreaId || !responsibleAttorneyUserId}>{isSubmitting ? 'Saving…' : 'Save assignment'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
   );
 }
 
@@ -1963,6 +2058,7 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
 
 function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { accessToken: string | null; detail: ContactDetail; onDetailChanged: (detail: ContactDetail) => void }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
   return (
     <div className="detail-sections">
       <section aria-labelledby="contact-info-title">
@@ -2121,6 +2217,7 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
 
 function OrganizationDetailReadOnly({ accessToken, detail, onDetailChanged }: { accessToken: string | null; detail: OrganizationDetail; onDetailChanged: (detail: OrganizationDetail) => void }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
   return (
     <div className="detail-sections">
       <section aria-labelledby="organization-info-title">

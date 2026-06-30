@@ -16,6 +16,7 @@ public final class CaseDetailDto {
 	private final String description;
 	private final String caseStatus;
 	private final String responsibleAttorney;
+	private final Integer responsibleAttorneyId;
 
 	private final Integer practiceAreaId;
 
@@ -92,7 +93,7 @@ public final class CaseDetailDto {
 			String receivedUpdates,
 			LocalDateTime updatedAt,
 			byte[] rowVer) {
-		this(caseId, caseNumber, caseName, description, caseStatus, null, practiceAreaId,
+		this(caseId, caseNumber, caseName, description, caseStatus, null, null, practiceAreaId,
 				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
 				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
 				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
@@ -139,7 +140,55 @@ public final class CaseDetailDto {
 			String receivedUpdates,
 			LocalDateTime updatedAt,
 			byte[] rowVer) {
-		this(caseId, caseNumber, caseName, description, caseStatus, responsibleAttorney, practiceAreaId,
+		this(caseId, caseNumber, caseName, description, caseStatus, responsibleAttorney, null, practiceAreaId,
+				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
+				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
+				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
+				officePrinterCode, medicalRecordsReceived, feeAgreementSigned, dateFeeAgreementSigned,
+				nonEngagementLetterSent, dateNonEngagementLetterSent, acceptedChronology,
+				acceptedConsultantExpertSearch, acceptedTestifyingExpertSearch,
+				acceptedMedicalLiterature, acceptedDetail, deniedChronology, deniedDetail,
+				summary, receivedUpdates, updatedAt, rowVer);
+	}
+
+	public CaseDetailDto(long caseId,
+			String caseNumber,
+			String caseName,
+			String description,
+			String caseStatus,
+			String responsibleAttorney,
+			Integer responsibleAttorneyId,
+			Integer practiceAreaId,
+			LocalDate callerDate,
+			String callerTime,
+			LocalDate acceptedDate,
+			LocalDate closedDate,
+			LocalDate deniedDate,
+			LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			LocalDate discoveryDeadline,
+			String clientEstate,
+			String officePrinterCode,
+			Boolean medicalRecordsReceived,
+			Boolean feeAgreementSigned,
+			LocalDate dateFeeAgreementSigned,
+			Boolean nonEngagementLetterSent,
+			LocalDate dateNonEngagementLetterSent,
+			Boolean acceptedChronology,
+			Boolean acceptedConsultantExpertSearch,
+			Boolean acceptedTestifyingExpertSearch,
+			Boolean acceptedMedicalLiterature,
+			String acceptedDetail,
+			Boolean deniedChronology,
+			String deniedDetail,
+			String summary,
+			String receivedUpdates,
+			LocalDateTime updatedAt,
+			byte[] rowVer) {
+		this(caseId, caseNumber, caseName, description, caseStatus, responsibleAttorney, responsibleAttorneyId, practiceAreaId,
 				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
 				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
 				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
@@ -150,12 +199,14 @@ public final class CaseDetailDto {
 				summary, receivedUpdates, updatedAt, rowVer, List.of(), List.of());
 	}
 
+
 	public CaseDetailDto(long caseId,
 			String caseNumber,
 			String caseName,
 			String description,
 			String caseStatus,
 			String responsibleAttorney,
+			Integer responsibleAttorneyId,
 			Integer practiceAreaId,
 			LocalDate callerDate,
 			String callerTime,
@@ -187,7 +238,7 @@ public final class CaseDetailDto {
 			LocalDateTime updatedAt,
 			byte[] rowVer,
 			List<RelatedContactDto> relatedContacts) {
-		this(caseId, caseNumber, caseName, description, caseStatus, responsibleAttorney, practiceAreaId,
+		this(caseId, caseNumber, caseName, description, caseStatus, responsibleAttorney, responsibleAttorneyId, practiceAreaId,
 				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
 				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
 				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
@@ -198,12 +249,14 @@ public final class CaseDetailDto {
 				summary, receivedUpdates, updatedAt, rowVer, relatedContacts, List.of());
 	}
 
+
 	public CaseDetailDto(long caseId,
 			String caseNumber,
 			String caseName,
 			String description,
 			String caseStatus,
 			String responsibleAttorney,
+			Integer responsibleAttorneyId,
 			Integer practiceAreaId,
 			LocalDate callerDate,
 			String callerTime,
@@ -242,6 +295,7 @@ public final class CaseDetailDto {
 		this.description = description == null ? "" : description;
 		this.caseStatus = caseStatus == null ? "" : caseStatus;
 		this.responsibleAttorney = responsibleAttorney == null ? "" : responsibleAttorney;
+		this.responsibleAttorneyId = responsibleAttorneyId;
 		this.practiceAreaId = practiceAreaId;
 		this.callerDate = callerDate;
 		this.callerTime = callerTime == null ? "" : callerTime;
@@ -282,6 +336,7 @@ public final class CaseDetailDto {
 	public String getDescription() { return description; }
 	public String getCaseStatus() { return caseStatus; }
 	public String getResponsibleAttorney() { return responsibleAttorney; }
+	public Integer getResponsibleAttorneyId() { return responsibleAttorneyId; }
 	public Integer getPracticeAreaId() { return practiceAreaId; }
 	public LocalDate getCallerDate() { return callerDate; }
 	public String getCallerTime() { return callerTime; }
