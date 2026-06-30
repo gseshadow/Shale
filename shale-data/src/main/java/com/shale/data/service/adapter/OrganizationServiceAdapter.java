@@ -73,6 +73,29 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 				relatedCases));
 	}
 	@Override
+	public int createOrganization(CreateOrganizationCommand command) {
+		Objects.requireNonNull(command, "command");
+		OrganizationDao.OrganizationTypeRow organizationType = organizationDao.findOrganizationTypes().stream()
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException("No organization types are configured."));
+		return organizationDao.create(new OrganizationDao.OrganizationCreateRequest(
+				command.shaleClientId(),
+				organizationType.organizationTypeId(),
+				command.name(),
+				command.phone(),
+				command.fax(),
+				command.email(),
+				command.website(),
+				command.address1(),
+				command.address2(),
+				command.city(),
+				command.state(),
+				command.postalCode(),
+				command.country(),
+				command.notes()));
+	}
+
+	@Override
 	public boolean updateOrganization(UpdateOrganizationCommand command) {
 		Objects.requireNonNull(command, "command");
 		Organization current = organizationDao.findById(command.organizationId());

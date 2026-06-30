@@ -37,6 +37,7 @@ import com.shale.core.service.NotificationServicePort.NotificationSummary;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.OrganizationServicePort.OrganizationDetail;
 import com.shale.core.service.OrganizationServicePort.OrganizationSummary;
+import com.shale.core.service.OrganizationServicePort.CreateOrganizationCommand;
 import com.shale.core.service.OrganizationServicePort.UpdateOrganizationCommand;
 import com.shale.core.service.TaskServicePort;
 import com.shale.core.service.TaskServicePort.CreateTaskCommand;
@@ -102,6 +103,21 @@ public final class ApiReadController {
             String dateOfBirth,
             String condition,
             Boolean deceased) {
+    }
+
+    public record CreateOrganizationRequest(
+            String name,
+            String phone,
+            String fax,
+            String email,
+            String website,
+            String address1,
+            String address2,
+            String city,
+            String state,
+            String postalCode,
+            String country,
+            String notes) {
     }
 
     public record UpdateOrganizationRequest(
@@ -487,6 +503,30 @@ public final class ApiReadController {
         return new PagedResponse<>(slice(fetched, safePage, safeSize), safePage, safeSize, null);
     }
 
+
+
+    @Operation(summary = "Create organization", description = "Creates a tenant-scoped organization for the authenticated user and returns the refreshed organization detail.")
+    @PostMapping("/api/organizations")
+    public OrganizationDetail createOrganization(@RequestBody CreateOrganizationRequest request) {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        String name = ApiValidation.organizationName(request == null ? null : request.name());
+        String phone = ApiValidation.optionalOrganizationText(request == null ? null : request.phone(), "Phone", 100);
+        String fax = ApiValidation.optionalOrganizationText(request == null ? null : request.fax(), "Fax", 100);
+        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
+        String website = ApiValidation.optionalOrganizationText(request == null ? null : request.website(), "Website", 500);
+        String address1 = ApiValidation.optionalOrganizationText(request == null ? null : request.address1(), "Address line 1", 500);
+        String address2 = ApiValidation.optionalOrganizationText(request == null ? null : request.address2(), "Address line 2", 500);
+        String city = ApiValidation.optionalOrganizationText(request == null ? null : request.city(), "City", 200);
+        String state = ApiValidation.optionalOrganizationText(request == null ? null : request.state(), "State", 100);
+        String postalCode = ApiValidation.optionalOrganizationText(request == null ? null : request.postalCode(), "Zip", 100);
+        String country = ApiValidation.optionalOrganizationText(request == null ? null : request.country(), "Country", 100);
+        String notes = ApiValidation.optionalOrganizationText(request == null ? null : request.notes(), "Notes", 10000);
+        int organizationId = organizationServicePort.createOrganization(new CreateOrganizationCommand(
+                shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes));
+        return organizationServicePort.getOrganizationDetail(organizationId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
+    }
 
     @Operation(summary = "Search organizations", description = "Returns the first matching organizations for the authenticated tenant.")
     @GetMapping("/api/organizations/search")

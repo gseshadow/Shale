@@ -147,6 +147,21 @@ export interface OrganizationRelatedCase {
   notes: string | null;
 }
 
+export interface CreateOrganizationRequest {
+  name: string;
+  phone?: string | null;
+  fax?: string | null;
+  email?: string | null;
+  website?: string | null;
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  notes?: string | null;
+}
+
 export interface UpdateOrganizationDetailsRequest {
   name: string;
   phone?: string | null;
@@ -724,6 +739,29 @@ export async function getContactDetail(accessToken: string, contactId: number): 
   }
 
   return response.json() as Promise<ContactDetail>;
+}
+
+
+export async function createOrganization(accessToken: string, request: CreateOrganizationRequest): Promise<OrganizationDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/organizations`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Check the organization details and try again.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not create the organization.', response.status);
+  }
+
+  return response.json() as Promise<OrganizationDetail>;
 }
 
 export async function searchOrganizations(accessToken: string, query: string): Promise<OrganizationSearchResult[]> {
