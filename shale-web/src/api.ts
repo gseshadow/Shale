@@ -294,6 +294,19 @@ export interface CaseDetail {
   statusHistory: CaseStatusHistoryItem[];
 }
 
+export interface CreateCasePayload {
+  caseName: string;
+  caseNumber?: string | null;
+  practiceAreaId: number;
+  responsibleAttorneyUserId: number;
+  callerDate?: string | null;
+  dateOfInjury?: string | null;
+  statuteOfLimitations?: string | null;
+  tortNoticeDeadline?: string | null;
+  summary?: string | null;
+  description?: string | null;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);
@@ -374,6 +387,24 @@ export async function searchCases(accessToken: string, query: string): Promise<C
   }
 
   return response.json() as Promise<CaseSearchResult[]>;
+}
+
+export async function createCase(accessToken: string, payload: CreateCasePayload): Promise<CaseDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/cases`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not create the case.', response.status);
+  }
+
+  return response.json() as Promise<CaseDetail>;
 }
 
 

@@ -27,6 +27,8 @@ public interface CaseServicePort {
 
 	List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit);
 
+	CaseDetailDto createCase(CreateCaseCommand command);
+
 	List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
 	List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
@@ -121,5 +123,20 @@ public interface CaseServicePort {
 			LocalDate tortNoticeDeadline,
 			String summary,
 			byte[] expectedRowVer) {
+	}
+
+	record CreateCaseCommand(
+			int shaleClientId,
+			int actorUserId,
+			String caseName,
+			String caseNumber,
+			int practiceAreaId,
+			int responsibleAttorneyUserId,
+			LocalDate callerDate,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortNoticeDeadline,
+			String summary,
+			String description) {
 	}
 }

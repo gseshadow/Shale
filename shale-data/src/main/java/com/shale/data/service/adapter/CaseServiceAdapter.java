@@ -71,6 +71,19 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public CaseDetailDto createCase(CreateCaseCommand command) {
+		Objects.requireNonNull(command, "command");
+		List<CaseStatusDto> statuses = listCaseStatuses(command.shaleClientId(), false);
+		CaseStatusDto initialStatus = statuses.stream()
+				.filter(Objects::nonNull)
+				.filter(status -> !status.closed())
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException("No active non-closed case status is available for this tenant."));
+		long caseId = caseGateway.createBasicCase(command, initialStatus.id());
+		return caseGateway.getDetail(caseId);
+	}
+
+	@Override
 	public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
 		return caseGateway.listCaseStatuses(shaleClientId, includeInactive);
 	}
@@ -263,6 +276,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
 				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
 				byte[] expectedRowVer, Integer actorUserId);
+
+		long createBasicCase(CreateCaseCommand command, int statusId);
 	}
 
 	private record DaoCaseGateway(CaseDao caseDao) implements CaseGateway {
@@ -376,6 +391,14 @@ public final class CaseServiceAdapter implements CaseServicePort {
 				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
 				byte[] expectedRowVer, Integer actorUserId) {
 			return caseDao.updateCase(caseId, name, caseNumber, description, incidentDate, solDate, tortNoticeDeadline, summary, expectedRowVer, actorUserId);
+		}
+
+		@Override
+		public long createBasicCase(CreateCaseCommand command, int statusId) {
+			return caseDao.createBasicCase(command.shaleClientId(), command.caseName(), command.caseNumber(),
+					command.callerDate(), command.practiceAreaId(), command.responsibleAttorneyUserId(),
+					statusId, command.description(), command.summary(), command.dateOfInjury(),
+					command.statuteOfLimitations(), command.tortNoticeDeadline(), command.actorUserId());
 		}
 	}
 }
