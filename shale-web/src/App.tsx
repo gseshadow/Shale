@@ -581,38 +581,34 @@ function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout
 
   return (
     <div className="app-layout">
-      <aside className="sidebar" aria-label="Primary navigation">
-        <div className="brand">
+      <header className="topbar">
+        <div className="brand" aria-label="Shale">
           <span className="brand-mark" aria-hidden="true">S</span>
           <span>Shale</span>
         </div>
         <span className="beta-badge">Read-only beta</span>
-        <PrimaryNavigation locationPathname={location.pathname} />
-      </aside>
+        <div className="user-summary">
+          <p className="eyebrow">Signed in</p>
+          <p className="user-name">{displayNameFor(user)}</p>
+          <p className="user-meta">{displayValue(user.email, 'Email not provided')}</p>
+        </div>
+        <button type="button" onClick={onLogout}>Logout</button>
+      </header>
 
-      <div className="content-column">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Signed in</p>
-            <p className="user-name">{displayNameFor(user)}</p>
-            <p className="user-meta">{displayValue(user.email, 'Email not provided')}</p>
-          </div>
-          <button type="button" onClick={onLogout}>Logout</button>
-        </header>
-        <main className="page-content">
-          <div className="content-container">
-            <Outlet />
-          </div>
-        </main>
-        <PrimaryNavigation locationPathname={location.pathname} variant="mobile" />
-      </div>
+      <main className="page-content">
+        <div className="content-container">
+          <Outlet />
+        </div>
+      </main>
+
+      <PrimaryNavigation locationPathname={location.pathname} />
     </div>
   );
 }
 
-function PrimaryNavigation({ locationPathname, variant = 'sidebar' }: { locationPathname: string; variant?: 'sidebar' | 'mobile' }) {
+function PrimaryNavigation({ locationPathname }: { locationPathname: string }) {
   return (
-    <nav className={variant === 'mobile' ? 'mobile-nav-list' : 'nav-list'} aria-label={variant === 'mobile' ? 'Primary mobile navigation' : undefined}>
+    <nav className="bottom-nav-list" aria-label="Primary navigation">
       {navigationItems.map((item) => {
         const isActive = item.activePrefixes.some((prefix) => locationPathname === prefix || locationPathname.startsWith(`${prefix}/`));
         return (
