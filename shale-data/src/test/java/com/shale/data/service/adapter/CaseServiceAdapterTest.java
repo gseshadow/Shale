@@ -15,6 +15,7 @@ import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
 import com.shale.core.service.CaseServicePort.CaseStatusCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
@@ -149,7 +150,7 @@ class CaseServiceAdapterTest {
 
 		@Override
 		public CaseDetailDto getDetail(long caseId) {
-			return null;
+			return detail(caseId, "Created case");
 		}
 
 		@Override
@@ -261,6 +262,11 @@ class CaseServiceAdapterTest {
 			lastUpdateRowVer = expectedRowVer;
 			lastUpdateActorUserId = actorUserId;
 			return updatedCase;
+		}
+
+		@Override
+		public long createBasicCase(CaseServicePort.CreateCaseCommand command, int statusId) {
+			return 42L;
 		}
 	}
 }

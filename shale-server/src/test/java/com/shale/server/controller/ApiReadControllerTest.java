@@ -781,6 +781,11 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public CaseDetailDto createCase(CaseServicePort.CreateCaseCommand command) {
+            return getCaseDetail(777L, command.shaleClientId()).orElseThrow();
+        }
+
+        @Override
         public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
             this.updatesCaseId = caseId;
             this.updatesShaleClientId = shaleClientId;

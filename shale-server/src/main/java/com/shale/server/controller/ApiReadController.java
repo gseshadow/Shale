@@ -26,6 +26,7 @@ import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
+import com.shale.core.service.CaseServicePort.CreateCaseCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseStatusCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseAssignmentCommand;
@@ -60,6 +61,19 @@ public final class ApiReadController {
     }
 
     public record CreateCaseTaskRequest(String title, String description, String dueDate) {
+    }
+
+    public record CreateCaseRequest(
+            String caseName,
+            String caseNumber,
+            Integer practiceAreaId,
+            Integer responsibleAttorneyUserId,
+            String callerDate,
+            String dateOfInjury,
+            String statuteOfLimitations,
+            String tortNoticeDeadline,
+            String summary,
+            String description) {
     }
 
     public record UpdateCaseAssignmentRequest(Integer practiceAreaId, Integer responsibleAttorneyUserId) {
@@ -193,6 +207,32 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         return caseServicePort.listAssignedCases(userId, shaleClientId, DEFAULT_SEARCH_LIMIT);
+    }
+
+    @Operation(summary = "Create case", description = "Creates a basic tenant-scoped case and returns the refreshed case detail.")
+    @PostMapping("/api/cases")
+    public CaseDetailDto createCase(@RequestBody CreateCaseRequest request) {
+        String caseName = ApiValidation.caseName(request == null ? null : request.caseName());
+        String caseNumber = ApiValidation.optionalContactText(request == null ? null : request.caseNumber(), "caseNumber", 200);
+        if (request == null || request.practiceAreaId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "practiceAreaId is required.");
+        }
+        if (request.responsibleAttorneyUserId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "responsibleAttorneyUserId is required.");
+        }
+        int practiceAreaId = Math.toIntExact(ApiValidation.positiveId(request.practiceAreaId(), "practiceAreaId"));
+        int responsibleAttorneyUserId = Math.toIntExact(ApiValidation.positiveId(request.responsibleAttorneyUserId(), "responsibleAttorneyUserId"));
+        LocalDate callerDate = parseOptionalIsoDate(request.callerDate(), "callerDate");
+        LocalDate dateOfInjury = parseOptionalIsoDate(request.dateOfInjury(), "dateOfInjury");
+        LocalDate statuteOfLimitations = parseOptionalIsoDate(request.statuteOfLimitations(), "statuteOfLimitations");
+        LocalDate tortNoticeDeadline = parseOptionalIsoDate(request.tortNoticeDeadline(), "tortNoticeDeadline");
+        String summary = ApiValidation.optionalCaseSummary(request.summary());
+        String description = ApiValidation.optionalCaseDescription(request.description());
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        return caseServicePort.createCase(new CreateCaseCommand(shaleClientId, userId, caseName, caseNumber,
+                practiceAreaId, responsibleAttorneyUserId, callerDate, dateOfInjury, statuteOfLimitations,
+                tortNoticeDeadline, summary, description));
     }
 
     @Operation(summary = "List my tasks", description = "Returns active tasks assigned to the current authenticated user.")

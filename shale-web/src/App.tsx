@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -841,6 +841,8 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const navigate = useNavigate();
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -877,7 +879,9 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="cases-page" aria-labelledby="cases-title">
-      <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search and open read-only case records." />
+      <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search, open, and create case records."
+        action={<button type="button" onClick={() => setIsCreating((value) => !value)}>{isCreating ? 'Cancel new case' : 'New case'}</button>} />
+      {isCreating && <NewCaseForm accessToken={accessToken} onCancel={() => setIsCreating(false)} onCreated={(created) => navigate(`/cases/${created.caseId}`)} />}
       <SearchBar
         id="case-search"
         label="Search cases"
@@ -894,6 +898,103 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
         {!isLoading && !error && hasSearched && results.length === 0 && <EmptyState message="No cases matched your search." />}
         {!isLoading && !error && results.length > 0 && <CaseResultsList results={results} />}
       </div>
+    </section>
+  );
+}
+
+function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string | null; onCancel: () => void; onCreated: (created: CaseDetail) => void }) {
+  const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
+  const [attorneys, setAttorneys] = useState<TeamMemberSummary[]>([]);
+  const [caseName, setCaseName] = useState('');
+  const [caseNumber, setCaseNumber] = useState('');
+  const [practiceAreaId, setPracticeAreaId] = useState('');
+  const [responsibleAttorneyUserId, setResponsibleAttorneyUserId] = useState('');
+  const [callerDate, setCallerDate] = useState('');
+  const [dateOfInjury, setDateOfInjury] = useState('');
+  const [statuteOfLimitations, setStatuteOfLimitations] = useState('');
+  const [tortNoticeDeadline, setTortNoticeDeadline] = useState('');
+  const [summary, setSummary] = useState('');
+  const [description, setDescription] = useState('');
+  const [isLoadingLookups, setIsLoadingLookups] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    setIsLoadingLookups(true);
+    Promise.all([listPracticeAreaLookups(accessToken), listTeamMembers(accessToken)])
+      .then(([areas, members]) => {
+        const activeAreas = areas.filter((area) => area.active && !area.deleted);
+        setPracticeAreas(activeAreas);
+        setAttorneys(members.filter((member) => member.attorney));
+      })
+      .catch((caught) => setSubmitError(caught instanceof Error ? caught.message : 'Lookups could not be loaded.'))
+      .finally(() => setIsLoadingLookups(false));
+  }, [accessToken]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const selectedPracticeAreaId = Number(practiceAreaId);
+    const selectedAttorneyId = Number(responsibleAttorneyUserId);
+    if (!caseName.trim()) {
+      setSubmitError('Enter a case name before saving.');
+      return;
+    }
+    if (!Number.isInteger(selectedPracticeAreaId) || selectedPracticeAreaId <= 0) {
+      setSubmitError('Choose a practice area before saving.');
+      return;
+    }
+    if (!Number.isInteger(selectedAttorneyId) || selectedAttorneyId <= 0) {
+      setSubmitError('Choose a responsible attorney before saving.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const created = await createCase(accessToken, {
+        caseName: caseName.trim(),
+        caseNumber: caseNumber.trim() || null,
+        practiceAreaId: selectedPracticeAreaId,
+        responsibleAttorneyUserId: selectedAttorneyId,
+        callerDate: callerDate || null,
+        dateOfInjury: dateOfInjury || null,
+        statuteOfLimitations: statuteOfLimitations || null,
+        tortNoticeDeadline: tortNoticeDeadline || null,
+        summary: summary.trim() || null,
+        description: description.trim() || null,
+      });
+      onCreated(created);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Case could not be created.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="settings-subcard" aria-labelledby="new-case-title">
+      <h2 id="new-case-title">New case</h2>
+      <form className="case-edit-form" onSubmit={handleSubmit} aria-label="Create case">
+        <label htmlFor="new-case-name">Case name<input id="new-case-name" value={caseName} onChange={(event) => setCaseName(event.target.value)} disabled={isSubmitting} maxLength={255} required /></label>
+        <label htmlFor="new-case-number">Case number<input id="new-case-number" value={caseNumber} onChange={(event) => setCaseNumber(event.target.value)} disabled={isSubmitting} maxLength={200} /></label>
+        <label htmlFor="new-case-practice-area">Practice area<select id="new-case-practice-area" value={practiceAreaId} onChange={(event) => setPracticeAreaId(event.target.value)} disabled={isSubmitting || isLoadingLookups} required><option value="">Choose a practice area</option>{practiceAreas.map((area) => <option key={area.id} value={area.id}>{displayValue(area.name, `Practice area ${area.id}`)}</option>)}</select></label>
+        <label htmlFor="new-case-attorney">Responsible attorney<select id="new-case-attorney" value={responsibleAttorneyUserId} onChange={(event) => setResponsibleAttorneyUserId(event.target.value)} disabled={isSubmitting || isLoadingLookups} required><option value="">Choose an attorney</option>{attorneys.map((member) => <option key={member.id} value={member.id}>{displayValue(member.displayName, `User ${member.id}`)}</option>)}</select></label>
+        <label htmlFor="new-case-caller-date">Intake date<input id="new-case-caller-date" type="date" value={callerDate} onChange={(event) => setCallerDate(event.target.value)} disabled={isSubmitting} /></label>
+        <label htmlFor="new-case-injury-date">Date of injury<input id="new-case-injury-date" type="date" value={dateOfInjury} onChange={(event) => setDateOfInjury(event.target.value)} disabled={isSubmitting} /></label>
+        <label htmlFor="new-case-sol">Statute of limitations<input id="new-case-sol" type="date" value={statuteOfLimitations} onChange={(event) => setStatuteOfLimitations(event.target.value)} disabled={isSubmitting} /></label>
+        <label htmlFor="new-case-tort">Tort notice deadline<input id="new-case-tort" type="date" value={tortNoticeDeadline} onChange={(event) => setTortNoticeDeadline(event.target.value)} disabled={isSubmitting} /></label>
+        <label htmlFor="new-case-summary">Summary<textarea id="new-case-summary" value={summary} onChange={(event) => setSummary(event.target.value)} disabled={isSubmitting} rows={4} maxLength={10000} /></label>
+        <label htmlFor="new-case-description">Description<textarea id="new-case-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} /></label>
+        {submitError && <p className="status error" role="alert">{submitError}</p>}
+        <div className="form-actions">
+          <button type="submit" disabled={isSubmitting || isLoadingLookups}>{isSubmitting ? 'Creating…' : isLoadingLookups ? 'Loading lookups…' : 'Create case'}</button>
+          <button type="button" className="secondary-button" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
+        </div>
+      </form>
     </section>
   );
 }
