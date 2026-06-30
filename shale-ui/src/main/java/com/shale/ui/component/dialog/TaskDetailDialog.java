@@ -346,6 +346,15 @@ public final class TaskDetailDialog {
         HBox contentColumns = new HBox(12, formContent, rightRail);
         HBox.setHgrow(formContent, Priority.ALWAYS);
         contentColumns.setAlignment(Pos.TOP_LEFT);
+        contentColumns.setPadding(new Insets(0, 24, 0, 24));
+        contentColumns.setMinHeight(Region.USE_PREF_SIZE);
+
+        ScrollPane contentScrollPane = new ScrollPane(contentColumns);
+        contentScrollPane.setFitToWidth(true);
+        contentScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        contentScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        contentScrollPane.getStyleClass().add("transparent-scroll");
+        VBox.setVgrow(contentScrollPane, Priority.ALWAYS);
 
         Button deleteButton = new Button("Delete");
         deleteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -470,21 +479,31 @@ public final class TaskDetailDialog {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox actions = new HBox(10, deleteButton, spacer, cancelButton, completionToggleButton, saveButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.getStyleClass().add("app-dialog-action-bar");
+        actions.setMaxWidth(Double.MAX_VALUE);
 
-        VBox body = new VBox(16, heading, message, contentColumns, actions);
-        body.setPadding(new Insets(22, 24, 22, 24));
+        VBox headerContent = new VBox(8, heading, message);
+        headerContent.setPadding(new Insets(22, 24, 0, 24));
+        VBox body = new VBox(14, headerContent, contentScrollPane, actions);
+        body.setPadding(Insets.EMPTY);
+        VBox.setVgrow(contentScrollPane, Priority.ALWAYS);
         VBox root = AppDialogs.createSecondaryWindowShell(stage, "Task Details", stage::close, body);
+        VBox.setVgrow(body, Priority.ALWAYS);
         double dialogWidth = WindowSizingUtil.cappedModalWidth(owner, 980);
         double dialogHeight = WindowSizingUtil.cappedModalHeight(owner, 720);
-        root.setMinWidth(Math.min(860, dialogWidth));
+        double minWidth = Math.min(760, dialogWidth);
+        double minHeight = Math.min(480, dialogHeight);
+        root.setMinWidth(minWidth);
         root.setPrefWidth(dialogWidth);
-        root.setMinHeight(Math.min(620, dialogHeight));
+        root.setMinHeight(minHeight);
+        root.setPrefHeight(dialogHeight);
+        stage.setResizable(true);
 
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(
                 TaskDetailDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
-        WindowSizingUtil.sizeModalStage(stage, owner, dialogWidth, dialogHeight);
+        WindowSizingUtil.sizeModalStage(stage, owner, dialogWidth, dialogHeight, minWidth, minHeight);
         String context = safe(timingContext).isBlank() ? "UNKNOWN" : timingContext;
         PerfLog.logElapsed("TASK_DETAIL_TIMING", "dialog_creation", "context=" + context + " taskId=" + model.taskId(), elapsedMillis(dialogCreateStartedAt));
         PerfLog.log("TASK_DETAIL_TIMING", "fxml_load", "context=" + context + " taskId=" + model.taskId() + " reason=programmatic-dialog");

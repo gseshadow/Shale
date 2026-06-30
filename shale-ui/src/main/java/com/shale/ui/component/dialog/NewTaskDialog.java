@@ -13,6 +13,7 @@ import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.util.WindowSizingUtil;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -139,7 +140,15 @@ public final class NewTaskDialog {
                 dueLabel,
                 dueRow,
                 errorLabel);
-        content.setPadding(new Insets(6, 2, 2, 2));
+        content.setPadding(new Insets(6, 24, 2, 24));
+        content.setMinHeight(Region.USE_PREF_SIZE);
+
+        ScrollPane contentScrollPane = new ScrollPane(content);
+        contentScrollPane.setFitToWidth(true);
+        contentScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        contentScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        contentScrollPane.getStyleClass().add("transparent-scroll");
+        VBox.setVgrow(contentScrollPane, Priority.ALWAYS);
 
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -180,16 +189,31 @@ public final class NewTaskDialog {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox actions = new HBox(10, spacer, cancelButton, createButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.getStyleClass().add("app-dialog-action-bar");
+        actions.setMaxWidth(Double.MAX_VALUE);
 
-        VBox body = new VBox(16, heading, message, content, actions);
-        body.setPadding(new Insets(22, 24, 22, 24));
+        VBox headerContent = new VBox(8, heading, message);
+        headerContent.setPadding(new Insets(22, 24, 0, 24));
+        VBox body = new VBox(14, headerContent, contentScrollPane, actions);
+        body.setPadding(Insets.EMPTY);
+        VBox.setVgrow(contentScrollPane, Priority.ALWAYS);
         VBox root = AppDialogs.createSecondaryWindowShell(stage, "New Task", stage::close, body);
-        root.setMinWidth(460);
+        VBox.setVgrow(body, Priority.ALWAYS);
+        double dialogWidth = WindowSizingUtil.cappedModalWidth(owner, 560);
+        double dialogHeight = WindowSizingUtil.cappedModalHeight(owner, 680);
+        double minWidth = Math.min(460, dialogWidth);
+        double minHeight = Math.min(420, dialogHeight);
+        root.setMinWidth(minWidth);
+        root.setPrefWidth(dialogWidth);
+        root.setMinHeight(minHeight);
+        root.setPrefHeight(dialogHeight);
+        stage.setResizable(true);
 
         Scene scene = new Scene(root);
         scene.getStylesheets().add(Objects.requireNonNull(
                 NewTaskDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene);
+        WindowSizingUtil.sizeModalStage(stage, owner, dialogWidth, dialogHeight, minWidth, minHeight);
         stage.showAndWait();
         return Optional.ofNullable(result.value);
     }
