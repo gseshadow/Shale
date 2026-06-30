@@ -62,6 +62,7 @@ public interface TaskServicePort {
 			String description,
 			LocalDateTime dueAt,
 			Integer statusId,
-			Integer priorityId) {
+			Integer priorityId,
+			Integer assignedUserId) {
 	}
 }

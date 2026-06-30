@@ -23,6 +23,7 @@ import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.TaskDetailDto;
+import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
@@ -76,7 +77,7 @@ public final class ApiReadController {
     public record UpdateCaseStatusRequest(Integer statusId) {
     }
 
-    public record UpdateTaskRequest(String title, String description, String dueDate, Integer priorityId) {
+    public record UpdateTaskRequest(String title, String description, String dueDate, Integer priorityId, Integer assignedUserId) {
     }
 
     public record UpdateContactRequest(
@@ -326,6 +327,13 @@ public final class ApiReadController {
         return updated;
     }
 
+    @Operation(summary = "List task priorities", description = "Returns active effective task priorities available to the authenticated tenant.")
+    @GetMapping("/api/lookups/task-priorities")
+    public List<TaskPriorityOptionDto> listTaskPriorityLookup() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        return taskServicePort.listPriorities(shaleClientId);
+    }
+
     @Operation(summary = "Get task detail", description = "Returns one tenant-scoped task detail record.")
     @GetMapping("/api/tasks/{taskId:\\d+}")
     public TaskDetailDto getTask(@PathVariable("taskId") long taskId) {
@@ -349,6 +357,10 @@ public final class ApiReadController {
         if (priorityId != null) {
             priorityId = Math.toIntExact(ApiValidation.positiveId(priorityId, "priorityId"));
         }
+        Integer assignedUserId = request == null ? null : request.assignedUserId();
+        if (assignedUserId != null) {
+            assignedUserId = Math.toIntExact(ApiValidation.positiveId(assignedUserId, "assignedUserId"));
+        }
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         TaskDetailDto current = taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
@@ -361,7 +373,8 @@ public final class ApiReadController {
                 description,
                 dueAt,
                 current.statusId(),
-                priorityId));
+                priorityId,
+                assignedUserId));
         return taskServicePort.getTaskDetail(safeTaskId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
     }

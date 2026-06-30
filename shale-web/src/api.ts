@@ -70,6 +70,13 @@ export interface CaseTaskListItem {
   assignedUserDisplayName?: string | null;
 }
 
+export interface TaskPriorityOption {
+  id: number;
+  name: string | null;
+  sortOrder: number | null;
+  colorHex: string | null;
+}
+
 export interface TaskDetail {
   id: number;
   shaleClientId: number;
@@ -539,6 +546,24 @@ export interface UpdateTaskPayload {
   description?: string;
   dueDate?: string;
   priorityId?: number | null;
+  assignedUserId?: number | null;
+}
+
+
+export async function listTaskPriorityLookups(accessToken: string): Promise<TaskPriorityOption[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/lookups/task-priorities`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not load task priorities.', response.status);
+  }
+
+  return response.json() as Promise<TaskPriorityOption[]>;
 }
 
 export async function updateTaskDetail(accessToken: string, taskId: number, payload: UpdateTaskPayload): Promise<TaskDetail> {

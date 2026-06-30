@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -1391,8 +1391,38 @@ function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }:
   const [title, setTitle] = useState(detail.title ?? '');
   const [description, setDescription] = useState(detail.description ?? '');
   const [dueDate, setDueDate] = useState(toDateInputValue(detail.dueAt));
+  const [priorityId, setPriorityId] = useState(detail.priorityId ? String(detail.priorityId) : '');
+  const [assignedUserId, setAssignedUserId] = useState(detail.assignedUserId ? String(detail.assignedUserId) : '');
+  const [priorities, setPriorities] = useState<TaskPriorityOption[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [isLoadingLookups, setIsLoadingLookups] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setLookupError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    let isCurrent = true;
+    setIsLoadingLookups(true);
+    setLookupError(null);
+    Promise.all([listTaskPriorityLookups(accessToken), listTeamMembers(accessToken)])
+      .then(([priorityOptions, users]) => {
+        if (!isCurrent) return;
+        setPriorities(priorityOptions);
+        setTeamMembers(users);
+      })
+      .catch((caught) => {
+        if (!isCurrent) return;
+        setLookupError(caught instanceof Error ? caught.message : 'Task edit options could not be loaded.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingLookups(false);
+      });
+    return () => { isCurrent = false; };
+  }, [accessToken]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1407,13 +1437,24 @@ function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }:
       setSubmitError('Your Shale session is not available. Please sign in again.');
       return;
     }
+    const selectedPriorityId = priorityId ? Number(priorityId) : null;
+    const selectedAssignedUserId = assignedUserId ? Number(assignedUserId) : null;
+    if (selectedPriorityId !== null && (!Number.isInteger(selectedPriorityId) || selectedPriorityId <= 0)) {
+      setSubmitError('Choose a valid task priority before saving.');
+      return;
+    }
+    if (selectedAssignedUserId !== null && (!Number.isInteger(selectedAssignedUserId) || selectedAssignedUserId <= 0)) {
+      setSubmitError('Choose a valid assigned user before saving.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const updated = await updateTaskDetail(accessToken, detail.id, {
         title: safeTitle,
         description: description.trim() || undefined,
         dueDate: dueDate || undefined,
-        priorityId: detail.priorityId,
+        priorityId: selectedPriorityId,
+        assignedUserId: selectedAssignedUserId,
       });
       onTaskChanged(updated);
     } catch (caught) {
@@ -1425,16 +1466,28 @@ function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }:
 
   return (
     <form className="case-edit-form" onSubmit={handleSubmit}>
+      {isLoadingLookups && <p className="status muted">Loading task options…</p>}
+      {lookupError && <p className="status error" role="alert">{lookupError}</p>}
       {submitError && <p className="status error" role="alert">{submitError}</p>}
       <label htmlFor="task-title">Task name</label>
       <input id="task-title" type="text" value={title} onChange={(event) => { setTitle(event.target.value); setSubmitError(null); }} disabled={isSubmitting} maxLength={255} required />
       <label htmlFor="task-due-date">Due date</label>
       <input id="task-due-date" type="date" value={dueDate} onChange={(event) => { setDueDate(event.target.value); setSubmitError(null); }} disabled={isSubmitting} />
+      <label htmlFor="task-priority">Priority</label>
+      <select id="task-priority" value={priorityId} onChange={(event) => { setPriorityId(event.target.value); setSubmitError(null); }} disabled={isSubmitting || isLoadingLookups || priorities.length === 0}>
+        <option value="">{priorities.length === 0 ? 'No priority options available' : 'Choose a priority'}</option>
+        {priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name || `Priority ${priority.id}`}</option>)}
+      </select>
+      <label htmlFor="task-assigned-user">Assigned user</label>
+      <select id="task-assigned-user" value={assignedUserId} onChange={(event) => { setAssignedUserId(event.target.value); setSubmitError(null); }} disabled={isSubmitting || isLoadingLookups}>
+        <option value="">Unassigned</option>
+        {teamMembers.map((member) => <option key={member.id} value={member.id}>{teamMemberName(member)}</option>)}
+      </select>
       <label htmlFor="task-description">Description</label>
       <textarea id="task-description" value={description} onChange={(event) => { setDescription(event.target.value); setSubmitError(null); }} disabled={isSubmitting} rows={5} maxLength={10000} />
       <p className="form-help">Status changes stay with the existing Complete action.</p>
       <div className="form-actions">
-        <ActionButton type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : 'Save task'}</ActionButton>
+        <ActionButton type="submit" disabled={isSubmitting || isLoadingLookups}>{isSubmitting ? 'Saving…' : 'Save task'}</ActionButton>
         <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
       </div>
     </form>

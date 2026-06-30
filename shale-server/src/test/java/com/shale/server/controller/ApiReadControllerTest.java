@@ -290,7 +290,7 @@ class ApiReadControllerTest {
                 .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
                 .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .content("{\"title\":\"Updated task\",\"description\":\"Updated notes\",\"dueDate\":\"2026-03-04\",\"priorityId\":1}"))
+                .content("{\"title\":\"Updated task\",\"description\":\"Updated notes\",\"dueDate\":\"2026-03-04\",\"priorityId\":1,\"assignedUserId\":31}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(701));
 
@@ -303,6 +303,7 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2026, 3, 4, 0, 0), taskServicePort.updatedCommand.dueAt());
         org.junit.jupiter.api.Assertions.assertEquals(2, taskServicePort.updatedCommand.statusId());
         org.junit.jupiter.api.Assertions.assertEquals(1, taskServicePort.updatedCommand.priorityId());
+        org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.updatedCommand.assignedUserId());
     }
 
 
