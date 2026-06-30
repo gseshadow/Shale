@@ -286,7 +286,7 @@ function SettingsPage({ accessToken, user }: { accessToken: string | null; user:
         eyebrow="Settings"
         title="Settings"
         lede="Read-only account and tenant settings for the signed-in Shale session."
-        action={<span className="inline-beta-badge">Read-only beta</span>}
+        action={<span className="inline-beta-badge">BETA</span>}
       />
 
       <div className="detail-sections">
@@ -507,7 +507,6 @@ function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (v
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const baseUrl = useMemo(() => apiBaseUrl(), []);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -540,7 +539,6 @@ function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (v
         <p className="eyebrow">Shale Web</p>
         <h1 id="login-title">Sign in</h1>
         <p className="lede">Use your Shale account to access the web application shell.</p>
-        <p className="api-note">API target: <code>{baseUrl}</code></p>
         <form onSubmit={handleSubmit}>
           <label>
             Email
@@ -586,7 +584,7 @@ function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout
           <span className="brand-mark" aria-hidden="true">S</span>
           <span>Shale</span>
         </div>
-        <span className="beta-badge">Read-only beta</span>
+        <span className="beta-badge">BETA</span>
         <div className="user-summary">
           <p className="eyebrow">Signed in</p>
           <p className="user-name">{displayNameFor(user)}</p>
