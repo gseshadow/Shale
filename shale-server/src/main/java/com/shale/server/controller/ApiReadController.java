@@ -3,6 +3,7 @@ package com.shale.server.controller;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.Base64;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
@@ -23,6 +25,7 @@ import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactDetail;
 import com.shale.core.service.ContactServicePort.ContactSummary;
@@ -51,6 +54,14 @@ public final class ApiReadController {
     }
 
     public record CreateCaseTaskRequest(String title, String description, String dueDate) {
+    }
+
+    public record UpdateCaseCoreDetailsRequest(
+            String caseName,
+            String description,
+            String dateOfInjury,
+            String statuteOfLimitations,
+            String expectedRowVer) {
     }
 
     private static final int DEFAULT_SEARCH_LIMIT = 25;
@@ -128,6 +139,38 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         return caseServicePort.getCaseDetail(safeCaseId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found."));
+    }
+
+
+    @Operation(summary = "Update case core details", description = "Updates safe core fields for one tenant-scoped case and returns the refreshed case detail.")
+    @PatchMapping("/api/cases/{caseId:\\d+}/core-details")
+    public CaseDetailDto updateCaseCoreDetails(
+            @PathVariable("caseId") long caseId,
+            @RequestBody UpdateCaseCoreDetailsRequest request) {
+        long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
+        String caseName = ApiValidation.caseName(request == null ? null : request.caseName());
+        String description = ApiValidation.optionalCaseDescription(request == null ? null : request.description());
+        LocalDate dateOfInjury = parseOptionalIsoDate(request == null ? null : request.dateOfInjury(), "dateOfInjury");
+        LocalDate statuteOfLimitations = parseOptionalIsoDate(request == null ? null : request.statuteOfLimitations(), "statuteOfLimitations");
+        byte[] expectedRowVer = parseExpectedRowVer(request == null ? null : request.expectedRowVer());
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        CaseDetailDto current = caseServicePort.getCaseDetail(safeCaseId, shaleClientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found."));
+        CaseDetailDto updated = caseServicePort.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
+                safeCaseId,
+                shaleClientId,
+                userId,
+                caseName,
+                current.getCaseNumber(),
+                description,
+                dateOfInjury,
+                statuteOfLimitations,
+                expectedRowVer));
+        if (updated == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Case details were changed by someone else. Refresh and try again.");
+        }
+        return updated;
     }
 
     @Operation(summary = "List case tasks", description = "Returns tasks for one tenant-scoped case.")
@@ -296,6 +339,31 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         return notificationServicePort.listUnreadNotifications(shaleClientId, userId);
+    }
+
+
+    private static LocalDate parseOptionalIsoDate(String dateText, String fieldName) {
+        String safeDateText = ApiValidation.optionalDateText(dateText, fieldName);
+        if (safeDateText == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(safeDateText);
+        } catch (DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " must be a valid calendar date.");
+        }
+    }
+
+    private static byte[] parseExpectedRowVer(String expectedRowVer) {
+        String safeExpectedRowVer = expectedRowVer == null ? "" : expectedRowVer.trim();
+        if (safeExpectedRowVer.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "expectedRowVer is required.");
+        }
+        try {
+            return Base64.getDecoder().decode(safeExpectedRowVer);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "expectedRowVer must be base64 encoded.");
+        }
     }
 
     private static LocalDateTime parseOptionalDueDate(String dueDate) {

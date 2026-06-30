@@ -14,6 +14,8 @@ final class ApiValidation {
     private static final int MAX_NOTE_TEXT_LENGTH = 10_000;
     private static final int MAX_TASK_TITLE_LENGTH = 255;
     private static final int MAX_TASK_DESCRIPTION_LENGTH = 10_000;
+    private static final int MAX_CASE_NAME_LENGTH = 255;
+    private static final int MAX_CASE_DESCRIPTION_LENGTH = 10_000;
 
     private ApiValidation() {
     }
@@ -49,6 +51,25 @@ final class ApiValidation {
             throw badRequest("Note text must be 10000 characters or fewer.");
         }
         return safeNoteText;
+    }
+
+    static String caseName(String caseName) {
+        String safeCaseName = caseName == null ? "" : caseName.trim();
+        if (safeCaseName.isEmpty()) {
+            throw badRequest("Case name is required.");
+        }
+        if (safeCaseName.length() > MAX_CASE_NAME_LENGTH) {
+            throw badRequest("Case name must be 255 characters or fewer.");
+        }
+        return safeCaseName;
+    }
+
+    static String optionalCaseDescription(String description) {
+        String safeDescription = description == null ? "" : description.trim();
+        if (safeDescription.length() > MAX_CASE_DESCRIPTION_LENGTH) {
+            throw badRequest("Case description must be 10000 characters or fewer.");
+        }
+        return safeDescription;
     }
 
     static String taskTitle(String title) {

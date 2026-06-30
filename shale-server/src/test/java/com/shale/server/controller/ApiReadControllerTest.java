@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.lang.reflect.Proxy;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -206,6 +207,44 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(31, taskServicePort.assignedUserId);
         org.junit.jupiter.api.Assertions.assertEquals(41, taskServicePort.assignedShaleClientId);
         org.junit.jupiter.api.Assertions.assertEquals(0L, taskServicePort.caseId);
+    }
+
+
+    @Test
+    void updateCaseCoreDetailsUsesSessionTenantAndReturnsUpdatedDetail() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(patch("/api/cases/501/core-details")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "caseName": "Smith v. Updated",
+                          "description": "Updated detail",
+                          "dateOfInjury": "2026-02-03",
+                          "statuteOfLimitations": "2027-02-03",
+                          "expectedRowVer": "AQ=="
+                        }
+                        """)
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caseId").value(501))
+                .andExpect(jsonPath("$.caseName").value("Smith v. Updated"))
+                .andExpect(jsonPath("$.description").value("Updated detail"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.updateCaseId);
+        org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.updateShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.updateActorUserId);
+        org.junit.jupiter.api.Assertions.assertEquals("Smith v. Updated", caseServicePort.updateCaseName);
+        org.junit.jupiter.api.Assertions.assertEquals("CASE-501", caseServicePort.updateCaseNumber);
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2026, 2, 3), caseServicePort.updateDateOfInjury);
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2027, 2, 3), caseServicePort.updateStatuteOfLimitations);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] {1}, caseServicePort.updateExpectedRowVer);
     }
 
     @Test
@@ -617,6 +656,14 @@ class ApiReadControllerTest {
         private int addNoteShaleClientId;
         private int addNoteActorUserId;
         private String addNoteText;
+        private long updateCaseId;
+        private int updateShaleClientId;
+        private int updateActorUserId;
+        private String updateCaseName;
+        private String updateCaseNumber;
+        private LocalDate updateDateOfInjury;
+        private LocalDate updateStatuteOfLimitations;
+        private byte[] updateExpectedRowVer;
 
         @Override
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
@@ -713,7 +760,18 @@ class ApiReadControllerTest {
 
         @Override
         public CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command) {
-            throw new AssertionError("updateCaseCoreDetails should not be called");
+            this.updateCaseId = command.caseId();
+            this.updateShaleClientId = command.shaleClientId();
+            this.updateActorUserId = command.actorUserId();
+            this.updateCaseName = command.caseName();
+            this.updateCaseNumber = command.caseNumber();
+            this.updateDateOfInjury = command.dateOfInjury();
+            this.updateStatuteOfLimitations = command.statuteOfLimitations();
+            this.updateExpectedRowVer = command.expectedRowVer();
+            return new CaseDetailDto(command.caseId(), command.caseNumber(), command.caseName(), command.description(), "Open", "Ada Attorney", 10,
+                    null, null, null, null, null, null, null, command.dateOfInjury(), command.statuteOfLimitations(), null, null,
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, LocalDateTime.of(2026, 1, 2, 0, 0), new byte[] {2});
         }
 
         @Override
