@@ -33,15 +33,21 @@ public final class ContactServiceAdapter implements ContactServicePort {
 
 	@Override
 	public Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId) {
-		return Optional.ofNullable(contactGateway.findDirectoryContactById(contactId, shaleClientId))
+		return Optional.ofNullable(contactGateway.findById(contactId, shaleClientId))
 				.map(row -> new ContactDetail(
 						row.id(),
 						shaleClientId,
+						row.name(),
 						row.firstName(),
 						row.lastName(),
 						row.displayName(),
 						row.email(),
-						row.phone()));
+						row.phone(),
+						row.addressHome(),
+						row.dateOfBirth() == null ? null : row.dateOfBirth().toString(),
+						row.condition(),
+						row.deceased(),
+						row.client()));
 	}
 
 	@Override
@@ -67,15 +73,15 @@ public final class ContactServiceAdapter implements ContactServicePort {
 				command.contactId(),
 				command.shaleClientId(),
 				command.actorUserId(),
-				current.name(),
+				command.name(),
 				command.firstName(),
 				command.lastName(),
 				command.email(),
 				command.phone(),
-				current.addressHome(),
-				current.dateOfBirth(),
-				current.condition(),
-				current.deceased(),
+				command.addressHome(),
+				command.dateOfBirth() == null ? null : java.time.LocalDate.parse(command.dateOfBirth()),
+				command.condition(),
+				command.deceased() == null ? current.deceased() : command.deceased(),
 				current.client()));
 	}
 

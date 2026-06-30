@@ -163,11 +163,29 @@ export interface OrganizationDetail {
 export interface ContactDetail {
   id: number;
   shaleClientId: number;
+  name: string | null;
   firstName: string | null;
   lastName: string | null;
   displayName: string | null;
   email: string | null;
   phone: string | null;
+  addressHome: string | null;
+  dateOfBirth: string | null;
+  condition: string | null;
+  deceased: boolean;
+  client: boolean;
+}
+
+export interface UpdateContactDetailsRequest {
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  addressHome: string | null;
+  dateOfBirth: string | null;
+  condition: string | null;
+  deceased: boolean;
 }
 
 export interface CaseUpdate {
@@ -528,6 +546,32 @@ export async function searchContacts(accessToken: string, query: string): Promis
   }
 
   return response.json() as Promise<ContactSearchResult[]>;
+}
+
+export async function updateContactDetails(accessToken: string, contactId: number, request: UpdateContactDetailsRequest): Promise<ContactDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/contacts/${contactId}`, {
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Check the contact details and try again.', response.status);
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that contact.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not save the contact detail.', response.status);
+  }
+
+  return response.json() as Promise<ContactDetail>;
 }
 
 export async function getContactDetail(accessToken: string, contactId: number): Promise<ContactDetail> {

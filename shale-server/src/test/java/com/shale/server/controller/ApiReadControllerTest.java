@@ -912,8 +912,8 @@ class ApiReadControllerTest {
             if (contactId == 404) {
                 return Optional.empty();
             }
-            return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada", "Lovelace",
-                    "Ada Lovelace", "ada@example.test", "555-0100"));
+            return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada Lovelace", "Ada", "Lovelace",
+                    "Ada Lovelace", "ada@example.test", "555-0100", "123 Main", "1980-01-02", "Notes", false, true));
         }
 
         @Override
