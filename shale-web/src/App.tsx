@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listPracticeAreaSettings, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -423,7 +423,7 @@ function EntityList({ children, ariaLabel }: { children: ReactNode; ariaLabel: s
   return <div className="entity-list" role="list" aria-label={ariaLabel}>{children}</div>;
 }
 
-function EntityCard({ title, subtitle, eyebrow, badges, metadata, onClick, ariaLabel }: { title: ReactNode; subtitle?: ReactNode; eyebrow?: ReactNode; badges?: ReactNode; metadata?: ReactNode; onClick?: () => void; ariaLabel?: string }) {
+function EntityCard({ title, subtitle, eyebrow, badges, metadata, actions, onClick, ariaLabel }: { title: ReactNode; subtitle?: ReactNode; eyebrow?: ReactNode; badges?: ReactNode; metadata?: ReactNode; actions?: ReactNode; onClick?: () => void; ariaLabel?: string }) {
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (!onClick) return;
     if (event.key === 'Enter' || event.key === ' ') {
@@ -450,6 +450,7 @@ function EntityCard({ title, subtitle, eyebrow, badges, metadata, onClick, ariaL
         {badges && <div className="entity-card-badges">{badges}</div>}
       </div>
       {metadata && <div className="entity-card-metadata">{metadata}</div>}
+      {actions && <div className="entity-card-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{actions}</div>}
     </article>
   );
 }
@@ -720,13 +721,36 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
       {isLoading && <LoadingState message="Loading your tasks…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
-      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} />}
+      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} accessToken={accessToken} onTasksChanged={setTasks} onError={setError} />}
     </section>
   );
 }
 
-function MyTasksList({ tasks }: { tasks: CaseTaskListItem[] }) {
+function mergeCompletedTask(tasks: CaseTaskListItem[], completedTask: TaskDetail): CaseTaskListItem[] {
+  return tasks.map((task) => task.id === completedTask.id ? { ...task, completedAt: completedTask.completedAt } : task);
+}
+
+function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError }: { tasks: CaseTaskListItem[]; allTasks?: CaseTaskListItem[]; accessToken: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onError: (message: string | null) => void }) {
   const navigate = useNavigate();
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
+
+  async function handleCompleteTask(task: CaseTaskListItem) {
+    if (!accessToken) {
+      onError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    setCompletingTaskId(task.id);
+    onError(null);
+    try {
+      const completedTask = await completeTask(accessToken, task.id);
+      onTasksChanged(mergeCompletedTask(allTasks ?? tasks, completedTask));
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : 'Task could not be completed.');
+    } finally {
+      setCompletingTaskId(null);
+    }
+  }
+
   return (
     <EntityList ariaLabel="Assigned tasks">
       {tasks.map((task) => (
@@ -741,6 +765,7 @@ function MyTasksList({ tasks }: { tasks: CaseTaskListItem[] }) {
               <MetadataRow label="Priority" value={task.priorityId ? `Priority ${task.priorityId}` : MISSING_VALUE} />
             </MetadataGrid>
           )}
+          actions={!task.completedAt ? <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton> : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
           onClick={() => navigate(`/tasks/${task.id}`)}
           ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
         />
@@ -811,7 +836,7 @@ function TasksPage({ accessToken }: { accessToken: string | null }) {
         {!isLoading && error && <p className="status error" role="alert">{error}</p>}
         {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
         {!isLoading && !error && tasks.length > 0 && filteredTasks.length === 0 && <EmptyState message="No tasks matched your search." />}
-        {!isLoading && !error && filteredTasks.length > 0 && <MyTasksList tasks={filteredTasks} />}
+        {!isLoading && !error && filteredTasks.length > 0 && <MyTasksList tasks={filteredTasks} allTasks={tasks} accessToken={accessToken} onTasksChanged={setTasks} onError={setError} />}
       </div>
     </section>
   );
@@ -1561,6 +1586,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
   const [description, setDescription] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
   const trimmedTitle = title.trim();
   const trimmedDescription = description.trim();
 
@@ -1570,6 +1596,24 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
     setDescription('');
     setSubmitError(null);
     setIsAdding(false);
+  }
+
+  async function handleCompleteTask(task: CaseTaskListItem) {
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+    setCompletingTaskId(task.id);
+    setSubmitError(null);
+    try {
+      const completedTask = await completeTask(accessToken, task.id);
+      onTasksChanged(mergeCompletedTask(tasks, completedTask));
+      onTasksError(null);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Task could not be completed.');
+    } finally {
+      setCompletingTaskId(null);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1662,6 +1706,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
                   <MetadataRow label="Completed date" value={formatDate(task.completedAt)} />
                 </MetadataGrid>
               )}
+              actions={!task.completedAt ? <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton> : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
               onClick={() => navigate(`/tasks/${task.id}`)}
               ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
             />

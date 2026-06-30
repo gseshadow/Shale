@@ -206,6 +206,20 @@ input { border: 1px solid #c9d4df; border-radius: 12px; min-height: 44px; min-wi
   justify-content: flex-end;
 }
 
+.entity-card-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  justify-content: flex-end;
+}
+
+.completed-state {
+  color: var(--text-muted);
+  font-size: .9rem;
+  font-weight: 700;
+}
+
 .metadata-grid {
   display: grid;
   gap: .75rem;

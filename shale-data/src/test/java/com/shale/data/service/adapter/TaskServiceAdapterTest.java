@@ -140,6 +140,10 @@ class TaskServiceAdapterTest {
 		}
 
 		@Override
+		public void markTaskCompleted(long taskId, int shaleClientId) {
+		}
+
+		@Override
 		public void removeTaskAssignment(long taskId, int shaleClientId, int userId) {
 		}
 	}

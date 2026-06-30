@@ -435,6 +435,26 @@ export async function listCaseUpdates(accessToken: string, caseId: number): Prom
   return response.json() as Promise<CaseUpdate[]>;
 }
 
+export async function completeTask(accessToken: string, taskId: number): Promise<TaskDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}/complete`, {
+    method: 'PATCH',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 404) {
+    throw new ApiError('Shale could not find that task.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not complete the task.', response.status);
+  }
+
+  return response.json() as Promise<TaskDetail>;
+}
+
 export async function getTaskDetail(accessToken: string, taskId: number): Promise<TaskDetail> {
   const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}`, {
     method: 'GET',
