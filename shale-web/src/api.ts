@@ -198,6 +198,18 @@ export interface ContactDetail {
   client: boolean;
 }
 
+export interface CreateContactRequest {
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  addressHome: string | null;
+  dateOfBirth: string | null;
+  condition: string | null;
+  deceased: boolean;
+}
+
 export interface UpdateContactDetailsRequest {
   name: string | null;
   firstName: string | null;
@@ -643,6 +655,29 @@ export async function searchContacts(accessToken: string, query: string): Promis
   }
 
   return response.json() as Promise<ContactSearchResult[]>;
+}
+
+
+export async function createContact(accessToken: string, request: CreateContactRequest): Promise<ContactDetail> {
+  const response = await fetch(`${apiBaseUrl()}/api/contacts`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 400) {
+    throw new ApiError('Check the contact details and try again.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('Shale could not create the contact.', response.status);
+  }
+
+  return response.json() as Promise<ContactDetail>;
 }
 
 export async function updateContactDetails(accessToken: string, contactId: number, request: UpdateContactDetailsRequest): Promise<ContactDetail> {

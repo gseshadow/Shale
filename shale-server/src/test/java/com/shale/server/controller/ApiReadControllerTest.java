@@ -516,6 +516,50 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(25, contactServicePort.limit);
     }
 
+
+    @Test
+    void createContactReachesServiceLayerWithDevelopmentHeaders() throws Exception {
+        RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
+        MockMvc devMockMvc = developmentMockMvc(
+                unusedPort(CaseServicePort.class),
+                unusedPort(TaskServicePort.class),
+                contactServicePort,
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(post("/api/contacts")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "name":"  Ada Byron  ",
+                          "firstName":" Ada ",
+                          "lastName":" Lovelace ",
+                          "email":" ada@example.test ",
+                          "phone":" 555-0100 ",
+                          "addressHome":" 123 Main ",
+                          "dateOfBirth":"1980-01-02",
+                          "condition":" Notes ",
+                          "deceased":false
+                        }
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(801))
+                .andExpect(jsonPath("$.shaleClientId").value(41))
+                .andExpect(jsonPath("$.displayName").value("Ada Lovelace"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(41, contactServicePort.createdCommand.shaleClientId());
+        org.junit.jupiter.api.Assertions.assertEquals(31, contactServicePort.createdCommand.actorUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("Ada Byron", contactServicePort.createdCommand.name());
+        org.junit.jupiter.api.Assertions.assertEquals("Ada", contactServicePort.createdCommand.firstName());
+        org.junit.jupiter.api.Assertions.assertEquals("Lovelace", contactServicePort.createdCommand.lastName());
+        org.junit.jupiter.api.Assertions.assertEquals("ada@example.test", contactServicePort.createdCommand.email());
+        org.junit.jupiter.api.Assertions.assertEquals("555-0100", contactServicePort.createdCommand.phone());
+        org.junit.jupiter.api.Assertions.assertEquals("123 Main", contactServicePort.createdCommand.addressHome());
+        org.junit.jupiter.api.Assertions.assertEquals("1980-01-02", contactServicePort.createdCommand.dateOfBirth());
+        org.junit.jupiter.api.Assertions.assertEquals("Notes", contactServicePort.createdCommand.condition());
+    }
+
     @Test
     void contactDetailReachesServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingContactServicePort contactServicePort = new RecordingContactServicePort();
@@ -940,6 +984,7 @@ class ApiReadControllerTest {
         private int limit;
         private int contactId;
         private int detailShaleClientId;
+        private CreateContactCommand createdCommand;
 
         @Override
         public List<ContactSummary> searchContacts(int shaleClientId, String query, int limit) {
@@ -962,7 +1007,8 @@ class ApiReadControllerTest {
 
         @Override
         public int createContact(CreateContactCommand command) {
-            throw new AssertionError("createContact should not be called");
+            this.createdCommand = command;
+            return 801;
         }
 
         @Override

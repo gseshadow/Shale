@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCaseTask, createContact, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -932,6 +932,8 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const navigate = useNavigate();
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -968,7 +970,20 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <section className="contacts-page" aria-labelledby="contacts-title">
-      <PageHeader eyebrow="Search" title="Contacts" titleId="contacts-title" lede="Search and open read-only contact records." />
+      <PageHeader
+        eyebrow="Search"
+        title="Contacts"
+        titleId="contacts-title"
+        lede="Search, open, and create contact records."
+        action={!isCreating ? <ActionButton onClick={() => setIsCreating(true)}>New contact</ActionButton> : undefined}
+      />
+      {isCreating && (
+        <ContactCreateForm
+          accessToken={accessToken}
+          onCreated={(created) => navigate(`/contacts/${created.id}`)}
+          onCancel={() => setIsCreating(false)}
+        />
+      )}
       <SearchBar
         id="contact-search"
         label="Search contacts"
@@ -2286,6 +2301,86 @@ function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { acces
         </dl>
       </section>
     </div>
+  );
+}
+
+
+function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: ContactDetail) => void; onCancel: () => void }) {
+  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [addressHome, setAddressHome] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [condition, setCondition] = useState('');
+  const [deceased, setDeceased] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasRequiredName = Boolean(name.trim() || firstName.trim() || lastName.trim());
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hasRequiredName) {
+      setSubmitError('Enter a display name, first name, or last name before saving.');
+      return;
+    }
+    if (email.trim() && !email.includes('@')) {
+      setSubmitError('Enter a valid email address.');
+      return;
+    }
+    if (!accessToken) {
+      setSubmitError('Your Shale session is not available. Please sign in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const created = await createContact(accessToken, {
+        name: name.trim() || null,
+        firstName: firstName.trim() || null,
+        lastName: lastName.trim() || null,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        addressHome: addressHome.trim() || null,
+        dateOfBirth: dateOfBirth || null,
+        condition: condition.trim() || null,
+        deceased,
+      });
+      onCreated(created);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Contact could not be created.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="case-edit-form" onSubmit={handleSubmit} aria-label="Create contact">
+      <label htmlFor="new-contact-display-name">Display name</label>
+      <input id="new-contact-display-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="name" maxLength={255} />
+      <label htmlFor="new-contact-first-name">First name</label>
+      <input id="new-contact-first-name" type="text" value={firstName} onChange={(event) => setFirstName(event.target.value)} disabled={isSubmitting} autoComplete="given-name" maxLength={255} />
+      <label htmlFor="new-contact-last-name">Last name</label>
+      <input id="new-contact-last-name" type="text" value={lastName} onChange={(event) => setLastName(event.target.value)} disabled={isSubmitting} autoComplete="family-name" maxLength={255} />
+      <label htmlFor="new-contact-email">Email</label>
+      <input id="new-contact-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" maxLength={254} />
+      <label htmlFor="new-contact-phone">Phone</label>
+      <input id="new-contact-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" maxLength={100} />
+      <label htmlFor="new-contact-address-home">Home address</label>
+      <textarea id="new-contact-address-home" value={addressHome} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
+      <label htmlFor="new-contact-date-of-birth">Date of birth</label>
+      <input id="new-contact-date-of-birth" type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} disabled={isSubmitting} />
+      <label htmlFor="new-contact-notes">Notes</label>
+      <textarea id="new-contact-notes" value={condition} onChange={(event) => setCondition(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
+      <label className="checkbox-row" htmlFor="new-contact-deceased"><input id="new-contact-deceased" type="checkbox" checked={deceased} onChange={(event) => setDeceased(event.target.checked)} disabled={isSubmitting} /> Deceased</label>
+      {submitError && <p className="status error" role="alert">{submitError}</p>}
+      <div className="form-actions">
+        <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Create contact'}</ActionButton>
+        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+      </div>
+    </form>
   );
 }
 
