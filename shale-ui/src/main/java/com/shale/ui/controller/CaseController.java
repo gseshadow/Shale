@@ -107,7 +107,6 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -1520,7 +1519,7 @@ public class CaseController {
 	}
 
 	private void showTasksTab() {
-		attachCaseUpdatesPane(CaseUpdatesPlacement.TASKS);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
@@ -1538,7 +1537,7 @@ public class CaseController {
 	}
 
 	private void showDetails() {
-		attachCaseUpdatesPane(CaseUpdatesPlacement.DETAILS);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
@@ -1577,7 +1576,7 @@ public class CaseController {
 	}
 
 	private void showTimeline() {
-		attachCaseUpdatesPane(CaseUpdatesPlacement.TIMELINE);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -1601,7 +1600,7 @@ public class CaseController {
 	}
 
 	private void showParties() {
-		attachCaseUpdatesPane(CaseUpdatesPlacement.PARTIES);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -1744,14 +1743,12 @@ public class CaseController {
 			if (timelineEmptyLabel != null)
 				timelineEmptyLabel.setText("No parties yet.");
 			setVisibleManaged(timelineEmptyLabel, true);
-			attachCaseUpdatesPane(CaseUpdatesPlacement.PARTIES);
 			return;
 		}
 
 		setVisibleManaged(timelineEmptyLabel, false);
 
 		renderPartyGroups(timelineListBox, safeParties, PartyRenderMode.MANAGE, 300, false);
-		attachCaseUpdatesPane(CaseUpdatesPlacement.PARTIES);
 	}
 
 	private void renderOverviewPartiesSection() {
@@ -2598,44 +2595,19 @@ public class CaseController {
 		if (caseRootPane == null || caseUpdatesPane == null) {
 			return;
 		}
-		if (caseRootPane.getRight() == caseUpdatesPane && placement != CaseUpdatesPlacement.RIGHT) {
+		if (placement == CaseUpdatesPlacement.HIDDEN) {
 			caseRootPane.setRight(null);
+			caseUpdatesPane.setManaged(false);
+			caseUpdatesPane.setVisible(false);
+			return;
 		}
-		if (caseUpdatesPane.getParent() instanceof Pane parent) {
-			parent.getChildren().remove(caseUpdatesPane);
-		}
-		clearCaseUpdatesHost(detailsUpdatesHost);
-		clearCaseUpdatesHost(partiesUpdatesHost);
-		clearCaseUpdatesHost(tasksUpdatesHost);
-		clearCaseUpdatesHost(timelineUpdatesHost);
-		caseUpdatesPane.setManaged(placement != CaseUpdatesPlacement.HIDDEN);
-		caseUpdatesPane.setVisible(placement != CaseUpdatesPlacement.HIDDEN);
-		caseUpdatesPane.setMaxWidth(placement == CaseUpdatesPlacement.RIGHT ? Region.USE_COMPUTED_SIZE : Double.MAX_VALUE);
-		caseUpdatesPane.setPrefWidth(placement == CaseUpdatesPlacement.RIGHT ? 320.0 : Region.USE_COMPUTED_SIZE);
-		VBox.setVgrow(caseUpdatesPane, placement == CaseUpdatesPlacement.RIGHT ? Priority.ALWAYS : Priority.NEVER);
-		setVisibleManaged(detailsUpdatesHost, placement == CaseUpdatesPlacement.DETAILS);
-		setVisibleManaged(partiesUpdatesHost, placement == CaseUpdatesPlacement.PARTIES);
-		setVisibleManaged(tasksUpdatesHost, placement == CaseUpdatesPlacement.TASKS);
-		setVisibleManaged(timelineUpdatesHost, placement == CaseUpdatesPlacement.TIMELINE);
-		switch (placement) {
-		case RIGHT -> caseRootPane.setRight(caseUpdatesPane);
-		case DETAILS -> addCaseUpdatesPaneTo(detailsUpdatesHost);
-		case PARTIES -> addCaseUpdatesPaneTo(partiesUpdatesHost);
-		case TASKS -> addCaseUpdatesPaneTo(tasksUpdatesHost);
-		case TIMELINE -> addCaseUpdatesPaneTo(timelineUpdatesHost);
-		case HIDDEN -> { }
-		}
-	}
-
-	private void clearCaseUpdatesHost(StackPane host) {
-		if (host != null) {
-			host.getChildren().remove(caseUpdatesPane);
-		}
-	}
-
-	private void addCaseUpdatesPaneTo(StackPane host) {
-		if (host != null && !host.getChildren().contains(caseUpdatesPane)) {
-			host.getChildren().add(caseUpdatesPane);
+		caseUpdatesPane.setManaged(true);
+		caseUpdatesPane.setVisible(true);
+		caseUpdatesPane.setMaxWidth(Region.USE_COMPUTED_SIZE);
+		caseUpdatesPane.setPrefWidth(320.0);
+		VBox.setVgrow(caseUpdatesPane, Priority.ALWAYS);
+		if (caseRootPane.getRight() != caseUpdatesPane) {
+			caseRootPane.setRight(caseUpdatesPane);
 		}
 	}
 
@@ -7230,10 +7202,6 @@ public class CaseController {
 
 	private enum CaseUpdatesPlacement {
 		RIGHT,
-		DETAILS,
-		PARTIES,
-		TASKS,
-		TIMELINE,
 		HIDDEN
 	}
 
