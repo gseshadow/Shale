@@ -805,7 +805,8 @@
 	</center>
 
 	<right>
-		<VBox fx:id="caseUpdatesPane" spacing="10.0" prefWidth="320.0"
+		<VBox fx:id="caseUpdatesPane" spacing="10.0" minWidth="300.0"
+			prefWidth="320.0" maxWidth="360.0"
 			styleClass="case-right-pane strong-panel"
 			BorderPane.alignment="TOP_LEFT">
 			<padding>
