@@ -3872,7 +3872,11 @@ public final class CaseDao {
 			ps.setInt(idx++, shaleClientId);
 			ps.setLong(idx++, caseId);
 			ps.setInt(idx++, contactId);
-			return ps.executeUpdate() > 0;
+			boolean linked = ps.executeUpdate() > 0;
+			if (linked) {
+				touchCaseUpdatedAt(con, caseId, shaleClientId);
+			}
+			return linked;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to link contact to case (caseId=" + caseId + ", contactId=" + contactId + ", roleId=" + roleId + ")", e);
 		}
@@ -4769,7 +4773,11 @@ public final class CaseDao {
 			ps.setInt(idx++, contactId);
 			ps.setInt(idx++, shaleClientId);
 			ps.setInt(idx++, shaleClientId);
-			return ps.executeUpdate() > 0;
+			boolean changed = ps.executeUpdate() > 0;
+			if (changed) {
+				touchCaseUpdatedAt(con, caseId, shaleClientId);
+			}
+			return changed;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to unlink contact from case (caseId=" + caseId + ", contactId=" + contactId + ")", e);
 		}
@@ -5153,6 +5161,11 @@ public final class CaseDao {
 				    VALUES
 				        (?, ?, @now, NULL, ?, @now, @now, 1);
 
+				    UPDATE dbo.Cases
+				    SET UpdatedAt = @now
+				    WHERE Id = ?
+				      AND (IsDeleted = 0 OR IsDeleted IS NULL);
+
 				  END
 
 				  COMMIT;
@@ -5173,6 +5186,7 @@ public final class CaseDao {
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, statusId);
 			ps.setString(i++, (notes == null || notes.isBlank()) ? null : notes.trim());
+			ps.setLong(i++, caseId);
 
 			ps.executeUpdate();
 		} catch (SQLException e) {
@@ -6565,6 +6579,10 @@ public final class CaseDao {
 				WHEN NOT MATCHED THEN
 				    INSERT (CaseId, UserId, RoleId, IsPrimary, Notes, CreatedAt, UpdatedAt)
 				    VALUES (?, ?, ?, CAST(1 AS bit), NULL, SYSDATETIME(), SYSDATETIME());
+
+				UPDATE dbo.Cases
+				SET UpdatedAt = SYSDATETIME()
+				WHERE Id = ? AND (IsDeleted = 0 OR IsDeleted IS NULL);
 				""";
 
 		try (Connection c = db.requireConnection();
@@ -6578,6 +6596,7 @@ public final class CaseDao {
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, userId);
 			ps.setInt(i++, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setLong(i++, caseId);
 
 			ps.executeUpdate();
 
@@ -6652,6 +6671,20 @@ public final class CaseDao {
 
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list attorneys (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	private static void touchCaseUpdatedAt(Connection con, long caseId, int shaleClientId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("""
+				UPDATE dbo.Cases
+				SET UpdatedAt = SYSDATETIME()
+				WHERE Id = ?
+				  AND ShaleClientId = ?
+				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
+				""")) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, shaleClientId);
+			ps.executeUpdate();
 		}
 	}
 
@@ -7161,6 +7194,8 @@ public final class CaseDao {
 					ps.executeBatch();
 				}
 			}
+
+			touchCaseUpdatedAt(con, caseId, requireCurrentShaleClientId(con));
 
 			con.commit();
 
