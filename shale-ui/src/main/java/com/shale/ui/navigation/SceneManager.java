@@ -772,9 +772,16 @@ public final class SceneManager {
 			UserPreferencesService userPreferencesService = new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-				c.init(appState, runtimeBridge, caseDao, caseTaskService, userBoardLanePreferencesDao, userPreferencesService, onOpenCase, onOpenUser, phiReadAuditService);
-				return c;
-			});
+			c.init(appState, runtimeBridge, caseDao, caseTaskService, userBoardLanePreferencesDao, userPreferencesService, notificationCenterService, this::openNotificationCenterFromDashboard, onOpenCase, onOpenUser, phiReadAuditService);
+			return c;
+		});
+	}
+
+	private void openNotificationCenterFromDashboard() {
+		MainController mainController = resolveMainController();
+		if (mainController != null) {
+			mainController.openNotificationCenter();
+		}
 	}
 
 	public Parent createCaseView(int caseId, String sectionKey, Consumer<Integer> onOpenOrganization, Runnable onCaseDeleted) {

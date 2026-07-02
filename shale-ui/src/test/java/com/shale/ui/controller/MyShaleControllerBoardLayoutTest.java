@@ -48,6 +48,33 @@ final class MyShaleControllerBoardLayoutTest {
     }
 
     @Test
+    void notificationsWidgetReusesCenterServiceAndKeepsCompactUnreadFirstBriefing() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+        String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
+
+        assertTrue(source.contains("buildNotificationsWidget()"),
+                "Overview dashboard should render the live Notifications widget instead of the placeholder");
+        assertTrue(source.contains("NotificationCenterService notificationCenterService"),
+                "Notifications widget should reuse the existing NotificationCenterService path");
+        assertTrue(source.contains("getNotificationsNewestFirst()"),
+                "Notifications widget should reuse the existing hydrated notification list instead of issuing duplicate queries");
+        assertTrue(source.contains("NOTIFICATIONS_ROW_LIMIT = 10"),
+                "Notifications widget should cap visible rows at 10");
+        assertTrue(source.contains("Comparator.comparing(AppNotification::isUnread).reversed()"),
+                "Notifications widget should prefer unread notifications first");
+        assertTrue(source.contains("notificationCenterService.getUnreadCount()"),
+                "Notifications widget should display the existing unread badge count");
+        assertTrue(source.contains("You’re all caught up."),
+                "Notifications widget should keep the requested empty state");
+        assertTrue(source.contains("TODO: Add recent-read durable notifications"),
+                "Recent-read support should remain an explicit TODO until the existing service exposes it");
+        assertTrue(source.contains("notificationCenterService.markRead(notification)"),
+                "Notification row clicks should reuse the existing mark-read behavior");
+        assertTrue(sceneManager.contains("notificationCenterService, this::openNotificationCenterFromDashboard"),
+                "My Shale should receive the existing notification center service and View All route from SceneManager");
+    }
+
+    @Test
     void myCasesBoardUsesWiderStatusColumnsAndHorizontalScroll() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
