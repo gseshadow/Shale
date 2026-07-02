@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -102,6 +103,9 @@ public final class MyShaleController {
 	private static final double MY_TASKS_GRID_HGAP = 10;
 	private static final double MY_TASKS_GRID_VGAP = 10;
 	private static final long MY_SHALE_PRIORITY_CACHE_TTL_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
+	private static final int IMPORTANT_DATES_WINDOW_DAYS = 30;
+	private static final int IMPORTANT_DATES_ROW_LIMIT = 10;
+	private static final DateTimeFormatter IMPORTANT_DATE_LABEL_FORMATTER = DateTimeFormatter.ofPattern("MMM d");
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -1655,7 +1659,7 @@ public final class MyShaleController {
 	private List<Node> buildOverviewDashboardWidgets() {
 		return List.of(
 				buildCaseRadarWidget(),
-				DashboardWidgetFactory.placeholder("Important Dates", "No upcoming important dates."),
+				buildImportantDatesWidget(),
 				DashboardWidgetFactory.placeholder("Notifications", "You’re all caught up."),
 				DashboardWidgetFactory.placeholder("Recent Case Activity", "No recent case activity."),
 				buildMyCaseSummaryWidget());
@@ -1803,6 +1807,153 @@ public final class MyShaleController {
 
 	private void onCaseRadarRowClicked(CaseRadarRow row) {
 		// TODO: Wire to a filtered tasks/cases navigation target when dashboard row navigation exists.
+	}
+
+
+	private Node buildImportantDatesWidget() {
+		if (loadingMyTasks || loadingMyCases) {
+			return DashboardWidgetFactory.widget("Important Dates", null, null, null, true, false);
+		}
+		if (myCasesLoadFailed) {
+			return DashboardWidgetFactory.widget(
+					"Important Dates",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Unable to load important dates."),
+					false,
+					false);
+		}
+		List<ImportantDateItem> items = buildImportantDateItems(LocalDate.now());
+		if (items.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"Important Dates",
+					null,
+					null,
+					DashboardWidgetFactory.emptyState("No upcoming important dates."),
+					false,
+					true);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("important-dates-list");
+		content.setFillWidth(true);
+		items.stream()
+				.limit(IMPORTANT_DATES_ROW_LIMIT)
+				.map(this::buildImportantDateRow)
+				.forEach(content.getChildren()::add);
+		return DashboardWidgetFactory.widget(
+				"Important Dates",
+				String.valueOf(items.size()),
+				null,
+				content,
+				false,
+				false);
+	}
+
+	private List<ImportantDateItem> buildImportantDateItems(LocalDate today) {
+		LocalDate effectiveToday = today == null ? LocalDate.now() : today;
+		LocalDate end = effectiveToday.plusDays(IMPORTANT_DATES_WINDOW_DAYS);
+		List<ImportantDateItem> items = new ArrayList<>();
+		for (CaseTaskListItemDto task : overviewEligibleTasks(myTasks)) {
+			if (task == null || task.deleted() || task.completedAt() != null || task.dueAt() == null) {
+				continue;
+			}
+			LocalDate dueDate = task.dueAt().toLocalDate();
+			if (!isDateInWindow(dueDate, effectiveToday, end)) {
+				continue;
+			}
+			items.add(new ImportantDateItem(
+					dueDate,
+					ImportantDateType.TASK,
+					ImportantDateSeverity.fromDate(dueDate, effectiveToday),
+					resolveMyTaskCardTitle(task),
+					task.caseId(),
+					task.id()));
+		}
+
+		for (CaseCardVm caseVm : activeAssignedCaseRadarSource()) {
+			if (caseVm == null || caseVm.id <= 0) {
+				continue;
+			}
+			if (isDateInWindow(caseVm.solDate, effectiveToday, end)) {
+				items.add(new ImportantDateItem(
+						caseVm.solDate,
+						ImportantDateType.SOL,
+						ImportantDateSeverity.fromDate(caseVm.solDate, effectiveToday),
+						caseVm.name,
+						caseVm.id,
+						null));
+			}
+			if (isDateInWindow(caseVm.tortNoticeDate, effectiveToday, end)) {
+				items.add(new ImportantDateItem(
+						caseVm.tortNoticeDate,
+						ImportantDateType.TORT_NOTICE,
+						ImportantDateSeverity.fromDate(caseVm.tortNoticeDate, effectiveToday),
+						caseVm.name,
+						caseVm.id,
+						null));
+			}
+		}
+		// TODO: Add Calendar important dates when My Shale has a reliable loaded calendar feed/service path to reuse without new calendar infrastructure.
+		return sortImportantDateItems(items);
+	}
+
+	static List<ImportantDateItem> sortImportantDateItems(List<ImportantDateItem> items) {
+		if (items == null || items.isEmpty()) {
+			return List.of();
+		}
+		return items.stream()
+				.filter(Objects::nonNull)
+				.sorted(Comparator
+						.comparing(ImportantDateItem::date)
+						.thenComparing(ImportantDateItem::severity)
+						.thenComparing(item -> safe(item.title()), String.CASE_INSENSITIVE_ORDER)
+						.thenComparing(ImportantDateItem::type))
+				.toList();
+	}
+
+	static boolean isDateInWindow(LocalDate date, LocalDate start, LocalDate end) {
+		return date != null && start != null && end != null && !date.isBefore(start) && !date.isAfter(end);
+	}
+
+	private Node buildImportantDateRow(ImportantDateItem item) {
+		HBox row = new HBox(8);
+		row.getStyleClass().addAll("important-date-row", "important-date-row-" + item.severity().styleSuffix());
+		row.setAlignment(Pos.CENTER_LEFT);
+		row.setMaxWidth(Double.MAX_VALUE);
+		row.setOnMouseClicked(event -> onImportantDateClicked(item));
+
+		Label date = new Label(formatImportantDateLabel(item.date()));
+		date.getStyleClass().add("important-date-date");
+
+		Label type = new Label(item.type().label());
+		type.getStyleClass().addAll("important-date-type", "important-date-type-" + item.type().styleSuffix());
+
+		Label title = new Label(safe(item.title()).isBlank() ? "Untitled" : safe(item.title()).trim());
+		title.getStyleClass().add("important-date-title");
+		title.setMaxWidth(Double.MAX_VALUE);
+		title.setWrapText(true);
+		HBox.setHgrow(title, Priority.ALWAYS);
+
+		row.getChildren().addAll(date, type, title);
+		return row;
+	}
+
+	private String formatImportantDateLabel(LocalDate date) {
+		if (date == null) {
+			return "—";
+		}
+		LocalDate today = LocalDate.now();
+		if (date.isEqual(today)) {
+			return "Today";
+		}
+		if (date.isEqual(today.plusDays(1))) {
+			return "Tomorrow";
+		}
+		return IMPORTANT_DATE_LABEL_FORMATTER.format(date);
+	}
+
+	private void onImportantDateClicked(ImportantDateItem item) {
+		// TODO: Wire Important Dates rows to task/case/calendar detail once dashboard navigation routes are available.
 	}
 
 	private Node buildMyCaseSummaryWidget() {
@@ -3221,6 +3372,62 @@ public final class MyShaleController {
 	}
 
 	private record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText) {
+	}
+
+
+	private enum ImportantDateType {
+		TASK("Task", "task"),
+		SOL("SOL", "sol"),
+		TORT_NOTICE("Tort Notice", "tort-notice"),
+		CALENDAR("Calendar", "calendar");
+
+		private final String label;
+		private final String styleSuffix;
+
+		ImportantDateType(String label, String styleSuffix) {
+			this.label = label;
+			this.styleSuffix = styleSuffix;
+		}
+
+		String label() {
+			return label;
+		}
+
+		String styleSuffix() {
+			return styleSuffix;
+		}
+	}
+
+	enum ImportantDateSeverity {
+		CRITICAL("critical"),
+		WARNING("warning"),
+		NEUTRAL("neutral");
+
+		private final String styleSuffix;
+
+		ImportantDateSeverity(String styleSuffix) {
+			this.styleSuffix = styleSuffix;
+		}
+
+		String styleSuffix() {
+			return styleSuffix;
+		}
+
+		static ImportantDateSeverity fromDate(LocalDate date, LocalDate today) {
+			if (date == null || today == null) {
+				return NEUTRAL;
+			}
+			if (!date.isAfter(today.plusDays(7))) {
+				return CRITICAL;
+			}
+			if (!date.isAfter(today.plusDays(14))) {
+				return WARNING;
+			}
+			return NEUTRAL;
+		}
+	}
+
+	record ImportantDateItem(LocalDate date, ImportantDateType type, ImportantDateSeverity severity, String title, Long caseId, Long taskId) {
 	}
 
 	private record MyCaseSummaryRow(Integer statusId, String statusName, String statusColor, long count) {

@@ -26,6 +26,28 @@ final class MyShaleControllerBoardLayoutTest {
     }
 
     @Test
+    void importantDatesWidgetUsesLoadedSourcesAndKeepsChronologicalCap() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+        assertTrue(source.contains("buildImportantDatesWidget()"),
+                "Overview dashboard should render the live Important Dates widget instead of a placeholder");
+        assertTrue(source.contains("IMPORTANT_DATES_WINDOW_DAYS = 30"),
+                "Important Dates should use the requested today-through-30-days window");
+        assertTrue(source.contains("IMPORTANT_DATES_ROW_LIMIT = 10"),
+                "Important Dates rendering should be capped at 10 visible rows");
+        assertTrue(source.contains("overviewEligibleTasks(myTasks)"),
+                "Important Dates should reuse already loaded assigned task data");
+        assertTrue(source.contains("activeAssignedCaseRadarSource()"),
+                "Important Dates should reuse active assigned case data with terminal status filtering");
+        assertTrue(source.contains("TORT_NOTICE"),
+                "Important Dates should include Tort Notice deadlines from the assigned case model");
+        assertTrue(source.contains("TODO: Add Calendar important dates"),
+                "Calendar integration should remain a TODO until a reliable My Shale loaded path exists");
+        assertTrue(source.contains("DashboardWidgetFactory.widget"),
+                "Important Dates should be built with DashboardWidgetFactory");
+    }
+
+    @Test
     void myCasesBoardUsesWiderStatusColumnsAndHorizontalScroll() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
