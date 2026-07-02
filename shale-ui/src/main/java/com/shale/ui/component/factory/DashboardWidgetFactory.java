@@ -73,6 +73,10 @@ public final class DashboardWidgetFactory {
 		return stateLabel(text, "dashboard-widget-empty", "shale-empty-state");
 	}
 
+	public static Label errorState(String text) {
+		return stateLabel(text, "dashboard-widget-error", "shale-empty-state");
+	}
+
 	private static Label stateLabel(String text, String... styleClasses) {
 		Label label = new Label(text == null ? "" : text);
 		label.getStyleClass().addAll(styleClasses);

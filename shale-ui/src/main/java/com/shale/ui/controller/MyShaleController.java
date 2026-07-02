@@ -30,6 +30,7 @@ import com.shale.ui.component.board.LaneBoardLayout;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.DashboardWidgetFactory;
+import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.controller.support.CaseListUiSupport;
 import com.shale.ui.services.CaseTaskService;
@@ -529,6 +530,7 @@ public final class MyShaleController {
 				renderMyOverview();
 			}
 			ensureMyTasksFresh(false);
+			ensureMyCasesFresh(false);
 		}
 		if (showTasks) {
 			primeTasksLoadingStateForFirstLoad();
@@ -662,6 +664,7 @@ public final class MyShaleController {
 				statusFilterOptions = options;
 				CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
 				syncMyCasesBoardStatusFilterOptions();
+				renderOverviewWidgets();
 			});
 		});
 	}
@@ -702,6 +705,7 @@ public final class MyShaleController {
 						myCasesLoadedOnce = true;
 						rerender();
 						renderMyCasesBoard();
+						renderOverviewWidgets();
 					}
 				});
 				} catch (Exception ex) {
@@ -1135,6 +1139,7 @@ public final class MyShaleController {
 		}
 		loadingMyCases = true;
 		renderMyCasesBoard();
+		renderOverviewWidgets();
 		Integer userId = appState.getUserId();
 		Integer shaleClientId = appState.getShaleClientId();
 		System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.refreshMyCasesBoard] load started userId=" + userId
@@ -1142,6 +1147,7 @@ public final class MyShaleController {
 		loadingMyCases = true;
 		myCasesLoadFailed = false;
 		renderMyCasesBoard();
+		renderOverviewWidgets();
 			if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
 				myAssignedCasesBoard = List.of();
 				loadingMyCases = false;
@@ -1151,6 +1157,7 @@ public final class MyShaleController {
 				myCasesLoadedOnce = true;
 				myCasesDirty = false;
 			renderMyCasesBoard();
+			renderOverviewWidgets();
 			return;
 		}
 		final int userIdValue = userId;
@@ -1181,6 +1188,7 @@ public final class MyShaleController {
 						myCasesLoadedOnce = true;
 						myCasesDirty = false;
 					renderMyCasesBoard();
+					renderOverviewWidgets();
 				});
 			} catch (Exception ex) {
 				System.err.println("My cases board load failed userId=" + userIdValue + ": " + ex.getMessage());
@@ -1191,6 +1199,7 @@ public final class MyShaleController {
 					myCasesDirty = true;
 					myAssignedCasesBoard = List.of();
 					renderMyCasesBoard();
+					renderOverviewWidgets();
 				});
 			}
 		});
@@ -1648,7 +1657,128 @@ public final class MyShaleController {
 				DashboardWidgetFactory.placeholder("Important Dates", "No upcoming important dates."),
 				DashboardWidgetFactory.placeholder("Notifications", "You’re all caught up."),
 				DashboardWidgetFactory.placeholder("Recent Case Activity", "No recent case activity."),
-				DashboardWidgetFactory.placeholder("My Case Summary", "No case summary available."));
+				buildMyCaseSummaryWidget());
+	}
+
+	private void renderOverviewWidgets() {
+		if (overviewWidgetsContainer == null) {
+			return;
+		}
+		overviewWidgetsContainer.getChildren().setAll(buildOverviewDashboardWidgets());
+	}
+
+	private Node buildMyCaseSummaryWidget() {
+		if (loadingMyCases) {
+			return DashboardWidgetFactory.widget("My Case Summary", null, null, null, true, false);
+		}
+		if (myCasesLoadFailed) {
+			return DashboardWidgetFactory.widget(
+					"My Case Summary",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Unable to load case summary."),
+					false,
+					false);
+		}
+		List<MyCaseSummaryRow> rows = buildMyCaseSummaryRows();
+		if (rows.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"My Case Summary",
+					null,
+					null,
+					DashboardWidgetFactory.emptyState("No case summary available."),
+					false,
+					false);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("my-case-summary-list");
+		content.setFillWidth(true);
+		for (MyCaseSummaryRow row : rows) {
+			content.getChildren().add(buildMyCaseSummaryRow(row));
+		}
+		return DashboardWidgetFactory.widget(
+				"My Case Summary",
+				String.valueOf(rows.stream().mapToLong(MyCaseSummaryRow::count).sum()),
+				null,
+				content,
+				false,
+				false);
+	}
+
+	private List<MyCaseSummaryRow> buildMyCaseSummaryRows() {
+		if (myAssignedCasesBoard == null || myAssignedCasesBoard.isEmpty()) {
+			return List.of();
+		}
+		Map<Integer, Long> countsByStatusId = myAssignedCasesBoard.stream()
+				.filter(Objects::nonNull)
+				.map(vm -> vm.primaryStatusId)
+				.filter(Objects::nonNull)
+				.collect(java.util.stream.Collectors.groupingBy(
+						statusId -> statusId,
+						LinkedHashMap::new,
+						java.util.stream.Collectors.counting()));
+		if (countsByStatusId.isEmpty()) {
+			return List.of();
+		}
+		List<MyCaseSummaryRow> rows = new ArrayList<>();
+		Set<Integer> knownStatusIds = new LinkedHashSet<>();
+		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
+			if (status == null || !countsByStatusId.containsKey(status.id())) {
+				continue;
+			}
+			knownStatusIds.add(status.id());
+			CaseCardVm representative = firstCaseWithStatus(status.id());
+			rows.add(new MyCaseSummaryRow(
+					status.id(),
+					safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim(),
+					representative == null ? "" : representative.primaryStatusColor,
+					countsByStatusId.getOrDefault(status.id(), 0L)));
+		}
+		for (Map.Entry<Integer, Long> entry : countsByStatusId.entrySet()) {
+			if (knownStatusIds.contains(entry.getKey())) {
+				continue;
+			}
+			CaseCardVm representative = firstCaseWithStatus(entry.getKey());
+			rows.add(new MyCaseSummaryRow(
+					entry.getKey(),
+					representative == null || safe(representative.primaryStatusName).isBlank()
+							? ("Status #" + entry.getKey())
+							: safe(representative.primaryStatusName).trim(),
+					representative == null ? "" : representative.primaryStatusColor,
+					entry.getValue()));
+		}
+		return rows;
+	}
+
+	private CaseCardVm firstCaseWithStatus(Integer statusId) {
+		if (statusId == null || myAssignedCasesBoard == null) {
+			return null;
+		}
+		return myAssignedCasesBoard.stream()
+				.filter(vm -> vm != null && Objects.equals(statusId, vm.primaryStatusId))
+				.findFirst()
+				.orElse(null);
+	}
+
+	private Node buildMyCaseSummaryRow(MyCaseSummaryRow row) {
+		HBox summaryRow = new HBox(8);
+		summaryRow.getStyleClass().add("my-case-summary-row");
+		summaryRow.setAlignment(Pos.CENTER_LEFT);
+		summaryRow.setMaxWidth(Double.MAX_VALUE);
+		summaryRow.setOnMouseClicked(event -> onMyCaseSummaryStatusClicked(row));
+
+		Node statusBadge = StatusIndicatorFactory.createStatusBadge(row.statusName(), row.statusColor());
+		HBox.setHgrow(statusBadge, Priority.ALWAYS);
+
+		Label count = new Label(String.valueOf(row.count()));
+		count.getStyleClass().add("my-case-summary-count");
+
+		summaryRow.getChildren().addAll(statusBadge, count);
+		return summaryRow;
+	}
+
+	private void onMyCaseSummaryStatusClicked(MyCaseSummaryRow row) {
+		// TODO: Wire to the future My Shale status-filtered case navigation route.
 	}
 
 	private Node buildOverviewControlBar() {
@@ -2933,6 +3063,9 @@ public final class MyShaleController {
 			String text = safe(displayName).trim();
 			return text.isBlank() ? "All Priorities" : text;
 		}
+	}
+
+	private record MyCaseSummaryRow(Integer statusId, String statusName, String statusColor, long count) {
 	}
 
 	private record BoardStatusFilterOption(Integer statusId, String displayName) {
