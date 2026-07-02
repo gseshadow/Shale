@@ -2064,3 +2064,44 @@
     -fx-font-size: 10.5px;
     -fx-text-fill: #5d7280;
 }
+
+.recent-case-activity-list {
+    -fx-spacing: 6;
+}
+
+.recent-case-activity-row {
+    -fx-padding: 7 8 7 8;
+    -fx-background-color: rgba(255, 255, 255, 0.58);
+    -fx-background-radius: 10;
+    -fx-border-color: rgba(24, 70, 92, 0.10);
+    -fx-border-radius: 10;
+    -fx-cursor: hand;
+}
+
+.recent-case-activity-icon {
+    -fx-min-width: 18;
+    -fx-pref-width: 18;
+    -fx-alignment: center;
+    -fx-text-fill: #1b759c;
+    -fx-font-size: 12px;
+    -fx-font-weight: 900;
+}
+
+.recent-case-activity-icon-task-completed {
+    -fx-text-fill: #18894f;
+}
+
+.recent-case-activity-icon-task-created {
+    -fx-text-fill: #7c5a13;
+}
+
+.recent-case-activity-summary {
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #17384a;
+}
+
+.recent-case-activity-meta {
+    -fx-font-size: 10.5px;
+    -fx-text-fill: #5d7280;
+}

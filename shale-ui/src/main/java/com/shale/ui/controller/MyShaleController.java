@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
@@ -110,6 +111,7 @@ public final class MyShaleController {
 	private static final int IMPORTANT_DATES_WINDOW_DAYS = 30;
 	private static final int IMPORTANT_DATES_ROW_LIMIT = 10;
 	private static final int NOTIFICATIONS_ROW_LIMIT = 10;
+	private static final int RECENT_CASE_ACTIVITY_ROW_LIMIT = 10;
 	private static final DateTimeFormatter IMPORTANT_DATE_LABEL_FORMATTER = DateTimeFormatter.ofPattern("MMM d");
 
 	@FXML
@@ -209,6 +211,7 @@ public final class MyShaleController {
 	private int loadGeneration = 0;
 	private int taskLoadGeneration = 0;
 	private int myCasesBoardLoadGeneration = 0;
+	private int recentCaseActivityLoadGeneration = 0;
 
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
@@ -218,6 +221,7 @@ public final class MyShaleController {
 	private Integer cachedPriorityTenantId;
 	private long cachedPriorityLoadedAtNanos;
 	private List<CaseCardVm> myAssignedCasesBoard = List.of();
+	private List<RecentCaseActivityItem> recentCaseActivities = List.of();
 	private boolean loadingOverview;
 	private boolean loadingMyTasks;
 	private boolean loadingMyCases;
@@ -230,6 +234,8 @@ public final class MyShaleController {
 	private Integer cachedCasesUserId;
 	private Integer cachedCasesTenantId;
 	private boolean myCasesLoadFailed;
+	private boolean loadingRecentCaseActivity;
+	private boolean recentCaseActivityLoadFailed;
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private final Set<Long> pinnedTaskLaneCaseIds = new LinkedHashSet<>();
@@ -642,6 +648,7 @@ public final class MyShaleController {
 
 		System.out.println("[DEBUG LIVE][MY_CASES] event accepted -> scheduling targeted refresh");
 		refreshCaseIncremental(event.caseId());
+		refreshRecentCaseActivity();
 	}
 
 	private void reloadStatusFilterOptionsAndThen(Runnable onLoaded) {
@@ -1111,6 +1118,7 @@ public final class MyShaleController {
 						syncMyTaskPriorityFilterOptions();
 						syncMyTaskCaseFilterOptions();
 						renderActiveTaskViews();
+						refreshRecentCaseActivity();
 					});
 			} catch (Exception ex) {
 				System.err.println("My tasks load failed: " + ex.getMessage());
@@ -1168,6 +1176,8 @@ public final class MyShaleController {
 		renderOverviewWidgets();
 			if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
 				myAssignedCasesBoard = List.of();
+				recentCaseActivities = List.of();
+				loadingRecentCaseActivity = false;
 				loadingMyCases = false;
 				myCasesLoadFailed = false;
 				cachedCasesUserId = userId;
@@ -1207,6 +1217,7 @@ public final class MyShaleController {
 						myCasesDirty = false;
 					renderMyCasesBoard();
 					renderOverviewWidgets();
+					refreshRecentCaseActivity();
 				});
 			} catch (Exception ex) {
 				System.err.println("My cases board load failed userId=" + userIdValue + ": " + ex.getMessage());
@@ -1674,7 +1685,7 @@ public final class MyShaleController {
 				buildCaseRadarWidget(),
 				buildImportantDatesWidget(),
 				buildNotificationsWidget(),
-				DashboardWidgetFactory.placeholder("Recent Case Activity", "No recent case activity."),
+				buildRecentCaseActivityWidget(),
 				buildMyCaseSummaryWidget());
 	}
 
@@ -1693,6 +1704,197 @@ public final class MyShaleController {
 		notificationCenterService.getNotificationsNewestFirst().addListener((javafx.collections.ListChangeListener<AppNotification>) change -> renderOverviewWidgets());
 		notificationCenterService.unreadCountProperty().addListener((obs, oldValue, newValue) -> renderOverviewWidgets());
 	}
+
+
+	private Node buildRecentCaseActivityWidget() {
+		if (loadingMyCases || loadingRecentCaseActivity) {
+			return DashboardWidgetFactory.widget("Recent Case Activity", null, null, null, true, false);
+		}
+		if (myCasesLoadFailed || recentCaseActivityLoadFailed) {
+			return DashboardWidgetFactory.widget(
+					"Recent Case Activity",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Unable to load recent case activity."),
+					false,
+					false);
+		}
+		List<RecentCaseActivityItem> visibleActivities = sortRecentCaseActivities(recentCaseActivities).stream()
+				.limit(RECENT_CASE_ACTIVITY_ROW_LIMIT)
+				.toList();
+		if (visibleActivities.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"Recent Case Activity",
+					null,
+					null,
+					DashboardWidgetFactory.emptyState("No recent case activity."),
+					false,
+					true);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("recent-case-activity-list");
+		content.setFillWidth(true);
+		visibleActivities.stream()
+				.map(this::buildRecentCaseActivityRow)
+				.forEach(content.getChildren()::add);
+		return DashboardWidgetFactory.widget(
+				"Recent Case Activity",
+				String.valueOf(visibleActivities.size()),
+				null,
+				content,
+				false,
+				false);
+	}
+
+	private void refreshRecentCaseActivity() {
+		if (caseDao == null || appState == null || loadingMyCases) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0 || myAssignedCasesBoard == null || myAssignedCasesBoard.isEmpty()) {
+			recentCaseActivities = List.of();
+			loadingRecentCaseActivity = false;
+			recentCaseActivityLoadFailed = false;
+			renderOverviewWidgets();
+			return;
+		}
+		List<CaseCardVm> assignedCases = List.copyOf(myAssignedCasesBoard);
+		Map<Long, String> caseNamesById = assignedCases.stream()
+				.filter(Objects::nonNull)
+				.collect(java.util.stream.Collectors.toMap(
+						caseVm -> caseVm.id,
+						caseVm -> safe(caseVm.name).isBlank() ? ("Case #" + caseVm.id) : safe(caseVm.name).trim(),
+						(first, second) -> first,
+						LinkedHashMap::new));
+		final int tenantId = shaleClientId;
+		final int generationAtSubmit = ++recentCaseActivityLoadGeneration;
+		loadingRecentCaseActivity = true;
+		recentCaseActivityLoadFailed = false;
+		renderOverviewWidgets();
+		casesDbExec.submit(() -> {
+			try {
+				List<RecentCaseActivityItem> loadedActivities = new ArrayList<>();
+				for (CaseCardVm caseVm : assignedCases) {
+					if (caseVm == null || caseVm.id <= 0) {
+						continue;
+					}
+					List<CaseUpdateDto> updates = caseDao.listCaseUpdates(caseVm.id, tenantId);
+					for (CaseUpdateDto update : updates == null ? List.<CaseUpdateDto>of() : updates) {
+						if (update == null) {
+							continue;
+						}
+						loadedActivities.add(RecentCaseActivityItem.caseUpdate(update, caseNamesById.get(update.getCaseId())));
+					}
+				}
+				loadedActivities.addAll(taskActivitiesForAssignedCases(myTasks, caseNamesById));
+				List<RecentCaseActivityItem> sorted = sortRecentCaseActivities(loadedActivities).stream()
+						.limit(RECENT_CASE_ACTIVITY_ROW_LIMIT)
+						.toList();
+				runOnFx(() -> {
+					if (generationAtSubmit != recentCaseActivityLoadGeneration) {
+						return;
+					}
+					loadingRecentCaseActivity = false;
+					recentCaseActivityLoadFailed = false;
+					recentCaseActivities = sorted;
+					renderOverviewWidgets();
+				});
+			} catch (Exception ex) {
+				System.err.println("Recent case activity load failed: " + ex.getMessage());
+				runOnFx(() -> {
+					if (generationAtSubmit != recentCaseActivityLoadGeneration) {
+						return;
+					}
+					loadingRecentCaseActivity = false;
+					recentCaseActivityLoadFailed = true;
+					renderOverviewWidgets();
+				});
+			}
+		});
+	}
+
+	static List<RecentCaseActivityItem> taskActivitiesForAssignedCases(List<CaseTaskListItemDto> tasks, Map<Long, String> caseNamesById) {
+		if (tasks == null || tasks.isEmpty() || caseNamesById == null || caseNamesById.isEmpty()) {
+			return List.of();
+		}
+		List<RecentCaseActivityItem> activities = new ArrayList<>();
+		for (CaseTaskListItemDto task : tasks) {
+			if (task == null || task.deleted() || !caseNamesById.containsKey(task.caseId())) {
+				continue;
+			}
+			String caseName = caseNamesById.get(task.caseId());
+			if (task.completedAt() != null) {
+				activities.add(new RecentCaseActivityItem(RecentCaseActivityType.TASK_COMPLETED, "✓", "Task completed: " + safeTaskTitle(task), caseName, task.completedAt(), task.caseId(), task.id()));
+			} else if (task.createdAt() != null) {
+				activities.add(new RecentCaseActivityItem(RecentCaseActivityType.TASK_CREATED, "+", "Task assigned: " + safeTaskTitle(task), caseName, task.createdAt(), task.caseId(), task.id()));
+			}
+		}
+		return activities;
+	}
+
+	static List<RecentCaseActivityItem> sortRecentCaseActivities(List<RecentCaseActivityItem> activities) {
+		if (activities == null || activities.isEmpty()) {
+			return List.of();
+		}
+		return activities.stream()
+				.filter(Objects::nonNull)
+				.sorted(Comparator
+						.comparing(RecentCaseActivityItem::occurredAt, Comparator.nullsLast(Comparator.reverseOrder()))
+						.thenComparing(item -> item.type().priority())
+						.thenComparing(RecentCaseActivityItem::caseName, String.CASE_INSENSITIVE_ORDER)
+						.thenComparing(RecentCaseActivityItem::summary, String.CASE_INSENSITIVE_ORDER))
+				.toList();
+	}
+
+	private Node buildRecentCaseActivityRow(RecentCaseActivityItem item) {
+		Label icon = new Label(item.icon());
+		icon.getStyleClass().addAll("recent-case-activity-icon", "recent-case-activity-icon-" + item.type().styleSuffix());
+
+		Label summary = new Label(item.summary());
+		summary.getStyleClass().add("recent-case-activity-summary");
+		summary.setWrapText(true);
+		Label meta = new Label(activityMeta(item));
+		meta.getStyleClass().add("recent-case-activity-meta");
+		meta.setWrapText(true);
+		VBox text = new VBox(2, summary, meta);
+		text.setFillWidth(true);
+		HBox.setHgrow(text, Priority.ALWAYS);
+
+		HBox row = new HBox(7, icon, text);
+		row.getStyleClass().add("recent-case-activity-row");
+		row.setAlignment(Pos.TOP_LEFT);
+		row.setMaxWidth(Double.MAX_VALUE);
+		row.setOnMouseClicked(event -> onRecentCaseActivityClicked(item));
+		return row;
+	}
+
+	private static String activityMeta(RecentCaseActivityItem item) {
+		List<String> parts = new ArrayList<>();
+		if (!safe(item.caseName()).isBlank()) {
+			parts.add(item.caseName().trim());
+		}
+		String relative = shortRelativeTime(toInstant(item.occurredAt()));
+		if (!relative.isBlank()) {
+			parts.add(relative);
+		}
+		return String.join(" • ", parts);
+	}
+
+	private void onRecentCaseActivityClicked(RecentCaseActivityItem item) {
+		// TODO: Navigate to the case detail activity/update/task anchor when dashboard deep links are available.
+		if (item != null && item.caseId() != null && item.caseId() > 0 && onOpenCase != null) {
+			onOpenCase.accept(item.caseId().intValue());
+		}
+	}
+
+	private static Instant toInstant(LocalDateTime dateTime) {
+		return dateTime == null ? null : dateTime.atZone(java.time.ZoneId.systemDefault()).toInstant();
+	}
+
+	private static String safeTaskTitle(CaseTaskListItemDto task) {
+		return task == null || safe(task.title()).isBlank() ? "Untitled task" : safe(task.title()).trim();
+	}
+
 
 	private Node buildNotificationsWidget() {
 		if (notificationCenterService == null) {
@@ -3578,6 +3780,59 @@ public final class MyShaleController {
 	}
 
 	record ImportantDateItem(LocalDate date, ImportantDateType type, ImportantDateSeverity severity, String title, Long caseId, Long taskId) {
+	}
+
+
+	enum RecentCaseActivityType {
+		CASE_UPDATE("update", 0),
+		TASK_COMPLETED("task-completed", 1),
+		TASK_CREATED("task-created", 2);
+
+		private final String styleSuffix;
+		private final int priority;
+
+		RecentCaseActivityType(String styleSuffix, int priority) {
+			this.styleSuffix = styleSuffix;
+			this.priority = priority;
+		}
+
+		String styleSuffix() {
+			return styleSuffix;
+		}
+
+		int priority() {
+			return priority;
+		}
+	}
+
+	record RecentCaseActivityItem(
+			RecentCaseActivityType type,
+			String icon,
+			String summary,
+			String caseName,
+			LocalDateTime occurredAt,
+			Long caseId,
+			Long sourceId) {
+		static RecentCaseActivityItem caseUpdate(CaseUpdateDto update, String caseName) {
+			String note = safe(update == null ? null : update.getNoteText()).trim();
+			String summary = note.isBlank() ? "Case update added" : "Case update added: " + compactActivityText(note);
+			return new RecentCaseActivityItem(
+					RecentCaseActivityType.CASE_UPDATE,
+					"•",
+					summary,
+					safe(caseName).isBlank() ? "Case #" + (update == null ? "" : update.getCaseId()) : safe(caseName).trim(),
+					update == null ? null : update.getCreatedAt(),
+					update == null ? null : update.getCaseId(),
+					update == null ? null : update.getId());
+		}
+	}
+
+	private static String compactActivityText(String text) {
+		String normalized = safe(text).replaceAll("\\s+", " ").trim();
+		if (normalized.length() <= 80) {
+			return normalized;
+		}
+		return normalized.substring(0, 77).trim() + "…";
 	}
 
 	private record MyCaseSummaryRow(Integer statusId, String statusName, String statusColor, long count) {
