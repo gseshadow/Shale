@@ -10,6 +10,22 @@ import org.junit.jupiter.api.Test;
 final class MyShaleControllerBoardLayoutTest {
 
     @Test
+    void caseRadarReplacesPlaceholderAndKeepsUrgentRowsFirst() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+        assertTrue(source.contains("buildCaseRadarWidget()"),
+                "Overview dashboard should render the live Case Radar widget instead of a placeholder");
+        assertTrue(source.contains("Overdue tasks"),
+                "Case Radar should include overdue tasks as the first attention row");
+        assertTrue(source.indexOf("Overdue tasks") < source.indexOf("SOL due ≤ 14 days"),
+                "Overdue tasks should appear before SOL warning rows");
+        assertTrue(source.contains("activeAssignedCaseRadarSource"),
+                "Case Radar should reuse loaded assigned case board data with terminal status filtering");
+        assertTrue(source.contains("TODO: Add inactive/recently-updated radar rows"),
+                "Unavailable activity metrics should remain an explicit follow-up hook");
+    }
+
+    @Test
     void myCasesBoardUsesWiderStatusColumnsAndHorizontalScroll() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
