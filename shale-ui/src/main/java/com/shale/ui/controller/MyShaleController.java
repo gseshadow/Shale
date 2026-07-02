@@ -29,6 +29,7 @@ import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.component.board.LaneBoardLayout;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.component.factory.DashboardWidgetFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.controller.support.CaseListUiSupport;
 import com.shale.ui.services.CaseTaskService;
@@ -234,6 +235,7 @@ public final class MyShaleController {
 	private boolean overviewOverdueOnly;
 	private String overviewSortMode = OVERVIEW_SORT_DUE_ASC;
 	private VBox overviewSectionsContainer;
+	private VBox overviewWidgetsContainer;
 	private TextField overviewSearchFieldControl;
 	private ChoiceBox<PriorityFilterOption> overviewPriorityChoiceControl;
 	private ChoiceBox<CaseFilterOption> overviewCaseChoiceControl;
@@ -1569,15 +1571,37 @@ public final class MyShaleController {
 
 	private void ensureOverviewContentShell() {
 		if (overviewSectionsContainer != null
-				&& overviewMainRow.getChildren().contains(overviewSectionsContainer)
+				&& overviewWidgetsContainer != null
 				&& overviewSearchFieldControl != null) {
 			return;
 		}
+		HBox dashboard = new HBox(12);
+		dashboard.getStyleClass().add("my-shale-overview-dashboard");
+		dashboard.setAlignment(Pos.TOP_LEFT);
+		dashboard.setMaxWidth(Double.MAX_VALUE);
+
 		VBox sections = new VBox(10);
+		sections.getStyleClass().add("my-shale-overview-primary-column");
 		sections.setFillWidth(true);
+		sections.setMaxWidth(Double.MAX_VALUE);
+		HBox.setHgrow(sections, Priority.ALWAYS);
+
+		VBox widgets = new VBox(10);
+		widgets.getStyleClass().add("my-shale-overview-briefing-column");
+		widgets.setFillWidth(true);
+		widgets.setMinWidth(300);
+		widgets.setPrefWidth(360);
+		widgets.setMaxWidth(430);
+
+		sections.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.67));
+		widgets.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.33));
+
 		sections.getChildren().add(buildOverviewControlBar());
+		widgets.getChildren().setAll(buildOverviewDashboardWidgets());
 		overviewSectionsContainer = sections;
-		overviewMainRow.getChildren().setAll(sections);
+		overviewWidgetsContainer = widgets;
+		dashboard.getChildren().setAll(sections, widgets);
+		overviewMainRow.getChildren().setAll(dashboard);
 	}
 
 	private void renderOverviewSections(List<CaseTaskListItemDto> overviewSource) {
@@ -1598,7 +1622,7 @@ public final class MyShaleController {
 			sectionNodes.add(overviewSectionsContainer.getChildren().get(0));
 		}
 		sectionNodes.add(buildOverviewTaskSection(
-				"Today",
+				"Today’s Tasks",
 				todayTasks,
 				"Nothing due today",
 				true));
@@ -1613,6 +1637,18 @@ public final class MyShaleController {
 				"No tasks due later this month",
 				false));
 		overviewSectionsContainer.getChildren().setAll(sectionNodes);
+		if (overviewWidgetsContainer != null) {
+			overviewWidgetsContainer.getChildren().setAll(buildOverviewDashboardWidgets());
+		}
+	}
+
+	private List<Node> buildOverviewDashboardWidgets() {
+		return List.of(
+				DashboardWidgetFactory.placeholder("Case Radar", "No urgent items."),
+				DashboardWidgetFactory.placeholder("Important Dates", "No upcoming important dates."),
+				DashboardWidgetFactory.placeholder("Notifications", "You’re all caught up."),
+				DashboardWidgetFactory.placeholder("Recent Case Activity", "No recent case activity."),
+				DashboardWidgetFactory.placeholder("My Case Summary", "No case summary available."));
 	}
 
 	private Node buildOverviewControlBar() {
