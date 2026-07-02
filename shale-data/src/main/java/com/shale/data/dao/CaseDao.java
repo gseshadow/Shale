@@ -153,6 +153,7 @@ public final class CaseDao {
 		INTAKE_OLDEST,
 		STATUTE_SOONEST,
 		STATUTE_LATEST,
+		TORT_NOTICE_SOONEST,
 		CASE_NAME_ASC,
 		CASE_NAME_DESC,
 		RESPONSIBLE_ATTORNEY_ASC,
@@ -2005,6 +2006,7 @@ public final class CaseDao {
 		case INTAKE_OLDEST -> "c.CallerDate ASC, c.Id ASC";
 		case STATUTE_SOONEST -> "c.StatuteOfLimitations ASC, c.Id ASC";
 		case STATUTE_LATEST -> "c.StatuteOfLimitations DESC, c.Id DESC";
+		case TORT_NOTICE_SOONEST -> "c.TortNoticeDeadline ASC, c.Id ASC";
 		case CASE_NAME_ASC -> "c.Name ASC, c.Id ASC";
 		case CASE_NAME_DESC -> "c.Name DESC, c.Id DESC";
 		case RESPONSIBLE_ATTORNEY_ASC -> "ResponsibleAttorneyName ASC, c.Id ASC";

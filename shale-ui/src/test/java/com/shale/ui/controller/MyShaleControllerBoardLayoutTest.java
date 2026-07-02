@@ -56,12 +56,27 @@ final class MyShaleControllerBoardLayoutTest {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
         String css = Files.readString(Path.of("src/main/resources/css/app.css"));
 
-        assertTrue(source.contains("this::showOverdueTasksInMyTasks"),
+        assertTrue(source.contains("CaseRadarAction.OVERDUE_TASKS"),
                 "Overdue Case Radar rows should have an explicit action instead of a no-op click handler");
+        assertTrue(source.contains("CaseRadarAction.SOL_DUE_14_DAYS")
+                        && source.contains("CaseRadarAction.SOL_DUE_15_TO_30_DAYS"),
+                "SOL Case Radar rows should have explicit deadline actions");
+        assertTrue(source.contains("CaseRadarAction.TORT_NOTICE_DUE_14_DAYS")
+                        && source.contains("CaseRadarAction.TORT_NOTICE_DUE_15_TO_30_DAYS"),
+                "Tort Notice Case Radar rows should have explicit deadline actions");
         assertTrue(source.contains("onSectionSelected(SECTION_TASKS)"),
                 "Overdue Case Radar rows should navigate to the existing My Tasks section");
         assertTrue(source.contains("MY_TASKS_SORT_DUE_ASC"),
                 "Overdue Case Radar navigation should reuse existing due-date sorting to surface overdue work");
+        assertTrue(source.contains("showDeadlineCasesInMyCases(SORT_SOL"),
+                "Clicking SOL radar rows should switch to My Cases using SOL soonest sorting");
+        assertTrue(source.contains("showDeadlineCasesInMyCases(SORT_TORT_NOTICE"),
+                "Clicking Tort Notice radar rows should switch to My Cases using Tort Notice soonest sorting");
+        assertTrue(source.contains("myCasesBoardSearchField.clear()")
+                        && source.contains("myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION)"),
+                "Deadline radar actions should clear unrelated My Cases board search/status filters");
+        assertTrue(source.contains("TODO: Apply an existing My Cases deadline/window filter"),
+                "Deadline radar actions should keep an explicit TODO until a reusable deadline/window filter exists");
         assertTrue(source.contains("case TASK -> openTask(item.taskId())"),
                 "Task Important Dates should reuse the existing task detail opening path");
         assertTrue(source.contains("case SOL, TORT_NOTICE -> onOpenCase.accept(item.caseId().intValue())"),

@@ -75,6 +75,7 @@ public final class MyShaleController {
 	private static final String SORT_NAME = "Name";
 	private static final String SORT_INTAKE = "Date of Intake";
 	private static final String SORT_SOL = "Statute of Limitations Date";
+	private static final String SORT_TORT_NOTICE = "Tort Notice Deadline";
 	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
 	private static final String MY_TASKS_COLUMN_ORDER_CASE_NAME = "Case Name";
@@ -350,7 +351,7 @@ public final class MyShaleController {
 		configureSectionSizing();
 
 		if (myCasesSortChoice != null) {
-			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
+			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE);
 			myCasesSortChoice.getSelectionModel().select(SORT_NAME);
 			myCasesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> loadFirstPage());
 		}
@@ -432,7 +433,7 @@ public final class MyShaleController {
 		preferredMyTasksPriorityFilterId = restoreMyTasksPriorityFilterPreference();
 		preferredMyTasksCaseFilterId = restoreMyTasksCaseFilterPreference();
 		if (myCasesBoardSortChoice != null) {
-			myCasesBoardSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
+			myCasesBoardSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE);
 			myCasesBoardSortChoice.getSelectionModel().select(SORT_NAME);
 			myCasesBoardSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
 		}
@@ -898,6 +899,9 @@ public final class MyShaleController {
 		if (SORT_SOL.equals(value)) {
 			return CaseSort.STATUTE_SOONEST;
 		}
+		if (SORT_TORT_NOTICE.equals(value)) {
+			return CaseSort.TORT_NOTICE_SOONEST;
+		}
 		return CaseSort.INTAKE_NEWEST;
 	}
 
@@ -907,6 +911,9 @@ public final class MyShaleController {
 		}
 		if (SORT_SOL.equals(sortOption)) {
 			return Comparator.comparing((CaseCardVm v) -> v.solDate, this::nullsLastDate);
+		}
+		if (SORT_TORT_NOTICE.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm v) -> v.tortNoticeDate, this::nullsLastDate);
 		}
 		if (SORT_INTAKE.equals(sortOption)) {
 			return Comparator.comparing((CaseCardVm v) -> v.intakeDate, this::nullsLastDate).reversed();
@@ -1425,6 +1432,11 @@ public final class MyShaleController {
 		}
 		if (SORT_SOL.equals(sortOption)) {
 			return Comparator.comparing((CaseCardVm vm) -> vm.solDate, Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		if (SORT_TORT_NOTICE.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.tortNoticeDate, Comparator.nullsLast(Comparator.naturalOrder()))
 					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
 					.thenComparingLong(vm -> vm.id);
 		}
@@ -2116,19 +2128,19 @@ public final class MyShaleController {
 
 		List<CaseRadarRow> rows = new ArrayList<>();
 		if (overdueTasks > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Overdue tasks", overdueTasks, "Assigned to you and past due.", this::showOverdueTasksInMyTasks));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Overdue tasks", overdueTasks, "Assigned to you and past due.", CaseRadarAction.OVERDUE_TASKS));
 		}
 		if (solCritical > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "SOL due ≤ 14 days", solCritical, "Assigned active cases.", null));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "SOL due ≤ 14 days", solCritical, "Assigned active cases.", CaseRadarAction.SOL_DUE_14_DAYS));
 		}
 		if (tortCritical > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Tort notice due ≤ 14 days", tortCritical, "Assigned active cases.", null));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Tort notice due ≤ 14 days", tortCritical, "Assigned active cases.", CaseRadarAction.TORT_NOTICE_DUE_14_DAYS));
 		}
 		if (solWarning > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "SOL due in 15–30 days", solWarning, "Assigned active cases.", null));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "SOL due in 15–30 days", solWarning, "Assigned active cases.", CaseRadarAction.SOL_DUE_15_TO_30_DAYS));
 		}
 		if (tortWarning > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "Tort notice due in 15–30 days", tortWarning, "Assigned active cases.", null));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "Tort notice due in 15–30 days", tortWarning, "Assigned active cases.", CaseRadarAction.TORT_NOTICE_DUE_15_TO_30_DAYS));
 		}
 		// TODO: Add inactive/recently-updated radar rows once a reliable activity/UpdatedAt field is present in this loaded overview model.
 		return rows;
@@ -2197,14 +2209,22 @@ public final class MyShaleController {
 	}
 
 	private boolean isCaseRadarRowActionable(CaseRadarRow row) {
-		return row != null && row.action() != null;
+		return row != null && row.action() != null && row.action() != CaseRadarAction.NONE;
 	}
 
 	private void onCaseRadarRowClicked(CaseRadarRow row) {
 		if (!isCaseRadarRowActionable(row)) {
 			return;
 		}
-		row.action().run();
+		switch (row.action()) {
+			case OVERDUE_TASKS -> showOverdueTasksInMyTasks();
+			case SOL_DUE_14_DAYS -> showDeadlineCasesInMyCases(SORT_SOL, CaseDeadlineWindow.DUE_WITHIN_14_DAYS);
+			case SOL_DUE_15_TO_30_DAYS -> showDeadlineCasesInMyCases(SORT_SOL, CaseDeadlineWindow.DUE_15_TO_30_DAYS);
+			case TORT_NOTICE_DUE_14_DAYS -> showDeadlineCasesInMyCases(SORT_TORT_NOTICE, CaseDeadlineWindow.DUE_WITHIN_14_DAYS);
+			case TORT_NOTICE_DUE_15_TO_30_DAYS -> showDeadlineCasesInMyCases(SORT_TORT_NOTICE, CaseDeadlineWindow.DUE_15_TO_30_DAYS);
+			case NONE -> {
+			}
+		}
 	}
 
 	private void showOverdueTasksInMyTasks() {
@@ -2235,6 +2255,29 @@ public final class MyShaleController {
 		// My Tasks does not currently expose an overdue-only filter, so due-date ascending sorting makes overdue work appear first.
 	}
 
+	private void showDeadlineCasesInMyCases(String sortOption, CaseDeadlineWindow deadlineWindow) {
+		if (myCasesBoardSearchField != null) {
+			myCasesBoardSearchField.clear();
+		}
+		if (myCasesSearchField != null) {
+			myCasesSearchField.clear();
+		}
+		if (myCasesBoardStatusFilterChoice != null) {
+			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
+		}
+		selectedStatusIds.clear();
+		CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, this::loadFirstPage);
+		if (myCasesBoardSortChoice != null) {
+			myCasesBoardSortChoice.getSelectionModel().select(sortOption);
+		}
+		if (myCasesSortChoice != null) {
+			myCasesSortChoice.getSelectionModel().select(sortOption);
+		}
+		onSectionSelected(SECTION_MY_CASES);
+		// TODO: Apply an existing My Cases deadline/window filter for deadlineWindow when the assigned-case board exposes one.
+		renderMyCasesBoard();
+		ensureMyCasesFresh(false);
+	}
 
 	private Node buildImportantDatesWidget() {
 		if (loadingMyTasks || loadingMyCases) {
@@ -3851,7 +3894,21 @@ public final class MyShaleController {
 		}
 	}
 
-	private record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText, Runnable action) {
+	private enum CaseRadarAction {
+		NONE,
+		OVERDUE_TASKS,
+		SOL_DUE_14_DAYS,
+		SOL_DUE_15_TO_30_DAYS,
+		TORT_NOTICE_DUE_14_DAYS,
+		TORT_NOTICE_DUE_15_TO_30_DAYS
+	}
+
+	private enum CaseDeadlineWindow {
+		DUE_WITHIN_14_DAYS,
+		DUE_15_TO_30_DAYS
+	}
+
+	private record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText, CaseRadarAction action) {
 	}
 
 
