@@ -99,6 +99,53 @@ final class MyShaleControllerBoardLayoutTest {
     }
 
     @Test
+    void overviewDashboardKeepsCompactTwoColumnBriefingOrderAndStates() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+
+        assertTrue(source.contains("sections.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.68))"),
+                "Overview task column should remain near the requested 65-70% width");
+        assertTrue(source.contains("widgets.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.32))"),
+                "Overview briefing column should remain near the requested 30-35% width");
+        int radarIndex = source.indexOf("buildCaseRadarWidget()");
+        int datesIndex = source.indexOf("buildImportantDatesWidget()");
+        int notificationsIndex = source.indexOf("buildNotificationsWidget()");
+        int activityIndex = source.indexOf("buildRecentCaseActivityWidget()");
+        int summaryIndex = source.indexOf("buildMyCaseSummaryWidget()");
+        assertTrue(radarIndex > 0 && radarIndex < datesIndex && datesIndex < notificationsIndex
+                        && notificationsIndex < activityIndex && activityIndex < summaryIndex,
+                "Right-column widgets should keep the requested briefing order");
+        assertTrue(source.contains("No urgent items."));
+        assertTrue(source.contains("No upcoming important dates."));
+        assertTrue(source.contains("You’re all caught up."));
+        assertTrue(source.contains("No recent case activity."));
+        assertTrue(source.contains("No case summary available."));
+        assertTrue(css.contains(".dashboard-widget"));
+        assertTrue(css.contains("-fx-padding: 10 12 12 12"),
+                "Dashboard widget shell should keep compact padding");
+        assertTrue(css.contains("-fx-min-height: 34"),
+                "Dashboard state rows should avoid unnecessary vertical sprawl");
+    }
+
+    @Test
+    void overviewWidgetRefreshHooksAreCoalescedAndActivityRiskIsDocumented() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+        assertTrue(source.contains("requestOverviewWidgetRefresh()"),
+                "Notification-driven widget refreshes should be coalesced to reduce duplicate renders");
+        assertTrue(source.contains("overviewWidgetRenderQueued"),
+                "Coalesced refreshes should track pending JavaFX render work");
+        assertTrue(source.contains("subscribeCaseUpdated(liveCaseUpdatedHandler)"));
+        assertTrue(source.contains("refreshCaseIncremental(event.caseId())"));
+        assertTrue(source.contains("refreshRecentCaseActivity()"),
+                "Live case updates and assigned task/case loads should keep the activity widget independently refreshable");
+        assertTrue(source.contains("activeAssignedCaseRadarSource()"),
+                "Recent activity should skip terminal assigned cases through the existing active assigned case source");
+        assertTrue(source.contains("TODO: Replace this per-case CaseUpdates loop with a tenant-scoped batch activity read"),
+                "Known per-case CaseUpdates loading risk should remain documented for a future batch path");
+    }
+
+    @Test
     void recentCaseActivitySortsNewestFirstAndPrefersCaseUpdatesOnTies() {
         LocalDateTime now = LocalDateTime.of(2026, 7, 2, 12, 0);
         List<MyShaleController.RecentCaseActivityItem> sorted = MyShaleController.sortRecentCaseActivities(List.of(

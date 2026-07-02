@@ -56,6 +56,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -263,6 +264,7 @@ public final class MyShaleController {
 	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 	private FlowPane myTasksGrid;
 	private boolean notificationWidgetRefreshListenerAttached;
+	private boolean overviewWidgetRenderQueued;
 
 	private enum MyTasksViewMode {
 		BOARD,
@@ -1164,13 +1166,10 @@ public final class MyShaleController {
 			return;
 		}
 		loadingMyCases = true;
-		renderMyCasesBoard();
-		renderOverviewWidgets();
 		Integer userId = appState.getUserId();
 		Integer shaleClientId = appState.getShaleClientId();
 		System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.refreshMyCasesBoard] load started userId=" + userId
 				+ " selectedUserId=" + userId);
-		loadingMyCases = true;
 		myCasesLoadFailed = false;
 		renderMyCasesBoard();
 		renderOverviewWidgets();
@@ -1631,8 +1630,8 @@ public final class MyShaleController {
 		widgets.setPrefWidth(360);
 		widgets.setMaxWidth(430);
 
-		sections.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.67));
-		widgets.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.33));
+		sections.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.68));
+		widgets.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.32));
 
 		sections.getChildren().add(buildOverviewControlBar());
 		widgets.getChildren().setAll(buildOverviewDashboardWidgets());
@@ -1696,13 +1695,24 @@ public final class MyShaleController {
 		overviewWidgetsContainer.getChildren().setAll(buildOverviewDashboardWidgets());
 	}
 
+	private void requestOverviewWidgetRefresh() {
+		if (overviewWidgetsContainer == null || overviewWidgetRenderQueued) {
+			return;
+		}
+		overviewWidgetRenderQueued = true;
+		runOnFx(() -> {
+			overviewWidgetRenderQueued = false;
+			renderOverviewWidgets();
+		});
+	}
+
 	private void attachNotificationWidgetRefreshListener() {
 		if (notificationCenterService == null || notificationWidgetRefreshListenerAttached) {
 			return;
 		}
 		notificationWidgetRefreshListenerAttached = true;
-		notificationCenterService.getNotificationsNewestFirst().addListener((javafx.collections.ListChangeListener<AppNotification>) change -> renderOverviewWidgets());
-		notificationCenterService.unreadCountProperty().addListener((obs, oldValue, newValue) -> renderOverviewWidgets());
+		notificationCenterService.getNotificationsNewestFirst().addListener((javafx.collections.ListChangeListener<AppNotification>) change -> requestOverviewWidgetRefresh());
+		notificationCenterService.unreadCountProperty().addListener((obs, oldValue, newValue) -> requestOverviewWidgetRefresh());
 	}
 
 
@@ -1758,7 +1768,7 @@ public final class MyShaleController {
 			renderOverviewWidgets();
 			return;
 		}
-		List<CaseCardVm> assignedCases = List.copyOf(myAssignedCasesBoard);
+		List<CaseCardVm> assignedCases = activeAssignedCaseRadarSource();
 		Map<Long, String> caseNamesById = assignedCases.stream()
 				.filter(Objects::nonNull)
 				.collect(java.util.stream.Collectors.toMap(
@@ -1774,6 +1784,7 @@ public final class MyShaleController {
 		casesDbExec.submit(() -> {
 			try {
 				List<RecentCaseActivityItem> loadedActivities = new ArrayList<>();
+				// TODO: Replace this per-case CaseUpdates loop with a tenant-scoped batch activity read when an existing DAO/service path is available.
 				for (CaseCardVm caseVm : assignedCases) {
 					if (caseVm == null || caseVm.id <= 0) {
 						continue;
@@ -1852,7 +1863,9 @@ public final class MyShaleController {
 
 		Label summary = new Label(item.summary());
 		summary.getStyleClass().add("recent-case-activity-summary");
-		summary.setWrapText(true);
+		summary.setTextOverrun(OverrunStyle.ELLIPSIS);
+		summary.setWrapText(false);
+		summary.setMaxWidth(Double.MAX_VALUE);
 		Label meta = new Label(activityMeta(item));
 		meta.getStyleClass().add("recent-case-activity-meta");
 		meta.setWrapText(true);
@@ -1948,7 +1961,9 @@ public final class MyShaleController {
 
 		Label title = new Label(notificationTitle(notification));
 		title.getStyleClass().add("dashboard-notification-title");
-		title.setWrapText(true);
+		title.setTextOverrun(OverrunStyle.ELLIPSIS);
+		title.setWrapText(false);
+		title.setMaxWidth(Double.MAX_VALUE);
 		Label meta = new Label(notificationMeta(notification));
 		meta.getStyleClass().add("dashboard-notification-meta");
 		meta.setWrapText(true);
@@ -2142,6 +2157,9 @@ public final class MyShaleController {
 		text.setFillWidth(true);
 		Label label = new Label(row.label());
 		label.getStyleClass().add("case-radar-label");
+		label.setTextOverrun(OverrunStyle.ELLIPSIS);
+		label.setWrapText(false);
+		label.setMaxWidth(Double.MAX_VALUE);
 		text.getChildren().add(label);
 		if (!safe(row.helperText()).isBlank()) {
 			Label helper = new Label(row.helperText());
@@ -2282,8 +2300,9 @@ public final class MyShaleController {
 
 		Label title = new Label(safe(item.title()).isBlank() ? "Untitled" : safe(item.title()).trim());
 		title.getStyleClass().add("important-date-title");
+		title.setTextOverrun(OverrunStyle.ELLIPSIS);
 		title.setMaxWidth(Double.MAX_VALUE);
-		title.setWrapText(true);
+		title.setWrapText(false);
 		HBox.setHgrow(title, Priority.ALWAYS);
 
 		row.getChildren().addAll(date, type, title);
