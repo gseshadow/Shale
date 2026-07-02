@@ -265,6 +265,7 @@ public final class MyShaleController {
 	private FlowPane myTasksGrid;
 	private boolean notificationWidgetRefreshListenerAttached;
 	private boolean overviewWidgetRenderQueued;
+	private Integer pendingMyCaseSummaryStatusFilterId;
 
 	private enum MyTasksViewMode {
 		BOARD,
@@ -690,6 +691,7 @@ public final class MyShaleController {
 				statusFilterOptions = options;
 				CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
 				syncMyCasesBoardStatusFilterOptions();
+				applyPendingMyCaseSummaryStatusFilter();
 				renderOverviewWidgets();
 			});
 		});
@@ -1214,6 +1216,8 @@ public final class MyShaleController {
 						cachedCasesTenantId = shaleClientId;
 						myCasesLoadedOnce = true;
 						myCasesDirty = false;
+					syncMyCasesBoardStatusFilterOptions();
+					applyPendingMyCaseSummaryStatusFilter();
 					renderMyCasesBoard();
 					renderOverviewWidgets();
 					refreshRecentCaseActivity();
@@ -1337,15 +1341,26 @@ public final class MyShaleController {
 			return;
 		}
 		BoardStatusFilterOption previouslySelected = myCasesBoardStatusFilterChoice.getValue();
-		Integer previousStatusId = previouslySelected == null ? null : previouslySelected.statusId();
+		Integer previousStatusId = pendingMyCaseSummaryStatusFilterId != null
+				? pendingMyCaseSummaryStatusFilterId
+				: (previouslySelected == null ? null : previouslySelected.statusId());
 		List<BoardStatusFilterOption> options = new ArrayList<>();
 		options.add(ALL_BOARD_STATUSES_OPTION);
+		Set<Integer> addedStatusIds = new LinkedHashSet<>();
 		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
 			if (status == null) {
 				continue;
 			}
 			String label = safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim();
 			options.add(new BoardStatusFilterOption(status.id(), label));
+			addedStatusIds.add(status.id());
+		}
+		for (MyCaseSummaryRow row : buildMyCaseSummaryRows()) {
+			if (row == null || row.statusId() == null || addedStatusIds.contains(row.statusId())) {
+				continue;
+			}
+			options.add(new BoardStatusFilterOption(row.statusId(), row.statusName()));
+			addedStatusIds.add(row.statusId());
 		}
 		myCasesBoardStatusFilterChoice.getItems().setAll(options);
 		if (previousStatusId == null) {
@@ -1356,6 +1371,9 @@ public final class MyShaleController {
 				.filter(option -> Objects.equals(option.statusId(), previousStatusId))
 				.findFirst();
 		myCasesBoardStatusFilterChoice.getSelectionModel().select(matching.orElse(ALL_BOARD_STATUSES_OPTION));
+		if (matching.isPresent()) {
+			pendingMyCaseSummaryStatusFilterId = null;
+		}
 	}
 
 	private Integer selectedMyCasesBoardStatusId() {
@@ -2486,7 +2504,10 @@ public final class MyShaleController {
 		summaryRow.getStyleClass().add("my-case-summary-row");
 		summaryRow.setAlignment(Pos.CENTER_LEFT);
 		summaryRow.setMaxWidth(Double.MAX_VALUE);
-		summaryRow.setOnMouseClicked(event -> onMyCaseSummaryStatusClicked(row));
+		if (isMyCaseSummaryRowActionable(row)) {
+			summaryRow.getStyleClass().add("my-case-summary-row-actionable");
+			summaryRow.setOnMouseClicked(event -> onMyCaseSummaryStatusClicked(row));
+		}
 
 		Node statusBadge = StatusIndicatorFactory.createStatusBadge(row.statusName(), row.statusColor());
 		HBox.setHgrow(statusBadge, Priority.ALWAYS);
@@ -2498,8 +2519,35 @@ public final class MyShaleController {
 		return summaryRow;
 	}
 
+	private boolean isMyCaseSummaryRowActionable(MyCaseSummaryRow row) {
+		return row != null && row.statusId() != null && row.statusId() > 0;
+	}
+
 	private void onMyCaseSummaryStatusClicked(MyCaseSummaryRow row) {
-		// TODO: Wire to the future My Shale status-filtered case navigation route.
+		if (!isMyCaseSummaryRowActionable(row)) {
+			return;
+		}
+		pendingMyCaseSummaryStatusFilterId = row.statusId();
+		onSectionSelected(SECTION_MY_CASES);
+		applyPendingMyCaseSummaryStatusFilter();
+		ensureMyCasesFresh(false);
+	}
+
+	private void applyPendingMyCaseSummaryStatusFilter() {
+		if (pendingMyCaseSummaryStatusFilterId == null || myCasesBoardStatusFilterChoice == null) {
+			return;
+		}
+		Integer statusId = pendingMyCaseSummaryStatusFilterId;
+		syncMyCasesBoardStatusFilterOptions();
+		Optional<BoardStatusFilterOption> matching = myCasesBoardStatusFilterChoice.getItems().stream()
+				.filter(option -> option != null && Objects.equals(option.statusId(), statusId))
+				.findFirst();
+		if (matching.isEmpty()) {
+			return;
+		}
+		myCasesBoardStatusFilterChoice.getSelectionModel().select(matching.get());
+		pendingMyCaseSummaryStatusFilterId = null;
+		renderMyCasesBoard();
 	}
 
 	private Node buildOverviewControlBar() {

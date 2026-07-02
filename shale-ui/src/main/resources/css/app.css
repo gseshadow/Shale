@@ -802,7 +802,15 @@
 
 .my-case-summary-row {
     -fx-padding: 5 0 5 0;
+}
+
+.my-case-summary-row-actionable {
     -fx-cursor: hand;
+}
+
+.my-case-summary-row-actionable:hover {
+    -fx-background-color: rgba(17, 37, 66, 0.05);
+    -fx-background-radius: 8;
 }
 
 .my-case-summary-count {

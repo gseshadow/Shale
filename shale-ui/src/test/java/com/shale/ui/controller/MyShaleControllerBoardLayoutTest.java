@@ -78,6 +78,35 @@ final class MyShaleControllerBoardLayoutTest {
     }
 
     @Test
+    void myCaseSummaryRowsNavigateToExistingMyCasesStatusFilter() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+
+        assertTrue(source.contains("isMyCaseSummaryRowActionable"),
+                "My Case Summary rows should use an explicit action check instead of implicit label matching");
+        assertTrue(source.contains("my-case-summary-row-actionable"),
+                "Only actionable My Case Summary rows should receive actionable styling");
+        assertTrue(source.contains("onMyCaseSummaryStatusClicked"),
+                "My Case Summary rows should have an explicit click handler");
+        assertTrue(source.contains("onSectionSelected(SECTION_MY_CASES)"),
+                "Clicking a My Case Summary row should switch to the existing My Cases section");
+        assertTrue(source.contains("pendingMyCaseSummaryStatusFilterId = row.statusId()"),
+                "The click handler should carry the row's effective StatusId, not display text");
+        assertTrue(source.contains("applyPendingMyCaseSummaryStatusFilter()"),
+                "Summary clicks should safely defer the status filter selection until filter options are available");
+        assertTrue(source.contains("myCasesBoardStatusFilterChoice.getSelectionModel().select(matching.get())"),
+                "Summary clicks should select the existing My Cases status filter control");
+        assertTrue(source.contains("Objects.equals(option.statusId(), statusId)"),
+                "The status filter should be matched by StatusId");
+        assertTrue(source.contains("renderMyCasesBoard()"),
+                "Selecting the status should reuse normal My Cases board rendering and sorting");
+        assertTrue(!css.contains(".my-case-summary-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;"),
+                "Base My Case Summary rows without actions should not show the hand cursor");
+        assertTrue(css.contains(".my-case-summary-row-actionable") && css.contains(".my-case-summary-row-actionable:hover"),
+                "Actionable My Case Summary rows should have pointer and hover affordances");
+    }
+
+    @Test
     void notificationsWidgetReusesCenterServiceAndKeepsCompactUnreadFirstBriefing() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
         String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
