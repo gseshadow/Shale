@@ -176,7 +176,11 @@ public class CaseController {
 	@FXML
 	private VBox detailsPane;
 	@FXML
+	private StackPane detailsUpdatesHost;
+	@FXML
 	private VBox tasksTabPane;
+	@FXML
+	private StackPane tasksUpdatesHost;
 	@FXML
 	private VBox genericPane;
 	@FXML
@@ -200,6 +204,10 @@ public class CaseController {
 	private VBox timelineListBox;
 	@FXML
 	private Label timelineEmptyLabel;
+	@FXML
+	private StackPane partiesUpdatesHost;
+	@FXML
+	private StackPane timelineUpdatesHost;
 
 	@FXML
 	private Label ovCaseStatusValue;
