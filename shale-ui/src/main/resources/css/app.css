@@ -749,6 +749,48 @@
     -fx-alignment: top-left;
 }
 
+.my-shale-overview-dashboard {
+    -fx-spacing: 12;
+    -fx-alignment: top-left;
+}
+
+.my-shale-overview-primary-column,
+.my-shale-overview-briefing-column {
+    -fx-spacing: 10;
+}
+
+.dashboard-widget {
+    -fx-padding: 12 14 14 14;
+    -fx-spacing: 10;
+}
+
+.dashboard-widget-header {
+    -fx-padding: 0 0 2 0;
+}
+
+.dashboard-widget-title {
+    -fx-text-fill: #112542;
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+}
+
+.dashboard-widget-badge {
+    -fx-padding: 2 8 2 8;
+}
+
+.dashboard-widget-content {
+    -fx-padding: 6 0 0 0;
+    -fx-alignment: center-left;
+    -fx-min-height: 42;
+}
+
+.dashboard-widget-empty,
+.dashboard-widget-loading {
+    -fx-text-fill: rgba(17, 37, 66, 0.68);
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
 .combo-box.app-toolbar-select > .arrow-button > .arrow {
     -fx-background-color: -app-toolbar-select-text;
 }
