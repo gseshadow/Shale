@@ -3814,8 +3814,17 @@ public class CaseController {
 		DatePicker picker = new DatePicker(currentValue);
 		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
 		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(currentValue, picker.getValue()));
-		dialog.setResultConverter(button -> button == saveType ? Optional.ofNullable(picker.getValue()) : null);
+		dialog.setResultConverter(button -> button == saveType ? Optional.ofNullable(nullableDatePickerValue(picker)) : null);
 		dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null)));
+	}
+
+	static LocalDate nullableDatePickerValue(DatePicker picker) {
+		if (picker == null)
+			return null;
+		String editorText = picker.getEditor() == null ? null : picker.getEditor().getText();
+		if (editorText == null || editorText.trim().isEmpty())
+			return null;
+		return picker.getValue();
 	}
 
 	private void showDetailsBooleanDialog(String title, String label, boolean currentValue, Button ownerButton, Consumer<Boolean> onSave) {
@@ -7318,10 +7327,6 @@ public class CaseController {
 
 		private void runSaveWorker(DetailsSaveRequest request) {
 			try {
-				System.out.println("Case details save: sentToDao feeAgreementSigned=" + request.feeAgreementSigned()
-						+ ", finalDate=" + request.dateFeeAgreementSigned()
-						+ ", nonEngagementLetterSent=" + request.nonEngagementLetterSent()
-						+ ", nonEngagementDate=" + request.dateNonEngagementLetterSent());
 				CaseDetailDto updated = caseDao.updateCaseDetails(
 						request.caseId(),
 						request.name(),
@@ -7750,13 +7755,6 @@ public class CaseController {
 			LocalDate dateNonEngagementLetterSent = rawDateNonEngagementLetterSent;
 			if (Boolean.TRUE.equals(nonEngagementLetterSent) && dateNonEngagementLetterSent == null)
 				dateNonEngagementLetterSent = LocalDate.now();
-			System.out.println("Case details save: feeAgreementSigned rawLoaded=" + baseline.getFeeAgreementSigned()
-					+ ", selected=" + feeAgreementSigned
-					+ ", rawDate=" + rawDateFeeAgreementSigned
-					+ ", finalDate=" + dateFeeAgreementSigned
-					+ ", nonEngagementLetterSent selected=" + nonEngagementLetterSent
-					+ ", nonEngagementRawDate=" + rawDateNonEngagementLetterSent
-					+ ", nonEngagementFinalDate=" + dateNonEngagementLetterSent);
 			Boolean acceptedChronology = normalizeDetailsCheckboxBoolean(source.acceptedChronology);
 			Boolean acceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedConsultantExpertSearch);
 			Boolean acceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedTestifyingExpertSearch);
@@ -8704,9 +8702,9 @@ public class CaseController {
 			if (detDateOfInjuryEditor != null)
 				d.dateOfInjury = detDateOfInjuryEditor.getValue();
 			if (detStatuteOfLimitationsEditor != null)
-				d.statuteOfLimitations = detStatuteOfLimitationsEditor.getValue();
+				d.statuteOfLimitations = nullableDatePickerValue(detStatuteOfLimitationsEditor);
 			if (detTortNoticeDeadlineEditor != null)
-				d.tortNoticeDeadline = detTortNoticeDeadlineEditor.getValue();
+				d.tortNoticeDeadline = nullableDatePickerValue(detTortNoticeDeadlineEditor);
 			if (detDiscoveryDeadlineEditor != null)
 				d.discoveryDeadline = detDiscoveryDeadlineEditor.getValue();
 			d.clientEstate = toNullableBooleanStorage(captureNullableBoolean(detClientEstateEditor));

@@ -21,9 +21,15 @@ class CaseControllerNullableDateDialogTest {
                 "Tort Notice Deadline should use the null-aware date dialog.");
         assertTrue(source.contains("Dialog<Optional<LocalDate>> dialog = new Dialog<>()"),
                 "The dialog result must distinguish Save with an empty date from Cancel.");
-        assertTrue(source.contains("Optional.ofNullable(picker.getValue())"),
-                "Saving an empty DatePicker should produce a present dialog result containing an empty Optional.");
+        assertTrue(source.contains("Optional.ofNullable(nullableDatePickerValue(picker))"),
+                "Saving an empty DatePicker editor should produce a present dialog result containing an empty Optional.");
         assertTrue(source.contains("dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null)))"),
                 "The saved empty Optional should be forwarded as null so the database date column can be cleared.");
+        assertTrue(source.contains("d.statuteOfLimitations = nullableDatePickerValue(detStatuteOfLimitationsEditor);"),
+                "The full details save path should capture a cleared SOL editor as null.");
+        assertTrue(source.contains("d.tortNoticeDeadline = nullableDatePickerValue(detTortNoticeDeadlineEditor);"),
+                "The full details save path should capture a cleared TCN editor as null.");
+        assertTrue(source.contains("if (editorText == null || editorText.trim().isEmpty())\n\t\t\treturn null;"),
+                "Blank DatePicker editor text must be treated as an explicit clear instead of preserving the previous value.");
     }
 }
