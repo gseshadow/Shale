@@ -1,7 +1,11 @@
 package com.shale.ui.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -72,6 +76,59 @@ final class MyShaleControllerBoardLayoutTest {
                 "Notification row clicks should reuse the existing mark-read behavior");
         assertTrue(sceneManager.contains("notificationCenterService, this::openNotificationCenterFromDashboard"),
                 "My Shale should receive the existing notification center service and View All route from SceneManager");
+    }
+
+    @Test
+    void recentCaseActivityWidgetUsesExistingSourcesAndDashboardFactory() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+        assertTrue(source.contains("buildRecentCaseActivityWidget()"),
+                "Overview dashboard should render the live Recent Case Activity widget instead of a placeholder");
+        assertTrue(source.contains("RECENT_CASE_ACTIVITY_ROW_LIMIT = 10"),
+                "Recent Case Activity should cap visible rows at 10");
+        assertTrue(source.contains("caseDao.listCaseUpdates(caseVm.id, tenantId)"),
+                "Recent Case Activity should reuse the existing tenant-scoped Case Updates DAO path");
+        assertTrue(source.contains("taskActivitiesForAssignedCases(myTasks, caseNamesById)"),
+                "Recent Case Activity should reuse already loaded assigned-task models for task activity");
+        assertTrue(source.contains("DashboardWidgetFactory.widget(\n\t\t\t\t\"Recent Case Activity\""),
+                "Recent Case Activity should be built with DashboardWidgetFactory");
+        assertTrue(source.contains("No recent case activity."),
+                "Recent Case Activity should keep the requested empty state");
+        assertTrue(source.contains("TODO: Navigate to the case detail activity/update/task anchor"),
+                "Row click behavior should leave a clear future deep-link hook");
+    }
+
+    @Test
+    void recentCaseActivitySortsNewestFirstAndPrefersCaseUpdatesOnTies() {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 2, 12, 0);
+        List<MyShaleController.RecentCaseActivityItem> sorted = MyShaleController.sortRecentCaseActivities(List.of(
+                new MyShaleController.RecentCaseActivityItem(MyShaleController.RecentCaseActivityType.TASK_CREATED, "+", "Task assigned", "Beta", now.minusDays(1), 2L, 20L),
+                new MyShaleController.RecentCaseActivityItem(MyShaleController.RecentCaseActivityType.TASK_COMPLETED, "✓", "Task completed", "Gamma", now, 3L, 30L),
+                new MyShaleController.RecentCaseActivityItem(MyShaleController.RecentCaseActivityType.CASE_UPDATE, "•", "Case update added", "Alpha", now, 1L, 10L)
+        ));
+
+        assertEquals(MyShaleController.RecentCaseActivityType.CASE_UPDATE, sorted.get(0).type());
+        assertEquals(MyShaleController.RecentCaseActivityType.TASK_COMPLETED, sorted.get(1).type());
+        assertEquals(MyShaleController.RecentCaseActivityType.TASK_CREATED, sorted.get(2).type());
+    }
+
+    @Test
+    void recentCaseActivityTaskSourceOnlyIncludesAssignedCases() {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 2, 12, 0);
+        var included = new com.shale.core.dto.CaseTaskListItemDto(
+                10, 7, 100, "Included", null, null, null, null, null, null,
+                "Review records", null, null, null, null, null, null, null, null, null, null, now, now, false);
+        var excluded = new com.shale.core.dto.CaseTaskListItemDto(
+                11, 7, 200, "Excluded", null, null, null, null, null, null,
+                "Outside case", null, null, null, null, null, null, null, null, null, null, now, now, false);
+
+        List<MyShaleController.RecentCaseActivityItem> activities = MyShaleController.taskActivitiesForAssignedCases(
+                List.of(included, excluded),
+                Map.of(100L, "Included"));
+
+        assertEquals(1, activities.size());
+        assertEquals("Included", activities.get(0).caseName());
+        assertTrue(activities.get(0).summary().contains("Review records"));
     }
 
     @Test
