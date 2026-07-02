@@ -1158,14 +1158,6 @@ public final class TaskDao {
                     SET UpdatedAt = @now
                     WHERE Id = ?
                       AND ShaleClientId = ?;
-
-                    UPDATE c
-                    SET UpdatedAt = @now
-                    FROM dbo.Cases c
-                    INNER JOIN dbo.Tasks t ON t.CaseId = c.Id AND t.ShaleClientId = c.ShaleClientId
-                    WHERE t.Id = ?
-                      AND t.ShaleClientId = ?
-                      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
                   END
 
                   SELECT @inserted AS Inserted;
@@ -1192,8 +1184,6 @@ public final class TaskDao {
             ps.setInt(i++, shaleClientId);
             ps.setByte(i++, DEFAULT_PRIMARY_ASSIGNMENT_ROLE);
             ps.setInt(i++, assignedByUserId);
-            ps.setLong(i++, taskId);
-            ps.setInt(i++, shaleClientId);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -1237,14 +1227,6 @@ public final class TaskDao {
                     SET UpdatedAt = @now
                     WHERE Id = ?
                       AND ShaleClientId = ?;
-
-                    UPDATE c
-                    SET UpdatedAt = @now
-                    FROM dbo.Cases c
-                    INNER JOIN dbo.Tasks t ON t.CaseId = c.Id AND t.ShaleClientId = c.ShaleClientId
-                    WHERE t.Id = ?
-                      AND t.ShaleClientId = ?
-                      AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
                   END
 
                   COMMIT;
@@ -1261,8 +1243,6 @@ public final class TaskDao {
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
             ps.setInt(i++, userId);
-            ps.setLong(i++, taskId);
-            ps.setInt(i++, shaleClientId);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
             ps.executeUpdate();
@@ -1359,14 +1339,6 @@ public final class TaskDao {
                   WHERE Id = ?
                     AND ShaleClientId = ?;
 
-                  UPDATE c
-                  SET UpdatedAt = @now
-                  FROM dbo.Cases c
-                  INNER JOIN dbo.Tasks t ON t.CaseId = c.Id AND t.ShaleClientId = c.ShaleClientId
-                  WHERE t.Id = ?
-                    AND t.ShaleClientId = ?
-                    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
-
                   COMMIT;
                 END TRY
                 BEGIN CATCH
@@ -1398,8 +1370,6 @@ public final class TaskDao {
             ps.setInt(i++, shaleClientId);
             ps.setByte(i++, DEFAULT_PRIMARY_ASSIGNMENT_ROLE);
             ps.setInt(i++, assignedByUserId);
-            ps.setLong(i++, taskId);
-            ps.setInt(i++, shaleClientId);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
             ps.executeUpdate();
@@ -1621,12 +1591,16 @@ public final class TaskDao {
                     DueAt = ?,
                     StatusId = ?,
                     PriorityId = ?,
-                    CompletedAt = %s,
+                    CompletedAt = CASE
+                        WHEN ? = 1 AND CompletedAt IS NULL THEN SYSDATETIME()
+                        WHEN ? = 0 AND CompletedAt IS NOT NULL THEN NULL
+                        ELSE CompletedAt
+                    END,
                     UpdatedAt = SYSDATETIME()
                 WHERE Id = ?
                   AND ShaleClientId = ?
                   AND ISNULL(IsDeleted, 0) = 0;
-                """.formatted(completed ? "SYSDATETIME()" : "NULL");
+                """;
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -1639,9 +1613,12 @@ public final class TaskDao {
             setNullableTimestamp(ps, i++, dueAt);
             ps.setInt(i++, resolvedStatusId);
             ps.setInt(i++, resolvedPriorityId);
+            ps.setBoolean(i++, completed);
+            ps.setBoolean(i++, completed);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
-            if (ps.executeUpdate() > 0) {
+            boolean completionChanged = before != null && ((before.completedAt() == null) == completed);
+            if (ps.executeUpdate() > 0 && completionChanged) {
                 touchTaskCaseUpdatedAt(con, taskId, shaleClientId);
             }
             TaskDetailDto after = findTaskDetail(taskId, shaleClientId);
@@ -1683,9 +1660,7 @@ public final class TaskDao {
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setLong(1, taskId);
             ps.setInt(2, shaleClientId);
-            if (ps.executeUpdate() > 0) {
-                touchTaskCaseUpdatedAt(con, taskId, shaleClientId);
-            }
+            ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete taskId=" + taskId, e);
         }
@@ -1751,7 +1726,6 @@ public final class TaskDao {
                     throw new RuntimeException("Task timeline insert did not return inserted id");
                 }
                 long timelineEventId = rs.getLong(1);
-                touchCaseUpdatedAt(con, caseId, shaleClientId);
                 phiAuditService.auditCreate(actorUserId, "TaskTimelineEvents", "Body", timelineEventId, normalizedBody);
                 return timelineEventId;
             }
@@ -1912,7 +1886,6 @@ public final class TaskDao {
                     throw new RuntimeException("Task update insert did not return inserted id");
                 }
                 long taskUpdateId = rs.getLong(1);
-                touchCaseUpdatedAt(con, caseId, shaleClientId);
                 phiAuditService.auditCreate(userId, "TaskUpdates", "Body", taskUpdateId, trimmedBody);
                 return taskUpdateId;
             }
@@ -2166,14 +2139,6 @@ public final class TaskDao {
                   WHERE Id = ?
                     AND ShaleClientId = ?;
 
-                  UPDATE c
-                  SET UpdatedAt = @now
-                  FROM dbo.Cases c
-                  INNER JOIN dbo.Tasks t ON t.CaseId = c.Id AND t.ShaleClientId = c.ShaleClientId
-                  WHERE t.Id = ?
-                    AND t.ShaleClientId = ?
-                    AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
-
                   COMMIT;
                 END TRY
                 BEGIN CATCH
@@ -2201,8 +2166,6 @@ public final class TaskDao {
             ps.setInt(i++, shaleClientId);
             ps.setByte(i++, DEFAULT_PRIMARY_ASSIGNMENT_ROLE);
             ps.setInt(i++, assignedByUserId);
-            ps.setLong(i++, taskId);
-            ps.setInt(i++, shaleClientId);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
             ps.executeUpdate();
@@ -2273,8 +2236,9 @@ public final class TaskDao {
                     UpdatedAt = SYSDATETIME()
                 WHERE Id = ?
                   AND ShaleClientId = ?
-                  AND ISNULL(IsDeleted, 0) = 0;
-                """.formatted(completed ? "SYSDATETIME()" : "NULL");
+                  AND ISNULL(IsDeleted, 0) = 0
+                  AND CompletedAt IS %s NULL;
+                """.formatted(completed ? "SYSDATETIME()" : "NULL", completed ? "" : "NOT");
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
