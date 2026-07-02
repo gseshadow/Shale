@@ -1190,10 +1190,10 @@ public class CaseController {
 			showDetailsDateDialog("Edit Date of Injury", "Date of Injury", base.dateOfInjury, ownerButton,
 					value -> saveSingleDetailsField(d -> d.dateOfInjury = value));
 		} else if (editor == detStatuteOfLimitationsEditor) {
-			showDetailsDateDialog("Edit Statute of Limitations", "Statute of Limitations", base.statuteOfLimitations, ownerButton,
+			showDetailsNullableDateDialog("Edit Statute of Limitations", "Statute of Limitations", base.statuteOfLimitations, ownerButton,
 					value -> saveSingleDetailsField(d -> d.statuteOfLimitations = value));
 		} else if (editor == detTortNoticeDeadlineEditor) {
-			showDetailsDateDialog("Edit Tort Notice Deadline", "Tort Notice Deadline", base.tortNoticeDeadline, ownerButton,
+			showDetailsNullableDateDialog("Edit Tort Notice Deadline", "Tort Notice Deadline", base.tortNoticeDeadline, ownerButton,
 					value -> saveSingleDetailsField(d -> d.tortNoticeDeadline = value));
 		} else if (editor == detDiscoveryDeadlineEditor) {
 			showDetailsDateDialog("Edit Discovery Deadline", "Discovery Deadline", base.discoveryDeadline, ownerButton,
@@ -3803,6 +3803,19 @@ public class CaseController {
 		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(currentValue, picker.getValue()));
 		dialog.setResultConverter(button -> button == saveType ? picker.getValue() : null);
 		dialog.showAndWait().ifPresent(onSave);
+	}
+
+	private void showDetailsNullableDateDialog(String title, String label, LocalDate currentValue, Button ownerButton, Consumer<LocalDate> onSave) {
+		Dialog<Optional<LocalDate>> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+		DatePicker picker = new DatePicker(currentValue);
+		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
+		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(currentValue, picker.getValue()));
+		dialog.setResultConverter(button -> button == saveType ? Optional.ofNullable(picker.getValue()) : null);
+		dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null)));
 	}
 
 	private void showDetailsBooleanDialog(String title, String label, boolean currentValue, Button ownerButton, Consumer<Boolean> onSave) {
