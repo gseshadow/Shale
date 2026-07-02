@@ -760,8 +760,8 @@
 }
 
 .dashboard-widget {
-    -fx-padding: 12 14 14 14;
-    -fx-spacing: 10;
+    -fx-padding: 10 12 12 12;
+    -fx-spacing: 8;
 }
 
 .dashboard-widget-header {
@@ -779,9 +779,9 @@
 }
 
 .dashboard-widget-content {
-    -fx-padding: 6 0 0 0;
+    -fx-padding: 4 0 0 0;
     -fx-alignment: center-left;
-    -fx-min-height: 42;
+    -fx-min-height: 34;
 }
 
 .dashboard-widget-empty,
@@ -1927,7 +1927,7 @@
 }
 
 .case-radar-row {
-    -fx-padding: 6 0 6 0;
+    -fx-padding: 5 0 5 0;
     -fx-cursor: hand;
 }
 
@@ -1981,7 +1981,7 @@
 }
 
 .important-date-row {
-    -fx-padding: 6 0 6 0;
+    -fx-padding: 5 0 5 0;
     -fx-cursor: hand;
 }
 
@@ -2022,7 +2022,7 @@
 }
 
 .dashboard-notification-row {
-    -fx-padding: 7 8 7 8;
+    -fx-padding: 6 7 6 7;
     -fx-background-color: rgba(255, 255, 255, 0.58);
     -fx-background-radius: 10;
     -fx-border-color: rgba(24, 70, 92, 0.10);
@@ -2056,7 +2056,7 @@
 
 .dashboard-notification-title {
     -fx-font-size: 12px;
-    -fx-font-weight: 700;
+    -fx-font-weight: 800;
     -fx-text-fill: #17384a;
 }
 
@@ -2070,7 +2070,7 @@
 }
 
 .recent-case-activity-row {
-    -fx-padding: 7 8 7 8;
+    -fx-padding: 6 7 6 7;
     -fx-background-color: rgba(255, 255, 255, 0.58);
     -fx-background-radius: 10;
     -fx-border-color: rgba(24, 70, 92, 0.10);
