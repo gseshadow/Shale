@@ -107,6 +107,7 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -1485,7 +1486,7 @@ public class CaseController {
 	}
 
 	private void showOverview() {
-		setUpdatesPaneVisible(true);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, true);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -1516,7 +1517,7 @@ public class CaseController {
 	}
 
 	private void showDetails() {
-		setUpdatesPaneVisible(false);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.DETAILS);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
@@ -1525,6 +1526,7 @@ public class CaseController {
 		if (contentTitleLabel != null)
 			contentTitleLabel.setText("Details");
 		renderDetailsFromCurrent();
+		loadCaseUpdatesAsync();
 		auditCaseRead("Case.Detail.Read", "Case.Detail");
 	}
 
@@ -1577,7 +1579,7 @@ public class CaseController {
 	}
 
 	private void showParties() {
-		setUpdatesPaneVisible(false);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.PARTIES);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -1599,6 +1601,7 @@ public class CaseController {
 		setVisibleManaged(timelineListBox, true);
 		setVisibleManaged(timelineEmptyLabel, false);
 		renderPartiesSection();
+		loadCaseUpdatesAsync();
 		if (caseDao != null && caseId != null && (!partiesLoadedOnce || caseParties == null || caseParties.isEmpty())) {
 			refreshPartiesSectionAsync();
 		}
@@ -1719,12 +1722,14 @@ public class CaseController {
 			if (timelineEmptyLabel != null)
 				timelineEmptyLabel.setText("No parties yet.");
 			setVisibleManaged(timelineEmptyLabel, true);
+			attachCaseUpdatesPane(CaseUpdatesPlacement.PARTIES);
 			return;
 		}
 
 		setVisibleManaged(timelineEmptyLabel, false);
 
 		renderPartyGroups(timelineListBox, safeParties, PartyRenderMode.MANAGE, 300, false);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.PARTIES);
 	}
 
 	private void renderOverviewPartiesSection() {
@@ -2564,15 +2569,35 @@ public class CaseController {
 	}
 
 	private void setUpdatesPaneVisible(boolean showOnRight) {
+		attachCaseUpdatesPane(showOnRight ? CaseUpdatesPlacement.RIGHT : CaseUpdatesPlacement.HIDDEN);
+	}
+
+	private void attachCaseUpdatesPane(CaseUpdatesPlacement placement) {
 		if (caseRootPane == null || caseUpdatesPane == null) {
 			return;
 		}
-		if (showOnRight) {
-			if (caseRootPane.getRight() != caseUpdatesPane) {
-				caseRootPane.setRight(caseUpdatesPane);
-			}
-		} else if (caseRootPane.getRight() != null) {
+		if (caseRootPane.getRight() == caseUpdatesPane && placement != CaseUpdatesPlacement.RIGHT) {
 			caseRootPane.setRight(null);
+		}
+		if (caseUpdatesPane.getParent() instanceof Pane parent) {
+			parent.getChildren().remove(caseUpdatesPane);
+		}
+		caseUpdatesPane.setManaged(placement != CaseUpdatesPlacement.HIDDEN);
+		caseUpdatesPane.setVisible(placement != CaseUpdatesPlacement.HIDDEN);
+		caseUpdatesPane.setMaxWidth(placement == CaseUpdatesPlacement.RIGHT ? Region.USE_COMPUTED_SIZE : Double.MAX_VALUE);
+		caseUpdatesPane.setPrefWidth(placement == CaseUpdatesPlacement.RIGHT ? 320.0 : Region.USE_COMPUTED_SIZE);
+		VBox.setVgrow(caseUpdatesPane, placement == CaseUpdatesPlacement.RIGHT ? Priority.ALWAYS : Priority.NEVER);
+		switch (placement) {
+		case RIGHT -> caseRootPane.setRight(caseUpdatesPane);
+		case DETAILS -> addCaseUpdatesPaneTo(detailsPane);
+		case PARTIES -> addCaseUpdatesPaneTo(timelineListBox);
+		case HIDDEN -> { }
+		}
+	}
+
+	private void addCaseUpdatesPaneTo(VBox host) {
+		if (host != null && !host.getChildren().contains(caseUpdatesPane)) {
+			host.getChildren().add(caseUpdatesPane);
 		}
 	}
 
@@ -2644,6 +2669,10 @@ public class CaseController {
 
 	private boolean isSectionActive(String sectionName) {
 		return Objects.equals(activeSectionName, sectionName);
+	}
+
+	private boolean isCaseUpdatesSectionActive() {
+		return isSectionActive("Overview") || isSectionActive("Details") || isSectionActive("Parties");
 	}
 
 	private void onAddRelatedEntity() {
@@ -4567,7 +4596,7 @@ public class CaseController {
 	// ----------------------------
 
 	private void loadCaseUpdatesAsync() {
-		if (!isSectionActive("Overview")) {
+		if (!isCaseUpdatesSectionActive()) {
 			caseUpdatesStale = true;
 			return;
 		}
@@ -7086,6 +7115,13 @@ public class CaseController {
 		Node createCaseUpdateCard(CaseUpdateDto dto) {
 			return createCaseUpdateCardInternal(dto);
 		}
+	}
+
+	private enum CaseUpdatesPlacement {
+		RIGHT,
+		DETAILS,
+		PARTIES,
+		HIDDEN
 	}
 
 	private static final class CaseDetailsDraft {
