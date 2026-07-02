@@ -204,14 +204,19 @@
 								<DatePicker fx:id="ovSolDateEditor" visible="false" managed="false" GridPane.rowIndex="7" GridPane.columnIndex="1" />
 								<Button fx:id="editSolDateButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="7" GridPane.columnIndex="2" />
 
-								<Label text="Responsible attorney" styleClass="case-overview-row-label" GridPane.rowIndex="8" GridPane.columnIndex="0" />
-								<StackPane fx:id="ovResponsibleAttorneyHost" styleClass="case-overview-row-value-host" GridPane.rowIndex="8" GridPane.columnIndex="1" />
-								<Button fx:id="changeResponsibleAttorneyButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="8" GridPane.columnIndex="2" />
+								<Label text="Tort notice deadline" styleClass="case-overview-row-label" GridPane.rowIndex="8" GridPane.columnIndex="0" />
+								<Label fx:id="ovTortNoticeDeadlineValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="8" GridPane.columnIndex="1" />
+								<DatePicker fx:id="ovTortNoticeDeadlineEditor" visible="false" managed="false" GridPane.rowIndex="8" GridPane.columnIndex="1" />
+								<Button fx:id="editTortNoticeDeadlineButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="8" GridPane.columnIndex="2" />
 
-								<Label text="Description" styleClass="case-overview-row-label" GridPane.rowIndex="9" GridPane.columnIndex="0" />
-								<Label fx:id="ovDescriptionValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-								<TextArea fx:id="ovDescriptionEditor" visible="false" managed="false" wrapText="true" prefRowCount="4" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-								<Button fx:id="editDescriptionButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="9" GridPane.columnIndex="2" />
+								<Label text="Responsible attorney" styleClass="case-overview-row-label" GridPane.rowIndex="9" GridPane.columnIndex="0" />
+								<StackPane fx:id="ovResponsibleAttorneyHost" styleClass="case-overview-row-value-host" GridPane.rowIndex="9" GridPane.columnIndex="1" />
+								<Button fx:id="changeResponsibleAttorneyButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="9" GridPane.columnIndex="2" />
+
+								<Label text="Description" styleClass="case-overview-row-label" GridPane.rowIndex="10" GridPane.columnIndex="0" />
+								<Label fx:id="ovDescriptionValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="10" GridPane.columnIndex="1" />
+								<TextArea fx:id="ovDescriptionEditor" visible="false" managed="false" wrapText="true" prefRowCount="4" GridPane.rowIndex="10" GridPane.columnIndex="1" />
+								<Button fx:id="editDescriptionButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="10" GridPane.columnIndex="2" />
 							</GridPane>
 						</VBox>
 
