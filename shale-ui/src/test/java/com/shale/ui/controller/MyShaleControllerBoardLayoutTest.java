@@ -52,6 +52,32 @@ final class MyShaleControllerBoardLayoutTest {
     }
 
     @Test
+    void dashboardRowsOnlyExposeWorkingActions() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+
+        assertTrue(source.contains("this::showOverdueTasksInMyTasks"),
+                "Overdue Case Radar rows should have an explicit action instead of a no-op click handler");
+        assertTrue(source.contains("onSectionSelected(SECTION_TASKS)"),
+                "Overdue Case Radar rows should navigate to the existing My Tasks section");
+        assertTrue(source.contains("MY_TASKS_SORT_DUE_ASC"),
+                "Overdue Case Radar navigation should reuse existing due-date sorting to surface overdue work");
+        assertTrue(source.contains("case TASK -> openTask(item.taskId())"),
+                "Task Important Dates should reuse the existing task detail opening path");
+        assertTrue(source.contains("case SOL, TORT_NOTICE -> onOpenCase.accept(item.caseId().intValue())"),
+                "Case deadline Important Dates should reuse the existing case navigation callback");
+        assertTrue(source.contains("isImportantDateActionable"),
+                "Important Date rows should decide clickability from explicit supported actions");
+        assertTrue(source.contains("isCaseRadarRowActionable"),
+                "Case Radar rows should decide clickability from explicit supported actions");
+        assertTrue(css.contains(".case-radar-row-actionable") && css.contains(".important-date-row-actionable"),
+                "Only actionable dashboard rows should get pointer/hover styling");
+        assertTrue(!css.contains(".case-radar-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;")
+                        && !css.contains(".important-date-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;"),
+                "Base dashboard rows without actions should not show the hand cursor");
+    }
+
+    @Test
     void notificationsWidgetReusesCenterServiceAndKeepsCompactUnreadFirstBriefing() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
         String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));

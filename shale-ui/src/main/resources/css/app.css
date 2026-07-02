@@ -1928,7 +1928,15 @@
 
 .case-radar-row {
     -fx-padding: 5 0 5 0;
+}
+
+.case-radar-row-actionable {
     -fx-cursor: hand;
+}
+
+.case-radar-row-actionable:hover {
+    -fx-background-color: rgba(17, 37, 66, 0.05);
+    -fx-background-radius: 8;
 }
 
 .case-radar-severity-dot {
@@ -1982,7 +1990,15 @@
 
 .important-date-row {
     -fx-padding: 5 0 5 0;
+}
+
+.important-date-row-actionable {
     -fx-cursor: hand;
+}
+
+.important-date-row-actionable:hover {
+    -fx-background-color: rgba(17, 37, 66, 0.05);
+    -fx-background-radius: 8;
 }
 
 .important-date-date {

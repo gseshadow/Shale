@@ -2098,19 +2098,19 @@ public final class MyShaleController {
 
 		List<CaseRadarRow> rows = new ArrayList<>();
 		if (overdueTasks > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Overdue tasks", overdueTasks, "Assigned to you and past due."));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Overdue tasks", overdueTasks, "Assigned to you and past due.", this::showOverdueTasksInMyTasks));
 		}
 		if (solCritical > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "SOL due ≤ 14 days", solCritical, "Assigned active cases."));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "SOL due ≤ 14 days", solCritical, "Assigned active cases.", null));
 		}
 		if (tortCritical > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Tort notice due ≤ 14 days", tortCritical, "Assigned active cases."));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Tort notice due ≤ 14 days", tortCritical, "Assigned active cases.", null));
 		}
 		if (solWarning > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "SOL due in 15–30 days", solWarning, "Assigned active cases."));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "SOL due in 15–30 days", solWarning, "Assigned active cases.", null));
 		}
 		if (tortWarning > 0) {
-			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "Tort notice due in 15–30 days", tortWarning, "Assigned active cases."));
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "Tort notice due in 15–30 days", tortWarning, "Assigned active cases.", null));
 		}
 		// TODO: Add inactive/recently-updated radar rows once a reliable activity/UpdatedAt field is present in this loaded overview model.
 		return rows;
@@ -2146,9 +2146,12 @@ public final class MyShaleController {
 	private Node buildCaseRadarRow(CaseRadarRow row) {
 		HBox radarRow = new HBox(8);
 		radarRow.getStyleClass().addAll("case-radar-row", "case-radar-row-" + row.severity().styleSuffix());
+		if (isCaseRadarRowActionable(row)) {
+			radarRow.getStyleClass().add("case-radar-row-actionable");
+			radarRow.setOnMouseClicked(event -> onCaseRadarRowClicked(row));
+		}
 		radarRow.setAlignment(Pos.CENTER_LEFT);
 		radarRow.setMaxWidth(Double.MAX_VALUE);
-		radarRow.setOnMouseClicked(event -> onCaseRadarRowClicked(row));
 
 		Region indicator = new Region();
 		indicator.getStyleClass().addAll("case-radar-severity-dot", "case-radar-severity-" + row.severity().styleSuffix());
@@ -2175,8 +2178,43 @@ public final class MyShaleController {
 		return radarRow;
 	}
 
+	private boolean isCaseRadarRowActionable(CaseRadarRow row) {
+		return row != null && row.action() != null;
+	}
+
 	private void onCaseRadarRowClicked(CaseRadarRow row) {
-		// TODO: Wire to a filtered tasks/cases navigation target when dashboard row navigation exists.
+		if (!isCaseRadarRowActionable(row)) {
+			return;
+		}
+		row.action().run();
+	}
+
+	private void showOverdueTasksInMyTasks() {
+		if (myTasksSourceChoice != null) {
+			myTasksSourceChoice.getSelectionModel().select(MyTasksSource.ASSIGNED_TO_ME);
+		} else {
+			myTasksSource = MyTasksSource.ASSIGNED_TO_ME;
+		}
+		if (myTasksSortChoice != null) {
+			myTasksSortChoice.getSelectionModel().select(MY_TASKS_SORT_DUE_ASC);
+		}
+		if (myTasksSearchField != null) {
+			myTasksSearchField.clear();
+		}
+		if (myTasksPriorityFilterChoice != null) {
+			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
+		}
+		if (myTasksCaseFilterChoice != null) {
+			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
+		}
+		if (showCompletedMyTasks) {
+			showCompletedMyTasks = false;
+			persistMyTasksShowCompletedPreference(false);
+			updateMyTasksCompletionToggleLabel();
+			refreshMyTasks(true);
+		}
+		onSectionSelected(SECTION_TASKS);
+		// My Tasks does not currently expose an overdue-only filter, so due-date ascending sorting makes overdue work appear first.
 	}
 
 
@@ -2288,9 +2326,12 @@ public final class MyShaleController {
 	private Node buildImportantDateRow(ImportantDateItem item) {
 		HBox row = new HBox(8);
 		row.getStyleClass().addAll("important-date-row", "important-date-row-" + item.severity().styleSuffix());
+		if (isImportantDateActionable(item)) {
+			row.getStyleClass().add("important-date-row-actionable");
+			row.setOnMouseClicked(event -> onImportantDateClicked(item));
+		}
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.setMaxWidth(Double.MAX_VALUE);
-		row.setOnMouseClicked(event -> onImportantDateClicked(item));
 
 		Label date = new Label(formatImportantDateLabel(item.date()));
 		date.getStyleClass().add("important-date-date");
@@ -2323,8 +2364,28 @@ public final class MyShaleController {
 		return IMPORTANT_DATE_LABEL_FORMATTER.format(date);
 	}
 
+	private boolean isImportantDateActionable(ImportantDateItem item) {
+		if (item == null) {
+			return false;
+		}
+		return switch (item.type()) {
+			case TASK -> item.taskId() != null && item.taskId() > 0;
+			case SOL, TORT_NOTICE -> item.caseId() != null && item.caseId() > 0 && onOpenCase != null;
+			case CALENDAR -> false;
+		};
+	}
+
 	private void onImportantDateClicked(ImportantDateItem item) {
-		// TODO: Wire Important Dates rows to task/case/calendar detail once dashboard navigation routes are available.
+		if (!isImportantDateActionable(item)) {
+			return;
+		}
+		switch (item.type()) {
+			case TASK -> openTask(item.taskId());
+			case SOL, TORT_NOTICE -> onOpenCase.accept(item.caseId().intValue());
+			case CALENDAR -> {
+				// TODO: Wire calendar important-date rows when calendar integration is available in My Shale.
+			}
+		}
 	}
 
 	private Node buildMyCaseSummaryWidget() {
@@ -3742,7 +3803,7 @@ public final class MyShaleController {
 		}
 	}
 
-	private record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText) {
+	private record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText, Runnable action) {
 	}
 
 
