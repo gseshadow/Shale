@@ -154,6 +154,8 @@ public final class CaseDao {
 		STATUTE_SOONEST,
 		STATUTE_LATEST,
 		TORT_NOTICE_SOONEST,
+		UPDATED_OLDEST,
+		UPDATED_NEWEST,
 		CASE_NAME_ASC,
 		CASE_NAME_DESC,
 		RESPONSIBLE_ATTORNEY_ASC,
@@ -189,13 +191,26 @@ public final class CaseDao {
 			String latestCaseUpdate,
 			String description,
 			LocalDate dateOfIncident,
-			LocalDate tortClaimsNoticeDeadline
+			LocalDate tortClaimsNoticeDeadline,
+			LocalDateTime updatedAt
 	) {
 		public CaseRow(long id, String name, LocalDate intakeDate, LocalDate statuteOfLimitationsDate,
 				Integer primaryStatusId, Integer responsibleAttorneyId, String responsibleAttorneyName,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
 			this(id, name, intakeDate, statuteOfLimitationsDate, primaryStatusId, responsibleAttorneyId,
-					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent, null, null, null, null, null, null, null, null, null);
+					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent, null, null, null, null, null, null, null, null, null, null);
+		}
+
+		public CaseRow(long id, String name, LocalDate intakeDate, LocalDate statuteOfLimitationsDate,
+				Integer primaryStatusId, Integer responsibleAttorneyId, String responsibleAttorneyName,
+				String responsibleAttorneyColor, Boolean nonEngagementLetterSent,
+				String primaryStatusName, String primaryStatusColor, String practiceAreaColor,
+				String clientName, String opposingPartiesName, String latestCaseUpdate, String description,
+				LocalDate dateOfIncident, LocalDate tortClaimsNoticeDeadline) {
+			this(id, name, intakeDate, statuteOfLimitationsDate, primaryStatusId, responsibleAttorneyId,
+					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent,
+					primaryStatusName, primaryStatusColor, practiceAreaColor, clientName, opposingPartiesName,
+					latestCaseUpdate, description, dateOfIncident, tortClaimsNoticeDeadline, null);
 		}
 	}
 
@@ -1114,7 +1129,8 @@ public final class CaseDao {
 								rs.getString("LatestCaseUpdate"),
 								rs.getString("Description"),
 								toLocalDate(rs.getDate("DateOfIncident")),
-								toLocalDate(rs.getDate("TortNoticeDeadline"))));
+								toLocalDate(rs.getDate("TortNoticeDeadline")),
+								toLocalDateTime(rs.getTimestamp("UpdatedAt"))));
 					}
 				}
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
@@ -1348,6 +1364,7 @@ public final class CaseDao {
 					  c.StatuteOfLimitations,
 					  c.DateOfInjury AS DateOfIncident,
 					  c.TortNoticeDeadline,
+					  c.UpdatedAt,
 					  CAST(NULL AS nvarchar(max)) AS LatestCaseUpdate,
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
@@ -2007,6 +2024,8 @@ public final class CaseDao {
 		case STATUTE_SOONEST -> "c.StatuteOfLimitations ASC, c.Id ASC";
 		case STATUTE_LATEST -> "c.StatuteOfLimitations DESC, c.Id DESC";
 		case TORT_NOTICE_SOONEST -> "c.TortNoticeDeadline ASC, c.Id ASC";
+		case UPDATED_OLDEST -> "c.UpdatedAt ASC, c.Id ASC";
+		case UPDATED_NEWEST -> "c.UpdatedAt DESC, c.Id DESC";
 		case CASE_NAME_ASC -> "c.Name ASC, c.Id ASC";
 		case CASE_NAME_DESC -> "c.Name DESC, c.Id DESC";
 		case RESPONSIBLE_ATTORNEY_ASC -> "ResponsibleAttorneyName ASC, c.Id ASC";

@@ -25,8 +25,12 @@ final class MyShaleControllerBoardLayoutTest {
                 "Overdue tasks should appear before SOL warning rows");
         assertTrue(source.contains("activeAssignedCaseRadarSource"),
                 "Case Radar should reuse loaded assigned case board data with terminal status filtering");
-        assertTrue(source.contains("TODO: Add inactive/recently-updated radar rows"),
-                "Unavailable activity metrics should remain an explicit follow-up hook");
+        assertTrue(source.contains("INACTIVE_CASE_DAYS = 45"),
+                "Case Radar should count inactive assigned cases from Cases.UpdatedAt");
+        assertTrue(source.contains("RECENTLY_UPDATED_CASE_DAYS = 7"),
+                "Case Radar should count recently updated assigned cases from Cases.UpdatedAt");
+        assertTrue(source.contains("rows.sort(Comparator.comparingInt(row -> row.severity().sortOrder()))"),
+                "Case Radar should keep urgent/warning rows before positive informational rows");
     }
 
     @Test
@@ -72,6 +76,12 @@ final class MyShaleControllerBoardLayoutTest {
                 "Clicking SOL radar rows should switch to My Cases using SOL soonest sorting");
         assertTrue(source.contains("showDeadlineCasesInMyCases(SORT_TORT_NOTICE"),
                 "Clicking Tort Notice radar rows should switch to My Cases using Tort Notice soonest sorting");
+        assertTrue(source.contains("CaseRadarAction.INACTIVE_ASSIGNED_CASES")
+                        && source.contains("CaseRadarAction.RECENTLY_UPDATED_ASSIGNED_CASES"),
+                "UpdatedAt Case Radar rows should use explicit action hooks");
+        assertTrue(source.contains("showUpdatedAtCasesInMyCases(SORT_UPDATED_OLDEST)")
+                        && source.contains("showUpdatedAtCasesInMyCases(SORT_UPDATED_NEWEST)"),
+                "UpdatedAt Case Radar actions should reuse My Cases with the supported UpdatedAt sorts");
         assertTrue(source.contains("myCasesBoardSearchField.clear()")
                         && source.contains("myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION)"),
                 "Deadline radar actions should clear unrelated My Cases board search/status filters");
@@ -119,6 +129,29 @@ final class MyShaleControllerBoardLayoutTest {
                 "Base My Case Summary rows without actions should not show the hand cursor");
         assertTrue(css.contains(".my-case-summary-row-actionable") && css.contains(".my-case-summary-row-actionable:hover"),
                 "Actionable My Case Summary rows should have pointer and hover affordances");
+    }
+
+    @Test
+    void updatedAtIsCarriedThroughAssignedCaseModelAndSorts() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+        String dao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/CaseDao.java"));
+
+        assertTrue(dao.contains("c.UpdatedAt"),
+                "Assigned-case board query should select Cases.UpdatedAt");
+        assertTrue(dao.contains("LocalDateTime updatedAt"),
+                "CaseRow should expose UpdatedAt to the UI model");
+        assertTrue(source.contains("r.updatedAt()"),
+                "MyShaleController should carry CaseRow UpdatedAt into CaseCardVm");
+        assertTrue(source.contains("final LocalDateTime updatedAt"),
+                "Assigned-case VM should retain UpdatedAt for radar and sorting");
+        assertTrue(source.contains("SORT_UPDATED_OLDEST") && source.contains("SORT_UPDATED_NEWEST"),
+                "My Cases should expose narrow UpdatedAt sort options for radar click-through");
+        assertTrue(source.contains("CaseSort.UPDATED_OLDEST") && source.contains("CaseSort.UPDATED_NEWEST"),
+                "Paged My Cases loading should use DAO UpdatedAt sorting when selected");
+        assertTrue(source.contains("caseVm.updatedAt != null && caseVm.updatedAt.toLocalDate().isBefore(inactiveBefore)"),
+                "Inactive assigned case counts should be based on UpdatedAt before the 45-day cutoff");
+        assertTrue(source.contains("!date.isBefore(recentSince) && !date.isAfter(effectiveToday)"),
+                "Recently updated assigned case counts should include the seven-day through-today window");
     }
 
     @Test

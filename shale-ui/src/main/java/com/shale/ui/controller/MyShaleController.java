@@ -76,6 +76,8 @@ public final class MyShaleController {
 	private static final String SORT_INTAKE = "Date of Intake";
 	private static final String SORT_SOL = "Statute of Limitations Date";
 	private static final String SORT_TORT_NOTICE = "Tort Notice Deadline";
+	private static final String SORT_UPDATED_OLDEST = "Last Updated (Oldest)";
+	private static final String SORT_UPDATED_NEWEST = "Last Updated (Newest)";
 	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
 	private static final String MY_TASKS_COLUMN_ORDER_CASE_NAME = "Case Name";
@@ -114,6 +116,8 @@ public final class MyShaleController {
 	private static final int IMPORTANT_DATES_ROW_LIMIT = 10;
 	private static final int NOTIFICATIONS_ROW_LIMIT = 10;
 	private static final int RECENT_CASE_ACTIVITY_ROW_LIMIT = 10;
+	private static final int INACTIVE_CASE_DAYS = 45;
+	private static final int RECENTLY_UPDATED_CASE_DAYS = 7;
 	private static final DateTimeFormatter IMPORTANT_DATE_LABEL_FORMATTER = DateTimeFormatter.ofPattern("MMM d");
 
 	@FXML
@@ -351,7 +355,7 @@ public final class MyShaleController {
 		configureSectionSizing();
 
 		if (myCasesSortChoice != null) {
-			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE);
+			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE, SORT_UPDATED_OLDEST, SORT_UPDATED_NEWEST);
 			myCasesSortChoice.getSelectionModel().select(SORT_NAME);
 			myCasesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> loadFirstPage());
 		}
@@ -433,7 +437,7 @@ public final class MyShaleController {
 		preferredMyTasksPriorityFilterId = restoreMyTasksPriorityFilterPreference();
 		preferredMyTasksCaseFilterId = restoreMyTasksCaseFilterPreference();
 		if (myCasesBoardSortChoice != null) {
-			myCasesBoardSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE);
+			myCasesBoardSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE, SORT_UPDATED_OLDEST, SORT_UPDATED_NEWEST);
 			myCasesBoardSortChoice.getSelectionModel().select(SORT_NAME);
 			myCasesBoardSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
 		}
@@ -785,7 +789,8 @@ public final class MyShaleController {
 				r.nonEngagementLetterSent(),
 				safe(r.primaryStatusName()),
 				safe(r.primaryStatusColor()),
-				safe(r.practiceAreaColor())
+				safe(r.practiceAreaColor()),
+				r.updatedAt()
 		);
 	}
 
@@ -902,6 +907,12 @@ public final class MyShaleController {
 		if (SORT_TORT_NOTICE.equals(value)) {
 			return CaseSort.TORT_NOTICE_SOONEST;
 		}
+		if (SORT_UPDATED_OLDEST.equals(value)) {
+			return CaseSort.UPDATED_OLDEST;
+		}
+		if (SORT_UPDATED_NEWEST.equals(value)) {
+			return CaseSort.UPDATED_NEWEST;
+		}
 		return CaseSort.INTAKE_NEWEST;
 	}
 
@@ -917,6 +928,12 @@ public final class MyShaleController {
 		}
 		if (SORT_INTAKE.equals(sortOption)) {
 			return Comparator.comparing((CaseCardVm v) -> v.intakeDate, this::nullsLastDate).reversed();
+		}
+		if (SORT_UPDATED_OLDEST.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm v) -> v.updatedAt, this::nullsLastDateTime);
+		}
+		if (SORT_UPDATED_NEWEST.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm v) -> v.updatedAt, this::nullsLastDateTime).reversed();
 		}
 		return Comparator.comparing((CaseCardVm v) -> v.name, this::nullsLastString);
 	}
@@ -943,6 +960,16 @@ public final class MyShaleController {
 	}
 
 	private int nullsLastDate(LocalDate a, LocalDate b) {
+		if (a == null && b == null)
+			return 0;
+		if (a == null)
+			return 1;
+		if (b == null)
+			return -1;
+		return a.compareTo(b);
+	}
+
+	private int nullsLastDateTime(LocalDateTime a, LocalDateTime b) {
 		if (a == null && b == null)
 			return 0;
 		if (a == null)
@@ -1437,6 +1464,16 @@ public final class MyShaleController {
 		}
 		if (SORT_TORT_NOTICE.equals(sortOption)) {
 			return Comparator.comparing((CaseCardVm vm) -> vm.tortNoticeDate, Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		if (SORT_UPDATED_OLDEST.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.updatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		if (SORT_UPDATED_NEWEST.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.updatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
 					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
 					.thenComparingLong(vm -> vm.id);
 		}
@@ -2125,6 +2162,16 @@ public final class MyShaleController {
 		long solWarning = countCasesInDateWindow(activeCases, soon.plusDays(1), month, caseVm -> caseVm.solDate);
 		long tortCritical = countCasesInDateWindow(activeCases, effectiveToday, soon, caseVm -> caseVm.tortNoticeDate);
 		long tortWarning = countCasesInDateWindow(activeCases, soon.plusDays(1), month, caseVm -> caseVm.tortNoticeDate);
+		LocalDate inactiveBefore = effectiveToday.minusDays(INACTIVE_CASE_DAYS);
+		LocalDate recentSince = effectiveToday.minusDays(RECENTLY_UPDATED_CASE_DAYS);
+		long inactiveCases = activeCases.stream()
+				.filter(caseVm -> caseVm.updatedAt != null && caseVm.updatedAt.toLocalDate().isBefore(inactiveBefore))
+				.count();
+		long recentlyUpdatedCases = activeCases.stream()
+				.filter(caseVm -> caseVm.updatedAt != null)
+				.map(caseVm -> caseVm.updatedAt.toLocalDate())
+				.filter(date -> !date.isBefore(recentSince) && !date.isAfter(effectiveToday))
+				.count();
 
 		List<CaseRadarRow> rows = new ArrayList<>();
 		if (overdueTasks > 0) {
@@ -2142,7 +2189,13 @@ public final class MyShaleController {
 		if (tortWarning > 0) {
 			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "Tort notice due in 15–30 days", tortWarning, "Assigned active cases.", CaseRadarAction.TORT_NOTICE_DUE_15_TO_30_DAYS));
 		}
-		// TODO: Add inactive/recently-updated radar rows once a reliable activity/UpdatedAt field is present in this loaded overview model.
+		if (inactiveCases > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "Inactive assigned cases", inactiveCases, "No case update in 45+ days.", CaseRadarAction.INACTIVE_ASSIGNED_CASES));
+		}
+		if (recentlyUpdatedCases > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.POSITIVE, "Recently updated cases", recentlyUpdatedCases, "Updated in the last 7 days.", CaseRadarAction.RECENTLY_UPDATED_ASSIGNED_CASES));
+		}
+		rows.sort(Comparator.comparingInt(row -> row.severity().sortOrder()));
 		return rows;
 	}
 
@@ -2222,6 +2275,8 @@ public final class MyShaleController {
 			case SOL_DUE_15_TO_30_DAYS -> showDeadlineCasesInMyCases(SORT_SOL, CaseDeadlineWindow.DUE_15_TO_30_DAYS);
 			case TORT_NOTICE_DUE_14_DAYS -> showDeadlineCasesInMyCases(SORT_TORT_NOTICE, CaseDeadlineWindow.DUE_WITHIN_14_DAYS);
 			case TORT_NOTICE_DUE_15_TO_30_DAYS -> showDeadlineCasesInMyCases(SORT_TORT_NOTICE, CaseDeadlineWindow.DUE_15_TO_30_DAYS);
+			case INACTIVE_ASSIGNED_CASES -> showUpdatedAtCasesInMyCases(SORT_UPDATED_OLDEST);
+			case RECENTLY_UPDATED_ASSIGNED_CASES -> showUpdatedAtCasesInMyCases(SORT_UPDATED_NEWEST);
 			case NONE -> {
 			}
 		}
@@ -2255,6 +2310,11 @@ public final class MyShaleController {
 		// My Tasks does not currently expose an overdue-only filter, so due-date ascending sorting makes overdue work appear first.
 	}
 
+	private void selectAllMyCasesStatuses() {
+		selectedStatusIds.clear();
+		selectedStatusIds.addAll(CaseListUiSupport.defaultSelectedStatuses(statusFilterOptions));
+	}
+
 	private void showDeadlineCasesInMyCases(String sortOption, CaseDeadlineWindow deadlineWindow) {
 		if (myCasesBoardSearchField != null) {
 			myCasesBoardSearchField.clear();
@@ -2265,7 +2325,7 @@ public final class MyShaleController {
 		if (myCasesBoardStatusFilterChoice != null) {
 			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
 		}
-		selectedStatusIds.clear();
+		selectAllMyCasesStatuses();
 		CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, this::loadFirstPage);
 		if (myCasesBoardSortChoice != null) {
 			myCasesBoardSortChoice.getSelectionModel().select(sortOption);
@@ -2275,6 +2335,29 @@ public final class MyShaleController {
 		}
 		onSectionSelected(SECTION_MY_CASES);
 		// TODO: Apply an existing My Cases deadline/window filter for deadlineWindow when the assigned-case board exposes one.
+		renderMyCasesBoard();
+		ensureMyCasesFresh(false);
+	}
+
+	private void showUpdatedAtCasesInMyCases(String sortOption) {
+		if (myCasesBoardSearchField != null) {
+			myCasesBoardSearchField.clear();
+		}
+		if (myCasesSearchField != null) {
+			myCasesSearchField.clear();
+		}
+		if (myCasesBoardStatusFilterChoice != null) {
+			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
+		}
+		selectAllMyCasesStatuses();
+		CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, this::loadFirstPage);
+		if (myCasesBoardSortChoice != null) {
+			myCasesBoardSortChoice.getSelectionModel().select(sortOption);
+		}
+		if (myCasesSortChoice != null) {
+			myCasesSortChoice.getSelectionModel().select(sortOption);
+		}
+		onSectionSelected(SECTION_MY_CASES);
 		renderMyCasesBoard();
 		ensureMyCasesFresh(false);
 	}
@@ -3892,6 +3975,15 @@ public final class MyShaleController {
 		String styleSuffix() {
 			return styleSuffix;
 		}
+
+		int sortOrder() {
+			return switch (this) {
+				case CRITICAL -> 0;
+				case WARNING -> 1;
+				case POSITIVE -> 2;
+				case NEUTRAL -> 3;
+			};
+		}
 	}
 
 	private enum CaseRadarAction {
@@ -3900,7 +3992,9 @@ public final class MyShaleController {
 		SOL_DUE_14_DAYS,
 		SOL_DUE_15_TO_30_DAYS,
 		TORT_NOTICE_DUE_14_DAYS,
-		TORT_NOTICE_DUE_15_TO_30_DAYS
+		TORT_NOTICE_DUE_15_TO_30_DAYS,
+		INACTIVE_ASSIGNED_CASES,
+		RECENTLY_UPDATED_ASSIGNED_CASES
 	}
 
 	private enum CaseDeadlineWindow {
@@ -4059,10 +4153,11 @@ public final class MyShaleController {
 		final String primaryStatusName;
 		final String primaryStatusColor;
 		final String practiceAreaColor;
+		final LocalDateTime updatedAt;
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, LocalDate tortNoticeDate, Integer primaryStatusId,
 				String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent,
-				String primaryStatusName, String primaryStatusColor, String practiceAreaColor) {
+				String primaryStatusName, String primaryStatusColor, String practiceAreaColor, LocalDateTime updatedAt) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
@@ -4075,6 +4170,7 @@ public final class MyShaleController {
 			this.primaryStatusName = Objects.requireNonNullElse(primaryStatusName, "");
 			this.primaryStatusColor = Objects.requireNonNullElse(primaryStatusColor, "");
 			this.practiceAreaColor = Objects.requireNonNullElse(practiceAreaColor, "");
+			this.updatedAt = updatedAt;
 		}
 
 		boolean sameContent(CaseCardVm other) {
@@ -4092,7 +4188,8 @@ public final class MyShaleController {
 					&& Objects.equals(nonEngagementLetterSent, other.nonEngagementLetterSent)
 					&& Objects.equals(primaryStatusName, other.primaryStatusName)
 					&& Objects.equals(primaryStatusColor, other.primaryStatusColor)
-					&& Objects.equals(practiceAreaColor, other.practiceAreaColor);
+					&& Objects.equals(practiceAreaColor, other.practiceAreaColor)
+					&& Objects.equals(updatedAt, other.updatedAt);
 		}
 	}
 }
