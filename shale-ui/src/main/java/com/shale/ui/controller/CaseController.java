@@ -177,7 +177,11 @@ public class CaseController {
 	@FXML
 	private VBox detailsPane;
 	@FXML
+	private StackPane detailsUpdatesHost;
+	@FXML
 	private VBox tasksTabPane;
+	@FXML
+	private StackPane tasksUpdatesHost;
 	@FXML
 	private VBox genericPane;
 	@FXML
@@ -201,6 +205,10 @@ public class CaseController {
 	private VBox timelineListBox;
 	@FXML
 	private Label timelineEmptyLabel;
+	@FXML
+	private StackPane partiesUpdatesHost;
+	@FXML
+	private StackPane timelineUpdatesHost;
 
 	@FXML
 	private Label ovCaseStatusValue;
@@ -1512,7 +1520,7 @@ public class CaseController {
 	}
 
 	private void showTasksTab() {
-		setUpdatesPaneVisible(false);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.TASKS);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
@@ -1522,6 +1530,7 @@ public class CaseController {
 			loadCaseTasksAsync();
 		}
 		renderTasksSection();
+		loadCaseUpdatesAsync();
 	}
 
 	private boolean shouldReloadTasksForTabOpen() {
@@ -1568,7 +1577,7 @@ public class CaseController {
 	}
 
 	private void showTimeline() {
-		setUpdatesPaneVisible(false);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.TIMELINE);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -1587,6 +1596,7 @@ public class CaseController {
 		setVisibleManaged(timelineListBox, true);
 		showTimelineLoadingState();
 		auditCaseRead("Case.Timeline.Read", "Case.Timeline");
+		loadCaseUpdatesAsync();
 		loadCaseTimelineEventsAsync();
 	}
 
@@ -2594,20 +2604,36 @@ public class CaseController {
 		if (caseUpdatesPane.getParent() instanceof Pane parent) {
 			parent.getChildren().remove(caseUpdatesPane);
 		}
+		clearCaseUpdatesHost(detailsUpdatesHost);
+		clearCaseUpdatesHost(partiesUpdatesHost);
+		clearCaseUpdatesHost(tasksUpdatesHost);
+		clearCaseUpdatesHost(timelineUpdatesHost);
 		caseUpdatesPane.setManaged(placement != CaseUpdatesPlacement.HIDDEN);
 		caseUpdatesPane.setVisible(placement != CaseUpdatesPlacement.HIDDEN);
 		caseUpdatesPane.setMaxWidth(placement == CaseUpdatesPlacement.RIGHT ? Region.USE_COMPUTED_SIZE : Double.MAX_VALUE);
 		caseUpdatesPane.setPrefWidth(placement == CaseUpdatesPlacement.RIGHT ? 320.0 : Region.USE_COMPUTED_SIZE);
 		VBox.setVgrow(caseUpdatesPane, placement == CaseUpdatesPlacement.RIGHT ? Priority.ALWAYS : Priority.NEVER);
+		setVisibleManaged(detailsUpdatesHost, placement == CaseUpdatesPlacement.DETAILS);
+		setVisibleManaged(partiesUpdatesHost, placement == CaseUpdatesPlacement.PARTIES);
+		setVisibleManaged(tasksUpdatesHost, placement == CaseUpdatesPlacement.TASKS);
+		setVisibleManaged(timelineUpdatesHost, placement == CaseUpdatesPlacement.TIMELINE);
 		switch (placement) {
 		case RIGHT -> caseRootPane.setRight(caseUpdatesPane);
-		case DETAILS -> addCaseUpdatesPaneTo(detailsPane);
-		case PARTIES -> addCaseUpdatesPaneTo(timelineListBox);
+		case DETAILS -> addCaseUpdatesPaneTo(detailsUpdatesHost);
+		case PARTIES -> addCaseUpdatesPaneTo(partiesUpdatesHost);
+		case TASKS -> addCaseUpdatesPaneTo(tasksUpdatesHost);
+		case TIMELINE -> addCaseUpdatesPaneTo(timelineUpdatesHost);
 		case HIDDEN -> { }
 		}
 	}
 
-	private void addCaseUpdatesPaneTo(VBox host) {
+	private void clearCaseUpdatesHost(StackPane host) {
+		if (host != null) {
+			host.getChildren().remove(caseUpdatesPane);
+		}
+	}
+
+	private void addCaseUpdatesPaneTo(StackPane host) {
 		if (host != null && !host.getChildren().contains(caseUpdatesPane)) {
 			host.getChildren().add(caseUpdatesPane);
 		}
@@ -2684,7 +2710,11 @@ public class CaseController {
 	}
 
 	private boolean isCaseUpdatesSectionActive() {
-		return isSectionActive("Overview") || isSectionActive("Details") || isSectionActive("Parties");
+		return isSectionActive("Overview")
+				|| isSectionActive("Details")
+				|| isSectionActive("Parties")
+				|| isSectionActive("Tasks")
+				|| isSectionActive("Timeline");
 	}
 
 	private void onAddRelatedEntity() {
@@ -7202,6 +7232,8 @@ public class CaseController {
 		RIGHT,
 		DETAILS,
 		PARTIES,
+		TASKS,
+		TIMELINE,
 		HIDDEN
 	}
 
