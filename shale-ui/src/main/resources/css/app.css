@@ -1921,3 +1921,57 @@
 .statistic-card-subtitle {
     -fx-font-size: 11px;
 }
+
+.case-radar-list {
+    -fx-spacing: 6;
+}
+
+.case-radar-row {
+    -fx-padding: 6 0 6 0;
+    -fx-cursor: hand;
+}
+
+.case-radar-severity-dot {
+    -fx-min-width: 8;
+    -fx-min-height: 8;
+    -fx-pref-width: 8;
+    -fx-pref-height: 8;
+    -fx-background-radius: 999;
+}
+
+.case-radar-severity-critical {
+    -fx-background-color: #c24132;
+}
+
+.case-radar-severity-warning {
+    -fx-background-color: #d97706;
+}
+
+.case-radar-severity-positive {
+    -fx-background-color: #18894f;
+}
+
+.case-radar-severity-neutral {
+    -fx-background-color: rgba(17, 37, 66, 0.45);
+}
+
+.case-radar-label {
+    -fx-text-fill: #112542;
+    -fx-font-size: 12px;
+    -fx-font-weight: 900;
+}
+
+.case-radar-helper {
+    -fx-text-fill: rgba(17, 37, 66, 0.62);
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.case-radar-count {
+    -fx-background-color: rgba(17, 37, 66, 0.08);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-text-fill: #112542;
+    -fx-font-size: 12px;
+    -fx-font-weight: 900;
+}

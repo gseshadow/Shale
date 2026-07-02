@@ -749,6 +749,7 @@ public final class MyShaleController {
 				safe(r.name()),
 				r.intakeDate(),
 				r.statuteOfLimitationsDate(),
+				r.tortClaimsNoticeDeadline(),
 				r.primaryStatusId(),
 				safe(r.responsibleAttorneyName()),
 				safe(r.responsibleAttorneyColor()),
@@ -1653,7 +1654,7 @@ public final class MyShaleController {
 
 	private List<Node> buildOverviewDashboardWidgets() {
 		return List.of(
-				DashboardWidgetFactory.placeholder("Case Radar", "No urgent items."),
+				buildCaseRadarWidget(),
 				DashboardWidgetFactory.placeholder("Important Dates", "No upcoming important dates."),
 				DashboardWidgetFactory.placeholder("Notifications", "You’re all caught up."),
 				DashboardWidgetFactory.placeholder("Recent Case Activity", "No recent case activity."),
@@ -1665,6 +1666,143 @@ public final class MyShaleController {
 			return;
 		}
 		overviewWidgetsContainer.getChildren().setAll(buildOverviewDashboardWidgets());
+	}
+
+	private Node buildCaseRadarWidget() {
+		if (loadingMyTasks || loadingMyCases) {
+			return DashboardWidgetFactory.widget("Case Radar", null, null, null, true, false);
+		}
+		if (myCasesLoadFailed) {
+			return DashboardWidgetFactory.widget(
+					"Case Radar",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Unable to load case radar."),
+					false,
+					false);
+		}
+		List<CaseRadarRow> rows = buildCaseRadarRows(LocalDate.now());
+		if (rows.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"Case Radar",
+					null,
+					null,
+					DashboardWidgetFactory.emptyState("No urgent items."),
+					false,
+					true);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("case-radar-list");
+		content.setFillWidth(true);
+		for (CaseRadarRow row : rows) {
+			content.getChildren().add(buildCaseRadarRow(row));
+		}
+		long attentionCount = rows.stream()
+				.filter(row -> row.severity() == CaseRadarSeverity.CRITICAL || row.severity() == CaseRadarSeverity.WARNING)
+				.mapToLong(CaseRadarRow::count)
+				.sum();
+		return DashboardWidgetFactory.widget(
+				"Case Radar",
+				attentionCount > 0 ? String.valueOf(attentionCount) : null,
+				null,
+				content,
+				false,
+				false);
+	}
+
+	private List<CaseRadarRow> buildCaseRadarRows(LocalDate today) {
+		LocalDate effectiveToday = today == null ? LocalDate.now() : today;
+		LocalDate soon = effectiveToday.plusDays(14);
+		LocalDate month = effectiveToday.plusDays(30);
+		long overdueTasks = overviewEligibleTasks(myTasks).stream()
+				.filter(task -> task != null && !task.deleted() && task.completedAt() == null)
+				.filter(task -> task.dueAt() != null && task.dueAt().toLocalDate().isBefore(effectiveToday))
+				.count();
+
+		List<CaseCardVm> activeCases = activeAssignedCaseRadarSource();
+		long solCritical = countCasesInDateWindow(activeCases, effectiveToday, soon, caseVm -> caseVm.solDate);
+		long solWarning = countCasesInDateWindow(activeCases, soon.plusDays(1), month, caseVm -> caseVm.solDate);
+		long tortCritical = countCasesInDateWindow(activeCases, effectiveToday, soon, caseVm -> caseVm.tortNoticeDate);
+		long tortWarning = countCasesInDateWindow(activeCases, soon.plusDays(1), month, caseVm -> caseVm.tortNoticeDate);
+
+		List<CaseRadarRow> rows = new ArrayList<>();
+		if (overdueTasks > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Overdue tasks", overdueTasks, "Assigned to you and past due."));
+		}
+		if (solCritical > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "SOL due ≤ 14 days", solCritical, "Assigned active cases."));
+		}
+		if (tortCritical > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Tort notice due ≤ 14 days", tortCritical, "Assigned active cases."));
+		}
+		if (solWarning > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "SOL due in 15–30 days", solWarning, "Assigned active cases."));
+		}
+		if (tortWarning > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "Tort notice due in 15–30 days", tortWarning, "Assigned active cases."));
+		}
+		// TODO: Add inactive/recently-updated radar rows once a reliable activity/UpdatedAt field is present in this loaded overview model.
+		return rows;
+	}
+
+	private List<CaseCardVm> activeAssignedCaseRadarSource() {
+		if (myAssignedCasesBoard == null || myAssignedCasesBoard.isEmpty()) {
+			return List.of();
+		}
+		Set<Integer> terminalStatusIds = statusFilterOptions.stream()
+				.filter(Objects::nonNull)
+				.filter(CaseListUiSupport.StatusFilterOption::terminal)
+				.map(CaseListUiSupport.StatusFilterOption::id)
+				.collect(java.util.stream.Collectors.toSet());
+		return myAssignedCasesBoard.stream()
+				.filter(Objects::nonNull)
+				.filter(caseVm -> caseVm.id > 0)
+				.filter(caseVm -> caseVm.primaryStatusId == null || !terminalStatusIds.contains(caseVm.primaryStatusId))
+				.toList();
+	}
+
+	private long countCasesInDateWindow(List<CaseCardVm> cases, LocalDate start, LocalDate end, java.util.function.Function<CaseCardVm, LocalDate> dateExtractor) {
+		if (cases == null || cases.isEmpty() || start == null || end == null || dateExtractor == null) {
+			return 0;
+		}
+		return cases.stream()
+				.map(dateExtractor)
+				.filter(Objects::nonNull)
+				.filter(date -> !date.isBefore(start) && !date.isAfter(end))
+				.count();
+	}
+
+	private Node buildCaseRadarRow(CaseRadarRow row) {
+		HBox radarRow = new HBox(8);
+		radarRow.getStyleClass().addAll("case-radar-row", "case-radar-row-" + row.severity().styleSuffix());
+		radarRow.setAlignment(Pos.CENTER_LEFT);
+		radarRow.setMaxWidth(Double.MAX_VALUE);
+		radarRow.setOnMouseClicked(event -> onCaseRadarRowClicked(row));
+
+		Region indicator = new Region();
+		indicator.getStyleClass().addAll("case-radar-severity-dot", "case-radar-severity-" + row.severity().styleSuffix());
+
+		VBox text = new VBox(1);
+		text.setFillWidth(true);
+		Label label = new Label(row.label());
+		label.getStyleClass().add("case-radar-label");
+		text.getChildren().add(label);
+		if (!safe(row.helperText()).isBlank()) {
+			Label helper = new Label(row.helperText());
+			helper.getStyleClass().add("case-radar-helper");
+			helper.setWrapText(true);
+			text.getChildren().add(helper);
+		}
+		HBox.setHgrow(text, Priority.ALWAYS);
+
+		Label count = new Label(String.valueOf(row.count()));
+		count.getStyleClass().add("case-radar-count");
+		radarRow.getChildren().addAll(indicator, text, count);
+		return radarRow;
+	}
+
+	private void onCaseRadarRowClicked(CaseRadarRow row) {
+		// TODO: Wire to a filtered tasks/cases navigation target when dashboard row navigation exists.
 	}
 
 	private Node buildMyCaseSummaryWidget() {
@@ -3065,6 +3203,26 @@ public final class MyShaleController {
 		}
 	}
 
+	private enum CaseRadarSeverity {
+		CRITICAL("critical"),
+		WARNING("warning"),
+		POSITIVE("positive"),
+		NEUTRAL("neutral");
+
+		private final String styleSuffix;
+
+		CaseRadarSeverity(String styleSuffix) {
+			this.styleSuffix = styleSuffix;
+		}
+
+		String styleSuffix() {
+			return styleSuffix;
+		}
+	}
+
+	private record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText) {
+	}
+
 	private record MyCaseSummaryRow(Integer statusId, String statusName, String statusColor, long count) {
 	}
 
@@ -3096,6 +3254,7 @@ public final class MyShaleController {
 		final String name;
 		final LocalDate intakeDate;
 		final LocalDate solDate;
+		final LocalDate tortNoticeDate;
 		final Integer primaryStatusId;
 		final String responsibleAttorney;
 		final String responsibleAttorneyColor;
@@ -3104,13 +3263,14 @@ public final class MyShaleController {
 		final String primaryStatusColor;
 		final String practiceAreaColor;
 
-		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId,
+		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, LocalDate tortNoticeDate, Integer primaryStatusId,
 				String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent,
 				String primaryStatusName, String primaryStatusColor, String practiceAreaColor) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
 			this.solDate = solDate;
+			this.tortNoticeDate = tortNoticeDate;
 			this.primaryStatusId = primaryStatusId;
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
@@ -3128,6 +3288,7 @@ public final class MyShaleController {
 					&& Objects.equals(name, other.name)
 					&& Objects.equals(intakeDate, other.intakeDate)
 					&& Objects.equals(solDate, other.solDate)
+					&& Objects.equals(tortNoticeDate, other.tortNoticeDate)
 					&& Objects.equals(primaryStatusId, other.primaryStatusId)
 					&& Objects.equals(responsibleAttorney, other.responsibleAttorney)
 					&& Objects.equals(responsibleAttorneyColor, other.responsibleAttorneyColor)
