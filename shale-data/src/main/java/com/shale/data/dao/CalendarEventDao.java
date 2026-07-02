@@ -30,6 +30,7 @@ public final class CalendarEventDao {
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             bindUpsert(ps, event);
             ps.executeUpdate();
+            touchCaseUpdatedAt(con, event.caseId(), event.shaleClientId());
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     return rs.getInt(1);
@@ -68,6 +69,7 @@ public final class CalendarEventDao {
                 """;
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
+            Integer previousCaseId = findCalendarEventCaseId(con, event.calendarEventId(), event.shaleClientId());
             ps.setInt(1, event.calendarEventTypeId());
             ps.setObject(2, event.caseId());
             ps.setObject(3, event.taskId());
@@ -84,7 +86,10 @@ public final class CalendarEventDao {
             ps.setBoolean(14, event.cancelled());
             ps.setInt(15, event.calendarEventId());
             ps.setInt(16, event.shaleClientId());
-            ps.executeUpdate();
+            if (ps.executeUpdate() > 0) {
+                touchCaseUpdatedAt(con, previousCaseId, event.shaleClientId());
+                touchCaseUpdatedAt(con, event.caseId(), event.shaleClientId());
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update calendar event", e);
         }
@@ -175,6 +180,7 @@ public final class CalendarEventDao {
                 """;
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
+            Integer previousCaseId = findCalendarEventCaseId(con, calendarEventId, shaleClientId);
             ps.setInt(1, calendarEventId);
             ps.setInt(2, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -194,11 +200,49 @@ public final class CalendarEventDao {
                 """;
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
+            Integer previousCaseId = findCalendarEventCaseId(con, calendarEventId, shaleClientId);
             ps.setInt(1, calendarEventId);
             ps.setInt(2, shaleClientId);
-            ps.executeUpdate();
+            if (ps.executeUpdate() > 0) {
+                touchCaseUpdatedAt(con, previousCaseId, shaleClientId);
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete calendar event", e);
+        }
+    }
+
+    private static void touchCaseUpdatedAt(Connection con, Integer caseId, int shaleClientId) throws SQLException {
+        if (caseId == null || caseId <= 0) {
+            return;
+        }
+        try (PreparedStatement ps = con.prepareStatement("""
+                UPDATE dbo.Cases
+                SET UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = ?
+                  AND ShaleClientId = ?
+                  AND (IsDeleted = 0 OR IsDeleted IS NULL);
+                """)) {
+            ps.setInt(1, caseId);
+            ps.setInt(2, shaleClientId);
+            ps.executeUpdate();
+        }
+    }
+
+    private static Integer findCalendarEventCaseId(Connection con, int calendarEventId, int shaleClientId) throws SQLException {
+        try (PreparedStatement ps = con.prepareStatement("""
+                SELECT CaseId
+                FROM dbo.CalendarEvents
+                WHERE CalendarEventId = ?
+                  AND ShaleClientId = ?;
+                """)) {
+            ps.setInt(1, calendarEventId);
+            ps.setInt(2, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return (Integer) rs.getObject("CaseId");
+                }
+                return null;
+            }
         }
     }
 
