@@ -229,6 +229,10 @@ public final class MainController {
 
 	@FXML
 	private void onOpenNotificationCenter() {
+		openNotificationCenter();
+	}
+
+	public void openNotificationCenter() {
 		if (notificationCenterService == null || notificationBellButton == null || notificationBellButton.getScene() == null) {
 			return;
 		}

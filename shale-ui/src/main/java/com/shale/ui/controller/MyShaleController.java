@@ -2,6 +2,8 @@ package com.shale.ui.controller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,6 +36,8 @@ import com.shale.ui.component.factory.DashboardWidgetFactory;
 import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.controller.support.CaseListUiSupport;
+import com.shale.ui.notification.AppNotification;
+import com.shale.ui.notification.NotificationCenterService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -105,6 +109,7 @@ public final class MyShaleController {
 	private static final long MY_SHALE_PRIORITY_CACHE_TTL_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
 	private static final int IMPORTANT_DATES_WINDOW_DAYS = 30;
 	private static final int IMPORTANT_DATES_ROW_LIMIT = 10;
+	private static final int NOTIFICATIONS_ROW_LIMIT = 10;
 	private static final DateTimeFormatter IMPORTANT_DATE_LABEL_FORMATTER = DateTimeFormatter.ofPattern("MMM d");
 
 	@FXML
@@ -187,6 +192,8 @@ public final class MyShaleController {
 	private UiRuntimeBridge runtimeBridge;
 	private PhiReadAuditService phiReadAuditService;
 	private UserPreferencesService userPreferencesService;
+	private NotificationCenterService notificationCenterService;
+	private Runnable onOpenNotificationCenter;
 	private Consumer<Integer> onOpenCase;
 	private Consumer<Integer> onOpenUser;
 	private CaseCardFactory caseCardFactory;
@@ -249,6 +256,7 @@ public final class MyShaleController {
 	private boolean suppressOverviewControlEvents;
 	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 	private FlowPane myTasksGrid;
+	private boolean notificationWidgetRefreshListenerAttached;
 
 	private enum MyTasksViewMode {
 		BOARD,
@@ -299,6 +307,8 @@ public final class MyShaleController {
 			CaseTaskService caseTaskService,
 			UserBoardLanePreferencesDao userBoardLanePreferencesDao,
 			UserPreferencesService userPreferencesService,
+			NotificationCenterService notificationCenterService,
+			Runnable onOpenNotificationCenter,
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenUser,
 			PhiReadAuditService phiReadAuditService) {
@@ -306,6 +316,8 @@ public final class MyShaleController {
 		this.caseTaskService = caseTaskService;
 		this.userBoardLanePreferencesDao = userBoardLanePreferencesDao;
 		this.userPreferencesService = userPreferencesService;
+		this.notificationCenterService = notificationCenterService;
+		this.onOpenNotificationCenter = onOpenNotificationCenter;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.phiReadAuditService = phiReadAuditService;
@@ -320,6 +332,7 @@ public final class MyShaleController {
 				onOpenUser == null ? id ->
 				{
 				} : onOpenUser);
+		attachNotificationWidgetRefreshListener();
 	}
 
 	@FXML
@@ -1660,7 +1673,7 @@ public final class MyShaleController {
 		return List.of(
 				buildCaseRadarWidget(),
 				buildImportantDatesWidget(),
-				DashboardWidgetFactory.placeholder("Notifications", "You’re all caught up."),
+				buildNotificationsWidget(),
 				DashboardWidgetFactory.placeholder("Recent Case Activity", "No recent case activity."),
 				buildMyCaseSummaryWidget());
 	}
@@ -1670,6 +1683,143 @@ public final class MyShaleController {
 			return;
 		}
 		overviewWidgetsContainer.getChildren().setAll(buildOverviewDashboardWidgets());
+	}
+
+	private void attachNotificationWidgetRefreshListener() {
+		if (notificationCenterService == null || notificationWidgetRefreshListenerAttached) {
+			return;
+		}
+		notificationWidgetRefreshListenerAttached = true;
+		notificationCenterService.getNotificationsNewestFirst().addListener((javafx.collections.ListChangeListener<AppNotification>) change -> renderOverviewWidgets());
+		notificationCenterService.unreadCountProperty().addListener((obs, oldValue, newValue) -> renderOverviewWidgets());
+	}
+
+	private Node buildNotificationsWidget() {
+		if (notificationCenterService == null) {
+			return DashboardWidgetFactory.widget(
+					"Notifications",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Notifications are unavailable."),
+					false,
+					false);
+		}
+		List<AppNotification> visibleNotifications = notificationCenterService.getNotificationsNewestFirst().stream()
+				.filter(Objects::nonNull)
+				// TODO: Add recent-read durable notifications if the existing notification service exposes a recent-read path.
+				.sorted(Comparator.comparing(AppNotification::isUnread).reversed()
+						.thenComparing(AppNotification::getCreatedAt, Comparator.reverseOrder()))
+				.limit(NOTIFICATIONS_ROW_LIMIT)
+				.toList();
+		if (visibleNotifications.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"Notifications",
+					notificationBadgeText(),
+					onOpenNotificationCenter,
+					DashboardWidgetFactory.emptyState("You’re all caught up."),
+					false,
+					false);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("dashboard-notification-list");
+		content.setFillWidth(true);
+		visibleNotifications.forEach(notification -> content.getChildren().add(buildNotificationBriefingRow(notification)));
+		return DashboardWidgetFactory.widget(
+				"Notifications",
+				notificationBadgeText(),
+				onOpenNotificationCenter,
+				content,
+				false,
+				false);
+	}
+
+	private String notificationBadgeText() {
+		if (notificationCenterService == null || notificationCenterService.getUnreadCount() <= 0) {
+			return null;
+		}
+		return Integer.toString(notificationCenterService.getUnreadCount());
+	}
+
+	private Node buildNotificationBriefingRow(AppNotification notification) {
+		Region unreadDot = new Region();
+		unreadDot.getStyleClass().addAll("dashboard-notification-dot", notification.isUnread() ? "dashboard-notification-dot-unread" : "dashboard-notification-dot-read");
+
+		Label title = new Label(notificationTitle(notification));
+		title.getStyleClass().add("dashboard-notification-title");
+		title.setWrapText(true);
+		Label meta = new Label(notificationMeta(notification));
+		meta.getStyleClass().add("dashboard-notification-meta");
+		meta.setWrapText(true);
+		VBox text = new VBox(2, title, meta);
+		text.setFillWidth(true);
+		HBox.setHgrow(text, Priority.ALWAYS);
+		HBox row = new HBox(7, unreadDot, text);
+		row.getStyleClass().add("dashboard-notification-row");
+		if (notification.isUnread()) {
+			row.getStyleClass().add("dashboard-notification-row-unread");
+		}
+		row.setAlignment(Pos.TOP_LEFT);
+		row.setOnMouseClicked(event -> handleNotificationBriefingRowClicked(notification));
+		return row;
+	}
+
+	private void handleNotificationBriefingRowClicked(AppNotification notification) {
+		if (notification == null || notificationCenterService == null) {
+			return;
+		}
+		notificationCenterService.markRead(notification);
+		if ("Task".equalsIgnoreCase(Objects.toString(notification.getEntityType(), ""))
+				&& notification.getEntityId() != null && notification.getEntityId() > 0) {
+			openTask(notification.getEntityId());
+		}
+		// TODO: Reuse additional notification-center activation routes here if they become available outside MainController.
+	}
+
+	private static String notificationTitle(AppNotification notification) {
+		String title = notification.getTitle();
+		if (title != null && !title.isBlank()) {
+			return title.trim();
+		}
+		String message = notification.getMessage();
+		return message == null || message.isBlank() ? "Notification" : message.trim();
+	}
+
+	private static String notificationMeta(AppNotification notification) {
+		List<String> parts = new ArrayList<>();
+		String relative = shortRelativeTime(notification.getCreatedAt());
+		if (!relative.isBlank()) {
+			parts.add(relative);
+		}
+		String caseName = notification.getCaseName();
+		if (caseName != null && !caseName.isBlank()) {
+			parts.add(caseName.trim());
+		} else if (notification.getEntityTitle() != null && !notification.getEntityTitle().isBlank()) {
+			parts.add(notification.getEntityTitle().trim());
+		}
+		return String.join(" • ", parts);
+	}
+
+	private static String shortRelativeTime(Instant createdAt) {
+		if (createdAt == null) {
+			return "";
+		}
+		Duration age = Duration.between(createdAt, Instant.now());
+		if (age.isNegative()) {
+			age = Duration.ZERO;
+		}
+		long minutes = age.toMinutes();
+		if (minutes < 1) {
+			return "now";
+		}
+		if (minutes < 60) {
+			return minutes + "m";
+		}
+		long hours = age.toHours();
+		if (hours < 24) {
+			return hours + "h";
+		}
+		long days = age.toDays();
+		return days + "d";
 	}
 
 	private Node buildCaseRadarWidget() {
