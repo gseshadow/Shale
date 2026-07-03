@@ -33,7 +33,13 @@ class CaseControllerNullableDateDialogTest {
                 "The full details save path should capture a cleared SOL editor as null.");
         assertTrue(source.contains("d.tortNoticeDeadline = nullableDatePickerValue(detTortNoticeDeadlineEditor);"),
                 "The full details save path should capture a cleared TCN editor as null.");
-        assertTrue(source.contains("if (editorText == null || editorText.trim().isEmpty())\n\t\t\treturn null;"),
+        assertTrue(Pattern.compile("""
+                        static\\s+LocalDate\\s+nullableDatePickerValue\\s*\\([^)]*DatePicker\\s+picker[^)]*\\)\\s*\\{.*?
+                        String\\s+editorText\\s*=\\s*picker\\.getEditor\\(\\)\\s*==\\s*null\\s*\\?\\s*null\\s*:\\s*picker\\.getEditor\\(\\)\\.getText\\(\\)\\s*;.*?
+                        if\\s*\\(\\s*editorText\\s*==\\s*null\\s*\\|\\|\\s*editorText\\.trim\\(\\)\\.isEmpty\\(\\)\\s*\\)\\s*
+                        return\\s+null\\s*;.*?
+                        return\\s+picker\\.getValue\\(\\)\\s*;
+                        """, Pattern.DOTALL | Pattern.COMMENTS).matcher(source).find(),
                 "Blank DatePicker editor text must be treated as an explicit clear instead of preserving the previous value.");
     }
 
