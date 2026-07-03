@@ -219,8 +219,8 @@ final class MyShaleControllerBoardLayoutTest {
         int notificationsIndex = source.indexOf("buildNotificationsWidget()");
         int activityIndex = source.indexOf("buildRecentCaseActivityWidget()");
         int summaryIndex = source.indexOf("buildMyCaseSummaryWidget()");
-        assertTrue(radarIndex > 0 && radarIndex < datesIndex && datesIndex < notificationsIndex
-                        && notificationsIndex < activityIndex && activityIndex < summaryIndex,
+        assertTrue(radarIndex > 0 && radarIndex < datesIndex && datesIndex < activityIndex
+                        && activityIndex < notificationsIndex && notificationsIndex < summaryIndex,
                 "Right-column widgets should keep the requested briefing order");
         assertTrue(source.contains("No urgent items."));
         assertTrue(source.contains("No upcoming important dates."));
