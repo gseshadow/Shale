@@ -204,14 +204,19 @@
 								<DatePicker fx:id="ovSolDateEditor" visible="false" managed="false" GridPane.rowIndex="7" GridPane.columnIndex="1" />
 								<Button fx:id="editSolDateButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="7" GridPane.columnIndex="2" />
 
-								<Label text="Responsible attorney" styleClass="case-overview-row-label" GridPane.rowIndex="8" GridPane.columnIndex="0" />
-								<StackPane fx:id="ovResponsibleAttorneyHost" styleClass="case-overview-row-value-host" GridPane.rowIndex="8" GridPane.columnIndex="1" />
-								<Button fx:id="changeResponsibleAttorneyButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="8" GridPane.columnIndex="2" />
+								<Label text="Tort notice deadline" styleClass="case-overview-row-label" GridPane.rowIndex="8" GridPane.columnIndex="0" />
+								<Label fx:id="ovTortNoticeDeadlineValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="8" GridPane.columnIndex="1" />
+								<DatePicker fx:id="ovTortNoticeDeadlineEditor" visible="false" managed="false" GridPane.rowIndex="8" GridPane.columnIndex="1" />
+								<Button fx:id="editTortNoticeDeadlineButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="8" GridPane.columnIndex="2" />
 
-								<Label text="Description" styleClass="case-overview-row-label" GridPane.rowIndex="9" GridPane.columnIndex="0" />
-								<Label fx:id="ovDescriptionValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-								<TextArea fx:id="ovDescriptionEditor" visible="false" managed="false" wrapText="true" prefRowCount="4" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-								<Button fx:id="editDescriptionButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="9" GridPane.columnIndex="2" />
+								<Label text="Responsible attorney" styleClass="case-overview-row-label" GridPane.rowIndex="9" GridPane.columnIndex="0" />
+								<StackPane fx:id="ovResponsibleAttorneyHost" styleClass="case-overview-row-value-host" GridPane.rowIndex="9" GridPane.columnIndex="1" />
+								<Button fx:id="changeResponsibleAttorneyButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="9" GridPane.columnIndex="2" />
+
+								<Label text="Description" styleClass="case-overview-row-label" GridPane.rowIndex="10" GridPane.columnIndex="0" />
+								<Label fx:id="ovDescriptionValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="10" GridPane.columnIndex="1" />
+								<TextArea fx:id="ovDescriptionEditor" visible="false" managed="false" wrapText="true" prefRowCount="4" GridPane.rowIndex="10" GridPane.columnIndex="1" />
+								<Button fx:id="editDescriptionButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="10" GridPane.columnIndex="2" />
 							</GridPane>
 						</VBox>
 
@@ -304,10 +309,11 @@
 						</styleClass>
 					</Button>
 				</HBox>
-				<ScrollPane fx:id="detailsScrollPane" fitToWidth="true"
-					hbarPolicy="NEVER" styleClass="surface-scroll"
-					VBox.vgrow="ALWAYS">
-					<VBox fx:id="detailsPane" spacing="10" maxWidth="980"
+				<HBox spacing="12" fillHeight="true" VBox.vgrow="ALWAYS">
+					<ScrollPane fx:id="detailsScrollPane" fitToWidth="true"
+						hbarPolicy="NEVER" styleClass="surface-scroll"
+						HBox.hgrow="ALWAYS">
+						<VBox fx:id="detailsPane" spacing="10" maxWidth="980"
 						styleClass="case-main-surface">
 						<padding>
 							<Insets top="12" right="12" bottom="12" left="12" />
@@ -665,8 +671,11 @@
 						</GridPane>
 					</VBox>
 
-					</VBox>
-				</ScrollPane>
+						</VBox>
+					</ScrollPane>
+					<StackPane fx:id="detailsUpdatesHost" prefWidth="320.0"
+						minWidth="300.0" maxWidth="360.0" />
+				</HBox>
 			</VBox>
 			<!-- TASKS TAB PANE (center) -->
 			<VBox fx:id="tasksTabPane" spacing="8" maxWidth="1.7976931348623157E308"
@@ -720,28 +729,33 @@
 							</content>
 						</ScrollPane>
 					</VBox>
-					<VBox fx:id="caseTaskActivityPane" spacing="8" prefWidth="420"
-						minWidth="360" maxWidth="480" maxHeight="1.7976931348623157E308"
-						VBox.vgrow="ALWAYS" styleClass="secondary-panel">
-						<padding>
-							<Insets top="10" right="10" bottom="10" left="10" />
-						</padding>
-						<Label text="Task Activity"
-							style="-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);" />
-						<Label fx:id="caseTaskActivityEmptyLabel" text="No task activity yet."
-							style="-fx-opacity: 0.7;" visible="false" managed="false" />
-						<ScrollPane fx:id="caseTaskActivityScrollPane" fitToWidth="true"
-							fitToHeight="true"
-							hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS"
-							styleClass="transparent-scroll">
-							<content>
-								<VBox fx:id="caseTaskActivityFeedBox" spacing="8">
-									<padding>
-										<Insets top="2" right="10" bottom="2" left="2" />
-									</padding>
-								</VBox>
-							</content>
-						</ScrollPane>
+					<VBox spacing="10" prefWidth="420" minWidth="360" maxWidth="480"
+						maxHeight="1.7976931348623157E308" VBox.vgrow="ALWAYS">
+						<VBox fx:id="caseTaskActivityPane" spacing="8"
+							maxHeight="1.7976931348623157E308" VBox.vgrow="ALWAYS"
+							styleClass="secondary-panel">
+							<padding>
+								<Insets top="10" right="10" bottom="10" left="10" />
+							</padding>
+							<Label text="Task Activity"
+								style="-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);" />
+							<Label fx:id="caseTaskActivityEmptyLabel" text="No task activity yet."
+								style="-fx-opacity: 0.7;" visible="false" managed="false" />
+							<ScrollPane fx:id="caseTaskActivityScrollPane" fitToWidth="true"
+								fitToHeight="true"
+								hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS"
+								styleClass="transparent-scroll">
+								<content>
+									<VBox fx:id="caseTaskActivityFeedBox" spacing="8">
+										<padding>
+											<Insets top="2" right="10" bottom="2" left="2" />
+										</padding>
+									</VBox>
+								</content>
+							</ScrollPane>
+						</VBox>
+						<StackPane fx:id="tasksUpdatesHost" prefHeight="360.0"
+							maxWidth="1.7976931348623157E308" />
 					</VBox>
 				</HBox>
 			</VBox>
@@ -781,16 +795,23 @@
 						</padding>
 					</FlowPane>
 				</ScrollPane>
-				<ScrollPane fx:id="timelineScrollPane" fitToWidth="true"
-					hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" visible="false"
-					managed="false" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
-					<VBox fx:id="timelineListBox" spacing="10.0" visible="false"
-						managed="false">
-						<padding>
-							<Insets top="4" right="4" bottom="4" left="4" />
-						</padding>
-					</VBox>
-				</ScrollPane>
+				<HBox fx:id="genericContentWithUpdates" spacing="12" fillHeight="true"
+					VBox.vgrow="ALWAYS">
+					<ScrollPane fx:id="timelineScrollPane" fitToWidth="true"
+						hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" visible="false"
+						managed="false" HBox.hgrow="ALWAYS" styleClass="transparent-scroll">
+						<VBox fx:id="timelineListBox" spacing="10.0" visible="false"
+							managed="false">
+							<padding>
+								<Insets top="4" right="4" bottom="4" left="4" />
+							</padding>
+						</VBox>
+					</ScrollPane>
+					<StackPane fx:id="partiesUpdatesHost" prefWidth="320.0"
+						minWidth="300.0" maxWidth="360.0" visible="false" managed="false" />
+					<StackPane fx:id="timelineUpdatesHost" prefWidth="320.0"
+						minWidth="300.0" maxWidth="360.0" visible="false" managed="false" />
+				</HBox>
 				<TextArea fx:id="placeholderTextArea"
 					promptText="Placeholder notes / testing area" prefRowCount="12" />
 			</VBox>
@@ -800,7 +821,8 @@
 	</center>
 
 	<right>
-		<VBox fx:id="caseUpdatesPane" spacing="10.0" prefWidth="320.0"
+		<VBox fx:id="caseUpdatesPane" spacing="10.0" minWidth="300.0"
+			prefWidth="320.0" maxWidth="360.0"
 			styleClass="case-right-pane strong-panel"
 			BorderPane.alignment="TOP_LEFT">
 			<padding>

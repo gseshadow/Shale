@@ -153,6 +153,9 @@ public final class CaseDao {
 		INTAKE_OLDEST,
 		STATUTE_SOONEST,
 		STATUTE_LATEST,
+		TORT_NOTICE_SOONEST,
+		UPDATED_OLDEST,
+		UPDATED_NEWEST,
 		CASE_NAME_ASC,
 		CASE_NAME_DESC,
 		RESPONSIBLE_ATTORNEY_ASC,
@@ -188,13 +191,26 @@ public final class CaseDao {
 			String latestCaseUpdate,
 			String description,
 			LocalDate dateOfIncident,
-			LocalDate tortClaimsNoticeDeadline
+			LocalDate tortClaimsNoticeDeadline,
+			LocalDateTime updatedAt
 	) {
 		public CaseRow(long id, String name, LocalDate intakeDate, LocalDate statuteOfLimitationsDate,
 				Integer primaryStatusId, Integer responsibleAttorneyId, String responsibleAttorneyName,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
 			this(id, name, intakeDate, statuteOfLimitationsDate, primaryStatusId, responsibleAttorneyId,
-					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent, null, null, null, null, null, null, null, null, null);
+					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent, null, null, null, null, null, null, null, null, null, null);
+		}
+
+		public CaseRow(long id, String name, LocalDate intakeDate, LocalDate statuteOfLimitationsDate,
+				Integer primaryStatusId, Integer responsibleAttorneyId, String responsibleAttorneyName,
+				String responsibleAttorneyColor, Boolean nonEngagementLetterSent,
+				String primaryStatusName, String primaryStatusColor, String practiceAreaColor,
+				String clientName, String opposingPartiesName, String latestCaseUpdate, String description,
+				LocalDate dateOfIncident, LocalDate tortClaimsNoticeDeadline) {
+			this(id, name, intakeDate, statuteOfLimitationsDate, primaryStatusId, responsibleAttorneyId,
+					responsibleAttorneyName, responsibleAttorneyColor, nonEngagementLetterSent,
+					primaryStatusName, primaryStatusColor, practiceAreaColor, clientName, opposingPartiesName,
+					latestCaseUpdate, description, dateOfIncident, tortClaimsNoticeDeadline, null);
 		}
 	}
 
@@ -1113,7 +1129,8 @@ public final class CaseDao {
 								rs.getString("LatestCaseUpdate"),
 								rs.getString("Description"),
 								toLocalDate(rs.getDate("DateOfIncident")),
-								toLocalDate(rs.getDate("TortNoticeDeadline"))));
+								toLocalDate(rs.getDate("TortNoticeDeadline")),
+								toLocalDateTime(rs.getTimestamp("UpdatedAt"))));
 					}
 				}
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
@@ -1347,6 +1364,7 @@ public final class CaseDao {
 					  c.StatuteOfLimitations,
 					  c.DateOfInjury AS DateOfIncident,
 					  c.TortNoticeDeadline,
+					  c.UpdatedAt,
 					  CAST(NULL AS nvarchar(max)) AS LatestCaseUpdate,
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
@@ -2005,6 +2023,9 @@ public final class CaseDao {
 		case INTAKE_OLDEST -> "c.CallerDate ASC, c.Id ASC";
 		case STATUTE_SOONEST -> "c.StatuteOfLimitations ASC, c.Id ASC";
 		case STATUTE_LATEST -> "c.StatuteOfLimitations DESC, c.Id DESC";
+		case TORT_NOTICE_SOONEST -> "c.TortNoticeDeadline ASC, c.Id ASC";
+		case UPDATED_OLDEST -> "c.UpdatedAt ASC, c.Id ASC";
+		case UPDATED_NEWEST -> "c.UpdatedAt DESC, c.Id DESC";
 		case CASE_NAME_ASC -> "c.Name ASC, c.Id ASC";
 		case CASE_NAME_DESC -> "c.Name DESC, c.Id DESC";
 		case RESPONSIBLE_ATTORNEY_ASC -> "ResponsibleAttorneyName ASC, c.Id ASC";
@@ -3851,7 +3872,11 @@ public final class CaseDao {
 			ps.setInt(idx++, shaleClientId);
 			ps.setLong(idx++, caseId);
 			ps.setInt(idx++, contactId);
-			return ps.executeUpdate() > 0;
+			boolean linked = ps.executeUpdate() > 0;
+			if (linked) {
+				touchCaseUpdatedAt(con, caseId, shaleClientId);
+			}
+			return linked;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to link contact to case (caseId=" + caseId + ", contactId=" + contactId + ", roleId=" + roleId + ")", e);
 		}
@@ -4748,7 +4773,11 @@ public final class CaseDao {
 			ps.setInt(idx++, contactId);
 			ps.setInt(idx++, shaleClientId);
 			ps.setInt(idx++, shaleClientId);
-			return ps.executeUpdate() > 0;
+			boolean changed = ps.executeUpdate() > 0;
+			if (changed) {
+				touchCaseUpdatedAt(con, caseId, shaleClientId);
+			}
+			return changed;
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to unlink contact from case (caseId=" + caseId + ", contactId=" + contactId + ")", e);
 		}
@@ -5132,6 +5161,11 @@ public final class CaseDao {
 				    VALUES
 				        (?, ?, @now, NULL, ?, @now, @now, 1);
 
+				    UPDATE dbo.Cases
+				    SET UpdatedAt = @now
+				    WHERE Id = ?
+				      AND (IsDeleted = 0 OR IsDeleted IS NULL);
+
 				  END
 
 				  COMMIT;
@@ -5152,6 +5186,7 @@ public final class CaseDao {
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, statusId);
 			ps.setString(i++, (notes == null || notes.isBlank()) ? null : notes.trim());
+			ps.setLong(i++, caseId);
 
 			ps.executeUpdate();
 		} catch (SQLException e) {
@@ -6544,6 +6579,10 @@ public final class CaseDao {
 				WHEN NOT MATCHED THEN
 				    INSERT (CaseId, UserId, RoleId, IsPrimary, Notes, CreatedAt, UpdatedAt)
 				    VALUES (?, ?, ?, CAST(1 AS bit), NULL, SYSDATETIME(), SYSDATETIME());
+
+				UPDATE dbo.Cases
+				SET UpdatedAt = SYSDATETIME()
+				WHERE Id = ? AND (IsDeleted = 0 OR IsDeleted IS NULL);
 				""";
 
 		try (Connection c = db.requireConnection();
@@ -6557,6 +6596,7 @@ public final class CaseDao {
 			ps.setLong(i++, caseId);
 			ps.setInt(i++, userId);
 			ps.setInt(i++, ROLE_RESPONSIBLE_ATTORNEY);
+			ps.setLong(i++, caseId);
 
 			ps.executeUpdate();
 
@@ -6631,6 +6671,20 @@ public final class CaseDao {
 
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list attorneys (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	private static void touchCaseUpdatedAt(Connection con, long caseId, int shaleClientId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("""
+				UPDATE dbo.Cases
+				SET UpdatedAt = SYSDATETIME()
+				WHERE Id = ?
+				  AND ShaleClientId = ?
+				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
+				""")) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, shaleClientId);
+			ps.executeUpdate();
 		}
 	}
 
@@ -7140,6 +7194,8 @@ public final class CaseDao {
 					ps.executeBatch();
 				}
 			}
+
+			touchCaseUpdatedAt(con, caseId, requireCurrentShaleClientId(con));
 
 			con.commit();
 

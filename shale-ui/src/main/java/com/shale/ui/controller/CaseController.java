@@ -176,7 +176,11 @@ public class CaseController {
 	@FXML
 	private VBox detailsPane;
 	@FXML
+	private StackPane detailsUpdatesHost;
+	@FXML
 	private VBox tasksTabPane;
+	@FXML
+	private StackPane tasksUpdatesHost;
 	@FXML
 	private VBox genericPane;
 	@FXML
@@ -200,6 +204,10 @@ public class CaseController {
 	private VBox timelineListBox;
 	@FXML
 	private Label timelineEmptyLabel;
+	@FXML
+	private StackPane partiesUpdatesHost;
+	@FXML
+	private StackPane timelineUpdatesHost;
 
 	@FXML
 	private Label ovCaseStatusValue;
@@ -247,6 +255,10 @@ public class CaseController {
 	private Label ovSolDateValue;
 	@FXML
 	private DatePicker ovSolDateEditor;
+	@FXML
+	private Label ovTortNoticeDeadlineValue;
+	@FXML
+	private DatePicker ovTortNoticeDeadlineEditor;
 
 	@FXML
 	private Label ovDescriptionValue;
@@ -273,6 +285,8 @@ public class CaseController {
 	private Button editDateOfMedicalNegligenceButton;
 	@FXML
 	private Button editSolDateButton;
+	@FXML
+	private Button editTortNoticeDeadlineButton;
 	@FXML
 	private Button editPartiesButton;
 
@@ -790,6 +804,8 @@ public class CaseController {
 			editDateOfMedicalNegligenceButton.setOnAction(e -> onEditDateOfMedicalNegligenceField());
 		if (editSolDateButton != null)
 			editSolDateButton.setOnAction(e -> onEditSolDateField());
+		if (editTortNoticeDeadlineButton != null)
+			editTortNoticeDeadlineButton.setOnAction(e -> onEditTortNoticeDeadlineField());
 		if (editPartiesButton != null)
 			editPartiesButton.setOnAction(e -> onSectionSelected("Parties", true));
 		if (changeStatusButton != null)
@@ -1189,10 +1205,10 @@ public class CaseController {
 			showDetailsDateDialog("Edit Date of Injury", "Date of Injury", base.dateOfInjury, ownerButton,
 					value -> saveSingleDetailsField(d -> d.dateOfInjury = value));
 		} else if (editor == detStatuteOfLimitationsEditor) {
-			showDetailsDateDialog("Edit Statute of Limitations", "Statute of Limitations", base.statuteOfLimitations, ownerButton,
+			showDetailsNullableDateDialog("Edit Statute of Limitations", "Statute of Limitations", base.statuteOfLimitations, ownerButton,
 					value -> saveSingleDetailsField(d -> d.statuteOfLimitations = value));
 		} else if (editor == detTortNoticeDeadlineEditor) {
-			showDetailsDateDialog("Edit Tort Notice Deadline", "Tort Notice Deadline", base.tortNoticeDeadline, ownerButton,
+			showDetailsNullableDateDialog("Edit Tort Notice Deadline", "Tort Notice Deadline", base.tortNoticeDeadline, ownerButton,
 					value -> saveSingleDetailsField(d -> d.tortNoticeDeadline = value));
 		} else if (editor == detDiscoveryDeadlineEditor) {
 			showDetailsDateDialog("Edit Discovery Deadline", "Discovery Deadline", base.discoveryDeadline, ownerButton,
@@ -1285,6 +1301,10 @@ public class CaseController {
 			ovSolDateValue.setText(formatDate(null));
 		if (ovSolDateEditor != null)
 			ovSolDateEditor.setValue(null);
+		if (ovTortNoticeDeadlineValue != null)
+			ovTortNoticeDeadlineValue.setText(formatDate(null));
+		if (ovTortNoticeDeadlineEditor != null)
+			ovTortNoticeDeadlineEditor.setValue(null);
 
 		if (ovDescriptionValue != null)
 			ovDescriptionValue.setText("");
@@ -1485,7 +1505,7 @@ public class CaseController {
 	}
 
 	private void showOverview() {
-		setUpdatesPaneVisible(true);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, true);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -1499,7 +1519,7 @@ public class CaseController {
 	}
 
 	private void showTasksTab() {
-		setUpdatesPaneVisible(false);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
@@ -1509,6 +1529,7 @@ public class CaseController {
 			loadCaseTasksAsync();
 		}
 		renderTasksSection();
+		loadCaseUpdatesAsync();
 	}
 
 	private boolean shouldReloadTasksForTabOpen() {
@@ -1516,7 +1537,7 @@ public class CaseController {
 	}
 
 	private void showDetails() {
-		setUpdatesPaneVisible(false);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
@@ -1525,6 +1546,7 @@ public class CaseController {
 		if (contentTitleLabel != null)
 			contentTitleLabel.setText("Details");
 		renderDetailsFromCurrent();
+		loadCaseUpdatesAsync();
 		auditCaseRead("Case.Detail.Read", "Case.Detail");
 	}
 
@@ -1554,7 +1576,7 @@ public class CaseController {
 	}
 
 	private void showTimeline() {
-		setUpdatesPaneVisible(false);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -1573,11 +1595,12 @@ public class CaseController {
 		setVisibleManaged(timelineListBox, true);
 		showTimelineLoadingState();
 		auditCaseRead("Case.Timeline.Read", "Case.Timeline");
+		loadCaseUpdatesAsync();
 		loadCaseTimelineEventsAsync();
 	}
 
 	private void showParties() {
-		setUpdatesPaneVisible(false);
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
@@ -1599,6 +1622,7 @@ public class CaseController {
 		setVisibleManaged(timelineListBox, true);
 		setVisibleManaged(timelineEmptyLabel, false);
 		renderPartiesSection();
+		loadCaseUpdatesAsync();
 		if (caseDao != null && caseId != null && (!partiesLoadedOnce || caseParties == null || caseParties.isEmpty())) {
 			refreshPartiesSectionAsync();
 		}
@@ -2564,15 +2588,26 @@ public class CaseController {
 	}
 
 	private void setUpdatesPaneVisible(boolean showOnRight) {
+		attachCaseUpdatesPane(showOnRight ? CaseUpdatesPlacement.RIGHT : CaseUpdatesPlacement.HIDDEN);
+	}
+
+	private void attachCaseUpdatesPane(CaseUpdatesPlacement placement) {
 		if (caseRootPane == null || caseUpdatesPane == null) {
 			return;
 		}
-		if (showOnRight) {
-			if (caseRootPane.getRight() != caseUpdatesPane) {
-				caseRootPane.setRight(caseUpdatesPane);
-			}
-		} else if (caseRootPane.getRight() != null) {
+		if (placement == CaseUpdatesPlacement.HIDDEN) {
 			caseRootPane.setRight(null);
+			caseUpdatesPane.setManaged(false);
+			caseUpdatesPane.setVisible(false);
+			return;
+		}
+		caseUpdatesPane.setManaged(true);
+		caseUpdatesPane.setVisible(true);
+		caseUpdatesPane.setMaxWidth(Region.USE_COMPUTED_SIZE);
+		caseUpdatesPane.setPrefWidth(320.0);
+		VBox.setVgrow(caseUpdatesPane, Priority.ALWAYS);
+		if (caseRootPane.getRight() != caseUpdatesPane) {
+			caseRootPane.setRight(caseUpdatesPane);
 		}
 	}
 
@@ -2644,6 +2679,14 @@ public class CaseController {
 
 	private boolean isSectionActive(String sectionName) {
 		return Objects.equals(activeSectionName, sectionName);
+	}
+
+	private boolean isCaseUpdatesSectionActive() {
+		return isSectionActive("Overview")
+				|| isSectionActive("Details")
+				|| isSectionActive("Parties")
+				|| isSectionActive("Tasks")
+				|| isSectionActive("Timeline");
 	}
 
 	private void onAddRelatedEntity() {
@@ -3639,23 +3682,23 @@ public class CaseController {
 	// ----------------------------
 
 	private void onEditCaseNameField() {
-		showTextFieldDialog("Edit Case Name", "Case name", currentOverview == null ? "" : currentOverview.getCaseName(), true, value -> saveCoreOverviewField("name", value, null,
-				null));
+		showTextFieldDialog("Edit Case Name", "Case name", currentOverview == null ? "" : currentOverview.getCaseName(), true,
+				value -> saveCoreOverviewField("name", value, null, null, null));
 	}
 
 	private void onEditCaseNumberField() {
 		showTextFieldDialog("Edit Case Number", "Case number", currentOverview == null ? "" : currentOverview.getCaseNumber(), false, value -> saveCoreOverviewField("caseNumber",
-				value, null, null));
+				value, null, null, null));
 	}
 
 	private void onEditDescriptionField() {
 		showTextAreaDialog("Edit Description", "Description / summary notes", currentOverview == null ? "" : currentOverview.getDescription(), value -> saveCoreOverviewField(
-				"description", value, null, null));
+				"description", value, null, null, null));
 	}
 
 	private void onEditIncidentDateField() {
 		showDateFieldDialog("Edit Incident Date", "Incident date", currentOverview == null ? null : currentOverview.getIncidentDate(), value -> saveCoreOverviewField(
-				"incidentDate", null, value, null));
+				"incidentDate", null, value, null, null));
 	}
 
 	private void onEditDateOfMedicalNegligenceField() {
@@ -3664,8 +3707,13 @@ public class CaseController {
 	}
 
 	private void onEditSolDateField() {
-		showDateFieldDialog("Edit SOL Date", "SOL date", currentOverview == null ? null : currentOverview.getSolDate(), value -> saveCoreOverviewField("solDate", null, null,
-				value));
+		showNullableDateFieldDialog("Edit SOL Date", "SOL date", currentOverview == null ? null : currentOverview.getSolDate(), editSolDateButton,
+				value -> saveCoreOverviewField("solDate", null, null, value, null));
+	}
+
+	private void onEditTortNoticeDeadlineField() {
+		showNullableDateFieldDialog("Edit Tort Notice Deadline", "Tort notice deadline", current == null ? null : current.getTortNoticeDeadline(),
+				editTortNoticeDeadlineButton, value -> saveCoreOverviewField("tortNoticeDeadline", null, null, null, value));
 	}
 
 	private void showTextFieldDialog(String title, String label, String currentValue, boolean required, Consumer<String> onSave) {
@@ -3721,6 +3769,18 @@ public class CaseController {
 		dialog.showAndWait().ifPresent(onSave);
 	}
 
+	private void showNullableDateFieldDialog(String title, String label, LocalDate currentValue, Button ownerButton, Consumer<LocalDate> onSave) {
+		Dialog<Optional<LocalDate>> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+		DatePicker picker = new DatePicker(currentValue);
+		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
+		dialog.setResultConverter(button -> button == saveType ? Optional.ofNullable(nullableDatePickerValue(picker)) : null);
+		dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null)));
+	}
+
 	private void showDetailsTextFieldDialog(String title, String label, String currentValue, boolean required, Button ownerButton, Consumer<String> onSave) {
 		Dialog<String> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, title);
@@ -3774,6 +3834,28 @@ public class CaseController {
 		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(currentValue, picker.getValue()));
 		dialog.setResultConverter(button -> button == saveType ? picker.getValue() : null);
 		dialog.showAndWait().ifPresent(onSave);
+	}
+
+	private void showDetailsNullableDateDialog(String title, String label, LocalDate currentValue, Button ownerButton, Consumer<LocalDate> onSave) {
+		Dialog<Optional<LocalDate>> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, title);
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
+		DatePicker picker = new DatePicker(currentValue);
+		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
+		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(currentValue, picker.getValue()));
+		dialog.setResultConverter(button -> button == saveType ? Optional.ofNullable(nullableDatePickerValue(picker)) : null);
+		dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null)));
+	}
+
+	static LocalDate nullableDatePickerValue(DatePicker picker) {
+		if (picker == null)
+			return null;
+		String editorText = picker.getEditor() == null ? null : picker.getEditor().getText();
+		if (editorText == null || editorText.trim().isEmpty())
+			return null;
+		return picker.getValue();
 	}
 
 	private void showDetailsBooleanDialog(String title, String label, boolean currentValue, Button ownerButton, Consumer<Boolean> onSave) {
@@ -3900,7 +3982,7 @@ public class CaseController {
 		detailsSaveCoordinator.save();
 	}
 
-	private void saveCoreOverviewField(String field, String textValue, LocalDate incidentDate, LocalDate solDate) {
+	private void saveCoreOverviewField(String field, String textValue, LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline) {
 		if (caseDao == null || caseId == null || current == null) {
 			showError("Case is still loading. Please try again.");
 			return;
@@ -3920,8 +4002,9 @@ public class CaseController {
 				String description = "description".equals(field) ? safeText(textValue) : latest.getDescription();
 				LocalDate injury = "incidentDate".equals(field) ? incidentDate : latest.getDateOfInjury();
 				LocalDate sol = "solDate".equals(field) ? solDate : latest.getStatuteOfLimitations();
+				LocalDate tortNotice = "tortNoticeDeadline".equals(field) ? tortNoticeDeadline : latest.getTortNoticeDeadline();
 				CaseDetailDto updated = caseDao.updateCase(activeCaseId, name, number, description, injury, sol,
-						latest.getTortNoticeDeadline(), latest.getSummary(), latest.getRowVer(), appState == null ? null
+						tortNotice, latest.getSummary(), latest.getRowVer(), appState == null ? null
 								: appState.getUserId());
 				if (updated == null) {
 					runOnFx(() ->
@@ -3943,6 +4026,7 @@ public class CaseController {
 					case "description" -> description;
 					case "incidentDate" -> injury == null ? null : injury.toString();
 					case "solDate" -> sol == null ? null : sol.toString();
+					case "tortNoticeDeadline" -> tortNotice == null ? null : tortNotice.toString();
 					default -> null;
 					});
 					reloadCurrentCaseForViewMode();
@@ -4567,7 +4651,7 @@ public class CaseController {
 	// ----------------------------
 
 	private void loadCaseUpdatesAsync() {
-		if (!isSectionActive("Overview")) {
+		if (!isCaseUpdatesSectionActive()) {
 			caseUpdatesStale = true;
 			return;
 		}
@@ -5584,6 +5668,8 @@ public class CaseController {
 				ovDateOfMedicalNegligenceValue.setText(formatDate(current == null ? null : current.getDateOfMedicalNegligence()));
 			if (ovSolDateValue != null)
 				ovSolDateValue.setText(formatDate(dto.getSolDate()));
+			if (ovTortNoticeDeadlineValue != null)
+				ovTortNoticeDeadlineValue.setText(formatDate(current == null ? null : current.getTortNoticeDeadline()));
 			if (!editSafeOnly) {
 				if (ovIncidentDateEditor != null && !editMode)
 					ovIncidentDateEditor.setValue(dto.getIncidentDate());
@@ -5664,6 +5750,8 @@ public class CaseController {
 			setVisibleManaged(ovDateOfMedicalNegligenceEditor, false);
 			setVisibleManaged(ovSolDateValue, true);
 			setVisibleManaged(ovSolDateEditor, false);
+			setVisibleManaged(ovTortNoticeDeadlineValue, true);
+			setVisibleManaged(ovTortNoticeDeadlineEditor, false);
 
 			setVisibleManaged(editButton, false);
 			setVisibleManaged(saveButton, false);
@@ -5674,6 +5762,7 @@ public class CaseController {
 			setVisibleManaged(editIncidentDateButton, true);
 			setVisibleManaged(editDateOfMedicalNegligenceButton, true);
 			setVisibleManaged(editSolDateButton, true);
+			setVisibleManaged(editTortNoticeDeadlineButton, true);
 			setVisibleManaged(editPartiesButton, true);
 
 			if (!enabled)
@@ -5704,6 +5793,8 @@ public class CaseController {
 			draftPrimaryOpposingCounselName = null;
 			draftIncidentDate = null;
 			draftSolDate = null;
+			if (ovTortNoticeDeadlineEditor != null)
+				ovTortNoticeDeadlineEditor.setValue(current == null ? null : current.getTortNoticeDeadline());
 			draftTeamAssignments = null;
 		}
 
@@ -5727,6 +5818,8 @@ public class CaseController {
 				ovDateOfMedicalNegligenceEditor.setValue(current == null ? null : current.getDateOfMedicalNegligence());
 			if (ovSolDateEditor != null)
 				ovSolDateEditor.setValue(draftSolDate);
+			if (ovTortNoticeDeadlineEditor != null)
+				ovTortNoticeDeadlineEditor.setValue(current == null ? null : current.getTortNoticeDeadline());
 		}
 
 		private boolean ensureCurrentDetailReady() {
@@ -5851,7 +5944,8 @@ public class CaseController {
 					draftPrimaryOpposingCounselContactId,
 					draftPrimaryOpposingCounselName,
 					(ovIncidentDateEditor == null ? null : ovIncidentDateEditor.getValue()),
-					(ovSolDateEditor == null ? null : ovSolDateEditor.getValue()),
+					(ovSolDateEditor == null ? null : nullableDatePickerValue(ovSolDateEditor)),
+					(ovTortNoticeDeadlineEditor == null ? current.getTortNoticeDeadline() : nullableDatePickerValue(ovTortNoticeDeadlineEditor)),
 					(draftTeamAssignments == null) ? null : List.copyOf(draftTeamAssignments)
 			);
 		}
@@ -5959,6 +6053,17 @@ public class CaseController {
 							request.desired().desiredSolDate()
 					);
 				}
+				if (computation.tortNoticeChanged()) {
+					addDateChangedTimelineEvent(
+							request.saveCaseId(),
+							request.tenantId(),
+							request.userId(),
+							CaseDao.CaseTimelineEventTypes.TORT_NOTICE_DEADLINE_CHANGED,
+							"Tort notice deadline changed",
+							request.baseline().tortNoticeDeadline(),
+							request.desired().desiredTortNoticeDeadline()
+					);
+				}
 				if (computation.practiceAreaChanged()) {
 					addPracticeAreaChangedTimelineEvent(
 							request.saveCaseId(),
@@ -6029,9 +6134,11 @@ public class CaseController {
 
 			LocalDate baseIncidentDate = baseOverview == null ? null : baseOverview.getIncidentDate();
 			LocalDate baseSolDate = baseOverview == null ? null : baseOverview.getSolDate();
+			LocalDate baseTortNoticeDeadline = request.baseline().tortNoticeDeadline();
 
 			boolean incidentChanged = !Objects.equals(desired.desiredIncidentDate(), baseIncidentDate);
 			boolean solChanged = !Objects.equals(desired.desiredSolDate(), baseSolDate);
+			boolean tortNoticeChanged = !Objects.equals(desired.desiredTortNoticeDeadline(), baseTortNoticeDeadline);
 
 			Integer baseStatusId = baseOverview == null ? null : baseOverview.getPrimaryStatusId();
 			boolean statusChanged = desired.desiredStatusId() != null && !desired.desiredStatusId().equals(baseStatusId);
@@ -6054,7 +6161,7 @@ public class CaseController {
 			boolean opposingCounselChanged = desired.desiredOpposingCounselContactId() != null
 					&& !desired.desiredOpposingCounselContactId().equals(baseOpposingCounselContactId);
 
-			return new SaveComputation(incidentChanged, solChanged, statusChanged, callerChanged, clientChanged,
+			return new SaveComputation(incidentChanged, solChanged, tortNoticeChanged, statusChanged, callerChanged, clientChanged,
 					practiceAreaChanged, attyChanged, opposingCounselChanged);
 		}
 
@@ -6066,7 +6173,7 @@ public class CaseController {
 					request.saveDraft().description(),
 					request.desired().desiredIncidentDate(),
 					request.desired().desiredSolDate(),
-					request.baseline().tortNoticeDeadline(),
+					request.desired().desiredTortNoticeDeadline(),
 					request.baseline().summary(),
 					request.baseline().expectedRowVer(),
 					request.userId()
@@ -6170,6 +6277,9 @@ public class CaseController {
 			if (computation.solChanged())
 				publishCaseFieldUpdated(request.saveCaseId(), "solDate",
 						request.desired().desiredSolDate() == null ? null : request.desired().desiredSolDate().toString());
+			if (computation.tortNoticeChanged())
+				publishCaseFieldUpdated(request.saveCaseId(), "tortNoticeDeadline",
+						request.desired().desiredTortNoticeDeadline() == null ? null : request.desired().desiredTortNoticeDeadline().toString());
 
 			if (computation.statusChanged())
 				publishCaseFieldUpdated(request.saveCaseId(), "primaryStatusId", request.desired().desiredStatusId());
@@ -6259,6 +6369,7 @@ public class CaseController {
 			String desiredOpposingCounselContactName,
 			LocalDate desiredIncidentDate,
 			LocalDate desiredSolDate,
+			LocalDate desiredTortNoticeDeadline,
 			List<CaseDao.TeamAssignmentRow> desiredTeamAssignments
 	) {
 	}
@@ -6266,6 +6377,7 @@ public class CaseController {
 	private record SaveComputation(
 			boolean incidentChanged,
 			boolean solChanged,
+			boolean tortNoticeChanged,
 			boolean statusChanged,
 			boolean callerChanged,
 			boolean clientChanged,
@@ -7088,6 +7200,11 @@ public class CaseController {
 		}
 	}
 
+	private enum CaseUpdatesPlacement {
+		RIGHT,
+		HIDDEN
+	}
+
 	private static final class CaseDetailsDraft {
 		String name;
 		String caseNumber;
@@ -7269,10 +7386,6 @@ public class CaseController {
 
 		private void runSaveWorker(DetailsSaveRequest request) {
 			try {
-				System.out.println("Case details save: sentToDao feeAgreementSigned=" + request.feeAgreementSigned()
-						+ ", finalDate=" + request.dateFeeAgreementSigned()
-						+ ", nonEngagementLetterSent=" + request.nonEngagementLetterSent()
-						+ ", nonEngagementDate=" + request.dateNonEngagementLetterSent());
 				CaseDetailDto updated = caseDao.updateCaseDetails(
 						request.caseId(),
 						request.name(),
@@ -7701,13 +7814,6 @@ public class CaseController {
 			LocalDate dateNonEngagementLetterSent = rawDateNonEngagementLetterSent;
 			if (Boolean.TRUE.equals(nonEngagementLetterSent) && dateNonEngagementLetterSent == null)
 				dateNonEngagementLetterSent = LocalDate.now();
-			System.out.println("Case details save: feeAgreementSigned rawLoaded=" + baseline.getFeeAgreementSigned()
-					+ ", selected=" + feeAgreementSigned
-					+ ", rawDate=" + rawDateFeeAgreementSigned
-					+ ", finalDate=" + dateFeeAgreementSigned
-					+ ", nonEngagementLetterSent selected=" + nonEngagementLetterSent
-					+ ", nonEngagementRawDate=" + rawDateNonEngagementLetterSent
-					+ ", nonEngagementFinalDate=" + dateNonEngagementLetterSent);
 			Boolean acceptedChronology = normalizeDetailsCheckboxBoolean(source.acceptedChronology);
 			Boolean acceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedConsultantExpertSearch);
 			Boolean acceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedTestifyingExpertSearch);
@@ -8655,9 +8761,9 @@ public class CaseController {
 			if (detDateOfInjuryEditor != null)
 				d.dateOfInjury = detDateOfInjuryEditor.getValue();
 			if (detStatuteOfLimitationsEditor != null)
-				d.statuteOfLimitations = detStatuteOfLimitationsEditor.getValue();
+				d.statuteOfLimitations = nullableDatePickerValue(detStatuteOfLimitationsEditor);
 			if (detTortNoticeDeadlineEditor != null)
-				d.tortNoticeDeadline = detTortNoticeDeadlineEditor.getValue();
+				d.tortNoticeDeadline = nullableDatePickerValue(detTortNoticeDeadlineEditor);
 			if (detDiscoveryDeadlineEditor != null)
 				d.discoveryDeadline = detDiscoveryDeadlineEditor.getValue();
 			d.clientEstate = toNullableBooleanStorage(captureNullableBoolean(detClientEstateEditor));

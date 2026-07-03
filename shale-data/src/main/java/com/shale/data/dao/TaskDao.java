@@ -1497,6 +1497,7 @@ public final class TaskDao {
                     throw new RuntimeException("Failed to create task for caseId=" + caseId);
                 }
                 long taskId = rs.getLong(1);
+                touchCaseUpdatedAt(con, caseId, shaleClientId);
                 phiAuditService.auditCreate(createdByUserId, "Tasks", "Title", taskId, normalizedTitle);
                 phiAuditService.auditCreate(createdByUserId, "Tasks", "Description", taskId, description);
                 return taskId;
@@ -1590,12 +1591,16 @@ public final class TaskDao {
                     DueAt = ?,
                     StatusId = ?,
                     PriorityId = ?,
-                    CompletedAt = %s,
+                    CompletedAt = CASE
+                        WHEN ? = 1 AND CompletedAt IS NULL THEN SYSDATETIME()
+                        WHEN ? = 0 AND CompletedAt IS NOT NULL THEN NULL
+                        ELSE CompletedAt
+                    END,
                     UpdatedAt = SYSDATETIME()
                 WHERE Id = ?
                   AND ShaleClientId = ?
                   AND ISNULL(IsDeleted, 0) = 0;
-                """.formatted(completed ? "SYSDATETIME()" : "NULL");
+                """;
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -1608,9 +1613,14 @@ public final class TaskDao {
             setNullableTimestamp(ps, i++, dueAt);
             ps.setInt(i++, resolvedStatusId);
             ps.setInt(i++, resolvedPriorityId);
+            ps.setBoolean(i++, completed);
+            ps.setBoolean(i++, completed);
             ps.setLong(i++, taskId);
             ps.setInt(i++, shaleClientId);
-            ps.executeUpdate();
+            boolean completionChanged = before != null && ((before.completedAt() == null) == completed);
+            if (ps.executeUpdate() > 0 && completionChanged) {
+                touchTaskCaseUpdatedAt(con, taskId, shaleClientId);
+            }
             TaskDetailDto after = findTaskDetail(taskId, shaleClientId);
             if (before != null && after != null) {
                 phiAuditService.auditUpdate(updatedByUserId, "Tasks", "Title", taskId, before.title(), after.title());
@@ -2226,16 +2236,52 @@ public final class TaskDao {
                     UpdatedAt = SYSDATETIME()
                 WHERE Id = ?
                   AND ShaleClientId = ?
-                  AND ISNULL(IsDeleted, 0) = 0;
-                """.formatted(completed ? "SYSDATETIME()" : "NULL");
+                  AND ISNULL(IsDeleted, 0) = 0
+                  AND CompletedAt IS %s NULL;
+                """.formatted(completed ? "SYSDATETIME()" : "NULL", completed ? "" : "NOT");
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setLong(1, taskId);
             ps.setInt(2, shaleClientId);
-            ps.executeUpdate();
+            if (ps.executeUpdate() > 0) {
+                touchTaskCaseUpdatedAt(con, taskId, shaleClientId);
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update completion for taskId=" + taskId, e);
+        }
+    }
+
+    private static void touchTaskCaseUpdatedAt(Connection con, long taskId, int shaleClientId) throws SQLException {
+        try (PreparedStatement ps = con.prepareStatement("""
+                UPDATE c
+                SET UpdatedAt = SYSDATETIME()
+                FROM dbo.Cases c
+                INNER JOIN dbo.Tasks t
+                  ON t.CaseId = c.Id
+                 AND t.ShaleClientId = c.ShaleClientId
+                WHERE t.Id = ?
+                  AND t.ShaleClientId = ?
+                  AND ISNULL(t.IsDeleted, 0) = 0
+                  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+                """)) {
+            ps.setLong(1, taskId);
+            ps.setInt(2, shaleClientId);
+            ps.executeUpdate();
+        }
+    }
+
+    private static void touchCaseUpdatedAt(Connection con, long caseId, int shaleClientId) throws SQLException {
+        try (PreparedStatement ps = con.prepareStatement("""
+                UPDATE dbo.Cases
+                SET UpdatedAt = SYSDATETIME()
+                WHERE Id = ?
+                  AND ShaleClientId = ?
+                  AND (IsDeleted = 0 OR IsDeleted IS NULL);
+                """)) {
+            ps.setLong(1, caseId);
+            ps.setInt(2, shaleClientId);
+            ps.executeUpdate();
         }
     }
 

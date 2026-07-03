@@ -2,6 +2,9 @@ package com.shale.ui.controller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -18,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseTaskListItemDto;
+import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
@@ -29,8 +33,12 @@ import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.component.board.LaneBoardLayout;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
+import com.shale.ui.component.factory.DashboardWidgetFactory;
+import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.controller.support.CaseListUiSupport;
+import com.shale.ui.notification.AppNotification;
+import com.shale.ui.notification.NotificationCenterService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -48,6 +56,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -66,6 +75,9 @@ public final class MyShaleController {
 	private static final String SORT_NAME = "Name";
 	private static final String SORT_INTAKE = "Date of Intake";
 	private static final String SORT_SOL = "Statute of Limitations Date";
+	private static final String SORT_TORT_NOTICE = "Tort Notice Deadline";
+	private static final String SORT_UPDATED_OLDEST = "Last Updated (Oldest)";
+	private static final String SORT_UPDATED_NEWEST = "Last Updated (Newest)";
 	private static final String MY_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String MY_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
 	private static final String MY_TASKS_COLUMN_ORDER_CASE_NAME = "Case Name";
@@ -100,6 +112,13 @@ public final class MyShaleController {
 	private static final double MY_TASKS_GRID_HGAP = 10;
 	private static final double MY_TASKS_GRID_VGAP = 10;
 	private static final long MY_SHALE_PRIORITY_CACHE_TTL_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
+	private static final int IMPORTANT_DATES_WINDOW_DAYS = 30;
+	private static final int IMPORTANT_DATES_ROW_LIMIT = 10;
+	private static final int NOTIFICATIONS_ROW_LIMIT = 10;
+	private static final int RECENT_CASE_ACTIVITY_ROW_LIMIT = 10;
+	private static final int INACTIVE_CASE_DAYS = 45;
+	private static final int RECENTLY_UPDATED_CASE_DAYS = 7;
+	private static final DateTimeFormatter IMPORTANT_DATE_LABEL_FORMATTER = DateTimeFormatter.ofPattern("MMM d");
 
 	@FXML
 	private TextField myCasesSearchField;
@@ -181,6 +200,8 @@ public final class MyShaleController {
 	private UiRuntimeBridge runtimeBridge;
 	private PhiReadAuditService phiReadAuditService;
 	private UserPreferencesService userPreferencesService;
+	private NotificationCenterService notificationCenterService;
+	private Runnable onOpenNotificationCenter;
 	private Consumer<Integer> onOpenCase;
 	private Consumer<Integer> onOpenUser;
 	private CaseCardFactory caseCardFactory;
@@ -196,6 +217,7 @@ public final class MyShaleController {
 	private int loadGeneration = 0;
 	private int taskLoadGeneration = 0;
 	private int myCasesBoardLoadGeneration = 0;
+	private int recentCaseActivityLoadGeneration = 0;
 
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
@@ -205,6 +227,7 @@ public final class MyShaleController {
 	private Integer cachedPriorityTenantId;
 	private long cachedPriorityLoadedAtNanos;
 	private List<CaseCardVm> myAssignedCasesBoard = List.of();
+	private List<RecentCaseActivityItem> recentCaseActivities = List.of();
 	private boolean loadingOverview;
 	private boolean loadingMyTasks;
 	private boolean loadingMyCases;
@@ -217,6 +240,8 @@ public final class MyShaleController {
 	private Integer cachedCasesUserId;
 	private Integer cachedCasesTenantId;
 	private boolean myCasesLoadFailed;
+	private boolean loadingRecentCaseActivity;
+	private boolean recentCaseActivityLoadFailed;
 	private boolean showCompletedMyTasks;
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private final Set<Long> pinnedTaskLaneCaseIds = new LinkedHashSet<>();
@@ -234,6 +259,7 @@ public final class MyShaleController {
 	private boolean overviewOverdueOnly;
 	private String overviewSortMode = OVERVIEW_SORT_DUE_ASC;
 	private VBox overviewSectionsContainer;
+	private VBox overviewWidgetsContainer;
 	private TextField overviewSearchFieldControl;
 	private ChoiceBox<PriorityFilterOption> overviewPriorityChoiceControl;
 	private ChoiceBox<CaseFilterOption> overviewCaseChoiceControl;
@@ -242,6 +268,9 @@ public final class MyShaleController {
 	private boolean suppressOverviewControlEvents;
 	private static final BoardStatusFilterOption ALL_BOARD_STATUSES_OPTION = new BoardStatusFilterOption(null, "All Statuses");
 	private FlowPane myTasksGrid;
+	private boolean notificationWidgetRefreshListenerAttached;
+	private boolean overviewWidgetRenderQueued;
+	private Integer pendingMyCaseSummaryStatusFilterId;
 
 	private enum MyTasksViewMode {
 		BOARD,
@@ -292,6 +321,8 @@ public final class MyShaleController {
 			CaseTaskService caseTaskService,
 			UserBoardLanePreferencesDao userBoardLanePreferencesDao,
 			UserPreferencesService userPreferencesService,
+			NotificationCenterService notificationCenterService,
+			Runnable onOpenNotificationCenter,
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenUser,
 			PhiReadAuditService phiReadAuditService) {
@@ -299,6 +330,8 @@ public final class MyShaleController {
 		this.caseTaskService = caseTaskService;
 		this.userBoardLanePreferencesDao = userBoardLanePreferencesDao;
 		this.userPreferencesService = userPreferencesService;
+		this.notificationCenterService = notificationCenterService;
+		this.onOpenNotificationCenter = onOpenNotificationCenter;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.phiReadAuditService = phiReadAuditService;
@@ -313,6 +346,7 @@ public final class MyShaleController {
 				onOpenUser == null ? id ->
 				{
 				} : onOpenUser);
+		attachNotificationWidgetRefreshListener();
 	}
 
 	@FXML
@@ -321,7 +355,7 @@ public final class MyShaleController {
 		configureSectionSizing();
 
 		if (myCasesSortChoice != null) {
-			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
+			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE, SORT_UPDATED_OLDEST, SORT_UPDATED_NEWEST);
 			myCasesSortChoice.getSelectionModel().select(SORT_NAME);
 			myCasesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> loadFirstPage());
 		}
@@ -403,7 +437,7 @@ public final class MyShaleController {
 		preferredMyTasksPriorityFilterId = restoreMyTasksPriorityFilterPreference();
 		preferredMyTasksCaseFilterId = restoreMyTasksCaseFilterPreference();
 		if (myCasesBoardSortChoice != null) {
-			myCasesBoardSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL);
+			myCasesBoardSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE, SORT_UPDATED_OLDEST, SORT_UPDATED_NEWEST);
 			myCasesBoardSortChoice.getSelectionModel().select(SORT_NAME);
 			myCasesBoardSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
 		}
@@ -527,6 +561,7 @@ public final class MyShaleController {
 				renderMyOverview();
 			}
 			ensureMyTasksFresh(false);
+			ensureMyCasesFresh(false);
 		}
 		if (showTasks) {
 			primeTasksLoadingStateForFirstLoad();
@@ -621,6 +656,7 @@ public final class MyShaleController {
 
 		System.out.println("[DEBUG LIVE][MY_CASES] event accepted -> scheduling targeted refresh");
 		refreshCaseIncremental(event.caseId());
+		refreshRecentCaseActivity();
 	}
 
 	private void reloadStatusFilterOptionsAndThen(Runnable onLoaded) {
@@ -660,6 +696,8 @@ public final class MyShaleController {
 				statusFilterOptions = options;
 				CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
 				syncMyCasesBoardStatusFilterOptions();
+				applyPendingMyCaseSummaryStatusFilter();
+				renderOverviewWidgets();
 			});
 		});
 	}
@@ -700,6 +738,7 @@ public final class MyShaleController {
 						myCasesLoadedOnce = true;
 						rerender();
 						renderMyCasesBoard();
+						renderOverviewWidgets();
 					}
 				});
 				} catch (Exception ex) {
@@ -743,13 +782,15 @@ public final class MyShaleController {
 				safe(r.name()),
 				r.intakeDate(),
 				r.statuteOfLimitationsDate(),
+				r.tortClaimsNoticeDeadline(),
 				r.primaryStatusId(),
 				safe(r.responsibleAttorneyName()),
 				safe(r.responsibleAttorneyColor()),
 				r.nonEngagementLetterSent(),
 				safe(r.primaryStatusName()),
 				safe(r.primaryStatusColor()),
-				safe(r.practiceAreaColor())
+				safe(r.practiceAreaColor()),
+				r.updatedAt()
 		);
 	}
 
@@ -863,6 +904,15 @@ public final class MyShaleController {
 		if (SORT_SOL.equals(value)) {
 			return CaseSort.STATUTE_SOONEST;
 		}
+		if (SORT_TORT_NOTICE.equals(value)) {
+			return CaseSort.TORT_NOTICE_SOONEST;
+		}
+		if (SORT_UPDATED_OLDEST.equals(value)) {
+			return CaseSort.UPDATED_OLDEST;
+		}
+		if (SORT_UPDATED_NEWEST.equals(value)) {
+			return CaseSort.UPDATED_NEWEST;
+		}
 		return CaseSort.INTAKE_NEWEST;
 	}
 
@@ -873,8 +923,17 @@ public final class MyShaleController {
 		if (SORT_SOL.equals(sortOption)) {
 			return Comparator.comparing((CaseCardVm v) -> v.solDate, this::nullsLastDate);
 		}
+		if (SORT_TORT_NOTICE.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm v) -> v.tortNoticeDate, this::nullsLastDate);
+		}
 		if (SORT_INTAKE.equals(sortOption)) {
 			return Comparator.comparing((CaseCardVm v) -> v.intakeDate, this::nullsLastDate).reversed();
+		}
+		if (SORT_UPDATED_OLDEST.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm v) -> v.updatedAt, this::nullsLastDateTime);
+		}
+		if (SORT_UPDATED_NEWEST.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm v) -> v.updatedAt, this::nullsLastDateTime).reversed();
 		}
 		return Comparator.comparing((CaseCardVm v) -> v.name, this::nullsLastString);
 	}
@@ -901,6 +960,16 @@ public final class MyShaleController {
 	}
 
 	private int nullsLastDate(LocalDate a, LocalDate b) {
+		if (a == null && b == null)
+			return 0;
+		if (a == null)
+			return 1;
+		if (b == null)
+			return -1;
+		return a.compareTo(b);
+	}
+
+	private int nullsLastDateTime(LocalDateTime a, LocalDateTime b) {
 		if (a == null && b == null)
 			return 0;
 		if (a == null)
@@ -1087,6 +1156,7 @@ public final class MyShaleController {
 						syncMyTaskPriorityFilterOptions();
 						syncMyTaskCaseFilterOptions();
 						renderActiveTaskViews();
+						refreshRecentCaseActivity();
 					});
 			} catch (Exception ex) {
 				System.err.println("My tasks load failed: " + ex.getMessage());
@@ -1132,16 +1202,17 @@ public final class MyShaleController {
 			return;
 		}
 		loadingMyCases = true;
-		renderMyCasesBoard();
 		Integer userId = appState.getUserId();
 		Integer shaleClientId = appState.getShaleClientId();
 		System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.refreshMyCasesBoard] load started userId=" + userId
 				+ " selectedUserId=" + userId);
-		loadingMyCases = true;
 		myCasesLoadFailed = false;
 		renderMyCasesBoard();
+		renderOverviewWidgets();
 			if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
 				myAssignedCasesBoard = List.of();
+				recentCaseActivities = List.of();
+				loadingRecentCaseActivity = false;
 				loadingMyCases = false;
 				myCasesLoadFailed = false;
 				cachedCasesUserId = userId;
@@ -1149,6 +1220,7 @@ public final class MyShaleController {
 				myCasesLoadedOnce = true;
 				myCasesDirty = false;
 			renderMyCasesBoard();
+			renderOverviewWidgets();
 			return;
 		}
 		final int userIdValue = userId;
@@ -1178,7 +1250,11 @@ public final class MyShaleController {
 						cachedCasesTenantId = shaleClientId;
 						myCasesLoadedOnce = true;
 						myCasesDirty = false;
+					syncMyCasesBoardStatusFilterOptions();
+					applyPendingMyCaseSummaryStatusFilter();
 					renderMyCasesBoard();
+					renderOverviewWidgets();
+					refreshRecentCaseActivity();
 				});
 			} catch (Exception ex) {
 				System.err.println("My cases board load failed userId=" + userIdValue + ": " + ex.getMessage());
@@ -1189,6 +1265,7 @@ public final class MyShaleController {
 					myCasesDirty = true;
 					myAssignedCasesBoard = List.of();
 					renderMyCasesBoard();
+					renderOverviewWidgets();
 				});
 			}
 		});
@@ -1298,15 +1375,26 @@ public final class MyShaleController {
 			return;
 		}
 		BoardStatusFilterOption previouslySelected = myCasesBoardStatusFilterChoice.getValue();
-		Integer previousStatusId = previouslySelected == null ? null : previouslySelected.statusId();
+		Integer previousStatusId = pendingMyCaseSummaryStatusFilterId != null
+				? pendingMyCaseSummaryStatusFilterId
+				: (previouslySelected == null ? null : previouslySelected.statusId());
 		List<BoardStatusFilterOption> options = new ArrayList<>();
 		options.add(ALL_BOARD_STATUSES_OPTION);
+		Set<Integer> addedStatusIds = new LinkedHashSet<>();
 		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
 			if (status == null) {
 				continue;
 			}
 			String label = safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim();
 			options.add(new BoardStatusFilterOption(status.id(), label));
+			addedStatusIds.add(status.id());
+		}
+		for (MyCaseSummaryRow row : buildMyCaseSummaryRows()) {
+			if (row == null || row.statusId() == null || addedStatusIds.contains(row.statusId())) {
+				continue;
+			}
+			options.add(new BoardStatusFilterOption(row.statusId(), row.statusName()));
+			addedStatusIds.add(row.statusId());
 		}
 		myCasesBoardStatusFilterChoice.getItems().setAll(options);
 		if (previousStatusId == null) {
@@ -1317,6 +1405,9 @@ public final class MyShaleController {
 				.filter(option -> Objects.equals(option.statusId(), previousStatusId))
 				.findFirst();
 		myCasesBoardStatusFilterChoice.getSelectionModel().select(matching.orElse(ALL_BOARD_STATUSES_OPTION));
+		if (matching.isPresent()) {
+			pendingMyCaseSummaryStatusFilterId = null;
+		}
 	}
 
 	private Integer selectedMyCasesBoardStatusId() {
@@ -1368,6 +1459,21 @@ public final class MyShaleController {
 		}
 		if (SORT_SOL.equals(sortOption)) {
 			return Comparator.comparing((CaseCardVm vm) -> vm.solDate, Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		if (SORT_TORT_NOTICE.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.tortNoticeDate, Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		if (SORT_UPDATED_OLDEST.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.updatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
+					.thenComparingLong(vm -> vm.id);
+		}
+		if (SORT_UPDATED_NEWEST.equals(sortOption)) {
+			return Comparator.comparing((CaseCardVm vm) -> vm.updatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
 					.thenComparing(vm -> normalizeCaseName(vm.name), Comparator.nullsLast(String::compareToIgnoreCase))
 					.thenComparingLong(vm -> vm.id);
 		}
@@ -1569,15 +1675,37 @@ public final class MyShaleController {
 
 	private void ensureOverviewContentShell() {
 		if (overviewSectionsContainer != null
-				&& overviewMainRow.getChildren().contains(overviewSectionsContainer)
+				&& overviewWidgetsContainer != null
 				&& overviewSearchFieldControl != null) {
 			return;
 		}
+		HBox dashboard = new HBox(12);
+		dashboard.getStyleClass().add("my-shale-overview-dashboard");
+		dashboard.setAlignment(Pos.TOP_LEFT);
+		dashboard.setMaxWidth(Double.MAX_VALUE);
+
 		VBox sections = new VBox(10);
+		sections.getStyleClass().add("my-shale-overview-primary-column");
 		sections.setFillWidth(true);
+		sections.setMaxWidth(Double.MAX_VALUE);
+		HBox.setHgrow(sections, Priority.ALWAYS);
+
+		VBox widgets = new VBox(10);
+		widgets.getStyleClass().add("my-shale-overview-briefing-column");
+		widgets.setFillWidth(true);
+		widgets.setMinWidth(300);
+		widgets.setPrefWidth(360);
+		widgets.setMaxWidth(430);
+
+		sections.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.68));
+		widgets.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.32));
+
 		sections.getChildren().add(buildOverviewControlBar());
+		widgets.getChildren().setAll(buildOverviewDashboardWidgets());
 		overviewSectionsContainer = sections;
-		overviewMainRow.getChildren().setAll(sections);
+		overviewWidgetsContainer = widgets;
+		dashboard.getChildren().setAll(sections, widgets);
+		overviewMainRow.getChildren().setAll(dashboard);
 	}
 
 	private void renderOverviewSections(List<CaseTaskListItemDto> overviewSource) {
@@ -1598,7 +1726,7 @@ public final class MyShaleController {
 			sectionNodes.add(overviewSectionsContainer.getChildren().get(0));
 		}
 		sectionNodes.add(buildOverviewTaskSection(
-				"Today",
+				"Today’s Tasks",
 				todayTasks,
 				"Nothing due today",
 				true));
@@ -1613,6 +1741,939 @@ public final class MyShaleController {
 				"No tasks due later this month",
 				false));
 		overviewSectionsContainer.getChildren().setAll(sectionNodes);
+		if (overviewWidgetsContainer != null) {
+			overviewWidgetsContainer.getChildren().setAll(buildOverviewDashboardWidgets());
+		}
+	}
+
+	private List<Node> buildOverviewDashboardWidgets() {
+		return List.of(
+				buildCaseRadarWidget(),
+				buildImportantDatesWidget(),
+				buildNotificationsWidget(),
+				buildRecentCaseActivityWidget(),
+				buildMyCaseSummaryWidget());
+	}
+
+	private void renderOverviewWidgets() {
+		if (overviewWidgetsContainer == null) {
+			return;
+		}
+		overviewWidgetsContainer.getChildren().setAll(buildOverviewDashboardWidgets());
+	}
+
+	private void requestOverviewWidgetRefresh() {
+		if (overviewWidgetsContainer == null || overviewWidgetRenderQueued) {
+			return;
+		}
+		overviewWidgetRenderQueued = true;
+		runOnFx(() -> {
+			overviewWidgetRenderQueued = false;
+			renderOverviewWidgets();
+		});
+	}
+
+	private void attachNotificationWidgetRefreshListener() {
+		if (notificationCenterService == null || notificationWidgetRefreshListenerAttached) {
+			return;
+		}
+		notificationWidgetRefreshListenerAttached = true;
+		notificationCenterService.getNotificationsNewestFirst().addListener((javafx.collections.ListChangeListener<AppNotification>) change -> requestOverviewWidgetRefresh());
+		notificationCenterService.unreadCountProperty().addListener((obs, oldValue, newValue) -> requestOverviewWidgetRefresh());
+	}
+
+
+	private Node buildRecentCaseActivityWidget() {
+		if (loadingMyCases || loadingRecentCaseActivity) {
+			return DashboardWidgetFactory.widget("Recent Case Activity", null, null, null, true, false);
+		}
+		if (myCasesLoadFailed || recentCaseActivityLoadFailed) {
+			return DashboardWidgetFactory.widget(
+					"Recent Case Activity",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Unable to load recent case activity."),
+					false,
+					false);
+		}
+		List<RecentCaseActivityItem> visibleActivities = sortRecentCaseActivities(recentCaseActivities).stream()
+				.limit(RECENT_CASE_ACTIVITY_ROW_LIMIT)
+				.toList();
+		if (visibleActivities.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"Recent Case Activity",
+					null,
+					null,
+					DashboardWidgetFactory.emptyState("No recent case activity."),
+					false,
+					true);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("recent-case-activity-list");
+		content.setFillWidth(true);
+		visibleActivities.stream()
+				.map(this::buildRecentCaseActivityRow)
+				.forEach(content.getChildren()::add);
+		return DashboardWidgetFactory.widget(
+				"Recent Case Activity",
+				String.valueOf(visibleActivities.size()),
+				null,
+				content,
+				false,
+				false);
+	}
+
+	private void refreshRecentCaseActivity() {
+		if (caseDao == null || appState == null || loadingMyCases) {
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0 || myAssignedCasesBoard == null || myAssignedCasesBoard.isEmpty()) {
+			recentCaseActivities = List.of();
+			loadingRecentCaseActivity = false;
+			recentCaseActivityLoadFailed = false;
+			renderOverviewWidgets();
+			return;
+		}
+		List<CaseCardVm> assignedCases = activeAssignedCaseRadarSource();
+		Map<Long, String> caseNamesById = assignedCases.stream()
+				.filter(Objects::nonNull)
+				.collect(java.util.stream.Collectors.toMap(
+						caseVm -> caseVm.id,
+						caseVm -> safe(caseVm.name).isBlank() ? ("Case #" + caseVm.id) : safe(caseVm.name).trim(),
+						(first, second) -> first,
+						LinkedHashMap::new));
+		final int tenantId = shaleClientId;
+		final int generationAtSubmit = ++recentCaseActivityLoadGeneration;
+		loadingRecentCaseActivity = true;
+		recentCaseActivityLoadFailed = false;
+		renderOverviewWidgets();
+		casesDbExec.submit(() -> {
+			try {
+				List<RecentCaseActivityItem> loadedActivities = new ArrayList<>();
+				// TODO: Replace this per-case CaseUpdates loop with a tenant-scoped batch activity read when an existing DAO/service path is available.
+				for (CaseCardVm caseVm : assignedCases) {
+					if (caseVm == null || caseVm.id <= 0) {
+						continue;
+					}
+					List<CaseUpdateDto> updates = caseDao.listCaseUpdates(caseVm.id, tenantId);
+					for (CaseUpdateDto update : updates == null ? List.<CaseUpdateDto>of() : updates) {
+						if (update == null) {
+							continue;
+						}
+						loadedActivities.add(RecentCaseActivityItem.caseUpdate(update, caseNamesById.get(update.getCaseId())));
+					}
+				}
+				loadedActivities.addAll(taskActivitiesForAssignedCases(myTasks, caseNamesById));
+				List<RecentCaseActivityItem> sorted = sortRecentCaseActivities(loadedActivities).stream()
+						.limit(RECENT_CASE_ACTIVITY_ROW_LIMIT)
+						.toList();
+				runOnFx(() -> {
+					if (generationAtSubmit != recentCaseActivityLoadGeneration) {
+						return;
+					}
+					loadingRecentCaseActivity = false;
+					recentCaseActivityLoadFailed = false;
+					recentCaseActivities = sorted;
+					renderOverviewWidgets();
+				});
+			} catch (Exception ex) {
+				System.err.println("Recent case activity load failed: " + ex.getMessage());
+				runOnFx(() -> {
+					if (generationAtSubmit != recentCaseActivityLoadGeneration) {
+						return;
+					}
+					loadingRecentCaseActivity = false;
+					recentCaseActivityLoadFailed = true;
+					renderOverviewWidgets();
+				});
+			}
+		});
+	}
+
+	static List<RecentCaseActivityItem> taskActivitiesForAssignedCases(List<CaseTaskListItemDto> tasks, Map<Long, String> caseNamesById) {
+		if (tasks == null || tasks.isEmpty() || caseNamesById == null || caseNamesById.isEmpty()) {
+			return List.of();
+		}
+		List<RecentCaseActivityItem> activities = new ArrayList<>();
+		for (CaseTaskListItemDto task : tasks) {
+			if (task == null || task.deleted() || !caseNamesById.containsKey(task.caseId())) {
+				continue;
+			}
+			String caseName = caseNamesById.get(task.caseId());
+			if (task.completedAt() != null) {
+				activities.add(new RecentCaseActivityItem(RecentCaseActivityType.TASK_COMPLETED, "✓", "Task completed: " + safeTaskTitle(task), caseName, task.completedAt(), task.caseId(), task.id()));
+			} else if (task.createdAt() != null) {
+				activities.add(new RecentCaseActivityItem(RecentCaseActivityType.TASK_CREATED, "+", "Task assigned: " + safeTaskTitle(task), caseName, task.createdAt(), task.caseId(), task.id()));
+			}
+		}
+		return activities;
+	}
+
+	static List<RecentCaseActivityItem> sortRecentCaseActivities(List<RecentCaseActivityItem> activities) {
+		if (activities == null || activities.isEmpty()) {
+			return List.of();
+		}
+		return activities.stream()
+				.filter(Objects::nonNull)
+				.sorted(Comparator
+						.comparing(RecentCaseActivityItem::occurredAt, Comparator.nullsLast(Comparator.reverseOrder()))
+						.thenComparing(item -> item.type().priority())
+						.thenComparing(RecentCaseActivityItem::caseName, String.CASE_INSENSITIVE_ORDER)
+						.thenComparing(RecentCaseActivityItem::summary, String.CASE_INSENSITIVE_ORDER))
+				.toList();
+	}
+
+	private Node buildRecentCaseActivityRow(RecentCaseActivityItem item) {
+		Label icon = new Label(item.icon());
+		icon.getStyleClass().addAll("recent-case-activity-icon", "recent-case-activity-icon-" + item.type().styleSuffix());
+
+		Label summary = new Label(item.summary());
+		summary.getStyleClass().add("recent-case-activity-summary");
+		summary.setTextOverrun(OverrunStyle.ELLIPSIS);
+		summary.setWrapText(false);
+		summary.setMaxWidth(Double.MAX_VALUE);
+		Label meta = new Label(activityMeta(item));
+		meta.getStyleClass().add("recent-case-activity-meta");
+		meta.setWrapText(true);
+		VBox text = new VBox(2, summary, meta);
+		text.setFillWidth(true);
+		HBox.setHgrow(text, Priority.ALWAYS);
+
+		HBox row = new HBox(7, icon, text);
+		row.getStyleClass().add("recent-case-activity-row");
+		row.setAlignment(Pos.TOP_LEFT);
+		row.setMaxWidth(Double.MAX_VALUE);
+		row.setOnMouseClicked(event -> onRecentCaseActivityClicked(item));
+		return row;
+	}
+
+	private static String activityMeta(RecentCaseActivityItem item) {
+		List<String> parts = new ArrayList<>();
+		if (!safe(item.caseName()).isBlank()) {
+			parts.add(item.caseName().trim());
+		}
+		String relative = shortRelativeTime(toInstant(item.occurredAt()));
+		if (!relative.isBlank()) {
+			parts.add(relative);
+		}
+		return String.join(" • ", parts);
+	}
+
+	private void onRecentCaseActivityClicked(RecentCaseActivityItem item) {
+		// TODO: Navigate to the case detail activity/update/task anchor when dashboard deep links are available.
+		if (item != null && item.caseId() != null && item.caseId() > 0 && onOpenCase != null) {
+			onOpenCase.accept(item.caseId().intValue());
+		}
+	}
+
+	private static Instant toInstant(LocalDateTime dateTime) {
+		return dateTime == null ? null : dateTime.atZone(java.time.ZoneId.systemDefault()).toInstant();
+	}
+
+	private static String safeTaskTitle(CaseTaskListItemDto task) {
+		return task == null || safe(task.title()).isBlank() ? "Untitled task" : safe(task.title()).trim();
+	}
+
+
+	private Node buildNotificationsWidget() {
+		if (notificationCenterService == null) {
+			return DashboardWidgetFactory.widget(
+					"Notifications",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Notifications are unavailable."),
+					false,
+					false);
+		}
+		List<AppNotification> visibleNotifications = notificationCenterService.getNotificationsNewestFirst().stream()
+				.filter(Objects::nonNull)
+				// TODO: Add recent-read durable notifications if the existing notification service exposes a recent-read path.
+				.sorted(Comparator.comparing(AppNotification::isUnread).reversed()
+						.thenComparing(AppNotification::getCreatedAt, Comparator.reverseOrder()))
+				.limit(NOTIFICATIONS_ROW_LIMIT)
+				.toList();
+		if (visibleNotifications.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"Notifications",
+					notificationBadgeText(),
+					onOpenNotificationCenter,
+					DashboardWidgetFactory.emptyState("You’re all caught up."),
+					false,
+					false);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("dashboard-notification-list");
+		content.setFillWidth(true);
+		visibleNotifications.forEach(notification -> content.getChildren().add(buildNotificationBriefingRow(notification)));
+		return DashboardWidgetFactory.widget(
+				"Notifications",
+				notificationBadgeText(),
+				onOpenNotificationCenter,
+				content,
+				false,
+				false);
+	}
+
+	private String notificationBadgeText() {
+		if (notificationCenterService == null || notificationCenterService.getUnreadCount() <= 0) {
+			return null;
+		}
+		return Integer.toString(notificationCenterService.getUnreadCount());
+	}
+
+	private Node buildNotificationBriefingRow(AppNotification notification) {
+		Region unreadDot = new Region();
+		unreadDot.getStyleClass().addAll("dashboard-notification-dot", notification.isUnread() ? "dashboard-notification-dot-unread" : "dashboard-notification-dot-read");
+
+		Label title = new Label(notificationTitle(notification));
+		title.getStyleClass().add("dashboard-notification-title");
+		title.setTextOverrun(OverrunStyle.ELLIPSIS);
+		title.setWrapText(false);
+		title.setMaxWidth(Double.MAX_VALUE);
+		Label meta = new Label(notificationMeta(notification));
+		meta.getStyleClass().add("dashboard-notification-meta");
+		meta.setWrapText(true);
+		VBox text = new VBox(2, title, meta);
+		text.setFillWidth(true);
+		HBox.setHgrow(text, Priority.ALWAYS);
+		HBox row = new HBox(7, unreadDot, text);
+		row.getStyleClass().add("dashboard-notification-row");
+		if (notification.isUnread()) {
+			row.getStyleClass().add("dashboard-notification-row-unread");
+		}
+		row.setAlignment(Pos.TOP_LEFT);
+		row.setOnMouseClicked(event -> handleNotificationBriefingRowClicked(notification));
+		return row;
+	}
+
+	private void handleNotificationBriefingRowClicked(AppNotification notification) {
+		if (notification == null || notificationCenterService == null) {
+			return;
+		}
+		notificationCenterService.markRead(notification);
+		if ("Task".equalsIgnoreCase(Objects.toString(notification.getEntityType(), ""))
+				&& notification.getEntityId() != null && notification.getEntityId() > 0) {
+			openTask(notification.getEntityId());
+		}
+		// TODO: Reuse additional notification-center activation routes here if they become available outside MainController.
+	}
+
+	private static String notificationTitle(AppNotification notification) {
+		String title = notification.getTitle();
+		if (title != null && !title.isBlank()) {
+			return title.trim();
+		}
+		String message = notification.getMessage();
+		return message == null || message.isBlank() ? "Notification" : message.trim();
+	}
+
+	private static String notificationMeta(AppNotification notification) {
+		List<String> parts = new ArrayList<>();
+		String relative = shortRelativeTime(notification.getCreatedAt());
+		if (!relative.isBlank()) {
+			parts.add(relative);
+		}
+		String caseName = notification.getCaseName();
+		if (caseName != null && !caseName.isBlank()) {
+			parts.add(caseName.trim());
+		} else if (notification.getEntityTitle() != null && !notification.getEntityTitle().isBlank()) {
+			parts.add(notification.getEntityTitle().trim());
+		}
+		return String.join(" • ", parts);
+	}
+
+	private static String shortRelativeTime(Instant createdAt) {
+		if (createdAt == null) {
+			return "";
+		}
+		Duration age = Duration.between(createdAt, Instant.now());
+		if (age.isNegative()) {
+			age = Duration.ZERO;
+		}
+		long minutes = age.toMinutes();
+		if (minutes < 1) {
+			return "now";
+		}
+		if (minutes < 60) {
+			return minutes + "m";
+		}
+		long hours = age.toHours();
+		if (hours < 24) {
+			return hours + "h";
+		}
+		long days = age.toDays();
+		return days + "d";
+	}
+
+	private Node buildCaseRadarWidget() {
+		if (loadingMyTasks || loadingMyCases) {
+			return DashboardWidgetFactory.widget("Case Radar", null, null, null, true, false);
+		}
+		if (myCasesLoadFailed) {
+			return DashboardWidgetFactory.widget(
+					"Case Radar",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Unable to load case radar."),
+					false,
+					false);
+		}
+		List<CaseRadarRow> rows = buildCaseRadarRows(LocalDate.now());
+		if (rows.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"Case Radar",
+					null,
+					null,
+					DashboardWidgetFactory.emptyState("No urgent items."),
+					false,
+					true);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("case-radar-list");
+		content.setFillWidth(true);
+		for (CaseRadarRow row : rows) {
+			content.getChildren().add(buildCaseRadarRow(row));
+		}
+		long attentionCount = rows.stream()
+				.filter(row -> row.severity() == CaseRadarSeverity.CRITICAL || row.severity() == CaseRadarSeverity.WARNING)
+				.mapToLong(CaseRadarRow::count)
+				.sum();
+		return DashboardWidgetFactory.widget(
+				"Case Radar",
+				attentionCount > 0 ? String.valueOf(attentionCount) : null,
+				null,
+				content,
+				false,
+				false);
+	}
+
+	private List<CaseRadarRow> buildCaseRadarRows(LocalDate today) {
+		LocalDate effectiveToday = today == null ? LocalDate.now() : today;
+		LocalDate soon = effectiveToday.plusDays(14);
+		LocalDate month = effectiveToday.plusDays(30);
+		long overdueTasks = overviewEligibleTasks(myTasks).stream()
+				.filter(task -> task != null && !task.deleted() && task.completedAt() == null)
+				.filter(task -> task.dueAt() != null && task.dueAt().toLocalDate().isBefore(effectiveToday))
+				.count();
+
+		List<CaseCardVm> activeCases = activeAssignedCaseRadarSource();
+		long solCritical = countCasesInDateWindow(activeCases, effectiveToday, soon, caseVm -> caseVm.solDate);
+		long solWarning = countCasesInDateWindow(activeCases, soon.plusDays(1), month, caseVm -> caseVm.solDate);
+		long tortCritical = countCasesInDateWindow(activeCases, effectiveToday, soon, caseVm -> caseVm.tortNoticeDate);
+		long tortWarning = countCasesInDateWindow(activeCases, soon.plusDays(1), month, caseVm -> caseVm.tortNoticeDate);
+		LocalDate inactiveBefore = effectiveToday.minusDays(INACTIVE_CASE_DAYS);
+		LocalDate recentSince = effectiveToday.minusDays(RECENTLY_UPDATED_CASE_DAYS);
+		long inactiveCases = activeCases.stream()
+				.filter(caseVm -> caseVm.updatedAt != null && caseVm.updatedAt.toLocalDate().isBefore(inactiveBefore))
+				.count();
+		long recentlyUpdatedCases = activeCases.stream()
+				.filter(caseVm -> caseVm.updatedAt != null)
+				.map(caseVm -> caseVm.updatedAt.toLocalDate())
+				.filter(date -> !date.isBefore(recentSince) && !date.isAfter(effectiveToday))
+				.count();
+
+		List<CaseRadarRow> rows = new ArrayList<>();
+		if (overdueTasks > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Overdue tasks", overdueTasks, "Assigned to you and past due.", CaseRadarAction.OVERDUE_TASKS));
+		}
+		if (solCritical > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "SOL due ≤ 14 days", solCritical, "Assigned active cases.", CaseRadarAction.SOL_DUE_14_DAYS));
+		}
+		if (tortCritical > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.CRITICAL, "Tort notice due ≤ 14 days", tortCritical, "Assigned active cases.", CaseRadarAction.TORT_NOTICE_DUE_14_DAYS));
+		}
+		if (solWarning > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "SOL due in 15–30 days", solWarning, "Assigned active cases.", CaseRadarAction.SOL_DUE_15_TO_30_DAYS));
+		}
+		if (tortWarning > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "Tort notice due in 15–30 days", tortWarning, "Assigned active cases.", CaseRadarAction.TORT_NOTICE_DUE_15_TO_30_DAYS));
+		}
+		if (inactiveCases > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.WARNING, "Inactive assigned cases", inactiveCases, "No case update in 45+ days.", CaseRadarAction.INACTIVE_ASSIGNED_CASES));
+		}
+		if (recentlyUpdatedCases > 0) {
+			rows.add(new CaseRadarRow(CaseRadarSeverity.POSITIVE, "Recently updated cases", recentlyUpdatedCases, "Updated in the last 7 days.", CaseRadarAction.RECENTLY_UPDATED_ASSIGNED_CASES));
+		}
+		rows.sort(Comparator.comparingInt(row -> row.severity().sortOrder()));
+		return rows;
+	}
+
+	private List<CaseCardVm> activeAssignedCaseRadarSource() {
+		if (myAssignedCasesBoard == null || myAssignedCasesBoard.isEmpty()) {
+			return List.of();
+		}
+		Set<Integer> terminalStatusIds = statusFilterOptions.stream()
+				.filter(Objects::nonNull)
+				.filter(CaseListUiSupport.StatusFilterOption::terminal)
+				.map(CaseListUiSupport.StatusFilterOption::id)
+				.collect(java.util.stream.Collectors.toSet());
+		return myAssignedCasesBoard.stream()
+				.filter(Objects::nonNull)
+				.filter(caseVm -> caseVm.id > 0)
+				.filter(caseVm -> caseVm.primaryStatusId == null || !terminalStatusIds.contains(caseVm.primaryStatusId))
+				.toList();
+	}
+
+	private long countCasesInDateWindow(List<CaseCardVm> cases, LocalDate start, LocalDate end, java.util.function.Function<CaseCardVm, LocalDate> dateExtractor) {
+		if (cases == null || cases.isEmpty() || start == null || end == null || dateExtractor == null) {
+			return 0;
+		}
+		return cases.stream()
+				.map(dateExtractor)
+				.filter(Objects::nonNull)
+				.filter(date -> !date.isBefore(start) && !date.isAfter(end))
+				.count();
+	}
+
+	private Node buildCaseRadarRow(CaseRadarRow row) {
+		HBox radarRow = new HBox(8);
+		radarRow.getStyleClass().addAll("case-radar-row", "case-radar-row-" + row.severity().styleSuffix());
+		if (isCaseRadarRowActionable(row)) {
+			radarRow.getStyleClass().add("case-radar-row-actionable");
+			radarRow.setOnMouseClicked(event -> onCaseRadarRowClicked(row));
+		}
+		radarRow.setAlignment(Pos.CENTER_LEFT);
+		radarRow.setMaxWidth(Double.MAX_VALUE);
+
+		Region indicator = new Region();
+		indicator.getStyleClass().addAll("case-radar-severity-dot", "case-radar-severity-" + row.severity().styleSuffix());
+
+		VBox text = new VBox(1);
+		text.setFillWidth(true);
+		Label label = new Label(row.label());
+		label.getStyleClass().add("case-radar-label");
+		label.setTextOverrun(OverrunStyle.ELLIPSIS);
+		label.setWrapText(false);
+		label.setMaxWidth(Double.MAX_VALUE);
+		text.getChildren().add(label);
+		if (!safe(row.helperText()).isBlank()) {
+			Label helper = new Label(row.helperText());
+			helper.getStyleClass().add("case-radar-helper");
+			helper.setWrapText(true);
+			text.getChildren().add(helper);
+		}
+		HBox.setHgrow(text, Priority.ALWAYS);
+
+		Label count = new Label(String.valueOf(row.count()));
+		count.getStyleClass().add("case-radar-count");
+		radarRow.getChildren().addAll(indicator, text, count);
+		return radarRow;
+	}
+
+	private boolean isCaseRadarRowActionable(CaseRadarRow row) {
+		return row != null && row.action() != null && row.action() != CaseRadarAction.NONE;
+	}
+
+	private void onCaseRadarRowClicked(CaseRadarRow row) {
+		if (!isCaseRadarRowActionable(row)) {
+			return;
+		}
+		switch (row.action()) {
+			case OVERDUE_TASKS -> showOverdueTasksInMyTasks();
+			case SOL_DUE_14_DAYS -> showDeadlineCasesInMyCases(SORT_SOL, CaseDeadlineWindow.DUE_WITHIN_14_DAYS);
+			case SOL_DUE_15_TO_30_DAYS -> showDeadlineCasesInMyCases(SORT_SOL, CaseDeadlineWindow.DUE_15_TO_30_DAYS);
+			case TORT_NOTICE_DUE_14_DAYS -> showDeadlineCasesInMyCases(SORT_TORT_NOTICE, CaseDeadlineWindow.DUE_WITHIN_14_DAYS);
+			case TORT_NOTICE_DUE_15_TO_30_DAYS -> showDeadlineCasesInMyCases(SORT_TORT_NOTICE, CaseDeadlineWindow.DUE_15_TO_30_DAYS);
+			case INACTIVE_ASSIGNED_CASES -> showUpdatedAtCasesInMyCases(SORT_UPDATED_OLDEST);
+			case RECENTLY_UPDATED_ASSIGNED_CASES -> showUpdatedAtCasesInMyCases(SORT_UPDATED_NEWEST);
+			case NONE -> {
+			}
+		}
+	}
+
+	private void showOverdueTasksInMyTasks() {
+		if (myTasksSourceChoice != null) {
+			myTasksSourceChoice.getSelectionModel().select(MyTasksSource.ASSIGNED_TO_ME);
+		} else {
+			myTasksSource = MyTasksSource.ASSIGNED_TO_ME;
+		}
+		if (myTasksSortChoice != null) {
+			myTasksSortChoice.getSelectionModel().select(MY_TASKS_SORT_DUE_ASC);
+		}
+		if (myTasksSearchField != null) {
+			myTasksSearchField.clear();
+		}
+		if (myTasksPriorityFilterChoice != null) {
+			myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
+		}
+		if (myTasksCaseFilterChoice != null) {
+			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
+		}
+		if (showCompletedMyTasks) {
+			showCompletedMyTasks = false;
+			persistMyTasksShowCompletedPreference(false);
+			updateMyTasksCompletionToggleLabel();
+			refreshMyTasks(true);
+		}
+		onSectionSelected(SECTION_TASKS);
+		// My Tasks does not currently expose an overdue-only filter, so due-date ascending sorting makes overdue work appear first.
+	}
+
+	private void selectAllMyCasesStatuses() {
+		selectedStatusIds.clear();
+		selectedStatusIds.addAll(CaseListUiSupport.defaultSelectedStatuses(statusFilterOptions));
+	}
+
+	private void showDeadlineCasesInMyCases(String sortOption, CaseDeadlineWindow deadlineWindow) {
+		if (myCasesBoardSearchField != null) {
+			myCasesBoardSearchField.clear();
+		}
+		if (myCasesSearchField != null) {
+			myCasesSearchField.clear();
+		}
+		if (myCasesBoardStatusFilterChoice != null) {
+			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
+		}
+		selectAllMyCasesStatuses();
+		CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, this::loadFirstPage);
+		if (myCasesBoardSortChoice != null) {
+			myCasesBoardSortChoice.getSelectionModel().select(sortOption);
+		}
+		if (myCasesSortChoice != null) {
+			myCasesSortChoice.getSelectionModel().select(sortOption);
+		}
+		onSectionSelected(SECTION_MY_CASES);
+		// TODO: Apply an existing My Cases deadline/window filter for deadlineWindow when the assigned-case board exposes one.
+		renderMyCasesBoard();
+		ensureMyCasesFresh(false);
+	}
+
+	private void showUpdatedAtCasesInMyCases(String sortOption) {
+		if (myCasesBoardSearchField != null) {
+			myCasesBoardSearchField.clear();
+		}
+		if (myCasesSearchField != null) {
+			myCasesSearchField.clear();
+		}
+		if (myCasesBoardStatusFilterChoice != null) {
+			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
+		}
+		selectAllMyCasesStatuses();
+		CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, this::loadFirstPage);
+		if (myCasesBoardSortChoice != null) {
+			myCasesBoardSortChoice.getSelectionModel().select(sortOption);
+		}
+		if (myCasesSortChoice != null) {
+			myCasesSortChoice.getSelectionModel().select(sortOption);
+		}
+		onSectionSelected(SECTION_MY_CASES);
+		renderMyCasesBoard();
+		ensureMyCasesFresh(false);
+	}
+
+	private Node buildImportantDatesWidget() {
+		if (loadingMyTasks || loadingMyCases) {
+			return DashboardWidgetFactory.widget("Important Dates", null, null, null, true, false);
+		}
+		if (myCasesLoadFailed) {
+			return DashboardWidgetFactory.widget(
+					"Important Dates",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Unable to load important dates."),
+					false,
+					false);
+		}
+		List<ImportantDateItem> items = buildImportantDateItems(LocalDate.now());
+		if (items.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"Important Dates",
+					null,
+					null,
+					DashboardWidgetFactory.emptyState("No upcoming important dates."),
+					false,
+					true);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("important-dates-list");
+		content.setFillWidth(true);
+		items.stream()
+				.limit(IMPORTANT_DATES_ROW_LIMIT)
+				.map(this::buildImportantDateRow)
+				.forEach(content.getChildren()::add);
+		return DashboardWidgetFactory.widget(
+				"Important Dates",
+				String.valueOf(items.size()),
+				null,
+				content,
+				false,
+				false);
+	}
+
+	private List<ImportantDateItem> buildImportantDateItems(LocalDate today) {
+		LocalDate effectiveToday = today == null ? LocalDate.now() : today;
+		LocalDate end = effectiveToday.plusDays(IMPORTANT_DATES_WINDOW_DAYS);
+		List<ImportantDateItem> items = new ArrayList<>();
+		for (CaseTaskListItemDto task : overviewEligibleTasks(myTasks)) {
+			if (task == null || task.deleted() || task.completedAt() != null || task.dueAt() == null) {
+				continue;
+			}
+			LocalDate dueDate = task.dueAt().toLocalDate();
+			if (!isDateInWindow(dueDate, effectiveToday, end)) {
+				continue;
+			}
+			items.add(new ImportantDateItem(
+					dueDate,
+					ImportantDateType.TASK,
+					ImportantDateSeverity.fromDate(dueDate, effectiveToday),
+					resolveMyTaskCardTitle(task),
+					task.caseId(),
+					task.id()));
+		}
+
+		for (CaseCardVm caseVm : activeAssignedCaseRadarSource()) {
+			if (caseVm == null || caseVm.id <= 0) {
+				continue;
+			}
+			if (isDateInWindow(caseVm.solDate, effectiveToday, end)) {
+				items.add(new ImportantDateItem(
+						caseVm.solDate,
+						ImportantDateType.SOL,
+						ImportantDateSeverity.fromDate(caseVm.solDate, effectiveToday),
+						caseVm.name,
+						caseVm.id,
+						null));
+			}
+			if (isDateInWindow(caseVm.tortNoticeDate, effectiveToday, end)) {
+				items.add(new ImportantDateItem(
+						caseVm.tortNoticeDate,
+						ImportantDateType.TORT_NOTICE,
+						ImportantDateSeverity.fromDate(caseVm.tortNoticeDate, effectiveToday),
+						caseVm.name,
+						caseVm.id,
+						null));
+			}
+		}
+		// TODO: Add Calendar important dates when My Shale has a reliable loaded calendar feed/service path to reuse without new calendar infrastructure.
+		return sortImportantDateItems(items);
+	}
+
+	static List<ImportantDateItem> sortImportantDateItems(List<ImportantDateItem> items) {
+		if (items == null || items.isEmpty()) {
+			return List.of();
+		}
+		return items.stream()
+				.filter(Objects::nonNull)
+				.sorted(Comparator
+						.comparing(ImportantDateItem::date)
+						.thenComparing(ImportantDateItem::severity)
+						.thenComparing(item -> safe(item.title()), String.CASE_INSENSITIVE_ORDER)
+						.thenComparing(ImportantDateItem::type))
+				.toList();
+	}
+
+	static boolean isDateInWindow(LocalDate date, LocalDate start, LocalDate end) {
+		return date != null && start != null && end != null && !date.isBefore(start) && !date.isAfter(end);
+	}
+
+	private Node buildImportantDateRow(ImportantDateItem item) {
+		HBox row = new HBox(8);
+		row.getStyleClass().addAll("important-date-row", "important-date-row-" + item.severity().styleSuffix());
+		if (isImportantDateActionable(item)) {
+			row.getStyleClass().add("important-date-row-actionable");
+			row.setOnMouseClicked(event -> onImportantDateClicked(item));
+		}
+		row.setAlignment(Pos.CENTER_LEFT);
+		row.setMaxWidth(Double.MAX_VALUE);
+
+		Label date = new Label(formatImportantDateLabel(item.date()));
+		date.getStyleClass().add("important-date-date");
+
+		Label type = new Label(item.type().label());
+		type.getStyleClass().addAll("important-date-type", "important-date-type-" + item.type().styleSuffix());
+
+		Label title = new Label(safe(item.title()).isBlank() ? "Untitled" : safe(item.title()).trim());
+		title.getStyleClass().add("important-date-title");
+		title.setTextOverrun(OverrunStyle.ELLIPSIS);
+		title.setMaxWidth(Double.MAX_VALUE);
+		title.setWrapText(false);
+		HBox.setHgrow(title, Priority.ALWAYS);
+
+		row.getChildren().addAll(date, type, title);
+		return row;
+	}
+
+	private String formatImportantDateLabel(LocalDate date) {
+		if (date == null) {
+			return "—";
+		}
+		LocalDate today = LocalDate.now();
+		if (date.isEqual(today)) {
+			return "Today";
+		}
+		if (date.isEqual(today.plusDays(1))) {
+			return "Tomorrow";
+		}
+		return IMPORTANT_DATE_LABEL_FORMATTER.format(date);
+	}
+
+	private boolean isImportantDateActionable(ImportantDateItem item) {
+		if (item == null) {
+			return false;
+		}
+		return switch (item.type()) {
+			case TASK -> item.taskId() != null && item.taskId() > 0;
+			case SOL, TORT_NOTICE -> item.caseId() != null && item.caseId() > 0 && onOpenCase != null;
+			case CALENDAR -> false;
+		};
+	}
+
+	private void onImportantDateClicked(ImportantDateItem item) {
+		if (!isImportantDateActionable(item)) {
+			return;
+		}
+		switch (item.type()) {
+			case TASK -> openTask(item.taskId());
+			case SOL, TORT_NOTICE -> onOpenCase.accept(item.caseId().intValue());
+			case CALENDAR -> {
+				// TODO: Wire calendar important-date rows when calendar integration is available in My Shale.
+			}
+		}
+	}
+
+	private Node buildMyCaseSummaryWidget() {
+		if (loadingMyCases) {
+			return DashboardWidgetFactory.widget("My Case Summary", null, null, null, true, false);
+		}
+		if (myCasesLoadFailed) {
+			return DashboardWidgetFactory.widget(
+					"My Case Summary",
+					null,
+					null,
+					DashboardWidgetFactory.errorState("Unable to load case summary."),
+					false,
+					false);
+		}
+		List<MyCaseSummaryRow> rows = buildMyCaseSummaryRows();
+		if (rows.isEmpty()) {
+			return DashboardWidgetFactory.widget(
+					"My Case Summary",
+					null,
+					null,
+					DashboardWidgetFactory.emptyState("No case summary available."),
+					false,
+					false);
+		}
+		VBox content = new VBox(6);
+		content.getStyleClass().add("my-case-summary-list");
+		content.setFillWidth(true);
+		for (MyCaseSummaryRow row : rows) {
+			content.getChildren().add(buildMyCaseSummaryRow(row));
+		}
+		return DashboardWidgetFactory.widget(
+				"My Case Summary",
+				String.valueOf(rows.stream().mapToLong(MyCaseSummaryRow::count).sum()),
+				null,
+				content,
+				false,
+				false);
+	}
+
+	private List<MyCaseSummaryRow> buildMyCaseSummaryRows() {
+		if (myAssignedCasesBoard == null || myAssignedCasesBoard.isEmpty()) {
+			return List.of();
+		}
+		Map<Integer, Long> countsByStatusId = myAssignedCasesBoard.stream()
+				.filter(Objects::nonNull)
+				.map(vm -> vm.primaryStatusId)
+				.filter(Objects::nonNull)
+				.collect(java.util.stream.Collectors.groupingBy(
+						statusId -> statusId,
+						LinkedHashMap::new,
+						java.util.stream.Collectors.counting()));
+		if (countsByStatusId.isEmpty()) {
+			return List.of();
+		}
+		List<MyCaseSummaryRow> rows = new ArrayList<>();
+		Set<Integer> knownStatusIds = new LinkedHashSet<>();
+		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
+			if (status == null || !countsByStatusId.containsKey(status.id())) {
+				continue;
+			}
+			knownStatusIds.add(status.id());
+			CaseCardVm representative = firstCaseWithStatus(status.id());
+			rows.add(new MyCaseSummaryRow(
+					status.id(),
+					safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim(),
+					representative == null ? "" : representative.primaryStatusColor,
+					countsByStatusId.getOrDefault(status.id(), 0L)));
+		}
+		for (Map.Entry<Integer, Long> entry : countsByStatusId.entrySet()) {
+			if (knownStatusIds.contains(entry.getKey())) {
+				continue;
+			}
+			CaseCardVm representative = firstCaseWithStatus(entry.getKey());
+			rows.add(new MyCaseSummaryRow(
+					entry.getKey(),
+					representative == null || safe(representative.primaryStatusName).isBlank()
+							? ("Status #" + entry.getKey())
+							: safe(representative.primaryStatusName).trim(),
+					representative == null ? "" : representative.primaryStatusColor,
+					entry.getValue()));
+		}
+		return rows;
+	}
+
+	private CaseCardVm firstCaseWithStatus(Integer statusId) {
+		if (statusId == null || myAssignedCasesBoard == null) {
+			return null;
+		}
+		return myAssignedCasesBoard.stream()
+				.filter(vm -> vm != null && Objects.equals(statusId, vm.primaryStatusId))
+				.findFirst()
+				.orElse(null);
+	}
+
+	private Node buildMyCaseSummaryRow(MyCaseSummaryRow row) {
+		HBox summaryRow = new HBox(8);
+		summaryRow.getStyleClass().add("my-case-summary-row");
+		summaryRow.setAlignment(Pos.CENTER_LEFT);
+		summaryRow.setMaxWidth(Double.MAX_VALUE);
+		if (isMyCaseSummaryRowActionable(row)) {
+			summaryRow.getStyleClass().add("my-case-summary-row-actionable");
+			summaryRow.setOnMouseClicked(event -> onMyCaseSummaryStatusClicked(row));
+		}
+
+		Node statusBadge = StatusIndicatorFactory.createStatusBadge(row.statusName(), row.statusColor());
+		HBox.setHgrow(statusBadge, Priority.ALWAYS);
+
+		Label count = new Label(String.valueOf(row.count()));
+		count.getStyleClass().add("my-case-summary-count");
+
+		summaryRow.getChildren().addAll(statusBadge, count);
+		return summaryRow;
+	}
+
+	private boolean isMyCaseSummaryRowActionable(MyCaseSummaryRow row) {
+		return row != null && row.statusId() != null && row.statusId() > 0;
+	}
+
+	private void onMyCaseSummaryStatusClicked(MyCaseSummaryRow row) {
+		if (!isMyCaseSummaryRowActionable(row)) {
+			return;
+		}
+		pendingMyCaseSummaryStatusFilterId = row.statusId();
+		onSectionSelected(SECTION_MY_CASES);
+		applyPendingMyCaseSummaryStatusFilter();
+		ensureMyCasesFresh(false);
+	}
+
+	private void applyPendingMyCaseSummaryStatusFilter() {
+		if (pendingMyCaseSummaryStatusFilterId == null || myCasesBoardStatusFilterChoice == null) {
+			return;
+		}
+		Integer statusId = pendingMyCaseSummaryStatusFilterId;
+		syncMyCasesBoardStatusFilterOptions();
+		Optional<BoardStatusFilterOption> matching = myCasesBoardStatusFilterChoice.getItems().stream()
+				.filter(option -> option != null && Objects.equals(option.statusId(), statusId))
+				.findFirst();
+		if (matching.isEmpty()) {
+			return;
+		}
+		myCasesBoardStatusFilterChoice.getSelectionModel().select(matching.get());
+		pendingMyCaseSummaryStatusFilterId = null;
+		renderMyCasesBoard();
 	}
 
 	private Node buildOverviewControlBar() {
@@ -2899,6 +3960,163 @@ public final class MyShaleController {
 		}
 	}
 
+	private enum CaseRadarSeverity {
+		CRITICAL("critical"),
+		WARNING("warning"),
+		POSITIVE("positive"),
+		NEUTRAL("neutral");
+
+		private final String styleSuffix;
+
+		CaseRadarSeverity(String styleSuffix) {
+			this.styleSuffix = styleSuffix;
+		}
+
+		String styleSuffix() {
+			return styleSuffix;
+		}
+
+		int sortOrder() {
+			return switch (this) {
+				case CRITICAL -> 0;
+				case WARNING -> 1;
+				case POSITIVE -> 2;
+				case NEUTRAL -> 3;
+			};
+		}
+	}
+
+	private enum CaseRadarAction {
+		NONE,
+		OVERDUE_TASKS,
+		SOL_DUE_14_DAYS,
+		SOL_DUE_15_TO_30_DAYS,
+		TORT_NOTICE_DUE_14_DAYS,
+		TORT_NOTICE_DUE_15_TO_30_DAYS,
+		INACTIVE_ASSIGNED_CASES,
+		RECENTLY_UPDATED_ASSIGNED_CASES
+	}
+
+	private enum CaseDeadlineWindow {
+		DUE_WITHIN_14_DAYS,
+		DUE_15_TO_30_DAYS
+	}
+
+	private record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText, CaseRadarAction action) {
+	}
+
+
+	private enum ImportantDateType {
+		TASK("Task", "task"),
+		SOL("SOL", "sol"),
+		TORT_NOTICE("Tort Notice", "tort-notice"),
+		CALENDAR("Calendar", "calendar");
+
+		private final String label;
+		private final String styleSuffix;
+
+		ImportantDateType(String label, String styleSuffix) {
+			this.label = label;
+			this.styleSuffix = styleSuffix;
+		}
+
+		String label() {
+			return label;
+		}
+
+		String styleSuffix() {
+			return styleSuffix;
+		}
+	}
+
+	enum ImportantDateSeverity {
+		CRITICAL("critical"),
+		WARNING("warning"),
+		NEUTRAL("neutral");
+
+		private final String styleSuffix;
+
+		ImportantDateSeverity(String styleSuffix) {
+			this.styleSuffix = styleSuffix;
+		}
+
+		String styleSuffix() {
+			return styleSuffix;
+		}
+
+		static ImportantDateSeverity fromDate(LocalDate date, LocalDate today) {
+			if (date == null || today == null) {
+				return NEUTRAL;
+			}
+			if (!date.isAfter(today.plusDays(7))) {
+				return CRITICAL;
+			}
+			if (!date.isAfter(today.plusDays(14))) {
+				return WARNING;
+			}
+			return NEUTRAL;
+		}
+	}
+
+	record ImportantDateItem(LocalDate date, ImportantDateType type, ImportantDateSeverity severity, String title, Long caseId, Long taskId) {
+	}
+
+
+	enum RecentCaseActivityType {
+		CASE_UPDATE("update", 0),
+		TASK_COMPLETED("task-completed", 1),
+		TASK_CREATED("task-created", 2);
+
+		private final String styleSuffix;
+		private final int priority;
+
+		RecentCaseActivityType(String styleSuffix, int priority) {
+			this.styleSuffix = styleSuffix;
+			this.priority = priority;
+		}
+
+		String styleSuffix() {
+			return styleSuffix;
+		}
+
+		int priority() {
+			return priority;
+		}
+	}
+
+	record RecentCaseActivityItem(
+			RecentCaseActivityType type,
+			String icon,
+			String summary,
+			String caseName,
+			LocalDateTime occurredAt,
+			Long caseId,
+			Long sourceId) {
+		static RecentCaseActivityItem caseUpdate(CaseUpdateDto update, String caseName) {
+			String note = safe(update == null ? null : update.getNoteText()).trim();
+			String summary = note.isBlank() ? "Case update added" : "Case update added: " + compactActivityText(note);
+			return new RecentCaseActivityItem(
+					RecentCaseActivityType.CASE_UPDATE,
+					"•",
+					summary,
+					safe(caseName).isBlank() ? "Case #" + (update == null ? "" : update.getCaseId()) : safe(caseName).trim(),
+					update == null ? null : update.getCreatedAt(),
+					update == null ? null : update.getCaseId(),
+					update == null ? null : update.getId());
+		}
+	}
+
+	private static String compactActivityText(String text) {
+		String normalized = safe(text).replaceAll("\\s+", " ").trim();
+		if (normalized.length() <= 80) {
+			return normalized;
+		}
+		return normalized.substring(0, 77).trim() + "…";
+	}
+
+	private record MyCaseSummaryRow(Integer statusId, String statusName, String statusColor, long count) {
+	}
+
 	private record BoardStatusFilterOption(Integer statusId, String displayName) {
 		@Override
 		public String toString() {
@@ -2927,6 +4145,7 @@ public final class MyShaleController {
 		final String name;
 		final LocalDate intakeDate;
 		final LocalDate solDate;
+		final LocalDate tortNoticeDate;
 		final Integer primaryStatusId;
 		final String responsibleAttorney;
 		final String responsibleAttorneyColor;
@@ -2934,14 +4153,16 @@ public final class MyShaleController {
 		final String primaryStatusName;
 		final String primaryStatusColor;
 		final String practiceAreaColor;
+		final LocalDateTime updatedAt;
 
-		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId,
+		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, LocalDate tortNoticeDate, Integer primaryStatusId,
 				String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent,
-				String primaryStatusName, String primaryStatusColor, String practiceAreaColor) {
+				String primaryStatusName, String primaryStatusColor, String practiceAreaColor, LocalDateTime updatedAt) {
 			this.id = id;
 			this.name = Objects.requireNonNullElse(name, "");
 			this.intakeDate = intakeDate;
 			this.solDate = solDate;
+			this.tortNoticeDate = tortNoticeDate;
 			this.primaryStatusId = primaryStatusId;
 			this.responsibleAttorney = Objects.requireNonNullElse(responsibleAttorney, "");
 			this.responsibleAttorneyColor = Objects.requireNonNullElse(responsibleAttorneyColor, "");
@@ -2949,6 +4170,7 @@ public final class MyShaleController {
 			this.primaryStatusName = Objects.requireNonNullElse(primaryStatusName, "");
 			this.primaryStatusColor = Objects.requireNonNullElse(primaryStatusColor, "");
 			this.practiceAreaColor = Objects.requireNonNullElse(practiceAreaColor, "");
+			this.updatedAt = updatedAt;
 		}
 
 		boolean sameContent(CaseCardVm other) {
@@ -2959,13 +4181,15 @@ public final class MyShaleController {
 					&& Objects.equals(name, other.name)
 					&& Objects.equals(intakeDate, other.intakeDate)
 					&& Objects.equals(solDate, other.solDate)
+					&& Objects.equals(tortNoticeDate, other.tortNoticeDate)
 					&& Objects.equals(primaryStatusId, other.primaryStatusId)
 					&& Objects.equals(responsibleAttorney, other.responsibleAttorney)
 					&& Objects.equals(responsibleAttorneyColor, other.responsibleAttorneyColor)
 					&& Objects.equals(nonEngagementLetterSent, other.nonEngagementLetterSent)
 					&& Objects.equals(primaryStatusName, other.primaryStatusName)
 					&& Objects.equals(primaryStatusColor, other.primaryStatusColor)
-					&& Objects.equals(practiceAreaColor, other.practiceAreaColor);
+					&& Objects.equals(practiceAreaColor, other.practiceAreaColor)
+					&& Objects.equals(updatedAt, other.updatedAt);
 		}
 	}
 }
