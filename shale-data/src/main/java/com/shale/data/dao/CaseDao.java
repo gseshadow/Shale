@@ -28,6 +28,7 @@ import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseStatusHistoryDto;
 import com.shale.core.dto.CaseStatusReportRowDto;
 import com.shale.core.dto.PracticeAreaDto;
+import com.shale.core.dto.RecentCaseUpdateActivityDto;
 import com.shale.core.dto.ReportCaseDetailRowDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
@@ -2811,6 +2812,78 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to " + (deleted ? "soft delete" : "restore") + " case (id=" + caseId + ")", e);
+		}
+	}
+
+	public List<RecentCaseUpdateActivityDto> listRecentCaseUpdatesForAssignedCases(int assignedUserId, int shaleClientId, int limit) {
+		if (assignedUserId <= 0 || shaleClientId <= 0 || limit <= 0) {
+			return List.of();
+		}
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String caseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "caseUser");
+			String userDeletedColumn = resolveUsersDeletedColumn(con);
+			String userDeletedPredicate = userDeletedColumn == null || userDeletedColumn.isBlank()
+					? ""
+					: "\n AND " + activeFilter(userDeletedColumn, "u");
+			String sql = """
+					SELECT TOP (?)
+					  cu.Id,
+					  cu.CaseId,
+					  c.Name AS CaseName,
+					  cu.NoteText,
+					  cu.CreatedAt,
+					  cu.CreatedByUserId,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS CreatedByDisplayName
+					FROM dbo.CaseUpdates cu
+					JOIN dbo.Cases c
+					  ON c.Id = cu.CaseId
+					 AND c.ShaleClientId = cu.ShaleClientId
+					JOIN (
+					  SELECT DISTINCT caseUser.CaseId
+					  FROM dbo.CaseUsers caseUser
+					  WHERE caseUser.UserId = ?
+					    AND %s
+					) assignedCase
+					  ON assignedCase.CaseId = c.Id
+					LEFT JOIN dbo.Users u
+					  ON u.Id = cu.CreatedByUserId
+					 AND u.ShaleClientId = cu.ShaleClientId%s
+					WHERE c.ShaleClientId = ?
+					  AND cu.ShaleClientId = ?
+					  AND %s
+					  AND ISNULL(cu.IsDeleted, 0) = 0
+					  AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
+					ORDER BY cu.CreatedAt DESC, cu.Id DESC;
+					""".formatted(caseUserActiveFilter, userDeletedPredicate, activeFilter(schema.deletedColumn(), "c"));
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, limit);
+				ps.setInt(2, assignedUserId);
+				ps.setInt(3, shaleClientId);
+				ps.setInt(4, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<RecentCaseUpdateActivityDto> out = new ArrayList<>();
+					while (rs.next()) {
+						Integer createdByUserId = getNullableInt(rs, "CreatedByUserId");
+						out.add(new RecentCaseUpdateActivityDto(
+								rs.getLong("Id"),
+								rs.getLong("CaseId"),
+								rs.getString("CaseName"),
+								rs.getString("NoteText"),
+								toLocalDateTime(rs.getTimestamp("CreatedAt")),
+								createdByUserId,
+								safeUserDisplayName(rs.getString("CreatedByDisplayName"), createdByUserId)));
+					}
+					return out;
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list recent assigned case updates (assignedUserId=" + assignedUserId + ")", e);
 		}
 	}
 
