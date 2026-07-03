@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
@@ -193,7 +194,8 @@ final class MyShaleControllerBoardLayoutTest {
                 "Recent Case Activity should reuse the existing tenant-scoped Case Updates DAO path");
         assertTrue(source.contains("taskActivitiesForAssignedCases(myTasks, caseNamesById)"),
                 "Recent Case Activity should reuse already loaded assigned-task models for task activity");
-        assertTrue(source.contains("DashboardWidgetFactory.widget(\n\t\t\t\t\"Recent Case Activity\""),
+        assertTrue(Pattern.compile("return\\s+DashboardWidgetFactory\\.widget\\(\\s*\"Recent Case Activity\"",
+                        Pattern.DOTALL).matcher(source).find(),
                 "Recent Case Activity should be built with DashboardWidgetFactory");
         assertTrue(source.contains("No recent case activity."),
                 "Recent Case Activity should keep the requested empty state");

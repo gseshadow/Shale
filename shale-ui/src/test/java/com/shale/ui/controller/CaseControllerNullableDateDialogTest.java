@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
@@ -16,9 +17,11 @@ class CaseControllerNullableDateDialogTest {
     void statuteAndTortDateDialogsCanSaveNullValues() throws IOException {
         String source = Files.readString(SOURCE);
 
-        assertTrue(source.contains("editor == detStatuteOfLimitationsEditor) {\n\t\t\tshowDetailsNullableDateDialog"),
+        assertTrue(Pattern.compile("editor\\s*==\\s*detStatuteOfLimitationsEditor\\)\\s*\\{\\s*showDetailsNullableDateDialog",
+                        Pattern.DOTALL).matcher(source).find(),
                 "Statute of Limitations should use the null-aware date dialog.");
-        assertTrue(source.contains("editor == detTortNoticeDeadlineEditor) {\n\t\t\tshowDetailsNullableDateDialog"),
+        assertTrue(Pattern.compile("editor\\s*==\\s*detTortNoticeDeadlineEditor\\)\\s*\\{\\s*showDetailsNullableDateDialog",
+                        Pattern.DOTALL).matcher(source).find(),
                 "Tort Notice Deadline should use the null-aware date dialog.");
         assertTrue(source.contains("Dialog<Optional<LocalDate>> dialog = new Dialog<>()"),
                 "The dialog result must distinguish Save with an empty date from Cancel.");
@@ -30,7 +33,13 @@ class CaseControllerNullableDateDialogTest {
                 "The full details save path should capture a cleared SOL editor as null.");
         assertTrue(source.contains("d.tortNoticeDeadline = nullableDatePickerValue(detTortNoticeDeadlineEditor);"),
                 "The full details save path should capture a cleared TCN editor as null.");
-        assertTrue(source.contains("if (editorText == null || editorText.trim().isEmpty())\n\t\t\treturn null;"),
+        assertTrue(Pattern.compile("""
+                        static\\s+LocalDate\\s+nullableDatePickerValue\\s*\\([^)]*DatePicker\\s+picker[^)]*\\)\\s*\\{.*?
+                        String\\s+editorText\\s*=\\s*picker\\.getEditor\\(\\)\\s*==\\s*null\\s*\\?\\s*null\\s*:\\s*picker\\.getEditor\\(\\)\\.getText\\(\\)\\s*;.*?
+                        if\\s*\\(\\s*editorText\\s*==\\s*null\\s*\\|\\|\\s*editorText\\.trim\\(\\)\\.isEmpty\\(\\)\\s*\\)\\s*
+                        return\\s+null\\s*;.*?
+                        return\\s+picker\\.getValue\\(\\)\\s*;
+                        """, Pattern.DOTALL | Pattern.COMMENTS).matcher(source).find(),
                 "Blank DatePicker editor text must be treated as an explicit clear instead of preserving the previous value.");
     }
 
