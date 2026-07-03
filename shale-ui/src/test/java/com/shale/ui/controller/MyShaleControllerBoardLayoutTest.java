@@ -190,8 +190,10 @@ final class MyShaleControllerBoardLayoutTest {
                 "Overview dashboard should render the live Recent Case Activity widget instead of a placeholder");
         assertTrue(source.contains("RECENT_CASE_ACTIVITY_ROW_LIMIT = 10"),
                 "Recent Case Activity should cap visible rows at 10");
-        assertTrue(source.contains("caseDao.listCaseUpdates(caseVm.id, tenantId)"),
-                "Recent Case Activity should reuse the existing tenant-scoped Case Updates DAO path");
+        assertTrue(source.contains("caseDao.listRecentCaseUpdatesForAssignedCases"),
+                "Recent Case Activity should use the tenant-scoped assigned-case batch Case Updates DAO path");
+        assertTrue(!source.contains("caseDao.listCaseUpdates(caseVm.id, tenantId)"),
+                "Recent Case Activity should not load CaseUpdates once per assigned case");
         assertTrue(source.contains("taskActivitiesForAssignedCases(myTasks, caseNamesById)"),
                 "Recent Case Activity should reuse already loaded assigned-task models for task activity");
         assertTrue(Pattern.compile("return\\s+DashboardWidgetFactory\\.widget\\(\\s*\"Recent Case Activity\"",
@@ -246,8 +248,10 @@ final class MyShaleControllerBoardLayoutTest {
                 "Live case updates and assigned task/case loads should keep the activity widget independently refreshable");
         assertTrue(source.contains("activeAssignedCaseRadarSource()"),
                 "Recent activity should skip terminal assigned cases through the existing active assigned case source");
-        assertTrue(source.contains("TODO: Replace this per-case CaseUpdates loop with a tenant-scoped batch activity read"),
-                "Known per-case CaseUpdates loading risk should remain documented for a future batch path");
+        assertTrue(source.contains("caseDao.listRecentCaseUpdatesForAssignedCases"),
+                "Recent activity should use the tenant-scoped batch Case Updates path");
+        assertTrue(!source.contains("TODO: Replace this per-case CaseUpdates loop with a tenant-scoped batch activity read"),
+                "The documented N+1 CaseUpdates loop should be removed after the batch path is available");
     }
 
     @Test

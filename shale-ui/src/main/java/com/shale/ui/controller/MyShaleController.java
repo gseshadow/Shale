@@ -22,6 +22,7 @@ import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.RecentCaseUpdateActivityDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
@@ -1828,7 +1829,8 @@ public final class MyShaleController {
 			return;
 		}
 		Integer shaleClientId = appState.getShaleClientId();
-		if (shaleClientId == null || shaleClientId <= 0 || myAssignedCasesBoard == null || myAssignedCasesBoard.isEmpty()) {
+		Integer userId = appState.getUserId();
+		if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0 || myAssignedCasesBoard == null || myAssignedCasesBoard.isEmpty()) {
 			recentCaseActivities = List.of();
 			loadingRecentCaseActivity = false;
 			recentCaseActivityLoadFailed = false;
@@ -1844,6 +1846,7 @@ public final class MyShaleController {
 						(first, second) -> first,
 						LinkedHashMap::new));
 		final int tenantId = shaleClientId;
+		final int assignedUserId = userId;
 		final int generationAtSubmit = ++recentCaseActivityLoadGeneration;
 		loadingRecentCaseActivity = true;
 		recentCaseActivityLoadFailed = false;
@@ -1851,18 +1854,15 @@ public final class MyShaleController {
 		casesDbExec.submit(() -> {
 			try {
 				List<RecentCaseActivityItem> loadedActivities = new ArrayList<>();
-				// TODO: Replace this per-case CaseUpdates loop with a tenant-scoped batch activity read when an existing DAO/service path is available.
-				for (CaseCardVm caseVm : assignedCases) {
-					if (caseVm == null || caseVm.id <= 0) {
+				List<RecentCaseUpdateActivityDto> updates = caseDao.listRecentCaseUpdatesForAssignedCases(
+						assignedUserId,
+						tenantId,
+						RECENT_CASE_ACTIVITY_ROW_LIMIT);
+				for (RecentCaseUpdateActivityDto update : updates == null ? List.<RecentCaseUpdateActivityDto>of() : updates) {
+					if (update == null) {
 						continue;
 					}
-					List<CaseUpdateDto> updates = caseDao.listCaseUpdates(caseVm.id, tenantId);
-					for (CaseUpdateDto update : updates == null ? List.<CaseUpdateDto>of() : updates) {
-						if (update == null) {
-							continue;
-						}
-						loadedActivities.add(RecentCaseActivityItem.caseUpdate(update, caseNamesById.get(update.getCaseId())));
-					}
+					loadedActivities.add(RecentCaseActivityItem.caseUpdate(update));
 				}
 				loadedActivities.addAll(taskActivitiesForAssignedCases(myTasks, caseNamesById));
 				List<RecentCaseActivityItem> sorted = sortRecentCaseActivities(loadedActivities).stream()
@@ -4104,6 +4104,19 @@ public final class MyShaleController {
 					update == null ? null : update.getCaseId(),
 					update == null ? null : update.getId());
 		}
+		static RecentCaseActivityItem caseUpdate(RecentCaseUpdateActivityDto update) {
+			String note = safe(update == null ? null : update.noteText()).trim();
+			String summary = note.isBlank() ? "Case update added" : "Case update added: " + compactActivityText(note);
+			return new RecentCaseActivityItem(
+					RecentCaseActivityType.CASE_UPDATE,
+					"•",
+					summary,
+					safe(update == null ? null : update.caseName()).isBlank() ? "Case #" + (update == null ? "" : update.caseId()) : safe(update.caseName()).trim(),
+					update == null ? null : update.createdAt(),
+					update == null ? null : update.caseId(),
+					update == null ? null : update.id());
+		}
+
 	}
 
 	private static String compactActivityText(String text) {
