@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
@@ -16,9 +17,11 @@ class CaseControllerNullableDateDialogTest {
     void statuteAndTortDateDialogsCanSaveNullValues() throws IOException {
         String source = Files.readString(SOURCE);
 
-        assertTrue(source.contains("editor == detStatuteOfLimitationsEditor) {\n\t\t\tshowDetailsNullableDateDialog"),
+        assertTrue(Pattern.compile("editor\\s*==\\s*detStatuteOfLimitationsEditor\\)\\s*\\{\\s*showDetailsNullableDateDialog",
+                        Pattern.DOTALL).matcher(source).find(),
                 "Statute of Limitations should use the null-aware date dialog.");
-        assertTrue(source.contains("editor == detTortNoticeDeadlineEditor) {\n\t\t\tshowDetailsNullableDateDialog"),
+        assertTrue(Pattern.compile("editor\\s*==\\s*detTortNoticeDeadlineEditor\\)\\s*\\{\\s*showDetailsNullableDateDialog",
+                        Pattern.DOTALL).matcher(source).find(),
                 "Tort Notice Deadline should use the null-aware date dialog.");
         assertTrue(source.contains("Dialog<Optional<LocalDate>> dialog = new Dialog<>()"),
                 "The dialog result must distinguish Save with an empty date from Cancel.");
