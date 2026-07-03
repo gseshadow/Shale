@@ -1751,8 +1751,8 @@ public final class MyShaleController {
 		return List.of(
 				buildCaseRadarWidget(),
 				buildImportantDatesWidget(),
-				buildNotificationsWidget(),
 				buildRecentCaseActivityWidget(),
+				buildNotificationsWidget(),
 				buildMyCaseSummaryWidget());
 	}
 
