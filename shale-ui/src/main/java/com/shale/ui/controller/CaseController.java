@@ -3349,6 +3349,7 @@ public class CaseController {
 				overview.getIntakeDate(),
 				overview.getIncidentDate(),
 				overview.getSolDate(),
+				overview.getTortNoticeDeadline(),
 				effectiveCallerId,
 				overview.getPrimaryClientContactId(),
 				effectiveOpposingCounselId,
@@ -5383,6 +5384,7 @@ public class CaseController {
 				base.getIntakeDate(),
 				incidentDate,
 				solDate,
+				base.getTortNoticeDeadline(),
 				base.getPrimaryCallerContactId(),
 				base.getPrimaryClientContactId(),
 				base.getPrimaryOpposingCounselContactId(),
@@ -5669,7 +5671,7 @@ public class CaseController {
 			if (ovSolDateValue != null)
 				ovSolDateValue.setText(formatDate(dto.getSolDate()));
 			if (ovTortNoticeDeadlineValue != null)
-				ovTortNoticeDeadlineValue.setText(formatDate(current == null ? null : current.getTortNoticeDeadline()));
+				ovTortNoticeDeadlineValue.setText(formatDate(dto.getTortNoticeDeadline()));
 			if (!editSafeOnly) {
 				if (ovIncidentDateEditor != null && !editMode)
 					ovIncidentDateEditor.setValue(dto.getIncidentDate());
