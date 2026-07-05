@@ -2186,6 +2186,7 @@ public final class CaseDao {
 					  c.CallerDate,
 					  c.DateOfInjury,
 					  c.StatuteOfLimitations,
+					  c.TortNoticeDeadline,
 
 					  pa.Id    AS PracticeAreaId,
 					  pa.Name  AS PracticeAreaName,
@@ -2323,6 +2324,7 @@ public final class CaseDao {
 							toLocalDate(rs.getDate("CallerDate")),
 							toLocalDate(rs.getDate("DateOfInjury")),
 							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							toLocalDate(rs.getDate("TortNoticeDeadline")),
 							getNullableInt(rs, "PrimaryCallerContactId"),
 							primaryClientContactId,
 							getNullableInt(rs, "PrimaryOpposingCounselContactId"),
