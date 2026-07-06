@@ -308,11 +308,8 @@ public final class NotificationCardFactory {
 						item.getCaseResponsibleAttorneyColor(),
 						item.getCaseNonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		miniCard.getStyleClass().add("task-related-case-card");
-		StackPane wrapper = new StackPane(miniCard);
-		wrapper.setMinWidth(0);
-		wrapper.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
-		return wrapper;
+		caseCard.getStyleClass().add("task-related-case-card");
+		return caseCard;
 	}
 
 	private static String resolveCategory(AppNotification item) {
