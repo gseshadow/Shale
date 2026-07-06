@@ -419,8 +419,7 @@ public final class TaskCard extends VBox {
 				new CaseCardModel(relatedCaseId, relatedCaseName, null, null, relatedCaseResponsibleAttorney,
 						relatedCaseResponsibleAttorneyColor, relatedCaseNonEngagementLetterSent,
 						relatedCasePrimaryStatusName, relatedCasePrimaryStatusColor, relatedCasePracticeAreaColor),
-				CaseCardFactory.Variant.MINI);
-		caseCard.getStyleClass().add("task-related-case-card");
+				CaseCardFactory.Variant.EMBEDDED);
 		if (caseCard instanceof Region region && currentVariant == Variant.MY_TASKS) {
 			region.setMinWidth(0);
 			region.setPrefWidth(Region.USE_COMPUTED_SIZE);

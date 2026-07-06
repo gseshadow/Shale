@@ -166,8 +166,7 @@ public final class TaskDetailDialog {
                             model.casePrimaryStatusName(),
                             model.casePrimaryStatusColor(),
                             model.casePracticeAreaColor()),
-                    CaseCardFactory.Variant.MINI);
-            caseCard.getStyleClass().add("task-related-case-card");
+                    CaseCardFactory.Variant.EMBEDDED);
             relatedCaseSection.getChildren().setAll(relatedCaseLabel, caseCard);
         } else {
             relatedCaseSection.setManaged(false);

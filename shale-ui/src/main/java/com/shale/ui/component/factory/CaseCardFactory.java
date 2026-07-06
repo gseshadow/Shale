@@ -12,7 +12,7 @@ public final class CaseCardFactory {
 	private static final String PRACTICE_AREA_FALLBACK_CSS = "#CBD5E1";
 
 	public enum Variant {
-		FULL, COMPACT, MINI, TASK_PREVIEW
+		FULL, COMPACT, MINI, EMBEDDED, TASK_PREVIEW
 	}
 
 	private final Consumer<Integer> onOpenCase;
@@ -23,15 +23,6 @@ public final class CaseCardFactory {
 
 	public Node create(CaseCardModel vm) {
 		return create(vm, Variant.COMPACT);
-	}
-
-	public Node createEmbeddedTaskCaseCard(long id, String name, String responsibleAttorney, String responsibleAttorneyColor,
-			Boolean nonEngagementLetterSent) {
-		CaseCard card = (CaseCard) create(new CaseCardModel(id, name, null, null, responsibleAttorney, responsibleAttorneyColor,
-				nonEngagementLetterSent), Variant.MINI);
-		card.applyEmbeddedTaskMini();
-		card.getStyleClass().add("task-related-case-card");
-		return card;
 	}
 
 	public Node create(CaseCardModel vm, Variant variant) {
@@ -59,6 +50,7 @@ public final class CaseCardFactory {
 		case FULL -> card.applyFull();
 		case COMPACT -> card.applyCompact();
 		case MINI -> card.applyMini();
+		case EMBEDDED -> card.applyEmbeddedMini();
 		case TASK_PREVIEW -> card.applyTaskPreview();
 		}
 
