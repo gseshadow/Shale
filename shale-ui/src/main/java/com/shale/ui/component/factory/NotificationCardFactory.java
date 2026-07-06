@@ -23,11 +23,9 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 public final class NotificationCardFactory {
@@ -300,7 +298,7 @@ public final class NotificationCardFactory {
 			return null;
 		}
 		String caseName = resolveCaseContext(item);
-		Node miniCard = caseCardFactory.create(
+		Node caseCard = caseCardFactory.create(
 				new CaseCardModel(
 						caseId,
 						caseName == null ? "Case #" + caseId : caseName,
