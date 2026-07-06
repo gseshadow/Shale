@@ -106,6 +106,15 @@ public class CaseCard extends VBox {
 		refreshSurfaceStyle();
 	}
 
+	public void applyEmbeddedTaskMini() {
+		applyMini();
+		attorneyMiniCard.setManaged(true);
+		attorneyMiniCard.setVisible(true);
+		headerRow.setAlignment(Pos.CENTER_LEFT);
+		HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
+	}
+
 	public void applyTaskPreview() {
 		embeddedMini = true;
 		taskPreview = true;
