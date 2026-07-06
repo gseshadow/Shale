@@ -3075,6 +3075,25 @@ public final class CaseDao {
 		}
 	}
 
+	public boolean markMedicalRecordsRequested(long caseId, int shaleClientId) {
+		try (Connection con = db.requireConnection();
+				PreparedStatement ps = con.prepareStatement("""
+						UPDATE dbo.Cases
+						SET MedicalRecordsRequested = 1,
+						    UpdatedAt = SYSDATETIME()
+						WHERE Id = ?
+						  AND ShaleClientId = ?
+						  AND MedicalRecordsRequested = 0
+						  AND (IsDeleted = 0 OR IsDeleted IS NULL);
+						""")) {
+			ps.setLong(1, caseId);
+			ps.setInt(2, shaleClientId);
+			return ps.executeUpdate() == 1;
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to mark medical records requested (caseId=" + caseId + ")", e);
+		}
+	}
+
 	public void addCaseUpdate(long caseId, int shaleClientId, String noteText, Integer createdByUserId) {
 		if (isSystemGeneratedCaseUpdateText(noteText)) {
 			return;

@@ -27,6 +27,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.caseupdates.MedicalRecordRequestKeywordMatcher;
 import com.shale.core.dto.CaseStatusHistoryDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
@@ -53,6 +54,8 @@ import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.StatusIndicatorFactory.PillSize;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.dialog.AppDialogs.DialogAction;
+import com.shale.ui.component.dialog.AppDialogs.DialogActionKind;
 import com.shale.ui.component.dialog.ClientAssignmentDialog;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.CreateContactDialog;
@@ -69,6 +72,7 @@ import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
+import com.shale.ui.controller.support.MedicalRecordsRequestedCaseUpdateSafeguard;
 import com.shale.ui.util.AppSectionTabs;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.PerfLog;
@@ -547,6 +551,7 @@ public class CaseController {
 	private UiRuntimeBridge runtimeBridge;
 	private CaseDocumentService caseDocumentService;
 	private CaseDocumentExportService caseDocumentExportService;
+	private final MedicalRecordRequestKeywordMatcher medicalRecordRequestKeywordMatcher = new MedicalRecordRequestKeywordMatcher();
 
 	// ----------------------------
 	// Controller state
@@ -4829,6 +4834,7 @@ public class CaseController {
 					refreshLastUpdatedLabelAsync();
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
+					handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(activeCaseId, activeClientId, trimmedText);
 				});
 			} catch (Exception ex) {
 				runOnFx(() ->
@@ -4841,6 +4847,37 @@ public class CaseController {
 				});
 			}
 		}, "case-updates-submit-" + activeCaseId).start();
+	}
+
+	private void handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(long activeCaseId, int activeClientId, String savedNoteText) {
+		if (caseDao == null || caseId == null || caseId.longValue() != activeCaseId) {
+			return;
+		}
+		boolean alreadyRequested = current != null && Boolean.TRUE.equals(current.getMedicalRecordsRequested());
+		MedicalRecordsRequestedCaseUpdateSafeguard safeguard = new MedicalRecordsRequestedCaseUpdateSafeguard(
+				medicalRecordRequestKeywordMatcher,
+				this::confirmMarkMedicalRecordsRequested,
+				(caseIdToUpdate, clientId) -> caseDao.markMedicalRecordsRequested(caseIdToUpdate, clientId));
+		try {
+			boolean updated = safeguard.handleSavedCaseUpdate(activeCaseId, activeClientId, savedNoteText, alreadyRequested);
+			if (updated) {
+				reloadCurrentCaseForViewMode();
+			}
+		} catch (Exception ex) {
+			showError("Failed to mark medical records requested. " + ex.getMessage());
+		}
+	}
+
+	private boolean confirmMarkMedicalRecordsRequested() {
+		return AppDialogs.showChoice(
+				caseRootPane == null || caseRootPane.getScene() == null ? null : caseRootPane.getScene().getWindow(),
+				"Medical Records Requested",
+				"Medical Records Requested",
+				"This update appears to mention medical records. Would you like to mark Medical Records Requested as true?",
+				List.of(
+						DialogAction.of("Yes", true, DialogActionKind.PRIMARY, true, false),
+						DialogAction.cancel("No", false)))
+				.orElse(false);
 	}
 
 	private Node createCaseUpdateCard(CaseUpdateDto dto) {
