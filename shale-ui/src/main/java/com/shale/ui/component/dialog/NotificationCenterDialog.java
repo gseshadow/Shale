@@ -729,8 +729,7 @@ public final class NotificationCenterDialog {
 			}
 			return hasStyleClassInAncestorChain(node, "notification-row-dismiss")
 					|| hasStyleClassInAncestorChain(node, "notification-row-expand")
-					|| hasStyleClassInAncestorChain(node, "notification-row-case-mini")
-					|| hasStyleClassInAncestorChain(node, "notification-row-case-mini-card");
+					|| hasStyleClassInAncestorChain(node, "task-related-case-card");
 		}
 
 		private static boolean hasStyleClassInAncestorChain(Node node, String styleClass) {

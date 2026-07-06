@@ -1369,17 +1369,6 @@
     -fx-font-weight: 800;
 }
 
-.notification-row-case-mini {
-    -fx-alignment: center-right;
-    -fx-min-width: 0;
-    -fx-pref-width: 190px;
-    -fx-max-width: 190px;
-}
-
-.notification-row-case-mini-card {
-    -fx-effect: null;
-}
-
 .notification-row-expanded {
     -fx-padding: 10 4 0 48;
     -fx-spacing: 5;
