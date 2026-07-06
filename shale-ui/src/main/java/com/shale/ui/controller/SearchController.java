@@ -297,6 +297,7 @@ public final class SearchController {
 				row.name(),
 				row.intakeDate(),
 				row.statuteOfLimitationsDate(),
+				row.tortClaimsNoticeDeadline(),
 				row.responsibleAttorneyName(),
 				row.responsibleAttorneyColor(),
 				row.nonEngagementLetterSent(),

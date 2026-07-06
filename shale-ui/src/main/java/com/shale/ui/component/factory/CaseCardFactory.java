@@ -25,6 +25,14 @@ public final class CaseCardFactory {
 		return create(vm, Variant.COMPACT);
 	}
 
+	public Node createEmbeddedTaskCaseCard(long id, String name, String responsibleAttorney, String responsibleAttorneyColor,
+			Boolean nonEngagementLetterSent) {
+		Node card = create(new CaseCardModel(id, name, null, null, responsibleAttorney, responsibleAttorneyColor,
+				nonEngagementLetterSent), Variant.MINI);
+		card.getStyleClass().add("task-related-case-card");
+		return card;
+	}
+
 	public Node create(CaseCardModel vm, Variant variant) {
 		CaseCard card = new CaseCard();
 
@@ -33,6 +41,7 @@ public final class CaseCardFactory {
 		card.setResponsibleAttorney(vm.responsibleAttorney());
 		card.setIntakeDate(vm.intakeDate());
 		card.setSolDate(vm.solDate());
+		card.setTortNoticeDeadline(vm.tortNoticeDeadline());
 
 		card.setStatus(vm.primaryStatusName());
 		card.setStatusCssColor(CaseCard.normalizeColor(vm.primaryStatusColor(), STATUS_FALLBACK_CSS));
@@ -61,6 +70,7 @@ public final class CaseCardFactory {
 			String name,
 			LocalDate intakeDate,
 			LocalDate solDate,
+			LocalDate tortNoticeDeadline,
 			String responsibleAttorney,
 			String responsibleAttorneyColor,
 			Boolean nonEngagementLetterSent,
@@ -70,13 +80,20 @@ public final class CaseCardFactory {
 	) {
 		public CaseCardModel(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
-			this(id, name, intakeDate, solDate, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent, "", "", "");
+			this(id, name, intakeDate, solDate, null, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent, "", "", "");
 		}
 
 		public CaseCardModel(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String primaryStatusColor) {
-			this(id, name, intakeDate, solDate, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent,
+			this(id, name, intakeDate, solDate, null, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent,
 					primaryStatusName, primaryStatusColor, "");
+		}
+
+		public CaseCardModel(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney,
+				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String primaryStatusColor,
+				String practiceAreaColor) {
+			this(id, name, intakeDate, solDate, null, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent,
+					primaryStatusName, primaryStatusColor, practiceAreaColor);
 		}
 
 		public CaseCardModel {

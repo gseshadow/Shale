@@ -30,6 +30,7 @@ public class CaseCard extends VBox {
 	private final Label titleLabel = new Label();
 	private final Label intakeLabel = new Label();
 	private final Label solLabel = new Label();
+	private final Label tortNoticeLabel = new Label();
 	private final Label statusLabel = new Label();
 	private final Region practiceAreaBar = new Region();
 	private final ContactCard attorneyMiniCard = new ContactCard();
@@ -53,6 +54,7 @@ public class CaseCard extends VBox {
 	private String practiceAreaColorCss = "#CBD5E1";
 	private String statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
 	private LocalDate solDate;
+	private LocalDate tortNoticeDeadline;
 	private boolean hovered;
 	private boolean embeddedMini;
 	private boolean taskPreview;
@@ -84,8 +86,8 @@ public class CaseCard extends VBox {
 		HBox.setMargin(practiceAreaBar, new Insets(5, 0, 5, 6));
 		datesBox.setManaged(false);
 		datesBox.setVisible(false);
-		attorneyMiniCard.setManaged(true);
-		attorneyMiniCard.setVisible(true);
+		attorneyMiniCard.setManaged(false);
+		attorneyMiniCard.setVisible(false);
 		bottomRow.setManaged(false);
 		bottomRow.setVisible(false);
 		bodySpacer.setManaged(false);
@@ -98,7 +100,7 @@ public class CaseCard extends VBox {
 		statusLabelBaseStyle = "-fx-font-size: 10px; -fx-font-weight: 800;";
 		attorneyMiniCard.applyCompactMini();
 		attorneyMiniCard.setMaxWidth(88);
-		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
+		headerRow.getChildren().setAll(titleLabel);
 		bodyPane.getChildren().setAll(headerRow);
 		bottomRow.setSpacing(4);
 		refreshSurfaceStyle();
@@ -217,6 +219,15 @@ public class CaseCard extends VBox {
 		refreshSolStyle();
 	}
 
+	public void setTortNoticeDeadline(LocalDate tortNoticeDeadline) {
+		this.tortNoticeDeadline = tortNoticeDeadline;
+		boolean show = tortNoticeDeadline != null;
+		tortNoticeLabel.setText(show ? "TCN: " + tortNoticeDeadline : "");
+		tortNoticeLabel.setManaged(show);
+		tortNoticeLabel.setVisible(show);
+		refreshTortNoticeStyle();
+	}
+
 	/**
 	 * Set the card background color using a CSS color string produced by your existing
 	 * toCssBackgroundColor(...) Example values: "#RRGGBB", "rgba(...)",
@@ -293,8 +304,11 @@ public class CaseCard extends VBox {
 		setBackgroundCssColor(null);
 		intakeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.78);");
 		refreshSolStyle();
+		refreshTortNoticeStyle();
+		tortNoticeLabel.setManaged(false);
+		tortNoticeLabel.setVisible(false);
 
-		datesBox.getChildren().setAll(intakeLabel, solLabel);
+		datesBox.getChildren().setAll(intakeLabel, solLabel, tortNoticeLabel);
 
 		VBox.setVgrow(bodySpacer, Priority.ALWAYS);
 		HBox.setHgrow(bodyPane, Priority.ALWAYS);
@@ -428,7 +442,16 @@ public class CaseCard extends VBox {
 
 	private void refreshSolStyle() {
 		String color = solUrgencyColor(solDate);
-		solLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: " + color + ";");
+		solLabel.setStyle(deadlineLabelStyle(color));
+	}
+
+	private void refreshTortNoticeStyle() {
+		String color = solUrgencyColor(tortNoticeDeadline);
+		tortNoticeLabel.setStyle(deadlineLabelStyle(color));
+	}
+
+	private static String deadlineLabelStyle(String color) {
+		return "-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: " + color + ";";
 	}
 
 	private static String solUrgencyColor(LocalDate solDate) {
