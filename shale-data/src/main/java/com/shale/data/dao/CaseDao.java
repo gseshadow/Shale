@@ -988,6 +988,7 @@ public final class CaseDao {
 					  c.StatuteOfLimitations,
 					  c.DateOfInjury AS DateOfIncident,
 					  c.TortNoticeDeadline,
+					  c.UpdatedAt,
 					  latestUpdate.LatestCaseUpdate,
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
