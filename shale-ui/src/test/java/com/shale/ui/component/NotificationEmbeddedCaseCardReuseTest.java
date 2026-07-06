@@ -16,12 +16,27 @@ final class NotificationEmbeddedCaseCardReuseTest {
 
         assertTrue(source.contains("CaseCardFactory.Variant.MINI"),
                 "Notification case previews should render through the shared CaseCardFactory MINI variant.");
-        assertTrue(source.contains("miniCard.getStyleClass().add(\"task-related-case-card\")"),
+        assertTrue(source.contains("caseCard.getStyleClass().add(\"task-related-case-card\")"),
                 "Notification case previews should share the Overview task embedded case-card style class.");
         assertFalse(source.contains("notification-row-case-mini-card"),
                 "Notification case previews should not use a notification-specific duplicate mini-card style.");
         assertFalse(source.contains("notification-row-case-mini"),
                 "Notification case previews should not wrap the card in a notification-specific duplicate mini-card style.");
+    }
+
+    @Test
+    void notificationCasePreviewLayoutKeepsTaskEmbeddedCardWidth() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
+        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+
+        assertTrue(source.contains("private static final double EMBEDDED_CASE_CARD_WIDTH = 210"),
+                "Notification previews should use the shared MINI card width rather than a narrower notification-specific width.");
+        assertTrue(source.contains("region.setPrefWidth(EMBEDDED_CASE_CARD_WIDTH)"),
+                "Notification previews should let the shared embedded card render at its expected width.");
+        assertFalse(css.contains("-fx-pref-width: 195px"),
+                "Notification right column should not squeeze embedded case cards into the old narrow pill layout.");
+        assertTrue(css.contains(".notification-row-right") && css.contains("-fx-pref-width: 210px"),
+                "Notification right column should reserve the same width as the shared embedded MINI case card.");
     }
 
     @Test
