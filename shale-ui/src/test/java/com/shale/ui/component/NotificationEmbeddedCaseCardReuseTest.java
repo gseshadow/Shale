@@ -81,6 +81,23 @@ final class NotificationEmbeddedCaseCardReuseTest {
     }
 
     @Test
+    void notificationRightAreaDoesNotShrinkEmbeddedCaseCardBelowComputedPreviewWidth() throws Exception {
+        String notificationFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
+        String myShaleController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+        assertTrue(myShaleController.contains("headerTopRow.getChildren().add(caseCard);\n\t\tLabel inlineCountLabel"),
+                "Overview places the embedded case card before any growable spacer, so the card receives its computed width.");
+        assertTrue(notificationFactory.contains("rightArea.setMinWidth(Region.USE_PREF_SIZE);"),
+                "Notification right-area must not advertise minWidth=0; HBox shrink would compress the embedded case card into a pill.");
+        assertTrue(notificationFactory.contains("rightArea.setPrefWidth(Region.USE_COMPUTED_SIZE);"),
+                "Notification right-area should derive its preferred width from the shared embedded card, not a hardcoded width.");
+        assertTrue(notificationFactory.contains("HBox.setHgrow(mainArea, Priority.ALWAYS);"),
+                "This documents the parent-chain pressure point: the growable main area can force HBox shrink on later siblings.");
+        assertFalse(notificationFactory.contains("rightArea.setMinWidth(0);"),
+                "The regression was the Notification right-area VBox minWidth=0, which allowed HBox to shrink the card to a tiny pill.");
+    }
+
+    @Test
     void notificationCenterTreatsSharedEmbeddedCaseCardAsInteractiveChild() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/component/dialog/NotificationCenterDialog.java"));
 

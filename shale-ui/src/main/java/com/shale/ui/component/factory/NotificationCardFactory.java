@@ -148,7 +148,7 @@ public final class NotificationCardFactory {
 		Node caseCard = createCaseMiniCard(item);
 		VBox rightArea = new VBox(8, topControls);
 		rightArea.getStyleClass().add("notification-row-right");
-		rightArea.setMinWidth(0);
+		rightArea.setMinWidth(Region.USE_PREF_SIZE);
 		rightArea.setPrefWidth(Region.USE_COMPUTED_SIZE);
 		rightArea.setMaxWidth(Region.USE_COMPUTED_SIZE);
 		rightArea.setAlignment(Pos.TOP_RIGHT);
