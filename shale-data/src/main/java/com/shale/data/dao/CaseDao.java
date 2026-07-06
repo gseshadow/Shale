@@ -94,7 +94,7 @@ public final class CaseDao {
 		public static final String DISCOVERY_DEADLINE_CHANGED = "DISCOVERY_DEADLINE_CHANGED";
 		public static final String FEE_AGREEMENT_DATE_CHANGED = "FEE_AGREEMENT_DATE_CHANGED";
 		public static final String ESTATE_CASE_CHANGED = "ESTATE_CASE_CHANGED";
-		public static final String MEDICAL_RECORDS_RECEIVED_CHANGED = "MEDICAL_RECORDS_RECEIVED_CHANGED";
+		public static final String MEDICAL_RECORDS_REQUESTED_CHANGED = "MEDICAL_RECORDS_REQUESTED_CHANGED";
 		public static final String FEE_AGREEMENT_SIGNED_CHANGED = "FEE_AGREEMENT_SIGNED_CHANGED";
 		public static final String ACCEPTED_CHRONOLOGY_CHANGED = "ACCEPTED_CHRONOLOGY_CHANGED";
 		public static final String CONSULTANT_EXPERT_SEARCH_CHANGED = "CONSULTANT_EXPERT_SEARCH_CHANGED";
@@ -135,7 +135,7 @@ public final class CaseDao {
 				DISCOVERY_DEADLINE_CHANGED,
 				FEE_AGREEMENT_DATE_CHANGED,
 				ESTATE_CASE_CHANGED,
-				MEDICAL_RECORDS_RECEIVED_CHANGED,
+				MEDICAL_RECORDS_REQUESTED_CHANGED,
 				FEE_AGREEMENT_SIGNED_CHANGED,
 				ACCEPTED_CHRONOLOGY_CHANGED,
 				CONSULTANT_EXPERT_SEARCH_CHANGED,
@@ -641,7 +641,7 @@ public final class CaseDao {
 				  AcceptedMedicalLiterature,
 				  DeniedChronology,
 				  FeeAgreementSigned,
-				  MedicalRecordsReceived,
+				  MedicalRecordsRequested,
 				  IsDeleted,
 				  CreatedAt,
 				  UpdatedAt,
@@ -842,7 +842,7 @@ public final class CaseDao {
 				  Description, Summary, DateOfInjury, StatuteOfLimitations, TortNoticeDeadline,
 				  FollowUpMeetWithClient, FollowUpNurseReview, FollowUpExpertReview, FollowUpCaseTransferred,
 				  AcceptedChronology, AcceptedConsultantExpertSearch, AcceptedTestifyingExpertSearch, AcceptedMedicalLiterature,
-				  DeniedChronology, FeeAgreementSigned, MedicalRecordsReceived, IsDeleted, CreatedAt, UpdatedAt, ShaleClientId
+				  DeniedChronology, FeeAgreementSigned, MedicalRecordsRequested, IsDeleted, CreatedAt, UpdatedAt, ShaleClientId
 				)
 				OUTPUT INSERTED.Id
 				VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?);
@@ -2432,7 +2432,7 @@ public final class CaseDao {
 				  c.DiscoveryDeadline,
 				  c.ClientEstate,
 				  c.OfficePrinterCode,
-				  c.MedicalRecordsReceived,
+				  c.MedicalRecordsRequested,
 				  c.FeeAgreementSigned,
 				  c.DateFeeAgreementSigned,
 				  c.NonEngagementLetterSent,
@@ -2524,7 +2524,7 @@ public final class CaseDao {
 				toLocalDate(rs.getDate("DiscoveryDeadline")),
 				rs.getString("ClientEstate"),
 				rs.getString("OfficePrinterCode"),
-				getNullableBoolean(rs, "MedicalRecordsReceived"),
+				getNullableBoolean(rs, "MedicalRecordsRequested"),
 				getNullableBoolean(rs, "FeeAgreementSigned"),
 				toLocalDate(rs.getDate("DateFeeAgreementSigned")),
 				getNullableBoolean(rs, "NonEngagementLetterSent"),
@@ -2643,7 +2643,7 @@ public final class CaseDao {
 			LocalDate discoveryDeadline,
 			String clientEstate,
 			String officePrinterCode,
-			Boolean medicalRecordsReceived,
+			Boolean medicalRecordsRequested,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
 			Boolean nonEngagementLetterSent,
@@ -2683,7 +2683,7 @@ public final class CaseDao {
 					    DiscoveryDeadline = ?,
 					    ClientEstate = ?,
 					    OfficePrinterCode = ?,
-					    MedicalRecordsReceived = ?,
+					    MedicalRecordsRequested = ?,
 					    FeeAgreementSigned = ?,
 					    DateFeeAgreementSigned = ?,
 					    NonEngagementLetterSent = ?,
@@ -2726,7 +2726,7 @@ public final class CaseDao {
 				setNullableDate(ps, idx++, discoveryDeadline);
 				setNullableString(ps, idx++, clientEstate);
 				setNullableString(ps, idx++, officePrinterCode);
-				setNullableBoolean(ps, idx++, medicalRecordsReceived);
+				setNullableBoolean(ps, idx++, medicalRecordsRequested);
 				setNullableBoolean(ps, idx++, feeAgreementSigned);
 				setNullableDate(ps, idx++, dateFeeAgreementSigned);
 				setNullableBoolean(ps, idx++, nonEngagementLetterSent);

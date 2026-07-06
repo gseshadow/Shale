@@ -554,11 +554,11 @@
 							<TextField fx:id="detOfficePrinterCodeEditor"
 								maxWidth="1.7976931348623157E308" visible="false"
 								managed="false" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-							<Label text="Medical Records Received:"
+							<Label text="Medical Records Requested:"
 								style="-fx-opacity: 0.8;" GridPane.rowIndex="2" />
-							<Label fx:id="detMedicalRecordsReceivedValue" text="—"
+							<Label fx:id="detMedicalRecordsRequestedValue" text="—"
 								GridPane.rowIndex="2" GridPane.columnIndex="1" />
-							<CheckBox fx:id="detMedicalRecordsReceivedEditor"
+							<CheckBox fx:id="detMedicalRecordsRequestedEditor"
 								visible="false" managed="false" GridPane.rowIndex="2"
 								GridPane.columnIndex="1" />
 						</GridPane>

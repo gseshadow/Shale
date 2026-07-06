@@ -149,7 +149,7 @@ Primary case table.
 | `StatuteOfLimitations`               | date          | SOL deadline                          |
 | `TortNoticeDeadline`                 | date          | Tort claims notice deadline           |
 | `DiscoveryDeadline`                  | date          | Discovery deadline                    |
-| `MedicalRecordsReceived`             | bit           | Medical records received flag         |
+| `MedicalRecordsRequested`             | bit           | Medical records requested flag         |
 | `Description`                        | nvarchar(max) | Main case description                 |
 | `Summary`                            | nvarchar(max) | Case summary                          |
 | `CreatedAt`                          | datetime2     | Created timestamp                     |

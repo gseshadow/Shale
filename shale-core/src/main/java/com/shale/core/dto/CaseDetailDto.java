@@ -35,7 +35,7 @@ public final class CaseDetailDto {
 
 	private final String clientEstate;
 	private final String officePrinterCode;
-	private final Boolean medicalRecordsReceived;
+	private final Boolean medicalRecordsRequested;
 	private final Boolean feeAgreementSigned;
 	private final LocalDate dateFeeAgreementSigned;
 	private final Boolean nonEngagementLetterSent;
@@ -77,7 +77,7 @@ public final class CaseDetailDto {
 			LocalDate discoveryDeadline,
 			String clientEstate,
 			String officePrinterCode,
-			Boolean medicalRecordsReceived,
+			Boolean medicalRecordsRequested,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
 			Boolean nonEngagementLetterSent,
@@ -97,7 +97,7 @@ public final class CaseDetailDto {
 				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
 				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
 				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
-				officePrinterCode, medicalRecordsReceived, feeAgreementSigned, dateFeeAgreementSigned,
+				officePrinterCode, medicalRecordsRequested, feeAgreementSigned, dateFeeAgreementSigned,
 				nonEngagementLetterSent, dateNonEngagementLetterSent, acceptedChronology,
 				acceptedConsultantExpertSearch, acceptedTestifyingExpertSearch,
 				acceptedMedicalLiterature, acceptedDetail, deniedChronology, deniedDetail,
@@ -124,7 +124,7 @@ public final class CaseDetailDto {
 			LocalDate discoveryDeadline,
 			String clientEstate,
 			String officePrinterCode,
-			Boolean medicalRecordsReceived,
+			Boolean medicalRecordsRequested,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
 			Boolean nonEngagementLetterSent,
@@ -144,7 +144,7 @@ public final class CaseDetailDto {
 				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
 				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
 				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
-				officePrinterCode, medicalRecordsReceived, feeAgreementSigned, dateFeeAgreementSigned,
+				officePrinterCode, medicalRecordsRequested, feeAgreementSigned, dateFeeAgreementSigned,
 				nonEngagementLetterSent, dateNonEngagementLetterSent, acceptedChronology,
 				acceptedConsultantExpertSearch, acceptedTestifyingExpertSearch,
 				acceptedMedicalLiterature, acceptedDetail, deniedChronology, deniedDetail,
@@ -172,7 +172,7 @@ public final class CaseDetailDto {
 			LocalDate discoveryDeadline,
 			String clientEstate,
 			String officePrinterCode,
-			Boolean medicalRecordsReceived,
+			Boolean medicalRecordsRequested,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
 			Boolean nonEngagementLetterSent,
@@ -192,7 +192,7 @@ public final class CaseDetailDto {
 				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
 				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
 				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
-				officePrinterCode, medicalRecordsReceived, feeAgreementSigned, dateFeeAgreementSigned,
+				officePrinterCode, medicalRecordsRequested, feeAgreementSigned, dateFeeAgreementSigned,
 				nonEngagementLetterSent, dateNonEngagementLetterSent, acceptedChronology,
 				acceptedConsultantExpertSearch, acceptedTestifyingExpertSearch,
 				acceptedMedicalLiterature, acceptedDetail, deniedChronology, deniedDetail,
@@ -221,7 +221,7 @@ public final class CaseDetailDto {
 			LocalDate discoveryDeadline,
 			String clientEstate,
 			String officePrinterCode,
-			Boolean medicalRecordsReceived,
+			Boolean medicalRecordsRequested,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
 			Boolean nonEngagementLetterSent,
@@ -242,7 +242,7 @@ public final class CaseDetailDto {
 				callerDate, callerTime, acceptedDate, closedDate, deniedDate,
 				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
 				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
-				officePrinterCode, medicalRecordsReceived, feeAgreementSigned, dateFeeAgreementSigned,
+				officePrinterCode, medicalRecordsRequested, feeAgreementSigned, dateFeeAgreementSigned,
 				nonEngagementLetterSent, dateNonEngagementLetterSent, acceptedChronology,
 				acceptedConsultantExpertSearch, acceptedTestifyingExpertSearch,
 				acceptedMedicalLiterature, acceptedDetail, deniedChronology, deniedDetail,
@@ -271,7 +271,7 @@ public final class CaseDetailDto {
 			LocalDate discoveryDeadline,
 			String clientEstate,
 			String officePrinterCode,
-			Boolean medicalRecordsReceived,
+			Boolean medicalRecordsRequested,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
 			Boolean nonEngagementLetterSent,
@@ -310,7 +310,7 @@ public final class CaseDetailDto {
 		this.discoveryDeadline = discoveryDeadline;
 		this.clientEstate = clientEstate == null ? "" : clientEstate;
 		this.officePrinterCode = officePrinterCode == null ? "" : officePrinterCode;
-		this.medicalRecordsReceived = medicalRecordsReceived;
+		this.medicalRecordsRequested = medicalRecordsRequested;
 		this.feeAgreementSigned = feeAgreementSigned;
 		this.dateFeeAgreementSigned = dateFeeAgreementSigned;
 		this.nonEngagementLetterSent = nonEngagementLetterSent;
@@ -351,7 +351,7 @@ public final class CaseDetailDto {
 	public LocalDate getDiscoveryDeadline() { return discoveryDeadline; }
 	public String getClientEstate() { return clientEstate; }
 	public String getOfficePrinterCode() { return officePrinterCode; }
-	public Boolean getMedicalRecordsReceived() { return medicalRecordsReceived; }
+	public Boolean getMedicalRecordsRequested() { return medicalRecordsRequested; }
 	public Boolean getFeeAgreementSigned() { return feeAgreementSigned; }
 	public LocalDate getDateFeeAgreementSigned() { return dateFeeAgreementSigned; }
 	public Boolean getNonEngagementLetterSent() { return nonEngagementLetterSent; }
