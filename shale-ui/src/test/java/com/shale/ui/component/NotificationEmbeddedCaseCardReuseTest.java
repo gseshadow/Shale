@@ -62,7 +62,7 @@ final class NotificationEmbeddedCaseCardReuseTest {
                 "MINI should still route to the standalone mini behavior.");
         assertTrue(factory.contains("case EMBEDDED -> card.applyEmbeddedMini();"),
                 "EMBEDDED should route to the embedded mini behavior.");
-        assertTrue(miniBlock.contains("attorneyMiniCard.setManaged(false);\n\t\tattorneyMiniCard.setVisible(false);"),
+        assertContainsStatements(miniBlock, "attorneyMiniCard.setManaged(false);", "attorneyMiniCard.setVisible(false);",
                 "MINI should keep hiding the attorney mini card.");
         assertTrue(miniBlock.contains("headerRow.getChildren().setAll(titleLabel);"),
                 "MINI should keep its title-only header structure.");
@@ -119,7 +119,7 @@ final class NotificationEmbeddedCaseCardReuseTest {
         String notificationFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
         String myShaleController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
-        assertTrue(myShaleController.contains("headerTopRow.getChildren().add(caseCard);\n\t\tLabel inlineCountLabel"),
+        assertContainsStatements(myShaleController, "headerTopRow.getChildren().add(caseCard);", "Label inlineCountLabel",
                 "Overview places the embedded case card before any growable spacer, so the card receives its computed width.");
         assertTrue(notificationFactory.contains("rightArea.setMinWidth(Region.USE_PREF_SIZE);"),
                 "Notification right-area must not advertise minWidth=0; HBox shrink would compress the embedded case card into a pill.");
@@ -141,5 +141,12 @@ final class NotificationEmbeddedCaseCardReuseTest {
                 "Notification row click handling should not depend on a notification-specific duplicate case-card style.");
         assertFalse(source.contains("notification-row-case-mini"),
                 "Notification row click handling should not depend on a notification-specific duplicate case-card wrapper style.");
+    }
+
+    private static void assertContainsStatements(String source, String firstStatement, String secondStatement, String message) {
+        int firstIndex = source.indexOf(firstStatement);
+        assertTrue(firstIndex >= 0, () -> message + " Missing: " + firstStatement);
+        int secondIndex = source.indexOf(secondStatement, firstIndex + firstStatement.length());
+        assertTrue(secondIndex >= 0, () -> message + " Missing after first statement: " + secondStatement);
     }
 }
