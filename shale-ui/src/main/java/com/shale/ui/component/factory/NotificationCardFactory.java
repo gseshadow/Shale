@@ -28,6 +28,8 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 public final class NotificationCardFactory {
+	private static final double EMBEDDED_CASE_CARD_WIDTH = 210;
+
 	private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter
 			.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
 			.withZone(ZoneId.systemDefault());
@@ -149,6 +151,8 @@ public final class NotificationCardFactory {
 		VBox rightArea = new VBox(8, topControls);
 		rightArea.getStyleClass().add("notification-row-right");
 		rightArea.setMinWidth(0);
+		rightArea.setPrefWidth(EMBEDDED_CASE_CARD_WIDTH);
+		rightArea.setMaxWidth(EMBEDDED_CASE_CARD_WIDTH);
 		rightArea.setAlignment(Pos.TOP_RIGHT);
 		if (caseCard != null) {
 			rightArea.getChildren().add(caseCard);

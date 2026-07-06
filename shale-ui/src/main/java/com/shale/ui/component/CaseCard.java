@@ -86,8 +86,8 @@ public class CaseCard extends VBox {
 		HBox.setMargin(practiceAreaBar, new Insets(5, 0, 5, 6));
 		datesBox.setManaged(false);
 		datesBox.setVisible(false);
-		attorneyMiniCard.setManaged(true);
-		attorneyMiniCard.setVisible(true);
+		attorneyMiniCard.setManaged(false);
+		attorneyMiniCard.setVisible(false);
 		bottomRow.setManaged(false);
 		bottomRow.setVisible(false);
 		bodySpacer.setManaged(false);
@@ -100,7 +100,7 @@ public class CaseCard extends VBox {
 		statusLabelBaseStyle = "-fx-font-size: 10px; -fx-font-weight: 800;";
 		attorneyMiniCard.applyCompactMini();
 		attorneyMiniCard.setMaxWidth(88);
-		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
+		headerRow.getChildren().setAll(titleLabel);
 		bodyPane.getChildren().setAll(headerRow);
 		bottomRow.setSpacing(4);
 		refreshSurfaceStyle();
