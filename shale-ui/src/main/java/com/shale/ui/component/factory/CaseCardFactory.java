@@ -25,6 +25,14 @@ public final class CaseCardFactory {
 		return create(vm, Variant.COMPACT);
 	}
 
+	public Node createEmbeddedTaskCaseCard(long id, String name, String responsibleAttorney, String responsibleAttorneyColor,
+			Boolean nonEngagementLetterSent) {
+		Node card = create(new CaseCardModel(id, name, null, null, responsibleAttorney, responsibleAttorneyColor,
+				nonEngagementLetterSent), Variant.MINI);
+		card.getStyleClass().add("task-related-case-card");
+		return card;
+	}
+
 	public Node create(CaseCardModel vm, Variant variant) {
 		CaseCard card = new CaseCard();
 
