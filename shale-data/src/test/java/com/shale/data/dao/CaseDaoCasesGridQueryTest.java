@@ -103,6 +103,17 @@ final class CaseDaoCasesGridQueryTest {
         assertFalse(method.contains("NonEngagementLetterSent"));
     }
 
+    @Test
+    void assignedTeamMemberCasesSelectUpdatedAtForMapper() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String method = source.substring(source.indexOf("public List<CaseRow> listActiveCasesForUserTeamMember"), source.indexOf("public List<CaseStatusReportRowDto> listCaseStatusReport"));
+
+        assertTrue(method.contains("c.UpdatedAt"),
+                "Assigned user detail cases must select UpdatedAt because the CaseRow mapper reads UpdatedAt.");
+        assertTrue(method.contains("toLocalDateTime(rs.getTimestamp(\"UpdatedAt\"))"),
+                "Assigned user detail cases should continue hydrating CaseRow updatedAt from the UpdatedAt result column.");
+    }
+
 
     @Test
     void assignedCaseBoardUsesDynamicCurrentStatusAliasesAndTenantStatuses() throws Exception {
