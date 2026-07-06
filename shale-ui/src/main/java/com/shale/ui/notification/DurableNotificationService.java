@@ -174,7 +174,10 @@ public final class DurableNotificationService {
 				row.caseName(),
 				row.caseResponsibleAttorney(),
 				row.caseResponsibleAttorneyColor(),
-				row.caseNonEngagementLetterSent());
+				row.caseNonEngagementLetterSent(),
+				row.casePrimaryStatusName(),
+				row.casePrimaryStatusColor(),
+				row.casePracticeAreaColor());
 	}
 
 	private static String safeTaskNotificationTitle(String actionType) {

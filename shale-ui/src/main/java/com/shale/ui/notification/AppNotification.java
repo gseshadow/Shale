@@ -27,6 +27,9 @@ public final class AppNotification {
 	private final String caseResponsibleAttorney;
 	private final String caseResponsibleAttorneyColor;
 	private final Boolean caseNonEngagementLetterSent;
+	private final String casePrimaryStatusName;
+	private final String casePrimaryStatusColor;
+	private final String casePracticeAreaColor;
 	private final BooleanProperty unread;
 
 	public AppNotification(
@@ -137,6 +140,36 @@ public final class AppNotification {
 			String caseResponsibleAttorney,
 			String caseResponsibleAttorneyColor,
 			Boolean caseNonEngagementLetterSent) {
+		this(id, category, severity, title, message, createdAt, unread, showAsBanner, targetScope, durableNotificationId,
+				eventKey, entityType, entityId, entityTitle, actionType, actorDisplayName, caseId, caseName,
+				caseResponsibleAttorney, caseResponsibleAttorneyColor, caseNonEngagementLetterSent, null, null, null);
+	}
+
+	public AppNotification(
+			String id,
+			NotificationCategory category,
+			NotificationSeverity severity,
+			String title,
+			String message,
+			Instant createdAt,
+			boolean unread,
+			boolean showAsBanner,
+			NotificationTargetScope targetScope,
+			Long durableNotificationId,
+			String eventKey,
+			String entityType,
+			Long entityId,
+			String entityTitle,
+			String actionType,
+			String actorDisplayName,
+			Long caseId,
+			String caseName,
+			String caseResponsibleAttorney,
+			String caseResponsibleAttorneyColor,
+			Boolean caseNonEngagementLetterSent,
+			String casePrimaryStatusName,
+			String casePrimaryStatusColor,
+			String casePracticeAreaColor) {
 		this.id = Objects.requireNonNull(id, "id");
 		this.category = Objects.requireNonNull(category, "category");
 		this.severity = Objects.requireNonNull(severity, "severity");
@@ -158,6 +191,9 @@ public final class AppNotification {
 		this.caseResponsibleAttorney = caseResponsibleAttorney;
 		this.caseResponsibleAttorneyColor = caseResponsibleAttorneyColor;
 		this.caseNonEngagementLetterSent = caseNonEngagementLetterSent;
+		this.casePrimaryStatusName = casePrimaryStatusName;
+		this.casePrimaryStatusColor = casePrimaryStatusColor;
+		this.casePracticeAreaColor = casePracticeAreaColor;
 	}
 
 	public String getId() {
@@ -235,6 +271,18 @@ public final class AppNotification {
 
 	public Boolean getCaseNonEngagementLetterSent() {
 		return caseNonEngagementLetterSent;
+	}
+
+	public String getCasePrimaryStatusName() {
+		return casePrimaryStatusName;
+	}
+
+	public String getCasePrimaryStatusColor() {
+		return casePrimaryStatusColor;
+	}
+
+	public String getCasePracticeAreaColor() {
+		return casePracticeAreaColor;
 	}
 
 	public boolean isShowAsBanner() {

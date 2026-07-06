@@ -306,7 +306,10 @@ public final class NotificationCardFactory {
 				null,
 				item.getCaseResponsibleAttorney(),
 				item.getCaseResponsibleAttorneyColor(),
-				item.getCaseNonEngagementLetterSent()), CaseCardFactory.Variant.EMBEDDED);
+				item.getCaseNonEngagementLetterSent(),
+				item.getCasePrimaryStatusName(),
+				item.getCasePrimaryStatusColor(),
+				item.getCasePracticeAreaColor()), CaseCardFactory.Variant.EMBEDDED);
 	}
 
 	private static String resolveCategory(AppNotification item) {

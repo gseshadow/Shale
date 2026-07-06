@@ -243,6 +243,18 @@ public final class NotificationDao {
 				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN c.NonEngagementLetterSent
 				         ELSE NULL
 				       END AS CaseNonEngagementLetterSent,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN current_status.CurrentStatusName
+				         ELSE NULL
+				       END AS CasePrimaryStatusName,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN current_status.PrimaryStatusColor
+				         ELSE NULL
+				       END AS CasePrimaryStatusColor,
+				       CASE
+				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN pa.Color
+				         ELSE NULL
+				       END AS CasePracticeAreaColor,
 				       n.IsRead AS IsRead,
 				       n.CreatedAt AS CreatedAt,
 				       n.EventKey AS EventKey
@@ -259,6 +271,15 @@ public final class NotificationDao {
 				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'
 				 AND c.Id = t.CaseId
 				 AND c.ShaleClientId = n.ShaleClientId
+				LEFT JOIN dbo.PracticeAreas pa
+				  ON pa.Id = c.PracticeAreaId
+				OUTER APPLY (
+				  SELECT TOP (1) s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
+				  FROM dbo.CaseStatuses cs
+				  INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+				  WHERE cs.CaseId = c.Id AND cs.IsPrimary = 1
+				  ORDER BY cs.UpdatedAt DESC, cs.CreatedAt DESC, cs.Id DESC
+				) current_status
 				OUTER APPLY (
 				  SELECT TOP (1)
 				    LTRIM(RTRIM(
@@ -306,6 +327,9 @@ public final class NotificationDao {
 							rs.getString("CaseResponsibleAttorney"),
 							rs.getString("CaseResponsibleAttorneyColor"),
 							rs.getObject("CaseNonEngagementLetterSent") == null ? null : rs.getBoolean("CaseNonEngagementLetterSent"),
+							rs.getString("CasePrimaryStatusName"),
+							rs.getString("CasePrimaryStatusColor"),
+							rs.getString("CasePracticeAreaColor"),
 							rs.getBoolean("IsRead"),
 							toInstant(rs.getTimestamp("CreatedAt")),
 							rs.getString("EventKey")));
@@ -529,6 +553,9 @@ public final class NotificationDao {
 			String caseResponsibleAttorney,
 			String caseResponsibleAttorneyColor,
 			Boolean caseNonEngagementLetterSent,
+			String casePrimaryStatusName,
+			String casePrimaryStatusColor,
+			String casePracticeAreaColor,
 			boolean isRead,
 			Instant createdAt,
 			String eventKey) {

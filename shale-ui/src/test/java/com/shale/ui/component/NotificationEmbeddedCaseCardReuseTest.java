@@ -71,6 +71,31 @@ final class NotificationEmbeddedCaseCardReuseTest {
     }
 
     @Test
+    void notificationEmbeddedCaseModelPassesSameVisualFieldsAsMyShaleTaskCards() throws Exception {
+        String notificationFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
+        String myShaleController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+        String durableService = Files.readString(Path.of("src/main/java/com/shale/ui/notification/DurableNotificationService.java"));
+        String appNotification = Files.readString(Path.of("src/main/java/com/shale/ui/notification/AppNotification.java"));
+
+        assertTrue(myShaleController.contains("task.casePrimaryStatusName()")
+                        && myShaleController.contains("task.casePrimaryStatusColor()")
+                        && myShaleController.contains("task.casePracticeAreaColor()"),
+                "My Shale task-card previews pass status and practice-area visual fields into TaskCardModel.");
+        assertTrue(notificationFactory.contains("item.getCasePrimaryStatusName()")
+                        && notificationFactory.contains("item.getCasePrimaryStatusColor()")
+                        && notificationFactory.contains("item.getCasePracticeAreaColor()"),
+                "Notification embedded case previews should pass the same visual fields into CaseCardModel.");
+        assertTrue(durableService.contains("row.casePrimaryStatusName()")
+                        && durableService.contains("row.casePrimaryStatusColor()")
+                        && durableService.contains("row.casePracticeAreaColor()"),
+                "Durable notification hydration should copy case visual fields onto AppNotification.");
+        assertTrue(appNotification.contains("getCasePrimaryStatusName()")
+                        && appNotification.contains("getCasePrimaryStatusColor()")
+                        && appNotification.contains("getCasePracticeAreaColor()"),
+                "AppNotification should expose hydrated case visual fields to the notification card factory.");
+    }
+
+    @Test
     void notificationPathDoesNotUseNotificationSpecificWidthOrMiniCardClasses() throws Exception {
         String notificationFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
         String css = Files.readString(Path.of("src/main/resources/css/app.css"));
