@@ -415,15 +415,12 @@ public final class TaskCard extends VBox {
 			caseSection.setVisible(false);
 			return;
 		}
-		CaseCardFactory.Variant variant = currentVariant == Variant.MY_TASKS
-				? CaseCardFactory.Variant.TASK_PREVIEW
-				: CaseCardFactory.Variant.MINI;
 		var caseCard = caseCardFactory.create(
 				new CaseCardModel(relatedCaseId, relatedCaseName, null, null, relatedCaseResponsibleAttorney,
 						relatedCaseResponsibleAttorneyColor, relatedCaseNonEngagementLetterSent,
 						relatedCasePrimaryStatusName, relatedCasePrimaryStatusColor, relatedCasePracticeAreaColor),
-				variant);
-		caseCard.getStyleClass().add(currentVariant == Variant.MY_TASKS ? "my-tasks-mini-case-card" : "task-related-case-card");
+				CaseCardFactory.Variant.MINI);
+		caseCard.getStyleClass().add("task-related-case-card");
 		if (caseCard instanceof Region region && currentVariant == Variant.MY_TASKS) {
 			region.setMinWidth(0);
 			region.setPrefWidth(Region.USE_COMPUTED_SIZE);

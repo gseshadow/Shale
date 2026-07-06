@@ -310,17 +310,9 @@ public final class NotificationCardFactory {
 						item.getCaseResponsibleAttorneyColor(),
 						item.getCaseNonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		miniCard.getStyleClass().add("notification-row-case-mini-card");
-		if (miniCard instanceof Region region) {
-			region.setMinWidth(0);
-			region.setPrefWidth(190);
-			region.setMaxWidth(190);
-		}
+		miniCard.getStyleClass().add("task-related-case-card");
 		StackPane wrapper = new StackPane(miniCard);
-		wrapper.getStyleClass().add("notification-row-case-mini");
 		wrapper.setMinWidth(0);
-		wrapper.setPrefWidth(190);
-		wrapper.setMaxWidth(190);
 		wrapper.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
 		return wrapper;
 	}
