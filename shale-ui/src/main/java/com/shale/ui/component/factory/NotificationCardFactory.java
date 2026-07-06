@@ -301,12 +301,18 @@ public final class NotificationCardFactory {
 			return null;
 		}
 		String caseName = resolveCaseContext(item);
-		return caseCardFactory.createEmbeddedTaskCaseCard(
-				caseId,
-				caseName == null ? "Case #" + caseId : caseName,
-				item.getCaseResponsibleAttorney(),
-				item.getCaseResponsibleAttorneyColor(),
-				item.getCaseNonEngagementLetterSent());
+		Node caseCard = caseCardFactory.create(
+				new CaseCardModel(
+						caseId,
+						caseName == null ? "Case #" + caseId : caseName,
+						null,
+						null,
+						item.getCaseResponsibleAttorney(),
+						item.getCaseResponsibleAttorneyColor(),
+						item.getCaseNonEngagementLetterSent()),
+				CaseCardFactory.Variant.MINI);
+		caseCard.getStyleClass().add("task-related-case-card");
+		return caseCard;
 	}
 
 	private static String resolveCategory(AppNotification item) {
