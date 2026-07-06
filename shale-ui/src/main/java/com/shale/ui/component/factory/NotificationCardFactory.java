@@ -308,13 +308,11 @@ public final class NotificationCardFactory {
 						item.getCaseResponsibleAttorneyColor(),
 						item.getCaseNonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		caseCard.getStyleClass().add("task-related-case-card");
-		if (caseCard instanceof Region region) {
-			region.setMinWidth(0);
-			region.setPrefWidth(Region.USE_COMPUTED_SIZE);
-			region.setMaxWidth(Double.MAX_VALUE);
-		}
-		return caseCard;
+		miniCard.getStyleClass().add("task-related-case-card");
+		StackPane wrapper = new StackPane(miniCard);
+		wrapper.setMinWidth(0);
+		wrapper.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
+		return wrapper;
 	}
 
 	private static String resolveCategory(AppNotification item) {
