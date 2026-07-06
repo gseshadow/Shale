@@ -18,7 +18,7 @@ final class NotificationEmbeddedCaseCardReuseTest {
 
         assertFalse(caseCardFactory.contains("createEmbeddedTaskCaseCard"),
                 "The notification fix should not invent a new embedded case-card helper when the existing MINI factory path is reusable.");
-        assertTrue(notificationFactory.contains("new CaseCardModel(\n\t\t\t\t\t\tcaseId,\n\t\t\t\t\t\tcaseName == null ? \"Case #\" + caseId : caseName,\n\t\t\t\t\t\tnull,\n\t\t\t\t\t\tnull,"),
+        assertTrue(notificationFactory.contains("new CaseCardFactory.CaseCardModel(\n\t\t\t\t\t\tcaseId,\n\t\t\t\t\t\tcaseName == null ? \"Case #\" + caseId : caseName,\n\t\t\t\t\t\tnull,\n\t\t\t\t\t\tnull,"),
                 "Notification previews should use the same 7-field embedded case-card model shape used by My Shale Overview lane headers.");
         assertTrue(myShaleController.contains("new CaseCardModel(\n\t\t\t\t\t\tkey == null || key.caseId() == null ? 0L : key.caseId(),\n\t\t\t\t\t\tkey == null ? NO_CASE_COLUMN_TITLE : key.displayName(),\n\t\t\t\t\t\tnull,\n\t\t\t\t\t\tnull,"),
                 "My Shale Overview lane headers should remain on the existing compact embedded case-card model shape.");

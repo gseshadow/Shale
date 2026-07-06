@@ -302,7 +302,7 @@ public final class NotificationCardFactory {
 		}
 		String caseName = resolveCaseContext(item);
 		Node caseCard = caseCardFactory.create(
-				new CaseCardModel(
+				new CaseCardFactory.CaseCardModel(
 						caseId,
 						caseName == null ? "Case #" + caseId : caseName,
 						null,
