@@ -7,22 +7,35 @@ set ROOT=%SCRIPT_DIR%..\..
 for %%I in ("%ROOT%") do set ROOT=%%~fI
 
 if "%~1"=="" (
-    echo Usage: release-and-publish.bat ^<version^>
+    echo Usage: release-and-publish.bat ^<version^> [mandatory^|--mandatory]
     exit /b 1
 )
 
 set VERSION=%~1
+set MANDATORY_UPDATE=false
+shift
+
+:parse_args
+if "%~1"=="" goto :args_done
+if /I "%~1"=="mandatory" set MANDATORY_UPDATE=true
+if /I "%~1"=="--mandatory" set MANDATORY_UPDATE=true
+if /I "%~1"=="true" set MANDATORY_UPDATE=true
+shift
+goto :parse_args
+
+:args_done
 set BASE_URL=https://shalestorage.z13.web.core.windows.net
 set DIST=%ROOT%\dist
 set MAC_ZIP=%DIST%\ShaleApp-%VERSION%-mac.zip
 
 echo ====================================
 echo Starting Shale Release and Publish %VERSION%
+echo Mandatory update: %MANDATORY_UPDATE%
 echo ====================================
 echo.
 
 echo Step 1: Release build
-call "%SCRIPT_DIR%\release.bat" %VERSION% || goto :fail
+call "%SCRIPT_DIR%\release.bat" %VERSION% %MANDATORY_UPDATE% || goto :fail
 
 echo.
 echo Step 2: Publish

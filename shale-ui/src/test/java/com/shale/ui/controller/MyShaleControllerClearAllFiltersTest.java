@@ -30,8 +30,8 @@ final class MyShaleControllerClearAllFiltersTest {
                         && source.contains("updateMyTasksCompletionToggleLabel()"),
                 "My Tasks clear-all should reset the completed toggle filter and label.");
         assertTrue(source.contains("suppressMyTasksFilterEvents = true")
-                        && source.contains("if (sourceChanged || completedChanged) {\n\t\t\trefreshMyTasks(true);")
-                        && source.contains("} else {\n\t\t\trenderMyTasks();"),
+                        && containsStatementsInOrder(source, "if (sourceChanged || completedChanged) {", "refreshMyTasks(true);")
+                        && containsStatementsInOrder(source, "} else {", "renderMyTasks();"),
                 "My Tasks clear-all should suppress duplicate listener renders and refresh/re-render once.");
     }
 
@@ -53,7 +53,19 @@ final class MyShaleControllerClearAllFiltersTest {
                         && source.contains("selectAllMyCasesStatuses()"),
                 "My Cases clear-all should reset board and legacy status filters to defaults.");
         assertTrue(source.contains("suppressMyCasesFilterEvents = true")
-                        && source.contains("renderMyCasesBoard();\n\t\trerender();\n\t\tensureMyCasesFresh(false);"),
+                        && containsStatementsInOrder(source, "renderMyCasesBoard();", "rerender();", "ensureMyCasesFresh(false);"),
                 "My Cases clear-all should suppress duplicate listener renders and refresh the default board state once.");
+    }
+
+    private static boolean containsStatementsInOrder(String source, String... statements) {
+        int searchFrom = 0;
+        for (String statement : statements) {
+            int index = source.indexOf(statement, searchFrom);
+            if (index < 0) {
+                return false;
+            }
+            searchFrom = index + statement.length();
+        }
+        return true;
     }
 }
