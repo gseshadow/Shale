@@ -28,8 +28,6 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 public final class NotificationCardFactory {
-	private static final double EMBEDDED_CASE_CARD_WIDTH = 210;
-
 	private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter
 			.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
 			.withZone(ZoneId.systemDefault());
@@ -151,8 +149,8 @@ public final class NotificationCardFactory {
 		VBox rightArea = new VBox(8, topControls);
 		rightArea.getStyleClass().add("notification-row-right");
 		rightArea.setMinWidth(0);
-		rightArea.setPrefWidth(EMBEDDED_CASE_CARD_WIDTH);
-		rightArea.setMaxWidth(EMBEDDED_CASE_CARD_WIDTH);
+		rightArea.setPrefWidth(Region.USE_COMPUTED_SIZE);
+		rightArea.setMaxWidth(Region.USE_COMPUTED_SIZE);
 		rightArea.setAlignment(Pos.TOP_RIGHT);
 		if (caseCard != null) {
 			rightArea.getChildren().add(caseCard);
@@ -301,18 +299,12 @@ public final class NotificationCardFactory {
 			return null;
 		}
 		String caseName = resolveCaseContext(item);
-		Node caseCard = caseCardFactory.create(
-				new CaseCardFactory.CaseCardModel(
-						caseId,
-						caseName == null ? "Case #" + caseId : caseName,
-						null,
-						null,
-						item.getCaseResponsibleAttorney(),
-						item.getCaseResponsibleAttorneyColor(),
-						item.getCaseNonEngagementLetterSent()),
-				CaseCardFactory.Variant.MINI);
-		caseCard.getStyleClass().add("task-related-case-card");
-		return caseCard;
+		return caseCardFactory.createEmbeddedTaskCaseCard(
+				caseId,
+				caseName == null ? "Case #" + caseId : caseName,
+				item.getCaseResponsibleAttorney(),
+				item.getCaseResponsibleAttorneyColor(),
+				item.getCaseNonEngagementLetterSent());
 	}
 
 	private static String resolveCategory(AppNotification item) {

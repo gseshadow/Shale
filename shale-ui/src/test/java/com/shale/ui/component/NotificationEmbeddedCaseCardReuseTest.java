@@ -11,33 +11,53 @@ import org.junit.jupiter.api.Test;
 final class NotificationEmbeddedCaseCardReuseTest {
 
     @Test
-    void notificationCasePreviewUsesSameExistingMiniFactoryShapeAsMyShaleOverview() throws Exception {
+    void notificationCasePreviewUsesSameEmbeddedTaskCaseCardFactoryPathAsMyShaleOverview() throws Exception {
         String notificationFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
         String myShaleController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
         String caseCardFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/CaseCardFactory.java"));
 
-        assertFalse(caseCardFactory.contains("createEmbeddedTaskCaseCard"),
-                "The notification fix should not invent a new embedded case-card helper when the existing MINI factory path is reusable.");
-        assertTrue(notificationFactory.contains("new CaseCardFactory.CaseCardModel(\n\t\t\t\t\t\tcaseId,\n\t\t\t\t\t\tcaseName == null ? \"Case #\" + caseId : caseName,\n\t\t\t\t\t\tnull,\n\t\t\t\t\t\tnull,"),
-                "Notification previews should use the same 7-field embedded case-card model shape used by My Shale Overview lane headers.");
-        assertTrue(myShaleController.contains("new CaseCardModel(\n\t\t\t\t\t\tkey == null || key.caseId() == null ? 0L : key.caseId(),\n\t\t\t\t\t\tkey == null ? NO_CASE_COLUMN_TITLE : key.displayName(),\n\t\t\t\t\t\tnull,\n\t\t\t\t\t\tnull,"),
-                "My Shale Overview lane headers should remain on the existing compact embedded case-card model shape.");
-        assertTrue(notificationFactory.contains("CaseCardFactory.Variant.MINI"),
-                "Notification previews should render through the existing CaseCardFactory MINI variant.");
-        assertTrue(myShaleController.contains("CaseCardFactory.Variant.MINI"),
-                "My Shale Overview lane headers should render through the existing CaseCardFactory MINI variant.");
-        assertTrue(notificationFactory.contains("caseCard.getStyleClass().add(\"task-related-case-card\")"),
-                "Notification previews should still mark the shared case card as an interactive task-related child.");
+        assertTrue(myShaleController.contains("caseCardFactory.createEmbeddedTaskCaseCard("),
+                "My Shale Overview task lanes should use the shared embedded task case-card path.");
+        assertTrue(notificationFactory.contains("caseCardFactory.createEmbeddedTaskCaseCard("),
+                "Notification previews must copy the exact My Shale Overview embedded task case-card path.");
+        assertTrue(caseCardFactory.contains("new CaseCardModel(id, name, null, null, responsibleAttorney, responsibleAttorneyColor,"),
+                "The shared embedded path should keep the same compact model construction used by Overview task-lane headers.");
+        assertTrue(caseCardFactory.contains("card.applyEmbeddedTaskMini();"),
+                "The shared embedded path should apply the task-card embedded mini layout without changing MINI globally.");
+        assertTrue(caseCardFactory.contains("card.getStyleClass().add(\"task-related-case-card\")"),
+                "The shared embedded path should apply the Overview embedded mini root marker.");
+    }
+
+    @Test
+    void embeddedTaskMiniKeepsOverviewRootAndChildStyleClasses() throws Exception {
+        String caseCard = Files.readString(Path.of("src/main/java/com/shale/ui/component/CaseCard.java"));
+        String factory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/CaseCardFactory.java"));
+        String embeddedBlock = caseCard.substring(caseCard.indexOf("public void applyEmbeddedTaskMini()"), caseCard.indexOf("public void applyTaskPreview()"));
+        String buildBlock = caseCard.substring(caseCard.indexOf("private void buildUi()"), caseCard.indexOf("private void setPracticeAreaBarWidth"));
+
+        assertTrue(buildBlock.contains("getStyleClass().addAll(\"case-card\", \"shale-entity-card\", \"shale-entity-card-clickable\")"),
+                "Embedded cards should retain the CaseCard root style classes.");
+        assertTrue(factory.contains("card.getStyleClass().add(\"task-related-case-card\")"),
+                "Embedded task cards should retain the Overview task-related root style class.");
+        assertTrue(buildBlock.contains("practiceAreaBar.getStyleClass().addAll(\"case-card__practice-area-bar\", \"shale-indicator-practice-area\")"),
+                "Embedded cards should retain the left practice-area color-bar style classes.");
+        assertTrue(buildBlock.contains("attorneyMiniCard.getStyleClass().add(\"case-card__attorney-mini-card\")"),
+                "Embedded cards should retain the right attorney pill child style class.");
+        assertTrue(embeddedBlock.contains("attorneyMiniCard.setManaged(true);")
+                && embeddedBlock.contains("attorneyMiniCard.setVisible(true);"),
+                "Embedded task cards must not regress to the old plain title-only pill.");
+        assertTrue(embeddedBlock.contains("headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);"),
+                "Embedded task cards should include the title and right-side attorney pill like Overview.");
     }
 
     @Test
     void globalMiniCaseCardBehaviorIsNotChangedForNotifications() throws Exception {
         String caseCard = Files.readString(Path.of("src/main/java/com/shale/ui/component/CaseCard.java"));
-        String miniBlock = caseCard.substring(caseCard.indexOf("public void applyMini()"), caseCard.indexOf("public void applyTaskPreview()"));
+        String miniBlock = caseCard.substring(caseCard.indexOf("public void applyMini()"), caseCard.indexOf("public void applyEmbeddedTaskMini()"));
 
-        assertTrue(miniBlock.contains("attorneyMiniCard.setManaged(true);\n\t\tattorneyMiniCard.setVisible(true);"),
-                "Notification fixes should not globally remove the existing MINI attorney child from all MINI case cards.");
-        assertTrue(miniBlock.contains("headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);"),
+        assertTrue(miniBlock.contains("attorneyMiniCard.setManaged(false);\n\t\tattorneyMiniCard.setVisible(false);"),
+                "Notification fixes should not globally change the existing MINI variant.");
+        assertTrue(miniBlock.contains("headerRow.getChildren().setAll(titleLabel);"),
                 "Notification fixes should not globally alter the existing MINI header structure.");
     }
 

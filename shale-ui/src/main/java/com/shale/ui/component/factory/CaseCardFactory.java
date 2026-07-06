@@ -27,8 +27,9 @@ public final class CaseCardFactory {
 
 	public Node createEmbeddedTaskCaseCard(long id, String name, String responsibleAttorney, String responsibleAttorneyColor,
 			Boolean nonEngagementLetterSent) {
-		Node card = create(new CaseCardModel(id, name, null, null, responsibleAttorney, responsibleAttorneyColor,
+		CaseCard card = (CaseCard) create(new CaseCardModel(id, name, null, null, responsibleAttorney, responsibleAttorneyColor,
 				nonEngagementLetterSent), Variant.MINI);
+		card.applyEmbeddedTaskMini();
 		card.getStyleClass().add("task-related-case-card");
 		return card;
 	}
