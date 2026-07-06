@@ -3217,12 +3217,14 @@ public final class MyShaleController {
 		int taskCount = tasksInLane == null ? 0 : tasksInLane.size();
 		LaneUrgency laneUrgency = resolveLaneUrgency(tasksInLane);
 		boolean laneCollapsed = isCollapsedLane(key);
-		Node caseCard = caseCardFactory.createEmbeddedTaskCaseCard(
+		Node caseCard = caseCardFactory.create(new CaseCardModel(
 				key == null || key.caseId() == null ? 0L : key.caseId(),
 				key == null ? NO_CASE_COLUMN_TITLE : key.displayName(),
+				null,
+				null,
 				key == null ? "" : key.responsibleAttorney(),
 				key == null ? "" : key.responsibleAttorneyColor(),
-				key != null && key.nonEngagementLetterSent());
+				key != null && key.nonEngagementLetterSent()), CaseCardFactory.Variant.EMBEDDED);
 		VBox header = new VBox(6);
 		HBox headerTopRow = new HBox(8);
 		headerTopRow.setAlignment(Pos.CENTER_LEFT);

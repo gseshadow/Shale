@@ -106,8 +106,9 @@ public class CaseCard extends VBox {
 		refreshSurfaceStyle();
 	}
 
-	public void applyEmbeddedTaskMini() {
+	public void applyEmbeddedMini() {
 		applyMini();
+		getStyleClass().add("task-related-case-card");
 		attorneyMiniCard.setManaged(true);
 		attorneyMiniCard.setVisible(true);
 		headerRow.setAlignment(Pos.CENTER_LEFT);

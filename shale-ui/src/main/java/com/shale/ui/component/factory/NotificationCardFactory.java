@@ -299,12 +299,17 @@ public final class NotificationCardFactory {
 			return null;
 		}
 		String caseName = resolveCaseContext(item);
-		return caseCardFactory.createEmbeddedTaskCaseCard(
+		return caseCardFactory.create(new CaseCardFactory.CaseCardModel(
 				caseId,
 				caseName == null ? "Case #" + caseId : caseName,
+				null,
+				null,
 				item.getCaseResponsibleAttorney(),
 				item.getCaseResponsibleAttorneyColor(),
-				item.getCaseNonEngagementLetterSent());
+				item.getCaseNonEngagementLetterSent(),
+				item.getCasePrimaryStatusName(),
+				item.getCasePrimaryStatusColor(),
+				item.getCasePracticeAreaColor()), CaseCardFactory.Variant.EMBEDDED);
 	}
 
 	private static String resolveCategory(AppNotification item) {

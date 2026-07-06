@@ -603,10 +603,6 @@
     -fx-padding: 0 2 0 2;
 }
 
-.lane-header-top-row {
-    -fx-padding: 0 2 0 2;
-}
-
 .label.lane-task-count {
     -fx-text-fill: -shale-indicator-count-text-on-dark;
     -fx-font-size: 11px;
