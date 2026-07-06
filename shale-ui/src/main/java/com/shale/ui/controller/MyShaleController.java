@@ -146,6 +146,8 @@ public final class MyShaleController {
 	@FXML
 	private Button myTasksShowCompletedButton;
 	@FXML
+	private Button myTasksClearAllFiltersButton;
+	@FXML
 	private Button myTasksBoardViewButton;
 	@FXML
 	private Button myTasksGridViewButton;
@@ -193,6 +195,8 @@ public final class MyShaleController {
 	private ChoiceBox<String> myCasesBoardSortChoice;
 	@FXML
 	private ChoiceBox<BoardStatusFilterOption> myCasesBoardStatusFilterChoice;
+	@FXML
+	private Button myCasesClearAllFiltersButton;
 
 	private CaseDao caseDao;
 	private CaseTaskService caseTaskService;
@@ -251,6 +255,8 @@ public final class MyShaleController {
 	private final Map<String, Button> sectionTabs = new LinkedHashMap<>();
 	private String activeSection = SECTION_OVERVIEW;
 	private boolean suppressMyTaskPreferenceWrites;
+	private boolean suppressMyTasksFilterEvents;
+	private boolean suppressMyCasesFilterEvents;
 	private MyTasksViewMode myTasksViewMode = MyTasksViewMode.BOARD;
 	private Integer preferredMyTasksPriorityFilterId;
 	private Long preferredMyTasksCaseFilterId;
@@ -382,7 +388,9 @@ public final class MyShaleController {
 					return;
 				}
 				myTasksSource = selected;
-				refreshMyTasks();
+				if (!suppressMyTasksFilterEvents) {
+					refreshMyTasks();
+				}
 			});
 		}
 		if (myTasksCaseFilterChoice != null) {
@@ -391,7 +399,9 @@ public final class MyShaleController {
 			myTasksCaseFilterChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> {
 						persistMyTasksCaseFilterPreference(newV);
-						renderMyTasks();
+						if (!suppressMyTasksFilterEvents) {
+							renderMyTasks();
+						}
 					});
 		}
 		if (myTasksPriorityFilterChoice != null) {
@@ -400,7 +410,9 @@ public final class MyShaleController {
 			myTasksPriorityFilterChoice.getSelectionModel().selectedItemProperty()
 					.addListener((obs, oldV, newV) -> {
 						persistMyTasksPriorityFilterPreference(newV);
-						renderMyTasks();
+						if (!suppressMyTasksFilterEvents) {
+							renderMyTasks();
+						}
 					});
 		}
 		if (myTasksColumnOrderChoice != null) {
@@ -415,7 +427,11 @@ public final class MyShaleController {
 					});
 		}
 		if (myTasksSearchField != null) {
-			myTasksSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyTasks());
+			myTasksSearchField.textProperty().addListener((obs, oldV, newV) -> {
+				if (!suppressMyTasksFilterEvents) {
+					renderMyTasks();
+				}
+			});
 		}
 		if (myTasksShowCompletedButton != null) {
 			showCompletedMyTasks = restoreMyTasksShowCompletedPreference();
@@ -434,6 +450,9 @@ public final class MyShaleController {
 		if (myTasksGridViewButton != null) {
 			myTasksGridViewButton.setOnAction(e -> setMyTasksViewMode(MyTasksViewMode.GRID));
 		}
+		if (myTasksClearAllFiltersButton != null) {
+			myTasksClearAllFiltersButton.setOnAction(e -> clearAllMyTasksFilters());
+		}
 		updateMyTasksViewToggleStyles();
 		preferredMyTasksPriorityFilterId = restoreMyTasksPriorityFilterPreference();
 		preferredMyTasksCaseFilterId = restoreMyTasksCaseFilterPreference();
@@ -443,12 +462,23 @@ public final class MyShaleController {
 			myCasesBoardSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
 		}
 		if (myCasesBoardSearchField != null) {
-			myCasesBoardSearchField.textProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
+			myCasesBoardSearchField.textProperty().addListener((obs, oldV, newV) -> {
+				if (!suppressMyCasesFilterEvents) {
+					renderMyCasesBoard();
+				}
+			});
 		}
 		if (myCasesBoardStatusFilterChoice != null) {
 			myCasesBoardStatusFilterChoice.getItems().setAll(ALL_BOARD_STATUSES_OPTION);
 			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
-			myCasesBoardStatusFilterChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> renderMyCasesBoard());
+			myCasesBoardStatusFilterChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+				if (!suppressMyCasesFilterEvents) {
+					renderMyCasesBoard();
+				}
+			});
+		}
+		if (myCasesClearAllFiltersButton != null) {
+			myCasesClearAllFiltersButton.setOnAction(e -> clearAllMyCasesFilters());
 		}
 
 		reloadStatusFilterOptionsAndThen(() -> {
@@ -2308,6 +2338,78 @@ public final class MyShaleController {
 		}
 		onSectionSelected(SECTION_TASKS);
 		// My Tasks does not currently expose an overdue-only filter, so due-date ascending sorting makes overdue work appear first.
+	}
+
+	@FXML
+	private void clearAllMyTasksFilters() {
+		boolean sourceChanged = myTasksSource != MyTasksSource.ASSIGNED_TO_ME;
+		boolean completedChanged = showCompletedMyTasks;
+		suppressMyTasksFilterEvents = true;
+		try {
+			if (myTasksSearchField != null) {
+				myTasksSearchField.clear();
+			}
+			if (myTasksSourceChoice != null) {
+				myTasksSourceChoice.getSelectionModel().select(MyTasksSource.ASSIGNED_TO_ME);
+			}
+			myTasksSource = MyTasksSource.ASSIGNED_TO_ME;
+			if (myTasksPriorityFilterChoice != null) {
+				myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
+			}
+			if (myTasksCaseFilterChoice != null) {
+				myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
+			}
+			if (showCompletedMyTasks) {
+				showCompletedMyTasks = false;
+				persistMyTasksShowCompletedPreference(false);
+				updateMyTasksCompletionToggleLabel();
+			}
+		} finally {
+			suppressMyTasksFilterEvents = false;
+		}
+		if (sourceChanged || completedChanged) {
+			refreshMyTasks(true);
+		} else {
+			renderMyTasks();
+		}
+	}
+
+	private boolean hasActiveMyTasksFilters() {
+		return !normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText()).isEmpty()
+				|| myTasksSource != MyTasksSource.ASSIGNED_TO_ME
+				|| selectedPriorityFilterId() != null
+				|| selectedCaseFilterId() != null
+				|| showCompletedMyTasks;
+	}
+
+	@FXML
+	private void clearAllMyCasesFilters() {
+		suppressMyCasesFilterEvents = true;
+		try {
+			if (myCasesBoardSearchField != null) {
+				myCasesBoardSearchField.clear();
+			}
+			if (myCasesSearchField != null) {
+				myCasesSearchField.clear();
+			}
+			if (myCasesBoardStatusFilterChoice != null) {
+				myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
+			}
+			selectAllMyCasesStatuses();
+			CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, this::loadFirstPage);
+		} finally {
+			suppressMyCasesFilterEvents = false;
+		}
+		renderMyCasesBoard();
+		rerender();
+		ensureMyCasesFresh(false);
+	}
+
+	private boolean hasActiveMyCasesFilters() {
+		return !normalizeSearchQuery(myCasesBoardSearchField == null ? null : myCasesBoardSearchField.getText()).isEmpty()
+				|| !normalizedSearchQuery().isEmpty()
+				|| selectedMyCasesBoardStatusId() != null
+				|| !selectedStatusIds.equals(CaseListUiSupport.defaultSelectedStatuses(statusFilterOptions));
 	}
 
 	private void selectAllMyCasesStatuses() {

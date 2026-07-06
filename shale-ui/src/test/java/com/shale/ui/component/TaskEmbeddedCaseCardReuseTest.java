@@ -37,4 +37,24 @@ final class TaskEmbeddedCaseCardReuseTest {
                         && source.contains("model.casePracticeAreaColor()"),
                 "Task Details should pass case status and practice-area colors into the shared case card path.");
     }
+
+    @Test
+    void notificationCenterCaseCardsUseSharedEmbeddedCaseCardVariantAndStyle() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
+        String dialogSource = Files.readString(Path.of("src/main/java/com/shale/ui/component/dialog/NotificationCenterDialog.java"));
+        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+
+        assertTrue(source.contains("CaseCardFactory.Variant.MINI"),
+                "Notification case previews should use the shared embedded CaseCardFactory MINI variant.");
+        assertTrue(source.contains("caseCard.getStyleClass().add(\"task-related-case-card\")"),
+                "Notification case previews should share the same embedded case-card style class used by My Tasks, Task Details, and Overview.");
+        assertFalse(source.contains("notification-row-case-mini"),
+                "Notification case previews should not use a notification-only case-card wrapper/style.");
+        assertFalse(source.contains("notification-row-case-mini-card"),
+                "Notification case previews should not use a notification-only case-card style.");
+        assertTrue(dialogSource.contains("hasStyleClassInAncestorChain(node, \"task-related-case-card\")"),
+                "Notification row interactions should treat the shared embedded case card as an interactive child.");
+        assertFalse(css.contains("notification-row-case-mini"),
+                "Notification case-card CSS should not reintroduce notification-only mini case-card styling.");
+    }
 }

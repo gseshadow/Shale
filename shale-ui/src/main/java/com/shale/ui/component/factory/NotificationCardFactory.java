@@ -23,11 +23,9 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 public final class NotificationCardFactory {
@@ -300,7 +298,7 @@ public final class NotificationCardFactory {
 			return null;
 		}
 		String caseName = resolveCaseContext(item);
-		Node miniCard = caseCardFactory.create(
+		Node caseCard = caseCardFactory.create(
 				new CaseCardModel(
 						caseId,
 						caseName == null ? "Case #" + caseId : caseName,
@@ -310,19 +308,13 @@ public final class NotificationCardFactory {
 						item.getCaseResponsibleAttorneyColor(),
 						item.getCaseNonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		miniCard.getStyleClass().add("notification-row-case-mini-card");
-		if (miniCard instanceof Region region) {
+		caseCard.getStyleClass().add("task-related-case-card");
+		if (caseCard instanceof Region region) {
 			region.setMinWidth(0);
-			region.setPrefWidth(190);
-			region.setMaxWidth(190);
+			region.setPrefWidth(Region.USE_COMPUTED_SIZE);
+			region.setMaxWidth(Double.MAX_VALUE);
 		}
-		StackPane wrapper = new StackPane(miniCard);
-		wrapper.getStyleClass().add("notification-row-case-mini");
-		wrapper.setMinWidth(0);
-		wrapper.setPrefWidth(190);
-		wrapper.setMaxWidth(190);
-		wrapper.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
-		return wrapper;
+		return caseCard;
 	}
 
 	private static String resolveCategory(AppNotification item) {
