@@ -2,11 +2,22 @@
 setlocal
 
 if "%~1"=="" (
-    echo Usage: release-all.bat ^<version^>
+    echo Usage: release-all.bat ^<version^> [mandatory^|--mandatory]
     exit /b 1
 )
 
 set VERSION=%~1
+set MANDATORY_UPDATE=false
+shift
+
+:parse_args
+if "%~1"=="" goto :args_done
+if /I "%~1"=="mandatory" set MANDATORY_UPDATE=true
+if /I "%~1"=="--mandatory" set MANDATORY_UPDATE=true
+shift
+goto :parse_args
+
+:args_done
 set MAC_HOST=admin@192.168.1.56
 set MAC_REPO=/Users/admin/Documents/Shale
 set MAC_DIST=%MAC_REPO%/dist-macos
@@ -18,6 +29,7 @@ set HANDOFF=%ROOT%\build\mac-handoff
 
 echo ====================================
 echo Full cross-platform release %VERSION%
+echo Mandatory update: %MANDATORY_UPDATE%
 echo ====================================
 echo.
 
@@ -34,7 +46,7 @@ scp "%MAC_HOST%:%MAC_DIST%/shale-mac-release.json" "%HANDOFF%"
 
 echo.
 echo Step 3: Run Windows release + publish
-call "%ROOT%\build\scripts\release-and-publish.bat" %VERSION% || goto :fail
+call "%ROOT%\build\scripts\release-and-publish.bat" %VERSION% %MANDATORY_UPDATE% || goto :fail
 
 echo.
 echo ====================================
