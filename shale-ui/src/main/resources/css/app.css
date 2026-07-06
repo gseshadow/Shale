@@ -1289,7 +1289,7 @@
 .notification-row-right {
     -fx-spacing: 8;
     -fx-min-width: 0;
-    -fx-pref-width: 195px;
+    -fx-pref-width: 210px;
     -fx-max-width: 210px;
 }
 
