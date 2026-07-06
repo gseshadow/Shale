@@ -1,7 +1,6 @@
 package com.shale.ui.component.factory;
 
 import com.shale.ui.component.NotificationCard;
-import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCategory;
 import com.shale.ui.notification.NotificationGroup;
@@ -299,7 +298,7 @@ public final class NotificationCardFactory {
 		}
 		String caseName = resolveCaseContext(item);
 		Node caseCard = caseCardFactory.create(
-				new CaseCardModel(
+				new CaseCardFactory.CaseCardModel(
 						caseId,
 						caseName == null ? "Case #" + caseId : caseName,
 						null,
@@ -308,11 +307,8 @@ public final class NotificationCardFactory {
 						item.getCaseResponsibleAttorneyColor(),
 						item.getCaseNonEngagementLetterSent()),
 				CaseCardFactory.Variant.MINI);
-		miniCard.getStyleClass().add("task-related-case-card");
-		StackPane wrapper = new StackPane(miniCard);
-		wrapper.setMinWidth(0);
-		wrapper.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
-		return wrapper;
+		caseCard.getStyleClass().add("task-related-case-card");
+		return caseCard;
 	}
 
 	private static String resolveCategory(AppNotification item) {

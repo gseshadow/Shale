@@ -1026,6 +1026,7 @@ public final class MyShaleController {
 				vm.name,
 				vm.intakeDate,
 				vm.solDate,
+				vm.tortNoticeDate,
 				vm.responsibleAttorney,
 				vm.responsibleAttorneyColor,
 				vm.nonEngagementLetterSent,

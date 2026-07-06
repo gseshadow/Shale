@@ -11,17 +11,53 @@ import org.junit.jupiter.api.Test;
 final class NotificationEmbeddedCaseCardReuseTest {
 
     @Test
-    void notificationCasePreviewsUseSharedOverviewEmbeddedCaseCardPath() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
+    void notificationCasePreviewUsesSameExistingMiniFactoryShapeAsMyShaleOverview() throws Exception {
+        String notificationFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
+        String myShaleController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+        String caseCardFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/CaseCardFactory.java"));
 
-        assertTrue(source.contains("CaseCardFactory.Variant.MINI"),
-                "Notification case previews should render through the shared CaseCardFactory MINI variant.");
-        assertTrue(source.contains("miniCard.getStyleClass().add(\"task-related-case-card\")"),
-                "Notification case previews should share the Overview task embedded case-card style class.");
-        assertFalse(source.contains("notification-row-case-mini-card"),
-                "Notification case previews should not use a notification-specific duplicate mini-card style.");
-        assertFalse(source.contains("notification-row-case-mini"),
-                "Notification case previews should not wrap the card in a notification-specific duplicate mini-card style.");
+        assertFalse(caseCardFactory.contains("createEmbeddedTaskCaseCard"),
+                "The notification fix should not invent a new embedded case-card helper when the existing MINI factory path is reusable.");
+        assertTrue(notificationFactory.contains("new CaseCardFactory.CaseCardModel(\n\t\t\t\t\t\tcaseId,\n\t\t\t\t\t\tcaseName == null ? \"Case #\" + caseId : caseName,\n\t\t\t\t\t\tnull,\n\t\t\t\t\t\tnull,"),
+                "Notification previews should use the same 7-field embedded case-card model shape used by My Shale Overview lane headers.");
+        assertTrue(myShaleController.contains("new CaseCardModel(\n\t\t\t\t\t\tkey == null || key.caseId() == null ? 0L : key.caseId(),\n\t\t\t\t\t\tkey == null ? NO_CASE_COLUMN_TITLE : key.displayName(),\n\t\t\t\t\t\tnull,\n\t\t\t\t\t\tnull,"),
+                "My Shale Overview lane headers should remain on the existing compact embedded case-card model shape.");
+        assertTrue(notificationFactory.contains("CaseCardFactory.Variant.MINI"),
+                "Notification previews should render through the existing CaseCardFactory MINI variant.");
+        assertTrue(myShaleController.contains("CaseCardFactory.Variant.MINI"),
+                "My Shale Overview lane headers should render through the existing CaseCardFactory MINI variant.");
+        assertTrue(notificationFactory.contains("caseCard.getStyleClass().add(\"task-related-case-card\")"),
+                "Notification previews should still mark the shared case card as an interactive task-related child.");
+    }
+
+    @Test
+    void globalMiniCaseCardBehaviorIsNotChangedForNotifications() throws Exception {
+        String caseCard = Files.readString(Path.of("src/main/java/com/shale/ui/component/CaseCard.java"));
+        String miniBlock = caseCard.substring(caseCard.indexOf("public void applyMini()"), caseCard.indexOf("public void applyTaskPreview()"));
+
+        assertTrue(miniBlock.contains("attorneyMiniCard.setManaged(true);\n\t\tattorneyMiniCard.setVisible(true);"),
+                "Notification fixes should not globally remove the existing MINI attorney child from all MINI case cards.");
+        assertTrue(miniBlock.contains("headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);"),
+                "Notification fixes should not globally alter the existing MINI header structure.");
+    }
+
+    @Test
+    void notificationPathDoesNotUseNotificationSpecificWidthOrMiniCardClasses() throws Exception {
+        String notificationFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/NotificationCardFactory.java"));
+        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+
+        assertFalse(notificationFactory.contains("EMBEDDED_CASE_CARD_WIDTH"),
+                "Notification previews should not be fixed by hardcoded notification mini-card widths.");
+        assertFalse(notificationFactory.contains("setPrefWidth(EMBEDDED_CASE_CARD_WIDTH)"),
+                "Notification previews should rely on the shared card path instead of width patching.");
+        assertFalse(css.contains("-fx-pref-width: 195px"),
+                "Notification right column should not squeeze embedded case cards into the old narrow pill layout.");
+        assertFalse(css.contains("-fx-pref-width: 210px"),
+                "Notification right column should not hardcode embedded case-card width.");
+        assertFalse(notificationFactory.contains("notification-row-case-mini-card"));
+        assertFalse(notificationFactory.contains("notification-row-case-mini"));
+        assertFalse(css.contains(".notification-row-case-mini-card"));
+        assertFalse(css.contains(".notification-row-case-mini"));
     }
 
     @Test
@@ -34,15 +70,5 @@ final class NotificationEmbeddedCaseCardReuseTest {
                 "Notification row click handling should not depend on a notification-specific duplicate case-card style.");
         assertFalse(source.contains("notification-row-case-mini"),
                 "Notification row click handling should not depend on a notification-specific duplicate case-card wrapper style.");
-    }
-
-    @Test
-    void notificationCssDoesNotOverrideSharedEmbeddedCaseCardSurface() throws Exception {
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
-
-        assertFalse(css.contains(".notification-row-case-mini-card"),
-                "Notification CSS should not null out or override the shared embedded case-card surface.");
-        assertFalse(css.contains(".notification-row-case-mini"),
-                "Notification CSS should not force notification-specific embedded case-card sizing.");
     }
 }
