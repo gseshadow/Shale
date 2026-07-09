@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Optional;
+import java.sql.SQLTransientConnectionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,6 +77,16 @@ final class NewIntakeControllerConnectivityPreflightTest {
 		assertFalse(blocked);
 	}
 
+	@Test
+	void sqlTransientConnectionException_isConnectivityFailure() throws Exception {
+		NewIntakeController controller = new NewIntakeController();
+
+		boolean connectivityFailure = invokeIsConnectivityFailure(controller,
+				new RuntimeException("save failed", new SQLTransientConnectionException("Network timeout", "08S01")));
+
+		assertTrue(connectivityFailure);
+	}
+
 	private static UiRuntimeBridge bridgeReturning(Optional<Boolean> result) {
 		return new UiRuntimeBridge() {
 			@Override
@@ -97,6 +108,20 @@ final class NewIntakeControllerConnectivityPreflightTest {
 		Method method = NewIntakeController.class.getDeclaredMethod("shouldBlockCreateForOfflinePreflight");
 		method.setAccessible(true);
 		return (boolean) method.invoke(controller);
+	}
+
+	private static boolean invokeIsConnectivityFailure(NewIntakeController controller, Throwable throwable) throws Exception {
+		Method method = NewIntakeController.class.getDeclaredMethod("isConnectivityFailure", Throwable.class);
+		method.setAccessible(true);
+		return (boolean) method.invoke(controller, throwable);
+	}
+
+	private static void restoreProperty(String key, String value) {
+		if (value == null) {
+			System.clearProperty(key);
+		} else {
+			System.setProperty(key, value);
+		}
 	}
 
 	private static void setField(Object target, String fieldName, Object value) throws Exception {

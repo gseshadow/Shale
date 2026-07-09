@@ -11,6 +11,7 @@ import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.DevIntakeSaveFailureConfig;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -22,6 +23,8 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -45,6 +48,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ArrayList;
 import java.util.function.Consumer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.sql.SQLException;
 import java.util.stream.Collectors;
 
 public final class NewIntakeController {
@@ -108,6 +114,11 @@ public final class NewIntakeController {
 	private Stage stage;
 	private Consumer<Integer> onCaseCreated;
 	private boolean saving;
+	private final ExecutorService intakeSaveExecutor = Executors.newSingleThreadExecutor(r -> {
+		Thread t = new Thread(r, "new-intake-save");
+		t.setDaemon(true);
+		return t;
+	});
 	private Boolean knownOnlineState;
 	private final Consumer<UiRuntimeBridge.ConnectivityEvent> connectivityHandler = event -> {
 		if (event != null) {
@@ -148,6 +159,7 @@ public final class NewIntakeController {
 				if (this.runtimeBridge != null) {
 					this.runtimeBridge.unsubscribeConnectivity(connectivityHandler);
 				}
+				intakeSaveExecutor.shutdownNow();
 			});
 			this.stage.setOnCloseRequest(event -> {
 				if (!confirmDiscardIfDirty()) {
@@ -569,9 +581,21 @@ public final class NewIntakeController {
 
 		setSaving(true);
 		int tenantId = requireClientId();
-		System.out.println("[NewIntakeController] create attempt started tenant=" + tenantId + " userId=" + (appState == null ? null : appState.getUserId()));
-		try {
-			CaseDao.NewIntakeCreateRequest request = new CaseDao.NewIntakeCreateRequest(
+		CaseDao.NewIntakeCreateRequest request = buildCreateRequest();
+		System.out.println("[NewIntakeController] create attempt started " + saveContext(tenantId));
+		intakeSaveExecutor.submit(() -> {
+			try {
+				CaseDao.NewIntakeCreateResult result = DevIntakeSaveFailureConfig.runPrimaryIntakeSaveUnlessForced(() -> caseDao.createIntake(request));
+				Platform.runLater(() -> handleCreateSuccess(tenantId, result));
+			} catch (RuntimeException ex) {
+				logCreateFailure(tenantId, ex);
+				Platform.runLater(() -> handleCreateFailure(ex));
+			}
+		});
+	}
+
+	private CaseDao.NewIntakeCreateRequest buildCreateRequest() {
+		return new CaseDao.NewIntakeCreateRequest(
 				requireClientId(),
 				safeTrim(caseNameField.getText()),
 				dateOfIntakePicker.getValue(),
@@ -613,25 +637,29 @@ public final class NewIntakeController {
 						party.organizationName(),
 						party.organizationTypeId())).toList(),
 				appState == null ? null : appState.getUserId()
-			);
+		);
+	}
 
-			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
-			captureInitialSnapshot();
-			deleteLocalDraftIfPresent();
-			System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
-			showSuccess("Intake created successfully.");
-			if (stage != null)
-				stage.close();
-			if (onCaseCreated != null)
-				onCaseCreated.accept(Math.toIntExact(result.caseId()));
-		} catch (RuntimeException ex) {
-			System.err.println("[NewIntakeController] DAO create failed tenant=" + tenantId + " error=" + ex.getMessage());
-			ex.printStackTrace(System.err);
-			showValidation("Unable to save intake. Your information has not been discarded. Please try again.");
-			offerCreateFailureActions();
-		} finally {
-			setSaving(false);
-		}
+	private void handleCreateSuccess(int tenantId, CaseDao.NewIntakeCreateResult result) {
+		captureInitialSnapshot();
+		deleteLocalDraftIfPresent();
+		System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
+		showSuccess("Intake created successfully.");
+		setSaving(false);
+		if (stage != null)
+			stage.close();
+		if (onCaseCreated != null)
+			onCaseCreated.accept(Math.toIntExact(result.caseId()));
+	}
+
+	private void handleCreateFailure(RuntimeException ex) {
+		knownOnlineState = isConnectivityFailure(ex) ? Boolean.FALSE : knownOnlineState;
+		String message = isConnectivityFailure(ex)
+				? "Shale could not connect to the database. Your intake was not saved. You can save a local backup and retry later."
+				: "Unable to save intake. Your information has not been discarded. Please try again.";
+		showValidation(message);
+		setSaving(false);
+		offerCreateFailureActions(message);
 	}
 
 	private boolean shouldBlockCreateForOfflinePreflight() {
@@ -681,31 +709,39 @@ public final class NewIntakeController {
 				message,
 				List.of(
 						AppDialogs.DialogAction.of("Try Again", SaveBlockedAction.TRY_AGAIN, AppDialogs.DialogActionKind.PRIMARY, true, false),
-						AppDialogs.DialogAction.of("Save Draft Locally", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
-						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)));
+						AppDialogs.DialogAction.of("Save Local Backup", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.of("Copy Intake Text", SaveBlockedAction.COPY_TEXT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)),
+				660);
 		SaveBlockedAction action = decision.orElse(SaveBlockedAction.KEEP_EDITING);
 		if (action == SaveBlockedAction.TRY_AGAIN) {
 			attemptCreateIntake(true);
 		} else if (action == SaveBlockedAction.SAVE_DRAFT) {
 			saveDraftLocally();
+		} else if (action == SaveBlockedAction.COPY_TEXT) {
+			copyIntakeTextToClipboard();
 		}
 	}
 
-	private void offerCreateFailureActions() {
+	private void offerCreateFailureActions(String message) {
 		Optional<SaveBlockedAction> decision = AppDialogs.showChoice(
 				stage,
 				"Save Intake Failed",
 				"Save Intake Failed",
-				"Shale could not save the intake right now. Your information is still here.",
+				message,
 				List.of(
 						AppDialogs.DialogAction.of("Try Again", SaveBlockedAction.TRY_AGAIN, AppDialogs.DialogActionKind.PRIMARY, true, false),
-						AppDialogs.DialogAction.of("Save Draft Locally", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
-						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)));
+						AppDialogs.DialogAction.of("Save Local Backup", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.of("Copy Intake Text", SaveBlockedAction.COPY_TEXT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)),
+				660);
 		SaveBlockedAction action = decision.orElse(SaveBlockedAction.KEEP_EDITING);
 		if (action == SaveBlockedAction.TRY_AGAIN) {
 			attemptCreateIntake(true);
 		} else if (action == SaveBlockedAction.SAVE_DRAFT) {
 			saveDraftLocally();
+		} else if (action == SaveBlockedAction.COPY_TEXT) {
+			copyIntakeTextToClipboard();
 		}
 	}
 
@@ -740,25 +776,27 @@ public final class NewIntakeController {
 		try {
 			Path draftPath = resolveDraftPath();
 			Files.createDirectories(draftPath.getParent());
-			String payload = GSON.toJson(new DraftPayload(1, captureCurrentSnapshot()));
+			String payload = GSON.toJson(toLocalDraftPayload(captureCurrentSnapshot()));
 			Files.writeString(draftPath, payload, StandardCharsets.UTF_8);
-			showSuccess("Draft saved locally. You can restore it next time New Intake is opened.");
+			showSuccess("Local backup saved. You can restore it next time New Intake is opened.");
 			System.out.println("[NewIntakeController] local draft saved path=" + draftPath);
 		} catch (Exception ex) {
 			System.err.println("[NewIntakeController] local draft save failed: " + ex.getMessage());
-			showValidation("Unable to save a local draft right now. Your form is still open.");
+			ex.printStackTrace(System.err);
+			showValidation("Unable to save a local backup right now. Your form is still open. Use Copy Intake Text to keep an emergency copy.");
+			copyIntakeTextToClipboard();
 		}
 	}
 
 	private void restoreDraft(Path draftPath) {
 		try {
 			String payload = Files.readString(draftPath, StandardCharsets.UTF_8);
-			DraftPayload parsed = GSON.fromJson(payload, DraftPayload.class);
+			LocalDraftPayload parsed = GSON.fromJson(payload, LocalDraftPayload.class);
 			if (parsed == null || parsed.snapshot() == null) {
 				showValidation("The local draft could not be restored.");
 				return;
 			}
-			applySnapshot(parsed.snapshot());
+			applySnapshot(fromLocalDraftPayload(parsed));
 			showSuccess("Local draft restored.");
 			System.out.println("[NewIntakeController] local draft restored path=" + draftPath);
 		} catch (Exception ex) {
@@ -846,6 +884,49 @@ public final class NewIntakeController {
 			return;
 		}
 		renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
+	}
+
+	private void copyIntakeTextToClipboard() {
+		try {
+			ClipboardContent content = new ClipboardContent();
+			content.putString(toReadableIntakeText(captureCurrentSnapshot()));
+			Clipboard.getSystemClipboard().setContent(content);
+			showSuccess("Intake text copied to the clipboard.");
+		} catch (Exception ex) {
+			System.err.println("[NewIntakeController] copy intake text failed: " + ex.getMessage());
+			ex.printStackTrace(System.err);
+			showValidation("Unable to copy intake text automatically. Your form is still open; please keep editing or copy fields manually.");
+		}
+	}
+
+	private boolean isConnectivityFailure(Throwable throwable) {
+		Throwable current = throwable;
+		while (current != null) {
+			if (current instanceof DevIntakeSaveFailureConfig.ForcedIntakeSaveFailureException) return true;
+			if (current instanceof SQLException sqlEx) {
+				String state = sqlEx.getSQLState();
+				if (state != null && (state.startsWith("08") || state.equals("HYT00") || state.equals("HYT01"))) return true;
+			}
+			String name = current.getClass().getName().toLowerCase();
+			String msg = String.valueOf(current.getMessage()).toLowerCase();
+			if (name.contains("sqlserverexception") && (msg.contains("connection") || msg.contains("network") || msg.contains("socket") || msg.contains("timeout"))) return true;
+			if (msg.contains("connection") || msg.contains("network") || msg.contains("socket") || msg.contains("timed out") || msg.contains("timeout")) return true;
+			current = current.getCause();
+		}
+		return false;
+	}
+
+	private void logCreateFailure(int tenantId, RuntimeException ex) {
+		System.err.println("[NewIntakeController] DAO create failed " + saveContext(tenantId) + " connectivity=" + isConnectivityFailure(ex) + " error=" + ex.getMessage());
+		ex.printStackTrace(System.err);
+	}
+
+	private String saveContext(int tenantId) {
+		return "tenant=" + tenantId
+				+ " userId=" + (appState == null ? null : appState.getUserId())
+				+ " userEmail=" + (appState == null ? null : appState.getUserEmail())
+				+ " shaleClientId=" + (appState == null ? null : appState.getShaleClientId())
+				+ " appVersion=" + System.getProperty("shale.version", System.getProperty("app.version", "unknown"));
 	}
 
 	private Path resolveDraftPath() {
@@ -971,11 +1052,13 @@ public final class NewIntakeController {
 	}
 
 	private List<String> validate() {
-		List<CaseDao.PracticeAreaRow> tenantPracticeAreas = loadTenantPracticeAreasForValidation();
-		boolean hasTenantPracticeAreas = !tenantPracticeAreas.isEmpty();
-		boolean selectedPracticeAreaValid = hasTenantPracticeAreas
-				&& selectedPracticeArea != null
-				&& tenantPracticeAreas.stream().anyMatch(area -> area.id() == selectedPracticeArea.id());
+		PracticeAreaValidationResult practiceAreaState = loadTenantPracticeAreasForValidation();
+		boolean selectedPracticeAreaValid = selectedPracticeArea != null
+				&& (practiceAreaState.unverifiedDueToConnectivity()
+						|| practiceAreaState.practiceAreas().stream().anyMatch(area -> area.id() == selectedPracticeArea.id()));
+		String practiceAreaError = practiceAreaState.unverifiedDueToConnectivity()
+				? "Shale could not connect to the database to verify practice areas. Your intake was not saved. You can save a local backup and retry later."
+				: practiceAreaState.practiceAreas().isEmpty() ? "No tenant practice areas are configured. Please contact support." : null;
 		return java.util.stream.Stream.of(
 				required(caseNameField.getText(), "Case Name is required."),
 				requiredDate(dateOfIntakePicker.getValue(), "Date of Intake is required."),
@@ -983,8 +1066,8 @@ public final class NewIntakeController {
 				required(clientFirstNameField.getText(), "Client First Name is required."),
 				required(clientLastNameField.getText(), "Client Last Name is required."),
 				required(clientPhoneField.getText(), "Client Phone Number is required."),
-				!hasTenantPracticeAreas ? "No tenant practice areas are configured. Please contact support." : null,
-				hasTenantPracticeAreas && !selectedPracticeAreaValid ? "Practice Area is required." : null,
+				practiceAreaError,
+				practiceAreaError == null && !selectedPracticeAreaValid ? "Practice Area is required." : null,
 				selectedStatus == null ? "Status is required." : null,
 				callerRequiredWhenNotClient(callerFirstNameField.getText(), "Caller First Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked."),
@@ -992,11 +1075,17 @@ public final class NewIntakeController {
 		).filter(s -> s != null && !s.isBlank()).toList();
 	}
 
-	private List<CaseDao.PracticeAreaRow> loadTenantPracticeAreasForValidation() {
+	private PracticeAreaValidationResult loadTenantPracticeAreasForValidation() {
 		try {
-			return caseDao.listPracticeAreasForTenant(requireClientId());
+			return new PracticeAreaValidationResult(caseDao.listPracticeAreasForTenant(requireClientId()), false);
 		} catch (RuntimeException ex) {
-			return List.of();
+			if (isConnectivityFailure(ex)) {
+				System.err.println("[NewIntakeController] practice area validation connectivity failure " + saveContext(appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId()));
+				ex.printStackTrace(System.err);
+				knownOnlineState = Boolean.FALSE;
+				return new PracticeAreaValidationResult(List.of(), true);
+			}
+			return new PracticeAreaValidationResult(List.of(), false);
 		}
 	}
 
@@ -1059,7 +1148,7 @@ public final class NewIntakeController {
 		return value == null ? "" : value.trim();
 	}
 
-	private record IntakeFormSnapshot(
+	record IntakeFormSnapshot(
 			String caseName,
 			LocalDate dateOfIntake,
 			String timeOfIntake,
@@ -1090,14 +1179,229 @@ public final class NewIntakeController {
 			List<PartyAddWorkflowDialog.AddPartyDraft> pendingParties) {
 	}
 
-	private record DraftPayload(
-			int version,
-			IntakeFormSnapshot snapshot) {
+	static LocalDraftPayload toLocalDraftPayload(IntakeFormSnapshot snapshot) {
+		List<LocalDraftParty> parties = snapshot.pendingParties() == null ? List.of() : snapshot.pendingParties().stream()
+				.map(party -> new LocalDraftParty(
+						safeString(party.entityType()),
+						party.entityId() == null ? "" : String.valueOf(party.entityId()),
+						safeString(party.entityLabel()),
+						String.valueOf(party.partyRoleId()),
+						safeString(party.side()),
+						party.primary(),
+						safeString(party.notes()),
+						party.createNew(),
+						safeString(party.contactFirstName()),
+						safeString(party.contactLastName()),
+						safeString(party.organizationName()),
+						party.organizationTypeId() == null ? "" : String.valueOf(party.organizationTypeId())))
+				.toList();
+		return new LocalDraftPayload(1, new LocalDraftSnapshot(
+				safeString(snapshot.caseName()),
+				isoDate(snapshot.dateOfIntake()),
+				safeString(snapshot.timeOfIntake()),
+				snapshot.estateCase(),
+				safeString(snapshot.clientFirstName()),
+				safeString(snapshot.clientLastName()),
+				safeString(snapshot.clientAddress()),
+				safeString(snapshot.clientPhone()),
+				safeString(snapshot.clientEmail()),
+				isoDate(snapshot.clientDateOfBirth()),
+				snapshot.clientDeceased(),
+				safeString(snapshot.clientCondition()),
+				snapshot.callerIsClient(),
+				safeString(snapshot.callerFirstName()),
+				safeString(snapshot.callerLastName()),
+				safeString(snapshot.callerPhone()),
+				safeString(snapshot.callerAddress()),
+				safeString(snapshot.callerEmail()),
+				snapshot.practiceAreaId() == null ? "" : String.valueOf(snapshot.practiceAreaId()),
+				snapshot.statusId() == null ? "" : String.valueOf(snapshot.statusId()),
+				safeString(snapshot.description()),
+				safeString(snapshot.summary()),
+				isoDate(snapshot.medicalNegligenceDate()),
+				isoDate(snapshot.medicalNegligenceDiscoveredDate()),
+				isoDate(snapshot.injuryDate()),
+				isoDate(snapshot.statuteOfLimitationsDate()),
+				isoDate(snapshot.tortClaimsNoticeDate()),
+				parties));
+	}
+
+	static IntakeFormSnapshot fromLocalDraftPayload(LocalDraftPayload payload) {
+		LocalDraftSnapshot s = payload.snapshot();
+		List<PartyAddWorkflowDialog.AddPartyDraft> parties = s.pendingParties() == null ? List.of() : s.pendingParties().stream()
+				.map(party -> new PartyAddWorkflowDialog.AddPartyDraft(
+						party.entityType(),
+						parseLongOrNull(party.entityId()),
+						party.entityLabel(),
+						parseLongOrDefault(party.partyRoleId()),
+						party.side(),
+						party.primary(),
+						party.notes(),
+						party.createNew(),
+						party.contactFirstName(),
+						party.contactLastName(),
+						party.organizationName(),
+						parseIntOrNull(party.organizationTypeId())))
+				.toList();
+		return new IntakeFormSnapshot(s.caseName(), parseDateOrNull(s.dateOfIntake()), s.timeOfIntake(), s.estateCase(),
+				s.clientFirstName(), s.clientLastName(), s.clientAddress(), s.clientPhone(), s.clientEmail(),
+				parseDateOrNull(s.clientDateOfBirth()), s.clientDeceased(), s.clientCondition(), s.callerIsClient(),
+				s.callerFirstName(), s.callerLastName(), s.callerPhone(), s.callerAddress(), s.callerEmail(),
+				parseIntOrNull(s.practiceAreaId()), parseIntOrNull(s.statusId()), s.description(), s.summary(),
+				parseDateOrNull(s.medicalNegligenceDate()), parseDateOrNull(s.medicalNegligenceDiscoveredDate()),
+				parseDateOrNull(s.injuryDate()), parseDateOrNull(s.statuteOfLimitationsDate()), parseDateOrNull(s.tortClaimsNoticeDate()), parties);
+	}
+
+	static String toReadableIntakeText(IntakeFormSnapshot snapshot) {
+		StringBuilder text = new StringBuilder("New Intake Backup\n");
+		appendLine(text, "Case name", snapshot.caseName());
+		appendLine(text, "Date of intake", isoDate(snapshot.dateOfIntake()));
+		appendLine(text, "Time of intake", snapshot.timeOfIntake());
+		appendLine(text, "Estate case", yesNo(snapshot.estateCase()));
+		appendLine(text, "Client", (safeString(snapshot.clientFirstName()) + " " + safeString(snapshot.clientLastName())).trim());
+		appendLine(text, "Client phone", snapshot.clientPhone());
+		appendLine(text, "Client email", snapshot.clientEmail());
+		appendLine(text, "Client address", snapshot.clientAddress());
+		appendLine(text, "Client date of birth", isoDate(snapshot.clientDateOfBirth()));
+		appendLine(text, "Client deceased", yesNo(snapshot.clientDeceased()));
+		appendLine(text, "Caller is client", yesNo(snapshot.callerIsClient()));
+		appendLine(text, "Caller", (safeString(snapshot.callerFirstName()) + " " + safeString(snapshot.callerLastName())).trim());
+		appendLine(text, "Caller phone", snapshot.callerPhone());
+		appendLine(text, "Caller email", snapshot.callerEmail());
+		appendLine(text, "Description", snapshot.description());
+		appendLine(text, "Summary", snapshot.summary());
+		appendLine(text, "Medical negligence date", isoDate(snapshot.medicalNegligenceDate()));
+		appendLine(text, "Medical negligence discovered", isoDate(snapshot.medicalNegligenceDiscoveredDate()));
+		appendLine(text, "Injury date", isoDate(snapshot.injuryDate()));
+		appendLine(text, "Statute of limitations", isoDate(snapshot.statuteOfLimitationsDate()));
+		appendLine(text, "Tort claims notice", isoDate(snapshot.tortClaimsNoticeDate()));
+		if (snapshot.pendingParties() != null && !snapshot.pendingParties().isEmpty()) {
+			text.append("Pending parties:\n");
+			for (PartyAddWorkflowDialog.AddPartyDraft party : snapshot.pendingParties()) {
+				text.append("- ").append(safeString(party.entityLabel()));
+				appendInline(text, "type", party.entityType());
+				appendInline(text, "side", party.side());
+				appendInline(text, "notes", party.notes());
+				text.append('\n');
+			}
+		}
+		return text.toString();
+	}
+
+	private static void appendLine(StringBuilder text, String label, String value) {
+		try {
+			text.append(label).append(": ").append(safeString(value)).append('\n');
+		} catch (RuntimeException ignored) {
+			text.append(label).append(": \n");
+		}
+	}
+
+	private static void appendInline(StringBuilder text, String label, String value) {
+		String safe = safeString(value);
+		if (!safe.isBlank()) {
+			text.append(" | ").append(label).append('=').append(safe);
+		}
+	}
+
+	private static String yesNo(boolean value) {
+		return value ? "Yes" : "No";
+	}
+
+	private static String isoDate(LocalDate value) {
+		return value == null ? "" : value.toString();
+	}
+
+	private static String safeString(String value) {
+		return value == null ? "" : value;
+	}
+
+	private static LocalDate parseDateOrNull(String value) {
+		try {
+			return safeString(value).isBlank() ? null : LocalDate.parse(value);
+		} catch (RuntimeException ignored) {
+			return null;
+		}
+	}
+
+	private static Integer parseIntOrNull(String value) {
+		try {
+			return safeString(value).isBlank() ? null : Integer.parseInt(value);
+		} catch (RuntimeException ignored) {
+			return null;
+		}
+	}
+
+	private static Long parseLongOrNull(String value) {
+		try {
+			return safeString(value).isBlank() ? null : Long.parseLong(value);
+		} catch (RuntimeException ignored) {
+			return null;
+		}
+	}
+
+	private static long parseLongOrDefault(String value) {
+		Long parsed = parseLongOrNull(value);
+		return parsed == null ? 0 : parsed;
+	}
+
+	record LocalDraftPayload(int version, LocalDraftSnapshot snapshot) {
+	}
+
+	record LocalDraftSnapshot(
+			String caseName,
+			String dateOfIntake,
+			String timeOfIntake,
+			boolean estateCase,
+			String clientFirstName,
+			String clientLastName,
+			String clientAddress,
+			String clientPhone,
+			String clientEmail,
+			String clientDateOfBirth,
+			boolean clientDeceased,
+			String clientCondition,
+			boolean callerIsClient,
+			String callerFirstName,
+			String callerLastName,
+			String callerPhone,
+			String callerAddress,
+			String callerEmail,
+			String practiceAreaId,
+			String statusId,
+			String description,
+			String summary,
+			String medicalNegligenceDate,
+			String medicalNegligenceDiscoveredDate,
+			String injuryDate,
+			String statuteOfLimitationsDate,
+			String tortClaimsNoticeDate,
+			List<LocalDraftParty> pendingParties) {
+	}
+
+	record LocalDraftParty(
+			String entityType,
+			String entityId,
+			String entityLabel,
+			String partyRoleId,
+			String side,
+			boolean primary,
+			String notes,
+			boolean createNew,
+			String contactFirstName,
+			String contactLastName,
+			String organizationName,
+			String organizationTypeId) {
+	}
+
+	private record PracticeAreaValidationResult(
+			List<CaseDao.PracticeAreaRow> practiceAreas,
+			boolean unverifiedDueToConnectivity) {
 	}
 
 	private enum SaveBlockedAction {
 		TRY_AGAIN,
 		SAVE_DRAFT,
+		COPY_TEXT,
 		KEEP_EDITING
 	}
 }
