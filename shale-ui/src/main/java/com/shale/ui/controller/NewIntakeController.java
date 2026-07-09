@@ -11,6 +11,7 @@ import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.DevIntakeSaveFailureConfig;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -894,10 +895,7 @@ public final class NewIntakeController {
 	}
 
 	private boolean shouldForceDevIntakeSaveFailure() {
-		String flag = System.getProperty("shale.dev.forceIntakeSaveFailure", "false");
-		String profile = System.getProperty("shale.profile", System.getProperty("app.profile", "")).trim().toLowerCase();
-		boolean devProfile = profile.equals("dev") || profile.equals("local") || profile.equals("development") || Boolean.getBoolean("shale.dev.enabled");
-		return devProfile && Boolean.parseBoolean(flag);
+		return DevIntakeSaveFailureConfig.resolveFromSystemProperties().enabled();
 	}
 
 	private boolean isConnectivityFailure(Throwable throwable) {
