@@ -8,13 +8,25 @@ for %%I in ("%ROOT%") do set ROOT=%%~fI
 
 if "%~1"=="" (
     echo ====================================
-    echo Usage: release.bat ^<version^>
-    echo Example: release.bat 1.0.10
+    echo Usage: release.bat ^<version^> [mandatory^|--mandatory]
+    echo Example: release.bat 1.0.10 mandatory
     echo ====================================
     exit /b 1
 )
 
 set VERSION=%~1
+set MANDATORY_UPDATE=false
+shift
+
+:parse_args
+if "%~1"=="" goto :args_done
+if /I "%~1"=="mandatory" set MANDATORY_UPDATE=true
+if /I "%~1"=="--mandatory" set MANDATORY_UPDATE=true
+if /I "%~1"=="true" set MANDATORY_UPDATE=true
+shift
+goto :parse_args
+
+:args_done
 set DIST=%ROOT%\dist
 set MANIFEST_SRC=%ROOT%\build\assets\shale-stable.json
 set MANIFEST_DIST=%DIST%\shale-stable.json
@@ -29,6 +41,7 @@ set MAC_DIST_ZIP=
 
 echo ====================================
 echo Starting Shale Release %VERSION%
+echo Mandatory update: %MANDATORY_UPDATE%
 echo ====================================
 echo.
 
@@ -96,9 +109,9 @@ if exist "%MAC_META_FILE%" (
 echo.
 echo Step 4: Updating manifest
 if not "!MAC_ZIP_NAME!"=="" if not "!MAC_SHA256!"=="" (
-    call "%SCRIPT_DIR%\update-manifest.bat" "!MAC_ZIP_NAME!" "!MAC_SHA256!" || goto :fail
+    call "%SCRIPT_DIR%\update-manifest.bat" --mac-zip "!MAC_ZIP_NAME!" --mac-sha "!MAC_SHA256!" --mandatory=%MANDATORY_UPDATE% || goto :fail
 ) else (
-    call "%SCRIPT_DIR%\update-manifest.bat" || goto :fail
+    call "%SCRIPT_DIR%\update-manifest.bat" --mandatory=%MANDATORY_UPDATE% || goto :fail
 )
 
 echo.

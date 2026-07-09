@@ -603,10 +603,6 @@
     -fx-padding: 0 2 0 2;
 }
 
-.lane-header-top-row {
-    -fx-padding: 0 2 0 2;
-}
-
 .label.lane-task-count {
     -fx-text-fill: -shale-indicator-count-text-on-dark;
     -fx-font-size: 11px;
@@ -1289,8 +1285,6 @@
 .notification-row-right {
     -fx-spacing: 8;
     -fx-min-width: 0;
-    -fx-pref-width: 195px;
-    -fx-max-width: 210px;
 }
 
 .notification-row-controls {
@@ -1367,17 +1361,6 @@
     -fx-text-fill: rgba(16, 36, 66, 0.58);
     -fx-font-size: 11px;
     -fx-font-weight: 800;
-}
-
-.notification-row-case-mini {
-    -fx-alignment: center-right;
-    -fx-min-width: 0;
-    -fx-pref-width: 190px;
-    -fx-max-width: 190px;
-}
-
-.notification-row-case-mini-card {
-    -fx-effect: null;
 }
 
 .notification-row-expanded {

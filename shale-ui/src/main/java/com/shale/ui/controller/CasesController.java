@@ -1155,6 +1155,7 @@ public final class CasesController {
 				vm.name,
 				vm.intakeDate,
 				vm.solDate,
+				vm.tortClaimsNoticeDeadline,
 				vm.responsibleAttorney,
 				vm.responsibleAttorneyColor,
 				vm.nonEngagementLetterSent,

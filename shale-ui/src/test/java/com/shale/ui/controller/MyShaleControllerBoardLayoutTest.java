@@ -291,11 +291,11 @@ final class MyShaleControllerBoardLayoutTest {
     void myCasesBoardUsesWiderStatusColumnsAndHorizontalScroll() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
-        assertTrue(source.contains("MY_CASES_STATUS_COLUMN_MIN_WIDTH = 320"),
+        assertTrue(source.contains("MY_CASES_STATUS_COLUMN_MIN_WIDTH = 336"),
                 "My Cases board lane minimum width should be widened from the previous 245px value");
-        assertTrue(source.contains("MY_CASES_STATUS_COLUMN_PREF_WIDTH = 360"),
+        assertTrue(source.contains("MY_CASES_STATUS_COLUMN_PREF_WIDTH = 376"),
                 "My Cases board lane preferred width should be widened from the previous 280px value");
-        assertTrue(source.contains("MY_CASES_STATUS_COLUMN_MAX_WIDTH = 400"),
+        assertTrue(source.contains("MY_CASES_STATUS_COLUMN_MAX_WIDTH = 416"),
                 "My Cases board lane maximum width should be widened from the previous 320px value");
         assertTrue(source.contains("myCasesBoardScroll.setFitToWidth(false)"),
                 "The board should horizontally scroll instead of fitting/compressing all status lanes into the viewport");

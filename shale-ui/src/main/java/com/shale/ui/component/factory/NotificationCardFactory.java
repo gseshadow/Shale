@@ -1,7 +1,6 @@
 package com.shale.ui.component.factory;
 
 import com.shale.ui.component.NotificationCard;
-import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.notification.AppNotification;
 import com.shale.ui.notification.NotificationCategory;
 import com.shale.ui.notification.NotificationGroup;
@@ -23,11 +22,9 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 public final class NotificationCardFactory {
@@ -151,7 +148,9 @@ public final class NotificationCardFactory {
 		Node caseCard = createCaseMiniCard(item);
 		VBox rightArea = new VBox(8, topControls);
 		rightArea.getStyleClass().add("notification-row-right");
-		rightArea.setMinWidth(0);
+		rightArea.setMinWidth(Region.USE_PREF_SIZE);
+		rightArea.setPrefWidth(Region.USE_COMPUTED_SIZE);
+		rightArea.setMaxWidth(Region.USE_COMPUTED_SIZE);
 		rightArea.setAlignment(Pos.TOP_RIGHT);
 		if (caseCard != null) {
 			rightArea.getChildren().add(caseCard);
@@ -300,29 +299,17 @@ public final class NotificationCardFactory {
 			return null;
 		}
 		String caseName = resolveCaseContext(item);
-		Node miniCard = caseCardFactory.create(
-				new CaseCardModel(
-						caseId,
-						caseName == null ? "Case #" + caseId : caseName,
-						null,
-						null,
-						item.getCaseResponsibleAttorney(),
-						item.getCaseResponsibleAttorneyColor(),
-						item.getCaseNonEngagementLetterSent()),
-				CaseCardFactory.Variant.MINI);
-		miniCard.getStyleClass().add("notification-row-case-mini-card");
-		if (miniCard instanceof Region region) {
-			region.setMinWidth(0);
-			region.setPrefWidth(190);
-			region.setMaxWidth(190);
-		}
-		StackPane wrapper = new StackPane(miniCard);
-		wrapper.getStyleClass().add("notification-row-case-mini");
-		wrapper.setMinWidth(0);
-		wrapper.setPrefWidth(190);
-		wrapper.setMaxWidth(190);
-		wrapper.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
-		return wrapper;
+		return caseCardFactory.create(new CaseCardFactory.CaseCardModel(
+				caseId,
+				caseName == null ? "Case #" + caseId : caseName,
+				null,
+				null,
+				item.getCaseResponsibleAttorney(),
+				item.getCaseResponsibleAttorneyColor(),
+				item.getCaseNonEngagementLetterSent(),
+				item.getCasePrimaryStatusName(),
+				item.getCasePrimaryStatusColor(),
+				item.getCasePracticeAreaColor()), CaseCardFactory.Variant.EMBEDDED);
 	}
 
 	private static String resolveCategory(AppNotification item) {

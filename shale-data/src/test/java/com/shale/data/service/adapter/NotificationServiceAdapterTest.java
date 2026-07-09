@@ -34,6 +34,9 @@ class NotificationServiceAdapterTest {
 				"Attorney",
 				"#000",
 				false,
+				"Prelitigation",
+				"#2563eb",
+				"#f97316",
 				false,
 				createdAt,
 				"event-key")));

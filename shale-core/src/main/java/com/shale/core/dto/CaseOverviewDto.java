@@ -36,6 +36,7 @@ public final class CaseOverviewDto {
 	private final LocalDate intakeDate;
 	private final LocalDate incidentDate;
 	private final LocalDate solDate;
+	private final LocalDate tortNoticeDeadline;
 
 	// Parties
 	private final Integer primaryCallerContactId;
@@ -72,6 +73,7 @@ public final class CaseOverviewDto {
 			LocalDate intakeDate,
 			LocalDate incidentDate,
 			LocalDate solDate,
+			LocalDate tortNoticeDeadline,
 			Integer primaryCallerContactId,
 			Integer primaryClientContactId,
 			Integer primaryOpposingCounselContactId,
@@ -102,6 +104,7 @@ public final class CaseOverviewDto {
 		this.intakeDate = intakeDate;
 		this.incidentDate = incidentDate;
 		this.solDate = solDate;
+		this.tortNoticeDeadline = tortNoticeDeadline;
 
 		this.primaryCallerContactId = primaryCallerContactId;
 		this.primaryClientContactId = primaryClientContactId;
@@ -173,6 +176,10 @@ public final class CaseOverviewDto {
 
 	public LocalDate getSolDate() {
 		return solDate;
+	}
+
+	public LocalDate getTortNoticeDeadline() {
+		return tortNoticeDeadline;
 	}
 
 	public String getCaller() {

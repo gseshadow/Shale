@@ -77,4 +77,13 @@ class CaseControllerNullableDateDialogTest {
         assertTrue(source.contains("boolean tortNoticeChanged = !Objects.equals(desired.desiredTortNoticeDeadline(), baseTortNoticeDeadline);"),
                 "Overview full-save should detect cleared and newly selected TCN dates as changes.");
     }
+
+    @Test
+    void overviewDisplaysTortNoticeDeadlineFromOverviewDto() throws IOException {
+        String source = Files.readString(SOURCE);
+
+        assertTrue(source.contains("ovTortNoticeDeadlineValue.setText(formatDate(dto.getTortNoticeDeadline()))"),
+                "Overview display should read Tort Notice Deadline from the CaseOverviewDto instead of depending on the details tab model.");
+    }
+
 }

@@ -129,6 +129,12 @@
 							</HBox>
 							<HBox spacing="8" alignment="CENTER_LEFT">
 								<TextField fx:id="myTasksSearchField" promptText="Search my tasks…" HBox.hgrow="ALWAYS" styleClass="shale-search-field" />
+								<Button fx:id="myTasksClearAllFiltersButton" text="Clear all filters" onAction="#clearAllMyTasksFilters">
+									<styleClass>
+										<String fx:value="app-toolbar-button" />
+										<String fx:value="app-toolbar-button-neutral" />
+									</styleClass>
+								</Button>
 							</HBox>
 						</VBox>
 						<Label fx:id="myTasksLoadingLabel" text="Loading your tasks..." managed="false" visible="false" styleClass="shale-loading-placeholder" />
@@ -180,6 +186,12 @@
 												<String fx:value="shale-filter-combo" />
 											</styleClass>
 										</ChoiceBox>
+										<Button fx:id="myCasesClearAllFiltersButton" text="Clear all filters" onAction="#clearAllMyCasesFilters">
+											<styleClass>
+												<String fx:value="app-toolbar-button" />
+												<String fx:value="app-toolbar-button-neutral" />
+											</styleClass>
+										</Button>
 									</HBox>
 								</VBox>
 							</HBox>

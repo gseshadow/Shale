@@ -27,6 +27,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.caseupdates.MedicalRecordRequestKeywordMatcher;
 import com.shale.core.dto.CaseStatusHistoryDto;
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
@@ -53,6 +54,8 @@ import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.StatusIndicatorFactory.PillSize;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.dialog.AppDialogs.DialogAction;
+import com.shale.ui.component.dialog.AppDialogs.DialogActionKind;
 import com.shale.ui.component.dialog.ClientAssignmentDialog;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.CreateContactDialog;
@@ -69,6 +72,7 @@ import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
+import com.shale.ui.controller.support.MedicalRecordsRequestedCaseUpdateSafeguard;
 import com.shale.ui.util.AppSectionTabs;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.PerfLog;
@@ -441,9 +445,9 @@ public class CaseController {
 	@FXML
 	private TextField detOfficePrinterCodeEditor;
 	@FXML
-	private Label detMedicalRecordsReceivedValue;
+	private Label detMedicalRecordsRequestedValue;
 	@FXML
-	private CheckBox detMedicalRecordsReceivedEditor;
+	private CheckBox detMedicalRecordsRequestedEditor;
 	@FXML
 	private Label detFeeAgreementSignedValue;
 	@FXML
@@ -547,6 +551,7 @@ public class CaseController {
 	private UiRuntimeBridge runtimeBridge;
 	private CaseDocumentService caseDocumentService;
 	private CaseDocumentExportService caseDocumentExportService;
+	private final MedicalRecordRequestKeywordMatcher medicalRecordRequestKeywordMatcher = new MedicalRecordRequestKeywordMatcher();
 
 	// ----------------------------
 	// Controller state
@@ -3349,6 +3354,7 @@ public class CaseController {
 				overview.getIntakeDate(),
 				overview.getIncidentDate(),
 				overview.getSolDate(),
+				overview.getTortNoticeDeadline(),
 				effectiveCallerId,
 				overview.getPrimaryClientContactId(),
 				effectiveOpposingCounselId,
@@ -3949,8 +3955,8 @@ public class CaseController {
 		{
 			if (editor == detClientEstateEditor)
 				d.clientEstate = toNullableBooleanStorage(value);
-			else if (editor == detMedicalRecordsReceivedEditor)
-				d.medicalRecordsReceived = value;
+			else if (editor == detMedicalRecordsRequestedEditor)
+				d.medicalRecordsRequested = value;
 			else if (editor == detFeeAgreementSignedEditor)
 				d.feeAgreementSigned = value;
 			else if (editor == detNonEngagementLetterSentEditor)
@@ -4828,6 +4834,7 @@ public class CaseController {
 					refreshLastUpdatedLabelAsync();
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
+					handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(activeCaseId, activeClientId, trimmedText);
 				});
 			} catch (Exception ex) {
 				runOnFx(() ->
@@ -4840,6 +4847,37 @@ public class CaseController {
 				});
 			}
 		}, "case-updates-submit-" + activeCaseId).start();
+	}
+
+	private void handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(long activeCaseId, int activeClientId, String savedNoteText) {
+		if (caseDao == null || caseId == null || caseId.longValue() != activeCaseId) {
+			return;
+		}
+		boolean alreadyRequested = current != null && Boolean.TRUE.equals(current.getMedicalRecordsRequested());
+		MedicalRecordsRequestedCaseUpdateSafeguard safeguard = new MedicalRecordsRequestedCaseUpdateSafeguard(
+				medicalRecordRequestKeywordMatcher,
+				this::confirmMarkMedicalRecordsRequested,
+				(caseIdToUpdate, clientId) -> caseDao.markMedicalRecordsRequested(caseIdToUpdate, clientId));
+		try {
+			boolean updated = safeguard.handleSavedCaseUpdate(activeCaseId, activeClientId, savedNoteText, alreadyRequested);
+			if (updated) {
+				reloadCurrentCaseForViewMode();
+			}
+		} catch (Exception ex) {
+			showError("Failed to mark medical records requested. " + ex.getMessage());
+		}
+	}
+
+	private boolean confirmMarkMedicalRecordsRequested() {
+		return AppDialogs.showChoice(
+				caseRootPane == null || caseRootPane.getScene() == null ? null : caseRootPane.getScene().getWindow(),
+				"Medical Records Requested",
+				"Medical Records Requested",
+				"This update appears to mention medical records. Would you like to mark Medical Records Requested as true?",
+				List.of(
+						DialogAction.of("Yes", true, DialogActionKind.PRIMARY, true, false),
+						DialogAction.cancel("No", false)))
+				.orElse(false);
 	}
 
 	private Node createCaseUpdateCard(CaseUpdateDto dto) {
@@ -5383,6 +5421,7 @@ public class CaseController {
 				base.getIntakeDate(),
 				incidentDate,
 				solDate,
+				base.getTortNoticeDeadline(),
 				base.getPrimaryCallerContactId(),
 				base.getPrimaryClientContactId(),
 				base.getPrimaryOpposingCounselContactId(),
@@ -5669,7 +5708,7 @@ public class CaseController {
 			if (ovSolDateValue != null)
 				ovSolDateValue.setText(formatDate(dto.getSolDate()));
 			if (ovTortNoticeDeadlineValue != null)
-				ovTortNoticeDeadlineValue.setText(formatDate(current == null ? null : current.getTortNoticeDeadline()));
+				ovTortNoticeDeadlineValue.setText(formatDate(dto.getTortNoticeDeadline()));
 			if (!editSafeOnly) {
 				if (ovIncidentDateEditor != null && !editMode)
 					ovIncidentDateEditor.setValue(dto.getIncidentDate());
@@ -6971,7 +7010,7 @@ public class CaseController {
 					"callerDate", "callerTime", "acceptedDate", "closedDate", "deniedDate",
 					"dateOfMedicalNegligence", "dateMedicalNegligenceWasDiscovered", "dateOfInjury",
 					"statuteOfLimitations", "tortNoticeDeadline", "discoveryDeadline",
-					"clientEstate", "officePrinterCode", "medicalRecordsReceived", "feeAgreementSigned",
+					"clientEstate", "officePrinterCode", "medicalRecordsRequested", "feeAgreementSigned",
 					"dateFeeAgreementSigned", "nonEngagementLetterSent", "dateNonEngagementLetterSent",
 					"acceptedChronology", "acceptedConsultantExpertSearch",
 					"acceptedTestifyingExpertSearch", "acceptedMedicalLiterature", "acceptedDetail",
@@ -7231,7 +7270,7 @@ public class CaseController {
 
 		String clientEstate;
 		String officePrinterCode;
-		Boolean medicalRecordsReceived;
+		Boolean medicalRecordsRequested;
 		Boolean feeAgreementSigned;
 		LocalDate dateFeeAgreementSigned;
 		Boolean nonEngagementLetterSent;
@@ -7280,7 +7319,7 @@ public class CaseController {
 
 			d.clientEstate = detail == null ? "0" : normalizeDetailsCheckboxStorage(detail.getClientEstate());
 			d.officePrinterCode = detail == null ? "" : safeText(detail.getOfficePrinterCode());
-			d.medicalRecordsReceived = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getMedicalRecordsReceived());
+			d.medicalRecordsRequested = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getMedicalRecordsRequested());
 			System.out.println("Case details load: feeAgreementSigned rawLoaded=" + (detail == null ? null : detail.getFeeAgreementSigned()));
 			d.feeAgreementSigned = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getFeeAgreementSigned());
 			d.dateFeeAgreementSigned = detail == null ? null : detail.getDateFeeAgreementSigned();
@@ -7325,7 +7364,7 @@ public class CaseController {
 			c.discoveryDeadline = discoveryDeadline;
 			c.clientEstate = clientEstate;
 			c.officePrinterCode = officePrinterCode;
-			c.medicalRecordsReceived = medicalRecordsReceived;
+			c.medicalRecordsRequested = medicalRecordsRequested;
 			c.feeAgreementSigned = feeAgreementSigned;
 			c.dateFeeAgreementSigned = dateFeeAgreementSigned;
 			c.nonEngagementLetterSent = nonEngagementLetterSent;
@@ -7405,7 +7444,7 @@ public class CaseController {
 						request.discoveryDeadline(),
 						request.clientEstate(),
 						request.officePrinterCode(),
-						request.medicalRecordsReceived(),
+						request.medicalRecordsRequested(),
 						request.feeAgreementSigned(),
 						request.dateFeeAgreementSigned(),
 						request.nonEngagementLetterSent(),
@@ -7564,10 +7603,10 @@ public class CaseController {
 							request.caseId(),
 							(appState == null ? null : appState.getShaleClientId()),
 							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.MEDICAL_RECORDS_RECEIVED_CHANGED,
-							"Medical records received updated",
-							request.baseline().getMedicalRecordsReceived(),
-							request.medicalRecordsReceived()
+							CaseDao.CaseTimelineEventTypes.MEDICAL_RECORDS_REQUESTED_CHANGED,
+							"Medical records requested updated",
+							request.baseline().getMedicalRecordsRequested(),
+							request.medicalRecordsRequested()
 					);
 					addBooleanChangedTimelineEvent(
 							request.caseId(),
@@ -7763,7 +7802,7 @@ public class CaseController {
 			publishIfChanged(request.caseId(), "discoveryDeadline", baseline.getDiscoveryDeadline(), request.discoveryDeadline());
 			publishIfChanged(request.caseId(), "clientEstate", normalizeNullableText(baseline.getClientEstate()), request.clientEstate());
 			publishIfChanged(request.caseId(), "officePrinterCode", normalizeNullableText(baseline.getOfficePrinterCode()), request.officePrinterCode());
-			publishIfChanged(request.caseId(), "medicalRecordsReceived", baseline.getMedicalRecordsReceived(), request.medicalRecordsReceived());
+			publishIfChanged(request.caseId(), "medicalRecordsRequested", baseline.getMedicalRecordsRequested(), request.medicalRecordsRequested());
 			publishIfChanged(request.caseId(), "feeAgreementSigned", baseline.getFeeAgreementSigned(), request.feeAgreementSigned());
 			publishIfChanged(request.caseId(), "dateFeeAgreementSigned", baseline.getDateFeeAgreementSigned(), request.dateFeeAgreementSigned());
 			publishIfChanged(request.caseId(), "nonEngagementLetterSent", baseline.getNonEngagementLetterSent(), request.nonEngagementLetterSent());
@@ -7803,7 +7842,7 @@ public class CaseController {
 			String callerTime = normalizeCallerTimeInput(source.callerTime);
 			String clientEstate = normalizeDetailsCheckboxStorage(source.clientEstate);
 			String officePrinterCode = normalizeNullableText(source.officePrinterCode);
-			Boolean medicalRecordsReceived = normalizeDetailsCheckboxBoolean(source.medicalRecordsReceived);
+			Boolean medicalRecordsRequested = normalizeDetailsCheckboxBoolean(source.medicalRecordsRequested);
 			Boolean feeAgreementSigned = normalizeDetailsCheckboxBoolean(source.feeAgreementSigned);
 			LocalDate rawDateFeeAgreementSigned = source.dateFeeAgreementSigned;
 			LocalDate dateFeeAgreementSigned = rawDateFeeAgreementSigned;
@@ -7823,7 +7862,7 @@ public class CaseController {
 			String deniedDetail = normalizeNullableText(source.deniedDetail);
 			String summary = normalizeNullableText(source.summary);
 			String receivedUpdates = toNullableBooleanStorage(normalizeDetailsCheckboxBoolean(source.receivedUpdates));
-			Boolean baselineMedicalRecordsReceived = normalizeDetailsCheckboxBoolean(baseline.getMedicalRecordsReceived());
+			Boolean baselineMedicalRecordsRequested = normalizeDetailsCheckboxBoolean(baseline.getMedicalRecordsRequested());
 			Boolean baselineFeeAgreementSigned = baseline.getFeeAgreementSigned();
 			Boolean baselineNonEngagementLetterSent = baseline.getNonEngagementLetterSent();
 			Boolean baselineAcceptedChronology = normalizeDetailsCheckboxBoolean(baseline.getAcceptedChronology());
@@ -7857,7 +7896,7 @@ public class CaseController {
 					!Objects.equals(source.discoveryDeadline, baseline.getDiscoveryDeadline()) ||
 					!Objects.equals(clientEstate, normalizeDetailsCheckboxStorage(baseline.getClientEstate())) ||
 					!Objects.equals(officePrinterCode, normalizeNullableText(baseline.getOfficePrinterCode())) ||
-					!Objects.equals(medicalRecordsReceived, baselineMedicalRecordsReceived) ||
+					!Objects.equals(medicalRecordsRequested, baselineMedicalRecordsRequested) ||
 					!Objects.equals(feeAgreementSigned, baselineFeeAgreementSigned) ||
 					!Objects.equals(dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
 					!Objects.equals(nonEngagementLetterSent, baselineNonEngagementLetterSent) ||
@@ -7895,7 +7934,7 @@ public class CaseController {
 					source.discoveryDeadline,
 					clientEstate,
 					officePrinterCode,
-					medicalRecordsReceived,
+					medicalRecordsRequested,
 					feeAgreementSigned,
 					dateFeeAgreementSigned,
 					nonEngagementLetterSent,
@@ -8428,7 +8467,7 @@ public class CaseController {
 			LocalDate discoveryDeadline,
 			String clientEstate,
 			String officePrinterCode,
-			Boolean medicalRecordsReceived,
+			Boolean medicalRecordsRequested,
 			Boolean feeAgreementSigned,
 			LocalDate dateFeeAgreementSigned,
 			Boolean nonEngagementLetterSent,
@@ -8497,7 +8536,7 @@ public class CaseController {
 			toggleDetailField(detDiscoveryDeadlineValue, detDiscoveryDeadlineEditor, enabled);
 			toggleDetailField(detClientEstateValue, detClientEstateEditor, enabled);
 			toggleDetailField(detOfficePrinterCodeValue, detOfficePrinterCodeEditor, enabled);
-			toggleDetailField(detMedicalRecordsReceivedValue, detMedicalRecordsReceivedEditor, enabled);
+			toggleDetailField(detMedicalRecordsRequestedValue, detMedicalRecordsRequestedEditor, enabled);
 			toggleDetailField(detFeeAgreementSignedValue, detFeeAgreementSignedEditor, enabled);
 			toggleDetailField(detDateFeeAgreementSignedValue, detDateFeeAgreementSignedEditor, enabled);
 			toggleDetailField(detNonEngagementLetterSentValue, detNonEngagementLetterSentEditor, enabled);
@@ -8607,8 +8646,8 @@ public class CaseController {
 				detClientEstateValue.setText(boolLabel(parseNullableBooleanStorage(d.clientEstate)));
 			if (detOfficePrinterCodeValue != null)
 				detOfficePrinterCodeValue.setText(safe(d.officePrinterCode));
-			if (detMedicalRecordsReceivedValue != null)
-				detMedicalRecordsReceivedValue.setText(boolLabel(d.medicalRecordsReceived));
+			if (detMedicalRecordsRequestedValue != null)
+				detMedicalRecordsRequestedValue.setText(boolLabel(d.medicalRecordsRequested));
 			if (detFeeAgreementSignedValue != null)
 				detFeeAgreementSignedValue.setText(boolLabel(Boolean.TRUE.equals(d.feeAgreementSigned)));
 			if (detDateFeeAgreementSignedValue != null)
@@ -8676,7 +8715,7 @@ public class CaseController {
 			renderNullableBoolean(detClientEstateEditor, parseNullableBooleanStorage(d.clientEstate));
 			if (detOfficePrinterCodeEditor != null)
 				detOfficePrinterCodeEditor.setText(d.officePrinterCode);
-			renderNullableBoolean(detMedicalRecordsReceivedEditor, d.medicalRecordsReceived);
+			renderNullableBoolean(detMedicalRecordsRequestedEditor, d.medicalRecordsRequested);
 			if (detFeeAgreementSignedEditor != null) {
 				detFeeAgreementSignedEditor.setAllowIndeterminate(false);
 				detFeeAgreementSignedEditor.setIndeterminate(false);
@@ -8769,7 +8808,7 @@ public class CaseController {
 			d.clientEstate = toNullableBooleanStorage(captureNullableBoolean(detClientEstateEditor));
 			if (detOfficePrinterCodeEditor != null)
 				d.officePrinterCode = safeText(detOfficePrinterCodeEditor.getText());
-			d.medicalRecordsReceived = captureNullableBoolean(detMedicalRecordsReceivedEditor);
+			d.medicalRecordsRequested = captureNullableBoolean(detMedicalRecordsRequestedEditor);
 			d.feeAgreementSigned = detFeeAgreementSignedEditor != null && detFeeAgreementSignedEditor.isSelected();
 			if (detDateFeeAgreementSignedEditor != null)
 				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
