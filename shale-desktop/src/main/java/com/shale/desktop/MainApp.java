@@ -27,7 +27,6 @@ public final class MainApp extends Application {
 		}
 
 		DesktopConfig config = DesktopConfig.load(); // builds AuthService, db config, etc.
-
 		AuthService authService = config.getAuthService();
 		LiveEventDispatcher dispatcher = new LiveEventDispatcher();
 

@@ -122,6 +122,10 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>com.shale.desktop.MainApp</mainClass>
+                    <options>
+                        <option>-Dshale.profile=${shale.profile}</option>
+                        <option>-Dshale.launchMode=javafx-maven-plugin</option>
+                    </options>
                 </configuration>
             </plugin>
 

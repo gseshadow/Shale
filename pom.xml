@@ -34,6 +34,9 @@
         <failsafe.version>3.2.5</failsafe.version>
         <javafx.maven.plugin.version>0.0.8</javafx.maven.plugin.version>
         <maven.dependency.plugin.version>3.6.1</maven.dependency.plugin.version>
+
+        <!-- Defaults forwarded by javafx-maven-plugin for local developer runs. -->
+        <shale.profile></shale.profile>
     </properties>
 
     <modules>
