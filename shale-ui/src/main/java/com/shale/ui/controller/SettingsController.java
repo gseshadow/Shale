@@ -8,7 +8,6 @@ import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
-import com.shale.ui.services.DevIntakeSaveFailureConfig;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
 import javafx.application.Platform;
@@ -71,14 +70,6 @@ public final class SettingsController {
 	private Label notificationSettingsStatusLabel;
 	@FXML
 	private VBox auditSection;
-	@FXML
-	private VBox developerToolsSection;
-	@FXML
-	private Button forceNextIntakeSaveFailureButton;
-	@FXML
-	private Button clearForcedIntakeSaveFailureButton;
-	@FXML
-	private Label developerToolsStatusLabel;
 	@FXML
 	private VBox caseStatusAdministrationSection;
 	@FXML
@@ -146,7 +137,6 @@ public final class SettingsController {
 		configureLookupActionRows();
 		configureUserManagementTable();
 		updateAdminControlsVisibility();
-		updateDeveloperToolsVisibility();
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
@@ -162,7 +152,6 @@ public final class SettingsController {
 		if (fxmlReady) {
 			loadFromPreferences();
 			updateAdminControlsVisibility();
-			updateDeveloperToolsVisibility();
 			loadAdminSectionsAsync();
 		}
 	}
@@ -190,24 +179,6 @@ public final class SettingsController {
 			notificationSettingsStatusLabel.setText("Notification settings reset to saved values.");
 		}
 	}
-
-	@FXML
-	private void onForceNextIntakeSaveFailure() {
-		if (!DevIntakeSaveFailureConfig.armNextIntakeSaveFailureFromDeveloperUi()) {
-			setDeveloperToolsStatus("Developer tools are not active for this launch.");
-			return;
-		}
-		setDeveloperToolsStatus("Next New Intake save will be forced to fail before SQL so local fallback can be tested.");
-		updateDeveloperToolsButtons();
-	}
-
-	@FXML
-	private void onClearForcedIntakeSaveFailure() {
-		boolean cleared = DevIntakeSaveFailureConfig.clearNextIntakeSaveFailure();
-		setDeveloperToolsStatus(cleared ? "Forced intake save failure cleared." : "No forced intake save failure was armed.");
-		updateDeveloperToolsButtons();
-	}
-
 
 	@FXML
 	private void onViewAuditLog() {
@@ -1064,37 +1035,6 @@ public final class SettingsController {
 
 	@FXML
 	private VBox userAdministrationSection;
-
-	private void updateDeveloperToolsVisibility() {
-		boolean visible = DevIntakeSaveFailureConfig.isDeveloperModeActive();
-		if (developerToolsSection != null) {
-			developerToolsSection.setVisible(visible);
-			developerToolsSection.setManaged(visible);
-		}
-		if (visible) {
-			setDeveloperToolsStatus(DevIntakeSaveFailureConfig.isNextIntakeSaveFailureArmed()
-					? "Next New Intake save is currently armed to fail before SQL."
-					: "Developer tools active. Forced intake save failure is not armed.");
-		}
-		updateDeveloperToolsButtons();
-	}
-
-	private void updateDeveloperToolsButtons() {
-		boolean visible = DevIntakeSaveFailureConfig.isDeveloperModeActive();
-		boolean armed = DevIntakeSaveFailureConfig.isNextIntakeSaveFailureArmed();
-		if (forceNextIntakeSaveFailureButton != null) {
-			forceNextIntakeSaveFailureButton.setDisable(!visible || armed);
-		}
-		if (clearForcedIntakeSaveFailureButton != null) {
-			clearForcedIntakeSaveFailureButton.setDisable(!visible || !armed);
-		}
-	}
-
-	private void setDeveloperToolsStatus(String message) {
-		if (developerToolsStatusLabel != null) {
-			developerToolsStatusLabel.setText(message == null ? "" : message);
-		}
-	}
 
 	private void updateAdminControlsVisibility() {
 		boolean visible = isAdminUser();
