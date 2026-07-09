@@ -1398,6 +1398,11 @@ public final class NewIntakeController {
 			boolean unverifiedDueToConnectivity) {
 	}
 
+	private record PracticeAreaValidationState(
+			List<CaseDao.PracticeAreaRow> practiceAreas,
+			boolean unverifiedDueToConnectivity) {
+	}
+
 	private enum SaveBlockedAction {
 		TRY_AGAIN,
 		SAVE_DRAFT,
