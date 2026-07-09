@@ -36,7 +36,6 @@
         <maven.dependency.plugin.version>3.6.1</maven.dependency.plugin.version>
 
         <!-- Defaults forwarded by javafx-maven-plugin for local developer runs. -->
-        <shale.dev.forceIntakeSaveFailure>false</shale.dev.forceIntakeSaveFailure>
         <shale.profile></shale.profile>
     </properties>
 

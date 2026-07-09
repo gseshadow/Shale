@@ -619,7 +619,7 @@ public final class NewIntakeController {
 		System.out.println("[NewIntakeController] create attempt started " + saveContext(tenantId));
 		intakeSaveExecutor.submit(() -> {
 			try {
-				CaseDao.NewIntakeCreateResult result = DevIntakeSaveFailureConfig.runPrimaryIntakeSaveUnlessForced(() -> caseDao.createIntake(request));
+				CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
 				Platform.runLater(() -> handleCreateSuccess(tenantId, result));
 			} catch (RuntimeException ex) {
 				logCreateFailure(tenantId, ex);
@@ -961,7 +961,6 @@ public final class NewIntakeController {
 	private boolean isConnectivityFailure(Throwable throwable) {
 		Throwable current = throwable;
 		while (current != null) {
-			if (current instanceof DevIntakeSaveFailureConfig.ForcedIntakeSaveFailureException) return true;
 			if (current instanceof SQLException sqlEx) {
 				String state = sqlEx.getSQLState();
 				if (state != null && (state.startsWith("08") || state.equals("HYT00") || state.equals("HYT01"))) return true;
