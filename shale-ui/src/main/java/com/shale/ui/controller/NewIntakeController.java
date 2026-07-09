@@ -48,8 +48,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ArrayList;
 import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.sql.SQLException;
 import java.util.stream.Collectors;
 
@@ -60,6 +64,7 @@ public final class NewIntakeController {
 	private static final Gson GSON = new Gson();
 	private static final String DRAFTS_DIR = "drafts";
 	private static final String INTAKE_DRAFT_PREFIX = "new-intake";
+	private static final long PRACTICE_AREA_PREFLIGHT_TIMEOUT_SECONDS = 5;
 
 	@FXML private Label validationLabel;
 
@@ -137,6 +142,8 @@ public final class NewIntakeController {
 	private Map<Long, String> partyRoleLabelsById = Map.of();
 	private Map<String, String> partySideLabelsByKey = Map.of();
 	private IntakeFormSnapshot initialSnapshot;
+	private RecoveryActionPresenter recoveryActionPresenter = (owner, title, header, content, actions, minWidth) ->
+			AppDialogs.showChoice(owner, title, header, content, actions, minWidth);
 
 	public void init(
 			AppState appState,
@@ -566,7 +573,7 @@ public final class NewIntakeController {
 		if (saving)
 			return;
 		System.out.println("[NewIntakeController] save clicked cachedOnlineState=" + knownOnlineState + " offlineRetry=" + invokedFromOfflineRetry);
-		List<String> errors = validate();
+		List<String> errors = validateRequiredFields();
 		if (!errors.isEmpty()) {
 			showValidation(errors.stream().collect(Collectors.joining("\n")));
 			return;
@@ -579,8 +586,35 @@ public final class NewIntakeController {
 			return;
 		}
 
-		setSaving(true);
 		int tenantId = requireClientId();
+		setSaving(true);
+		CompletableFuture
+				.supplyAsync(this::loadTenantPracticeAreasForValidation, intakeSaveExecutor)
+				.orTimeout(PRACTICE_AREA_PREFLIGHT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+				.whenComplete((practiceAreaState, throwable) -> Platform.runLater(() -> {
+					if (throwable != null) {
+						RuntimeException ex = normalizePreflightException(throwable);
+						logPracticeAreaPreflightFailure(tenantId, ex);
+						handlePracticeAreaPreflightFailure(ex);
+						return;
+					}
+					if (practiceAreaState.unverifiedDueToConnectivity()) {
+						RuntimeException ex = new RuntimeException(practiceAreaConnectivityMessage());
+						logPracticeAreaPreflightFailure(tenantId, ex);
+						handlePracticeAreaPreflightFailure(ex);
+						return;
+					}
+					List<String> practiceAreaErrors = validatePracticeAreaSelection(practiceAreaState);
+					if (!practiceAreaErrors.isEmpty()) {
+						setSaving(false);
+						showValidation(practiceAreaErrors.stream().collect(Collectors.joining("\n")));
+						return;
+					}
+					startPrimaryIntakeSave(tenantId);
+				}));
+	}
+
+	private void startPrimaryIntakeSave(int tenantId) {
 		CaseDao.NewIntakeCreateRequest request = buildCreateRequest();
 		System.out.println("[NewIntakeController] create attempt started " + saveContext(tenantId));
 		intakeSaveExecutor.submit(() -> {
@@ -592,6 +626,33 @@ public final class NewIntakeController {
 				Platform.runLater(() -> handleCreateFailure(ex));
 			}
 		});
+	}
+
+	private RuntimeException normalizePreflightException(Throwable throwable) {
+		Throwable current = throwable;
+		if (current instanceof CompletionException && current.getCause() != null) {
+			current = current.getCause();
+		}
+		if (current instanceof TimeoutException) {
+			return new RuntimeException("Practice-area database verification timed out after "
+					+ PRACTICE_AREA_PREFLIGHT_TIMEOUT_SECONDS + " seconds.", current);
+		}
+		return current instanceof RuntimeException runtimeException
+				? runtimeException
+				: new RuntimeException(current);
+	}
+
+	private void logPracticeAreaPreflightFailure(int tenantId, RuntimeException ex) {
+		System.err.println("[NewIntakeController] practice area preflight failed " + saveContext(tenantId));
+		ex.printStackTrace(System.err);
+	}
+
+	private void handlePracticeAreaPreflightFailure(RuntimeException ex) {
+		knownOnlineState = Boolean.FALSE;
+		String message = practiceAreaConnectivityMessage();
+		showValidation(message);
+		setSaving(false);
+		offerCreateFailureActions(message);
 	}
 
 	private CaseDao.NewIntakeCreateRequest buildCreateRequest() {
@@ -702,17 +763,7 @@ public final class NewIntakeController {
 	private void showOfflinePreflightBlockedDialog() {
 		String message = "Shale could not confirm the connection, so the intake was not saved. Your information is still here. Reconnect and click Try Again, or keep editing.";
 		showValidation(message);
-		Optional<SaveBlockedAction> decision = AppDialogs.showChoice(
-				stage,
-				"Connection Check Required",
-				"Connection Check Required",
-				message,
-				List.of(
-						AppDialogs.DialogAction.of("Try Again", SaveBlockedAction.TRY_AGAIN, AppDialogs.DialogActionKind.PRIMARY, true, false),
-						AppDialogs.DialogAction.of("Save Local Backup", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
-						AppDialogs.DialogAction.of("Copy Intake Text", SaveBlockedAction.COPY_TEXT, AppDialogs.DialogActionKind.SECONDARY, false, false),
-						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)),
-				660);
+		Optional<SaveBlockedAction> decision = showRecoveryActionDialog("Connection Check Required", message);
 		SaveBlockedAction action = decision.orElse(SaveBlockedAction.KEEP_EDITING);
 		if (action == SaveBlockedAction.TRY_AGAIN) {
 			attemptCreateIntake(true);
@@ -724,17 +775,7 @@ public final class NewIntakeController {
 	}
 
 	private void offerCreateFailureActions(String message) {
-		Optional<SaveBlockedAction> decision = AppDialogs.showChoice(
-				stage,
-				"Save Intake Failed",
-				"Save Intake Failed",
-				message,
-				List.of(
-						AppDialogs.DialogAction.of("Try Again", SaveBlockedAction.TRY_AGAIN, AppDialogs.DialogActionKind.PRIMARY, true, false),
-						AppDialogs.DialogAction.of("Save Local Backup", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
-						AppDialogs.DialogAction.of("Copy Intake Text", SaveBlockedAction.COPY_TEXT, AppDialogs.DialogActionKind.SECONDARY, false, false),
-						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)),
-				660);
+		Optional<SaveBlockedAction> decision = showRecoveryActionDialog("Save Intake Failed", message);
 		SaveBlockedAction action = decision.orElse(SaveBlockedAction.KEEP_EDITING);
 		if (action == SaveBlockedAction.TRY_AGAIN) {
 			attemptCreateIntake(true);
@@ -743,6 +784,24 @@ public final class NewIntakeController {
 		} else if (action == SaveBlockedAction.COPY_TEXT) {
 			copyIntakeTextToClipboard();
 		}
+	}
+
+	private Optional<SaveBlockedAction> showRecoveryActionDialog(String title, String message) {
+		return recoveryActionPresenter.show(
+				stage,
+				title,
+				title,
+				message,
+				recoveryDialogActions(),
+				660);
+	}
+
+	private List<AppDialogs.DialogAction<SaveBlockedAction>> recoveryDialogActions() {
+		return List.of(
+				AppDialogs.DialogAction.of("Try Again", SaveBlockedAction.TRY_AGAIN, AppDialogs.DialogActionKind.PRIMARY, true, false),
+				AppDialogs.DialogAction.of("Save Local Backup", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+				AppDialogs.DialogAction.of("Copy Intake Text", SaveBlockedAction.COPY_TEXT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+				AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING));
 	}
 
 	private void offerDraftRestoreIfPresent() {
@@ -1053,12 +1112,14 @@ public final class NewIntakeController {
 
 	private List<String> validate() {
 		PracticeAreaValidationResult practiceAreaState = loadTenantPracticeAreasForValidation();
-		boolean selectedPracticeAreaValid = selectedPracticeArea != null
-				&& (practiceAreaState.unverifiedDueToConnectivity()
-						|| practiceAreaState.practiceAreas().stream().anyMatch(area -> area.id() == selectedPracticeArea.id()));
-		String practiceAreaError = practiceAreaState.unverifiedDueToConnectivity()
-				? "Shale could not connect to the database to verify practice areas. Your intake was not saved. You can save a local backup and retry later."
-				: practiceAreaState.practiceAreas().isEmpty() ? "No tenant practice areas are configured. Please contact support." : null;
+		List<String> practiceAreaErrors = validatePracticeAreaSelection(practiceAreaState);
+		return java.util.stream.Stream.concat(
+				validateRequiredFields().stream(),
+				practiceAreaErrors.stream()
+		).filter(s -> s != null && !s.isBlank()).toList();
+	}
+
+	private List<String> validateRequiredFields() {
 		return java.util.stream.Stream.of(
 				required(caseNameField.getText(), "Case Name is required."),
 				requiredDate(dateOfIntakePicker.getValue(), "Date of Intake is required."),
@@ -1066,13 +1127,28 @@ public final class NewIntakeController {
 				required(clientFirstNameField.getText(), "Client First Name is required."),
 				required(clientLastNameField.getText(), "Client Last Name is required."),
 				required(clientPhoneField.getText(), "Client Phone Number is required."),
-				practiceAreaError,
-				practiceAreaError == null && !selectedPracticeAreaValid ? "Practice Area is required." : null,
 				selectedStatus == null ? "Status is required." : null,
 				callerRequiredWhenNotClient(callerFirstNameField.getText(), "Caller First Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerPhoneField.getText(), "Caller Phone Number is required when Caller is Client is unchecked.")
 		).filter(s -> s != null && !s.isBlank()).toList();
+	}
+
+	private List<String> validatePracticeAreaSelection(PracticeAreaValidationResult practiceAreaState) {
+		boolean selectedPracticeAreaValid = selectedPracticeArea != null
+				&& (practiceAreaState.unverifiedDueToConnectivity()
+						|| practiceAreaState.practiceAreas().stream().anyMatch(area -> area.id() == selectedPracticeArea.id()));
+		String practiceAreaError = practiceAreaState.unverifiedDueToConnectivity()
+				? practiceAreaConnectivityMessage()
+				: practiceAreaState.practiceAreas().isEmpty() ? "No tenant practice areas are configured. Please contact support." : null;
+		return java.util.stream.Stream.of(
+				practiceAreaError,
+				practiceAreaError == null && !selectedPracticeAreaValid ? "Practice Area is required." : null
+		).filter(s -> s != null && !s.isBlank()).toList();
+	}
+
+	private String practiceAreaConnectivityMessage() {
+		return "Shale could not connect to the database to verify practice areas. Your intake was not saved. You can save a local backup and retry later.";
 	}
 
 	private PracticeAreaValidationResult loadTenantPracticeAreasForValidation() {
@@ -1403,5 +1479,16 @@ public final class NewIntakeController {
 		SAVE_DRAFT,
 		COPY_TEXT,
 		KEEP_EDITING
+	}
+
+	@FunctionalInterface
+	private interface RecoveryActionPresenter {
+		Optional<SaveBlockedAction> show(
+				Window owner,
+				String title,
+				String header,
+				String content,
+				List<AppDialogs.DialogAction<SaveBlockedAction>> actions,
+				double minWidth);
 	}
 }
