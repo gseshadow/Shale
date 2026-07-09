@@ -121,25 +121,6 @@
                 </HBox>
             </VBox>
 
-            <VBox fx:id="developerToolsSection" spacing="8" styleClass="strong-panel">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12"/>
-                </padding>
-                <Label text="Developer Tools" styleClass="search-section-title"/>
-                <Label text="Local-only tools for testing failure and fallback behavior. Hidden outside dev/local launches."
-                       styleClass="search-summary-text" wrapText="true"/>
-                <HBox spacing="8">
-                    <Button fx:id="forceNextIntakeSaveFailureButton"
-                            text="Force next intake save failure"
-                            styleClass="app-toolbar-button app-toolbar-button-danger app-toolbar-button-compact"
-                            onAction="#onForceNextIntakeSaveFailure"/>
-                    <Button fx:id="clearForcedIntakeSaveFailureButton"
-                            text="Clear forced intake failure"
-                            styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact"
-                            onAction="#onClearForcedIntakeSaveFailure"/>
-                    <Label fx:id="developerToolsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
-                </HBox>
-            </VBox>
 
             <VBox fx:id="auditSection" spacing="8" styleClass="strong-panel">
                 <padding>

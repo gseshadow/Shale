@@ -11,7 +11,6 @@ import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.services.UiRuntimeBridge;
-import com.shale.ui.services.DevIntakeSaveFailureConfig;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
