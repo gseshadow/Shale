@@ -60,7 +60,17 @@ public final class AppDialogs {
 			String heading,
 			String message,
 			List<DialogAction<T>> actions) {
-		return showDialog(owner, title, heading, message, null, actions, 460);
+		return showChoice(owner, title, heading, message, actions, 460);
+	}
+
+	public static <T> Optional<T> showChoice(
+			Window owner,
+			String title,
+			String heading,
+			String message,
+			List<DialogAction<T>> actions,
+			double minWidth) {
+		return showDialog(owner, title, heading, message, null, actions, minWidth);
 	}
 
 	public static Stage createModalStage(Window owner, String title) {
@@ -268,6 +278,9 @@ public final class AppDialogs {
 		actionsRow.getChildren().add(spacer);
 		for (DialogAction<T> action : actions) {
 			Button button = new Button(action.text());
+			double buttonWidth = buttonPrefWidthForActionText(action.text());
+			button.setMinWidth(buttonWidth);
+			button.setPrefWidth(buttonWidth);
 			button.getStyleClass().add("app-dialog-button");
 			button.getStyleClass().add(action.kind().styleClass());
 			button.setDefaultButton(action.defaultAction());
@@ -292,6 +305,10 @@ public final class AppDialogs {
 				CONFIRMATION_DIALOG_MIN_HEIGHT);
 		stage.showAndWait();
 		return Optional.ofNullable(result.value);
+	}
+
+	static double buttonPrefWidthForActionText(String text) {
+		return Math.max(128, (text == null ? 0 : text.length()) * 8.0 + 32);
 	}
 
 	private static boolean isBlank(String value) {
