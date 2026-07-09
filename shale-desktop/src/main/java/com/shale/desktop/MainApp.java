@@ -4,6 +4,7 @@ import com.shale.data.auth.AuthService;
 import com.shale.desktop.live.LiveEventDispatcher;
 import com.shale.desktop.navigation.SceneRouter;
 import com.shale.desktop.security.SessionContext;
+import com.shale.ui.services.DevIntakeSaveFailureConfig;
 import javafx.application.Application;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
@@ -27,6 +28,7 @@ public final class MainApp extends Application {
 		}
 
 		DesktopConfig config = DesktopConfig.load(); // builds AuthService, db config, etc.
+		DevIntakeSaveFailureConfig.logStartupResolution();
 
 		AuthService authService = config.getAuthService();
 		LiveEventDispatcher dispatcher = new LiveEventDispatcher();
