@@ -1,6 +1,8 @@
 package com.shale.ui.services;
 
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /**
  * Resolves the developer-only forced New Intake save failure switch.
@@ -13,9 +15,12 @@ public final class DevIntakeSaveFailureConfig {
 	public static final String FORCE_FAILURE_PROPERTY = "shale.dev.forceIntakeSaveFailure";
 	public static final String SHALE_PROFILE_PROPERTY = "shale.profile";
 	public static final String APP_PROFILE_PROPERTY = "app.profile";
+	public static final String APP_ENV_PROPERTY = "APP_ENV";
 	public static final String DEV_ENABLED_PROPERTY = "shale.dev.enabled";
 	public static final String LAUNCH_MODE_PROPERTY = "shale.launchMode";
 	public static final String JAVAFX_MAVEN_PLUGIN_LAUNCH_MODE = "javafx-maven-plugin";
+
+	private static final AtomicBoolean forceNextIntakeSaveFailure = new AtomicBoolean(false);
 
 	private DevIntakeSaveFailureConfig() {
 	}
@@ -24,19 +29,21 @@ public final class DevIntakeSaveFailureConfig {
 		String forceValue = System.getProperty(FORCE_FAILURE_PROPERTY);
 		String shaleProfile = System.getProperty(SHALE_PROFILE_PROPERTY);
 		String appProfile = System.getProperty(APP_PROFILE_PROPERTY);
+		String appEnv = System.getProperty(APP_ENV_PROPERTY);
 		String devEnabledValue = System.getProperty(DEV_ENABLED_PROPERTY);
 		String launchMode = System.getProperty(LAUNCH_MODE_PROPERTY);
-		return resolve(forceValue, shaleProfile, appProfile, devEnabledValue, launchMode);
+		return resolve(forceValue, shaleProfile, appProfile, appEnv, devEnabledValue, launchMode);
 	}
 
 	static Resolution resolve(
 			String forceValue,
 			String shaleProfile,
 			String appProfile,
+			String appEnv,
 			String devEnabledValue,
 			String launchMode) {
 		boolean forceDetected = Boolean.parseBoolean(blankToFalse(forceValue));
-		String activeProfile = firstNonBlank(shaleProfile, appProfile, "");
+		String activeProfile = firstNonBlank(shaleProfile, appProfile, appEnv, "");
 		boolean profileDevMode = isDevProfile(activeProfile);
 		boolean explicitDevMode = Boolean.parseBoolean(blankToFalse(devEnabledValue));
 		boolean javafxMavenRun = JAVAFX_MAVEN_PLUGIN_LAUNCH_MODE.equalsIgnoreCase(safeTrim(launchMode));
@@ -53,6 +60,48 @@ public final class DevIntakeSaveFailureConfig {
 		return new Resolution(forceDetected, enabled, activeProfile, devMode, profileDevMode, explicitDevMode, javafxMavenRun, reason);
 	}
 
+	public static boolean isDeveloperModeActive() {
+		return resolveFromSystemProperties().devMode();
+	}
+
+	public static boolean isNextIntakeSaveFailureArmed() {
+		return forceNextIntakeSaveFailure.get();
+	}
+
+	public static boolean armNextIntakeSaveFailureFromDeveloperUi() {
+		Resolution resolution = resolveFromSystemProperties();
+		if (!resolution.devMode()) {
+			System.out.println("[DevIntakeSaveFailure] dev trigger blocked; developer/local mode is inactive.");
+			return false;
+		}
+		forceNextIntakeSaveFailure.set(true);
+		System.out.println("[DevIntakeSaveFailure] dev trigger enabled; next intake save will be forced to fail.");
+		return true;
+	}
+
+	public static boolean clearNextIntakeSaveFailure() {
+		boolean cleared = forceNextIntakeSaveFailure.getAndSet(false);
+		if (cleared) {
+			System.out.println("[DevIntakeSaveFailure] dev trigger cleared.");
+		}
+		return cleared;
+	}
+
+	public static boolean consumeNextIntakeSaveFailure() {
+		if (forceNextIntakeSaveFailure.compareAndSet(true, false)) {
+			System.out.println("[DevIntakeSaveFailure] forced intake save failure consumed/reset.");
+			return true;
+		}
+		return false;
+	}
+
+	public static <T> T runPrimaryIntakeSaveUnlessForced(Supplier<T> primarySave) {
+		if (consumeNextIntakeSaveFailure() || resolveFromSystemProperties().enabled()) {
+			throw new ForcedIntakeSaveFailureException("Forced New Intake save failure for local fallback testing.");
+		}
+		return primarySave.get();
+	}
+
 	public static void logStartupResolution() {
 		Resolution resolution = resolveFromSystemProperties();
 		System.out.println("[DevIntakeSaveFailure] startup activeProfile=" + printable(resolution.activeProfile())
@@ -62,6 +111,7 @@ public final class DevIntakeSaveFailureConfig {
 				+ " javafxMavenRun=" + resolution.javafxMavenRun()
 				+ " forcePropertyDetected=" + resolution.forcePropertyDetected()
 				+ " forcedIntakeFailureEnabled=" + resolution.enabled()
+				+ " devUiNextFailureArmed=" + isNextIntakeSaveFailureArmed()
 				+ " reason=\"" + resolution.reason() + "\"");
 	}
 
@@ -102,5 +152,11 @@ public final class DevIntakeSaveFailureConfig {
 			boolean explicitDevMode,
 			boolean javafxMavenRun,
 			String reason) {
+	}
+
+	public static final class ForcedIntakeSaveFailureException extends RuntimeException {
+		private ForcedIntakeSaveFailureException(String message) {
+			super(message);
+		}
 	}
 }

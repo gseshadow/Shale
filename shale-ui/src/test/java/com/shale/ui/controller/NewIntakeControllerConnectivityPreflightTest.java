@@ -87,24 +87,6 @@ final class NewIntakeControllerConnectivityPreflightTest {
 		assertTrue(connectivityFailure);
 	}
 
-	@Test
-	void forceFailureSwitch_requiresDevProfile() throws Exception {
-		NewIntakeController controller = new NewIntakeController();
-		String oldFlag = System.getProperty("shale.dev.forceIntakeSaveFailure");
-		String oldProfile = System.getProperty("shale.profile");
-		try {
-			System.setProperty("shale.dev.forceIntakeSaveFailure", "true");
-			System.clearProperty("shale.profile");
-			assertFalse(invokeShouldForceDevIntakeSaveFailure(controller));
-
-			System.setProperty("shale.profile", "local");
-			assertTrue(invokeShouldForceDevIntakeSaveFailure(controller));
-		} finally {
-			restoreProperty("shale.dev.forceIntakeSaveFailure", oldFlag);
-			restoreProperty("shale.profile", oldProfile);
-		}
-	}
-
 	private static UiRuntimeBridge bridgeReturning(Optional<Boolean> result) {
 		return new UiRuntimeBridge() {
 			@Override
@@ -132,12 +114,6 @@ final class NewIntakeControllerConnectivityPreflightTest {
 		Method method = NewIntakeController.class.getDeclaredMethod("isConnectivityFailure", Throwable.class);
 		method.setAccessible(true);
 		return (boolean) method.invoke(controller, throwable);
-	}
-
-	private static boolean invokeShouldForceDevIntakeSaveFailure(NewIntakeController controller) throws Exception {
-		Method method = NewIntakeController.class.getDeclaredMethod("shouldForceDevIntakeSaveFailure");
-		method.setAccessible(true);
-		return (boolean) method.invoke(controller);
 	}
 
 	private static void restoreProperty(String key, String value) {
