@@ -1052,7 +1052,7 @@ public final class NewIntakeController {
 	}
 
 	private List<String> validate() {
-		PracticeAreaValidationState practiceAreaState = loadTenantPracticeAreasForValidation();
+		PracticeAreaValidationResult practiceAreaState = loadTenantPracticeAreasForValidation();
 		boolean selectedPracticeAreaValid = selectedPracticeArea != null
 				&& (practiceAreaState.unverifiedDueToConnectivity()
 						|| practiceAreaState.practiceAreas().stream().anyMatch(area -> area.id() == selectedPracticeArea.id()));
@@ -1075,17 +1075,17 @@ public final class NewIntakeController {
 		).filter(s -> s != null && !s.isBlank()).toList();
 	}
 
-	private PracticeAreaValidationState loadTenantPracticeAreasForValidation() {
+	private PracticeAreaValidationResult loadTenantPracticeAreasForValidation() {
 		try {
-			return new PracticeAreaValidationState(caseDao.listPracticeAreasForTenant(requireClientId()), false);
+			return new PracticeAreaValidationResult(caseDao.listPracticeAreasForTenant(requireClientId()), false);
 		} catch (RuntimeException ex) {
 			if (isConnectivityFailure(ex)) {
 				System.err.println("[NewIntakeController] practice area validation connectivity failure " + saveContext(appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId()));
 				ex.printStackTrace(System.err);
 				knownOnlineState = Boolean.FALSE;
-				return new PracticeAreaValidationState(List.of(), true);
+				return new PracticeAreaValidationResult(List.of(), true);
 			}
-			return new PracticeAreaValidationState(List.of(), false);
+			return new PracticeAreaValidationResult(List.of(), false);
 		}
 	}
 
@@ -1393,12 +1393,7 @@ public final class NewIntakeController {
 			String organizationTypeId) {
 	}
 
-	private record PracticeAreaValidationState(
-			List<CaseDao.PracticeAreaRow> practiceAreas,
-			boolean unverifiedDueToConnectivity) {
-	}
-
-	private record PracticeAreaValidationState(
+	private record PracticeAreaValidationResult(
 			List<CaseDao.PracticeAreaRow> practiceAreas,
 			boolean unverifiedDueToConnectivity) {
 	}
