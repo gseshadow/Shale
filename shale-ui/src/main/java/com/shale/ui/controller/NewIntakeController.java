@@ -11,6 +11,7 @@ import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.DevIntakeSaveFailureConfig;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -22,6 +23,8 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -45,6 +48,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ArrayList;
 import java.util.function.Consumer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.sql.SQLException;
 import java.util.stream.Collectors;
 
 public final class NewIntakeController {
@@ -108,6 +114,11 @@ public final class NewIntakeController {
 	private Stage stage;
 	private Consumer<Integer> onCaseCreated;
 	private boolean saving;
+	private final ExecutorService intakeSaveExecutor = Executors.newSingleThreadExecutor(r -> {
+		Thread t = new Thread(r, "new-intake-save");
+		t.setDaemon(true);
+		return t;
+	});
 	private Boolean knownOnlineState;
 	private final Consumer<UiRuntimeBridge.ConnectivityEvent> connectivityHandler = event -> {
 		if (event != null) {
@@ -148,6 +159,7 @@ public final class NewIntakeController {
 				if (this.runtimeBridge != null) {
 					this.runtimeBridge.unsubscribeConnectivity(connectivityHandler);
 				}
+				intakeSaveExecutor.shutdownNow();
 			});
 			this.stage.setOnCloseRequest(event -> {
 				if (!confirmDiscardIfDirty()) {
@@ -569,9 +581,21 @@ public final class NewIntakeController {
 
 		setSaving(true);
 		int tenantId = requireClientId();
-		System.out.println("[NewIntakeController] create attempt started tenant=" + tenantId + " userId=" + (appState == null ? null : appState.getUserId()));
-		try {
-			CaseDao.NewIntakeCreateRequest request = new CaseDao.NewIntakeCreateRequest(
+		CaseDao.NewIntakeCreateRequest request = buildCreateRequest();
+		System.out.println("[NewIntakeController] create attempt started " + saveContext(tenantId));
+		intakeSaveExecutor.submit(() -> {
+			try {
+				CaseDao.NewIntakeCreateResult result = DevIntakeSaveFailureConfig.runPrimaryIntakeSaveUnlessForced(() -> caseDao.createIntake(request));
+				Platform.runLater(() -> handleCreateSuccess(tenantId, result));
+			} catch (RuntimeException ex) {
+				logCreateFailure(tenantId, ex);
+				Platform.runLater(() -> handleCreateFailure(ex));
+			}
+		});
+	}
+
+	private CaseDao.NewIntakeCreateRequest buildCreateRequest() {
+		return new CaseDao.NewIntakeCreateRequest(
 				requireClientId(),
 				safeTrim(caseNameField.getText()),
 				dateOfIntakePicker.getValue(),
@@ -613,25 +637,29 @@ public final class NewIntakeController {
 						party.organizationName(),
 						party.organizationTypeId())).toList(),
 				appState == null ? null : appState.getUserId()
-			);
+		);
+	}
 
-			CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
-			captureInitialSnapshot();
-			deleteLocalDraftIfPresent();
-			System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
-			showSuccess("Intake created successfully.");
-			if (stage != null)
-				stage.close();
-			if (onCaseCreated != null)
-				onCaseCreated.accept(Math.toIntExact(result.caseId()));
-		} catch (RuntimeException ex) {
-			System.err.println("[NewIntakeController] DAO create failed tenant=" + tenantId + " error=" + ex.getMessage());
-			ex.printStackTrace(System.err);
-			showValidation("Unable to save intake. Your information has not been discarded. Please try again.");
-			offerCreateFailureActions();
-		} finally {
-			setSaving(false);
-		}
+	private void handleCreateSuccess(int tenantId, CaseDao.NewIntakeCreateResult result) {
+		captureInitialSnapshot();
+		deleteLocalDraftIfPresent();
+		System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
+		showSuccess("Intake created successfully.");
+		setSaving(false);
+		if (stage != null)
+			stage.close();
+		if (onCaseCreated != null)
+			onCaseCreated.accept(Math.toIntExact(result.caseId()));
+	}
+
+	private void handleCreateFailure(RuntimeException ex) {
+		knownOnlineState = isConnectivityFailure(ex) ? Boolean.FALSE : knownOnlineState;
+		String message = isConnectivityFailure(ex)
+				? "Shale could not connect to the database. Your intake was not saved. You can save a local backup and retry later."
+				: "Unable to save intake. Your information has not been discarded. Please try again.";
+		showValidation(message);
+		setSaving(false);
+		offerCreateFailureActions(message);
 	}
 
 	private boolean shouldBlockCreateForOfflinePreflight() {
@@ -681,31 +709,37 @@ public final class NewIntakeController {
 				message,
 				List.of(
 						AppDialogs.DialogAction.of("Try Again", SaveBlockedAction.TRY_AGAIN, AppDialogs.DialogActionKind.PRIMARY, true, false),
-						AppDialogs.DialogAction.of("Save Draft Locally", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.of("Save Intake Locally", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.of("Copy Intake Text", SaveBlockedAction.COPY_TEXT, AppDialogs.DialogActionKind.SECONDARY, false, false),
 						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)));
 		SaveBlockedAction action = decision.orElse(SaveBlockedAction.KEEP_EDITING);
 		if (action == SaveBlockedAction.TRY_AGAIN) {
 			attemptCreateIntake(true);
 		} else if (action == SaveBlockedAction.SAVE_DRAFT) {
 			saveDraftLocally();
+		} else if (action == SaveBlockedAction.COPY_TEXT) {
+			copyIntakeTextToClipboard();
 		}
 	}
 
-	private void offerCreateFailureActions() {
+	private void offerCreateFailureActions(String message) {
 		Optional<SaveBlockedAction> decision = AppDialogs.showChoice(
 				stage,
 				"Save Intake Failed",
 				"Save Intake Failed",
-				"Shale could not save the intake right now. Your information is still here.",
+				message,
 				List.of(
 						AppDialogs.DialogAction.of("Try Again", SaveBlockedAction.TRY_AGAIN, AppDialogs.DialogActionKind.PRIMARY, true, false),
-						AppDialogs.DialogAction.of("Save Draft Locally", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.of("Save Intake Locally", SaveBlockedAction.SAVE_DRAFT, AppDialogs.DialogActionKind.SECONDARY, false, false),
+						AppDialogs.DialogAction.of("Copy Intake Text", SaveBlockedAction.COPY_TEXT, AppDialogs.DialogActionKind.SECONDARY, false, false),
 						AppDialogs.DialogAction.cancel("Keep Editing", SaveBlockedAction.KEEP_EDITING)));
 		SaveBlockedAction action = decision.orElse(SaveBlockedAction.KEEP_EDITING);
 		if (action == SaveBlockedAction.TRY_AGAIN) {
 			attemptCreateIntake(true);
 		} else if (action == SaveBlockedAction.SAVE_DRAFT) {
 			saveDraftLocally();
+		} else if (action == SaveBlockedAction.COPY_TEXT) {
+			copyIntakeTextToClipboard();
 		}
 	}
 
@@ -746,7 +780,9 @@ public final class NewIntakeController {
 			System.out.println("[NewIntakeController] local draft saved path=" + draftPath);
 		} catch (Exception ex) {
 			System.err.println("[NewIntakeController] local draft save failed: " + ex.getMessage());
-			showValidation("Unable to save a local draft right now. Your form is still open.");
+			ex.printStackTrace(System.err);
+			showValidation("Unable to save a local draft right now. Your form is still open. Use Copy Intake Text to keep an emergency copy.");
+			copyIntakeTextToClipboard();
 		}
 	}
 
@@ -846,6 +882,43 @@ public final class NewIntakeController {
 			return;
 		}
 		renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
+	}
+
+	private void copyIntakeTextToClipboard() {
+		ClipboardContent content = new ClipboardContent();
+		content.putString(GSON.toJson(new DraftPayload(1, captureCurrentSnapshot())));
+		Clipboard.getSystemClipboard().setContent(content);
+		showSuccess("Intake text copied to the clipboard.");
+	}
+
+	private boolean isConnectivityFailure(Throwable throwable) {
+		Throwable current = throwable;
+		while (current != null) {
+			if (current instanceof DevIntakeSaveFailureConfig.ForcedIntakeSaveFailureException) return true;
+			if (current instanceof SQLException sqlEx) {
+				String state = sqlEx.getSQLState();
+				if (state != null && (state.startsWith("08") || state.equals("HYT00") || state.equals("HYT01"))) return true;
+			}
+			String name = current.getClass().getName().toLowerCase();
+			String msg = String.valueOf(current.getMessage()).toLowerCase();
+			if (name.contains("sqlserverexception") && (msg.contains("connection") || msg.contains("network") || msg.contains("socket") || msg.contains("timeout"))) return true;
+			if (msg.contains("connection") || msg.contains("network") || msg.contains("socket") || msg.contains("timed out") || msg.contains("timeout")) return true;
+			current = current.getCause();
+		}
+		return false;
+	}
+
+	private void logCreateFailure(int tenantId, RuntimeException ex) {
+		System.err.println("[NewIntakeController] DAO create failed " + saveContext(tenantId) + " connectivity=" + isConnectivityFailure(ex) + " error=" + ex.getMessage());
+		ex.printStackTrace(System.err);
+	}
+
+	private String saveContext(int tenantId) {
+		return "tenant=" + tenantId
+				+ " userId=" + (appState == null ? null : appState.getUserId())
+				+ " userEmail=" + (appState == null ? null : appState.getUserEmail())
+				+ " shaleClientId=" + (appState == null ? null : appState.getShaleClientId())
+				+ " appVersion=" + System.getProperty("shale.version", System.getProperty("app.version", "unknown"));
 	}
 
 	private Path resolveDraftPath() {
@@ -971,11 +1044,13 @@ public final class NewIntakeController {
 	}
 
 	private List<String> validate() {
-		List<CaseDao.PracticeAreaRow> tenantPracticeAreas = loadTenantPracticeAreasForValidation();
-		boolean hasTenantPracticeAreas = !tenantPracticeAreas.isEmpty();
-		boolean selectedPracticeAreaValid = hasTenantPracticeAreas
-				&& selectedPracticeArea != null
-				&& tenantPracticeAreas.stream().anyMatch(area -> area.id() == selectedPracticeArea.id());
+		PracticeAreaValidationState practiceAreaState = loadTenantPracticeAreasForValidation();
+		boolean selectedPracticeAreaValid = selectedPracticeArea != null
+				&& (practiceAreaState.unverifiedDueToConnectivity()
+						|| practiceAreaState.practiceAreas().stream().anyMatch(area -> area.id() == selectedPracticeArea.id()));
+		String practiceAreaError = practiceAreaState.unverifiedDueToConnectivity()
+				? "Shale could not connect to the database to verify practice areas. Your intake was not saved. You can save a local backup and retry later."
+				: practiceAreaState.practiceAreas().isEmpty() ? "No tenant practice areas are configured. Please contact support." : null;
 		return java.util.stream.Stream.of(
 				required(caseNameField.getText(), "Case Name is required."),
 				requiredDate(dateOfIntakePicker.getValue(), "Date of Intake is required."),
@@ -983,8 +1058,8 @@ public final class NewIntakeController {
 				required(clientFirstNameField.getText(), "Client First Name is required."),
 				required(clientLastNameField.getText(), "Client Last Name is required."),
 				required(clientPhoneField.getText(), "Client Phone Number is required."),
-				!hasTenantPracticeAreas ? "No tenant practice areas are configured. Please contact support." : null,
-				hasTenantPracticeAreas && !selectedPracticeAreaValid ? "Practice Area is required." : null,
+				practiceAreaError,
+				practiceAreaError == null && !selectedPracticeAreaValid ? "Practice Area is required." : null,
 				selectedStatus == null ? "Status is required." : null,
 				callerRequiredWhenNotClient(callerFirstNameField.getText(), "Caller First Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked."),
@@ -992,11 +1067,17 @@ public final class NewIntakeController {
 		).filter(s -> s != null && !s.isBlank()).toList();
 	}
 
-	private List<CaseDao.PracticeAreaRow> loadTenantPracticeAreasForValidation() {
+	private PracticeAreaValidationState loadTenantPracticeAreasForValidation() {
 		try {
-			return caseDao.listPracticeAreasForTenant(requireClientId());
+			return new PracticeAreaValidationState(caseDao.listPracticeAreasForTenant(requireClientId()), false);
 		} catch (RuntimeException ex) {
-			return List.of();
+			if (isConnectivityFailure(ex)) {
+				System.err.println("[NewIntakeController] practice area validation connectivity failure " + saveContext(appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId()));
+				ex.printStackTrace(System.err);
+				knownOnlineState = Boolean.FALSE;
+				return new PracticeAreaValidationState(List.of(), true);
+			}
+			return new PracticeAreaValidationState(List.of(), false);
 		}
 	}
 
@@ -1095,9 +1176,15 @@ public final class NewIntakeController {
 			IntakeFormSnapshot snapshot) {
 	}
 
+	private record PracticeAreaValidationState(
+			List<CaseDao.PracticeAreaRow> practiceAreas,
+			boolean unverifiedDueToConnectivity) {
+	}
+
 	private enum SaveBlockedAction {
 		TRY_AGAIN,
 		SAVE_DRAFT,
+		COPY_TEXT,
 		KEEP_EDITING
 	}
 }
