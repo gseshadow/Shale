@@ -4,6 +4,7 @@ import com.shale.data.auth.AuthService;
 import com.shale.desktop.live.LiveEventDispatcher;
 import com.shale.desktop.navigation.SceneRouter;
 import com.shale.desktop.security.SessionContext;
+import com.shale.ui.services.DevIntakeSaveFailureConfig;
 import javafx.application.Application;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
