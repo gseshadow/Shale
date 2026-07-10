@@ -83,11 +83,70 @@ public final class CalendarFeedDao {
             }
         } catch (SQLException e) { throw new RuntimeException("Failed to load calendar task card rows", e); }
     }
+    record CaseDateProjection(String keyPrefix, String columnName, String titlePrefix, String systemKey, String displayTypeName) {
+        boolean deadline() {
+            return "STATUTE_OF_LIMITATIONS".equals(systemKey)
+                    || "TORT_NOTICE_DEADLINE".equals(systemKey)
+                    || "DISCOVERY_DEADLINE".equals(systemKey);
+        }
+    }
+
+    static final List<CaseDateProjection> CASE_DATE_PROJECTIONS = List.of(
+            new CaseDateProjection("CASE_SOL", "StatuteOfLimitations", "SOL", "STATUTE_OF_LIMITATIONS", "Statute of Limitations"),
+            new CaseDateProjection("CASE_TORT", "TortNoticeDeadline", "Tort Notice", "TORT_NOTICE_DEADLINE", "Tort Notice Deadline"),
+            new CaseDateProjection("CASE_DISC", "DiscoveryDeadline", "Discovery Deadline", "DISCOVERY_DEADLINE", "Discovery Deadline"),
+            new CaseDateProjection("CASE_CALLER", "CallerDate", "Intake", "CASE_DATE", "Case Date"),
+            new CaseDateProjection("CASE_ACCEPTED", "AcceptedDate", "Accepted", "CASE_DATE", "Case Date"),
+            new CaseDateProjection("CASE_DENIED", "DeniedDate", "Denied", "CASE_DATE", "Case Date"),
+            new CaseDateProjection("CASE_CLOSED", "ClosedDate", "Closed", "CASE_DATE", "Case Date"),
+            new CaseDateProjection("CASE_INJURY", "DateOfInjury", "Date of Injury", "CASE_DATE", "Case Date"),
+            new CaseDateProjection("CASE_FEE_AGREEMENT", "DateFeeAgreementSigned", "Fee Agreement Signed", "CASE_DATE", "Case Date"),
+            new CaseDateProjection("CASE_NON_ENGAGEMENT", "DateNonEngagementLetterSent", "Non-Engagement Letter Sent", "CASE_DATE", "Case Date"),
+            new CaseDateProjection("CASE_MED_NEG", "DateOfMedicalNegligence", "Medical Negligence", "CASE_DATE", "Case Date"),
+            new CaseDateProjection("CASE_MED_NEG_DISCOVERED", "DateMedicalNegligenceWasDiscovered", "Medical Negligence Discovered", "CASE_DATE", "Case Date"));
+
     public List<CalendarFeedItem> listCalendarFeed(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive) {
         if (shaleClientId <= 0 || startInclusive == null || endExclusive == null) {
             return List.of();
         }
-        String sql = """
+        String sql = buildCalendarFeedSql();
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            int i = 1;
+            ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive));
+            ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive));
+            LocalDate startDate = startInclusive.toLocalDate();
+            LocalDate endDate = endExclusive.toLocalDate();
+            for (int branch = 0; branch < CASE_DATE_PROJECTIONS.size(); branch++) {
+                ps.setInt(i++, shaleClientId); ps.setDate(i++, Date.valueOf(startDate)); ps.setDate(i++, Date.valueOf(endDate));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                List<CalendarFeedItem> rows = new ArrayList<>();
+                while (rs.next()) {
+                    rows.add(new CalendarFeedItem(
+                            rs.getString("KeyValue"),
+                            rs.getString("Title"),
+                            rs.getTimestamp("StartsAt").toLocalDateTime(),
+                            rs.getTimestamp("EndsAt") == null ? null : rs.getTimestamp("EndsAt").toLocalDateTime(),
+                            rs.getBoolean("AllDay"),
+                            rs.getString("SourceType"),
+                            rs.getString("SourceField"),
+                            (Integer) rs.getObject("CaseId"),
+                            (Integer) rs.getObject("TaskId"),
+                            rs.getString("RelatedDisplayName"),
+                            rs.getString("CalendarEventTypeSystemKey"),
+                            rs.getString("DisplayTypeName"),
+                            rs.getString("ColorHex"),
+                            rs.getString("AssignedUserColor")));
+                }
+                return rows;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to list calendar feed", e);
+        }
+    }
+
+    static String buildCalendarFeedSql() {
+        StringBuilder sql = new StringBuilder("""
                 SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex, AssignedUserColor
                 FROM (
                     SELECT CONCAT('EVENT:', CAST(e.CalendarEventId AS varchar(20))) AS KeyValue,
@@ -111,6 +170,7 @@ public final class CalendarFeedDao {
                     WHERE e.ShaleClientId = ?
                       AND e.StartsAt >= ?
                       AND e.StartsAt < ?
+                      AND ISNULL(e.IsCancelled, 0) = 0
 
                     UNION ALL
 
@@ -143,137 +203,63 @@ public final class CalendarFeedDao {
                       AND t.DueAt >= ?
                       AND t.DueAt < ?
                       AND ISNULL(t.IsDeleted, 0) = 0
-
-                    UNION ALL
-
-                    SELECT CONCAT('CASE_SOL:', CAST(c.Id AS varchar(20))),
-                           'Statute of limitations',
-                           CAST(c.StatuteOfLimitations AS datetime2),
-                           NULL,
-                           1,
-                           'PROJECTED',
-                           'StatuteOfLimitations',
-                           c.Id,
-                           NULL,
-                           c.Name,
-                           'STATUTE_OF_LIMITATIONS',
-                           'Statute of Limitations',
-                           projectedType.ColorHex,
-                           NULL AS AssignedUserColor
-                    FROM dbo.Cases c
-                    OUTER APPLY (
-                      SELECT TOP (1) cet.ColorHex
-                      FROM dbo.CalendarEventTypes cet
-                      WHERE cet.SystemKey = 'STATUTE_OF_LIMITATIONS'
-                        AND cet.IsActive = 1
-                        AND (cet.ShaleClientId = c.ShaleClientId OR cet.ShaleClientId IS NULL)
-                      ORDER BY CASE WHEN cet.ShaleClientId = c.ShaleClientId THEN 0 ELSE 1 END,
-                               cet.CalendarEventTypeId DESC
-                    ) projectedType
-                    WHERE c.ShaleClientId = ?
-                      AND c.StatuteOfLimitations IS NOT NULL
-                      AND c.StatuteOfLimitations >= CAST(? AS date)
-                      AND c.StatuteOfLimitations < CAST(? AS date)
-                      AND ISNULL(c.IsDeleted, 0) = 0
-
-                    UNION ALL
-
-                    SELECT CONCAT('CASE_TORT:', CAST(c.Id AS varchar(20))),
-                           'Tort notice deadline',
-                           CAST(c.TortNoticeDeadline AS datetime2),
-                           NULL,
-                           1,
-                           'PROJECTED',
-                           'TortNoticeDeadline',
-                           c.Id,
-                           NULL,
-                           c.Name,
-                           'TORT_NOTICE_DEADLINE',
-                           'Tort Notice Deadline',
-                           projectedType.ColorHex,
-                           NULL AS AssignedUserColor
-                    FROM dbo.Cases c
-                    OUTER APPLY (
-                      SELECT TOP (1) cet.ColorHex
-                      FROM dbo.CalendarEventTypes cet
-                      WHERE cet.SystemKey = 'TORT_NOTICE_DEADLINE'
-                        AND cet.IsActive = 1
-                        AND (cet.ShaleClientId = c.ShaleClientId OR cet.ShaleClientId IS NULL)
-                      ORDER BY CASE WHEN cet.ShaleClientId = c.ShaleClientId THEN 0 ELSE 1 END,
-                               cet.CalendarEventTypeId DESC
-                    ) projectedType
-                    WHERE c.ShaleClientId = ?
-                      AND c.TortNoticeDeadline IS NOT NULL
-                      AND c.TortNoticeDeadline >= CAST(? AS date)
-                      AND c.TortNoticeDeadline < CAST(? AS date)
-                      AND ISNULL(c.IsDeleted, 0) = 0
-
-                    UNION ALL
-
-                    SELECT CONCAT('CASE_DISC:', CAST(c.Id AS varchar(20))),
-                           'Discovery deadline',
-                           CAST(c.DiscoveryDeadline AS datetime2),
-                           NULL,
-                           1,
-                           'PROJECTED',
-                           'DiscoveryDeadline',
-                           c.Id,
-                           NULL,
-                           c.Name,
-                           'DISCOVERY_DEADLINE',
-                           'Discovery Deadline',
-                           projectedType.ColorHex,
-                           NULL AS AssignedUserColor
-                    FROM dbo.Cases c
-                    OUTER APPLY (
-                      SELECT TOP (1) cet.ColorHex
-                      FROM dbo.CalendarEventTypes cet
-                      WHERE cet.SystemKey = 'DISCOVERY_DEADLINE'
-                        AND cet.IsActive = 1
-                        AND (cet.ShaleClientId = c.ShaleClientId OR cet.ShaleClientId IS NULL)
-                      ORDER BY CASE WHEN cet.ShaleClientId = c.ShaleClientId THEN 0 ELSE 1 END,
-                               cet.CalendarEventTypeId DESC
-                    ) projectedType
-                    WHERE c.ShaleClientId = ?
-                      AND c.DiscoveryDeadline IS NOT NULL
-                      AND c.DiscoveryDeadline >= CAST(? AS date)
-                      AND c.DiscoveryDeadline < CAST(? AS date)
-                      AND ISNULL(c.IsDeleted, 0) = 0
-                ) feed
-                ORDER BY StartsAt ASC, KeyValue ASC;
-                """;
-        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-            int i = 1;
-            ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive));
-            ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive));
-            LocalDate startDate = startInclusive.toLocalDate();
-            LocalDate endDate = endExclusive.toLocalDate();
-            ps.setInt(i++, shaleClientId); ps.setDate(i++, Date.valueOf(startDate)); ps.setDate(i++, Date.valueOf(endDate));
-            ps.setInt(i++, shaleClientId); ps.setDate(i++, Date.valueOf(startDate)); ps.setDate(i++, Date.valueOf(endDate));
-            ps.setInt(i++, shaleClientId); ps.setDate(i++, Date.valueOf(startDate)); ps.setDate(i++, Date.valueOf(endDate));
-            try (ResultSet rs = ps.executeQuery()) {
-                List<CalendarFeedItem> rows = new ArrayList<>();
-                while (rs.next()) {
-                    rows.add(new CalendarFeedItem(
-                            rs.getString("KeyValue"),
-                            rs.getString("Title"),
-                            rs.getTimestamp("StartsAt").toLocalDateTime(),
-                            rs.getTimestamp("EndsAt") == null ? null : rs.getTimestamp("EndsAt").toLocalDateTime(),
-                            rs.getBoolean("AllDay"),
-                            rs.getString("SourceType"),
-                            rs.getString("SourceField"),
-                            (Integer) rs.getObject("CaseId"),
-                            (Integer) rs.getObject("TaskId"),
-                            rs.getString("RelatedDisplayName"),
-                            rs.getString("CalendarEventTypeSystemKey"),
-                            rs.getString("DisplayTypeName"),
-                            rs.getString("ColorHex"),
-                            rs.getString("AssignedUserColor")));
-                }
-                return rows;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to list calendar feed", e);
+                      AND t.CompletedAt IS NULL
+                """);
+        for (CaseDateProjection projection : CASE_DATE_PROJECTIONS) {
+            sql.append("\n                    UNION ALL\n\n").append(caseDateBranch(projection));
         }
+        sql.append("""
+                ) feed
+                ORDER BY StartsAt ASC, AllDay DESC, KeyValue ASC;
+                """);
+        return sql.toString();
     }
+
+    private static String caseDateBranch(CaseDateProjection projection) {
+        String fallbackSystemKey = projection.deadline() ? "DEADLINE" : "REMINDER";
+        return """
+                    SELECT CONCAT('%s:', CAST(c.Id AS varchar(20))),
+                           CONCAT('%s', N' — ', c.Name),
+                           CAST(c.%s AS datetime2),
+                           NULL,
+                           1,
+                           'PROJECTED',
+                           '%s',
+                           c.Id,
+                           NULL,
+                           c.Name,
+                           COALESCE(projectedType.SystemKey, fallbackType.SystemKey, '%s'),
+                           COALESCE(projectedType.Name, fallbackType.Name, '%s'),
+                           COALESCE(projectedType.ColorHex, fallbackType.ColorHex),
+                           NULL AS AssignedUserColor
+                    FROM dbo.Cases c
+                    OUTER APPLY (
+                      SELECT TOP (1) cet.SystemKey, cet.Name, cet.ColorHex
+                      FROM dbo.CalendarEventTypes cet
+                      WHERE cet.SystemKey = '%s'
+                        AND cet.IsActive = 1
+                        AND (cet.ShaleClientId = c.ShaleClientId OR cet.ShaleClientId IS NULL)
+                      ORDER BY CASE WHEN cet.ShaleClientId = c.ShaleClientId THEN 0 ELSE 1 END,
+                               cet.CalendarEventTypeId DESC
+                    ) projectedType
+                    OUTER APPLY (
+                      SELECT TOP (1) cet.SystemKey, cet.Name, cet.ColorHex
+                      FROM dbo.CalendarEventTypes cet
+                      WHERE cet.SystemKey = '%s'
+                        AND cet.IsActive = 1
+                        AND (cet.ShaleClientId = c.ShaleClientId OR cet.ShaleClientId IS NULL)
+                      ORDER BY CASE WHEN cet.ShaleClientId = c.ShaleClientId THEN 0 ELSE 1 END,
+                               cet.CalendarEventTypeId DESC
+                    ) fallbackType
+                    WHERE c.ShaleClientId = ?
+                      AND c.%s IS NOT NULL
+                      AND c.%s >= CAST(? AS date)
+                      AND c.%s < CAST(? AS date)
+                      AND ISNULL(c.IsDeleted, 0) = 0
+                """.formatted(
+                projection.keyPrefix(), projection.titlePrefix().replace("'", "''"), projection.columnName(), projection.columnName(),
+                projection.systemKey(), projection.displayTypeName().replace("'", "''"), projection.systemKey(), fallbackSystemKey,
+                projection.columnName(), projection.columnName(), projection.columnName());
+    }
+
 }
