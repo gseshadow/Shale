@@ -73,6 +73,11 @@ public final class CalendarService {
         String key = type.systemKey() == null ? "" : type.systemKey().trim().toUpperCase();
         return !key.startsWith("PROJECTED_")
                 && !"TASK_DUE_DATE".equals(key)
-                && !"CASE_DEADLINE".equals(key);
+                && !"TASK_DUE".equals(key)
+                && !"CASE_DEADLINE".equals(key)
+                && !"STATUTE_OF_LIMITATIONS".equals(key)
+                && !"TORT_NOTICE_DEADLINE".equals(key)
+                && !"DISCOVERY_DEADLINE".equals(key)
+                && !"CASE_DATE".equals(key);
     }
 }
