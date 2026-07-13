@@ -634,7 +634,7 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), taskId -> openTaskProfile(taskId, c::refreshCurrentRange));
+			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openCalendarTaskLocation);
 			Integer pendingEventId = pendingCalendarNotificationEventId;
 			if (pendingEventId != null && pendingEventId > 0) {
 				pendingCalendarNotificationEventId = null;
@@ -896,6 +896,43 @@ public final class SceneManager {
 
 	private void openStatusProfile(Integer statusId) {
 		System.out.println("Navigate to Status: " + statusId);
+	}
+
+
+	private void openCalendarTaskLocation(Long taskId) {
+		if (taskId == null || taskId <= 0) {
+			System.err.println("Ignoring calendar task navigation for invalid taskId: " + taskId);
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			AppDialogs.showError(stage, "Tasks", "You must be signed in to view task details.");
+			return;
+		}
+		CaseTaskService caseTaskService = new CaseTaskService(
+				new TaskDao(dbSessionProvider),
+				new UserDao(dbSessionProvider),
+				runtimeBridge,
+				new NotificationDao(dbSessionProvider));
+		new Thread(() -> {
+			try {
+				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+				if (detail == null) {
+					Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted."));
+					return;
+				}
+				long caseId = detail.caseId();
+				Platform.runLater(() -> {
+					if (caseId > 0 && caseId <= Integer.MAX_VALUE) {
+						openCaseProfile((int) caseId, "TASKS");
+					} else {
+						openMyShaleView();
+					}
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
+			}
+		}, "calendar-task-navigation-" + taskId).start();
 	}
 
 	public void openTaskProfile(Long taskId) {
