@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
@@ -30,6 +31,16 @@
                 <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="170" styleClass="shale-filter-combo" />
                 <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="150" styleClass="shale-filter-combo" />
                 <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+            </children>
+        </HBox>
+
+        <HBox spacing="10" alignment="CENTER_LEFT" styleClass="shale-filter-panel calendar-source-filter-row">
+            <children>
+                <Label text="Layers" styleClass="shale-toolbar-heading" />
+                <CheckBox fx:id="eventsLayerCheckBox" text="Events" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
+                <CheckBox fx:id="tasksLayerCheckBox" text="Tasks" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
+                <CheckBox fx:id="deadlinesLayerCheckBox" text="Deadlines" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
+                <CheckBox fx:id="caseDatesLayerCheckBox" text="Case Dates" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
             </children>
         </HBox>
 

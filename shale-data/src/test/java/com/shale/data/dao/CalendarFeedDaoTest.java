@@ -45,6 +45,10 @@ class CalendarFeedDaoTest {
         assertTrue(sql.contains("AND ISNULL(c.IsDeleted, 0) = 0"));
         assertTrue(sql.contains("WHERE t.ShaleClientId = ?"));
         assertTrue(sql.contains("WHERE c.ShaleClientId = ?"));
+        assertTrue(sql.contains("LEFT JOIN dbo.Cases c ON c.Id = t.CaseId AND c.ShaleClientId = t.ShaleClientId AND ISNULL(c.IsDeleted, 0) = 0"));
+        assertTrue(sql.contains("c.Name AS CaseName"));
+        assertTrue(sql.contains("c.Name AS RelatedDisplayName"));
+        assertFalse(sql.contains("t.Title,\n                           'TASK_DUE'"), "task title must not occupy the case/related label slot");
         assertTrue(sql.contains("ORDER BY StartsAt ASC, AllDay DESC, KeyValue ASC"));
     }
 
