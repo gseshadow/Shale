@@ -131,6 +131,7 @@ public final class CalendarFeedDao {
                             rs.getString("SourceType"),
                             rs.getString("SourceField"),
                             (Integer) rs.getObject("CaseId"),
+                            rs.getString("CaseName"),
                             (Integer) rs.getObject("TaskId"),
                             rs.getString("RelatedDisplayName"),
                             rs.getString("CalendarEventTypeSystemKey"),
@@ -147,7 +148,7 @@ public final class CalendarFeedDao {
 
     static String buildCalendarFeedSql() {
         StringBuilder sql = new StringBuilder("""
-                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex, AssignedUserColor
+                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, CaseName, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex, AssignedUserColor
                 FROM (
                     SELECT CONCAT('EVENT:', CAST(e.CalendarEventId AS varchar(20))) AS KeyValue,
                            e.Title,
@@ -157,6 +158,7 @@ public final class CalendarFeedDao {
                            e.SourceType,
                            e.SourceField,
                            e.CaseId,
+                           c.Name AS CaseName,
                            e.TaskId,
                            c.Name AS RelatedDisplayName,
                            et.SystemKey AS CalendarEventTypeSystemKey,
@@ -182,8 +184,9 @@ public final class CalendarFeedDao {
                            'PROJECTED',
                            'DueAt',
                            t.CaseId,
+                           c.Name AS CaseName,
                            t.Id,
-                           t.Title,
+                           c.Name AS RelatedDisplayName,
                            'TASK_DUE',
                            'Task Due',
                            projectedType.ColorHex,
@@ -198,6 +201,7 @@ public final class CalendarFeedDao {
                       ORDER BY CASE WHEN cet.ShaleClientId = t.ShaleClientId THEN 0 ELSE 1 END,
                                cet.CalendarEventTypeId DESC
                     ) projectedType
+                    LEFT JOIN dbo.Cases c ON c.Id = t.CaseId AND c.ShaleClientId = t.ShaleClientId AND ISNULL(c.IsDeleted, 0) = 0
                     WHERE t.ShaleClientId = ?
                       AND t.DueAt IS NOT NULL
                       AND t.DueAt >= ?
@@ -226,6 +230,7 @@ public final class CalendarFeedDao {
                            'PROJECTED',
                            '%s',
                            c.Id,
+                           c.Name AS CaseName,
                            NULL,
                            c.Name,
                            COALESCE(projectedType.SystemKey, fallbackType.SystemKey, '%s'),
