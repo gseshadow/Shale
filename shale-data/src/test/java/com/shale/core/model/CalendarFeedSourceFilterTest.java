@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -72,6 +73,54 @@ class CalendarFeedSourceFilterTest {
         assertFalse(CalendarFeedFilters.matches(task, eventsOnly, "Alpha", 7, "TASK_DUE"));
     }
 
+
+    @Test
+    void caseOptionsUseAuthoritativeCaseNameAndIgnoreSourceSpecificTitles() {
+        List<CalendarFeedItem> items = List.of(
+                itemWithCaseName("TASK:1", "Call", "DueAt", 1, 42, "PROJECTED", "Smith v Jones", "TASK_DUE"),
+                itemWithCaseName("EVENT:2", "Event title", null, null, 43, "MANUAL", "Alpha Matter", "MEETING"),
+                itemWithCaseName("CASE_SOL:42", "SOL — Smith v Jones", "StatuteOfLimitations", null, 42, "PROJECTED", "Smith v Jones", "STATUTE_OF_LIMITATIONS"),
+                itemWithCaseName("CASE_CALLER:42", "Intake — Smith v Jones", "CallerDate", null, 42, "PROJECTED", "Smith v Jones", "CASE_DATE"),
+                itemWithCaseName("EVENT:3", "No case event", null, null, null, "MANUAL", null, "MEETING"));
+
+        List<CalendarCaseFilterOptions.CaseOption> options = CalendarCaseFilterOptions.fromFeedItems(items);
+
+        assertEquals("All cases", options.getFirst().displayName());
+        assertNull(options.getFirst().caseId());
+        assertEquals(List.of(43, 42), options.stream().filter(option -> !option.isAll()).map(CalendarCaseFilterOptions.CaseOption::caseId).toList());
+        assertEquals(List.of("Alpha Matter", "Smith v Jones"), options.stream().filter(option -> !option.isAll()).map(CalendarCaseFilterOptions.CaseOption::displayName).toList());
+        assertFalse(options.stream().anyMatch(option -> "Call".equals(option.displayName())));
+        assertFalse(options.stream().anyMatch(option -> "Event title".equals(option.displayName())));
+        assertFalse(options.stream().anyMatch(option -> "SOL — Smith v Jones".equals(option.displayName())));
+    }
+
+    @Test
+    void caseOptionsDeduplicateByCaseIdKeepDuplicateNamesDistinctAndSortByCaseNameThenId() {
+        List<CalendarFeedItem> items = List.of(
+                itemWithCaseName("TASK:1", "Call", "DueAt", 1, 20, "PROJECTED", "Zephyr", "TASK_DUE"),
+                itemWithCaseName("EVENT:2", "Review", null, null, 10, "MANUAL", "Acme", "MEETING"),
+                itemWithCaseName("CASE_SOL:10", "SOL — Acme", "StatuteOfLimitations", null, 10, "PROJECTED", "Acme", "STATUTE_OF_LIMITATIONS"),
+                itemWithCaseName("CASE_CALLER:12", "Intake — Acme", "CallerDate", null, 12, "PROJECTED", "Acme", "CASE_DATE"),
+                itemWithCaseName("TASK:3", "Missing case name", "DueAt", 3, 30, "PROJECTED", null, "TASK_DUE"),
+                itemWithCaseName("EVENT:4", "No case", null, null, null, "MANUAL", null, "MEETING"));
+
+        List<CalendarCaseFilterOptions.CaseOption> options = CalendarCaseFilterOptions.fromFeedItems(items);
+
+        assertEquals(Arrays.asList(null, 10, 12, 20), options.stream().map(CalendarCaseFilterOptions.CaseOption::caseId).toList());
+        assertEquals(List.of("All cases", "Acme", "Acme", "Zephyr"), options.stream().map(CalendarCaseFilterOptions.CaseOption::displayName).toList());
+    }
+
+    @Test
+    void selectingCaseStillMatchesAllSourceTypesForThatCase() {
+        CalendarFeedSourceFilter allLayers = new CalendarFeedSourceFilter(EnumSet.allOf(CalendarFeedCategory.class));
+        assertTrue(CalendarFeedFilters.matches(itemWithCaseName("EVENT:1", "Event", null, null, 7, "MANUAL", "Case Seven", "MEETING"), allLayers, "", 7, ""));
+        assertTrue(CalendarFeedFilters.matches(itemWithCaseName("TASK:1", "Task", "DueAt", 1, 7, "PROJECTED", "Case Seven", "TASK_DUE"), allLayers, "", 7, ""));
+        assertTrue(CalendarFeedFilters.matches(itemWithCaseName("CASE_SOL:7", "SOL", "StatuteOfLimitations", null, 7, "PROJECTED", "Case Seven", "STATUTE_OF_LIMITATIONS"), allLayers, "", 7, ""));
+        assertTrue(CalendarFeedFilters.matches(itemWithCaseName("CASE_CALLER:7", "Intake", "CallerDate", null, 7, "PROJECTED", "Case Seven", "CASE_DATE"), allLayers, "", 7, ""));
+        assertFalse(CalendarFeedFilters.matches(itemWithCaseName("EVENT:2", "Other", null, null, 8, "MANUAL", "Case Eight", "MEETING"), allLayers, "", 7, ""));
+        assertFalse(CalendarFeedFilters.matches(itemWithCaseName("EVENT:3", "No case", null, null, null, "MANUAL", null, "MEETING"), allLayers, "", 7, ""));
+    }
+
     @Test
     void allDisabledStateMatchesNoItems() {
         CalendarFeedSourceFilter filter = CalendarFeedSourceFilter.allDisabled();
@@ -85,6 +134,11 @@ class CalendarFeedSourceFilterTest {
     private static void assertDeadline(String sourceField) { assertEquals(CalendarFeedCategory.CASE_DEADLINES, CalendarFeedCategory.classify(item("CASE:" + sourceField, sourceField, null, 1, "PROJECTED", sourceField, 1, sourceField))); }
     private static void assertCaseDate(String sourceField) { assertEquals(CalendarFeedCategory.OTHER_CASE_DATES, CalendarFeedCategory.classify(item("CASE:" + sourceField, sourceField, null, 1, "PROJECTED", sourceField, 1, "CASE_DATE"))); }
     private static CalendarFeedItem item(String key, String sourceField, Integer taskId, Integer caseId, String sourceType, String title, Integer relatedCaseId, String typeKey) {
-        return new CalendarFeedItem(key, title, LocalDateTime.of(2026, 7, 10, 9, 0), null, true, sourceType, sourceField, caseId == null ? relatedCaseId : caseId, taskId, "Related", typeKey, typeKey, null, null);
+        Integer effectiveCaseId = caseId == null ? relatedCaseId : caseId;
+        return itemWithCaseName(key, title, sourceField, taskId, effectiveCaseId, sourceType, effectiveCaseId == null ? null : "Case " + effectiveCaseId, typeKey);
+    }
+
+    private static CalendarFeedItem itemWithCaseName(String key, String title, String sourceField, Integer taskId, Integer caseId, String sourceType, String caseName, String typeKey) {
+        return new CalendarFeedItem(key, title, LocalDateTime.of(2026, 7, 10, 9, 0), null, true, sourceType, sourceField, caseId, caseName, taskId, "Related", typeKey, typeKey, null, null);
     }
 }

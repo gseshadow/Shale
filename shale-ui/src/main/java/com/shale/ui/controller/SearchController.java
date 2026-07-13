@@ -406,6 +406,7 @@ public final class SearchController {
 					"MANUAL",
 					null,
 					row.caseId(),
+					row.caseName(),
 					null,
 					row.caseName(),
 					null,

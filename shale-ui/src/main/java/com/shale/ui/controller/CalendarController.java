@@ -1,5 +1,6 @@
 package com.shale.ui.controller;
 
+import com.shale.core.model.CalendarCaseFilterOptions;
 import com.shale.core.model.CalendarFeedCategory;
 import com.shale.core.model.CalendarFeedFilters;
 import com.shale.core.model.CalendarFeedItem;
@@ -50,7 +51,7 @@ public final class CalendarController {
     private static final String VIEW_DAY = "Day";
     private static final String VIEW_MONTH = "Month";
     private static final double HALF_HOUR_HEIGHT = 34.0;
-    private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All cases");
+    private static final CalendarCaseFilterOptions.CaseOption ALL_CASES_OPTION = CalendarCaseFilterOptions.ALL_CASES;
     private static final EventTypeFilterOption ALL_TYPES_OPTION = new EventTypeFilterOption("", "All types");
 
     @FXML private ChoiceBox<String> viewModeChoice;
@@ -59,7 +60,7 @@ public final class CalendarController {
     @FXML private Label calendarErrorLabel;
     @FXML private HBox weekBoard;
     @FXML private TextField searchTextField;
-    @FXML private ComboBox<CaseFilterOption> caseFilterCombo;
+    @FXML private ComboBox<CalendarCaseFilterOptions.CaseOption> caseFilterCombo;
     @FXML private ComboBox<EventTypeFilterOption> eventTypeFilterCombo;
     @FXML private Button clearFiltersButton;
     @FXML private CheckBox eventsLayerCheckBox;
@@ -115,8 +116,8 @@ public final class CalendarController {
         Platform.runLater(() -> loadCurrentRange(false));
     }
     private void configureFilters() {
-        caseFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(CaseFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All cases" : item.displayName()); }});
-        caseFilterCombo.setCellFactory(v -> new ListCell<>() { @Override protected void updateItem(CaseFilterOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "" : item.displayName()); }});
+        caseFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(CalendarCaseFilterOptions.CaseOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All cases" : item.displayName()); }});
+        caseFilterCombo.setCellFactory(v -> new ListCell<>() { @Override protected void updateItem(CalendarCaseFilterOptions.CaseOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "" : item.displayName()); }});
         caseFilterCombo.valueProperty().addListener((obs, o, n) -> {
             selectedCaseId = (n == null || n.isAll()) ? null : n.caseId();
             updateClearFiltersState();
@@ -245,7 +246,7 @@ public final class CalendarController {
     }
     private List<CalendarFeedItem> filterItems(List<CalendarFeedItem> items) {
         String search = safe(searchText).toLowerCase(Locale.ROOT);
-        CaseFilterOption activeCaseFilter = caseFilterCombo == null ? null : caseFilterCombo.getValue();
+        CalendarCaseFilterOptions.CaseOption activeCaseFilter = caseFilterCombo == null ? null : caseFilterCombo.getValue();
         EventTypeFilterOption activeTypeFilter = eventTypeFilterCombo == null ? null : eventTypeFilterCombo.getValue();
         Integer activeCaseId = (activeCaseFilter == null || activeCaseFilter.isAll()) ? null : activeCaseFilter.caseId();
         String activeTypeKey = (activeTypeFilter == null || activeTypeFilter.isAll()) ? "" : safe(activeTypeFilter.matchKey());
@@ -256,15 +257,10 @@ public final class CalendarController {
                 .toList();
     }
     private void refreshFilterOptions() {
-        Map<Integer, String> cases = new HashMap<>();
-        for (CalendarFeedItem i : loadedItems) if (i != null && i.caseId() != null) cases.putIfAbsent(i.caseId(), safe(i.relatedDisplayName()).isBlank() ? ("Case #" + i.caseId()) : i.relatedDisplayName());
-        List<CaseFilterOption> caseOptions = cases.entrySet().stream()
-                .map(e -> new CaseFilterOption(e.getKey(), e.getValue()))
-                .sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT)))
+        List<CalendarCaseFilterOptions.CaseOption> allCaseOptions = CalendarCaseFilterOptions.fromFeedItems(loadedItems);
+        List<CalendarCaseFilterOptions.CaseOption> caseOptions = allCaseOptions.stream()
+                .filter(option -> option != null && !option.isAll())
                 .toList();
-        List<CaseFilterOption> allCaseOptions = new ArrayList<>();
-        allCaseOptions.add(ALL_CASES_OPTION);
-        allCaseOptions.addAll(caseOptions);
         caseFilterCombo.getItems().setAll(allCaseOptions);
         if (selectedCaseId == null) caseFilterCombo.setValue(ALL_CASES_OPTION);
         else caseOptions.stream().filter(o -> Objects.equals(o.caseId(), selectedCaseId)).findFirst().ifPresentOrElse(caseFilterCombo::setValue, () -> { selectedCaseId = null; caseFilterCombo.setValue(ALL_CASES_OPTION); });
@@ -822,6 +818,5 @@ public final class CalendarController {
     private static String formatHourLabel(int hour24) { int hour12 = hour24 % 12; if (hour12 == 0) hour12 = 12; return hour12 + (hour24 < 12 ? " AM" : " PM"); }
     private void setLoading(boolean loading) { calendarLoadingLabel.setVisible(loading); calendarLoadingLabel.setManaged(loading); }
     private void showError(String text) { boolean has = text != null && !text.isBlank(); calendarErrorLabel.setText(has ? text : ""); calendarErrorLabel.setVisible(has); calendarErrorLabel.setManaged(has); }
-    private record CaseFilterOption(Integer caseId, String displayName) { boolean isAll() { return caseId == null; } }
     private record EventTypeFilterOption(String matchKey, String displayName) { boolean isAll() { return safe(matchKey).isBlank(); } }
 }
