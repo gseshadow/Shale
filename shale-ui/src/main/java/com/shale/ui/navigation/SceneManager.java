@@ -634,7 +634,7 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openCalendarTaskLocation);
+			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), taskId -> openTaskProfile(taskId, c::refreshCurrentRange));
 			Integer pendingEventId = pendingCalendarNotificationEventId;
 			if (pendingEventId != null && pendingEventId > 0) {
 				pendingCalendarNotificationEventId = null;

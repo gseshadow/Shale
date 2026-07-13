@@ -5,27 +5,23 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CalendarTaskNavigationTest {
     @Test
-    void calendarTaskNavigationUsesExistingCaseTasksSurfaceInsteadOfTaskDetailDialog() throws Exception {
+    void calendarTaskNavigationUsesSceneManagerTaskDetailsAndRefreshCallback() throws Exception {
         String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
-        String calendarSetup = sceneManager.substring(sceneManager.indexOf("public Parent createCalendarView()"), sceneManager.indexOf("public Parent createSearchView"));
-        String calendarTaskNavigation = sceneManager.substring(sceneManager.indexOf("private void openCalendarTaskLocation"), sceneManager.indexOf("public void openTaskProfile"));
+        String calendarController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
 
-        assertTrue(calendarSetup.contains("this::openCalendarTaskLocation"),
-                "Calendar projected task clicks should use the Calendar-specific navigation bridge to the existing task surface.");
-        assertFalse(calendarSetup.contains("this::openTaskProfile"),
-                "Calendar setup must not route projected task clicks through SceneManager.openTaskProfile.");
-        assertTrue(calendarTaskNavigation.contains("caseTaskService.loadTaskDetail(taskId, shaleClientId)"),
-                "Calendar task navigation should pass the real task id through tenant-safe task loading to locate the existing task surface.");
-        assertTrue(calendarTaskNavigation.contains("openCaseProfile((int) caseId, \"TASKS\")"),
-                "Case-linked Calendar tasks should navigate to the existing Case View Tasks tab/component.");
-        assertTrue(calendarTaskNavigation.contains("openMyShaleView()"),
-                "Unlinked Calendar tasks should fall back to the existing My Shale task surface instead of a task dialog.");
-        assertFalse(calendarTaskNavigation.contains("TaskDetailDialog.showAndWait"),
-                "Calendar task navigation must not open TaskDetailDialog directly or through openTaskProfile.");
+        assertTrue(sceneManager.contains("taskId -> openTaskProfile(taskId, c::refreshCurrentRange)"),
+                "Calendar projected task clicks should route through SceneManager's canonical task details opener with a Calendar refresh callback.");
+        assertTrue(sceneManager.contains("public void openTaskProfile(Long taskId, Runnable onTaskChanged)"),
+                "SceneManager should expose the existing task details opener with an optional mutation callback instead of adding a Calendar task dialog.");
+        assertTrue(sceneManager.contains("TaskDetailDialog.showAndWait"),
+                "SceneManager task navigation should continue to use the canonical TaskDetailDialog flow.");
+        assertTrue(sceneManager.contains("runTaskChangedCallback(onTaskChanged)"),
+                "Successful task saves/deletes/assignment edits should trigger the supplied refresh callback.");
+        assertTrue(calendarController.contains("public void refreshCurrentRange()"),
+                "Calendar should expose a narrow current-range refresh callback that preserves date, view, filters, and layer state.");
     }
 }
