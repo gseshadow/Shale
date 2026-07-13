@@ -959,7 +959,20 @@ public final class SceneManager {
 				new UserDao(dbSessionProvider),
 				runtimeBridge,
 				new NotificationDao(dbSessionProvider));
-		Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, onTaskChanged));
+		new Thread(() -> {
+			try {
+				TaskDetailDto initialDetail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
+				if (initialDetail == null) {
+					taskDetailDialogInFlight.set(false);
+					Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted."));
+					return;
+				}
+				Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, onTaskChanged, initialDetail));
+			} catch (Exception ex) {
+				taskDetailDialogInFlight.set(false);
+				Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
+			}
+		}, "scene-manager-open-task-detail-" + taskId).start();
 	}
 
 	private void showTaskDetailDialog(
@@ -967,24 +980,25 @@ public final class SceneManager {
 			int shaleClientId,
 			int currentUserId,
 			CaseTaskService caseTaskService,
-			Runnable onTaskChanged) {
+			Runnable onTaskChanged,
+			TaskDetailDto initialDetail) {
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 				taskId,
-				0L,
-				"",
-				"",
-				"",
-				null,
-				"",
-				"",
-				null,
-				null,
-				null,
-				"",
+				initialDetail == null ? 0L : initialDetail.caseId(),
+				initialDetail == null ? "" : initialDetail.caseName(),
+				initialDetail == null ? "" : initialDetail.caseResponsibleAttorney(),
+				initialDetail == null ? "" : initialDetail.caseResponsibleAttorneyColor(),
+				initialDetail == null ? null : initialDetail.caseNonEngagementLetterSent(),
+				initialDetail == null ? "" : initialDetail.title(),
+				initialDetail == null ? "" : initialDetail.description(),
+				initialDetail == null ? null : initialDetail.dueAt(),
+				initialDetail == null ? null : initialDetail.statusId(),
+				initialDetail == null ? null : initialDetail.priorityId(),
+				initialDetail == null ? "" : initialDetail.createdByDisplayName(),
 				List.of(),
 				List.of(),
 				List.of(),
-				false);
+				initialDetail != null && initialDetail.completedAt() != null);
 		java.util.concurrent.atomic.AtomicBoolean dialogMutatedAssignments = new java.util.concurrent.atomic.AtomicBoolean(false);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
 		phiReadAuditService.auditRead("Task.Detail.Read", "Task.Detail", "Task", taskId);

@@ -19,6 +19,12 @@ class CalendarTaskNavigationTest {
                 "SceneManager should expose the existing task details opener with an optional mutation callback instead of adding a Calendar task dialog.");
         assertTrue(sceneManager.contains("TaskDetailDialog.showAndWait"),
                 "SceneManager task navigation should continue to use the canonical TaskDetailDialog flow.");
+        assertTrue(sceneManager.contains("TaskDetailDto initialDetail = caseTaskService.loadTaskDetail(taskId, shaleClientId)"),
+                "The app-level task opener should preload the same tenant-safe TaskDetailDto used by My Shale before constructing the dialog model.");
+        assertTrue(sceneManager.contains("initialDetail == null ? 0L : initialDetail.caseId()"),
+                "The dialog's initial model should include hydrated case id data so the related Case section is visible immediately.");
+        assertTrue(sceneManager.contains("initialDetail == null ? \"\" : initialDetail.caseName()"),
+                "The dialog's initial model should include hydrated case name data so Calendar and My Shale display the same Case section.");
         assertTrue(sceneManager.contains("runTaskChangedCallback(onTaskChanged)"),
                 "Successful task saves/deletes/assignment edits should trigger the supplied refresh callback.");
         assertTrue(calendarController.contains("public void refreshCurrentRange()"),
