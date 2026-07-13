@@ -287,7 +287,14 @@ public final class CaseDao {
 	) {
 	}
 
-	private record CaseSchema(String deletedColumn) {
+	private record CaseSchema(String deletedColumn, String rowVersionColumn) {
+		String rowVersionSelectExpression(String alias) {
+			if (rowVersionColumn == null || rowVersionColumn.isBlank()) {
+				return "NULL AS RowVer";
+			}
+			String prefix = alias == null || alias.isBlank() ? "" : alias + ".";
+			return prefix + rowVersionColumn + " AS RowVer";
+		}
 	}
 
 	public record NewIntakeCreateRequest(
@@ -2447,7 +2454,7 @@ public final class CaseDao {
 				  c.Summary,
 				  c.ReceivedUpdates,
 				  c.UpdatedAt,
-				  c.RowVer,
+				  %s,
 				  current_status.CurrentStatusName,
 				  LTRIM(RTRIM(
 				    COALESCE(ra_user.name_first, '') +
@@ -2483,7 +2490,7 @@ public final class CaseDao {
 				 AND COALESCE(ra_user.is_deleted, 0) = 0
 				WHERE c.Id = ?
 				  AND %s;
-				""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"));
+				""".formatted(schema.rowVersionSelectExpression("c"), CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"));
 
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
@@ -7349,7 +7356,9 @@ public final class CaseDao {
 	}
 
 	private static CaseSchema resolveCaseSchema(Connection con) throws SQLException {
-		return new CaseSchema(existingColumn(con, CASES_TABLE, List.of("IsDeleted", "is_deleted")));
+		return new CaseSchema(
+				existingColumn(con, CASES_TABLE, List.of("IsDeleted", "is_deleted")),
+				existingColumn(con, CASES_TABLE, List.of("RowVer", "rowver", "RowVersion", "row_version")));
 	}
 
 	private static String resolveCaseUsersDeletedColumn(Connection con) throws SQLException {
