@@ -220,6 +220,7 @@ public final class CalendarController {
         });
     }
 
+    public void refreshCurrentRange() { loadCurrentRange(false); }
     private void loadCurrentRange() { loadCurrentRange(false); }
     private void loadCurrentRange(boolean fromTodayAction) {
         LocalDate rangeStart = currentRangeStart();

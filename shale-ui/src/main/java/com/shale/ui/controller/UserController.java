@@ -1100,11 +1100,7 @@ public final class UserController {
 				row.dueAt(),
 				row.completedAt(),
 				assignedTaskUsers.getOrDefault(row.taskId(), List.of()));
-		Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT_FLUID);
-		if (card instanceof Region region) {
-			region.setMaxWidth(Double.MAX_VALUE);
-		}
-		return card;
+		return taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true);
 	}
 
 	private String normalizedAssignedTaskQuery() {
