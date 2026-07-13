@@ -634,7 +634,7 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openTaskProfile);
+			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, caseId -> openCaseProfile(caseId, "OVERVIEW"), taskId -> openTaskProfile(taskId, c::refreshCurrentRange));
 			Integer pendingEventId = pendingCalendarNotificationEventId;
 			if (pendingEventId != null && pendingEventId > 0) {
 				pendingCalendarNotificationEventId = null;
@@ -899,6 +899,10 @@ public final class SceneManager {
 	}
 
 	public void openTaskProfile(Long taskId) {
+		openTaskProfile(taskId, null);
+	}
+
+	public void openTaskProfile(Long taskId, Runnable onTaskChanged) {
 		if (taskId == null || taskId <= 0) {
 			System.err.println("Ignoring task navigation for invalid taskId: " + taskId);
 			return;
@@ -918,14 +922,15 @@ public final class SceneManager {
 				new UserDao(dbSessionProvider),
 				runtimeBridge,
 				new NotificationDao(dbSessionProvider));
-		Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService));
+		Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, onTaskChanged));
 	}
 
 	private void showTaskDetailDialog(
 			long taskId,
 			int shaleClientId,
 			int currentUserId,
-			CaseTaskService caseTaskService) {
+			CaseTaskService caseTaskService,
+			Runnable onTaskChanged) {
 		TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 				taskId,
 				0L,
@@ -943,6 +948,7 @@ public final class SceneManager {
 				List.of(),
 				List.of(),
 				false);
+		java.util.concurrent.atomic.AtomicBoolean dialogMutatedAssignments = new java.util.concurrent.atomic.AtomicBoolean(false);
 		Window owner = stage.getScene() == null ? stage : stage.getScene().getWindow();
 		phiReadAuditService.auditRead("Task.Detail.Read", "Task.Detail", "Task", taskId);
 		phiReadAuditService.auditRead("Task.Activity.Read", "Task.Activity", "Task", taskId);
@@ -988,6 +994,7 @@ public final class SceneManager {
 					@Override
 					public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
 						caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+						dialogMutatedAssignments.set(true);
 						return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
 								.map(member -> new TaskDetailDialog.AssignedTeamMember(
 										member.userId(),
@@ -999,6 +1006,7 @@ public final class SceneManager {
 					@Override
 					public List<TaskDetailDialog.AssignedTeamMember> removeAndReload(int userId) {
 						caseTaskService.removeTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
+						dialogMutatedAssignments.set(true);
 						return caseTaskService.loadAssignedUsersForTask(model.taskId(), shaleClientId).stream()
 								.map(member -> new TaskDetailDialog.AssignedTeamMember(
 										member.userId(),
@@ -1042,6 +1050,7 @@ public final class SceneManager {
 				caseId -> openCaseProfile(caseId, "OVERVIEW"));
 		if (result.isEmpty()) {
 			taskDetailDialogInFlight.set(false);
+			if (dialogMutatedAssignments.get()) runTaskChangedCallback(onTaskChanged);
 			return;
 		}
 		taskDetailDialogInFlight.set(false);
@@ -1050,6 +1059,7 @@ public final class SceneManager {
 			new Thread(() -> {
 				try {
 					caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
+					runTaskChangedCallback(onTaskChanged);
 				} catch (Exception ex) {
 					Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to delete task. " + rootCauseMessage(ex)));
 				}
@@ -1073,10 +1083,17 @@ public final class SceneManager {
 		new Thread(() -> {
 			try {
 				caseTaskService.updateTask(request);
+				runTaskChangedCallback(onTaskChanged);
 			} catch (Exception ex) {
 				Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to save task. " + rootCauseMessage(ex)));
 			}
 		}, "scene-manager-save-task-" + taskId).start();
+	}
+
+
+	private static void runTaskChangedCallback(Runnable onTaskChanged) {
+		if (onTaskChanged == null) return;
+		Platform.runLater(onTaskChanged);
 	}
 
 	private static String rootCauseMessage(Throwable throwable) {

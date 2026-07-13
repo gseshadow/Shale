@@ -121,6 +121,24 @@ class CalendarFeedSourceFilterTest {
         assertFalse(CalendarFeedFilters.matches(itemWithCaseName("EVENT:3", "No case", null, null, null, "MANUAL", null, "MEETING"), allLayers, "", 7, ""));
     }
 
+
+    @Test
+    void clickTargetsRouteProjectedTasksEventsAndCasesByStableIdentity() {
+        CalendarFeedClickTarget projectedTask = CalendarFeedClickTarget.resolve(itemWithCaseName("TASK:987", "Task", "DueAt", 987, 7, "PROJECTED", "Case Seven", "TASK_DUE"));
+        assertEquals(CalendarFeedClickTarget.Kind.TASK, projectedTask.kind());
+        assertEquals(987L, projectedTask.id());
+
+        CalendarFeedClickTarget persistedEventWithTask = CalendarFeedClickTarget.resolve(itemWithCaseName("EVENT:123", "Scheduled task follow-up", null, 987, 7, "MANUAL", "Case Seven", "MEETING"));
+        assertEquals(CalendarFeedClickTarget.Kind.CALENDAR_EVENT, persistedEventWithTask.kind());
+        assertEquals(123L, persistedEventWithTask.id());
+
+        CalendarFeedClickTarget caseDate = CalendarFeedClickTarget.resolve(itemWithCaseName("CASE_SOL:7", "SOL", "StatuteOfLimitations", null, 7, "PROJECTED", "Case Seven", "STATUTE_OF_LIMITATIONS"));
+        assertEquals(CalendarFeedClickTarget.Kind.CASE, caseDate.kind());
+        assertEquals(7L, caseDate.id());
+
+        assertFalse(CalendarFeedClickTarget.resolve(itemWithCaseName("BROKEN", "Other", null, null, null, "PROJECTED", null, "OTHER")).actionable());
+    }
+
     @Test
     void allDisabledStateMatchesNoItems() {
         CalendarFeedSourceFilter filter = CalendarFeedSourceFilter.allDisabled();

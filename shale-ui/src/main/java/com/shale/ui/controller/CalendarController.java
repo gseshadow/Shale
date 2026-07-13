@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import com.shale.core.model.CalendarCaseFilterOptions;
 import com.shale.core.model.CalendarFeedCategory;
+import com.shale.core.model.CalendarFeedClickTarget;
 import com.shale.core.model.CalendarFeedFilters;
 import com.shale.core.model.CalendarFeedItem;
 import com.shale.core.model.CalendarFeedSourceFilter;
@@ -219,6 +220,7 @@ public final class CalendarController {
         });
     }
 
+    public void refreshCurrentRange() { loadCurrentRange(false); }
     private void loadCurrentRange() { loadCurrentRange(false); }
     private void loadCurrentRange(boolean fromTodayAction) {
         LocalDate rangeStart = currentRangeStart();
@@ -710,10 +712,18 @@ public final class CalendarController {
     }
 
     private void configureCalendarCardClick(Node card, CalendarFeedItem item) {
-        if (item == null || card == null) return;
-        if (isManualEvent(item)) { Integer eventId = parseEventId(item.key()); if (eventId == null || eventId <= 0) return; card.setCursor(Cursor.HAND); card.setOnMouseClicked(evt -> openEditEventDialog(eventId)); return; }
-        if (item.taskId() != null) { card.setCursor(Cursor.HAND); card.setOnMouseClicked(evt -> onOpenTask.accept(item.taskId().longValue())); return; }
-        if (item.caseId() != null) { card.setCursor(Cursor.HAND); card.setOnMouseClicked(evt -> onOpenCase.accept(item.caseId())); }
+        if (card == null) return;
+        CalendarFeedClickTarget target = CalendarFeedClickTarget.resolve(item);
+        if (!target.actionable()) return;
+        card.setCursor(Cursor.HAND);
+        card.setOnMouseClicked(evt -> {
+            switch (target.kind()) {
+                case CALENDAR_EVENT -> openEditEventDialog(Math.toIntExact(target.id()));
+                case TASK -> onOpenTask.accept(target.id());
+                case CASE -> onOpenCase.accept(Math.toIntExact(target.id()));
+                case NONE -> { }
+            }
+        });
     }
 
     private void openEditEventDialog(int eventId) {
@@ -806,8 +816,6 @@ public final class CalendarController {
     }
     private int resolveDurationMinutes(com.shale.core.model.CalendarEvent event) { if (event == null || event.endsAt() == null || event.startsAt() == null || !event.endsAt().isAfter(event.startsAt())) return 60; long minutes = java.time.Duration.between(event.startsAt(), event.endsAt()).toMinutes(); long roundedUp = ((minutes + 29) / 30) * 30; if (roundedUp < 30) roundedUp = 30; if (roundedUp > 8 * 60) roundedUp = 8 * 60; return (int) roundedUp; }
     private String deleteEvent(Integer calendarEventId, int tenantId) { try { calendarService.deleteCalendarEvent(calendarEventId, tenantId); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not delete event. Please try again."; } }
-    private static boolean isManualEvent(CalendarFeedItem item) { String sourceType = safe(item.sourceType()).trim().toUpperCase(Locale.ROOT); return "MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType); }
-    private static Integer parseEventId(String key) { if (key == null || !key.startsWith("EVENT:")) return null; try { return Integer.parseInt(key.substring("EVENT:".length())); } catch (NumberFormatException ex) { return null; } }
     private static LocalDate weekStartFor(LocalDate date) { return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)); }
     private static LocalDate workWeekStartFor(LocalDate date) { return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)); }
     private LocalDate currentRangeStart() { return switch (safe(viewModeChoice.getValue())) { case VIEW_FIVE_DAY -> workWeekStartFor(selectedDate); case VIEW_DAY -> selectedDate; case VIEW_MONTH -> selectedDate.withDayOfMonth(1); default -> weekStartFor(selectedDate); }; }
