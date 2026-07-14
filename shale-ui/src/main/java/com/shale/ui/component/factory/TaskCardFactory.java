@@ -2,6 +2,7 @@ package com.shale.ui.component.factory;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -10,6 +11,9 @@ import com.shale.ui.privacy.PhiFieldRegistry;
 import com.shale.ui.util.ColorUtil;
 
 public final class TaskCardFactory {
+
+    public static final String COMPLETED_STATUS_LABEL = "Completed";
+    public static final String COMPLETED_STATUS_FALLBACK_COLOR = "#DCFCE7";
 
     public enum Variant {
         FULL, MY_TASKS, COMPACT, COMPACT_FLUID, MINI
