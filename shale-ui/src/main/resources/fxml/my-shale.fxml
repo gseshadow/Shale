@@ -95,6 +95,11 @@
 												<String fx:value="app-toolbar-button-neutral" />
 											</styleClass>
 										</Button>
+										<ChoiceBox fx:id="myTasksStatusFilterChoice" prefWidth="150">
+											<styleClass>
+												<String fx:value="shale-filter-combo" />
+											</styleClass>
+										</ChoiceBox>
 										<ChoiceBox fx:id="myTasksPriorityFilterChoice" prefWidth="190">
 											<styleClass>
 												<String fx:value="shale-filter-combo" />
