@@ -22,4 +22,29 @@ class TaskCardSharedUsageRegressionTest {
             assertFalse(source.contains("setBorderByDueState"), file + " must not duplicate due-date accent rules.");
         }
     }
+
+    @Test
+    void overviewAndMyTasksMapTaskDescriptionIntoSharedTaskCardModel() throws Exception {
+        String myShale = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+        assertTrue(myShale.contains("task.description()"),
+                "My Shale task-card paths should pass the canonical DTO description into TaskCardModel.");
+        assertTrue(myShale.contains("taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT)"),
+                "Overview compact task cards should still use the shared factory.");
+        assertTrue(myShale.contains("taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true)"),
+                "My Tasks cards should still use the shared factory and the same model description.");
+    }
+
+    @Test
+    void calendarMiniTaskCardsHydrateDescriptionWithoutHoverQueries() throws Exception {
+        String calendarDao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/CalendarFeedDao.java"));
+        String calendarController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
+        String taskCard = Files.readString(Path.of("src/main/java/com/shale/ui/component/TaskCard.java"));
+
+        assertTrue(calendarDao.contains("t.Description"));
+        assertTrue(calendarDao.contains("rs.getString(\"Description\")"));
+        assertTrue(calendarController.contains("row.title(), row.description(), row.createdByDisplayName()"));
+        assertFalse(taskCard.contains("TaskDao"));
+        assertFalse(taskCard.contains("Service"));
+    }
 }

@@ -39,6 +39,10 @@ public final class TaskCard extends VBox {
 	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 	private static final double COMPACT_CARD_WIDTH = 210;
 	private static final Duration HOVER_REVEAL_DURATION = Duration.millis(180);
+	private static final int HOVER_DESCRIPTION_MAX_CHARS = 520;
+	private static final int HOVER_DESCRIPTION_MAX_LOGICAL_LINES = 8;
+	private static final double HOVER_DESCRIPTION_LINE_HEIGHT = 15;
+	private static final double HOVER_DESCRIPTION_MAX_HEIGHT = (HOVER_DESCRIPTION_LINE_HEIGHT * 3) + 4;
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
@@ -152,7 +156,8 @@ public final class TaskCard extends VBox {
 	}
 
 	public void setDescriptionPreview(String description) {
-		String text = description == null ? "" : description.trim();
+		String fullText = description == null ? "" : description.trim();
+		String text = fullText;
 		if (text.length() > 140) {
 			text = text.substring(0, 137) + "...";
 		}
@@ -160,7 +165,7 @@ public final class TaskCard extends VBox {
 		boolean hasText = !text.isBlank();
 		descriptionLabel.setManaged(hasText);
 		descriptionLabel.setVisible(hasText);
-		String hoverText = truncateForHover(text);
+		String hoverText = buildHoverDescriptionPreview(fullText);
 		hoverDescriptionLabel.setText(hoverText);
 		hoverDescriptionSection.setManaged(!hoverText.isBlank());
 		hoverDescriptionSection.setVisible(!hoverText.isBlank());
@@ -484,7 +489,8 @@ public final class TaskCard extends VBox {
 		hoverAssigneesHeader.setStyle(hoverRevealHeaderStyle());
 		hoverDescriptionLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70); -fx-line-spacing: 1px;");
 		hoverDescriptionLabel.setWrapText(true);
-		hoverDescriptionLabel.setMaxHeight(48);
+		hoverDescriptionLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		hoverDescriptionLabel.setMaxHeight(HOVER_DESCRIPTION_MAX_HEIGHT);
 		hoverAssigneesRow.setAlignment(Pos.CENTER_LEFT);
 	}
 
@@ -497,6 +503,131 @@ public final class TaskCard extends VBox {
 		if (!hoverRevealHasContent) {
 			setHoverRevealExpanded(false);
 		}
+	}
+
+	private void setHoverRevealExpanded(boolean expanded) {
+		if (!hoverRevealHasContent || fullExpanded) {
+			expanded = false;
+		}
+		if (hoverRevealTimeline != null) {
+			hoverRevealTimeline.stop();
+		}
+		if (expanded) {
+			hoverRevealPane.setManaged(true);
+			hoverRevealPane.setVisible(true);
+			double targetHeight = hoverRevealTargetHeight();
+			hoverRevealTimeline = new Timeline(
+					new KeyFrame(Duration.ZERO,
+							new KeyValue(hoverRevealPane.maxHeightProperty(), hoverRevealPane.getMaxHeight()),
+							new KeyValue(hoverRevealPane.opacityProperty(), hoverRevealPane.getOpacity())),
+					new KeyFrame(HOVER_REVEAL_DURATION,
+							new KeyValue(hoverRevealPane.maxHeightProperty(), targetHeight),
+							new KeyValue(hoverRevealPane.opacityProperty(), 1.0)));
+		} else {
+			hoverRevealTimeline = new Timeline(
+					new KeyFrame(Duration.ZERO,
+							new KeyValue(hoverRevealPane.maxHeightProperty(), hoverRevealPane.getMaxHeight()),
+							new KeyValue(hoverRevealPane.opacityProperty(), hoverRevealPane.getOpacity())),
+					new KeyFrame(HOVER_REVEAL_DURATION,
+							new KeyValue(hoverRevealPane.maxHeightProperty(), 0),
+							new KeyValue(hoverRevealPane.opacityProperty(), 0)));
+			hoverRevealTimeline.setOnFinished(e -> {
+				if (!hovered) {
+					hoverRevealPane.setManaged(false);
+					hoverRevealPane.setVisible(false);
+				}
+			});
+		}
+		hoverRevealTimeline.play();
+	}
+
+	private double hoverRevealTargetHeight() {
+		hoverRevealPane.applyCss();
+		double availableWidth = Math.max(1, bodyPane.getWidth() - bodyPane.snappedLeftInset() - bodyPane.snappedRightInset());
+		double preferredHeight = hoverRevealPane.prefHeight(availableWidth);
+		double maximumHeight = hoverRevealMaximumHeight(availableWidth);
+		return Math.min(Math.max(1, preferredHeight), maximumHeight);
+	}
+
+	private double hoverRevealMaximumHeight(double availableWidth) {
+		double total = hoverRevealPane.snappedTopInset() + hoverRevealPane.snappedBottomInset();
+		boolean hasDescription = hoverDescriptionSection.isManaged();
+		boolean hasAssignees = hoverAssigneesSection.isManaged();
+		if (hasDescription) {
+			total += hoverDescriptionHeader.prefHeight(availableWidth)
+					+ hoverDescriptionSection.getSpacing()
+					+ HOVER_DESCRIPTION_MAX_HEIGHT;
+		}
+		if (hasDescription && hasAssignees) {
+			total += hoverRevealPane.getSpacing();
+		}
+		if (hasAssignees) {
+			total += hoverAssigneesHeader.prefHeight(availableWidth)
+					+ hoverAssigneesSection.getSpacing()
+					+ hoverAssigneesRow.prefHeight(availableWidth);
+		}
+		return Math.max(1, total);
+	}
+
+	static String buildHoverDescriptionPreview(String text) {
+		String normalized = normalizeHoverDescription(text);
+		if (normalized.isBlank()) {
+			return "";
+		}
+		String[] lines = normalized.split("\\n", -1);
+		StringBuilder preview = new StringBuilder();
+		boolean truncated = false;
+		for (int i = 0; i < lines.length; i++) {
+			if (i >= HOVER_DESCRIPTION_MAX_LOGICAL_LINES) {
+				truncated = true;
+				break;
+			}
+			String line = lines[i].stripTrailing();
+			int separatorLength = preview.isEmpty() ? 0 : 1;
+			int remaining = HOVER_DESCRIPTION_MAX_CHARS - preview.length() - separatorLength;
+			if (remaining <= 0) {
+				truncated = true;
+				break;
+			}
+			if (line.length() > remaining) {
+				if (!preview.isEmpty()) {
+					preview.append('\n');
+				}
+				preview.append(line, 0, Math.max(0, remaining)).append("...");
+				truncated = true;
+				break;
+			}
+			if (!preview.isEmpty()) {
+				preview.append('\n');
+			}
+			preview.append(line);
+		}
+		String result = preview.toString().stripTrailing();
+		if (truncated && !result.endsWith("...")) {
+			result = appendInlineEllipsis(result);
+		}
+		return result;
+	}
+
+	private static String normalizeHoverDescription(String text) {
+		if (text == null) {
+			return "";
+		}
+		return text
+				.replace("\r\n", "\n")
+				.replace('\r', '\n')
+				.replaceAll("[\\t ]+\\n", "\n")
+				.replaceAll("\\n[\\t ]+", "\n")
+				.replaceAll("\\n{3,}", "\n\n")
+				.trim();
+	}
+
+	private static String appendInlineEllipsis(String text) {
+		String trimmed = text.stripTrailing();
+		if (trimmed.isBlank()) {
+			return "";
+		}
+		return trimmed + "...";
 	}
 
 	private void setHoverRevealExpanded(boolean expanded) {

@@ -72,7 +72,16 @@ class TaskCardDesignLanguageTest {
 		assertTrue(taskCard.contains("hoverRevealHasContent"));
 		assertTrue(taskCard.contains("hoverDescriptionSection.setManaged(!hoverText.isBlank())"));
 		assertTrue(taskCard.contains("hoverAssigneesSection.setManaged(!hoverAssigneesRow.getChildren().isEmpty())"));
-		assertTrue(taskCard.contains("truncateForHover"));
+		assertTrue(taskCard.contains("buildHoverDescriptionPreview(fullText)"));
+		assertTrue(taskCard.contains("hoverRevealTargetHeight()"));
+		assertTrue(taskCard.contains("hoverRevealMaximumHeight(availableWidth)"));
+	}
+
+	@Test
+	void compactVariantsCanReceiveDescriptionForHoverReveal() {
+		assertTrue(factory.contains("String safeDescription = (allowPhiDescriptionForFull || !PhiFieldRegistry.isPhi(\"Tasks\", \"Description\"))"));
+		assertFalse(factory.contains("variant == Variant.FULL || variant == Variant.MY_TASKS"),
+				"Compact task cards should not lose descriptions before the shared hover reveal can render them.");
 	}
 
 }

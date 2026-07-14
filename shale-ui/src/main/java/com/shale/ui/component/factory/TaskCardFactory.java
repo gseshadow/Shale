@@ -76,8 +76,7 @@ public final class TaskCardFactory {
         String displayTitle = suppressTitleForPassiveSurface
                 ? "Task #" + model.taskId()
                 : model.title();
-        String safeDescription = (variant == Variant.FULL || variant == Variant.MY_TASKS)
-                && (allowPhiDescriptionForFull || !PhiFieldRegistry.isPhi("Tasks", "Description"))
+        String safeDescription = (allowPhiDescriptionForFull || !PhiFieldRegistry.isPhi("Tasks", "Description"))
                 ? model.description()
                 : null;
         card.setTaskId(model.taskId());
