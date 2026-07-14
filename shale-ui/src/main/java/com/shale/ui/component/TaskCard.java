@@ -76,7 +76,10 @@ public final class TaskCard extends VBox {
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
 	private final Button expandDetailsButton = new Button("+");
 	private final VBox fullHeaderText = new VBox(2, titleLabel, dueLabel);
-	private final VBox myTasksMetadataBlock = new VBox(4, dueLabel, relatedCaseHost);
+	private final StackPane myTasksTitleRow = new StackPane(titleLabel);
+	private final Region myTasksMetadataSpacer = new Region();
+	private final HBox myTasksMetadataRow = new HBox(8, dueLabel, myTasksMetadataSpacer, statusPill, expandDetailsButton);
+	private final VBox myTasksMetadataBlock = new VBox(4, myTasksMetadataRow, relatedCaseHost);
 	private final Region fullHeaderSpacer = new Region();
 	private final HBox fullHeaderRow = new HBox(8, fullHeaderText, fullHeaderSpacer, statusPill, expandDetailsButton);
 	private final VBox fullExpandedContent = new VBox(6, createdByLabel, teamSection, descriptionLabel, completedLabel, actionsRow);
@@ -360,9 +363,16 @@ public final class TaskCard extends VBox {
 	public void applyMyTasks() {
 		applyFull();
 		currentVariant = Variant.MY_TASKS;
-		fullHeaderText.getChildren().setAll(titleLabel);
-		myTasksMetadataBlock.getChildren().setAll(dueLabel, relatedCaseHost);
-		bodyPane.getChildren().setAll(fullHeaderRow, myTasksMetadataBlock, fullExpandedContent, hoverRevealPane);
+		myTasksTitleRow.getChildren().setAll(titleLabel);
+		myTasksMetadataRow.getChildren().setAll(dueLabel, myTasksMetadataSpacer, statusPill, expandDetailsButton);
+		myTasksMetadataBlock.getChildren().setAll(myTasksMetadataRow, relatedCaseHost);
+		bodyPane.getChildren().setAll(myTasksTitleRow, myTasksMetadataBlock, fullExpandedContent, hoverRevealPane);
+		myTasksTitleRow.setAlignment(Pos.CENTER_LEFT);
+		myTasksTitleRow.setMinWidth(0);
+		myTasksTitleRow.setMaxWidth(Double.MAX_VALUE);
+		myTasksMetadataRow.setAlignment(Pos.CENTER_LEFT);
+		myTasksMetadataRow.setMinWidth(0);
+		myTasksMetadataRow.setMaxWidth(Double.MAX_VALUE);
 		myTasksMetadataBlock.setAlignment(Pos.TOP_LEFT);
 		myTasksMetadataBlock.setFillWidth(true);
 		myTasksMetadataBlock.setMinWidth(0);
@@ -409,6 +419,7 @@ public final class TaskCard extends VBox {
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(fullHeaderText, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(fullHeaderSpacer, javafx.scene.layout.Priority.ALWAYS);
+		HBox.setHgrow(myTasksMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(bodyPane, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(dueAccentBar, javafx.scene.layout.Priority.NEVER);
 		getStyleClass().addAll("task-card", "shale-entity-card", "shale-entity-card-clickable");
