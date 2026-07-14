@@ -68,7 +68,7 @@ public final class TaskCardFactory {
         return create(model, variant, false);
     }
 
-    public TaskCard create(TaskCardModel model, Variant variant, boolean allowPhiDescriptionForFull) {
+    public TaskCard create(TaskCardModel model, Variant variant, boolean allowPhiDescription) {
         Objects.requireNonNull(model, "model");
 
         TaskCard card = new TaskCard();
@@ -80,9 +80,7 @@ public final class TaskCardFactory {
         String displayTitle = suppressTitleForPassiveSurface
                 ? "Task #" + model.taskId()
                 : model.title();
-        String safeDescription = (allowPhiDescriptionForFull || !PhiFieldRegistry.isPhi("Tasks", "Description"))
-                ? model.description()
-                : null;
+        String safeDescription = descriptionForCard(model, allowPhiDescription);
         card.setTaskId(model.taskId());
         card.setOnOpen(onOpenTask);
         card.setOnToggleComplete(onToggleCompleteTask);
@@ -101,11 +99,7 @@ public final class TaskCardFactory {
         card.setDueAt(model.dueAt());
         card.setCreatedByDisplayName(model.createdByDisplayName());
         card.setDescriptionPreview(safeDescription);
-        TaskStatusPresentation status = resolveTaskStatusPresentation(
-                model.completedAt() != null,
-                model.taskStatusName(),
-                model.taskStatusColorHex());
-        card.setTaskStatus(status.name(), status.colorHex());
+        card.setTaskStatus(model.taskStatusName(), model.taskStatusColorHex());
         card.setCompleted(model.completedAt() != null);
         card.setBorderByDueState(model.dueAt(), model.completedAt());
         card.setAssignees(model.assignedUsers());
@@ -122,33 +116,9 @@ public final class TaskCardFactory {
         return card;
     }
 
-    public record TaskStatusPresentation(String name, String colorHex) {
-    }
-
-    public static TaskStatusPresentation resolveTaskStatusPresentation(
-            boolean completed,
-            String hydratedStatusName,
-            String hydratedStatusColorHex) {
-        if (completed) {
-            String completedColor = isCompletedStatusName(hydratedStatusName) && !isBlank(hydratedStatusColorHex)
-                    ? hydratedStatusColorHex.trim()
-                    : COMPLETED_STATUS_FALLBACK_COLOR;
-            return new TaskStatusPresentation(COMPLETED_STATUS_LABEL, completedColor);
-        }
-
-        String displayName = isBlank(hydratedStatusName) ? "—" : hydratedStatusName.trim();
-        return new TaskStatusPresentation(displayName, hydratedStatusColorHex);
-    }
-
-    private static boolean isCompletedStatusName(String statusName) {
-        if (isBlank(statusName)) {
-            return false;
-        }
-        String normalized = statusName.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
-        return "completed".equals(normalized) || "complete".equals(normalized) || "done".equals(normalized);
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
+    static String descriptionForCard(TaskCardModel model, boolean allowPhiDescription) {
+        return (allowPhiDescription || !PhiFieldRegistry.isPhi("Tasks", "Description"))
+                ? model.description()
+                : null;
     }
 }

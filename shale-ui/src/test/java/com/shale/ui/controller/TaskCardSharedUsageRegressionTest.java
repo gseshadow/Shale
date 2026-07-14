@@ -29,7 +29,7 @@ class TaskCardSharedUsageRegressionTest {
 
         assertTrue(myShale.contains("task.description()"),
                 "My Shale task-card paths should pass the canonical DTO description into TaskCardModel.");
-        assertTrue(myShale.contains("taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT)"),
+        assertTrue(myShale.contains("taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT, true)"),
                 "Overview compact task cards should still use the shared factory.");
         assertTrue(myShale.contains("taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true)"),
                 "My Tasks cards should still use the shared factory and the same model description.");

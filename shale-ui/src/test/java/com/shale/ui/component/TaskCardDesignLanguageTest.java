@@ -53,8 +53,7 @@ class TaskCardDesignLanguageTest {
     void statusPillUsesActualModelStatusAndNeutralFallback() {
         assertTrue(factory.contains("String taskStatusName"));
         assertTrue(factory.contains("String taskStatusColorHex"));
-        assertTrue(factory.contains("resolveTaskStatusPresentation("));
-        assertTrue(factory.contains("card.setTaskStatus(status.name(), status.colorHex())"));
+        assertTrue(factory.contains("card.setTaskStatus(model.taskStatusName(), model.taskStatusColorHex())"));
         assertTrue(taskCard.contains("CaseCard.normalizeColor(statusColor, \"#F1F5F9\")"));
         assertTrue(taskCard.contains("statusName == null || statusName.isBlank() ? \"—\""));
     }
@@ -80,7 +79,7 @@ class TaskCardDesignLanguageTest {
 
 	@Test
 	void compactVariantsCanReceiveDescriptionForHoverReveal() {
-		assertTrue(factory.contains("String safeDescription = (allowPhiDescriptionForFull || !PhiFieldRegistry.isPhi(\"Tasks\", \"Description\"))"));
+		assertTrue(factory.contains("descriptionForCard(model, allowPhiDescription)"));
 		assertFalse(factory.contains("variant == Variant.FULL || variant == Variant.MY_TASKS"),
 				"Compact task cards should not lose descriptions before the shared hover reveal can render them.");
 	}

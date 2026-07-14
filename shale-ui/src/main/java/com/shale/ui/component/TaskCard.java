@@ -630,14 +630,6 @@ public final class TaskCard extends VBox {
 		return trimmed + "...";
 	}
 
-	private String truncateForHover(String text) {
-		String normalized = text == null ? "" : text.trim();
-		if (normalized.length() <= 260) {
-			return normalized;
-		}
-		return normalized.substring(0, 257).trim() + "...";
-	}
-
 	private void configureRelatedSections() {
 		caseSection.getChildren().setAll(caseSectionLabel, relatedCaseHost);
 		teamSection.getChildren().setAll(teamSectionLabel, assigneeHost);

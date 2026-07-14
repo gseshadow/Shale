@@ -3102,7 +3102,7 @@ public final class MyShaleController {
 							task.dueAt(),
 							task.completedAt(),
 							myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-				Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT);
+				Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT, true);
 				if (card instanceof Region regionCard) {
 					regionCard.setMinWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
 					regionCard.setPrefWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
@@ -3472,7 +3472,7 @@ public final class MyShaleController {
 			if (fullVariant) {
 				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true));
 			} else {
-				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT, true));
 			}
 		}
 		return taskCards;
