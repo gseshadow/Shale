@@ -167,6 +167,6 @@ class CalendarFeedSourceFilterTest {
     }
 
     private static CalendarFeedItem itemWithCaseName(String key, String title, String sourceField, Integer taskId, Integer caseId, String sourceType, String caseName, String typeKey) {
-        return new CalendarFeedItem(key, title, LocalDateTime.of(2026, 7, 10, 9, 0), null, true, sourceType, sourceField, caseId, caseName, taskId, "Related", typeKey, typeKey, null, null);
+        return new CalendarFeedItem(key, title, LocalDateTime.of(2026, 7, 10, 9, 0), null, true, sourceType, sourceField, caseId, caseName, taskId, "Related", typeKey, typeKey, null, null, null, null);
     }
 }
