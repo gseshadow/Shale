@@ -40,6 +40,16 @@ class CalendarFeedSourceFilterTest {
         assertTrue(filter.matches(item("CASE_SOL:1", "StatuteOfLimitations", null, 1, "PROJECTED", "SOL", 1, "STATUTE_OF_LIMITATIONS")));
         assertFalse(filter.matches(item("CASE_CALLER:1", "CallerDate", null, 1, "PROJECTED", "Intake", 1, "CASE_DATE")));
     }
+    @Test
+    void caseCalendarDefaultFilterShowsEventsTasksDeadlinesAndCaseDates() {
+        CalendarFeedSourceFilter filter = CalendarFeedSourceFilter.caseCalendarDefaults();
+        assertTrue(filter.isEnabled(CalendarFeedCategory.CALENDAR_EVENTS));
+        assertTrue(filter.isEnabled(CalendarFeedCategory.TASKS));
+        assertTrue(filter.isEnabled(CalendarFeedCategory.CASE_DEADLINES));
+        assertTrue(filter.isEnabled(CalendarFeedCategory.OTHER_CASE_DATES));
+        assertTrue(filter.matches(item("CASE_CALLER:1", "CallerDate", null, 1, "PROJECTED", "Intake", 1, "CASE_DATE")));
+    }
+
 
     @Test
     void disabledCategoriesHideOnlyTheirLayerAndEnabledCategoriesUseOrSemantics() {
