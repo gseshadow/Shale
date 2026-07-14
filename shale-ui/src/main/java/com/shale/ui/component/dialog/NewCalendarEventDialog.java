@@ -195,7 +195,7 @@ public final class NewCalendarEventDialog {
         PerfLog.log("DIALOG", "start", "calendar new-event stage create");
         Stage stage = AppDialogs.createModalStage(owner, "New Event");
         PerfLog.logDone("DIALOG", "calendar new-event stage create", stageCreateStart);
-        CreateCalendarEventInput initial = new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, null);
+        CreateCalendarEventInput initial = new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, defaultAssignedUserId(assignedUserOptionsSupplier));
         DialogParts p = DialogParts.build(List.of(), initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, id -> {}, null, false);
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
@@ -221,7 +221,7 @@ public final class NewCalendarEventDialog {
         public void populateEventTypes(List<CalendarEventType> eventTypes){
             if(!stage.isShowing()) return;
             List<CalendarEventType> safeTypes = eventTypes == null ? List.of() : eventTypes;
-            CreateCalendarEventInput initial = new CreateCalendarEventInput("", resolveDefaultTypeId(safeTypes), defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, null);
+            CreateCalendarEventInput initial = new CreateCalendarEventInput("", resolveDefaultTypeId(safeTypes), defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, defaultAssignedUserId(assignedUserOptionsSupplier));
             DialogParts updated = DialogParts.build(safeTypes, initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, id -> {}, null, true);
             content.getChildren().setAll(updated.content());
             saveButton.setDisable(safeTypes.isEmpty());
@@ -425,7 +425,7 @@ public final class NewCalendarEventDialog {
             caseActionsRow.setAlignment(Pos.CENTER_LEFT);
             refreshCaseControls.run();
 
-            Label selectedUserLabel = new Label("None");
+            Label selectedUserLabel = new Label("Shared Calendar");
             StackPane selectedUserHost = new StackPane(selectedUserLabel);
             selectedUserHost.setMaxWidth(Double.MAX_VALUE);
             HBox.setHgrow(selectedUserHost, Priority.ALWAYS);
@@ -460,7 +460,7 @@ public final class NewCalendarEventDialog {
             clearAssignedButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
             Runnable refreshUserControls = () -> {
                 boolean hasAssigned = selectedUser[0] != null || hasUserAssignment[0];
-                assignUserButton.setText(hasAssigned ? "Change User" : "Add User");
+                assignUserButton.setText(hasAssigned ? "Change Calendar" : "Choose Calendar");
                 clearAssignedButton.setVisible(hasAssigned);
                 clearAssignedButton.setManaged(hasAssigned);
             };
@@ -487,7 +487,9 @@ public final class NewCalendarEventDialog {
             HBox timeRow = new HBox(8, startTimeCol, amPmCol, durationSection);
             HBox.setHgrow(startTimeCol, Priority.ALWAYS);
             VBox caseSection = new VBox(6, caseActionsRow, selectedCaseHost);
-            VBox assignedSection = new VBox(6, assignedActionsRow, selectedUserHost);
+            Label assignedSectionLabel = new Label("Calendar");
+            assignedSectionLabel.getStyleClass().add("calendar-all-day-meta");
+            VBox assignedSection = new VBox(6, assignedSectionLabel, assignedActionsRow, selectedUserHost);
             caseSection.setMaxWidth(Double.MAX_VALUE);
             assignedSection.setMaxWidth(Double.MAX_VALUE);
             HBox peopleSection = new HBox(12, caseSection, assignedSection);
@@ -603,6 +605,16 @@ public final class NewCalendarEventDialog {
     }
 
     private static <T> List<T> safeList(List<T> values) { return values == null ? List.of() : values; }
+    private static Integer defaultAssignedUserId(Supplier<List<AssignedUserOption>> supplier) {
+        try {
+            List<AssignedUserOption> options = supplier == null ? List.of() : safeList(supplier.get());
+            if (options.isEmpty()) return null;
+            AssignedUserOption first = options.getFirst();
+            return first == null ? null : first.userId();
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
     static int resolveDefaultTypeId(List<CalendarEventType> eventTypes) {
         if (eventTypes == null || eventTypes.isEmpty()) return 0;
         if (eventTypes.size() == 1) return eventTypes.getFirst().calendarEventTypeId();

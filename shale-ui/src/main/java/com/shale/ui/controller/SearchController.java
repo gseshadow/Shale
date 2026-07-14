@@ -412,6 +412,8 @@ public final class SearchController {
 					null,
 					"Event",
 					null,
+					null,
+					null,
 					null);
 			Node eventCard = calendarEventCardFactory.create(item, java.time.LocalDate.now(), java.time.LocalDateTime.now());
 			VBox container = new VBox(4, eventCard);

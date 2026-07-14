@@ -5,6 +5,7 @@
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.MenuButton?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
@@ -31,6 +32,13 @@
                 <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="170" styleClass="shale-filter-combo" />
                 <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="150" styleClass="shale-filter-combo" />
                 <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+            </children>
+        </HBox>
+
+        <HBox spacing="10" alignment="CENTER_LEFT" styleClass="shale-filter-panel calendar-source-filter-row">
+            <children>
+                <Label text="Calendars" styleClass="shale-toolbar-heading" />
+                <MenuButton fx:id="calendarOverlayMenuButton" text="Calendars" mnemonicParsing="false" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
             </children>
         </HBox>
 
