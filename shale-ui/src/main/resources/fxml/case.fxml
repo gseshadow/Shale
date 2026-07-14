@@ -760,6 +760,32 @@
 				</HBox>
 			</VBox>
 
+			<!-- CALENDAR TAB PANE (center) -->
+			<VBox fx:id="caseCalendarTabPane" spacing="8" maxWidth="1.7976931348623157E308"
+				maxHeight="1.7976931348623157E308" visible="false" managed="false">
+				<padding><Insets top="8" right="8" bottom="8" left="8" /></padding>
+				<HBox spacing="10" alignment="TOP_LEFT" fillHeight="true" VBox.vgrow="ALWAYS">
+					<VBox spacing="8" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS" maxHeight="1.7976931348623157E308" styleClass="case-main-surface">
+						<padding><Insets top="10" right="10" bottom="10" left="10" /></padding>
+						<HBox spacing="8" alignment="CENTER_LEFT">
+							<Label text="Calendar" style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+							<Region HBox.hgrow="ALWAYS" />
+							<CheckBox fx:id="caseCalendarEventsLayerCheckBox" text="Events" />
+							<CheckBox fx:id="caseCalendarTasksLayerCheckBox" text="Tasks" />
+							<CheckBox fx:id="caseCalendarDeadlinesLayerCheckBox" text="Deadlines" />
+							<CheckBox fx:id="caseCalendarCaseDatesLayerCheckBox" text="Case Dates" />
+							<Button fx:id="caseCalendarNewEventButton" text="New Event" styleClass="app-toolbar-button" />
+							<Button fx:id="caseCalendarNewTaskButton" text="New Task" styleClass="app-toolbar-button" />
+						</HBox>
+						<Label fx:id="caseCalendarStatusLabel" text="Loading calendar…" visible="false" managed="false" style="-fx-opacity: 0.75;" />
+						<ScrollPane fx:id="caseCalendarScrollPane" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
+							<content><VBox fx:id="caseCalendarAgendaBox" spacing="10"><padding><Insets top="4" right="4" bottom="4" left="4" /></padding></VBox></content>
+						</ScrollPane>
+					</VBox>
+					<StackPane fx:id="caseCalendarUpdatesHost" prefWidth="320.0" minWidth="300.0" maxWidth="360.0" />
+				</HBox>
+			</VBox>
+
 			<!-- GENERIC PLACEHOLDER PANE -->
 			<VBox fx:id="genericPane" spacing="10" maxWidth="980"
 				styleClass="case-main-surface" visible="false" managed="false">

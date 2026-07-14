@@ -60,6 +60,10 @@ public final class CalendarService {
         return calendarFeedDao.listCalendarFeed(shaleClientId, startInclusive, endExclusive);
     }
 
+    public List<CalendarFeedItem> listCalendarFeedForCase(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive, int caseId) {
+        return calendarFeedDao.listCalendarFeedForCase(shaleClientId, startInclusive, endExclusive, caseId);
+    }
+
     public CalendarEvent getEventById(int calendarEventId, int shaleClientId) {
         return calendarEventDao.getById(calendarEventId, shaleClientId);
     }
