@@ -28,6 +28,8 @@ public final class TaskCardFactory {
             String title,
             String description,
             String createdByDisplayName,
+            String taskStatusName,
+            String taskStatusColorHex,
             String priorityColorHex,
             LocalDateTime dueAt,
             LocalDateTime completedAt,
@@ -62,7 +64,7 @@ public final class TaskCardFactory {
         return create(model, variant, false);
     }
 
-    public TaskCard create(TaskCardModel model, Variant variant, boolean allowPhiDescriptionForFull) {
+    public TaskCard create(TaskCardModel model, Variant variant, boolean allowPhiDescription) {
         Objects.requireNonNull(model, "model");
 
         TaskCard card = new TaskCard();
@@ -74,10 +76,7 @@ public final class TaskCardFactory {
         String displayTitle = suppressTitleForPassiveSurface
                 ? "Task #" + model.taskId()
                 : model.title();
-        String safeDescription = (variant == Variant.FULL || variant == Variant.MY_TASKS)
-                && (allowPhiDescriptionForFull || !PhiFieldRegistry.isPhi("Tasks", "Description"))
-                ? model.description()
-                : null;
+        String safeDescription = descriptionForCard(model, allowPhiDescription);
         card.setTaskId(model.taskId());
         card.setOnOpen(onOpenTask);
         card.setOnToggleComplete(onToggleCompleteTask);
@@ -96,10 +95,11 @@ public final class TaskCardFactory {
         card.setDueAt(model.dueAt());
         card.setCreatedByDisplayName(model.createdByDisplayName());
         card.setDescriptionPreview(safeDescription);
+        card.setTaskStatus(model.taskStatusName(), model.taskStatusColorHex());
         card.setCompleted(model.completedAt() != null);
         card.setBorderByDueState(model.dueAt(), model.completedAt());
         card.setAssignees(model.assignedUsers());
-        card.setBackgroundCssColor(ColorUtil.toCssBackgroundColorOrNull(model.priorityColorHex()));
+        card.setPriorityBackgroundColor(model.priorityColorHex());
 
         switch (variant) {
             case FULL -> card.applyFull();
@@ -110,5 +110,11 @@ public final class TaskCardFactory {
         }
 
         return card;
+    }
+
+    static String descriptionForCard(TaskCardModel model, boolean allowPhiDescription) {
+        return (allowPhiDescription || !PhiFieldRegistry.isPhi("Tasks", "Description"))
+                ? model.description()
+                : null;
     }
 }
