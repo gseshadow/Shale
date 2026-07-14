@@ -44,9 +44,13 @@ public final class NewCalendarEventDialog {
         return showAndWait(owner, eventTypes, defaultDate, List.of(), List.of());
     }
     public static Optional<CreateCalendarEventInput> showAndWait(Window owner, List<CalendarEventType> eventTypes, LocalDate defaultDate, List<CaseOption> caseOptions, List<AssignedUserOption> assignedUserOptions) {
+        return showAndWait(owner, eventTypes, defaultDate, caseOptions, assignedUserOptions, null);
+    }
+
+    public static Optional<CreateCalendarEventInput> showAndWait(Window owner, List<CalendarEventType> eventTypes, LocalDate defaultDate, List<CaseOption> caseOptions, List<AssignedUserOption> assignedUserOptions, CaseOption initialSelectedCase) {
         Stage stage = AppDialogs.createModalStage(owner, "New Event");
         ResultHolder holder = new ResultHolder();
-        DialogParts p = DialogParts.build(eventTypes, new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, null), null, null, () -> caseOptions, () -> assignedUserOptions, id -> {}, null, true);
+        DialogParts p = DialogParts.build(eventTypes, new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", initialSelectedCase == null ? null : initialSelectedCase.caseId(), null), null, null, () -> caseOptions, () -> assignedUserOptions, id -> {}, initialSelectedCase, true);
 
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");

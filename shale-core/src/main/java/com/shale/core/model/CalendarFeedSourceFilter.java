@@ -18,6 +18,10 @@ public record CalendarFeedSourceFilter(Set<CalendarFeedCategory> enabledCategori
                 CalendarFeedCategory.CASE_DEADLINES));
     }
 
+    public static CalendarFeedSourceFilter caseCalendarDefaults() {
+        return new CalendarFeedSourceFilter(EnumSet.allOf(CalendarFeedCategory.class));
+    }
+
     public static CalendarFeedSourceFilter allDisabled() {
         return new CalendarFeedSourceFilter(EnumSet.noneOf(CalendarFeedCategory.class));
     }

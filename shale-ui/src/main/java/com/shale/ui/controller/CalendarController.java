@@ -390,12 +390,69 @@ public final class CalendarController {
         Map<LocalDate, List<CalendarFeedItem>> grouped = groupAndSort(items, gridStart, 42); GridPane grid = new GridPane(); grid.setHgap(6); grid.setVgap(6);
         for (int i = 0; i < 42; i++) {
             LocalDate day = gridStart.plusDays(i); VBox cell = new VBox(2); cell.getStyleClass().add("calendar-day-lane"); cell.setPadding(new Insets(6));
-            cell.getChildren().add(new Label(String.valueOf(day.getDayOfMonth()))); List<CalendarFeedItem> dayItems = grouped.getOrDefault(day, List.of());
+            configureMonthDayCellDrillDown(cell, day);
+            Button dayButton = createMonthDayButton(day);
+            cell.getChildren().add(dayButton); List<CalendarFeedItem> dayItems = grouped.getOrDefault(day, List.of());
             for (int j = 0; j < Math.min(3, dayItems.size()); j++) { Node bubble = calendarEventCardFactory.createAllDayBubble(dayItems.get(j)); configureCalendarCardClick(bubble, dayItems.get(j)); cell.getChildren().add(bubble); }
-            if (dayItems.size() > 3) cell.getChildren().add(new Label("+" + (dayItems.size() - 3) + " more"));
+            if (dayItems.size() > 3) cell.getChildren().add(createMonthMoreButton(day, dayItems.size() - 3));
             grid.add(cell, i % 7, i / 7);
         }
         weekBoard.getChildren().add(grid);
+    }
+
+    void openDayView(LocalDate date) {
+        if (date == null) return;
+        selectedDate = date;
+        boolean alreadyDay = viewModeChoice != null && VIEW_DAY.equals(viewModeChoice.getValue());
+        if (viewModeChoice != null) {
+            viewModeChoice.setValue(VIEW_DAY);
+        }
+        if (alreadyDay || viewModeChoice == null) {
+            loadCurrentRange(false);
+        }
+    }
+
+    private void configureMonthDayCellDrillDown(Pane cell, LocalDate day) {
+        if (cell == null || day == null) return;
+        cell.setCursor(Cursor.HAND);
+        cell.setAccessibleText("Open " + day.format(WEEK_RANGE_FORMAT) + " in Day view");
+        Tooltip.install(cell, new Tooltip("Open " + day.format(WEEK_RANGE_FORMAT) + " in Day view"));
+        cell.setOnMouseClicked(evt -> {
+            openDayView(day);
+            evt.consume();
+        });
+    }
+
+    private Button createMonthDayButton(LocalDate day) {
+        Button dayButton = new Button(String.valueOf(day.getDayOfMonth()));
+        dayButton.getStyleClass().add("calendar-month-day-button");
+        dayButton.setCursor(Cursor.HAND);
+        dayButton.setFocusTraversable(true);
+        String accessible = "Open " + day.format(WEEK_RANGE_FORMAT) + " in Day view";
+        dayButton.setAccessibleText(accessible);
+        Tooltip.install(dayButton, new Tooltip(accessible));
+        dayButton.setOnAction(evt -> {
+            openDayView(day);
+            evt.consume();
+        });
+        dayButton.setOnMouseClicked(evt -> evt.consume());
+        return dayButton;
+    }
+
+    private Button createMonthMoreButton(LocalDate day, int hiddenCount) {
+        Button moreButton = new Button("+" + hiddenCount + " more");
+        moreButton.getStyleClass().add("calendar-month-more-button");
+        moreButton.setCursor(Cursor.HAND);
+        moreButton.setFocusTraversable(true);
+        String accessible = "Show " + hiddenCount + " more items for " + day.format(WEEK_RANGE_FORMAT);
+        moreButton.setAccessibleText(accessible);
+        Tooltip.install(moreButton, new Tooltip(accessible));
+        moreButton.setOnAction(evt -> {
+            openDayView(day);
+            evt.consume();
+        });
+        moreButton.setOnMouseClicked(evt -> evt.consume());
+        return moreButton;
     }
 
     private VBox createAllDayLabelColumn() {
@@ -723,6 +780,7 @@ public final class CalendarController {
                 case CASE -> onOpenCase.accept(Math.toIntExact(target.id()));
                 case NONE -> { }
             }
+            evt.consume();
         });
     }
 
