@@ -1562,6 +1562,57 @@
     -fx-font-weight: 700;
 }
 
+
+.button.calendar-month-day-link,
+.button.calendar-month-more-link {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-padding: 1 5 1 5;
+    -fx-cursor: hand;
+}
+
+.button.calendar-month-day-link {
+    -fx-min-height: 20;
+    -fx-pref-height: 20;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-text-fill: rgba(17, 37, 66, 0.82);
+    -fx-alignment: center-left;
+}
+
+.button.calendar-month-more-link {
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: rgba(29, 78, 216, 0.82);
+    -fx-alignment: center-left;
+    -fx-padding: 1 4 1 4;
+}
+
+.button.calendar-month-day-link:hover,
+.button.calendar-month-more-link:hover {
+    -fx-background-color: rgba(29, 78, 216, 0.08);
+    -fx-border-color: rgba(29, 78, 216, 0.16);
+}
+
+.button.calendar-month-day-link:focused,
+.button.calendar-month-more-link:focused {
+    -fx-background-color: rgba(29, 78, 216, 0.10);
+    -fx-border-color: rgba(29, 78, 216, 0.52);
+}
+
+.button.calendar-month-day-link:pressed,
+.button.calendar-month-more-link:pressed {
+    -fx-background-color: rgba(29, 78, 216, 0.14);
+}
+
+.button.calendar-month-more-link:hover > .text {
+    -fx-underline: true;
+}
+
 .button.calendar-disclosure-toggle {
     -fx-background-color: transparent;
     -fx-border-color: transparent;

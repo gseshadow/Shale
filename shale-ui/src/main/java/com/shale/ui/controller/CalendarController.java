@@ -425,7 +425,8 @@ public final class CalendarController {
 
     private Button createMonthDayButton(LocalDate day) {
         Button dayButton = new Button(String.valueOf(day.getDayOfMonth()));
-        dayButton.getStyleClass().add("calendar-month-day-button");
+        dayButton.getStyleClass().add("calendar-month-day-link");
+        dayButton.setMaxWidth(Region.USE_PREF_SIZE);
         dayButton.setCursor(Cursor.HAND);
         dayButton.setFocusTraversable(true);
         String accessible = "Open " + day.format(WEEK_RANGE_FORMAT) + " in Day view";
@@ -441,7 +442,8 @@ public final class CalendarController {
 
     private Button createMonthMoreButton(LocalDate day, int hiddenCount) {
         Button moreButton = new Button("+" + hiddenCount + " more");
-        moreButton.getStyleClass().add("calendar-month-more-button");
+        moreButton.getStyleClass().add("calendar-month-more-link");
+        moreButton.setMaxWidth(Region.USE_PREF_SIZE);
         moreButton.setCursor(Cursor.HAND);
         moreButton.setFocusTraversable(true);
         String accessible = "Show " + hiddenCount + " more items for " + day.format(WEEK_RANGE_FORMAT);
