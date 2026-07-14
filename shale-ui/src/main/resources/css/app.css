@@ -2163,3 +2163,128 @@
     -fx-font-size: 10.5px;
     -fx-text-fill: #5d7280;
 }
+
+.calendar-page-root {
+    -fx-alignment: stretch;
+}
+
+.calendar-overlay-sidebar {
+    -fx-min-width: 200;
+    -fx-pref-width: 220;
+    -fx-max-width: 240;
+    -fx-padding: 12;
+    -fx-background-color: rgba(243, 248, 253, 0.94);
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(13, 33, 64, 0.16);
+    -fx-border-width: 1;
+}
+
+.calendar-main-content {
+    -fx-min-width: 720;
+}
+
+.calendar-overlay-actions {
+    -fx-padding: 0 0 2 0;
+}
+
+.button.calendar-sidebar-link-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 2 2 2 2;
+    -fx-text-fill: #2e6fb6;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+    -fx-cursor: hand;
+}
+
+.button.calendar-sidebar-link-button:hover,
+.button.calendar-sidebar-link-button:focused {
+    -fx-underline: true;
+}
+
+.calendar-overlay-list-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-fit-to-width: true;
+}
+
+.calendar-overlay-list-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.calendar-overlay-list {
+    -fx-padding: 1 2 1 0;
+}
+
+.calendar-sidebar-section-heading {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 11px;
+    -fx-font-weight: 900;
+    -fx-padding: 8 0 2 2;
+}
+
+.toggle-button.calendar-overlay-row {
+    -fx-background-color: transparent;
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
+    -fx-border-width: 1;
+    -fx-border-color: transparent;
+    -fx-padding: 6 8 6 8;
+    -fx-cursor: hand;
+    -fx-alignment: center-left;
+    -fx-content-display: graphic-only;
+}
+
+.toggle-button.calendar-overlay-row:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.72);
+    -fx-border-color: rgba(74, 104, 138, 0.18);
+}
+
+.toggle-button.calendar-overlay-row:selected {
+    -fx-background-color: rgba(46, 111, 182, 0.13);
+    -fx-border-color: rgba(46, 111, 182, 0.30);
+    -fx-font-weight: 900;
+}
+
+.toggle-button.calendar-overlay-row:selected .calendar-overlay-row-label {
+    -fx-font-weight: 900;
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.toggle-button.calendar-overlay-row:focused {
+    -fx-effect: dropshadow(gaussian, rgba(46,111,182,0.42), 8, 0.16, 0, 0);
+}
+
+.calendar-overlay-row-label {
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+.calendar-overlay-color-marker,
+.calendar-overlay-shared-marker {
+    -fx-font-size: 11px;
+    -fx-min-width: 12;
+    -fx-pref-width: 12;
+}
+
+.calendar-overlay-shared-marker {
+    -fx-text-fill: #6b778c;
+}
+
+.calendar-overlay-row-check {
+    -fx-text-fill: #2e6fb6;
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+    -fx-min-width: 14;
+    -fx-pref-width: 14;
+}
+
+.calendar-sidebar-layers-section {
+    -fx-padding: 10 0 0 0;
+    -fx-border-color: rgba(13, 33, 64, 0.12) transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}

@@ -146,7 +146,9 @@ public final class CalendarFeedDao {
                             rs.getString("CalendarEventTypeSystemKey"),
                             rs.getString("DisplayTypeName"),
                             rs.getString("ColorHex"),
-                            rs.getString("AssignedUserColor")));
+                            rs.getString("AssignedUserColor"),
+                            (Integer) rs.getObject("AssignedToUserId"),
+                            rs.getString("AssignedUserDisplayName")));
                 }
                 return rows;
             }
@@ -161,7 +163,7 @@ public final class CalendarFeedDao {
 
     static String buildCalendarFeedSql(boolean caseFiltered) {
         StringBuilder sql = new StringBuilder("""
-                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, CaseName, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex, AssignedUserColor
+                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, CaseName, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex, AssignedUserColor, AssignedToUserId, AssignedUserDisplayName
                 FROM (
                     SELECT CONCAT('EVENT:', CAST(e.CalendarEventId AS varchar(20))) AS KeyValue,
                            e.Title,
@@ -177,7 +179,9 @@ public final class CalendarFeedDao {
                            et.SystemKey AS CalendarEventTypeSystemKey,
                            COALESCE(et.Name, 'Event') AS DisplayTypeName,
                            COALESCE(assignedUser.color, et.ColorHex) AS ColorHex,
-                           assignedUser.color AS AssignedUserColor
+                           assignedUser.color AS AssignedUserColor,
+                           e.AssignedToUserId,
+                           LTRIM(RTRIM(COALESCE(assignedUser.name_first, '') + CASE WHEN COALESCE(assignedUser.name_first, '') = '' OR COALESCE(assignedUser.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(assignedUser.name_last, ''))) AS AssignedUserDisplayName
                     FROM dbo.CalendarEvents e
                     LEFT JOIN dbo.CalendarEventTypes et ON et.CalendarEventTypeId = e.CalendarEventTypeId
                     LEFT JOIN dbo.Cases c ON c.Id = e.CaseId AND c.ShaleClientId = e.ShaleClientId AND ISNULL(c.IsDeleted, 0) = 0
@@ -203,7 +207,9 @@ public final class CalendarFeedDao {
                            'TASK_DUE',
                            'Task Due',
                            projectedType.ColorHex,
-                           NULL AS AssignedUserColor
+                           NULL AS AssignedUserColor,
+                           NULL AS AssignedToUserId,
+                           NULL AS AssignedUserDisplayName
                     FROM dbo.Tasks t
                     OUTER APPLY (
                       SELECT TOP (1) cet.ColorHex
@@ -250,7 +256,9 @@ public final class CalendarFeedDao {
                            COALESCE(projectedType.SystemKey, fallbackType.SystemKey, '%s'),
                            COALESCE(projectedType.Name, fallbackType.Name, '%s'),
                            COALESCE(projectedType.ColorHex, fallbackType.ColorHex),
-                           NULL AS AssignedUserColor
+                           NULL AS AssignedUserColor,
+                           NULL AS AssignedToUserId,
+                           NULL AS AssignedUserDisplayName
                     FROM dbo.Cases c
                     OUTER APPLY (
                       SELECT TOP (1) cet.SystemKey, cet.Name, cet.ColorHex

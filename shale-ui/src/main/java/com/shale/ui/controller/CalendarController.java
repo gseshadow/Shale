@@ -6,6 +6,7 @@ import com.shale.core.model.CalendarFeedClickTarget;
 import com.shale.core.model.CalendarFeedFilters;
 import com.shale.core.model.CalendarFeedItem;
 import com.shale.core.model.CalendarFeedSourceFilter;
+import com.shale.core.model.CalendarOverlaySelection;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseDao;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
@@ -16,6 +17,7 @@ import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.ColorUtil;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -64,6 +66,10 @@ public final class CalendarController {
     @FXML private ComboBox<CalendarCaseFilterOptions.CaseOption> caseFilterCombo;
     @FXML private ComboBox<EventTypeFilterOption> eventTypeFilterCombo;
     @FXML private Button clearFiltersButton;
+    @FXML private VBox calendarRowsBox;
+    @FXML private Button selectAllCalendarsButton;
+    @FXML private Button clearAllCalendarsButton;
+    @FXML private Button resetCalendarsButton;
     @FXML private CheckBox eventsLayerCheckBox;
     @FXML private CheckBox tasksLayerCheckBox;
     @FXML private CheckBox deadlinesLayerCheckBox;
@@ -91,6 +97,10 @@ public final class CalendarController {
     private ScrollPane timedScrollPane;
     private boolean allDayCollapsed;
     private CalendarFeedSourceFilter sourceFilter = CalendarFeedSourceFilter.defaults();
+    private CalendarOverlaySelection calendarOverlaySelection = CalendarOverlaySelection.defaults(null);
+    private final Map<Integer, ToggleButton> userCalendarButtons = new LinkedHashMap<>();
+    private ToggleButton sharedCalendarButton;
+    private boolean suppressOverlayControlEvents;
 
     private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
     private CaseCardFactory caseCardFactory = new CaseCardFactory(id -> {});
@@ -102,6 +112,8 @@ public final class CalendarController {
         this.caseTaskService = caseTaskService;
         this.caseDao = caseDao;
         this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase; this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
+        resetCalendarOverlayDefaults();
+        configureCalendarOverlayControls();
         this.caseCardFactory = new CaseCardFactory(this.onOpenCase);
         this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id -> {}, this.onOpenCase, id -> {});
     }
@@ -113,6 +125,7 @@ public final class CalendarController {
         viewModeChoice.valueProperty().addListener((obs, o, n) -> { if (!Objects.equals(o, n)) loadCurrentRange(false); });
         configureFilters();
         configureSourceLayerFilters();
+        configureCalendarOverlayControls();
         renderCurrentShell();
         Platform.runLater(() -> loadCurrentRange(false));
     }
@@ -176,6 +189,135 @@ public final class CalendarController {
         sourceFilter = new CalendarFeedSourceFilter(enabled);
     }
 
+
+    private void configureCalendarOverlayControls() {
+        if (calendarRowsBox == null) return;
+        calendarRowsBox.getChildren().clear();
+        userCalendarButtons.clear();
+        sharedCalendarButton = createCalendarRowButton("Shared Calendar", "Shared Calendar", null, calendarOverlaySelection == null || calendarOverlaySelection.sharedEnabled(), true);
+        calendarRowsBox.getChildren().add(sharedCalendarButton);
+
+        Integer currentUserId = currentUserId();
+        List<NewCalendarEventDialog.AssignedUserOption> users = assignedUserOptionsForPicker(appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId(), currentUserId);
+        NewCalendarEventDialog.AssignedUserOption currentUser = users.stream()
+                .filter(user -> user != null && Objects.equals(user.userId(), currentUserId))
+                .findFirst()
+                .orElse(null);
+        if (currentUser != null) {
+            ToggleButton mine = createCalendarRowButton("My Calendar", "My Calendar (" + safe(currentUser.displayName()) + ")", currentUser.color(), calendarOverlaySelection != null && calendarOverlaySelection.enabledUserIds().contains(currentUser.userId()), false);
+            userCalendarButtons.put(currentUser.userId(), mine);
+            calendarRowsBox.getChildren().add(mine);
+        }
+
+        List<NewCalendarEventDialog.AssignedUserOption> otherUsers = users.stream()
+                .filter(user -> user != null && user.userId() != null && user.userId() > 0 && !Objects.equals(user.userId(), currentUserId))
+                .sorted(Comparator.comparing((NewCalendarEventDialog.AssignedUserOption user) -> safe(user.displayName()).toLowerCase(Locale.ROOT))
+                        .thenComparing(user -> user.userId() == null ? Integer.MAX_VALUE : user.userId()))
+                .toList();
+        if (!otherUsers.isEmpty()) {
+            Label usersLabel = new Label("Users");
+            usersLabel.getStyleClass().add("calendar-sidebar-section-heading");
+            calendarRowsBox.getChildren().add(usersLabel);
+            for (NewCalendarEventDialog.AssignedUserOption user : otherUsers) {
+                ToggleButton button = createCalendarRowButton(safe(user.displayName()), "Calendar for " + safe(user.displayName()), user.color(), calendarOverlaySelection != null && calendarOverlaySelection.enabledUserIds().contains(user.userId()), false);
+                userCalendarButtons.put(user.userId(), button);
+                calendarRowsBox.getChildren().add(button);
+            }
+        }
+        configureCalendarBulkActionTooltips();
+    }
+
+    private ToggleButton createCalendarRowButton(String labelText, String accessibleText, String color, boolean selected, boolean shared) {
+        ToggleButton button = new ToggleButton();
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setFocusTraversable(true);
+        button.setSelected(selected);
+        button.setAccessibleText(accessibleText);
+        button.getStyleClass().addAll("calendar-overlay-row", shared ? "calendar-overlay-row-shared" : "calendar-overlay-row-user");
+        button.setGraphic(createCalendarRowGraphic(labelText, color, selected, shared));
+        button.selectedProperty().addListener((obs, oldValue, newValue) -> {
+            button.setGraphic(createCalendarRowGraphic(labelText, color, newValue, shared));
+            if (!suppressOverlayControlEvents) updateCalendarOverlaySelectionFromRows();
+        });
+        return button;
+    }
+
+    private Node createCalendarRowGraphic(String labelText, String color, boolean selected, boolean shared) {
+        Label marker = new Label(shared ? "◈" : "●");
+        marker.getStyleClass().add(shared ? "calendar-overlay-shared-marker" : "calendar-overlay-color-marker");
+        String userColorCss = calendarOverlayUserColorCss(color);
+        if (!shared && userColorCss != null) marker.setStyle("-fx-text-fill: " + userColorCss + ";");
+        Label label = new Label(labelText);
+        label.getStyleClass().add("calendar-overlay-row-label");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Label check = new Label(selected ? "✓" : "");
+        check.getStyleClass().add("calendar-overlay-row-check");
+        HBox row = new HBox(7, marker, label, spacer, check);
+        row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        row.setMaxWidth(Double.MAX_VALUE);
+        return row;
+    }
+
+    private static String calendarOverlayUserColorCss(String storedColor) {
+        return ColorUtil.toCssBackgroundColorOrNull(storedColor);
+    }
+
+    private void configureCalendarBulkActionTooltips() {
+        if (selectAllCalendarsButton != null) Tooltip.install(selectAllCalendarsButton, new Tooltip("Show Shared, My Calendar, and all active user calendars"));
+        if (clearAllCalendarsButton != null) Tooltip.install(clearAllCalendarsButton, new Tooltip("Hide every calendar; does not change other filters"));
+        if (resetCalendarsButton != null) Tooltip.install(resetCalendarsButton, new Tooltip("Reset calendars to Shared + My Calendar only"));
+    }
+
+    private void resetCalendarOverlayDefaults() {
+        calendarOverlaySelection = CalendarOverlaySelection.defaults(currentUserId());
+    }
+
+    private void updateCalendarOverlaySelectionFromRows() {
+        LinkedHashSet<Integer> selectedUsers = new LinkedHashSet<>();
+        userCalendarButtons.forEach((id, button) -> { if (button.isSelected()) selectedUsers.add(id); });
+        calendarOverlaySelection = new CalendarOverlaySelection(sharedCalendarButton != null && sharedCalendarButton.isSelected(), selectedUsers);
+        updateClearFiltersState();
+        applyFiltersAndRender();
+    }
+
+    private void syncCalendarRowsFromSelection() {
+        suppressOverlayControlEvents = true;
+        try {
+            if (sharedCalendarButton != null) sharedCalendarButton.setSelected(calendarOverlaySelection != null && calendarOverlaySelection.sharedEnabled());
+            userCalendarButtons.forEach((id, button) -> button.setSelected(calendarOverlaySelection != null && calendarOverlaySelection.enabledUserIds().contains(id)));
+        } finally {
+            suppressOverlayControlEvents = false;
+        }
+    }
+
+    @FXML private void onSelectAllCalendars() {
+        LinkedHashSet<Integer> allUsers = new LinkedHashSet<>(userCalendarButtons.keySet());
+        calendarOverlaySelection = new CalendarOverlaySelection(true, allUsers);
+        syncCalendarRowsFromSelection();
+        updateClearFiltersState();
+        applyFiltersAndRender();
+    }
+
+    @FXML private void onClearAllCalendars() {
+        calendarOverlaySelection = new CalendarOverlaySelection(false, Set.of());
+        syncCalendarRowsFromSelection();
+        updateClearFiltersState();
+        applyFiltersAndRender();
+    }
+
+    @FXML private void onResetCalendars() {
+        resetCalendarOverlayDefaults();
+        syncCalendarRowsFromSelection();
+        updateClearFiltersState();
+        applyFiltersAndRender();
+    }
+
+    private Integer currentUserId() {
+        Integer userId = appState == null ? null : appState.getUserId();
+        return userId == null || userId <= 0 ? null : userId;
+    }
+
     @FXML private void onToday() { selectedDate = LocalDate.now(); loadCurrentRange(true); }
     @FXML private void onPreviousWeek() { selectedDate = shiftSelectedDate(-1); loadCurrentRange(false); }
     @FXML private void onNextWeek() { selectedDate = shiftSelectedDate(1); loadCurrentRange(false); }
@@ -186,6 +328,8 @@ public final class CalendarController {
         caseFilterCombo.setValue(ALL_CASES_OPTION);
         eventTypeFilterCombo.setValue(ALL_TYPES_OPTION);
         setLayerDefaults();
+        resetCalendarOverlayDefaults();
+        configureCalendarOverlayControls();
         updateClearFiltersState();
         applyFiltersAndRender();
     }
@@ -253,8 +397,10 @@ public final class CalendarController {
         Integer activeCaseId = (activeCaseFilter == null || activeCaseFilter.isAll()) ? null : activeCaseFilter.caseId();
         String activeTypeKey = (activeTypeFilter == null || activeTypeFilter.isAll()) ? "" : safe(activeTypeFilter.matchKey());
         CalendarFeedSourceFilter activeSourceFilter = sourceFilter == null ? CalendarFeedSourceFilter.defaults() : sourceFilter;
-        if (!activeSourceFilter.hasAnyEnabled()) return List.of();
+        CalendarOverlaySelection activeOverlaySelection = calendarOverlaySelection == null ? CalendarOverlaySelection.defaults(currentUserId()) : calendarOverlaySelection;
+        if (!activeOverlaySelection.hasAnyEnabled() || !activeSourceFilter.hasAnyEnabled()) return List.of();
         return items.stream()
+                .filter(activeOverlaySelection::matches)
                 .filter(item -> CalendarFeedFilters.matches(item, activeSourceFilter, search, activeCaseId, activeTypeKey))
                 .toList();
     }
@@ -284,6 +430,10 @@ public final class CalendarController {
         else sortedTypeOptions.stream().filter(o -> safe(o.matchKey()).equalsIgnoreCase(selectedEventTypeKey)).findFirst().ifPresentOrElse(eventTypeFilterCombo::setValue, () -> { selectedEventTypeKey = ""; eventTypeFilterCombo.setValue(ALL_TYPES_OPTION); });
     }
     private void renderCurrent(List<CalendarFeedItem> items) {
+        if (calendarOverlaySelection != null && !calendarOverlaySelection.hasAnyEnabled()) {
+            renderEmptyCalendarState("No calendars selected.");
+            return;
+        }
         if (sourceFilter != null && !sourceFilter.hasAnyEnabled()) {
             renderEmptyCalendarState("No calendar layers selected.");
             return;
@@ -308,7 +458,8 @@ public final class CalendarController {
         boolean dirty = !safe(searchTextField == null ? searchText : searchTextField.getText()).trim().isBlank()
                 || selectedCaseId != null
                 || !safe(selectedEventTypeKey).isBlank()
-                || !Objects.equals(sourceFilter, CalendarFeedSourceFilter.defaults());
+                || !Objects.equals(sourceFilter, CalendarFeedSourceFilter.defaults())
+                || !Objects.equals(calendarOverlaySelection, CalendarOverlaySelection.defaults(currentUserId()));
         clearFiltersButton.setDisable(!dirty);
     }
 
@@ -872,7 +1023,13 @@ public final class CalendarController {
         java.util.Map<Integer, String> colors = new LinkedHashMap<>();
         caseTaskService.loadAssignableUsers(tenantId).forEach(u -> { names.putIfAbsent(u.id(), safe(u.displayName())); colors.putIfAbsent(u.id(), u.color()); });
         if (selectedUserId != null && selectedUserId > 0) names.putIfAbsent(selectedUserId, "User #" + selectedUserId);
-        return names.entrySet().stream().map(e -> new NewCalendarEventDialog.AssignedUserOption(e.getKey(), e.getValue(), colors.get(e.getKey()))).toList();
+        Integer currentUserId = currentUserId();
+        return names.entrySet().stream()
+                .map(e -> new NewCalendarEventDialog.AssignedUserOption(e.getKey(), e.getValue(), colors.get(e.getKey())))
+                .sorted(Comparator.comparing((NewCalendarEventDialog.AssignedUserOption o) -> !Objects.equals(o.userId(), currentUserId))
+                        .thenComparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT))
+                        .thenComparing(o -> o.userId() == null ? Integer.MAX_VALUE : o.userId()))
+                .toList();
     }
     private int resolveDurationMinutes(com.shale.core.model.CalendarEvent event) { if (event == null || event.endsAt() == null || event.startsAt() == null || !event.endsAt().isAfter(event.startsAt())) return 60; long minutes = java.time.Duration.between(event.startsAt(), event.endsAt()).toMinutes(); long roundedUp = ((minutes + 29) / 30) * 30; if (roundedUp < 30) roundedUp = 30; if (roundedUp > 8 * 60) roundedUp = 8 * 60; return (int) roundedUp; }
     private String deleteEvent(Integer calendarEventId, int tenantId) { try { calendarService.deleteCalendarEvent(calendarEventId, tenantId); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not delete event. Please try again."; } }
