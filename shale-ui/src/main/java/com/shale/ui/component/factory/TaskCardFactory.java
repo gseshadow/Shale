@@ -2,6 +2,7 @@ package com.shale.ui.component.factory;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -10,6 +11,9 @@ import com.shale.ui.privacy.PhiFieldRegistry;
 import com.shale.ui.util.ColorUtil;
 
 public final class TaskCardFactory {
+
+    public static final String COMPLETED_STATUS_LABEL = "Completed";
+    public static final String COMPLETED_STATUS_FALLBACK_COLOR = "#DCFCE7";
 
     public enum Variant {
         FULL, MY_TASKS, COMPACT, COMPACT_FLUID, MINI
@@ -97,7 +101,11 @@ public final class TaskCardFactory {
         card.setDueAt(model.dueAt());
         card.setCreatedByDisplayName(model.createdByDisplayName());
         card.setDescriptionPreview(safeDescription);
-        card.setTaskStatus(model.taskStatusName(), model.taskStatusColorHex());
+        TaskStatusPresentation status = resolveTaskStatusPresentation(
+                model.completedAt() != null,
+                model.taskStatusName(),
+                model.taskStatusColorHex());
+        card.setTaskStatus(status.name(), status.colorHex());
         card.setCompleted(model.completedAt() != null);
         card.setBorderByDueState(model.dueAt(), model.completedAt());
         card.setAssignees(model.assignedUsers());
@@ -112,5 +120,35 @@ public final class TaskCardFactory {
         }
 
         return card;
+    }
+
+    public record TaskStatusPresentation(String name, String colorHex) {
+    }
+
+    public static TaskStatusPresentation resolveTaskStatusPresentation(
+            boolean completed,
+            String hydratedStatusName,
+            String hydratedStatusColorHex) {
+        if (completed) {
+            String completedColor = isCompletedStatusName(hydratedStatusName) && !isBlank(hydratedStatusColorHex)
+                    ? hydratedStatusColorHex.trim()
+                    : COMPLETED_STATUS_FALLBACK_COLOR;
+            return new TaskStatusPresentation(COMPLETED_STATUS_LABEL, completedColor);
+        }
+
+        String displayName = isBlank(hydratedStatusName) ? "—" : hydratedStatusName.trim();
+        return new TaskStatusPresentation(displayName, hydratedStatusColorHex);
+    }
+
+    private static boolean isCompletedStatusName(String statusName) {
+        if (isBlank(statusName)) {
+            return false;
+        }
+        String normalized = statusName.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
+        return "completed".equals(normalized) || "complete".equals(normalized) || "done".equals(normalized);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
