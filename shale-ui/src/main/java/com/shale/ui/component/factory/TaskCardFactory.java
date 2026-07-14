@@ -48,6 +48,24 @@ public final class TaskCardFactory {
     ) {
     }
 
+    public record TaskStatusPresentation(String name, String colorHex) {
+    }
+
+    public static TaskStatusPresentation resolveTaskStatusPresentation(
+            boolean completed,
+            String hydratedStatusName,
+            String hydratedStatusColorHex) {
+        String statusName = hydratedStatusName == null ? "" : hydratedStatusName.trim();
+        String statusColor = hydratedStatusColorHex == null ? "" : hydratedStatusColorHex.trim();
+        if (!completed) {
+            return new TaskStatusPresentation(statusName, statusColor);
+        }
+        if (COMPLETED_STATUS_LABEL.equalsIgnoreCase(statusName) && !statusColor.isBlank()) {
+            return new TaskStatusPresentation(COMPLETED_STATUS_LABEL, statusColor);
+        }
+        return new TaskStatusPresentation(COMPLETED_STATUS_LABEL, COMPLETED_STATUS_FALLBACK_COLOR);
+    }
+
     private final Consumer<Long> onOpenTask;
     private final Consumer<Long> onToggleCompleteTask;
     private final Consumer<Integer> onOpenCase;
@@ -99,8 +117,13 @@ public final class TaskCardFactory {
         card.setDueAt(model.dueAt());
         card.setCreatedByDisplayName(model.createdByDisplayName());
         card.setDescriptionPreview(safeDescription);
-        card.setTaskStatus(model.taskStatusName(), model.taskStatusColorHex());
-        card.setCompleted(model.completedAt() != null);
+        boolean completed = model.completedAt() != null;
+        TaskStatusPresentation status = resolveTaskStatusPresentation(
+                completed,
+                model.taskStatusName(),
+                model.taskStatusColorHex());
+        card.setTaskStatus(status.name(), status.colorHex());
+        card.setCompleted(completed);
         card.setBorderByDueState(model.dueAt(), model.completedAt());
         card.setAssignees(model.assignedUsers());
         card.setPriorityBackgroundColor(model.priorityColorHex());
