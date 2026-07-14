@@ -53,7 +53,8 @@ class TaskCardDesignLanguageTest {
     void statusPillUsesActualModelStatusAndNeutralFallback() {
         assertTrue(factory.contains("String taskStatusName"));
         assertTrue(factory.contains("String taskStatusColorHex"));
-        assertTrue(factory.contains("card.setTaskStatus(model.taskStatusName(), model.taskStatusColorHex())"));
+        assertTrue(factory.contains("resolveTaskStatusPresentation("));
+        assertTrue(factory.contains("card.setTaskStatus(status.name(), status.colorHex())"));
         assertTrue(taskCard.contains("CaseCard.normalizeColor(statusColor, \"#F1F5F9\")"));
         assertTrue(taskCard.contains("statusName == null || statusName.isBlank() ? \"—\""));
     }

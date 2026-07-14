@@ -28,6 +28,7 @@ public final class TaskDao {
     private static final String TASK_STATUSES_TABLE = "dbo.TaskStatuses";
     private static final String PRIORITY_SYSTEM_KEY_NORMAL = "normal";
     private static final String TASK_STATUS_SYSTEM_KEY_OPEN = "open";
+    private static final String TASK_STATUS_SYSTEM_KEY_COMPLETED = "completed";
     public static final class TaskTimelineEventTypes {
         public static final String TASK_CREATED = "TASK_CREATED";
         public static final String TASK_COMPLETED = "TASK_COMPLETED";
@@ -1656,6 +1657,9 @@ public final class TaskDao {
              PreparedStatement ps = con.prepareStatement(sql)) {
             TaskDetailDto before = findTaskDetail(taskId, shaleClientId);
             int resolvedStatusId = resolveStatusIdForUpdate(con, shaleClientId, statusId);
+            if (completed) {
+                resolvedStatusId = resolveCompletedTaskStatusId(con, shaleClientId, resolvedStatusId);
+            }
             int resolvedPriorityId = resolvePriorityIdForCreate(con, shaleClientId, priorityId);
             int i = 1;
             ps.setString(i++, normalizedTitle);
@@ -2283,6 +2287,7 @@ public final class TaskDao {
         String sql = """
                 UPDATE dbo.Tasks
                 SET CompletedAt = %s,
+                    StatusId = ?,
                     UpdatedAt = SYSDATETIME()
                 WHERE Id = ?
                   AND ShaleClientId = ?
@@ -2292,8 +2297,12 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setLong(1, taskId);
-            ps.setInt(2, shaleClientId);
+            int synchronizedStatusId = completed
+                    ? resolveCompletedTaskStatusId(con, shaleClientId, null)
+                    : resolveDefaultTaskStatusId(con, shaleClientId);
+            ps.setInt(1, synchronizedStatusId);
+            ps.setLong(2, taskId);
+            ps.setInt(3, shaleClientId);
             if (ps.executeUpdate() > 0) {
                 touchTaskCaseUpdatedAt(con, taskId, shaleClientId);
             }
@@ -2664,6 +2673,22 @@ public final class TaskDao {
             return effective.get(0).id();
         }
         throw new IllegalStateException("No default open task status found for shaleClientId=" + shaleClientId);
+    }
+
+    private static int resolveCompletedTaskStatusId(Connection con, int shaleClientId, Integer fallbackStatusId) throws SQLException {
+        List<TaskStatusLookupRow> effective = listEffectiveTaskStatusesForTenant(con, shaleClientId, true);
+        for (TaskStatusLookupRow row : effective) {
+            if (row == null) {
+                continue;
+            }
+            if (TASK_STATUS_SYSTEM_KEY_COMPLETED.equals(normalizeSystemKey(row.systemKey()))) {
+                return row.id();
+            }
+        }
+        if (fallbackStatusId != null && fallbackStatusId > 0) {
+            return fallbackStatusId;
+        }
+        return resolveDefaultTaskStatusId(con, shaleClientId);
     }
 
     private static int resolveStatusIdForUpdate(Connection con, int shaleClientId, Integer requestedStatusId) throws SQLException {

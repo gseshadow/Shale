@@ -630,42 +630,6 @@ public final class TaskCard extends VBox {
 		return trimmed + "...";
 	}
 
-	private void setHoverRevealExpanded(boolean expanded) {
-		if (!hoverRevealHasContent || fullExpanded) {
-			expanded = false;
-		}
-		if (hoverRevealTimeline != null) {
-			hoverRevealTimeline.stop();
-		}
-		if (expanded) {
-			hoverRevealPane.setManaged(true);
-			hoverRevealPane.setVisible(true);
-			double targetHeight = Math.max(1, hoverRevealPane.prefHeight(-1));
-			hoverRevealTimeline = new Timeline(
-					new KeyFrame(Duration.ZERO,
-							new KeyValue(hoverRevealPane.maxHeightProperty(), hoverRevealPane.getMaxHeight()),
-							new KeyValue(hoverRevealPane.opacityProperty(), hoverRevealPane.getOpacity())),
-					new KeyFrame(HOVER_REVEAL_DURATION,
-							new KeyValue(hoverRevealPane.maxHeightProperty(), targetHeight),
-							new KeyValue(hoverRevealPane.opacityProperty(), 1.0)));
-		} else {
-			hoverRevealTimeline = new Timeline(
-					new KeyFrame(Duration.ZERO,
-							new KeyValue(hoverRevealPane.maxHeightProperty(), hoverRevealPane.getMaxHeight()),
-							new KeyValue(hoverRevealPane.opacityProperty(), hoverRevealPane.getOpacity())),
-					new KeyFrame(HOVER_REVEAL_DURATION,
-							new KeyValue(hoverRevealPane.maxHeightProperty(), 0),
-							new KeyValue(hoverRevealPane.opacityProperty(), 0)));
-			hoverRevealTimeline.setOnFinished(e -> {
-				if (!hovered) {
-					hoverRevealPane.setManaged(false);
-					hoverRevealPane.setVisible(false);
-				}
-			});
-		}
-		hoverRevealTimeline.play();
-	}
-
 	private String truncateForHover(String text) {
 		String normalized = text == null ? "" : text.trim();
 		if (normalized.length() <= 260) {
