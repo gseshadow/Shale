@@ -53,4 +53,20 @@ final class TaskEmbeddedCaseCardReuseTest {
                 "New Calendar Event selected case previews should not be migrated to EMBEDDED in this refactor.");
     }
 
+    @Test
+    void myTasksEmbeddedCaseCardHasOwnFullWidthMetadataRow() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/component/TaskCard.java"));
+
+        assertTrue(source.contains("bodyPane.getChildren().setAll(fullHeaderRow, myTasksMetadataBlock, fullExpandedContent, hoverRevealPane)"),
+                "My Tasks should stack metadata and embedded case cards below the top header row.");
+        assertTrue(source.contains("fullHeaderText.getChildren().setAll(titleLabel)"),
+                "My Tasks top row should reserve horizontal space for title, status pill, and expand button only.");
+        assertTrue(source.contains("myTasksMetadataBlock.getChildren().setAll(dueLabel, relatedCaseHost)"),
+                "Due metadata and the embedded related case should live in the vertical metadata block.");
+        assertTrue(source.contains("relatedCaseHost.setMaxWidth(Double.MAX_VALUE)"),
+                "The My Tasks related case host should be allowed to use the full task-card width.");
+        assertFalse(source.contains("fullHeaderText.getChildren().setAll(titleLabel, dueLabel, relatedCaseHost)"),
+                "The embedded case card must not share the top header HBox with the status pill or expand button.");
+    }
+
 }

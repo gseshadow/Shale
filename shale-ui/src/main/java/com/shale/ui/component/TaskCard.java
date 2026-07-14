@@ -76,6 +76,7 @@ public final class TaskCard extends VBox {
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
 	private final Button expandDetailsButton = new Button("+");
 	private final VBox fullHeaderText = new VBox(2, titleLabel, dueLabel);
+	private final VBox myTasksMetadataBlock = new VBox(4, dueLabel, relatedCaseHost);
 	private final Region fullHeaderSpacer = new Region();
 	private final HBox fullHeaderRow = new HBox(8, fullHeaderText, fullHeaderSpacer, statusPill, expandDetailsButton);
 	private final VBox fullExpandedContent = new VBox(6, createdByLabel, teamSection, descriptionLabel, completedLabel, actionsRow);
@@ -359,7 +360,15 @@ public final class TaskCard extends VBox {
 	public void applyMyTasks() {
 		applyFull();
 		currentVariant = Variant.MY_TASKS;
-		fullHeaderText.getChildren().setAll(titleLabel, dueLabel, relatedCaseHost);
+		fullHeaderText.getChildren().setAll(titleLabel);
+		myTasksMetadataBlock.getChildren().setAll(dueLabel, relatedCaseHost);
+		bodyPane.getChildren().setAll(fullHeaderRow, myTasksMetadataBlock, fullExpandedContent, hoverRevealPane);
+		myTasksMetadataBlock.setAlignment(Pos.TOP_LEFT);
+		myTasksMetadataBlock.setFillWidth(true);
+		myTasksMetadataBlock.setMinWidth(0);
+		myTasksMetadataBlock.setMaxWidth(Double.MAX_VALUE);
+		relatedCaseHost.setMinWidth(0);
+		relatedCaseHost.setMaxWidth(Double.MAX_VALUE);
 		renderRelatedCaseCard();
 	}
 
@@ -639,7 +648,8 @@ public final class TaskCard extends VBox {
 		caseSectionLabel.setStyle(sectionLabelStyle);
 		teamSectionLabel.setStyle(sectionLabelStyle);
 		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
-		relatedCaseHost.setMaxWidth(Region.USE_PREF_SIZE);
+		relatedCaseHost.setMinWidth(0);
+		relatedCaseHost.setMaxWidth(currentVariant == Variant.MY_TASKS ? Double.MAX_VALUE : Region.USE_PREF_SIZE);
 		assigneeHost.setAlignment(Pos.CENTER_LEFT);
 		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
 	}
@@ -663,6 +673,8 @@ public final class TaskCard extends VBox {
 			region.setMinWidth(0);
 			region.setPrefWidth(Region.USE_COMPUTED_SIZE);
 			region.setMaxWidth(Double.MAX_VALUE);
+			relatedCaseHost.setMinWidth(0);
+			relatedCaseHost.setMaxWidth(Double.MAX_VALUE);
 		}
 		caseCard.setOnMouseClicked(e -> {
 			e.consume();
