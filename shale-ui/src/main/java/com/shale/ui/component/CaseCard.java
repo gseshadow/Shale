@@ -57,6 +57,7 @@ public class CaseCard extends VBox {
 	private LocalDate tortNoticeDeadline;
 	private boolean hovered;
 	private boolean embeddedMini;
+	private boolean relatedEmbedded;
 	private boolean taskPreview;
 
 	public CaseCard() {
@@ -72,6 +73,7 @@ public class CaseCard extends VBox {
 
 	public void applyMini() {
 		embeddedMini = true;
+		relatedEmbedded = false;
 		taskPreview = false;
 		getStyleClass().removeAll("case-card-full", "case-card-compact");
 		getStyleClass().add("case-card-compact");
@@ -108,6 +110,7 @@ public class CaseCard extends VBox {
 
 	public void applyEmbeddedMini() {
 		applyMini();
+		relatedEmbedded = true;
 		getStyleClass().add("task-related-case-card");
 		attorneyMiniCard.setManaged(true);
 		attorneyMiniCard.setVisible(true);
@@ -118,6 +121,7 @@ public class CaseCard extends VBox {
 
 	public void applyTaskPreview() {
 		embeddedMini = true;
+		relatedEmbedded = false;
 		taskPreview = true;
 		getStyleClass().removeAll("case-card-full", "case-card-compact");
 		getStyleClass().add("case-card-compact");
@@ -154,6 +158,7 @@ public class CaseCard extends VBox {
 
 	public void applyCompact() {
 		embeddedMini = false;
+		relatedEmbedded = false;
 		taskPreview = false;
 		getStyleClass().removeAll("case-card-full", "case-card-compact");
 		getStyleClass().add("case-card-full");
@@ -382,22 +387,15 @@ public class CaseCard extends VBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(CardSurfaceStyles.cardContainerStyle(taskPreview ? statusTintCss() : statusGradientCss(), hovered));
+		setStyle(relatedEmbedded
+				? CardSurfaceStyles.embeddedCardContainerStyle(statusGradientCss(), hovered)
+				: CardSurfaceStyles.cardContainerStyle(taskPreview ? statusTintCss() : statusGradientCss(), hovered));
 		practiceAreaBar.setStyle("""
 				-fx-background-color: %s;
 				-fx-background-radius: 999;
 				""".formatted(practiceAreaColorCss));
 		bodyPane.setStyle("-fx-background-color: transparent;");
-		statusLabel.setStyle("""
-				%s
-				-fx-text-fill: %s;
-				-fx-background-color: %s;
-				-fx-background-radius: 999;
-				-fx-border-color: rgba(7, 23, 44, 0.12);
-				-fx-border-radius: 999;
-				-fx-border-width: 1;
-				-fx-padding: 3 8 3 8;
-				""".formatted(statusLabelBaseStyle, com.shale.ui.util.ColorUtil.readableTextColor(statusColorCss), statusColorCss));
+		statusLabel.setStyle(StatusPillStyles.pillStyle(statusLabelBaseStyle, statusColorCss));
 		attorneyMiniCard.setBackgroundCssColor(attorneyColorCss);
 	}
 

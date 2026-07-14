@@ -278,7 +278,7 @@ public final class TaskCard extends VBox {
 		setMaxWidth(COMPACT_CARD_WIDTH);
 		titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		dueLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
-		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 500; -fx-text-fill: rgba(17,37,66,0.62);");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
@@ -329,7 +329,7 @@ public final class TaskCard extends VBox {
 		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		dueLabel.setWrapText(false);
 		dueLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
-		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 500; -fx-text-fill: rgba(17,37,66,0.62);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
@@ -362,10 +362,10 @@ public final class TaskCard extends VBox {
 		statusPill.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
 		statusPill.setMaxWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
 		cardRow.getChildren().setAll(dueAccentBar, bodyPane);
-		dueAccentBar.setMinWidth(5);
-		dueAccentBar.setPrefWidth(5);
-		dueAccentBar.setMaxWidth(5);
-		HBox.setMargin(dueAccentBar, new Insets(7, 0, 7, 7));
+		dueAccentBar.setMinWidth(7);
+		dueAccentBar.setPrefWidth(7);
+		dueAccentBar.setMaxWidth(7);
+		HBox.setMargin(dueAccentBar, new Insets(8, 0, 8, 8));
 		bodyPane.setPadding(new Insets(8, 10, 8, 10));
 		toggleCompleteButton.getStyleClass().addAll(
 				"app-toolbar-button",
@@ -480,9 +480,7 @@ public final class TaskCard extends VBox {
 	}
 
 	private String statusPillStyle() {
-		return "-fx-font-size: 10px; -fx-font-weight: 800; -fx-background-color: " + statusColorCss
-				+ "; -fx-text-fill: " + ColorUtil.readableTextColor(statusColorCss)
-				+ "; -fx-background-radius: 999; -fx-border-color: rgba(7, 23, 44, 0.12); -fx-border-radius: 999; -fx-border-width: 1; -fx-padding: 3 8 3 8;";
+		return StatusPillStyles.pillStyle("-fx-font-size: 10px; -fx-font-weight: 800;", statusColorCss);
 	}
 
 	private String priorityGradientCss(String storedColor) {
