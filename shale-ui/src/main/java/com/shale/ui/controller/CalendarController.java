@@ -17,6 +17,7 @@ import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.ColorUtil;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -244,7 +245,8 @@ public final class CalendarController {
     private Node createCalendarRowGraphic(String labelText, String color, boolean selected, boolean shared) {
         Label marker = new Label(shared ? "◈" : "●");
         marker.getStyleClass().add(shared ? "calendar-overlay-shared-marker" : "calendar-overlay-color-marker");
-        if (!shared && !safe(color).isBlank()) marker.setStyle("-fx-text-fill: " + color + ";");
+        String userColorCss = calendarOverlayUserColorCss(color);
+        if (!shared && userColorCss != null) marker.setStyle("-fx-text-fill: " + userColorCss + ";");
         Label label = new Label(labelText);
         label.getStyleClass().add("calendar-overlay-row-label");
         Region spacer = new Region();
@@ -255,6 +257,10 @@ public final class CalendarController {
         row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         row.setMaxWidth(Double.MAX_VALUE);
         return row;
+    }
+
+    private static String calendarOverlayUserColorCss(String storedColor) {
+        return ColorUtil.toCssBackgroundColorOrNull(storedColor);
     }
 
     private void configureCalendarBulkActionTooltips() {

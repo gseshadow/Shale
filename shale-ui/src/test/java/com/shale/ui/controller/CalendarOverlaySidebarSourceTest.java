@@ -59,6 +59,27 @@ class CalendarOverlaySidebarSourceTest {
     }
 
     @Test
+    void sidebarNormalizesStoredUserColorsWithExistingColorUtil() throws Exception {
+        String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
+        assertTrue(controller.contains("import com.shale.ui.util.ColorUtil;"));
+        assertTrue(controller.contains("ColorUtil.toCssBackgroundColorOrNull(storedColor)"));
+        assertTrue(controller.contains("calendarOverlayUserColorCss(color)"));
+        assertFalse(controller.contains("hashCode()"));
+        assertFalse(controller.contains("Objects.hash("));
+    }
+
+    @Test
+    void sharedIndicatorAndSelectionStylingRemainIndependentOfUserColor() throws Exception {
+        String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
+        assertTrue(controller.contains("shared ? \"◈\" : \"●\""));
+        assertTrue(controller.contains("if (!shared && userColorCss != null)"));
+        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+        assertTrue(css.contains(".calendar-overlay-shared-marker"));
+        assertTrue(css.contains(".toggle-button.calendar-overlay-row:selected"));
+        assertTrue(css.contains(".calendar-overlay-row-check"));
+    }
+
+    @Test
     void sidebarUsesIndependentScrollAreaForCalendarRows() throws Exception {
         String fxml = Files.readString(Path.of("src/main/resources/fxml/calendar.fxml"));
         assertTrue(fxml.contains("fx:id=\"calendarRowsScrollPane\""));
