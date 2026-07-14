@@ -1135,6 +1135,8 @@ public final class UserController {
 				row.title(),
 				row.description(),
 				null,
+				row.taskStatusName(),
+				row.taskStatusColorHex(),
 				row.priorityColorHex(),
 				row.dueAt(),
 				row.completedAt(),

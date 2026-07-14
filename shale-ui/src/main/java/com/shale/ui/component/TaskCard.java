@@ -9,6 +9,7 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.TaskCardFactory.AssignedUserModel;
 import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.util.ColorUtil;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 
 import javafx.geometry.Insets;
@@ -37,10 +38,15 @@ public final class TaskCard extends VBox {
 	private final Label createdByLabel = new Label();
 	private final Label descriptionLabel = new Label();
 	private final Label completedLabel = new Label();
+	private final Label statusPill = new Label();
+	private final Region dueAccentBar = new Region();
+	private final HBox cardRow = new HBox(0);
+	private final VBox bodyPane = new VBox(6);
 	private final StackPane relatedCaseHost = new StackPane();
 	private final StackPane assigneeHost = new StackPane();
 	private final VBox compactTitleBlock = new VBox(2, titleLabel, createdByLabel, dueLabel);
-	private final HBox compactTitleRow = new HBox(8, compactTitleBlock);
+	private final Region compactHeaderSpacer = new Region();
+	private final HBox compactTitleRow = new HBox(8, compactTitleBlock, compactHeaderSpacer, statusPill);
 	private final Label caseSectionLabel = new Label("Case:");
 	private final VBox caseSection = new VBox(3, caseSectionLabel, relatedCaseHost);
 	private final Label teamSectionLabel = new Label("Team:");
@@ -52,7 +58,8 @@ public final class TaskCard extends VBox {
 	private final HBox actionsRow = new HBox(8, actionsSpacer, toggleCompleteButton);
 	private final Button expandDetailsButton = new Button("+");
 	private final VBox fullHeaderText = new VBox(2, titleLabel, dueLabel);
-	private final HBox fullHeaderRow = new HBox(6, fullHeaderText, expandDetailsButton);
+	private final Region fullHeaderSpacer = new Region();
+	private final HBox fullHeaderRow = new HBox(8, fullHeaderText, fullHeaderSpacer, statusPill, expandDetailsButton);
 	private final VBox fullExpandedContent = new VBox(6, createdByLabel, teamSection, descriptionLabel, completedLabel, actionsRow);
 	private final UserCardFactory userCardFactory = new UserCardFactory(id -> {
 	});
@@ -75,7 +82,8 @@ public final class TaskCard extends VBox {
 	private Consumer<Integer> onOpenAssigneeUser;
 	private Consumer<Integer> onOpenRelatedCase;
 	private String backgroundCss;
-	private String borderCss;
+	private String dueAccentCss;
+	private String statusColorCss = "#F1F5F9";
 	private boolean hovered;
 	private boolean fullExpanded;
 
@@ -150,7 +158,7 @@ public final class TaskCard extends VBox {
 		completedLabel.setVisible(completed);
 		completedLabel.setText(completed ? "Completed" : "");
 		toggleCompleteButton.setText(completed ? "Mark Incomplete" : "Complete");
-		setOpacity(completed ? 0.78 : 1.0);
+		setOpacity(completed ? 0.9 : 1.0);
 	}
 
 	public void setAssignees(List<AssignedUserModel> users) {
@@ -204,41 +212,48 @@ public final class TaskCard extends VBox {
 		renderRelatedCaseCard();
 	}
 
-	public void setBackgroundCssColor(String css) {
-		this.backgroundCss = css;
+	public void setPriorityBackgroundColor(String storedColor) {
+		this.backgroundCss = priorityGradientCss(storedColor);
 		refreshSurfaceStyle();
+	}
+
+	public void setTaskStatus(String statusName, String statusColor) {
+		statusColorCss = CaseCard.normalizeColor(statusColor, "#F1F5F9");
+		statusPill.setText(statusName == null || statusName.isBlank() ? "—" : statusName.trim());
+		statusPill.setStyle(statusPillStyle());
 	}
 
 	public void setBorderByDueState(LocalDateTime dueAt, LocalDateTime completedAt) {
 		if (completedAt != null) {
-			borderCss = "#16a34a";
+			dueAccentCss = "#16a34a";
 			refreshSurfaceStyle();
 			return;
 		}
 		if (dueAt == null) {
-			borderCss = null;
+			dueAccentCss = null;
 			refreshSurfaceStyle();
 			return;
 		}
 
 		LocalDateTime now = LocalDateTime.now();
 		if (dueAt.isBefore(now)) {
-			borderCss = "#7f1d1d";
+			dueAccentCss = "#7f1d1d";
 		} else if (!dueAt.isAfter(now.plusDays(1))) {
-			borderCss = "#dc2626";
+			dueAccentCss = "#dc2626";
 		} else if (!dueAt.isAfter(now.plusWeeks(1))) {
-			borderCss = "#f97316";
+			dueAccentCss = "#f97316";
 		} else if (!dueAt.isAfter(now.plusWeeks(2))) {
-			borderCss = "#eab308";
+			dueAccentCss = "#eab308";
 		} else {
-			borderCss = null;
+			dueAccentCss = null;
 		}
 		refreshSurfaceStyle();
 	}
 
 	public void applyMini() {
 		currentVariant = Variant.MINI;
-		getChildren().setAll(titleLabel);
+		bodyPane.getChildren().setAll(titleLabel);
+		getChildren().setAll(cardRow);
 		setSpacing(2);
 		setPadding(new Insets(4, 10, 4, 10));
 		setMaxWidth(Region.USE_COMPUTED_SIZE);
@@ -251,8 +266,9 @@ public final class TaskCard extends VBox {
 		currentVariant = Variant.COMPACT;
 		setDueAt(dueAtValue);
 		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel, dueLabel);
-		compactTitleRow.getChildren().setAll(compactTitleBlock);
-		getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel);
+		compactTitleRow.getChildren().setAll(compactTitleBlock, compactHeaderSpacer, statusPill);
+		bodyPane.getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel);
+		getChildren().setAll(cardRow);
 		setSpacing(3);
 		setPadding(new Insets(6, 8, 6, 8));
 		setAlignment(Pos.TOP_LEFT);
@@ -261,7 +277,7 @@ public final class TaskCard extends VBox {
 		setMaxWidth(COMPACT_CARD_WIDTH);
 		titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		dueLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
-		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 500; -fx-text-fill: rgba(17,37,66,0.62);");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
@@ -312,7 +328,7 @@ public final class TaskCard extends VBox {
 		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
 		dueLabel.setWrapText(false);
 		dueLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
-		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 500; -fx-text-fill: rgba(17,37,66,0.62);");
 		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
 		descriptionLabel.setWrapText(true);
 		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
@@ -324,15 +340,32 @@ public final class TaskCard extends VBox {
 		setMaxWidth(Double.MAX_VALUE);
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 
-		getChildren().setAll(fullHeaderRow, fullExpandedContent);
+		bodyPane.getChildren().setAll(fullHeaderRow, fullExpandedContent);
+		getChildren().setAll(cardRow);
 		setFullExpanded(false);
 	}
 
 	private void wireEvents() {
 		HBox.setHgrow(compactTitleBlock, javafx.scene.layout.Priority.ALWAYS);
+		HBox.setHgrow(compactHeaderSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(compactMetadataSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(actionsSpacer, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(fullHeaderText, javafx.scene.layout.Priority.ALWAYS);
+		HBox.setHgrow(fullHeaderSpacer, javafx.scene.layout.Priority.ALWAYS);
+		HBox.setHgrow(bodyPane, javafx.scene.layout.Priority.ALWAYS);
+		HBox.setHgrow(dueAccentBar, javafx.scene.layout.Priority.NEVER);
+		getStyleClass().addAll("task-card", "shale-entity-card", "shale-entity-card-clickable");
+		dueAccentBar.getStyleClass().add("task-card__due-accent-bar");
+		bodyPane.getStyleClass().add("task-card__body");
+		statusPill.getStyleClass().addAll("task-card__status-pill", "shale-status-pill", "shale-status-pill-compact");
+		statusPill.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+		statusPill.setMaxWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+		cardRow.getChildren().setAll(dueAccentBar, bodyPane);
+		dueAccentBar.setMinWidth(7);
+		dueAccentBar.setPrefWidth(7);
+		dueAccentBar.setMaxWidth(7);
+		HBox.setMargin(dueAccentBar, new Insets(8, 0, 8, 8));
+		bodyPane.setPadding(new Insets(8, 10, 8, 10));
 		toggleCompleteButton.getStyleClass().addAll(
 				"app-toolbar-button",
 				"app-toolbar-button-success",
@@ -439,7 +472,19 @@ public final class TaskCard extends VBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, borderCss, hovered));
+		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
+		bodyPane.setStyle("-fx-background-color: transparent;");
+		dueAccentBar.setStyle("-fx-background-color: " + (dueAccentCss == null || dueAccentCss.isBlank() ? "#CBD5E1" : dueAccentCss) + "; -fx-background-radius: 999;");
+		statusPill.setStyle(statusPillStyle());
+	}
+
+	private String statusPillStyle() {
+		return StatusPillStyles.pillStyle("-fx-font-size: 10px; -fx-font-weight: 800;", statusColorCss);
+	}
+
+	private String priorityGradientCss(String storedColor) {
+		String css = ColorUtil.toCssBackgroundColorOrNull(storedColor);
+		return css == null ? null : EntityCardGradientStyles.caseStrengthGradient(css, false);
 	}
 
 }
