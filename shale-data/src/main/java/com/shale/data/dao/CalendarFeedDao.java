@@ -19,7 +19,7 @@ public final class CalendarFeedDao {
 
 
     public record CalendarCaseCardRow(int caseId, String caseName, String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {}
-    public record CalendarTaskCardRow(long taskId, Integer caseId, String caseName, String caseResponsibleAttorney, String caseResponsibleAttorneyColor, Boolean caseNonEngagementLetterSent, String title, LocalDateTime dueAt, LocalDateTime completedAt, String createdByDisplayName, String priorityColorHex) {}
+    public record CalendarTaskCardRow(long taskId, Integer caseId, String caseName, String caseResponsibleAttorney, String caseResponsibleAttorneyColor, Boolean caseNonEngagementLetterSent, String title, String description, LocalDateTime dueAt, LocalDateTime completedAt, String createdByDisplayName, String priorityColorHex) {}
 
     public List<CalendarCaseCardRow> listCaseCardRows(int shaleClientId, List<Integer> caseIds) {
         if (shaleClientId <= 0 || caseIds == null || caseIds.isEmpty()) return List.of();
@@ -63,7 +63,7 @@ public final class CalendarFeedDao {
                          COALESCE(ra.name_last, '')
                        )) AS CaseResponsibleAttorney,
                        ra.color AS CaseResponsibleAttorneyColor,
-                       c.NonEngagementLetterSent AS CaseNonEngagementLetterSent, t.Title, t.DueAt, t.CompletedAt, p.ColorHex AS PriorityColorHex,
+                       c.NonEngagementLetterSent AS CaseNonEngagementLetterSent, t.Title, t.Description, t.DueAt, t.CompletedAt, p.ColorHex AS PriorityColorHex,
                        LTRIM(RTRIM(COALESCE(u.name_first,'') + CASE WHEN COALESCE(u.name_first,'')='' OR COALESCE(u.name_last,'')='' THEN '' ELSE ' ' END + COALESCE(u.name_last,''))) AS CreatedByDisplayName
                 FROM dbo.Tasks t
                 LEFT JOIN dbo.Cases c ON c.Id = t.CaseId
@@ -78,7 +78,7 @@ public final class CalendarFeedDao {
             for (Integer id : taskIds) ps.setInt(i++, id);
             try (ResultSet rs = ps.executeQuery()) {
                 List<CalendarTaskCardRow> rows = new ArrayList<>();
-                while (rs.next()) rows.add(new CalendarTaskCardRow(rs.getLong("Id"), (Integer) rs.getObject("CaseId"), rs.getString("CaseName"), rs.getString("CaseResponsibleAttorney"), rs.getString("CaseResponsibleAttorneyColor"), (Boolean) rs.getObject("CaseNonEngagementLetterSent"), rs.getString("Title"), rs.getTimestamp("DueAt") == null ? null : rs.getTimestamp("DueAt").toLocalDateTime(), rs.getTimestamp("CompletedAt") == null ? null : rs.getTimestamp("CompletedAt").toLocalDateTime(), rs.getString("CreatedByDisplayName"), rs.getString("PriorityColorHex")));
+                while (rs.next()) rows.add(new CalendarTaskCardRow(rs.getLong("Id"), (Integer) rs.getObject("CaseId"), rs.getString("CaseName"), rs.getString("CaseResponsibleAttorney"), rs.getString("CaseResponsibleAttorneyColor"), (Boolean) rs.getObject("CaseNonEngagementLetterSent"), rs.getString("Title"), rs.getString("Description"), rs.getTimestamp("DueAt") == null ? null : rs.getTimestamp("DueAt").toLocalDateTime(), rs.getTimestamp("CompletedAt") == null ? null : rs.getTimestamp("CompletedAt").toLocalDateTime(), rs.getString("CreatedByDisplayName"), rs.getString("PriorityColorHex")));
                 return rows;
             }
         } catch (SQLException e) { throw new RuntimeException("Failed to load calendar task card rows", e); }

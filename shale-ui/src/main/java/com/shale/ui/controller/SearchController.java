@@ -383,7 +383,9 @@ public final class SearchController {
 					row.title(),
 					description,
 					null,
-					null,
+					row.statusName(),
+					row.statusColorHex(),
+					row.priorityColorHex(),
 					row.dueAt(),
 					row.completedAt(),
 					assignedUsers), TaskCardFactory.Variant.FULL, true);

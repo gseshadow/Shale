@@ -2999,6 +2999,8 @@ public class CaseController {
 					task.title(),
 					task.description(),
 					task.createdByDisplayName(),
+					task.taskStatusName(),
+					task.taskStatusColorHex(),
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
