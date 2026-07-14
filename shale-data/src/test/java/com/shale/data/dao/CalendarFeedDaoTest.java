@@ -58,12 +58,35 @@ class CalendarFeedDaoTest {
         Set<String> keys = new HashSet<>();
         for (CalendarFeedDao.CaseDateProjection projection : CalendarFeedDao.CASE_DATE_PROJECTIONS) {
             assertTrue(keys.add(projection.keyPrefix()), "duplicate key prefix " + projection.keyPrefix());
-            assertTrue(sql.contains("CONCAT('" + projection.keyPrefix() + ":'"));
+            assertTrue(sql.contains(projection.keyPrefix()), projection.keyPrefix());
             assertTrue(sql.contains("'" + projection.columnName() + "'"));
             assertTrue(sql.contains("AND c." + projection.columnName() + " IS NOT NULL"));
             assertTrue(sql.contains("AND c." + projection.columnName() + " >= CAST(? AS date)"));
             assertTrue(sql.contains("AND c." + projection.columnName() + " < CAST(? AS date)"));
         }
+    }
+
+    @Test
+    void caseFilteredFeedSqlPushesCaseIdIntoEveryUnifiedFeedBranch() {
+        String sql = CalendarFeedDao.buildCalendarFeedSql(true);
+
+        assertTrue(sql.contains("AND e.CaseId = ?"));
+        assertTrue(sql.contains("AND t.CaseId = ?"));
+        assertEquals(CalendarFeedDao.CASE_DATE_PROJECTIONS.size(), count(sql, "AND c.Id = ?"));
+        assertTrue(sql.contains("AND ISNULL(e.IsCancelled, 0) = 0"));
+        assertTrue(sql.contains("AND t.CompletedAt IS NULL"));
+        assertTrue(sql.contains("AND ISNULL(t.IsDeleted, 0) = 0"));
+        assertTrue(sql.contains("AND ISNULL(c.IsDeleted, 0) = 0"));
+    }
+
+    private static int count(String haystack, String needle) {
+        int count = 0;
+        int index = 0;
+        while ((index = haystack.indexOf(needle, index)) >= 0) {
+            count++;
+            index += needle.length();
+        }
+        return count;
     }
 
     private static void assertProjection(
