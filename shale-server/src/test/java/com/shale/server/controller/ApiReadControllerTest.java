@@ -1000,7 +1000,7 @@ class ApiReadControllerTest {
             this.detailTaskId = taskId;
             this.detailShaleClientId = shaleClientId;
             return Optional.of(new TaskDetailDto(taskId, shaleClientId, 501L, "Smith v. Example",
-                    "Ada Attorney", "#111111", false, "Review records", "Read intake packet",
+                    "Ada Attorney", "#111111", false, "Open", "#22AA55", "#004488", "Review records", "Read intake packet",
                     LocalDateTime.of(2026, 1, 2, 12, 0), 2, 1, null,
                     31, "Ada Attorney", "#111111", "Case Creator"));
         }
