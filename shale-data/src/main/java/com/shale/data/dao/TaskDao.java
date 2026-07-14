@@ -501,7 +501,6 @@ public final class TaskDao {
                       AND myAssignment.UserId = ?
                   )
                   AND ISNULL(t.IsDeleted, 0) = 0
-                  AND ISNULL(t.StatusId, 0) <> 3
                   %s
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
@@ -614,7 +613,6 @@ public final class TaskDao {
                 WHERE t.ShaleClientId = ?
                   AND t.CreatedByUserId = ?
                   AND ISNULL(t.IsDeleted, 0) = 0
-                  AND ISNULL(t.StatusId, 0) <> 3
                   %s
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
