@@ -218,6 +218,9 @@ public final class TaskDao {
                   caseAttorney.DisplayName AS CaseResponsibleAttorney,
                   caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
+                  current_status.CurrentStatusName AS CasePrimaryStatusName,
+                  current_status.PrimaryStatusColor AS CasePrimaryStatusColor,
+                  pa.Color AS CasePracticeAreaColor,
                   t.Title,
                   t.Description,
                   t.PriorityId,
@@ -850,6 +853,15 @@ public final class TaskDao {
                 LEFT JOIN dbo.Users createdByUser
                   ON createdByUser.Id = t.CreatedByUserId
                  AND createdByUser.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.PracticeAreas pa
+                  ON pa.Id = c.PracticeAreaId
+                OUTER APPLY (
+                  SELECT TOP (1) s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
+                  FROM dbo.CaseStatuses cs
+                  INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+                  WHERE cs.CaseId = c.Id AND cs.IsPrimary = 1
+                  ORDER BY cs.UpdatedAt DESC, cs.CreatedAt DESC, cs.Id DESC
+                ) current_status
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -907,6 +919,9 @@ public final class TaskDao {
                         rs.getString("CaseResponsibleAttorney"),
                         rs.getString("CaseResponsibleAttorneyColor"),
                         getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
+                        rs.getString("CasePrimaryStatusName"),
+                        rs.getString("CasePrimaryStatusColor"),
+                        rs.getString("CasePracticeAreaColor"),
                         rs.getString("Title"),
                         rs.getString("Description"),
                         toLocalDateTime(rs.getTimestamp("DueAt")),
