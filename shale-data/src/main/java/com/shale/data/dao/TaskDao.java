@@ -832,6 +832,9 @@ public final class TaskDao {
                   caseAttorney.DisplayName AS CaseResponsibleAttorney,
                   caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
+                  current_status.CurrentStatusName AS CasePrimaryStatusName,
+                  current_status.PrimaryStatusColor AS CasePrimaryStatusColor,
+                  pa.Color AS CasePracticeAreaColor,
                   t.Title,
                   t.Description,
                   t.DueAt,
@@ -911,31 +914,36 @@ public final class TaskDao {
                 if (!rs.next()) {
                     return null;
                 }
-                return new TaskDetailDto(
-                        rs.getLong("Id"),
-                        rs.getInt("ShaleClientId"),
-                        rs.getLong("CaseId"),
-                        rs.getString("CaseName"),
-                        rs.getString("CaseResponsibleAttorney"),
-                        rs.getString("CaseResponsibleAttorneyColor"),
-                        getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
-                        rs.getString("CasePrimaryStatusName"),
-                        rs.getString("CasePrimaryStatusColor"),
-                        rs.getString("CasePracticeAreaColor"),
-                        rs.getString("Title"),
-                        rs.getString("Description"),
-                        toLocalDateTime(rs.getTimestamp("DueAt")),
-                        getNullableInt(rs, "StatusId"),
-                        getNullableInt(rs, "PriorityId"),
-                        toLocalDateTime(rs.getTimestamp("CompletedAt")),
-                        getNullableInt(rs, "AssignedUserId"),
-                        rs.getString("AssignedUserDisplayName"),
-                        rs.getString("AssignedUserColor"),
-                        rs.getString("CreatedByDisplayName"));
+                return mapTaskDetail(rs);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load task detail for taskId=" + taskId, e);
         }
+    }
+
+
+    static TaskDetailDto mapTaskDetail(ResultSet rs) throws SQLException {
+        return new TaskDetailDto(
+                rs.getLong("Id"),
+                rs.getInt("ShaleClientId"),
+                rs.getLong("CaseId"),
+                rs.getString("CaseName"),
+                rs.getString("CaseResponsibleAttorney"),
+                rs.getString("CaseResponsibleAttorneyColor"),
+                getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
+                rs.getString("CasePrimaryStatusName"),
+                rs.getString("CasePrimaryStatusColor"),
+                rs.getString("CasePracticeAreaColor"),
+                rs.getString("Title"),
+                rs.getString("Description"),
+                toLocalDateTime(rs.getTimestamp("DueAt")),
+                getNullableInt(rs, "StatusId"),
+                getNullableInt(rs, "PriorityId"),
+                toLocalDateTime(rs.getTimestamp("CompletedAt")),
+                getNullableInt(rs, "AssignedUserId"),
+                rs.getString("AssignedUserDisplayName"),
+                rs.getString("AssignedUserColor"),
+                rs.getString("CreatedByDisplayName"));
     }
 
     public List<TaskAssignedUserRow> listAssignedUsersForTask(long taskId, int shaleClientId) {
