@@ -423,31 +423,7 @@ public class CaseCard extends VBox {
 	}
 
 	private String statusGradientCss() {
-		if (embeddedMini) {
-			return "linear-gradient(to right, #FFFFFF 0%, #F8FAFC 76%, " + statusColorCss + " 100%)";
-		}
-		return "linear-gradient(to right, "
-				+ "#FFFFFF 0%, "
-				+ "#F8FAFC 30%, "
-				+ statusTintStop(0.18) + " 48%, "
-				+ statusTintStop(0.42) + " 72%, "
-				+ statusTintStop(0.72) + " 88%, "
-				+ statusColorCss + " 98%, "
-				+ statusColorCss + " 100%)";
-	}
-
-	private String statusTintStop(double weight) {
-		try {
-			Color statusColor = com.shale.ui.util.ColorUtil.toFxColor(statusColorCss);
-			Color tint = Color.WHITE.interpolate(statusColor, weight);
-			return "rgba(%d, %d, %d, %.3f)".formatted(
-					Math.round(tint.getRed() * 255),
-					Math.round(tint.getGreen() * 255),
-					Math.round(tint.getBlue() * 255),
-					tint.getOpacity());
-		} catch (Exception ignored) {
-			return "#F8FAFC";
-		}
+		return EntityCardGradientStyles.caseStrengthGradient(statusColorCss, embeddedMini);
 	}
 
 	private void refreshSolStyle() {

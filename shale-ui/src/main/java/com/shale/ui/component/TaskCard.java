@@ -487,21 +487,7 @@ public final class TaskCard extends VBox {
 
 	private String priorityGradientCss(String storedColor) {
 		String css = ColorUtil.toCssBackgroundColorOrNull(storedColor);
-		if (css == null) {
-			return null;
-		}
-		try {
-			Color priority = ColorUtil.toFxColor(css);
-			Color left = Color.WHITE.interpolate(priority, 0.20);
-			Color mid = Color.WHITE.interpolate(priority, 0.10);
-			return "linear-gradient(to right, " + rgba(left, 0.98) + " 0%, " + rgba(mid, 0.97) + " 46%, rgba(248,250,252,0.96) 100%)";
-		} catch (Exception ignored) {
-			return null;
-		}
-	}
-
-	private static String rgba(Color color, double opacity) {
-		return "rgba(%d, %d, %d, %.3f)".formatted(Math.round(color.getRed() * 255), Math.round(color.getGreen() * 255), Math.round(color.getBlue() * 255), opacity);
+		return css == null ? null : EntityCardGradientStyles.caseStrengthGradient(css, false);
 	}
 
 }

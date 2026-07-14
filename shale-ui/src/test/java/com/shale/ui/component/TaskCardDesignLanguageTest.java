@@ -15,11 +15,15 @@ class TaskCardDesignLanguageTest {
     }
 
     @Test
-    void priorityGradientComesFromConfiguredPriorityColorWithNeutralFallback() {
+    void priorityGradientComesFromConfiguredPriorityColorWithNeutralFallback() throws Exception {
         assertTrue(taskCard.contains("private String priorityGradientCss(String storedColor)"));
         assertTrue(taskCard.contains("ColorUtil.toCssBackgroundColorOrNull(storedColor)"));
-        assertTrue(taskCard.contains("linear-gradient(to right"));
-        assertTrue(taskCard.contains("return null;"), "Invalid/missing colors should fall back to the shared neutral card surface.");
+        String sharedGradient = Files.readString(Path.of("src/main/java/com/shale/ui/component/EntityCardGradientStyles.java"));
+        assertTrue(sharedGradient.contains("#F8FAFC 30%"));
+        assertTrue(sharedGradient.contains("tintStop(cssColor, 0.72) + \" 88%"));
+        assertTrue(sharedGradient.contains("cssColor + \" 98%"));
+        assertTrue(taskCard.contains("EntityCardGradientStyles.caseStrengthGradient(css, false)"));
+        assertTrue(taskCard.contains("css == null ? null"), "Invalid/missing colors should fall back to the shared neutral card surface.");
         assertFalse(taskCard.contains("case \"High\""));
         assertFalse(taskCard.contains("case \"Medium\""));
         assertFalse(taskCard.contains("case \"Low\""));
