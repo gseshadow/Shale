@@ -5,6 +5,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.Consumer;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
+
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.TaskCardFactory.AssignedUserModel;
@@ -33,11 +38,19 @@ public final class TaskCard extends VBox {
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
 	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 	private static final double COMPACT_CARD_WIDTH = 210;
+	private static final Duration HOVER_REVEAL_DURATION = Duration.millis(180);
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
 	private final Label createdByLabel = new Label();
 	private final Label descriptionLabel = new Label();
+	private final Label hoverDescriptionLabel = new Label();
+	private final Label hoverDescriptionHeader = new Label("Description");
+	private final Label hoverAssigneesHeader = new Label("Assigned To");
+	private final VBox hoverDescriptionSection = new VBox(2, hoverDescriptionHeader, hoverDescriptionLabel);
+	private final HBox hoverAssigneesRow = new HBox(4);
+	private final VBox hoverAssigneesSection = new VBox(3, hoverAssigneesHeader, hoverAssigneesRow);
+	private final VBox hoverRevealPane = new VBox(6, hoverDescriptionSection, hoverAssigneesSection);
 	private final Label completedLabel = new Label();
 	private final Label statusPill = new Label();
 	private final Region dueAccentBar = new Region();
@@ -87,6 +100,8 @@ public final class TaskCard extends VBox {
 	private String statusColorCss = "#F1F5F9";
 	private boolean hovered;
 	private boolean fullExpanded;
+	private boolean hoverRevealHasContent;
+	private Timeline hoverRevealTimeline;
 
 	public TaskCard() {
 		setCursor(Cursor.HAND);
@@ -145,6 +160,11 @@ public final class TaskCard extends VBox {
 		boolean hasText = !text.isBlank();
 		descriptionLabel.setManaged(hasText);
 		descriptionLabel.setVisible(hasText);
+		String hoverText = truncateForHover(text);
+		hoverDescriptionLabel.setText(hoverText);
+		hoverDescriptionSection.setManaged(!hoverText.isBlank());
+		hoverDescriptionSection.setVisible(!hoverText.isBlank());
+		refreshHoverRevealAvailability();
 	}
 
 	public void setCreatedByDisplayName(String createdByDisplayName) {
@@ -166,11 +186,16 @@ public final class TaskCard extends VBox {
 		List<AssignedUserModel> safeUsers = users == null ? List.of() : users;
 		if (safeUsers.isEmpty()) {
 			assigneeHost.getChildren().clear();
+			hoverAssigneesRow.getChildren().clear();
+			hoverAssigneesSection.setManaged(false);
+			hoverAssigneesSection.setVisible(false);
 			teamSection.setManaged(false);
 			teamSection.setVisible(false);
+			refreshHoverRevealAvailability();
 			return;
 		}
 		VBox cards = new VBox(4);
+		HBox hoverChips = new HBox(4);
 		int maxVisible = 3;
 		for (int i = 0; i < safeUsers.size() && i < maxVisible; i++) {
 			AssignedUserModel user = safeUsers.get(i);
@@ -188,15 +213,32 @@ public final class TaskCard extends VBox {
 				}
 			});
 			cards.getChildren().add(assigneeCard);
+			Label chip = new Label(user.displayName().trim());
+			chip.getStyleClass().add("task-card__hover-assignee-chip");
+			chip.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.74); -fx-background-color: rgba(255,255,255,0.58); -fx-background-radius: 999; -fx-border-color: rgba(74,104,138,0.18); -fx-border-radius: 999; -fx-border-width: 1; -fx-padding: 2 6 2 6;");
+			chip.setOnMouseClicked(e -> {
+				e.consume();
+				if (onOpenAssigneeUser != null) {
+					onOpenAssigneeUser.accept(selectedUserId);
+				}
+			});
+			hoverChips.getChildren().add(chip);
 		}
 		if (safeUsers.size() > maxVisible) {
 			Label moreLabel = new Label("+" + (safeUsers.size() - maxVisible) + " more");
 			moreLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.62);");
 			cards.getChildren().add(moreLabel);
+			Label moreChip = new Label("+" + (safeUsers.size() - maxVisible));
+			moreChip.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62); -fx-padding: 2 2 2 2;");
+			hoverChips.getChildren().add(moreChip);
 		}
 		assigneeHost.getChildren().setAll(cards);
+		hoverAssigneesRow.getChildren().setAll(hoverChips.getChildren());
+		hoverAssigneesSection.setManaged(!hoverAssigneesRow.getChildren().isEmpty());
+		hoverAssigneesSection.setVisible(!hoverAssigneesRow.getChildren().isEmpty());
 		teamSection.setManaged(true);
 		teamSection.setVisible(true);
+		refreshHoverRevealAvailability();
 	}
 
 	public void setRelatedCase(Long caseId, String caseName, String casePrimaryStatusName, String casePrimaryStatusColor,
@@ -253,7 +295,7 @@ public final class TaskCard extends VBox {
 
 	public void applyMini() {
 		currentVariant = Variant.MINI;
-		bodyPane.getChildren().setAll(titleLabel);
+		bodyPane.getChildren().setAll(titleLabel, hoverRevealPane);
 		getChildren().setAll(cardRow);
 		setSpacing(2);
 		setPadding(new Insets(4, 10, 4, 10));
@@ -268,7 +310,7 @@ public final class TaskCard extends VBox {
 		setDueAt(dueAtValue);
 		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel, dueLabel);
 		compactTitleRow.getChildren().setAll(compactTitleBlock, compactHeaderSpacer, statusPill);
-		bodyPane.getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel);
+		bodyPane.getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel, hoverRevealPane);
 		getChildren().setAll(cardRow);
 		setSpacing(3);
 		setPadding(new Insets(6, 8, 6, 8));
@@ -341,7 +383,7 @@ public final class TaskCard extends VBox {
 		setMaxWidth(Double.MAX_VALUE);
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 
-		bodyPane.getChildren().setAll(fullHeaderRow, fullExpandedContent);
+		bodyPane.getChildren().setAll(fullHeaderRow, fullExpandedContent, hoverRevealPane);
 		getChildren().setAll(cardRow);
 		setFullExpanded(false);
 	}
@@ -367,6 +409,7 @@ public final class TaskCard extends VBox {
 		dueAccentBar.setMaxWidth(7);
 		HBox.setMargin(dueAccentBar, new Insets(8, 0, 8, 8));
 		bodyPane.setPadding(new Insets(8, 10, 8, 10));
+		configureHoverRevealPane();
 		toggleCompleteButton.getStyleClass().addAll(
 				"app-toolbar-button",
 				"app-toolbar-button-success",
@@ -396,12 +439,14 @@ public final class TaskCard extends VBox {
 			hovered = true;
 			setTranslateY(-1.5);
 			refreshSurfaceStyle();
+			setHoverRevealExpanded(true);
 		});
 		setOnMouseExited(e ->
 		{
 			hovered = false;
 			setTranslateY(0);
 			refreshSurfaceStyle();
+			setHoverRevealExpanded(false);
 		});
 		setOnMouseClicked(e ->
 		{
@@ -422,7 +467,80 @@ public final class TaskCard extends VBox {
 			fullExpandedContent.setManaged(expanded);
 			fullExpandedContent.setVisible(expanded);
 			expandDetailsButton.setText(expanded ? "−" : "+");
+			if (expanded) {
+				setHoverRevealExpanded(false);
+			}
 		}
+	}
+
+	private void configureHoverRevealPane() {
+		hoverRevealPane.getStyleClass().add("task-card__hover-reveal");
+		hoverRevealPane.setStyle("-fx-padding: 5 0 0 0; -fx-border-color: rgba(74,104,138,0.16) transparent transparent transparent; -fx-border-width: 1 0 0 0;");
+		hoverRevealPane.setManaged(false);
+		hoverRevealPane.setVisible(false);
+		hoverRevealPane.setOpacity(0);
+		hoverRevealPane.setMaxHeight(0);
+		hoverDescriptionHeader.setStyle(hoverRevealHeaderStyle());
+		hoverAssigneesHeader.setStyle(hoverRevealHeaderStyle());
+		hoverDescriptionLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70); -fx-line-spacing: 1px;");
+		hoverDescriptionLabel.setWrapText(true);
+		hoverDescriptionLabel.setMaxHeight(48);
+		hoverAssigneesRow.setAlignment(Pos.CENTER_LEFT);
+	}
+
+	private String hoverRevealHeaderStyle() {
+		return "-fx-font-size: 9px; -fx-font-weight: 800; -fx-text-fill: rgba(17,37,66,0.50);";
+	}
+
+	private void refreshHoverRevealAvailability() {
+		hoverRevealHasContent = hoverDescriptionSection.isManaged() || hoverAssigneesSection.isManaged();
+		if (!hoverRevealHasContent) {
+			setHoverRevealExpanded(false);
+		}
+	}
+
+	private void setHoverRevealExpanded(boolean expanded) {
+		if (!hoverRevealHasContent || fullExpanded) {
+			expanded = false;
+		}
+		if (hoverRevealTimeline != null) {
+			hoverRevealTimeline.stop();
+		}
+		if (expanded) {
+			hoverRevealPane.setManaged(true);
+			hoverRevealPane.setVisible(true);
+			double targetHeight = Math.max(1, hoverRevealPane.prefHeight(-1));
+			hoverRevealTimeline = new Timeline(
+					new KeyFrame(Duration.ZERO,
+							new KeyValue(hoverRevealPane.maxHeightProperty(), hoverRevealPane.getMaxHeight()),
+							new KeyValue(hoverRevealPane.opacityProperty(), hoverRevealPane.getOpacity())),
+					new KeyFrame(HOVER_REVEAL_DURATION,
+							new KeyValue(hoverRevealPane.maxHeightProperty(), targetHeight),
+							new KeyValue(hoverRevealPane.opacityProperty(), 1.0)));
+		} else {
+			hoverRevealTimeline = new Timeline(
+					new KeyFrame(Duration.ZERO,
+							new KeyValue(hoverRevealPane.maxHeightProperty(), hoverRevealPane.getMaxHeight()),
+							new KeyValue(hoverRevealPane.opacityProperty(), hoverRevealPane.getOpacity())),
+					new KeyFrame(HOVER_REVEAL_DURATION,
+							new KeyValue(hoverRevealPane.maxHeightProperty(), 0),
+							new KeyValue(hoverRevealPane.opacityProperty(), 0)));
+			hoverRevealTimeline.setOnFinished(e -> {
+				if (!hovered) {
+					hoverRevealPane.setManaged(false);
+					hoverRevealPane.setVisible(false);
+				}
+			});
+		}
+		hoverRevealTimeline.play();
+	}
+
+	private String truncateForHover(String text) {
+		String normalized = text == null ? "" : text.trim();
+		if (normalized.length() <= 260) {
+			return normalized;
+		}
+		return normalized.substring(0, 257).trim() + "...";
 	}
 
 	private void configureRelatedSections() {

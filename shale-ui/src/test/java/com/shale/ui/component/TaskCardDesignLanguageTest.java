@@ -64,4 +64,15 @@ class TaskCardDesignLanguageTest {
         assertTrue(taskCard.contains("setTranslateY(-1.5)"));
         assertFalse(taskCard.contains("hovered ? dueAccentCss"));
     }
+	@Test
+	void hoverRevealUsesSharedTaskCardAnimationAndConditionalContent() {
+		assertTrue(taskCard.contains("HOVER_REVEAL_DURATION = Duration.millis(180)"));
+		assertTrue(taskCard.contains("setHoverRevealExpanded(true)"));
+		assertTrue(taskCard.contains("setHoverRevealExpanded(false)"));
+		assertTrue(taskCard.contains("hoverRevealHasContent"));
+		assertTrue(taskCard.contains("hoverDescriptionSection.setManaged(!hoverText.isBlank())"));
+		assertTrue(taskCard.contains("hoverAssigneesSection.setManaged(!hoverAssigneesRow.getChildren().isEmpty())"));
+		assertTrue(taskCard.contains("truncateForHover"));
+	}
+
 }
