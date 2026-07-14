@@ -26,6 +26,7 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
 import javafx.scene.layout.VBox;
 
 public final class TaskCard extends VBox {
