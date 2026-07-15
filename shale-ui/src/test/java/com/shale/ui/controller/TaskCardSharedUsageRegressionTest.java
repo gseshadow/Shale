@@ -36,6 +36,18 @@ class TaskCardSharedUsageRegressionTest {
     }
 
     @Test
+    void caseTasksAllowPhiDescriptionInAuthenticatedWorkSurface() throws Exception {
+        String caseController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
+
+        assertTrue(caseController.contains("caseTaskService.loadTasksForCase("),
+                "Case > Tasks should load task DTOs through the case task service.");
+        assertTrue(caseController.contains("task.description()"),
+                "Case > Tasks should pass the canonical DTO description into TaskCardModel.");
+        assertTrue(caseController.contains("factory.create(model, TaskCardFactory.Variant.COMPACT, true)"),
+                "Case > Tasks is an authenticated work surface and should explicitly allow task description previews.");
+    }
+
+    @Test
     void calendarMiniTaskCardsHydrateDescriptionWithoutHoverQueries() throws Exception {
         String calendarDao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/CalendarFeedDao.java"));
         String calendarController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
