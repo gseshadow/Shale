@@ -26,6 +26,7 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.css.PseudoClass;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -54,6 +55,10 @@ public final class CalendarController {
     private static final String VIEW_DAY = "Day";
     private static final String VIEW_MONTH = "Month";
     private static final double HALF_HOUR_HEIGHT = 34.0;
+    private static final PseudoClass TODAY_PSEUDO_CLASS = PseudoClass.getPseudoClass("today");
+    private static final PseudoClass WEEKEND_PSEUDO_CLASS = PseudoClass.getPseudoClass("weekend");
+    private static final PseudoClass HOUR_PSEUDO_CLASS = PseudoClass.getPseudoClass("hour");
+    private static final PseudoClass HALF_HOUR_PSEUDO_CLASS = PseudoClass.getPseudoClass("half-hour");
     private static final CalendarCaseFilterOptions.CaseOption ALL_CASES_OPTION = CalendarCaseFilterOptions.ALL_CASES;
     private static final EventTypeFilterOption ALL_TYPES_OPTION = new EventTypeFilterOption("", "All types");
 
@@ -489,6 +494,8 @@ public final class CalendarController {
         for (int i = 0; i < dayCount; i++) {
             LocalDate day = start.plusDays(i);
             VBox header = new VBox(2);
+            header.getStyleClass().add("calendar-day-header");
+            applyCalendarDayState(header, day, today);
             header.getChildren().addAll(
                     new Label(day.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault())),
                     new Label(DAY_DATE_FORMAT.format(day)),
@@ -540,7 +547,7 @@ public final class CalendarController {
         weekBoard.getChildren().clear(); LocalDate monthStart = selectedDate.withDayOfMonth(1); LocalDate gridStart = weekStartFor(monthStart);
         Map<LocalDate, List<CalendarFeedItem>> grouped = groupAndSort(items, gridStart, 42); GridPane grid = new GridPane(); grid.setHgap(6); grid.setVgap(6);
         for (int i = 0; i < 42; i++) {
-            LocalDate day = gridStart.plusDays(i); VBox cell = new VBox(2); cell.getStyleClass().add("calendar-day-lane"); cell.setPadding(new Insets(6));
+            LocalDate day = gridStart.plusDays(i); VBox cell = new VBox(2); cell.getStyleClass().add("calendar-day-lane"); cell.getStyleClass().add("calendar-month-day-cell"); applyCalendarDayState(cell, day, LocalDate.now()); cell.setPadding(new Insets(6));
             configureMonthDayCellDrillDown(cell, day);
             Button dayButton = createMonthDayButton(day);
             cell.getChildren().add(dayButton); List<CalendarFeedItem> dayItems = grouped.getOrDefault(day, List.of());
@@ -655,7 +662,7 @@ public final class CalendarController {
 
     private VBox createAllDaySection(List<CalendarFeedItem> dayItems, boolean collapsed) {
         VBox allDaySection = new VBox(4);
-        allDaySection.getStyleClass().add("calendar-day-lane");
+        allDaySection.getStyleClass().addAll("calendar-day-lane", "calendar-all-day-section");
         allDaySection.setPadding(new Insets(6));
         List<CalendarFeedItem> allDayItems = dayItems.stream().filter(CalendarFeedItem::allDay).toList();
 
@@ -667,7 +674,7 @@ public final class CalendarController {
             allDaySection.setPrefHeight(36);
             allDaySection.setMaxHeight(36);
         } else {
-            if (allDayItems.isEmpty()) allDaySection.getChildren().add(new Label("No all-day items"));
+            if (allDayItems.isEmpty()) { Label empty = new Label("No all-day items"); empty.getStyleClass().add("calendar-all-day-empty"); allDaySection.getChildren().add(empty); }
             else for (CalendarFeedItem i : allDayItems) { Node b = calendarEventCardFactory.createAllDayBubble(i); configureCalendarCardClick(b, i); allDaySection.getChildren().add(b); }
             allDaySection.setMinHeight(Region.USE_COMPUTED_SIZE);
             allDaySection.setPrefHeight(Region.USE_COMPUTED_SIZE);
@@ -709,6 +716,8 @@ public final class CalendarController {
             timedGrid.getRowConstraints().add(rc);
             Label hour = new Label(slot % 2 == 0 ? formatHourLabel(slot / 2) : "");
             hour.getStyleClass().add("calendar-time-gutter-label");
+            hour.pseudoClassStateChanged(HOUR_PSEUDO_CLASS, slot % 2 == 0);
+            hour.pseudoClassStateChanged(HALF_HOUR_PSEUDO_CLASS, slot % 2 != 0);
             timedGrid.add(hour, 0, slot);
         }
 
@@ -718,6 +727,9 @@ public final class CalendarController {
                 box.setPrefHeight(HALF_HOUR_HEIGHT);
                 box.setMaxWidth(Double.MAX_VALUE);
                 box.getStyleClass().add("calendar-timed-day-cell");
+                box.pseudoClassStateChanged(HOUR_PSEUDO_CLASS, slot % 2 == 0);
+                box.pseudoClassStateChanged(HALF_HOUR_PSEUDO_CLASS, slot % 2 != 0);
+                if (visibleDays != null && dayIndex < visibleDays.size()) applyCalendarDayState(box, visibleDays.get(dayIndex), today);
                 GridPane.setHgrow(box, Priority.ALWAYS);
                 timedGrid.add(box, dayIndex + 1, slot);
                 if (slot == 0) dayWidthAnchors[dayIndex] = box;
@@ -912,6 +924,17 @@ public final class CalendarController {
         overlay.heightProperty().addListener((obs, oldVal, newVal) -> positionMarker.run());
         Platform.runLater(() -> Platform.runLater(positionMarker));
         return overlay;
+    }
+
+    private static void applyCalendarDayState(Node node, LocalDate day, LocalDate today) {
+        if (node == null || day == null) return;
+        boolean isToday = today != null && day.equals(today);
+        boolean isWeekend = day.getDayOfWeek() == DayOfWeek.SATURDAY || day.getDayOfWeek() == DayOfWeek.SUNDAY;
+        node.getStyleClass().removeAll("calendar-day-today", "calendar-day-weekend");
+        if (isToday) node.getStyleClass().add("calendar-day-today");
+        if (isWeekend) node.getStyleClass().add("calendar-day-weekend");
+        node.pseudoClassStateChanged(TODAY_PSEUDO_CLASS, isToday);
+        node.pseudoClassStateChanged(WEEKEND_PSEUDO_CLASS, isWeekend);
     }
 
     private Map<LocalDate, List<CalendarFeedItem>> groupAndSort(List<CalendarFeedItem> items, LocalDate start, int dayCount) {

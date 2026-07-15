@@ -2288,3 +2288,180 @@
     -fx-border-color: rgba(13, 33, 64, 0.12) transparent transparent transparent;
     -fx-border-width: 1 0 0 0;
 }
+
+/* Calendar Step 2 visual polish: scoped calendar layout, ownership, temporal, and empty-state refinements. */
+.calendar-toolbar {
+    -fx-padding: 9 10 9 10;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(13, 33, 64, 0.12);
+    -fx-border-width: 1;
+}
+
+.calendar-toolbar-group {
+    -fx-alignment: center-left;
+    -fx-padding: 0 2 0 2;
+}
+
+.calendar-toolbar-nav,
+.calendar-toolbar-actions {
+    -fx-border-color: transparent rgba(13, 33, 64, 0.12) transparent transparent;
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 0 10 0 0;
+}
+
+.calendar-toolbar-range {
+    -fx-padding: 0 2 0 4;
+    -fx-min-width: 128;
+}
+
+.button.calendar-toolbar-icon-button {
+    -fx-min-width: 30;
+    -fx-pref-width: 30;
+    -fx-padding: 5 0 5 0;
+}
+
+.calendar-toolbar-view-select {
+    -fx-pref-width: 92;
+}
+
+.calendar-toolbar-search {
+    -fx-pref-width: 150;
+}
+
+.calendar-toolbar-filter {
+    -fx-pref-width: 140;
+}
+
+.calendar-day-header {
+    -fx-padding: 7 8 7 8;
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
+    -fx-border-color: rgba(13, 33, 64, 0.08);
+    -fx-border-width: 1;
+}
+
+.calendar-day-header:today,
+.calendar-day-header.calendar-day-today {
+    -fx-background-color: rgba(46, 111, 182, 0.10);
+    -fx-border-color: rgba(46, 111, 182, 0.36);
+}
+
+.calendar-day-header:weekend,
+.calendar-day-header.calendar-day-weekend {
+    -fx-background-color: rgba(17, 37, 66, 0.035);
+}
+
+.calendar-day-header:today .label:first-child,
+.calendar-day-header.calendar-day-today .label:first-child,
+.calendar-day-header:today .label:last-child,
+.calendar-day-header.calendar-day-today .label:last-child {
+    -fx-text-fill: #1d4e8f;
+    -fx-font-weight: 900;
+}
+
+.calendar-month-day-cell {
+    -fx-min-width: 112;
+    -fx-pref-width: 128;
+    -fx-min-height: 108;
+    -fx-pref-height: 118;
+}
+
+.calendar-month-day-cell:weekend,
+.calendar-month-day-cell.calendar-day-weekend,
+.calendar-timed-day-cell:weekend,
+.calendar-timed-day-cell.calendar-day-weekend {
+    -fx-background-color: rgba(17, 37, 66, 0.025);
+}
+
+.calendar-month-day-cell:today,
+.calendar-month-day-cell.calendar-day-today {
+    -fx-background-color: rgba(46, 111, 182, 0.075);
+    -fx-border-color: rgba(46, 111, 182, 0.42);
+    -fx-border-width: 1.5;
+}
+
+.calendar-month-day-cell:today .button.calendar-month-day-link,
+.calendar-month-day-cell.calendar-day-today .button.calendar-month-day-link {
+    -fx-background-color: rgba(46, 111, 182, 0.13);
+    -fx-border-color: rgba(46, 111, 182, 0.34);
+    -fx-text-fill: #174a85;
+    -fx-font-weight: 900;
+}
+
+.calendar-timed-day-cell:today,
+.calendar-timed-day-cell.calendar-day-today {
+    -fx-background-color: rgba(46, 111, 182, 0.035);
+}
+
+.calendar-timed-grid .calendar-timed-day-cell:hour {
+    -fx-border-color: rgba(15, 35, 66, 0.13) transparent transparent rgba(15, 35, 66, 0.08);
+    -fx-border-width: 1 0 0 1;
+}
+
+.calendar-timed-grid .calendar-timed-day-cell:half-hour {
+    -fx-border-color: rgba(15, 35, 66, 0.055) transparent transparent rgba(15, 35, 66, 0.08);
+    -fx-border-width: 1 0 0 1;
+}
+
+.calendar-all-day-section {
+    -fx-background-color: rgba(250, 252, 255, 0.78);
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: rgba(13, 33, 64, 0.10);
+    -fx-padding: 6 7 6 7;
+}
+
+.calendar-all-day-empty {
+    -fx-text-fill: rgba(17, 37, 66, 0.46);
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-padding: 2 0 2 0;
+}
+
+.calendar-event-card:hover {
+    -fx-border-color: rgba(46, 111, 182, 0.30);
+    -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.12), 8, 0.12, 0, 1);
+}
+
+.calendar-event-card:focused {
+    -fx-border-color: rgba(46, 111, 182, 0.56);
+    -fx-effect: dropshadow(gaussian, rgba(46,111,182,0.30), 8, 0.14, 0, 0);
+}
+
+.calendar-event-card-shared {
+    -fx-border-style: solid;
+}
+
+
+.calendar-event-card-user-owned {
+    -fx-border-color: rgba(46, 111, 182, 0.22);
+}
+
+.calendar-event-card-shared .calendar-event-category-badge {
+    -fx-background-color: rgba(107, 119, 140, 0.16);
+}
+
+.calendar-event-card-user-owned .calendar-event-category-badge {
+    -fx-background-color: rgba(46, 111, 182, 0.14);
+}
+
+.calendar-overlay-sidebar {
+    -fx-effect: dropshadow(gaussian, rgba(13, 33, 64, 0.08), 12, 0.12, 0, 2);
+}
+
+.calendar-sidebar-layers-section .check-box {
+    -fx-padding: 3 4 3 4;
+}
+
+.calendar-event-owner-marker,
+.calendar-event-shared-marker {
+    -fx-font-size: 9px;
+    -fx-font-weight: 900;
+    -fx-padding: 0 2 0 2;
+    -fx-alignment: top-center;
+}
+
+.calendar-event-shared-marker {
+    -fx-text-fill: rgba(91, 103, 122, 0.78);
+}
