@@ -106,22 +106,27 @@ public final class CalendarFeedDao {
             new CaseDateProjection("CASE_MED_NEG_DISCOVERED", "DateMedicalNegligenceWasDiscovered", "Medical Negligence Discovered", "CASE_DATE", "Case Date"));
 
     public List<CalendarFeedItem> listCalendarFeed(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive) {
-        return listCalendarFeed(shaleClientId, startInclusive, endExclusive, null);
+        return listCalendarFeed(shaleClientId, startInclusive, endExclusive, null, null);
+    }
+
+    public List<CalendarFeedItem> listCalendarFeedForUserSchedule(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive, int viewedUserId) {
+        if (viewedUserId <= 0) return List.of();
+        return listCalendarFeed(shaleClientId, startInclusive, endExclusive, null, viewedUserId);
     }
 
     public List<CalendarFeedItem> listCalendarFeedForCase(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive, int caseId) {
         if (caseId <= 0) return List.of();
-        return listCalendarFeed(shaleClientId, startInclusive, endExclusive, caseId);
+        return listCalendarFeed(shaleClientId, startInclusive, endExclusive, caseId, null);
     }
 
-    private List<CalendarFeedItem> listCalendarFeed(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive, Integer caseId) {
+    private List<CalendarFeedItem> listCalendarFeed(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive, Integer caseId, Integer userScheduleUserId) {
         if (shaleClientId <= 0 || startInclusive == null || endExclusive == null) {
             return List.of();
         }
-        String sql = buildCalendarFeedSql(caseId != null);
+        String sql = buildCalendarFeedSql(caseId != null, userScheduleUserId != null);
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
             int i = 1;
-            ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive)); if (caseId != null) ps.setInt(i++, caseId);
+            ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive)); if (userScheduleUserId != null) ps.setInt(i++, userScheduleUserId); if (caseId != null) ps.setInt(i++, caseId);
             ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive)); if (caseId != null) ps.setInt(i++, caseId);
             LocalDate startDate = startInclusive.toLocalDate();
             LocalDate endDate = endExclusive.toLocalDate();
@@ -162,6 +167,10 @@ public final class CalendarFeedDao {
     }
 
     static String buildCalendarFeedSql(boolean caseFiltered) {
+        return buildCalendarFeedSql(caseFiltered, false);
+    }
+
+    static String buildCalendarFeedSql(boolean caseFiltered, boolean userScheduleScoped) {
         StringBuilder sql = new StringBuilder("""
                 SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, CaseName, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex, AssignedUserColor, AssignedToUserId, AssignedUserDisplayName
                 FROM (
@@ -190,7 +199,7 @@ public final class CalendarFeedDao {
                       AND e.StartsAt >= ?
                       AND e.StartsAt < ?
                       AND ISNULL(e.IsCancelled, 0) = 0
-                      """ + (caseFiltered ? "AND e.CaseId = ?\n" : "") + """
+                      """ + (userScheduleScoped ? "AND (e.AssignedToUserId IS NULL OR e.AssignedToUserId = ?)\n" : "") + (caseFiltered ? "AND e.CaseId = ?\n" : "") + """
                     UNION ALL
 
                     SELECT CONCAT('TASK:', CAST(t.Id AS varchar(20))),
