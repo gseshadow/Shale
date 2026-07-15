@@ -8,7 +8,7 @@
 <parent>
     <groupId>com.shale</groupId>
     <artifactId>shale-parent</artifactId>
-    <version>1.0.103</version>
+    <version>1.0.104</version>
     <relativePath>../pom.xml</relativePath>
 </parent>
 
@@ -122,6 +122,10 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>com.shale.desktop.MainApp</mainClass>
+                    <options>
+                        <option>-Dshale.profile=${shale.profile}</option>
+                        <option>-Dshale.launchMode=javafx-maven-plugin</option>
+                    </options>
                 </configuration>
             </plugin>
 

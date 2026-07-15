@@ -383,7 +383,9 @@ public final class SearchController {
 					row.title(),
 					description,
 					null,
-					null,
+					row.statusName(),
+					row.statusColorHex(),
+					row.priorityColorHex(),
 					row.dueAt(),
 					row.completedAt(),
 					assignedUsers), TaskCardFactory.Variant.FULL, true);
@@ -406,10 +408,13 @@ public final class SearchController {
 					"MANUAL",
 					null,
 					row.caseId(),
+					row.caseName(),
 					null,
 					row.caseName(),
 					null,
 					"Event",
+					null,
+					null,
 					null,
 					null);
 			Node eventCard = calendarEventCardFactory.create(item, java.time.LocalDate.now(), java.time.LocalDateTime.now());

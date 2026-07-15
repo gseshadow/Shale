@@ -93,6 +93,7 @@ public final class UserController {
 	@FXML private ScrollPane assignedTasksScroll;
 	@FXML private ScrollPane pageScroll;
 	@FXML private FlowPane sectionsFlow;
+	@FXML private VBox pageContent;
 	@FXML private VBox userDetailsSection;
 	@FXML private ScrollPane userDetailsScroll;
 	@FXML private VBox tasksSection;
@@ -155,7 +156,16 @@ public final class UserController {
 	private UserDetailCache userDetailCache;
 	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 	private static final double MIN_SECTION_HEIGHT = 320;
-	private static final double SECTION_HEIGHT_PADDING = 12;
+	private static final double WIDE_BREAKPOINT = 1420;
+	private static final double MEDIUM_BREAKPOINT = 860;
+	private static final double SECTION_GAP = 16;
+	private static final double FLOW_HORIZONTAL_PADDING = 24;
+	private static final double WIDE_DETAILS_WIDTH = 530;
+	private static final double WIDE_TASKS_WIDTH = 380;
+	private static final double WIDE_CASES_WIDTH = 460;
+	private static final double MEDIUM_LIST_HEIGHT = 420;
+	private static final double NARROW_LIST_HEIGHT = 360;
+	private static final double SECTION_HEIGHT_PADDING = 36;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "user-detail-loader");
@@ -271,52 +281,81 @@ public final class UserController {
 	}
 
 	private void configureResponsiveSectionSizing() {
-		if (pageScroll == null || userDetailsSection == null || tasksSection == null || casesSection == null) {
+		if (pageScroll == null || sectionsFlow == null || userDetailsSection == null || tasksSection == null || casesSection == null) {
 			return;
 		}
+		pageScroll.setFitToWidth(true);
+		pageScroll.setFitToHeight(false);
+		pageScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		pageScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+		sectionsFlow.setPrefWrapLength(WIDE_BREAKPOINT);
 		pageScroll.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> applyResponsiveSectionSizing());
+		pageScroll.widthProperty().addListener((obs, oldWidth, newWidth) -> applyResponsiveSectionSizing());
 		pageScroll.heightProperty().addListener((obs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
-		sectionsFlow.widthProperty().addListener((obs, oldWidth, newWidth) -> applyResponsiveSectionSizing());
-		sectionsFlow.heightProperty().addListener((obs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
-		pageScroll.sceneProperty().addListener((obs, oldScene, newScene) -> {
-			if (newScene == null) {
-				return;
-			}
-			newScene.heightProperty().addListener((sceneObs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
-			if (newScene.getWindow() != null) {
-				newScene.getWindow().heightProperty().addListener((windowObs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
-			}
-			newScene.windowProperty().addListener((windowObs, oldWindow, newWindow) -> {
-				if (newWindow != null) {
-					newWindow.heightProperty().addListener((heightObs, oldHeight, newHeight) -> applyResponsiveSectionSizing());
-				}
-			});
-		});
 		Platform.runLater(this::applyResponsiveSectionSizing);
 	}
 
 	private void applyResponsiveSectionSizing() {
-		if (pageScroll == null) {
+		if (pageScroll == null || sectionsFlow == null) {
 			return;
+		}
+		double viewportWidth = pageScroll.getViewportBounds() == null ? 0 : pageScroll.getViewportBounds().getWidth();
+		if (viewportWidth <= 0) {
+			viewportWidth = pageScroll.getWidth();
 		}
 		double viewportHeight = pageScroll.getViewportBounds() == null ? 0 : pageScroll.getViewportBounds().getHeight();
-		if (viewportHeight <= 0) {
+		if (viewportWidth <= 0) {
 			return;
 		}
-		double targetHeight = Math.max(MIN_SECTION_HEIGHT, viewportHeight - SECTION_HEIGHT_PADDING);
-		sectionsFlow.setMinHeight(targetHeight);
-		applySectionHeight(userDetailsSection, targetHeight);
-		applySectionHeight(tasksSection, targetHeight);
-		applySectionHeight(casesSection, targetHeight);
+
+		double contentWidth = Math.max(0, viewportWidth - FLOW_HORIZONTAL_PADDING);
+		sectionsFlow.setPrefWrapLength(contentWidth);
+		if (pageContent != null) {
+			pageContent.setMinWidth(viewportWidth);
+			pageContent.setPrefWidth(viewportWidth);
+		}
+
+		if (contentWidth >= WIDE_BREAKPOINT) {
+			applyWideLayout(viewportHeight);
+		} else if (contentWidth >= MEDIUM_BREAKPOINT) {
+			applyMediumLayout(contentWidth);
+		} else {
+			applyNarrowLayout(contentWidth);
+		}
 	}
 
-	private void applySectionHeight(Region section, double height) {
+	private void applyWideLayout(double viewportHeight) {
+		double targetHeight = Math.max(MIN_SECTION_HEIGHT, viewportHeight <= 0 ? MIN_SECTION_HEIGHT : viewportHeight - SECTION_HEIGHT_PADDING);
+		applySectionSize(userDetailsSection, WIDE_DETAILS_WIDTH, targetHeight);
+		applySectionSize(tasksSection, WIDE_TASKS_WIDTH, targetHeight);
+		applySectionSize(casesSection, WIDE_CASES_WIDTH, targetHeight);
+	}
+
+	private void applyMediumLayout(double contentWidth) {
+		double halfWidth = Math.max(280, (contentWidth - SECTION_GAP) / 2);
+		applySectionSize(userDetailsSection, halfWidth, Region.USE_COMPUTED_SIZE);
+		applySectionSize(tasksSection, halfWidth, MEDIUM_LIST_HEIGHT);
+		applySectionSize(casesSection, contentWidth, MEDIUM_LIST_HEIGHT);
+	}
+
+	private void applyNarrowLayout(double contentWidth) {
+		double sectionWidth = Math.max(260, contentWidth);
+		applySectionSize(userDetailsSection, sectionWidth, Region.USE_COMPUTED_SIZE);
+		applySectionSize(tasksSection, sectionWidth, NARROW_LIST_HEIGHT);
+		applySectionSize(casesSection, sectionWidth, NARROW_LIST_HEIGHT);
+	}
+
+	private void applySectionSize(Region section, double width, double prefHeight) {
 		if (section == null) {
 			return;
 		}
+		section.setMinWidth(Math.min(width, section == userDetailsSection ? 260 : 280));
+		section.setPrefWidth(width);
+		section.setMaxWidth(width);
 		section.setMinHeight(MIN_SECTION_HEIGHT);
-		section.setPrefHeight(height);
+		section.setPrefHeight(prefHeight);
 		section.setMaxHeight(Double.MAX_VALUE);
+		VBox.setVgrow(section, prefHeight == Region.USE_COMPUTED_SIZE ? Priority.NEVER : Priority.ALWAYS);
 	}
 
 	private void wireLiveRefreshLifecycle() {
@@ -1096,15 +1135,13 @@ public final class UserController {
 				row.title(),
 				row.description(),
 				null,
+				row.taskStatusName(),
+				row.taskStatusColorHex(),
 				row.priorityColorHex(),
 				row.dueAt(),
 				row.completedAt(),
 				assignedTaskUsers.getOrDefault(row.taskId(), List.of()));
-		Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT_FLUID);
-		if (card instanceof Region region) {
-			region.setMaxWidth(Double.MAX_VALUE);
-		}
-		return card;
+		return taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true);
 	}
 
 	private String normalizedAssignedTaskQuery() {
@@ -1432,8 +1469,11 @@ public final class UserController {
 								detail.caseName(),
 								detail.caseResponsibleAttorney(),
 								detail.caseResponsibleAttorneyColor(),
-				detail.caseNonEngagementLetterSent(),
-						detail.title(),
+								detail.caseNonEngagementLetterSent(),
+								detail.casePrimaryStatusName(),
+								detail.casePrimaryStatusColor(),
+								detail.casePracticeAreaColor(),
+								detail.title(),
 						detail.description(),
 						detail.dueAt(),
 						detail.statusId(),

@@ -2,6 +2,7 @@ package com.shale.ui.component.factory;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -10,6 +11,9 @@ import com.shale.ui.privacy.PhiFieldRegistry;
 import com.shale.ui.util.ColorUtil;
 
 public final class TaskCardFactory {
+
+    public static final String COMPLETED_STATUS_LABEL = "Completed";
+    public static final String COMPLETED_STATUS_FALLBACK_COLOR = "#DCFCE7";
 
     public enum Variant {
         FULL, MY_TASKS, COMPACT, COMPACT_FLUID, MINI
@@ -28,6 +32,8 @@ public final class TaskCardFactory {
             String title,
             String description,
             String createdByDisplayName,
+            String taskStatusName,
+            String taskStatusColorHex,
             String priorityColorHex,
             LocalDateTime dueAt,
             LocalDateTime completedAt,
@@ -40,6 +46,24 @@ public final class TaskCardFactory {
             String displayName,
             String colorCss
     ) {
+    }
+
+    public record TaskStatusPresentation(String name, String colorHex) {
+    }
+
+    public static TaskStatusPresentation resolveTaskStatusPresentation(
+            boolean completed,
+            String hydratedStatusName,
+            String hydratedStatusColorHex) {
+        String statusName = hydratedStatusName == null ? "" : hydratedStatusName.trim();
+        String statusColor = hydratedStatusColorHex == null ? "" : hydratedStatusColorHex.trim();
+        if (!completed) {
+            return new TaskStatusPresentation(statusName, statusColor);
+        }
+        if (COMPLETED_STATUS_LABEL.equalsIgnoreCase(statusName) && !statusColor.isBlank()) {
+            return new TaskStatusPresentation(COMPLETED_STATUS_LABEL, statusColor);
+        }
+        return new TaskStatusPresentation(COMPLETED_STATUS_LABEL, COMPLETED_STATUS_FALLBACK_COLOR);
     }
 
     private final Consumer<Long> onOpenTask;
@@ -62,7 +86,7 @@ public final class TaskCardFactory {
         return create(model, variant, false);
     }
 
-    public TaskCard create(TaskCardModel model, Variant variant, boolean allowPhiDescriptionForFull) {
+    public TaskCard create(TaskCardModel model, Variant variant, boolean allowPhiDescription) {
         Objects.requireNonNull(model, "model");
 
         TaskCard card = new TaskCard();
@@ -74,10 +98,7 @@ public final class TaskCardFactory {
         String displayTitle = suppressTitleForPassiveSurface
                 ? "Task #" + model.taskId()
                 : model.title();
-        String safeDescription = (variant == Variant.FULL || variant == Variant.MY_TASKS)
-                && (allowPhiDescriptionForFull || !PhiFieldRegistry.isPhi("Tasks", "Description"))
-                ? model.description()
-                : null;
+        String safeDescription = descriptionForCard(model, allowPhiDescription);
         card.setTaskId(model.taskId());
         card.setOnOpen(onOpenTask);
         card.setOnToggleComplete(onToggleCompleteTask);
@@ -96,10 +117,16 @@ public final class TaskCardFactory {
         card.setDueAt(model.dueAt());
         card.setCreatedByDisplayName(model.createdByDisplayName());
         card.setDescriptionPreview(safeDescription);
-        card.setCompleted(model.completedAt() != null);
+        boolean completed = model.completedAt() != null;
+        TaskStatusPresentation status = resolveTaskStatusPresentation(
+                completed,
+                model.taskStatusName(),
+                model.taskStatusColorHex());
+        card.setTaskStatus(status.name(), status.colorHex());
+        card.setCompleted(completed);
         card.setBorderByDueState(model.dueAt(), model.completedAt());
         card.setAssignees(model.assignedUsers());
-        card.setBackgroundCssColor(ColorUtil.toCssBackgroundColorOrNull(model.priorityColorHex()));
+        card.setPriorityBackgroundColor(model.priorityColorHex());
 
         switch (variant) {
             case FULL -> card.applyFull();
@@ -110,5 +137,11 @@ public final class TaskCardFactory {
         }
 
         return card;
+    }
+
+    static String descriptionForCard(TaskCardModel model, boolean allowPhiDescription) {
+        return (allowPhiDescription || !PhiFieldRegistry.isPhi("Tasks", "Description"))
+                ? model.description()
+                : null;
     }
 }

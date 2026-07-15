@@ -352,6 +352,63 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.detailShaleClientId);
     }
 
+
+    @Test
+    void caseDetailSerializesNullOptionalDatesWithDevelopmentHeaders() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        caseServicePort.detail = new CaseDetailDto(6502L, "CASE-6502", "Null Dates", "Detail", "Open", "Ada Attorney", 10,
+                null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, LocalDateTime.of(2026, 1, 1, 0, 0), null, List.of(), List.of());
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/cases/6502")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caseId").value(6502))
+                .andExpect(jsonPath("$.callerDate").doesNotExist())
+                .andExpect(jsonPath("$.acceptedDate").doesNotExist())
+                .andExpect(jsonPath("$.closedDate").doesNotExist())
+                .andExpect(jsonPath("$.deniedDate").doesNotExist())
+                .andExpect(jsonPath("$.dateOfInjury").doesNotExist())
+                .andExpect(jsonPath("$.statuteOfLimitations").doesNotExist())
+                .andExpect(jsonPath("$.tortNoticeDeadline").doesNotExist());
+    }
+
+    @Test
+    void caseDetailSerializesPopulatedDeadlineAndInjuryDatesWithDevelopmentHeaders() throws Exception {
+        RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        caseServicePort.detail = new CaseDetailDto(6503L, "CASE-6503", "Populated Dates", "Detail", "Open", "Ada Attorney", 10,
+                null, null, null, null, null, null, null, null, LocalDate.of(2026, 2, 3), LocalDate.of(2026, 3, 4), LocalDate.of(2026, 4, 5),
+                null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, LocalDateTime.of(2026, 1, 1, 0, 0), new byte[] {1}, List.of(), List.of());
+        MockMvc devMockMvc = developmentMockMvc(
+                caseServicePort,
+                unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+
+        devMockMvc.perform(get("/api/cases/6503")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caseId").value(6503))
+                .andExpect(jsonPath("$.dateOfInjury[0]").value(2026))
+                .andExpect(jsonPath("$.dateOfInjury[1]").value(2))
+                .andExpect(jsonPath("$.dateOfInjury[2]").value(3))
+                .andExpect(jsonPath("$.statuteOfLimitations[0]").value(2026))
+                .andExpect(jsonPath("$.statuteOfLimitations[1]").value(3))
+                .andExpect(jsonPath("$.statuteOfLimitations[2]").value(4))
+                .andExpect(jsonPath("$.tortNoticeDeadline[0]").value(2026))
+                .andExpect(jsonPath("$.tortNoticeDeadline[1]").value(4))
+                .andExpect(jsonPath("$.tortNoticeDeadline[2]").value(5));
+    }
+
     @Test
     void caseTasksReachServiceLayerWithDevelopmentHeaders() throws Exception {
         RecordingTaskServicePort taskServicePort = new RecordingTaskServicePort();
@@ -748,11 +805,15 @@ class ApiReadControllerTest {
         private LocalDate updateTortNoticeDeadline;
         private String updateSummary;
         private byte[] updateExpectedRowVer;
+        private CaseDetailDto detail;
 
         @Override
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
             this.detailCaseId = caseId;
             this.detailShaleClientId = shaleClientId;
+            if (detail != null) {
+                return Optional.of(detail);
+            }
             return Optional.of(new CaseDetailDto(caseId, "CASE-501", "Smith v. Example", "Detail", "Open", "Ada Attorney", 10,
                     null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null, null, null, null, null, null, null,
@@ -939,7 +1000,7 @@ class ApiReadControllerTest {
             this.detailTaskId = taskId;
             this.detailShaleClientId = shaleClientId;
             return Optional.of(new TaskDetailDto(taskId, shaleClientId, 501L, "Smith v. Example",
-                    "Ada Attorney", "#111111", false, "Review records", "Read intake packet",
+                    "Ada Attorney", "#111111", false, "Open", "#22AA55", "#004488", "Review records", "Read intake packet",
                     LocalDateTime.of(2026, 1, 2, 12, 0), 2, 1, null,
                     31, "Ada Attorney", "#111111", "Case Creator"));
         }

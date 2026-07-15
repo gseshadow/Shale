@@ -85,6 +85,9 @@ public final class MyShaleController {
 	private static final String MY_TASKS_COLUMN_ORDER_OLDEST_INCOMPLETE_DUE = "Oldest Incomplete Due Date";
 	private static final CaseFilterOption ALL_CASES_OPTION = new CaseFilterOption(null, "All Cases");
 	private static final PriorityFilterOption ALL_PRIORITIES_OPTION = new PriorityFilterOption(null, "All Priorities");
+	private static final MyTasksStatusFilterOption ALL_ACTIVE_TASK_STATUSES_OPTION = new MyTasksStatusFilterOption(MyTasksStatusFilterKind.ALL_ACTIVE, null, null, "All Active");
+	private static final MyTasksStatusFilterOption COMPLETED_TASK_STATUS_OPTION = new MyTasksStatusFilterOption(MyTasksStatusFilterKind.COMPLETED, null, null, "Completed");
+	private static final MyTasksStatusFilterOption ALL_TASK_STATUSES_OPTION = new MyTasksStatusFilterOption(MyTasksStatusFilterKind.ALL, null, null, "All");
 	private static final String SECTION_OVERVIEW = "Overview";
 	private static final String SECTION_TASKS = "My Tasks";
 	private static final String SECTION_MY_CASES = "My Cases";
@@ -139,6 +142,8 @@ public final class MyShaleController {
 	private ChoiceBox<CaseFilterOption> myTasksCaseFilterChoice;
 	@FXML
 	private ChoiceBox<PriorityFilterOption> myTasksPriorityFilterChoice;
+	@FXML
+	private ChoiceBox<MyTasksStatusFilterOption> myTasksStatusFilterChoice;
 	@FXML
 	private ChoiceBox<String> myTasksColumnOrderChoice;
 	@FXML
@@ -226,6 +231,7 @@ public final class MyShaleController {
 
 	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
+	private List<TaskStatusOptionDto> myTaskStatusOptions = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
 	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
 	private java.util.Map<Integer, String> cachedPriorityNamesById = java.util.Map.of();
@@ -282,6 +288,13 @@ public final class MyShaleController {
 	private enum MyTasksViewMode {
 		BOARD,
 		GRID
+	}
+
+	private enum MyTasksStatusFilterKind {
+		ALL_ACTIVE,
+		STATUS,
+		COMPLETED,
+		ALL
 	}
 
 	private enum MyTasksSource {
@@ -414,6 +427,15 @@ public final class MyShaleController {
 							renderMyTasks();
 						}
 					});
+		}
+		if (myTasksStatusFilterChoice != null) {
+			myTasksStatusFilterChoice.getItems().setAll(ALL_ACTIVE_TASK_STATUSES_OPTION, COMPLETED_TASK_STATUS_OPTION, ALL_TASK_STATUSES_OPTION);
+			myTasksStatusFilterChoice.getSelectionModel().select(ALL_ACTIVE_TASK_STATUSES_OPTION);
+			myTasksStatusFilterChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+				if (!suppressMyTasksFilterEvents) {
+					renderMyTasks();
+				}
+			});
 		}
 		if (myTasksColumnOrderChoice != null) {
 			myTasksColumnOrderChoice.getItems().setAll(
@@ -1166,6 +1188,7 @@ public final class MyShaleController {
 												row.color()),
 											java.util.stream.Collectors.toList())));
 					java.util.Map<Integer, String> prioritiesById = loadMyShalePriorityNames(shaleClientIdValue);
+					List<TaskStatusOptionDto> statusOptions = caseTaskService.loadActiveTaskStatuses(shaleClientIdValue);
 					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " rows=" + assignedByTask.size(), usersLoadStartNanos);
 					runOnFx(() -> {
 						if (generationAtSubmit != taskLoadGeneration) {
@@ -1181,11 +1204,13 @@ public final class MyShaleController {
 						collapsedTaskLaneCaseIds.addAll(collapsedLaneCaseIds);
 							myTaskAssignedUsers = assignedByTask;
 							myTaskPrioritiesById = prioritiesById;
+							myTaskStatusOptions = statusOptions == null ? List.of() : statusOptions;
 							cachedTasksUserId = userIdValue;
 							cachedTasksTenantId = shaleClientIdValue;
 							myTasksLoadedOnce = true;
 							myTasksDirty = false;
 						syncMyTaskPriorityFilterOptions();
+						syncMyTaskStatusFilterOptions();
 						syncMyTaskCaseFilterOptions();
 						renderActiveTaskViews();
 						refreshRecentCaseActivity();
@@ -1547,7 +1572,9 @@ public final class MyShaleController {
 		myTasksList.getChildren().clear();
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
-		List<CaseTaskListItemDto> taskFiltered = filterAndRankMyTasks(myTasks, selectedPriorityFilterId(), searchQuery);
+		List<CaseTaskListItemDto> taskFiltered = filterAndRankMyTasks(myTasks, selectedPriorityFilterId(), searchQuery).stream()
+				.filter(task -> matchesSelectedMyTaskStatus(task, selectedMyTaskStatusFilter()))
+				.toList();
 		List<CaseTaskListItemDto> filteredTasks = applyCaseColumnFilter(taskFiltered, selectedCaseFilterId());
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
@@ -1636,6 +1663,8 @@ public final class MyShaleController {
 					resolveMyTaskCardTitle(task),
 					task.description(),
 					task.createdByDisplayName(),
+					task.taskStatusName(),
+					task.taskStatusColorHex(),
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
@@ -2357,6 +2386,9 @@ public final class MyShaleController {
 			if (myTasksPriorityFilterChoice != null) {
 				myTasksPriorityFilterChoice.getSelectionModel().select(ALL_PRIORITIES_OPTION);
 			}
+			if (myTasksStatusFilterChoice != null) {
+				myTasksStatusFilterChoice.getSelectionModel().select(ALL_ACTIVE_TASK_STATUSES_OPTION);
+			}
 			if (myTasksCaseFilterChoice != null) {
 				myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
 			}
@@ -2379,6 +2411,7 @@ public final class MyShaleController {
 		return !normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText()).isEmpty()
 				|| myTasksSource != MyTasksSource.ASSIGNED_TO_ME
 				|| selectedPriorityFilterId() != null
+				|| !Objects.equals(selectedMyTaskStatusFilter(), ALL_ACTIVE_TASK_STATUSES_OPTION)
 				|| selectedCaseFilterId() != null
 				|| showCompletedMyTasks;
 	}
@@ -3094,11 +3127,13 @@ public final class MyShaleController {
 						resolveMyTaskCardTitle(task),
 						task.description(),
 						task.createdByDisplayName(),
+							task.taskStatusName(),
+							task.taskStatusColorHex(),
 							task.priorityColorHex(),
 							task.dueAt(),
 							task.completedAt(),
 							myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-				Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT);
+				Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT, true);
 				if (card instanceof Region regionCard) {
 					regionCard.setMinWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
 					regionCard.setPrefWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
@@ -3459,6 +3494,8 @@ public final class MyShaleController {
 					resolveMyTaskCardTitle(task),
 					task.description(),
 					task.createdByDisplayName(),
+					task.taskStatusName(),
+					task.taskStatusColorHex(),
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
@@ -3466,7 +3503,7 @@ public final class MyShaleController {
 			if (fullVariant) {
 				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true));
 			} else {
-				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT));
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT, true));
 			}
 		}
 		return taskCards;
@@ -3516,6 +3553,67 @@ public final class MyShaleController {
 		return tasks.stream()
 				.filter(task -> task.caseId() == selectedCaseId.longValue())
 				.toList();
+	}
+
+	private void syncMyTaskStatusFilterOptions() {
+		if (myTasksStatusFilterChoice == null) {
+			return;
+		}
+		MyTasksStatusFilterOption selected = myTasksStatusFilterChoice.getSelectionModel().getSelectedItem();
+		String selectedKey = selected == null ? null : selected.systemKey();
+		String selectedName = selected == null ? null : selected.displayName();
+		List<MyTasksStatusFilterOption> options = new ArrayList<>();
+		options.add(ALL_ACTIVE_TASK_STATUSES_OPTION);
+		for (TaskStatusOptionDto status : myTaskStatusOptions == null ? List.<TaskStatusOptionDto>of() : myTaskStatusOptions) {
+			String key = normalizeStatusKey(status.systemKey());
+			String name = safe(status.name()).trim();
+			if ("completed".equals(key) || "complete".equals(key) || "closed".equals(key)) {
+				continue;
+			}
+			if ("open".equals(key) || "waiting".equals(key) || "open".equalsIgnoreCase(name) || "waiting".equalsIgnoreCase(name)) {
+				options.add(new MyTasksStatusFilterOption(MyTasksStatusFilterKind.STATUS, key, name, name.isBlank() ? status.systemKey() : name));
+			}
+		}
+		options.add(COMPLETED_TASK_STATUS_OPTION);
+		options.add(ALL_TASK_STATUSES_OPTION);
+		myTasksStatusFilterChoice.getItems().setAll(options);
+		MyTasksStatusFilterOption toSelect = options.stream()
+				.filter(option -> selectedKey != null && Objects.equals(selectedKey, option.systemKey()))
+				.findFirst()
+				.or(() -> options.stream().filter(option -> selectedName != null && Objects.equals(selectedName, option.displayName())).findFirst())
+				.orElse(ALL_ACTIVE_TASK_STATUSES_OPTION);
+		myTasksStatusFilterChoice.getSelectionModel().select(toSelect);
+	}
+
+	private MyTasksStatusFilterOption selectedMyTaskStatusFilter() {
+		if (myTasksStatusFilterChoice == null || myTasksStatusFilterChoice.getSelectionModel().getSelectedItem() == null) {
+			return ALL_ACTIVE_TASK_STATUSES_OPTION;
+		}
+		return myTasksStatusFilterChoice.getSelectionModel().getSelectedItem();
+	}
+
+	private boolean matchesSelectedMyTaskStatus(CaseTaskListItemDto task, MyTasksStatusFilterOption option) {
+		MyTasksStatusFilterOption resolved = option == null ? ALL_ACTIVE_TASK_STATUSES_OPTION : option;
+		boolean completed = task != null && task.completedAt() != null;
+		return switch (resolved.kind()) {
+			case ALL -> true;
+			case COMPLETED -> completed;
+			case ALL_ACTIVE -> !completed;
+			case STATUS -> !completed && matchesTaskStatus(task, resolved);
+		};
+	}
+
+	private boolean matchesTaskStatus(CaseTaskListItemDto task, MyTasksStatusFilterOption option) {
+		String taskName = safe(task == null ? null : task.taskStatusName()).trim();
+		String selectedKey = normalizeStatusKey(option == null ? null : option.systemKey());
+		if (!selectedKey.isBlank()) {
+			return selectedKey.equals(normalizeStatusKey(taskName));
+		}
+		return taskName.equalsIgnoreCase(safe(option == null ? null : option.displayName()).trim());
+	}
+
+	private static String normalizeStatusKey(String value) {
+		return safe(value).trim().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
 	}
 
 	private void syncMyTaskPriorityFilterOptions() {
@@ -3977,10 +4075,7 @@ public final class MyShaleController {
 		{
 			try {
 				caseTaskService.updateTask(request);
-				runOnFx(() -> {
-					myTasksDirty = true;
-					refreshMyTasks(true);
-				});
+				refreshEditedTaskCollectionAfterMutation(taskId, shaleClientId, currentUserId);
 			} catch (Exception ex) {
 				runOnFx(() -> showTaskActionError("Failed to save task. " + rootCauseMessage(ex)));
 			}
@@ -4000,6 +4095,40 @@ public final class MyShaleController {
 				runOnFx(() -> showTaskActionError("Failed to delete task. " + rootCauseMessage(ex)));
 			}
 		}, "my-shale-task-delete-" + taskId).start();
+	}
+
+	private void refreshEditedTaskCollectionAfterMutation(long taskId, int shaleClientId, int currentUserId) {
+		CaseTaskService.MyTasksSortOption sortOption = selectedMyTaskSort();
+		boolean includeCompleted = showCompletedMyTasks || selectedMyTaskStatusFilter().kind() == MyTasksStatusFilterKind.COMPLETED
+				|| selectedMyTaskStatusFilter().kind() == MyTasksStatusFilterKind.ALL;
+		MyTasksSource sourceAtRefresh = myTasksSource;
+		try {
+			List<CaseTaskListItemDto> refreshedTasks = sourceAtRefresh == MyTasksSource.CREATED_BY_ME
+					? caseTaskService.loadTasksCreatedByUser(shaleClientId, currentUserId, sortOption, includeCompleted)
+					: caseTaskService.loadMyTasks(shaleClientId, currentUserId, sortOption, includeCompleted);
+			List<Long> taskIds = (refreshedTasks == null ? List.<CaseTaskListItemDto>of() : refreshedTasks).stream()
+					.map(CaseTaskListItemDto::id)
+					.toList();
+			java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = taskIds.isEmpty()
+					? java.util.Map.of()
+					: caseTaskService.loadAssignedUsersForTasks(taskIds, shaleClientId).stream()
+						.collect(java.util.stream.Collectors.groupingBy(
+								CaseTaskService.TaskAssignedUsersByTask::taskId,
+								java.util.stream.Collectors.mapping(
+										row -> new TaskCardFactory.AssignedUserModel(row.userId(), row.displayName(), row.color()),
+										java.util.stream.Collectors.toList())));
+			runOnFx(() -> {
+				myTasks = refreshedTasks == null ? List.of() : refreshedTasks;
+				myTaskAssignedUsers = assignedByTask;
+				myTasksLoadedOnce = true;
+				myTasksDirty = false;
+				syncMyTaskPriorityFilterOptions();
+				syncMyTaskCaseFilterOptions();
+				renderActiveTaskViews();
+			});
+		} catch (Exception ex) {
+			runOnFx(() -> showTaskActionError("Task was saved, but the card could not be refreshed. " + rootCauseMessage(ex)));
+		}
 	}
 
 	private void showTaskActionError(String message) {
@@ -4061,6 +4190,14 @@ public final class MyShaleController {
 		public String toString() {
 			String text = safe(displayName).trim();
 			return text.isBlank() ? "All Priorities" : text;
+		}
+	}
+
+	private record MyTasksStatusFilterOption(MyTasksStatusFilterKind kind, String systemKey, String statusName, String displayName) {
+		@Override
+		public String toString() {
+			String text = safe(displayName).trim();
+			return text.isBlank() ? "All Active" : text;
 		}
 	}
 

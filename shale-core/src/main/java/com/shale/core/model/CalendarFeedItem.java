@@ -11,10 +11,13 @@ public record CalendarFeedItem(
         String sourceType,
         String sourceField,
         Integer caseId,
+        String caseName,
         Integer taskId,
         String relatedDisplayName,
         String calendarEventTypeSystemKey,
         String displayTypeName,
         String colorHex,
-        String assignedUserColor) {
+        String assignedUserColor,
+        Integer assignedToUserId,
+        String assignedUserDisplayName) {
 }

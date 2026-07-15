@@ -62,14 +62,14 @@
     </top>
 
     <center>
-        <ScrollPane fx:id="pageScroll" fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
+        <ScrollPane fx:id="pageScroll" fitToWidth="true" fitToHeight="false" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
             <content>
-                <VBox fillWidth="true" BorderPane.alignment="CENTER">
+                <VBox fx:id="pageContent" fillWidth="true" BorderPane.alignment="CENTER">
                     <padding>
                         <Insets top="10" right="12" bottom="12" left="12" />
                     </padding>
 
-                    <FlowPane fx:id="sectionsFlow" hgap="16" vgap="16" prefWrapLength="1700" alignment="TOP_LEFT" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
+                    <FlowPane fx:id="sectionsFlow" hgap="16" vgap="16" prefWrapLength="1700" alignment="TOP_LEFT" maxWidth="1.7976931348623157E308">
                         <padding>
                             <Insets top="12" right="12" bottom="12" left="12" />
                         </padding>
@@ -78,7 +78,7 @@
                             <padding>
                                 <Insets top="10" right="10" bottom="10" left="10" />
                             </padding>
-                            <ScrollPane fx:id="userDetailsScroll" fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
+                            <ScrollPane fx:id="userDetailsScroll" fitToWidth="true" fitToHeight="false" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
                                 <content>
                                     <VBox spacing="10" maxWidth="1.7976931348623157E308">
                                         <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
@@ -162,8 +162,8 @@
                                 <Label text="Assigned Tasks" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
                                 <Region HBox.hgrow="ALWAYS" />
                             </HBox>
-                            <HBox spacing="8" alignment="CENTER_LEFT">
-                                <TextField fx:id="assignedTasksSearchField" promptText="Search assigned tasks…" HBox.hgrow="ALWAYS" />
+                            <FlowPane hgap="8" vgap="8" prefWrapLength="356" alignment="CENTER_LEFT">
+                                <TextField fx:id="assignedTasksSearchField" promptText="Search assigned tasks" prefWidth="220" minWidth="190" />
                                 <ChoiceBox fx:id="assignedTasksSortChoice" prefWidth="180" minWidth="140" maxWidth="180">
                                     <styleClass>
                                         <String fx:value="choice-box" />
@@ -178,7 +178,7 @@
                                         <String fx:value="app-toolbar-button-compact" />
                                     </styleClass>
                                 </Button>
-                            </HBox>
+                            </FlowPane>
                             <ScrollPane fx:id="assignedTasksScroll" fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
                                 <javafx.scene.layout.StackPane>
                                     <VBox fx:id="assignedTasksContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />

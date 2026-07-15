@@ -28,6 +28,7 @@ public final class TaskDao {
     private static final String TASK_STATUSES_TABLE = "dbo.TaskStatuses";
     private static final String PRIORITY_SYSTEM_KEY_NORMAL = "normal";
     private static final String TASK_STATUS_SYSTEM_KEY_OPEN = "open";
+    private static final String TASK_STATUS_SYSTEM_KEY_COMPLETED = "completed";
     public static final class TaskTimelineEventTypes {
         public static final String TASK_CREATED = "TASK_CREATED";
         public static final String TASK_COMPLETED = "TASK_COMPLETED";
@@ -98,6 +99,8 @@ public final class TaskDao {
             Boolean caseNonEngagementLetterSent,
             String title,
             String description,
+            String taskStatusName,
+            String taskStatusColorHex,
             String priorityColorHex,
             String priorityName,
             Integer prioritySortOrder,
@@ -120,6 +123,8 @@ public final class TaskDao {
             String title,
             String description,
             String statusName,
+            String statusColorHex,
+            String priorityColorHex,
             LocalDateTime dueAt,
             LocalDateTime completedAt,
             Integer assignedUserId,
@@ -220,6 +225,8 @@ public final class TaskDao {
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
                   t.Title,
                   t.Description,
+                  ts.Name AS TaskStatusName,
+                  ts.ColorHex AS TaskStatusColorHex,
                   t.PriorityId,
                   p.ColorHex AS PriorityColorHex,
                   t.DueAt,
@@ -246,6 +253,9 @@ public final class TaskDao {
                 LEFT JOIN dbo.Priorities p
                   ON p.Id = t.PriorityId
                  AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
+                LEFT JOIN dbo.TaskStatuses ts
+                  ON ts.Id = t.StatusId
+                 AND (ts.ShaleClientId = t.ShaleClientId OR ts.ShaleClientId IS NULL)
                 LEFT JOIN dbo.PracticeAreas pa
                   ON pa.Id = c.PracticeAreaId
                 OUTER APPLY (
@@ -335,6 +345,8 @@ public final class TaskDao {
                             getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
                             rs.getString("Title"),
                             rs.getString("Description"),
+                            rs.getString("TaskStatusName"),
+                            rs.getString("TaskStatusColorHex"),
                             getNullableInt(rs, "PriorityId"),
                             rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
@@ -389,6 +401,8 @@ public final class TaskDao {
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
                   t.Title,
                   t.Description,
+                  ts.Name AS TaskStatusName,
+                  ts.ColorHex AS TaskStatusColorHex,
                   t.PriorityId,
                   p.ColorHex AS PriorityColorHex,
                   t.DueAt,
@@ -415,6 +429,9 @@ public final class TaskDao {
                 LEFT JOIN dbo.Priorities p
                   ON p.Id = t.PriorityId
                  AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
+                LEFT JOIN dbo.TaskStatuses ts
+                  ON ts.Id = t.StatusId
+                 AND (ts.ShaleClientId = t.ShaleClientId OR ts.ShaleClientId IS NULL)
                 LEFT JOIN dbo.PracticeAreas pa
                   ON pa.Id = c.PracticeAreaId
                 OUTER APPLY (
@@ -484,7 +501,6 @@ public final class TaskDao {
                       AND myAssignment.UserId = ?
                   )
                   AND ISNULL(t.IsDeleted, 0) = 0
-                  AND ISNULL(t.StatusId, 0) <> 3
                   %s
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
@@ -516,6 +532,8 @@ public final class TaskDao {
                             getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
                             rs.getString("Title"),
                             rs.getString("Description"),
+                            rs.getString("TaskStatusName"),
+                            rs.getString("TaskStatusColorHex"),
                             getNullableInt(rs, "PriorityId"),
                             rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")),
@@ -559,7 +577,7 @@ public final class TaskDao {
                   pa.Color AS CasePracticeAreaColor,
                   caseAttorney.DisplayName AS CaseResponsibleAttorney, caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
-                  t.Title, t.Description, t.PriorityId, p.ColorHex AS PriorityColorHex,
+                  t.Title, t.Description, ts.Name AS TaskStatusName, ts.ColorHex AS TaskStatusColorHex, t.PriorityId, p.ColorHex AS PriorityColorHex,
                   t.DueAt, t.CompletedAt,
                   assignment.UserId AS AssignedUserId, assignment.DisplayName AS AssignedUserDisplayName, assignment.Color AS AssignedUserColor,
                   t.CreatedByUserId,
@@ -569,6 +587,7 @@ public final class TaskDao {
                 INNER JOIN dbo.Cases c ON c.Id = t.CaseId AND c.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Users createdByUser ON createdByUser.Id = t.CreatedByUserId AND createdByUser.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Priorities p ON p.Id = t.PriorityId AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
+                LEFT JOIN dbo.TaskStatuses ts ON ts.Id = t.StatusId AND (ts.ShaleClientId = t.ShaleClientId OR ts.ShaleClientId IS NULL)
                 LEFT JOIN dbo.PracticeAreas pa ON pa.Id = c.PracticeAreaId
                 OUTER APPLY (
                   SELECT TOP (1) s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
@@ -594,7 +613,6 @@ public final class TaskDao {
                 WHERE t.ShaleClientId = ?
                   AND t.CreatedByUserId = ?
                   AND ISNULL(t.IsDeleted, 0) = 0
-                  AND ISNULL(t.StatusId, 0) <> 3
                   %s
                 ORDER BY
                   CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END ASC,
@@ -616,6 +634,8 @@ public final class TaskDao {
                             rs.getString("CasePrimaryStatusName"), rs.getString("CasePrimaryStatusColor"), rs.getString("CasePracticeAreaColor"),
                             rs.getString("CaseResponsibleAttorney"), rs.getString("CaseResponsibleAttorneyColor"),
                             getNullableBoolean(rs, "CaseNonEngagementLetterSent"), rs.getString("Title"), rs.getString("Description"),
+                            rs.getString("TaskStatusName"),
+                            rs.getString("TaskStatusColorHex"),
                             getNullableInt(rs, "PriorityId"), rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")), toLocalDateTime(rs.getTimestamp("CompletedAt")),
                             getNullableInt(rs, "AssignedUserId"), rs.getString("AssignedUserDisplayName"), rs.getString("AssignedUserColor"),
@@ -648,6 +668,8 @@ public final class TaskDao {
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
                   t.Title,
                   t.Description,
+                  ts.Name AS TaskStatusName,
+                  ts.ColorHex AS TaskStatusColorHex,
                   p.ColorHex AS PriorityColorHex,
                   p.Name AS PriorityName,
                   p.SortOrder AS PrioritySortOrder,
@@ -665,6 +687,9 @@ public final class TaskDao {
                 LEFT JOIN dbo.Priorities p
                   ON p.Id = t.PriorityId
                  AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
+                LEFT JOIN dbo.TaskStatuses ts
+                  ON ts.Id = t.StatusId
+                 AND (ts.ShaleClientId = t.ShaleClientId OR ts.ShaleClientId IS NULL)
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -741,6 +766,8 @@ public final class TaskDao {
                             getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
                             rs.getString("Title"),
                             rs.getString("Description"),
+                            rs.getString("TaskStatusName"),
+                            rs.getString("TaskStatusColorHex"),
                             rs.getString("PriorityColorHex"),
                             rs.getString("PriorityName"),
                             (Integer) rs.getObject("PrioritySortOrder"),
@@ -774,11 +801,12 @@ public final class TaskDao {
         String sql = """
                 SELECT TOP (100)
                   t.Id, t.ShaleClientId, t.CaseId, c.Name AS CaseName,
-                  t.Title, t.Description, ts.Name AS StatusName, t.DueAt, t.CompletedAt,
+                  t.Title, t.Description, ts.Name AS StatusName, ts.ColorHex AS StatusColorHex, p.ColorHex AS PriorityColorHex, t.DueAt, t.CompletedAt,
                   assignment.UserId AS AssignedUserId, assignment.DisplayName AS AssignedUserDisplayName
                 FROM dbo.Tasks t
                 INNER JOIN dbo.Cases c ON c.Id = t.CaseId AND c.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.TaskStatuses ts ON ts.Id = t.StatusId AND (ts.ShaleClientId = t.ShaleClientId OR ts.ShaleClientId IS NULL)
+                LEFT JOIN dbo.Priorities p ON p.Id = t.PriorityId AND (p.ShaleClientId = t.ShaleClientId OR p.ShaleClientId IS NULL)
                 OUTER APPLY (
                   SELECT TOP (1) ta.UserId,
                     LTRIM(RTRIM(COALESCE(u.name_first, '') + CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(u.name_last, ''))) AS DisplayName
@@ -802,6 +830,7 @@ public final class TaskDao {
                     out.add(new GlobalSearchTaskRow(
                             rs.getLong("Id"), rs.getInt("ShaleClientId"), rs.getLong("CaseId"), rs.getString("CaseName"),
                             rs.getString("Title"), rs.getString("Description"), rs.getString("StatusName"),
+                            rs.getString("StatusColorHex"), rs.getString("PriorityColorHex"),
                             toLocalDateTime(rs.getTimestamp("DueAt")), toLocalDateTime(rs.getTimestamp("CompletedAt")),
                             getNullableInt(rs, "AssignedUserId"), rs.getString("AssignedUserDisplayName")));
                 }
@@ -829,6 +858,9 @@ public final class TaskDao {
                   caseAttorney.DisplayName AS CaseResponsibleAttorney,
                   caseAttorney.Color AS CaseResponsibleAttorneyColor,
                   c.NonEngagementLetterSent AS CaseNonEngagementLetterSent,
+                  current_status.CurrentStatusName AS CasePrimaryStatusName,
+                  current_status.PrimaryStatusColor AS CasePrimaryStatusColor,
+                  pa.Color AS CasePracticeAreaColor,
                   t.Title,
                   t.Description,
                   t.DueAt,
@@ -850,6 +882,15 @@ public final class TaskDao {
                 LEFT JOIN dbo.Users createdByUser
                   ON createdByUser.Id = t.CreatedByUserId
                  AND createdByUser.ShaleClientId = t.ShaleClientId
+                LEFT JOIN dbo.PracticeAreas pa
+                  ON pa.Id = c.PracticeAreaId
+                OUTER APPLY (
+                  SELECT TOP (1) s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
+                  FROM dbo.CaseStatuses cs
+                  INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+                  WHERE cs.CaseId = c.Id AND cs.IsPrimary = 1
+                  ORDER BY cs.UpdatedAt DESC, cs.CreatedAt DESC, cs.Id DESC
+                ) current_status
                 OUTER APPLY (
                   SELECT TOP (1)
                     LTRIM(RTRIM(
@@ -899,28 +940,36 @@ public final class TaskDao {
                 if (!rs.next()) {
                     return null;
                 }
-                return new TaskDetailDto(
-                        rs.getLong("Id"),
-                        rs.getInt("ShaleClientId"),
-                        rs.getLong("CaseId"),
-                        rs.getString("CaseName"),
-                        rs.getString("CaseResponsibleAttorney"),
-                        rs.getString("CaseResponsibleAttorneyColor"),
-                        getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
-                        rs.getString("Title"),
-                        rs.getString("Description"),
-                        toLocalDateTime(rs.getTimestamp("DueAt")),
-                        getNullableInt(rs, "StatusId"),
-                        getNullableInt(rs, "PriorityId"),
-                        toLocalDateTime(rs.getTimestamp("CompletedAt")),
-                        getNullableInt(rs, "AssignedUserId"),
-                        rs.getString("AssignedUserDisplayName"),
-                        rs.getString("AssignedUserColor"),
-                        rs.getString("CreatedByDisplayName"));
+                return mapTaskDetail(rs);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load task detail for taskId=" + taskId, e);
         }
+    }
+
+
+    static TaskDetailDto mapTaskDetail(ResultSet rs) throws SQLException {
+        return new TaskDetailDto(
+                rs.getLong("Id"),
+                rs.getInt("ShaleClientId"),
+                rs.getLong("CaseId"),
+                rs.getString("CaseName"),
+                rs.getString("CaseResponsibleAttorney"),
+                rs.getString("CaseResponsibleAttorneyColor"),
+                getNullableBoolean(rs, "CaseNonEngagementLetterSent"),
+                rs.getString("CasePrimaryStatusName"),
+                rs.getString("CasePrimaryStatusColor"),
+                rs.getString("CasePracticeAreaColor"),
+                rs.getString("Title"),
+                rs.getString("Description"),
+                toLocalDateTime(rs.getTimestamp("DueAt")),
+                getNullableInt(rs, "StatusId"),
+                getNullableInt(rs, "PriorityId"),
+                toLocalDateTime(rs.getTimestamp("CompletedAt")),
+                getNullableInt(rs, "AssignedUserId"),
+                rs.getString("AssignedUserDisplayName"),
+                rs.getString("AssignedUserColor"),
+                rs.getString("CreatedByDisplayName"));
     }
 
     public List<TaskAssignedUserRow> listAssignedUsersForTask(long taskId, int shaleClientId) {
@@ -1606,6 +1655,9 @@ public final class TaskDao {
              PreparedStatement ps = con.prepareStatement(sql)) {
             TaskDetailDto before = findTaskDetail(taskId, shaleClientId);
             int resolvedStatusId = resolveStatusIdForUpdate(con, shaleClientId, statusId);
+            if (completed) {
+                resolvedStatusId = resolveCompletedTaskStatusId(con, shaleClientId, resolvedStatusId);
+            }
             int resolvedPriorityId = resolvePriorityIdForCreate(con, shaleClientId, priorityId);
             int i = 1;
             ps.setString(i++, normalizedTitle);
@@ -2233,6 +2285,7 @@ public final class TaskDao {
         String sql = """
                 UPDATE dbo.Tasks
                 SET CompletedAt = %s,
+                    StatusId = ?,
                     UpdatedAt = SYSDATETIME()
                 WHERE Id = ?
                   AND ShaleClientId = ?
@@ -2242,8 +2295,12 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setLong(1, taskId);
-            ps.setInt(2, shaleClientId);
+            int synchronizedStatusId = completed
+                    ? resolveCompletedTaskStatusId(con, shaleClientId, null)
+                    : resolveDefaultTaskStatusId(con, shaleClientId);
+            ps.setInt(1, synchronizedStatusId);
+            ps.setLong(2, taskId);
+            ps.setInt(3, shaleClientId);
             if (ps.executeUpdate() > 0) {
                 touchTaskCaseUpdatedAt(con, taskId, shaleClientId);
             }
@@ -2614,6 +2671,22 @@ public final class TaskDao {
             return effective.get(0).id();
         }
         throw new IllegalStateException("No default open task status found for shaleClientId=" + shaleClientId);
+    }
+
+    private static int resolveCompletedTaskStatusId(Connection con, int shaleClientId, Integer fallbackStatusId) throws SQLException {
+        List<TaskStatusLookupRow> effective = listEffectiveTaskStatusesForTenant(con, shaleClientId, true);
+        for (TaskStatusLookupRow row : effective) {
+            if (row == null) {
+                continue;
+            }
+            if (TASK_STATUS_SYSTEM_KEY_COMPLETED.equals(normalizeSystemKey(row.systemKey()))) {
+                return row.id();
+            }
+        }
+        if (fallbackStatusId != null && fallbackStatusId > 0) {
+            return fallbackStatusId;
+        }
+        return resolveDefaultTaskStatusId(con, shaleClientId);
     }
 
     private static int resolveStatusIdForUpdate(Connection con, int shaleClientId, Integer requestedStatusId) throws SQLException {

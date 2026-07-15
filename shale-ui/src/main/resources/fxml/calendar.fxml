@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
@@ -11,37 +12,68 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx"
+<HBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
       fx:controller="com.shale.ui.controller.CalendarController"
       spacing="12"
-      styleClass="content-root shell-transparent">
+      styleClass="content-root shell-transparent calendar-page-root">
     <children>
-        <HBox spacing="8" alignment="CENTER_LEFT" styleClass="shale-filter-panel">
+        <VBox fx:id="calendarOverlaySidebar" spacing="10" styleClass="calendar-overlay-sidebar">
             <children>
-                <Button fx:id="todayButton" text="Today" onAction="#onToday" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-                <Button fx:id="prevWeekButton" text="◀" onAction="#onPreviousWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-                <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-                <Label fx:id="weekRangeLabel" styleClass="search-section-title shale-toolbar-heading" />
-                <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
-                <ChoiceBox fx:id="viewModeChoice" styleClass="shale-filter-combo" />
-                <TextField fx:id="searchTextField" promptText="Search" prefWidth="180" styleClass="shale-search-field" />
-                <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="170" styleClass="shale-filter-combo" />
-                <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="150" styleClass="shale-filter-combo" />
-                <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-            </children>
-        </HBox>
-
-        <Label fx:id="calendarLoadingLabel" text="Loading week..." styleClass="shale-loading-placeholder" visible="false" managed="false" />
-        <Label fx:id="calendarErrorLabel" styleClass="error" visible="false" managed="false" />
-
-        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="shell-transparent">
-            <content>
-                <HBox fx:id="weekBoard" spacing="6" styleClass="calendar-week-board">
-                    <padding><Insets top="2" right="1" bottom="6" left="1" /></padding>
+                <Label text="Calendars" styleClass="shale-toolbar-heading" />
+                <HBox spacing="8" alignment="CENTER_LEFT" styleClass="calendar-overlay-actions">
+                    <children>
+                        <Button fx:id="selectAllCalendarsButton" text="Select All" onAction="#onSelectAllCalendars" styleClass="calendar-sidebar-link-button" />
+                        <Button fx:id="clearAllCalendarsButton" text="Clear All" onAction="#onClearAllCalendars" styleClass="calendar-sidebar-link-button" />
+                        <Button fx:id="resetCalendarsButton" text="Reset" onAction="#onResetCalendars" styleClass="calendar-sidebar-link-button" />
+                    </children>
                 </HBox>
-            </content>
-        </ScrollPane>
+                <ScrollPane fx:id="calendarRowsScrollPane" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="calendar-overlay-list-scroll">
+                    <content>
+                        <VBox fx:id="calendarRowsBox" spacing="4" styleClass="calendar-overlay-list" />
+                    </content>
+                </ScrollPane>
+                <VBox spacing="6" styleClass="calendar-sidebar-layers-section">
+                    <children>
+                        <Label text="Layers" styleClass="calendar-sidebar-section-heading" />
+                        <CheckBox fx:id="eventsLayerCheckBox" text="Events" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
+                        <CheckBox fx:id="tasksLayerCheckBox" text="Tasks" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
+                        <CheckBox fx:id="deadlinesLayerCheckBox" text="Deadlines" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
+                        <CheckBox fx:id="caseDatesLayerCheckBox" text="Case Dates" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
+                    </children>
+                </VBox>
+            </children>
+        </VBox>
+
+        <VBox spacing="12" HBox.hgrow="ALWAYS" styleClass="calendar-main-content">
+            <children>
+                <HBox spacing="8" alignment="CENTER_LEFT" styleClass="shale-filter-panel">
+                    <children>
+                        <Button fx:id="todayButton" text="Today" onAction="#onToday" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                        <Button fx:id="prevWeekButton" text="◀" onAction="#onPreviousWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                        <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                        <Label fx:id="weekRangeLabel" styleClass="search-section-title shale-toolbar-heading" />
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
+                        <ChoiceBox fx:id="viewModeChoice" styleClass="shale-filter-combo" />
+                        <TextField fx:id="searchTextField" promptText="Search" prefWidth="180" styleClass="shale-search-field" />
+                        <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="170" styleClass="shale-filter-combo" />
+                        <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="150" styleClass="shale-filter-combo" />
+                        <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                    </children>
+                </HBox>
+
+                <Label fx:id="calendarLoadingLabel" text="Loading week..." styleClass="shale-loading-placeholder" visible="false" managed="false" />
+                <Label fx:id="calendarErrorLabel" styleClass="error" visible="false" managed="false" />
+
+                <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="shell-transparent">
+                    <content>
+                        <HBox fx:id="weekBoard" spacing="6" styleClass="calendar-week-board">
+                            <padding><Insets top="2" right="1" bottom="6" left="1" /></padding>
+                        </HBox>
+                    </content>
+                </ScrollPane>
+            </children>
+        </VBox>
     </children>
-</VBox>
+</HBox>
