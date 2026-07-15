@@ -8,12 +8,19 @@ import com.shale.data.dao.UserDao.UserRoleRow;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
+import com.shale.core.model.CalendarEvent;
+import com.shale.core.model.CalendarFeedCategory;
+import com.shale.core.model.CalendarFeedItem;
+import com.shale.core.model.CalendarFeedSourceFilter;
+import com.shale.ui.component.ScheduleAgendaPane;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.TaskDetailDialog;
+import com.shale.ui.component.dialog.NewCalendarEventDialog;
 import com.shale.ui.component.factory.TaskCardFactory;
+import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
@@ -33,6 +40,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -48,7 +56,10 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Window;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -98,6 +109,17 @@ public final class UserController {
 	@FXML private ScrollPane userDetailsScroll;
 	@FXML private VBox tasksSection;
 	@FXML private VBox casesSection;
+	@FXML private VBox calendarSection;
+	@FXML private Label userCalendarTitleLabel;
+	@FXML private Button userCalendarNewEventButton;
+	@FXML private Button userCalendarRefreshButton;
+	@FXML private CheckBox userCalendarEventsLayerCheckBox;
+	@FXML private CheckBox userCalendarTasksLayerCheckBox;
+	@FXML private CheckBox userCalendarDeadlinesLayerCheckBox;
+	@FXML private CheckBox userCalendarCaseDatesLayerCheckBox;
+	@FXML private ScrollPane userCalendarScroll;
+	@FXML private VBox userCalendarAgendaBox;
+	@FXML private Label userCalendarStatusLabel;
 
 	@FXML private Label displayNameValue;
 	@FXML private Label firstNameValue;
@@ -131,6 +153,7 @@ public final class UserController {
 	private Consumer<Integer> onOpenUser;
 	private CaseTaskService caseTaskService;
 	private PhiReadAuditService phiReadAuditService;
+	private CalendarService calendarService;
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
@@ -151,6 +174,10 @@ public final class UserController {
 	private PauseTransition assignedCasesFilterDebounce;
 	private PauseTransition assignedTasksFilterDebounce;
 	private boolean editMode;
+	private List<CalendarFeedItem> userCalendarItems = List.of();
+	private CalendarFeedSourceFilter userCalendarSourceFilter = CalendarFeedSourceFilter.caseCalendarDefaults();
+	private long userCalendarRefreshSequence;
+	private ScheduleAgendaPane userScheduleAgendaPane;
 	private boolean colorEditedInSession;
 	private long pageLoadStartNanos;
 	private UserDetailCache userDetailCache;
@@ -163,6 +190,9 @@ public final class UserController {
 	private static final double WIDE_DETAILS_WIDTH = 530;
 	private static final double WIDE_TASKS_WIDTH = 380;
 	private static final double WIDE_CASES_WIDTH = 460;
+	private static final double WIDE_CALENDAR_WIDTH = 520;
+	private static final int USER_CALENDAR_PAST_MONTHS = 12;
+	private static final int USER_CALENDAR_UPCOMING_MONTHS = 24;
 	private static final double MEDIUM_LIST_HEIGHT = 420;
 	private static final double NARROW_LIST_HEIGHT = 360;
 	private static final double SECTION_HEIGHT_PADDING = 36;
@@ -180,7 +210,8 @@ public final class UserController {
 			Consumer<Integer> onOpenCase,
 			Consumer<Integer> onOpenUser,
 			CaseTaskService caseTaskService,
-			PhiReadAuditService phiReadAuditService) {
+			PhiReadAuditService phiReadAuditService,
+			CalendarService calendarService) {
 		this.userId = userId;
 		this.userDetailService = userDetailService;
 		this.appState = appState;
@@ -190,6 +221,7 @@ public final class UserController {
 		} : onOpenUser;
 		this.caseTaskService = caseTaskService;
 		this.phiReadAuditService = phiReadAuditService;
+		this.calendarService = calendarService;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
 		this.taskCardFactory = new TaskCardFactory(
 				this::openTask,
@@ -220,6 +252,7 @@ public final class UserController {
 		}
 		initializeAssignedCaseControls();
 		initializeAssignedTaskControls();
+		initializeUserCalendarControls();
 		configureColorEditor();
 		configureResponsiveSectionSizing();
 
@@ -281,7 +314,7 @@ public final class UserController {
 	}
 
 	private void configureResponsiveSectionSizing() {
-		if (pageScroll == null || sectionsFlow == null || userDetailsSection == null || tasksSection == null || casesSection == null) {
+		if (pageScroll == null || sectionsFlow == null || userDetailsSection == null || tasksSection == null || casesSection == null || calendarSection == null) {
 			return;
 		}
 		pageScroll.setFitToWidth(true);
@@ -329,6 +362,7 @@ public final class UserController {
 		applySectionSize(userDetailsSection, WIDE_DETAILS_WIDTH, targetHeight);
 		applySectionSize(tasksSection, WIDE_TASKS_WIDTH, targetHeight);
 		applySectionSize(casesSection, WIDE_CASES_WIDTH, targetHeight);
+		applySectionSize(calendarSection, WIDE_CALENDAR_WIDTH, targetHeight);
 	}
 
 	private void applyMediumLayout(double contentWidth) {
@@ -336,6 +370,7 @@ public final class UserController {
 		applySectionSize(userDetailsSection, halfWidth, Region.USE_COMPUTED_SIZE);
 		applySectionSize(tasksSection, halfWidth, MEDIUM_LIST_HEIGHT);
 		applySectionSize(casesSection, contentWidth, MEDIUM_LIST_HEIGHT);
+		applySectionSize(calendarSection, contentWidth, MEDIUM_LIST_HEIGHT);
 	}
 
 	private void applyNarrowLayout(double contentWidth) {
@@ -343,6 +378,7 @@ public final class UserController {
 		applySectionSize(userDetailsSection, sectionWidth, Region.USE_COMPUTED_SIZE);
 		applySectionSize(tasksSection, sectionWidth, NARROW_LIST_HEIGHT);
 		applySectionSize(casesSection, sectionWidth, NARROW_LIST_HEIGHT);
+		applySectionSize(calendarSection, sectionWidth, NARROW_LIST_HEIGHT);
 	}
 
 	private void applySectionSize(Region section, double width, double prefHeight) {
@@ -444,6 +480,7 @@ public final class UserController {
 					refreshRolesAsync();
 					refreshAssignedCasesAsync();
 					refreshAssignedTasksAsync();
+					resetAndLoadUserCalendar();
 					PerfLog.logDone("NAV", "ready page=user_view userId=" + userId, pageLoadStartNanos);
 				});
 			} catch (Exception ex) {
@@ -625,6 +662,153 @@ public final class UserController {
 					renderAssignedTasks();
 					setError("Failed to load assigned tasks for this user.");
 				});
+			}
+		});
+	}
+
+
+	private void initializeUserCalendarControls() {
+		setUserCalendarLayerDefaults();
+		if (userCalendarAgendaBox != null) {
+			userScheduleAgendaPane = new ScheduleAgendaPane(userCalendarAgendaBox, userCalendarStatusLabel,
+					new ScheduleAgendaPane.ClickHandlers(this::openUserCalendarEventEditor, this::openTaskFromCalendar, this::openCaseFromCalendar));
+		}
+		List<CheckBox> boxes = List.of(userCalendarEventsLayerCheckBox, userCalendarTasksLayerCheckBox,
+				userCalendarDeadlinesLayerCheckBox, userCalendarCaseDatesLayerCheckBox).stream().filter(Objects::nonNull).toList();
+		for (CheckBox box : boxes) {
+			box.selectedProperty().addListener((obs, oldValue, newValue) -> {
+				updateUserCalendarSourceFilterFromControls();
+				renderUserCalendar(false);
+			});
+		}
+		if (userCalendarRefreshButton != null) userCalendarRefreshButton.setOnAction(e -> loadUserCalendarAsync(true));
+		if (userCalendarNewEventButton != null) userCalendarNewEventButton.setOnAction(e -> onUserCalendarNewEvent());
+	}
+
+	private void setUserCalendarLayerDefaults() {
+		if (userCalendarEventsLayerCheckBox != null) userCalendarEventsLayerCheckBox.setSelected(true);
+		if (userCalendarTasksLayerCheckBox != null) userCalendarTasksLayerCheckBox.setSelected(true);
+		if (userCalendarDeadlinesLayerCheckBox != null) userCalendarDeadlinesLayerCheckBox.setSelected(true);
+		if (userCalendarCaseDatesLayerCheckBox != null) userCalendarCaseDatesLayerCheckBox.setSelected(true);
+		userCalendarSourceFilter = CalendarFeedSourceFilter.caseCalendarDefaults();
+	}
+
+	private void updateUserCalendarSourceFilterFromControls() {
+		EnumSet<CalendarFeedCategory> enabled = EnumSet.noneOf(CalendarFeedCategory.class);
+		if (userCalendarEventsLayerCheckBox == null || userCalendarEventsLayerCheckBox.isSelected()) enabled.add(CalendarFeedCategory.CALENDAR_EVENTS);
+		if (userCalendarTasksLayerCheckBox == null || userCalendarTasksLayerCheckBox.isSelected()) enabled.add(CalendarFeedCategory.TASKS);
+		if (userCalendarDeadlinesLayerCheckBox == null || userCalendarDeadlinesLayerCheckBox.isSelected()) enabled.add(CalendarFeedCategory.CASE_DEADLINES);
+		if (userCalendarCaseDatesLayerCheckBox == null || userCalendarCaseDatesLayerCheckBox.isSelected()) enabled.add(CalendarFeedCategory.OTHER_CASE_DATES);
+		userCalendarSourceFilter = new CalendarFeedSourceFilter(enabled);
+	}
+
+	private void resetAndLoadUserCalendar() {
+		userCalendarItems = List.of();
+		setUserCalendarLayerDefaults();
+		if (userCalendarScroll != null) userCalendarScroll.setVvalue(0.0);
+		loadUserCalendarAsync(true);
+	}
+
+	private void loadUserCalendarAsync(boolean resetScroll) {
+		if (calendarService == null || appState == null || currentUser == null) {
+			showUserCalendarMessage("Calendar is unavailable.");
+			return;
+		}
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0 || tenantId != currentUser.shaleClientId()) {
+			showUserCalendarMessage("Calendar is unavailable because no tenant is selected.");
+			return;
+		}
+		final int targetUserId = currentUser.id();
+		final int targetTenantId = tenantId;
+		final long requestId = ++userCalendarRefreshSequence;
+		LocalDate today = LocalDate.now();
+		LocalDateTime start = today.minusMonths(USER_CALENDAR_PAST_MONTHS).atStartOfDay();
+		LocalDateTime end = today.plusMonths(USER_CALENDAR_UPCOMING_MONTHS).plusDays(1).atStartOfDay();
+		showUserCalendarMessage("Loading calendar…");
+		dbExec.submit(() -> {
+			try {
+				List<CalendarFeedItem> loaded = calendarService.listCalendarFeedForUserSchedule(targetTenantId, start, end, targetUserId);
+				Platform.runLater(() -> {
+					if (requestId != userCalendarRefreshSequence || currentUser == null || currentUser.id() != targetUserId) return;
+					userCalendarItems = loaded == null ? List.of() : List.copyOf(loaded);
+					renderUserCalendar(resetScroll);
+				});
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> { if (requestId == userCalendarRefreshSequence) showUserCalendarMessage("Failed to load user schedule."); });
+			}
+		});
+	}
+
+	private void renderUserCalendar(boolean resetScroll) {
+		if (userCalendarTitleLabel != null) userCalendarTitleLabel.setText((currentUser == null ? "User" : safeText(currentUser.displayName())) + "'s Schedule");
+		if (userScheduleAgendaPane == null) return;
+		userScheduleAgendaPane.render(userCalendarItems, userCalendarSourceFilter,
+				"No user schedule layers selected.",
+				"No shared or user calendar items in this range.",
+				"No upcoming schedule items.");
+		if (resetScroll && userCalendarScroll != null) userCalendarScroll.setVvalue(0.0);
+	}
+
+	private void showUserCalendarMessage(String message) {
+		if (userScheduleAgendaPane != null) userScheduleAgendaPane.showMessage(message);
+	}
+
+	private void openTaskFromCalendar(Long taskId) {
+		openTask(taskId);
+		loadUserCalendarAsync(false);
+	}
+
+	private void openCaseFromCalendar(Integer caseId) {
+		if (caseId != null && caseId > 0 && onOpenCase != null) onOpenCase.accept(caseId);
+	}
+
+	private void onUserCalendarNewEvent() {
+		if (calendarService == null || appState == null || currentUser == null) return;
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) return;
+		final int viewedUserId = currentUser.id();
+		final String viewedName = safeText(currentUser.displayName());
+		final String viewedColor = currentUser.color();
+		dbExec.submit(() -> {
+			try {
+				var eventTypes = calendarService.listEffectiveEventTypes(tenantId);
+				Platform.runLater(() -> NewCalendarEventDialog.showAndWait(taskDialogOwner(), eventTypes, LocalDate.now(), List.of(),
+						List.of(new NewCalendarEventDialog.AssignedUserOption(viewedUserId, viewedName, viewedColor))).ifPresent(value -> {
+					LocalDateTime startsAt = value.allDay() ? value.date().atStartOfDay() : value.date().atTime(value.startTime());
+					LocalDateTime endsAt = value.allDay() ? null : startsAt.plusMinutes(value.durationMinutes());
+					CalendarEvent event = new CalendarEvent(null, tenantId, value.calendarEventTypeId(), value.caseId(), null, value.title(), value.description(), startsAt, endsAt, value.allDay(), "MANUAL", null, null, value.assignedToUserId(), false, false, appState.getUserId(), null, null);
+					dbExec.submit(() -> { calendarService.createEvent(event); Platform.runLater(() -> loadUserCalendarAsync(false)); });
+				}));
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> showUserCalendarMessage("Unable to open the event dialog."));
+			}
+		});
+	}
+
+	private void openUserCalendarEventEditor(int eventId) {
+		if (calendarService == null || appState == null) return;
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) return;
+		dbExec.submit(() -> {
+			try {
+				CalendarEvent event = calendarService.getEventById(eventId, tenantId);
+				if (event == null) return;
+				var types = calendarService.listEffectiveEventTypes(tenantId);
+				var initial = new NewCalendarEventDialog.CreateCalendarEventInput(event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(), event.allDay() ? null : event.startsAt().toLocalTime(), 60, event.description(), event.caseId(), event.assignedToUserId());
+				Platform.runLater(() -> NewCalendarEventDialog.showEditDialog(taskDialogOwner(), types, initial, input -> {
+					LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
+					LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
+					calendarService.updateEvent(new CalendarEvent(event.calendarEventId(), event.shaleClientId(), input.calendarEventTypeId(), input.caseId(), event.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), event.sourceType(), event.sourceField(), event.sourceId(), input.assignedToUserId(), event.completed(), event.cancelled(), appState.getUserId(), event.createdAt(), event.updatedAt()));
+					loadUserCalendarAsync(false);
+					return null;
+				}, () -> {
+					calendarService.deleteCalendarEvent(event.calendarEventId(), tenantId);
+					loadUserCalendarAsync(false);
+					return null;
+				}, null, null, List.of(), List.of(new NewCalendarEventDialog.AssignedUserOption(event.assignedToUserId(), event.assignedToUserId() == null ? "Shared" : safeText(event.title()), null))));
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> showUserCalendarMessage("Unable to open this event."));
 			}
 		});
 	}
