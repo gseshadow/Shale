@@ -5,6 +5,7 @@ import com.shale.ui.util.ColorUtil;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -25,11 +26,14 @@ public final class CalendarEventCardFactory {
         HBox card = new HBox(0);
         card.getStyleClass().add("calendar-event-card");
         card.setFillHeight(true);
-        applyAssignedUserTint(card, item);
+        applyOwnershipStyle(card, item);
+        applyCalendarItemTooltip(card, item);
         Region accentBar = buildAccentBar(item.colorHex());
         if (accentBar != null) {
             card.getChildren().add(accentBar);
         }
+        Node ownershipMarker = buildOwnershipMarker(item);
+        if (ownershipMarker != null) card.getChildren().add(ownershipMarker);
 
         VBox content = new VBox(3);
         content.setFillWidth(true);
@@ -89,8 +93,12 @@ public final class CalendarEventCardFactory {
     public Node createAllDayBubble(CalendarFeedItem item) {
         HBox card = new HBox(6);
         card.getStyleClass().addAll("calendar-event-card", "calendar-all-day-bubble");
+        applyOwnershipStyle(card, item);
+        applyCalendarItemTooltip(card, item);
         Region accentBar = buildAccentBar(item.colorHex());
         if (accentBar != null) card.getChildren().add(accentBar);
+        Node ownershipMarker = buildOwnershipMarker(item);
+        if (ownershipMarker != null) card.getChildren().add(ownershipMarker);
         Label title = new Label(safe(item.title()));
         title.getStyleClass().add("calendar-all-day-title");
         title.setTextOverrun(OverrunStyle.ELLIPSIS);
@@ -113,6 +121,16 @@ public final class CalendarEventCardFactory {
         return card;
     }
 
+    private static Node buildOwnershipMarker(CalendarFeedItem item) {
+        if (item == null) return null;
+        if (!"MANUAL".equals(normalize(item.sourceType())) && !"CALENDAR_EVENT".equals(normalize(item.sourceType()))) return null;
+        Label marker = new Label(item.assignedToUserId() == null ? "◈" : "●");
+        marker.getStyleClass().add(item.assignedToUserId() == null ? "calendar-event-shared-marker" : "calendar-event-owner-marker");
+        String userColorCss = ColorUtil.toCssBackgroundColorOrNull(item.assignedUserColor());
+        if (item.assignedToUserId() != null && userColorCss != null) marker.setStyle("-fx-text-fill: " + userColorCss + ";");
+        return marker;
+    }
+
     private static Region buildAccentBar(String colorHex) {
         String normalized = ColorUtil.normalizeStoredColor(colorHex);
         if (normalized == null) {
@@ -127,18 +145,31 @@ public final class CalendarEventCardFactory {
         return accentBar;
     }
 
-    private static void applyAssignedUserTint(HBox card, CalendarFeedItem item) {
+    private static void applyOwnershipStyle(HBox card, CalendarFeedItem item) {
         if (card == null || item == null) return;
         if (!"MANUAL".equals(normalize(item.sourceType())) && !"CALENDAR_EVENT".equals(normalize(item.sourceType()))) return;
+        if (item.assignedToUserId() == null) {
+            card.getStyleClass().add("calendar-event-card-shared");
+            return;
+        }
+        card.getStyleClass().add("calendar-event-card-user-owned");
         String normalized = ColorUtil.normalizeStoredColor(item.assignedUserColor());
         if (normalized == null) return;
         String rgb = normalized.substring(0, 6);
         card.setStyle("-fx-background-color: #ffffff, rgba(" +
                 Integer.parseInt(rgb.substring(0, 2), 16) + "," +
                 Integer.parseInt(rgb.substring(2, 4), 16) + "," +
-                Integer.parseInt(rgb.substring(4, 6), 16) + ",0.12);" +
+                Integer.parseInt(rgb.substring(4, 6), 16) + ",0.10);" +
                 " -fx-background-insets: 0, 0;" +
                 " -fx-background-radius: 8, 8;");
+    }
+
+    private static void applyCalendarItemTooltip(Node card, CalendarFeedItem item) {
+        if (card == null || item == null) return;
+        String ownership = item.assignedToUserId() == null ? "Shared calendar" : "User calendar" + (safe(item.assignedUserDisplayName()).isBlank() ? "" : ": " + item.assignedUserDisplayName());
+        String time = resolveTime(item);
+        String type = resolveCategory(item);
+        Tooltip.install(card, new Tooltip(safe(item.title()) + "\n" + time + " · " + type + "\n" + ownership));
     }
 
     private static String resolveType(CalendarFeedItem item) {
