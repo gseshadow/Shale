@@ -876,6 +876,36 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public List<com.shale.core.dto.LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive) {
+            throw new AssertionError("listLinkTypes should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId) {
+            throw new AssertionError("listLinkTypesForAdministration should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.LinkTypeDto createLinkType(LinkTypeCommand command) {
+            throw new AssertionError("createLinkType should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.LinkTypeDto updateLinkType(LinkTypeCommand command) {
+            throw new AssertionError("updateLinkType should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.LinkTypeDto setLinkTypeActive(SetLinkTypeActiveCommand command) {
+            throw new AssertionError("setLinkTypeActive should not be called");
+        }
+
+        @Override
+        public void resetLinkTypeOverride(ResetLinkTypeOverrideCommand command) {
+            throw new AssertionError("resetLinkTypeOverride should not be called");
+        }
+
+        @Override
         public com.shale.core.dto.PracticeAreaDto createPracticeArea(PracticeAreaCommand command) {
             throw new AssertionError("createPracticeArea should not be called");
         }
@@ -898,6 +928,41 @@ class ApiReadControllerTest {
         @Override
         public com.shale.core.dto.CaseStatusDto updateCaseStatus(CaseStatusCommand command) {
             throw new AssertionError("updateCaseStatus should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseLinkDto> listCaseLinks(long caseId, int shaleClientId) {
+            throw new AssertionError("listCaseLinks should not be called");
+        }
+
+        @Override
+        public Optional<com.shale.core.dto.CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId) {
+            throw new AssertionError("getPrimaryCaseLink should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseLinkDto createCaseLink(CreateCaseLinkCommand command) {
+            throw new AssertionError("createCaseLink should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseLinkDto updateCaseLink(UpdateCaseLinkCommand command) {
+            throw new AssertionError("updateCaseLink should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseLinkDto setPrimaryCaseLink(SetPrimaryCaseLinkCommand command) {
+            throw new AssertionError("setPrimaryCaseLink should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseLinkDto> reorderCaseLinks(ReorderCaseLinksCommand command) {
+            throw new AssertionError("reorderCaseLinks should not be called");
+        }
+
+        @Override
+        public void deleteCaseLink(DeleteCaseLinkCommand command) {
+            throw new AssertionError("deleteCaseLink should not be called");
         }
 
         @Override

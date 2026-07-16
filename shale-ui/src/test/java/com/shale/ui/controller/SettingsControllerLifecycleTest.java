@@ -32,6 +32,8 @@ final class SettingsControllerLifecycleTest {
                 "SettingsController.initialize() should asynchronously populate Settings > Case Statuses for admins when service injection already happened.");
         assertTrue(loadAdminSections.contains("loadPracticeAreasAsync(null);"),
                 "SettingsController.initialize() should asynchronously populate Settings > Practice Areas for admins when service injection already happened.");
+        assertTrue(loadAdminSections.contains("loadLinkTypesAsync(null);"),
+                "SettingsController.initialize() should asynchronously populate Settings > Link Types for admins when service injection already happened.");
         assertTrue(loadAdminSections.contains("loadManagedUsersAsync(null);"),
                 "SettingsController.initialize() should asynchronously populate Settings > User Management for admins when service injection already happened.");
     }
@@ -39,7 +41,7 @@ final class SettingsControllerLifecycleTest {
     void settingsSectionHydrationUsesBackgroundExecutorAndStaleResultGuards() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
 
-        assertTrue(source.contains("Executors.newFixedThreadPool(3"),
+        assertTrue(source.contains("Executors.newFixedThreadPool(4"),
                 "Independent Settings sections should hydrate on a background executor instead of the JavaFX application thread.");
         assertTrue(source.contains("settingsLoadExecutor.submit"),
                 "Settings service/DAO calls should be submitted to the background executor.");

@@ -7413,6 +7413,24 @@ public final class CaseDao {
 		}
 	}
 
+	public List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId) {
+		String sql = """
+				SELECT Id, ShaleClientId, Name, Color, IsActive, IsDeleted, SystemKey, RowVer
+				FROM dbo.LinkTypes
+				WHERE ShaleClientId IS NULL OR ShaleClientId = ?
+				ORDER BY Name, Id
+				""";
+		try (Connection con = db.requireConnection()) {
+			validateAdminActorForTenant(con, shaleClientId, actorUserId);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, shaleClientId);
+				return mapLinkTypes(ps);
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to list link types for administration", e);
+		}
+	}
+
 	public List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive) {
 		String sql = """
 				SELECT Id, ShaleClientId, Name, Color, IsActive, IsDeleted, SystemKey, RowVer
@@ -7432,7 +7450,7 @@ public final class CaseDao {
 
 	public LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey) {
 		try (Connection con = db.requireConnection()) {
-			validateActorForTenant(con, shaleClientId, actorUserId);
+			validateAdminActorForTenant(con, shaleClientId, actorUserId);
 			return insertTenantLinkType(con, shaleClientId, actorUserId, name, color, active, normalizeSystemKey(systemKey));
 		} catch (SQLException e) {
 			throw translateSql("Failed to create link type", e);
@@ -7443,7 +7461,7 @@ public final class CaseDao {
 			boolean active, String systemKey, byte[] expectedRowVer) {
 		requireRowVer(expectedRowVer, "expectedRowVer");
 		try (Connection con = db.requireConnection()) {
-			validateActorForTenant(con, shaleClientId, actorUserId);
+			validateAdminActorForTenant(con, shaleClientId, actorUserId);
 			LinkTypeDto existing = findLinkTypeById(con, linkTypeId);
 			if (existing == null || (existing.shaleClientId() != null && existing.shaleClientId() != shaleClientId)) {
 				throw new IllegalArgumentException("Link type is not available for this tenant.");
@@ -7462,7 +7480,7 @@ public final class CaseDao {
 	public LinkTypeDto setLinkTypeActive(int shaleClientId, int actorUserId, int linkTypeId, boolean active, byte[] expectedRowVer) {
 		requireRowVer(expectedRowVer, "expectedRowVer");
 		try (Connection con = db.requireConnection()) {
-			validateActorForTenant(con, shaleClientId, actorUserId);
+			validateAdminActorForTenant(con, shaleClientId, actorUserId);
 			LinkTypeDto existing = findLinkTypeById(con, linkTypeId);
 			if (existing == null || (existing.shaleClientId() != null && existing.shaleClientId() != shaleClientId)) {
 				throw new IllegalArgumentException("Link type is not available for this tenant.");
@@ -7481,7 +7499,7 @@ public final class CaseDao {
 
 	public void resetLinkTypeOverride(int shaleClientId, int actorUserId, int linkTypeId) {
 		try (Connection con = db.requireConnection()) {
-			validateActorForTenant(con, shaleClientId, actorUserId);
+			validateAdminActorForTenant(con, shaleClientId, actorUserId);
 			LinkTypeDto requested = findLinkTypeById(con, linkTypeId);
 			if (requested == null || (requested.shaleClientId() != null && requested.shaleClientId() != shaleClientId)) {
 				throw new IllegalArgumentException("Link type is not available for this tenant.");
@@ -7917,6 +7935,18 @@ public final class CaseDao {
 			try (ResultSet rs = ps.executeQuery()) {
 				if (!rs.next()) {
 					throw new IllegalArgumentException("Actor user is not available for this tenant.");
+				}
+			}
+		}
+	}
+
+	private void validateAdminActorForTenant(Connection con, int tenant, int userId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("SELECT 1 FROM dbo.Users WHERE id = ? AND ShaleClientId = ? AND is_deleted = 0 AND is_admin = 1")) {
+			ps.setInt(1, userId);
+			ps.setInt(2, tenant);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) {
+					throw new IllegalArgumentException("Actor user is not an active admin for this tenant.");
 				}
 			}
 		}
