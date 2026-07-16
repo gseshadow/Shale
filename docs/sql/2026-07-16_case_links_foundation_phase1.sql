@@ -56,6 +56,24 @@ JOIN sys.security_policies AS sp
   ON sp.object_id = p.object_id
 WHERE sp.name = N'TenantFilter'
 ORDER BY PolicySchema, PolicyName, TargetTable, PredicateType, Operation;
+
+SELECT
+    FunctionSchema = OBJECT_SCHEMA_NAME(o.object_id),
+    FunctionName = o.name,
+    FunctionType = o.type_desc,
+    ParameterName = prm.name,
+    ParameterSqlType = typ.name,
+    FunctionDefinition = sm.definition
+FROM sys.objects AS o
+LEFT JOIN sys.parameters AS prm
+  ON prm.object_id = o.object_id
+ AND prm.parameter_id > 0
+LEFT JOIN sys.types AS typ
+  ON typ.user_type_id = prm.user_type_id
+LEFT JOIN sys.sql_modules AS sm
+  ON sm.object_id = o.object_id
+WHERE o.object_id = OBJECT_ID(N'sec.fn_FilterByTenantOrGlobal')
+ORDER BY prm.parameter_id;
 GO
 
 /* ============================================================================
@@ -99,10 +117,57 @@ RETURN
     WHERE @ShaleClientId IS NULL
        OR @ShaleClientId = TRY_CONVERT(int, SESSION_CONTEXT(N''''ShaleClientId''''));');
     END
-    ELSE IF LOWER(OBJECT_DEFINITION(OBJECT_ID(N'sec.fn_FilterByTenantOrGlobal', N'IF'))) NOT LIKE N'%@shaleclientid is null%'
-         OR LOWER(OBJECT_DEFINITION(OBJECT_ID(N'sec.fn_FilterByTenantOrGlobal', N'IF'))) NOT LIKE N'%session_context%shaleclientid%'
+    ELSE
     BEGIN
-        THROW 54007, 'Existing sec.fn_FilterByTenantOrGlobal does not match expected overlay semantics. Stop for manual review; migration will not replace it automatically.', 1;
+        DECLARE @OverlayFunctionId int = OBJECT_ID(N'sec.fn_FilterByTenantOrGlobal', N'IF'),
+                @OverlayParameterCount int,
+                @OverlayParameterName sysname,
+                @OverlayParameterSqlType sysname,
+                @OverlayDefinition nvarchar(max),
+                @OverlayDefinitionCompact nvarchar(max),
+                @OverlayParameterCompact nvarchar(128);
+
+        SELECT @OverlayParameterCount = COUNT(*)
+        FROM sys.parameters
+        WHERE object_id = @OverlayFunctionId
+          AND parameter_id > 0
+          AND is_output = 0;
+
+        IF @OverlayParameterCount <> 1
+            THROW 54007, 'Existing sec.fn_FilterByTenantOrGlobal must have exactly one ordinary input parameter. Stop for manual review.', 1;
+
+        SELECT
+            @OverlayParameterName = prm.name,
+            @OverlayParameterSqlType = typ.name
+        FROM sys.parameters AS prm
+        JOIN sys.types AS typ
+          ON typ.user_type_id = prm.user_type_id
+        WHERE prm.object_id = @OverlayFunctionId
+          AND prm.parameter_id > 0
+          AND prm.is_output = 0;
+
+        IF @OverlayParameterSqlType <> N'int'
+            THROW 54008, 'Existing sec.fn_FilterByTenantOrGlobal parameter must be SQL int. Stop for manual review.', 1;
+
+        SELECT @OverlayDefinition = sm.definition
+        FROM sys.sql_modules AS sm
+        WHERE sm.object_id = @OverlayFunctionId;
+
+        SET @OverlayDefinitionCompact = LOWER(@OverlayDefinition);
+        SET @OverlayDefinitionCompact = REPLACE(@OverlayDefinitionCompact, CHAR(13), N'');
+        SET @OverlayDefinitionCompact = REPLACE(@OverlayDefinitionCompact, CHAR(10), N'');
+        SET @OverlayDefinitionCompact = REPLACE(@OverlayDefinitionCompact, CHAR(9), N'');
+        SET @OverlayDefinitionCompact = REPLACE(@OverlayDefinitionCompact, N' ', N'');
+        SET @OverlayDefinitionCompact = REPLACE(@OverlayDefinitionCompact, N'[', N'');
+        SET @OverlayDefinitionCompact = REPLACE(@OverlayDefinitionCompact, N']', N'');
+        SET @OverlayParameterCompact = LOWER(REPLACE(REPLACE(@OverlayParameterName, N'[', N''), N']', N''));
+
+        IF @OverlayDefinitionCompact NOT LIKE N'%' + @OverlayParameterCompact + N'isnull%'
+            THROW 54009, 'Existing sec.fn_FilterByTenantOrGlobal does not allow NULL tenant rows for its declared parameter. Stop for manual review.', 1;
+
+        IF @OverlayDefinitionCompact NOT LIKE N'%' + @OverlayParameterCompact + N'=try_convert(int,session_context(n''shaleclientid''))%'
+           AND @OverlayDefinitionCompact NOT LIKE N'%try_convert(int,session_context(n''shaleclientid''))=' + @OverlayParameterCompact + N'%'
+            THROW 54010, 'Existing sec.fn_FilterByTenantOrGlobal does not compare its declared parameter with SESSION_CONTEXT(N''ShaleClientId''). Stop for manual review.', 1;
     END;
 
     DECLARE @PolicyCount int;
@@ -111,10 +176,10 @@ RETURN
     WHERE name = N'TenantFilter';
 
     IF @PolicyCount = 0
-        THROW 54008, 'Required security policy TenantFilter is missing. Stop and investigate live RLS.', 1;
+        THROW 54018, 'Required security policy TenantFilter is missing. Stop and investigate live RLS.', 1;
 
     IF @PolicyCount > 1
-        THROW 54009, 'Multiple security policies named TenantFilter exist. Stop: policy schema/name is ambiguous.', 1;
+        THROW 54019, 'Multiple security policies named TenantFilter exist. Stop: policy schema/name is ambiguous.', 1;
 
     DECLARE @PolicySchemaName sysname,
             @PolicyName sysname,
@@ -131,7 +196,7 @@ RETURN
     WHERE name = N'TenantFilter';
 
     IF @PolicyEnabled = 0
-        THROW 54010, 'Security policy TenantFilter is disabled. Stop: migration will not silently enable it.', 1;
+        THROW 54020, 'Security policy TenantFilter is disabled. Stop: migration will not silently enable it.', 1;
 
     SET @PolicyQualified = QUOTENAME(@PolicySchemaName) + N'.' + QUOTENAME(@PolicyName);
 
@@ -275,7 +340,7 @@ RETURN
            OR c.max_length <> rc.MaxLength
            OR c.is_nullable <> rc.IsNullable;
 
-        THROW 54011, 'Existing Case Links foundation table is missing required columns or has incompatible column definitions.', 1;
+        THROW 54021, 'Existing Case Links foundation table is missing required columns or has incompatible column definitions.', 1;
     END;
 
     IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.LinkTypes') AND name = N'UX_LinkTypes_ShaleClientId_SystemKey_NonNull')

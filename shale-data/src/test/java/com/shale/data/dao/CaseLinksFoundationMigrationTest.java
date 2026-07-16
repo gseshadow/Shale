@@ -35,11 +35,31 @@ class CaseLinksFoundationMigrationTest {
         assertContains(sql, "CREATE FUNCTION sec.fn_FilterByTenantOrGlobal(@ShaleClientId int)");
         assertContains(sql, "WHERE @ShaleClientId IS NULL");
         assertContains(sql, "OR @ShaleClientId = TRY_CONVERT(int, SESSION_CONTEXT");
+        assertContains(sql, "FROM sys.parameters");
+        assertContains(sql, "@OverlayParameterName = prm.name");
+        assertContains(sql, "@OverlayParameterSqlType = typ.name");
+        assertContains(sql, "@OverlayParameterSqlType <> N'int'");
+        assertContains(sql, "@OverlayDefinitionCompact NOT LIKE N'%' + @OverlayParameterCompact + N'isnull%'");
+        assertContains(sql, "@OverlayParameterCompact + N'=try_convert(int,session_context(n''shaleclientid''))");
         assertContains(sql, "ADD FILTER PREDICATE sec.fn_FilterByTenantOrGlobal(ShaleClientId) ON dbo.LinkTypes");
         assertContains(sql, "ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.ExternalLinks");
         assertContains(sql, "ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.CaseLinks");
         assertFalse(sql.contains("@BasePredicateAllowsNull"), "LinkTypes overlay must not depend on brittle base-predicate text detection");
+        assertFalse(sql.contains("LIKE N'%@shaleclientid is null%'"), "Existing overlay validation must use discovered parameter name, not literal @ShaleClientId");
         assertFalse(sql.contains("%is null%"), "Migration must not use generic %is null% predicate sniffing");
+    }
+
+
+    @Test
+    void preflightDisplaysOverlayFunctionParameterAndDefinition() throws IOException {
+        String sql = readMigration();
+
+        assertContains(sql, "FunctionSchema = OBJECT_SCHEMA_NAME(o.object_id)");
+        assertContains(sql, "FunctionName = o.name");
+        assertContains(sql, "FunctionType = o.type_desc");
+        assertContains(sql, "ParameterName = prm.name");
+        assertContains(sql, "ParameterSqlType = typ.name");
+        assertContains(sql, "FunctionDefinition = sm.definition");
     }
 
     @Test
