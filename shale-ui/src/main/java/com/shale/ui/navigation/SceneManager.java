@@ -801,7 +801,7 @@ public final class SceneManager {
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			CalendarFeedDao calendarFeedDao = new CalendarFeedDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), calendarFeedDao, notificationDao, runtimeBridge);
-			c.init(caseId, caseDao, caseDetailService, caseTaskService, calendarService, calendarFeedDao, organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted, phiReadAuditService);
+			c.init(caseId, caseDao, caseDetailService, caseTaskService, calendarService, calendarFeedDao, new CaseServiceAdapter(caseDao), organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted, phiReadAuditService);
 			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
