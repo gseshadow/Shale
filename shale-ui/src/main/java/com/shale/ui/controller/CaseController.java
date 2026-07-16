@@ -27,6 +27,9 @@ import java.util.stream.Collectors;
 import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.dto.LinkTypeDto;
+import com.shale.core.service.CaseServicePort;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.caseupdates.MedicalRecordRequestKeywordMatcher;
@@ -56,6 +59,8 @@ import com.shale.ui.document.CaseDocumentService;
 import com.shale.ui.document.CaseDocumentType;
 import com.shale.ui.document.GeneratedDocument;
 import com.shale.ui.component.factory.OrganizationCardFactory;
+import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
+import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
@@ -85,8 +90,10 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
 import com.shale.ui.controller.support.MedicalRecordsRequestedCaseUpdateSafeguard;
+import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.AppSectionTabs;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.util.ExternalBrowserHelper;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
@@ -108,6 +115,7 @@ import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
@@ -203,6 +211,14 @@ public class CaseController {
 	private StackPane tasksUpdatesHost;
 	@FXML
 	private VBox caseCalendarTabPane;
+	@FXML
+	private VBox caseLinksTabPane;
+	@FXML
+	private VBox caseLinksCardsBox;
+	@FXML
+	private Label caseLinksStatusLabel;
+	@FXML
+	private Button addCaseLinkButton;
 	@FXML
 	private ScrollPane caseCalendarScrollPane;
 	@FXML
@@ -554,6 +570,7 @@ public class CaseController {
 			"Parties",
 			"Tasks",
 			"Calendar",
+			"Links",
 			"Timeline"
 	);
 
@@ -580,6 +597,9 @@ public class CaseController {
 
 	private CalendarService calendarService;
 	private CalendarFeedDao calendarFeedDao;
+	private CaseServicePort caseService;
+	private final CaseLinkCardFactory caseLinkCardFactory = new CaseLinkCardFactory();
+	private ExternalBrowserHelper externalBrowserHelper = new ExternalBrowserHelper();
 
 	private OrganizationCardFactory organizationCardFactory;
 	private Consumer<Integer> onOpenOrganization;
@@ -610,6 +630,10 @@ public class CaseController {
 	private boolean caseCalendarStale = true;
 	private int caseCalendarLoadGeneration;
 	private List<CalendarFeedItem> caseCalendarItems = List.of();
+	private List<CaseLinkDto> caseLinks = List.of();
+	private boolean caseLinksLoadedOnce;
+	private boolean caseLinksStale = true;
+	private int caseLinksLoadGeneration;
 	private CalendarFeedSourceFilter caseCalendarSourceFilter = CalendarFeedSourceFilter.caseCalendarDefaults();
 	private byte[] latestCaseRowVer;
 	private byte[] overviewEditRowVer;
@@ -729,6 +753,7 @@ public class CaseController {
 		this.caseTasksLoadedOnce = false;
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
+		resetCaseLinksState();
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
 		this.caseUpdatesLoading = false;
@@ -738,13 +763,14 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 	}
 
-	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, CalendarService calendarService, CalendarFeedDao calendarFeedDao, OrganizationDao organizationDao, ContactDao contactDao,
+	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseServicePort caseService, OrganizationDao organizationDao, ContactDao contactDao,
 			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted, PhiReadAuditService phiReadAuditService) {
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
 		this.caseTasksLoadedOnce = false;
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
+		resetCaseLinksState();
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
 		this.caseUpdatesLoading = false;
@@ -755,6 +781,7 @@ public class CaseController {
 		this.caseTaskService = caseTaskService;
 		this.calendarService = calendarService;
 		this.calendarFeedDao = calendarFeedDao;
+		this.caseService = caseService;
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
@@ -885,6 +912,8 @@ public class CaseController {
 		}
 		if (addTaskButton != null)
 			addTaskButton.setOnAction(e -> onAddTask());
+		if (addCaseLinkButton != null)
+			addCaseLinkButton.setOnAction(e -> onAddCaseLink());
 		configureCaseCalendarControls();
 		if (generateSummaryHtmlMenuItem != null)
 			generateSummaryHtmlMenuItem.setOnAction(e -> onGenerateSummaryHtml());
@@ -1383,6 +1412,7 @@ public class CaseController {
 		case "Parties" -> showParties();
 		case "Tasks" -> showTasksTab();
 		case "Calendar" -> showCalendarTab();
+		case "Links" -> showLinksTab();
 		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
 		default -> showGeneric(sectionName);
@@ -1401,6 +1431,7 @@ public class CaseController {
 		case "Overview" -> "OVERVIEW";
 		case "Tasks" -> "TASKS";
 		case "Calendar" -> "CALENDAR";
+		case "Links" -> "LINKS";
 		case "Timeline" -> "TIMELINE";
 		case "Details" -> "DETAILS";
 		case "Parties" -> "PARTIES";
@@ -1417,6 +1448,7 @@ public class CaseController {
 		case "OVERVIEW" -> "Overview";
 		case "TASKS" -> "Tasks";
 		case "CALENDAR" -> "Calendar";
+		case "LINKS" -> "Links";
 		case "TIMELINE" -> "Timeline";
 		case "DETAILS" -> "Details";
 		case "PARTIES" -> "Parties";
@@ -1617,6 +1649,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, true);
+		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
 		if (!caseCalendarLoadedOnce || caseCalendarStale) {
@@ -1778,6 +1811,136 @@ public class CaseController {
 		}
 	}
 
+
+	private void resetCaseLinksState() {
+		caseLinksLoadedOnce = false;
+		caseLinksStale = true;
+		caseLinks = List.of();
+		caseLinksLoadGeneration++;
+		if (caseLinksCardsBox != null) caseLinksCardsBox.getChildren().clear();
+	}
+
+	private void showLinksTab() {
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
+		setPaneVisible(overviewScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseLinksTabPane, true);
+		setPaneVisible(genericPane, false);
+		setPaneVisible(tasksPanel, false);
+		if (!caseLinksLoadedOnce || caseLinksStale) loadCaseLinksAsync(null); else renderCaseLinks(null);
+		loadCaseUpdatesAsync();
+	}
+
+	private void loadCaseLinksAsync(String successMessage) {
+		if (caseService == null || appState == null || caseId == null) { showCaseLinksMessage("Links are unavailable."); return; }
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) { showCaseLinksMessage("Links are unavailable because no tenant is selected."); return; }
+		final int activeCaseId = caseId;
+		final int generation = ++caseLinksLoadGeneration;
+		showCaseLinksMessage("Loading links…");
+		new Thread(() -> {
+			try {
+				List<CaseLinkDto> links = caseService.listCaseLinks(activeCaseId, tenantId);
+				Platform.runLater(() -> {
+					if (caseId == null || caseId != activeCaseId || generation != caseLinksLoadGeneration) return;
+					caseLinks = links == null ? List.of() : List.copyOf(links);
+					caseLinksLoadedOnce = true;
+					caseLinksStale = false;
+					renderCaseLinks(successMessage);
+				});
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> { if (generation == caseLinksLoadGeneration) showCaseLinksMessage("Failed to load links. " + rootMessage(ex)); });
+			}
+		}, "case-links-load-" + activeCaseId).start();
+	}
+
+	private void renderCaseLinks(String message) {
+		if (caseLinksCardsBox == null) return;
+		caseLinksCardsBox.getChildren().clear();
+		if (message != null && !message.isBlank()) showCaseLinksMessage(message); else setVisibleManaged(caseLinksStatusLabel, false);
+		if (caseLinks.isEmpty()) { showCaseLinksMessage("No links have been added to this case yet."); return; }
+		for (int i = 0; i < caseLinks.size(); i++) {
+			CaseLinkDto link = caseLinks.get(i); final int index = i;
+			caseLinksCardsBox.getChildren().add(caseLinkCardFactory.create(link, i, caseLinks.size(), new CaseLinkCardFactory.Actions(
+					() -> onOpenCaseLink(link), () -> onEditCaseLink(link), () -> onSetPrimaryCaseLink(link), () -> onMoveCaseLink(index, -1), () -> onMoveCaseLink(index, 1), () -> onDeleteCaseLink(link))));
+		}
+	}
+
+	private void showCaseLinksMessage(String message) {
+		if (caseLinksStatusLabel != null) { caseLinksStatusLabel.setText(message == null ? "" : message); setVisibleManaged(caseLinksStatusLabel, message != null && !message.isBlank()); }
+	}
+
+	private void onOpenCaseLink(CaseLinkDto link) {
+		try { externalBrowserHelper.openHttpOrHttps(link.url()); }
+		catch (RuntimeException ex) { AppDialogs.showError(caseLinksOwner(), "Open Link", rootMessage(ex)); }
+	}
+
+	private void onAddCaseLink() {
+		loadLinkTypesForDialog(null).ifPresent(types -> showCaseLinkDialog(null, types).ifPresent(input -> runCaseLinkMutation("Link added.", () -> caseService.createCaseLink(new CaseServicePort.CreateCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, input.linkType().id(), input.displayName(), input.url(), input.description(), input.primary(), input.notes(), null)))));
+	}
+
+	private void onEditCaseLink(CaseLinkDto link) {
+		loadLinkTypesForDialog(link).ifPresent(types -> showCaseLinkDialog(link, types).ifPresent(input -> runCaseLinkMutation("Link updated.", () -> caseService.updateCaseLink(new CaseServicePort.UpdateCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, link.caseLinkId(), link.externalLinkId(), input.linkType().id(), input.displayName(), input.url(), input.description(), null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer())))));
+	}
+
+	private void onSetPrimaryCaseLink(CaseLinkDto link) {
+		runCaseLinkMutation("Primary link updated.", () -> caseService.setPrimaryCaseLink(new CaseServicePort.SetPrimaryCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, link.caseLinkId())));
+	}
+
+	private void onDeleteCaseLink(CaseLinkDto link) {
+		boolean ok = AppDialogs.showConfirmation(caseLinksOwner(), "Delete Link", "Remove this link from the case?", "The link will be removed from this case. Shared external-link records are left to the service/DAO to manage safely.", "Delete", DialogActionKind.DANGER);
+		if (!ok) return;
+		runCaseLinkMutation("Link deleted.", () -> { caseService.deleteCaseLink(new CaseServicePort.DeleteCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, link.caseLinkId(), link.caseLinkRowVer())); return null; });
+	}
+
+	private void onMoveCaseLink(int index, int delta) {
+		int target = index + delta;
+		if (index < 0 || target < 0 || index >= caseLinks.size() || target >= caseLinks.size()) return;
+		List<Long> ids = new ArrayList<>(caseLinks.stream().map(CaseLinkDto::caseLinkId).toList());
+		java.util.Collections.swap(ids, index, target);
+		if (ids.size() != caseLinks.size() || ids.stream().distinct().count() != ids.size()) { showCaseLinksMessage("Cannot reorder links because the active link list is invalid."); return; }
+		runCaseLinkMutation("Links reordered.", () -> caseService.reorderCaseLinks(new CaseServicePort.ReorderCaseLinksCommand(requireTenantId(), requireActorUserId(), caseId, ids)));
+	}
+
+	private void runCaseLinkMutation(String successMessage, java.util.concurrent.Callable<?> action) {
+		try { action.call(); loadCaseLinksAsync(successMessage); }
+		catch (Exception ex) { AppDialogs.showError(caseLinksOwner(), "Case Links", rootMessage(ex)); renderCaseLinks(null); }
+	}
+
+	private Optional<List<LinkTypeDto>> loadLinkTypesForDialog(CaseLinkDto currentLink) {
+		try {
+			List<LinkTypeDto> active = caseService.listLinkTypes(requireTenantId(), false);
+			if (currentLink != null && active.stream().noneMatch(t -> t.id() == currentLink.linkTypeId())) {
+				LinkTypeDto unavailable = new LinkTypeDto(currentLink.linkTypeId(), null, currentLink.linkTypeName() + " (unavailable)", currentLink.linkTypeColor(), false, false, currentLink.linkTypeSystemKey(), null);
+				List<LinkTypeDto> copy = new ArrayList<>(); copy.add(unavailable); copy.addAll(active); active = copy;
+			}
+			if (active.isEmpty()) { AppDialogs.showInfo(caseLinksOwner(), "Add Link", "No active Link Types are available for this tenant."); return Optional.empty(); }
+			return Optional.of(active);
+		} catch (RuntimeException ex) { AppDialogs.showError(caseLinksOwner(), "Case Links", rootMessage(ex)); return Optional.empty(); }
+	}
+
+	private Optional<CaseLinkInput> showCaseLinkDialog(CaseLinkDto existing, List<LinkTypeDto> linkTypes) {
+		Dialog<CaseLinkInput> dialog = new Dialog<>(); String title = existing == null ? "Add Link" : "Edit Link"; dialog.setTitle(title); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		ComboBox<LinkTypeDto> type = new ComboBox<>(); type.getItems().setAll(linkTypes); type.setMaxWidth(Double.MAX_VALUE); type.setConverter(new javafx.util.StringConverter<>() { public String toString(LinkTypeDto t) { return t == null ? "" : t.name(); } public LinkTypeDto fromString(String s) { return null; }});
+		type.setCellFactory(list -> new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); setGraphic(empty || item == null ? null : LinkTypeIndicatorFactory.createLinkTypePill(item.name(), item.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); }});
+		type.setButtonCell(new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); }});
+		TextField name = new TextField(existing == null ? "" : safeText(existing.displayName())); TextField url = new TextField(existing == null ? "" : safeText(existing.url())); TextArea description = new TextArea(existing == null ? "" : safeText(existing.description())); description.setPrefRowCount(3); TextArea notes = new TextArea(existing == null ? "" : safeText(existing.notes())); notes.setPrefRowCount(3); CheckBox primary = new CheckBox("Make primary"); primary.setSelected(existing != null && existing.primary());
+		if (existing != null) type.getSelectionModel().select(linkTypes.stream().filter(t -> t.id() == existing.linkTypeId()).findFirst().orElse(null)); else if (!linkTypes.isEmpty()) type.getSelectionModel().selectFirst();
+		Label error = new Label(); error.setTextFill(Color.web("#b42318")); error.setVisible(false); error.setManaged(false);
+		GridPane grid = new GridPane(); grid.setHgap(10); grid.setVgap(8); grid.addRow(0, new Label("Link Type"), type); grid.addRow(1, new Label("Display Name"), name); grid.addRow(2, new Label("URL"), url); grid.addRow(3, new Label("Description"), description); grid.addRow(4, new Label("Notes"), notes); grid.add(primary, 1, 5); grid.add(error, 0, 6, 2, 1); dialog.getDialogPane().setContent(grid);
+		dialog.setResultConverter(button -> { if (button != ButtonType.OK) return null; try { LinkTypeDto selected = type.getValue(); if (selected == null) throw new IllegalArgumentException("Link Type is required."); if (!selected.active()) throw new IllegalArgumentException("Select an active Link Type before saving."); String display = trimLimit(name.getText(), "Display name", 255, true); String cleanUrl = trimLimit(url.getText(), "URL", 2048, true); ExternalBrowserHelper.validateHttpOrHttps(cleanUrl); String desc = trimLimit(description.getText(), "Description", 2048, false); String note = trimLimit(notes.getText(), "Notes", 2000, false); return new CaseLinkInput(selected, display, cleanUrl, desc, primary.isSelected(), note); } catch (RuntimeException ex) { error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); return null; } });
+		return dialog.showAndWait();
+	}
+
+	private static String rootMessage(Throwable ex) { Throwable cur = ex; while (cur != null && cur.getCause() != null) cur = cur.getCause(); String msg = cur == null ? null : cur.getMessage(); return msg == null || msg.isBlank() ? "Unexpected error." : msg; }
+	private static String trimLimit(String value, String label, int max, boolean required) { String out = value == null ? "" : value.trim(); if (required && out.isBlank()) throw new IllegalArgumentException(label + " is required."); if (out.length() > max) throw new IllegalArgumentException(label + " must be " + max + " characters or fewer."); return out.isBlank() ? null : out; }
+	private Window caseLinksOwner() { return caseLinksTabPane != null && caseLinksTabPane.getScene() != null ? caseLinksTabPane.getScene().getWindow() : taskDialogOwner(); }
+	private int requireTenantId() { Integer id = appState == null ? null : appState.getShaleClientId(); if (id == null || id <= 0) throw new IllegalStateException("No tenant is selected."); return id; }
+	private int requireActorUserId() { Integer id = appState == null ? null : appState.getUserId(); if (id == null || id <= 0) throw new IllegalStateException("No active user is selected."); return id; }
+	private record CaseLinkInput(LinkTypeDto linkType, String displayName, String url, String description, boolean primary, String notes) {}
+
 	private void refreshCaseCalendar() {
 		caseCalendarStale = true;
 		if (isSectionActive("Calendar")) {
@@ -1856,6 +2019,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, true);
 		if (contentTitleLabel != null)
@@ -1871,6 +2035,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
 		if (shouldReloadTasksForTabOpen()) {
@@ -1890,6 +2055,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
 		if (contentTitleLabel != null)
@@ -1905,6 +2071,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
 
@@ -1931,6 +2098,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
 
@@ -1956,6 +2124,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
 

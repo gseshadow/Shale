@@ -786,6 +786,26 @@
 				</HBox>
 			</VBox>
 
+			<!-- LINKS TAB PANE (center) -->
+			<VBox fx:id="caseLinksTabPane" spacing="8" maxWidth="1.7976931348623157E308"
+				maxHeight="1.7976931348623157E308" visible="false" managed="false">
+				<padding><Insets top="8" right="8" bottom="8" left="8" /></padding>
+				<VBox spacing="8" VBox.vgrow="ALWAYS" maxHeight="1.7976931348623157E308" styleClass="case-main-surface">
+					<padding><Insets top="10" right="10" bottom="10" left="10" /></padding>
+					<HBox spacing="8" alignment="CENTER_LEFT">
+						<Label text="Links" style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+						<Region HBox.hgrow="ALWAYS" />
+						<Button fx:id="addCaseLinkButton" text="Add Link">
+							<styleClass><String fx:value="app-toolbar-button" /><String fx:value="app-toolbar-button-primary" /></styleClass>
+						</Button>
+					</HBox>
+					<Label fx:id="caseLinksStatusLabel" text="Loading links…" visible="false" managed="false" style="-fx-opacity: 0.75;" />
+					<ScrollPane fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
+						<content><VBox fx:id="caseLinksCardsBox" spacing="10"><padding><Insets top="4" right="4" bottom="4" left="4" /></padding></VBox></content>
+					</ScrollPane>
+				</VBox>
+			</VBox>
+
 			<!-- GENERIC PLACEHOLDER PANE -->
 			<VBox fx:id="genericPane" spacing="10" maxWidth="980"
 				styleClass="case-main-surface" visible="false" managed="false">
