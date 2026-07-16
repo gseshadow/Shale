@@ -705,3 +705,95 @@ Reuse existing DAO mappings where possible.
 If a needed field is not documented, verify it from the live schema or existing code before using it.
 If a field cannot be verified, leave it blank/null rather than introducing a crashing SQL reference.
 ```
+
+---
+
+## dbo.LinkTypes
+
+Link type lookup table for case/external links. This table follows the same global/default plus tenant override model used by modularized lookup tables such as `dbo.Statuses` and `dbo.PracticeAreas`.
+
+| Column          | Type          | Notes                                      |
+| --------------- | ------------- | ------------------------------------------ |
+| `Id`            | int           | Primary key                                |
+| `ShaleClientId` | int           | Tenant id, nullable for global/default row |
+| `Name`          | nvarchar(100) | Display name                               |
+| `Color`         | nvarchar(20)  | Display color                              |
+| `IsActive`      | bit           | Active flag                                |
+| `IsDeleted`     | bit           | Soft delete flag                           |
+| `SystemKey`     | nvarchar(64)  | Normalized lowercase overlay key           |
+| `CreatedAt`     | datetime2     | Created timestamp                          |
+| `UpdatedAt`     | datetime2     | Updated timestamp                          |
+| `RowVer`        | rowversion    | Row version                                |
+
+Effective Link Type semantics:
+
+* Global/default rows use `ShaleClientId IS NULL`.
+* Tenant override rows use the same normalized `SystemKey` as a global row with the tenant's `ShaleClientId`.
+* Tenant-created custom types are represented as tenant rows with their own `SystemKey`.
+* Effective lists should read global rows plus current-tenant rows and choose the tenant row when a non-null `SystemKey` appears in both scopes.
+* `UX_LinkTypes_ShaleClientId_SystemKey_NonNull` prevents duplicate non-null `SystemKey` values within the same scope.
+
+Seeded global keys from `docs/sql/2026-07-16_case_links_foundation_phase1.sql`:
+
+| SystemKey                | Name                   |
+| ------------------------ | ---------------------- |
+| `court_docket`           | Court Docket           |
+| `claims_portal`          | Claims Portal          |
+| `medical_records_portal` | Medical Records Portal |
+| `insurance_portal`       | Insurance Portal       |
+| `document_repository`    | Document Repository    |
+| `government_record`      | Government Record      |
+| `research`               | Research               |
+| `other`                  | Other                  |
+
+---
+
+## dbo.ExternalLinks
+
+Tenant-owned reusable hyperlink records.
+
+| Column            | Type           | Notes                                                        |
+| ----------------- | -------------- | ------------------------------------------------------------ |
+| `Id`              | int            | Primary key                                                  |
+| `ShaleClientId`   | int            | Tenant id                                                    |
+| `LinkTypeId`      | int            | Reference to `dbo.LinkTypes.Id`                              |
+| `DisplayName`     | nvarchar(255)  | User-facing link label                                       |
+| `Url`             | nvarchar(2048) | Full web URL                                                 |
+| `Description`     | nvarchar(max)  | Optional description                                         |
+| `IsDeleted`       | bit            | Soft delete flag                                             |
+| `DeletedAt`       | datetime2      | Deleted timestamp                                            |
+| `DeletedByUserId` | int            | Deleted by user id                                           |
+| `CreatedAt`       | datetime2      | Created timestamp                                            |
+| `UpdatedAt`       | datetime2      | Updated timestamp                                            |
+| `RowVer`          | rowversion     | Row version                                                  |
+
+Tenant validation note: SQL Server cannot enforce the Link Type tenant boundary with a simple foreign key because `dbo.LinkTypes` intentionally allows global rows (`ShaleClientId IS NULL`) and tenant rows. Service code must ensure `ExternalLinks.LinkTypeId` references either a global Link Type or a Link Type owned by the same `ShaleClientId`.
+
+---
+
+## dbo.CaseLinks
+
+Tenant-owned associations between cases and reusable external links.
+
+| Column            | Type           | Notes                           |
+| ----------------- | -------------- | ------------------------------- |
+| `Id`              | int            | Primary key                     |
+| `ShaleClientId`   | int            | Tenant id                       |
+| `CaseId`          | int            | Reference to `dbo.Cases.Id`     |
+| `ExternalLinkId`  | int            | Reference to `dbo.ExternalLinks.Id` |
+| `IsPrimary`       | bit            | Primary case link flag          |
+| `Notes`           | nvarchar(2000) | Case-specific notes             |
+| `SortOrder`       | int            | Explicit user ordering          |
+| `IsDeleted`       | bit            | Soft delete flag                |
+| `DeletedAt`       | datetime2      | Deleted timestamp               |
+| `DeletedByUserId` | int            | Deleted by user id              |
+| `CreatedAt`       | datetime2      | Created timestamp               |
+| `UpdatedAt`       | datetime2      | Updated timestamp               |
+| `RowVer`          | rowversion     | Row version                     |
+
+Integrity protections:
+
+* `UX_CaseLinks_CaseId_ExternalLinkId_Active` prevents the same active ExternalLink from being associated to the same case more than once.
+* `UX_CaseLinks_CaseId_Primary_Active` allows at most one active primary link per case.
+* Both filtered indexes ignore soft-deleted rows so legitimate replacements are not blocked.
+* Service code must keep `CaseLinks.ShaleClientId` equal to the linked case and external link tenants; the legacy single-column primary keys on `dbo.Cases` and `dbo.ExternalLinks` prevent this tenant boundary from being enforced with a verified composite foreign key in phase 1.
