@@ -23,10 +23,10 @@ final class CaseLinksPhase5OverviewTest {
         assertTrue(fxml.contains("case-overview-section"));
         assertTrue(fxml.contains("shale-surface-section"));
         assertTrue(source.contains("No primary link has been selected for this case."));
-        assertTrue(source.contains("ActionButtonFactory.cardAction(\"Open Link\""));
-        assertTrue(source.contains("ActionButtonFactory.cardAction(\"Manage Links\""));
-        assertTrue(source.contains("case-overview-primary-link-card"));
-        assertFalse(source.contains("ActionButtonFactory.cardAction(\"Edit\", e -> onEditOverviewPrimaryLink"));
+        assertFalse(source.contains("ActionButtonFactory.cardAction(\"Open Link\""));
+        assertFalse(source.contains("ActionButtonFactory.cardAction(\"Manage Links\""));
+        assertTrue(source.contains("CaseLinkCardFactory.Variant.COMPACT"));
+        assertTrue(source.contains("() -> onEditCaseLink(link)"));
         assertFalse(source.contains("ActionButtonFactory.danger(\"Delete\", e -> onDeleteOverviewPrimaryLink"));
         assertFalse(source.contains("onSetPrimaryOverviewPrimaryLink"));
         assertFalse(source.contains("onMoveOverviewPrimaryLink"));
@@ -56,12 +56,12 @@ final class CaseLinksPhase5OverviewTest {
     void overviewPrimaryLinkPresentationPreservesTypeColorPrimaryTextAndSafeUrlOpening() throws Exception {
         String source = Files.readString(CASE_CONTROLLER);
 
-        assertTrue(source.contains("blankTo(link.displayName(), \"Untitled link\")"));
-        assertTrue(source.contains("LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor(), LinkTypeIndicatorFactory.PillSize.COMPACT)"));
-        assertTrue(source.contains("new Label(\"Primary\")"));
-        assertTrue(source.contains("blankTo(link.url(), \"—\")"));
-        assertTrue(source.contains("url.setWrapText(true)"));
-        assertTrue(source.contains("url.setTextOverrun(OverrunStyle.ELLIPSIS)"));
+        String card = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/CaseLinkCardFactory.java"));
+        assertTrue(card.contains("blankTo(link.displayName(), \"Untitled link\")"));
+        assertTrue(card.contains("LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor()"));
+        assertTrue(card.contains("new Label(\"Primary\")"));
+        assertTrue(card.contains("blankTo(link.description(), \"No description\")"));
+        assertFalse(card.contains("new Label(blankTo(link.url()"));
         assertTrue(source.contains("externalBrowserHelper.openHttpOrHttps(link.url())"));
         assertFalse(source.contains("Desktop.getDesktop().browse"));
         assertFalse(source.contains("getHostServices().showDocument"));
@@ -71,8 +71,7 @@ final class CaseLinksPhase5OverviewTest {
     void overviewManageLinksUsesExistingSectionRoutingAndPreservesCurrentCase() throws Exception {
         String source = Files.readString(CASE_CONTROLLER);
 
-        assertTrue(source.contains("private void navigateToCaseLinksForManagement()"));
-        assertTrue(source.contains("onSectionSelected(\"Links\", true)"));
+        assertTrue(source.contains("caseLinkCardFactory.create(link, CaseLinkCardFactory.Variant.COMPACT"));
         assertTrue(source.contains("case \"Links\" -> \"LINKS\";"));
         assertTrue(source.contains("case \"Links\" -> showLinksTab();"));
         assertFalse(source.contains("new Tab(\"Links\")"));
