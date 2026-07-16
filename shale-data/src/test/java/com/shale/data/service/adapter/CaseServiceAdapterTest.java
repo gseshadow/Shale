@@ -369,25 +369,12 @@ class CaseServiceAdapterTest {
 			lastNoteCreatedByUserId = createdByUserId;
 		}
 
-		@Override public List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive) { return List.of(); }
-		@Override public List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive) { return List.of(); }
-		@Override public LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey) { return new LinkTypeDto(1, shaleClientId, name, color, active, false, systemKey, new byte[]{1}); }
-		@Override public LinkTypeDto updateLinkType(int shaleClientId, int actorUserId, int linkTypeId, String name, String color, boolean active, String systemKey, byte[] expectedRowVer) { return new LinkTypeDto(linkTypeId, shaleClientId, name, color, active, false, systemKey, new byte[]{2}); }
-		@Override public LinkTypeDto setLinkTypeActive(int shaleClientId, int actorUserId, int linkTypeId, boolean active, byte[] expectedRowVer) { return new LinkTypeDto(linkTypeId, shaleClientId, "Link", "#fff", active, false, "link", new byte[]{2}); }
-		@Override public void resetLinkTypeOverride(int shaleClientId, int actorUserId, int linkTypeId) {}
-		@Override public List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId) { return List.of(); }
-		@Override public java.util.Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId) { return java.util.Optional.empty(); }
-		@Override public CaseLinkDto createCaseLink(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder) { return null; }
-		@Override public CaseLinkDto updateCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer) { return null; }
-		@Override public CaseLinkDto setPrimaryCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId) { return null; }
-		@Override public List<CaseLinkDto> reorderCaseLinks(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds) { return List.of(); }
-		@Override public void deleteCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer) {}
 
 		@Override
 		public List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive) { return List.of(); }
 
 		@Override
-		public List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive) { return List.of(); }
+		public List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId) { return List.of(); }
 
 		@Override
 		public LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey) {

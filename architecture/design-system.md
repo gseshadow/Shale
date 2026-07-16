@@ -380,3 +380,7 @@ This applies to:
 These features should naturally inherit the Shale design language through shared surfaces, tokens, density, indicators, controls, and Entity Card composition.
 
 A future contributor should be able to add a screen by choosing the correct surface layer, composing shared primitives, selecting appropriate density, and applying semantic tokens. If a new primitive is required, it should be designed as a reusable addition to the Shale system rather than as a one-off screen style.
+
+### Link Type indicators
+
+Case Link Type settings use a reusable `LinkTypeIndicatorFactory` modeled on the existing practice-area pill treatment. The indicator accepts database-driven colors from seeded `#RRGGBB` values and existing stored `0xRRGGBBAA` values, preserving the Shale compact pill/card visual language instead of introducing a separate link-type visual system.

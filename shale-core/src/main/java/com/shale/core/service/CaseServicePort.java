@@ -44,7 +44,8 @@ public interface CaseServicePort {
 
 	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 
-	List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive);
+
+	List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId);
 
 	LinkTypeDto createLinkType(LinkTypeCommand command);
 

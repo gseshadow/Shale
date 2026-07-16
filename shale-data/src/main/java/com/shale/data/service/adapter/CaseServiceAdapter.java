@@ -211,8 +211,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
-	public List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive) {
-		return caseGateway.listTenantLinkTypes(shaleClientId, includeInactive);
+	public List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId) {
+		return caseGateway.listLinkTypesForAdministration(shaleClientId, actorUserId);
 	}
 
 	@Override
@@ -540,7 +540,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive);
 
 		List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
-		List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive);
+		List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId);
 		LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey);
 		LinkTypeDto updateLinkType(int shaleClientId, int actorUserId, int linkTypeId, String name, String color, boolean active, String systemKey, byte[] expectedRowVer);
 		LinkTypeDto setLinkTypeActive(int shaleClientId, int actorUserId, int linkTypeId, boolean active, byte[] expectedRowVer);
@@ -688,7 +688,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		}
 
 		@Override public List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive) { return caseDao.listLinkTypes(shaleClientId, includeInactive); }
-		@Override public List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive) { return caseDao.listTenantLinkTypes(shaleClientId, includeInactive); }
+		@Override public List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId) { return caseDao.listLinkTypesForAdministration(shaleClientId, actorUserId); }
 		@Override public LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey) { return caseDao.createLinkType(shaleClientId, actorUserId, name, color, active, systemKey); }
 		@Override public LinkTypeDto updateLinkType(int shaleClientId, int actorUserId, int linkTypeId, String name, String color, boolean active, String systemKey, byte[] expectedRowVer) { return caseDao.updateLinkType(shaleClientId, actorUserId, linkTypeId, name, color, active, systemKey, expectedRowVer); }
 		@Override public LinkTypeDto setLinkTypeActive(int shaleClientId, int actorUserId, int linkTypeId, boolean active, byte[] expectedRowVer) { return caseDao.setLinkTypeActive(shaleClientId, actorUserId, linkTypeId, active, expectedRowVer); }

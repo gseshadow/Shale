@@ -51,3 +51,11 @@ Remaining service-layer validation requirements:
 * `dbo.ExternalLinks.LinkTypeId` must reference either a global Link Type or a Link Type with the same tenant id as the ExternalLink. This cannot be represented as a verified declarative composite foreign key while Link Types support global rows.
 * `dbo.CaseLinks.ShaleClientId` must match both the linked `dbo.Cases.ShaleClientId` and `dbo.ExternalLinks.ShaleClientId`. Phase 1 keeps single-column foreign keys because the referenced tables do not expose a verified tenant composite key for direct enforcement.
 * Soft-deleted CaseLinks do not block later replacements. Active uniqueness is enforced by filtered indexes for duplicate case/link pairs and one primary active link per case.
+
+## Case Links Phase 3 Link Type administration
+
+Settings Link Type management is an admin-only tenant lookup administration surface layered on the existing `CaseServicePort -> CaseServiceAdapter -> CaseDao` path. Administration reads use an actor-aware operation that validates the current tenant, the current user, active/not-deleted user state, same-tenant membership, and `dbo.Users.is_admin = 1` before returning raw global plus current-tenant Link Type rows.
+
+The Settings cards resolve those raw rows into one card per effective Link Type: global rows are shown as `Global/default`; same-`SystemKey` tenant rows are `Tenant override` cards and mask global rows even when inactive; deleted tenant override rows act as reset markers so the global default appears again; tenant rows without a matching global `SystemKey` are `Tenant custom` cards. Other tenant rows are excluded.
+
+Global Link Type rows are never mutated by Settings. Editing or activating/deactivating a global default creates or updates a tenant override. Reset soft-deletes/deactivates the tenant override so the global default is effective again. Remove soft-deletes tenant custom rows. Existing Case Links retain their stored Link Type relationship when an admin resets or removes future effective selections.

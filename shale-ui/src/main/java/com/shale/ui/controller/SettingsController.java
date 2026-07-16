@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
+import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.data.dao.UserDao;
 import com.shale.ui.component.dialog.AppDialogs;
@@ -35,6 +36,7 @@ import javafx.scene.shape.Circle;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
+import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -87,6 +89,14 @@ public final class SettingsController {
 	@FXML
 	private Label practiceAreaSettingsStatusLabel;
 	@FXML
+	private VBox linkTypeAdministrationSection;
+	@FXML
+	private VBox linkTypeCardsContainer;
+	@FXML
+	private HBox linkTypeActionRow;
+	@FXML
+	private Label linkTypeSettingsStatusLabel;
+	@FXML
 	private TableView<UserManagementViewRow> userManagementTable;
 	@FXML
 	private TableColumn<UserManagementViewRow, String> userNameColumn;
@@ -119,13 +129,16 @@ public final class SettingsController {
 	private boolean fxmlReady;
 	private final List<CaseStatusViewRow> caseStatusRows = new ArrayList<>();
 	private final List<PracticeAreaViewRow> practiceAreaRows = new ArrayList<>();
+	private final List<LinkTypeViewRow> linkTypeRows = new ArrayList<>();
 	private CaseStatusViewRow selectedCaseStatusRow;
 	private PracticeAreaViewRow selectedPracticeAreaRow;
+	private LinkTypeViewRow selectedLinkTypeRow;
 	private int caseStatusLoadGeneration;
 	private int practiceAreaLoadGeneration;
+	private int linkTypeLoadGeneration;
 	private int userManagementLoadGeneration;
 
-	private final ExecutorService settingsLoadExecutor = Executors.newFixedThreadPool(3, runnable -> {
+	private final ExecutorService settingsLoadExecutor = Executors.newFixedThreadPool(4, runnable -> {
 		Thread thread = new Thread(runnable, "settings-section-loader");
 		thread.setDaemon(true);
 		return thread;
@@ -192,6 +205,7 @@ public final class SettingsController {
 		if (!fxmlReady || !isAdminUser()) return;
 		loadCaseStatusesAsync(null);
 		loadPracticeAreasAsync(null);
+		loadLinkTypesAsync(null);
 		loadManagedUsersAsync(null);
 	}
 
@@ -247,6 +261,14 @@ public final class SettingsController {
 					ActionButtonFactory.neutral("Move Down", event -> onMoveCaseStatusDown()),
 					caseStatusSettingsStatusLabel);
 		}
+		if (linkTypeActionRow != null) {
+			linkTypeActionRow.getChildren().setAll(
+					ActionButtonFactory.primary("Add Link Type", event -> onAddLinkType()),
+					ActionButtonFactory.neutral("Edit/Customize", event -> onEditLinkType()),
+					ActionButtonFactory.neutral("Activate/Deactivate", event -> onToggleLinkTypeActive()),
+					ActionButtonFactory.neutral("Reset/Remove", event -> onResetOrRemoveLinkType()),
+					linkTypeSettingsStatusLabel);
+		}
 		if (practiceAreaActionRow != null) {
 			practiceAreaActionRow.getChildren().setAll(
 					ActionButtonFactory.primary("Add Practice Area", event -> onAddPracticeArea()),
@@ -255,6 +277,122 @@ public final class SettingsController {
 					practiceAreaSettingsStatusLabel);
 		}
 	}
+
+
+	@FXML
+	private void onAddLinkType() {
+		if (!requireAdminLookupManagement("Link Types")) return;
+		showLinkTypeDialog(null).ifPresent(input -> {
+			try {
+				caseService.createLinkType(new CaseServicePort.LinkTypeCommand(null, requireTenantId(), requireActorUserId(), input.name(), input.color(), input.active(), input.systemKey(), null));
+				loadLinkTypesAsync("Link type added.");
+			} catch (RuntimeException ex) { showLinkTypeError(ex); }
+		});
+	}
+
+	@FXML
+	private void onEditLinkType() {
+		if (!requireAdminLookupManagement("Link Types")) return;
+		LinkTypeViewRow selected = selectedLinkTypeRow();
+		if (selected == null) return;
+		showLinkTypeDialog(selected.linkType()).ifPresent(input -> {
+			try {
+				caseService.updateLinkType(new CaseServicePort.LinkTypeCommand(selected.id(), requireTenantId(), requireActorUserId(), input.name(), input.color(), input.active(), linkTypeSystemKeyForSave(selected.linkType()), selected.rowVer()));
+				loadLinkTypesAsync(selected.global() ? "Tenant override saved for global link type." : "Link type updated.");
+			} catch (RuntimeException ex) { showLinkTypeError(ex); }
+		});
+	}
+
+	@FXML
+	private void onToggleLinkTypeActive() {
+		if (!requireAdminLookupManagement("Link Types")) return;
+		LinkTypeViewRow selected = selectedLinkTypeRow();
+		if (selected == null) return;
+		try {
+			caseService.setLinkTypeActive(new CaseServicePort.SetLinkTypeActiveCommand(requireTenantId(), requireActorUserId(), selected.id(), !selected.active(), selected.rowVer()));
+			loadLinkTypesAsync(selected.active() ? "Link type deactivated for future selections." : "Link type activated.");
+		} catch (RuntimeException ex) { showLinkTypeError(ex); }
+	}
+
+	@FXML
+	private void onResetOrRemoveLinkType() {
+		if (!requireAdminLookupManagement("Link Types")) return;
+		LinkTypeViewRow selected = selectedLinkTypeRow();
+		if (selected == null) return;
+		String action = selected.custom() ? "Remove" : "Reset to Default";
+		boolean confirmed = AppDialogs.showConfirmation(
+				linkTypeCardsContainer == null || linkTypeCardsContainer.getScene() == null ? null : linkTypeCardsContainer.getScene().getWindow(),
+				"Link Types",
+				action + " " + selected.getName() + "?",
+				"This affects future effective selections. Existing links retain their stored Link Type relationship.",
+				action,
+				selected.custom() ? AppDialogs.DialogActionKind.DANGER : AppDialogs.DialogActionKind.PRIMARY);
+		if (!confirmed) return;
+		try {
+			caseService.resetLinkTypeOverride(new CaseServicePort.ResetLinkTypeOverrideCommand(requireTenantId(), requireActorUserId(), selected.id()));
+			loadLinkTypesAsync(selected.custom() ? "Custom link type removed from future selections. Existing links retain their stored Link Type relationship." : "Tenant override reset to global default for future selections. Existing links retain their stored Link Type relationship.");
+		} catch (RuntimeException ex) { showLinkTypeError(ex); }
+	}
+
+	private void loadLinkTypesAsync(String successMessage) {
+		if (caseService == null || linkTypeCardsContainer == null) return;
+		if (!requireAdminLookupManagement("Link Types")) { linkTypeRows.clear(); selectedLinkTypeRow = null; linkTypeCardsContainer.getChildren().clear(); return; }
+		final int generation = ++linkTypeLoadGeneration;
+		final int tenantId;
+		final int actorUserId;
+		try { tenantId = requireTenantId(); actorUserId = requireActorUserId(); } catch (RuntimeException ex) { setLinkTypeMessage(rootMessage(ex)); return; }
+		setLinkTypeLoadingState("Loading link types…");
+		settingsLoadExecutor.submit(() -> {
+			try {
+				List<LinkTypeViewRow> rows = buildLinkTypeRows(caseService.listLinkTypesForAdministration(tenantId, actorUserId), tenantId);
+				Platform.runLater(() -> applyLinkTypeRows(generation, rows, successMessage));
+			} catch (RuntimeException ex) {
+				System.err.println("Failed to load Settings link types: " + rootMessage(ex));
+				Platform.runLater(() -> { if (generation != linkTypeLoadGeneration) return; linkTypeRows.clear(); selectedLinkTypeRow = null; linkTypeCardsContainer.getChildren().clear(); setLinkTypeMessage("Failed to load link types. " + rootMessage(ex)); });
+			}
+		});
+	}
+
+	static List<LinkTypeViewRow> buildLinkTypeRows(List<LinkTypeDto> rows, int tenantId) {
+		Map<String, LinkTypeDto> globals = new java.util.LinkedHashMap<>();
+		Map<String, LinkTypeDto> tenantKeyed = new java.util.LinkedHashMap<>();
+		List<LinkTypeViewRow> out = new ArrayList<>();
+		for (LinkTypeDto row : rows == null ? List.<LinkTypeDto>of() : rows) {
+			if (row == null || (row.shaleClientId() != null && row.shaleClientId() != tenantId)) continue;
+			String key = safe(row.systemKey()).trim().toLowerCase(java.util.Locale.ROOT);
+			if (row.shaleClientId() == null && !key.isBlank()) globals.put(key, row);
+			else if (!key.isBlank()) tenantKeyed.put(key, row);
+			else if (!row.deleted()) out.add(new LinkTypeViewRow(row, LinkTypeScope.TENANT_CUSTOM));
+		}
+		for (Map.Entry<String, LinkTypeDto> e : globals.entrySet()) {
+			LinkTypeDto tenant = tenantKeyed.get(e.getKey());
+			out.add(tenant == null || tenant.deleted() ? new LinkTypeViewRow(e.getValue(), LinkTypeScope.GLOBAL_DEFAULT) : new LinkTypeViewRow(tenant, LinkTypeScope.TENANT_OVERRIDE));
+		}
+		for (Map.Entry<String, LinkTypeDto> e : tenantKeyed.entrySet()) if (!globals.containsKey(e.getKey()) && !e.getValue().deleted()) out.add(new LinkTypeViewRow(e.getValue(), LinkTypeScope.TENANT_CUSTOM));
+		out.sort(java.util.Comparator.comparing(LinkTypeViewRow::getName, String.CASE_INSENSITIVE_ORDER).thenComparingInt(LinkTypeViewRow::id));
+		return List.copyOf(out);
+	}
+
+	private void setLinkTypeLoadingState(String message) { if (linkTypeCardsContainer != null) linkTypeCardsContainer.getChildren().setAll(loadingLabel(message)); setLinkTypeMessage(message); }
+	private void applyLinkTypeRows(int generation, List<LinkTypeViewRow> rows, String successMessage) { if (generation != linkTypeLoadGeneration) return; Integer selectedId = selectedLinkTypeRow == null ? null : selectedLinkTypeRow.id(); linkTypeRows.clear(); linkTypeRows.addAll(rows); selectedLinkTypeRow = rows.stream().filter(row -> selectedId != null && row.id() == selectedId).findFirst().orElse(null); renderLinkTypeCards(); setLinkTypeMessage(successMessage != null && !successMessage.isBlank() ? successMessage : rows.isEmpty() ? "No link types are configured for this tenant." : ""); }
+	private void renderLinkTypeCards() { if (linkTypeCardsContainer == null) return; linkTypeCardsContainer.getChildren().clear(); for (LinkTypeViewRow row : linkTypeRows) linkTypeCardsContainer.getChildren().add(buildLinkTypeCard(row)); }
+	private VBox buildLinkTypeCard(LinkTypeViewRow row) {
+		VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact"); if (selectedLinkTypeRow != null && selectedLinkTypeRow.id() == row.id()) card.getStyleClass().add("link-type-card-selected"); card.setOnMouseClicked(event -> selectLinkTypeRow(row));
+		HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String colorCss = safe(ColorUtil.toCssBackgroundColorOrNull(row.getColor())); if (!colorCss.isBlank()) dot.setStyle("-fx-background-color: " + colorCss + "; -fx-fill: " + colorCss + ";"); Label name = new Label(row.getName()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer, LinkTypeIndicatorFactory.createLinkTypePill(row.getName(), row.getColor(), LinkTypeIndicatorFactory.PillSize.COMPACT));
+		HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.getActiveState()), metadataPill(row.scopeLabel())); if (!row.getSystemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.getSystemKey())); if (!row.getColor().isBlank()) metadata.getChildren().add(metadataPill(row.getColor()));
+		HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", "app-toolbar-button-neutral"); edit.setOnAction(event -> { selectLinkTypeRow(row); onEditLinkType(); event.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", "app-toolbar-button-neutral"); toggle.setOnAction(event -> { selectLinkTypeRow(row); onToggleLinkTypeActive(); event.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", row.custom() ? "app-toolbar-button-danger" : "app-toolbar-button-neutral"); reset.setDisable(row.global()); reset.setOnAction(event -> { selectLinkTypeRow(row); onResetOrRemoveLinkType(); event.consume(); }); Label help = new Label(row.lifecycleText()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit, toggle, reset, help);
+		card.getChildren().addAll(header, metadata, actions); return card;
+	}
+	private void selectLinkTypeRow(LinkTypeViewRow row) { selectedLinkTypeRow = row; renderLinkTypeCards(); }
+	private LinkTypeViewRow selectedLinkTypeRow() { if (selectedLinkTypeRow == null) setLinkTypeMessage("Select a link type first."); return selectedLinkTypeRow; }
+	private Optional<LinkTypeInput> showLinkTypeDialog(LinkTypeDto existing) {
+		Dialog<LinkTypeInput> dialog = new Dialog<>(); String dialogTitle = existing == null ? "Add Link Type" : (existing.shaleClientId() == null ? "Customize Link Type" : "Edit Link Type"); dialog.setTitle(dialogTitle); AppDialogs.applySecondaryDialogShell(dialog, dialogTitle); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		TextField name = new TextField(existing == null ? "" : existing.name()); name.setPromptText("100 characters max"); CheckBox active = new CheckBox("Active"); active.setSelected(existing == null || existing.active()); ColorPicker colorPicker = new ColorPicker(dbColorToFx(existing == null ? null : existing.color())); GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Name"),0,0); grid.add(name,1,0); grid.add(new Label("Color"),0,1); grid.add(colorPicker,1,1); grid.add(active,1,2); if (existing != null && !safe(existing.systemKey()).isBlank()) { grid.add(new Label("System Key"),0,3); grid.add(new Label(existing.systemKey()),1,3); } dialog.getDialogPane().setContent(grid);
+		dialog.setResultConverter(button -> { if (button != ButtonType.OK) return null; String trimmedName = trim(name.getText()); if (trimmedName.isBlank()) throw new IllegalArgumentException("Name is required."); if (trimmedName.length() > 100) throw new IllegalArgumentException("Name must be 100 characters or fewer."); String systemKey = linkTypeSystemKeyForSave(existing); if (systemKey != null && systemKey.length() > 64) throw new IllegalArgumentException("SystemKey must be 64 characters or fewer."); String color = fxColorToDb(colorPicker.getValue()); if (color.length() > 20) throw new IllegalArgumentException("Color must be 20 characters or fewer."); return new LinkTypeInput(trimmedName, color, active.isSelected(), systemKey); });
+		try { return dialog.showAndWait(); } catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Link Types", rootMessage(ex)); return Optional.empty(); }
+	}
+	private void showLinkTypeError(RuntimeException ex) { AppDialogs.showError(linkTypeCardsContainer == null || linkTypeCardsContainer.getScene() == null ? null : linkTypeCardsContainer.getScene().getWindow(), "Link Types", rootMessage(ex)); }
+
 
 	@FXML
 	private void onAddPracticeArea() {
@@ -641,8 +779,16 @@ public final class SettingsController {
 			setCaseStatusMessage(message);
 		} else if ("Practice Areas".equals(sectionName)) {
 			setPracticeAreaMessage(message);
+		} else if ("Link Types".equals(sectionName)) {
+			setLinkTypeMessage(message);
 		}
 		return false;
+	}
+
+	private int requireActorUserId() {
+		Integer id = appState == null ? null : appState.getUserId();
+		if (id == null || id <= 0) throw new IllegalStateException("No actor user is selected.");
+		return id;
 	}
 
 	private int requireTenantId() {
@@ -656,6 +802,9 @@ public final class SettingsController {
 
 	static Color dbColorToFx(String value) {
 		String normalized = value == null ? "" : value.trim();
+		if (normalized.matches("(?i)^#[0-9a-f]{6}$")) {
+			try { return Color.web(normalized); } catch (RuntimeException ignored) { return DEFAULT_STATUS_COLOR; }
+		}
 		if (normalized.matches("(?i)^0x[0-9a-f]{8}$")) {
 			try {
 				int red = Integer.parseInt(normalized.substring(2, 4), 16);
@@ -692,6 +841,10 @@ public final class SettingsController {
 	}
 
 	static String practiceAreaSystemKeyForSave(PracticeAreaDto existing) {
+		return existing == null ? null : existing.systemKey();
+	}
+
+	static String linkTypeSystemKeyForSave(LinkTypeDto existing) {
 		return existing == null ? null : existing.systemKey();
 	}
 
@@ -923,6 +1076,7 @@ public final class SettingsController {
 	private static String trim(String value) { return value == null ? "" : value.trim(); }
 
 	private void setPracticeAreaMessage(String message) { if (practiceAreaSettingsStatusLabel != null) practiceAreaSettingsStatusLabel.setText(message == null ? "" : message); }
+	private void setLinkTypeMessage(String message) { if (linkTypeSettingsStatusLabel != null) linkTypeSettingsStatusLabel.setText(message == null ? "" : message); }
 	private static String safe(String value) { return value == null ? "" : value; }
 	private static String rootMessage(Throwable ex) { Throwable t = ex; while (t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? t.toString() : t.getMessage(); }
 
@@ -942,6 +1096,27 @@ public final class SettingsController {
 		CaseStatusDto status() { return status; }
 	}
 
+
+	public enum LinkTypeScope { GLOBAL_DEFAULT, TENANT_OVERRIDE, TENANT_CUSTOM }
+
+	public static final class LinkTypeViewRow {
+		private final LinkTypeDto linkType;
+		private final LinkTypeScope scope;
+		LinkTypeViewRow(LinkTypeDto linkType, LinkTypeScope scope) { this.linkType = linkType; this.scope = scope; }
+		public int getId() { return linkType.id(); }
+		public int id() { return linkType.id(); }
+		public String getName() { return safe(linkType.name()); }
+		public String getColor() { return safe(linkType.color()); }
+		public String getActiveState() { return linkType.active() && !linkType.deleted() ? "Active" : "Inactive"; }
+		public String getSystemKey() { return safe(linkType.systemKey()); }
+		public boolean active() { return linkType.active() && !linkType.deleted(); }
+		public boolean global() { return scope == LinkTypeScope.GLOBAL_DEFAULT; }
+		public boolean custom() { return scope == LinkTypeScope.TENANT_CUSTOM; }
+		public String scopeLabel() { return switch (scope) { case GLOBAL_DEFAULT -> "Global/default"; case TENANT_OVERRIDE -> "Tenant override"; case TENANT_CUSTOM -> "Tenant custom"; }; }
+		public String lifecycleText() { return switch (scope) { case GLOBAL_DEFAULT -> "Editing or changing active state creates a tenant override; global rows are never changed."; case TENANT_OVERRIDE -> "Tenant override masks the global default until reset."; case TENANT_CUSTOM -> "Tenant custom type can be edited, activated/deactivated, or removed."; }; }
+		byte[] rowVer() { return linkType.rowVer(); }
+		LinkTypeDto linkType() { return linkType; }
+	}
 
 	public static final class UserManagementViewRow {
 		private final UserDao.UserManagementRow row;
@@ -973,6 +1148,8 @@ public final class SettingsController {
 		public String scopeLabel() { return global() ? "Global/default" : "Tenant/custom"; }
 		PracticeAreaDto practiceArea() { return practiceArea; }
 	}
+
+	private record LinkTypeInput(String name, String color, boolean active, String systemKey) {}
 
 	private record PracticeAreaInput(String name, String color, boolean active, String systemKey) {}
 
@@ -1049,6 +1226,10 @@ public final class SettingsController {
 		if (practiceAreaAdministrationSection != null) {
 			practiceAreaAdministrationSection.setVisible(visible);
 			practiceAreaAdministrationSection.setManaged(visible);
+		}
+		if (linkTypeAdministrationSection != null) {
+			linkTypeAdministrationSection.setVisible(visible);
+			linkTypeAdministrationSection.setManaged(visible);
 		}
 		if (userAdministrationSection != null) {
 			userAdministrationSection.setVisible(visible);
