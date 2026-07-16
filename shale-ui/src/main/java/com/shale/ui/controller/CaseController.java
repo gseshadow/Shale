@@ -322,6 +322,10 @@ public class CaseController {
 	private Label ovDescriptionValue;
 	@FXML
 	private TextArea ovDescriptionEditor;
+	@FXML
+	private VBox ovPrimaryLinkBox;
+	@FXML
+	private Label ovPrimaryLinkStatusLabel;
 
 	@FXML
 	private Button deleteCaseButton;
@@ -634,6 +638,10 @@ public class CaseController {
 	private boolean caseLinksLoadedOnce;
 	private boolean caseLinksStale = true;
 	private int caseLinksLoadGeneration;
+	private Optional<CaseLinkDto> overviewPrimaryLink = Optional.empty();
+	private boolean overviewPrimaryLinkLoadedOnce;
+	private boolean overviewPrimaryLinkStale = true;
+	private int overviewPrimaryLinkLoadGeneration;
 	private CalendarFeedSourceFilter caseCalendarSourceFilter = CalendarFeedSourceFilter.caseCalendarDefaults();
 	private byte[] latestCaseRowVer;
 	private byte[] overviewEditRowVer;
@@ -754,6 +762,7 @@ public class CaseController {
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
 		resetCaseLinksState();
+		resetOverviewPrimaryLinkState();
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
 		this.caseUpdatesLoading = false;
@@ -771,6 +780,7 @@ public class CaseController {
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
 		resetCaseLinksState();
+		resetOverviewPrimaryLinkState();
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
 		this.caseUpdatesLoading = false;
@@ -1820,6 +1830,119 @@ public class CaseController {
 		if (caseLinksCardsBox != null) caseLinksCardsBox.getChildren().clear();
 	}
 
+	private void resetOverviewPrimaryLinkState() {
+		overviewPrimaryLink = Optional.empty();
+		overviewPrimaryLinkLoadedOnce = false;
+		overviewPrimaryLinkStale = true;
+		overviewPrimaryLinkLoadGeneration++;
+		renderOverviewPrimaryLinkLoading();
+	}
+
+	private void invalidateOverviewPrimaryLinkAfterCaseLinkMutation() {
+		overviewPrimaryLinkStale = true;
+		overviewPrimaryLinkLoadedOnce = false;
+		if ("Overview".equals(activeSectionName)) loadOverviewPrimaryLinkIfNeeded();
+	}
+
+	private void loadOverviewPrimaryLinkIfNeeded() {
+		if (overviewPrimaryLinkLoadedOnce && !overviewPrimaryLinkStale) {
+			renderOverviewPrimaryLinkState();
+			return;
+		}
+		if (caseService == null || appState == null || caseId == null) {
+			renderOverviewPrimaryLinkFailure("Primary Link is unavailable.");
+			return;
+		}
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || tenantId <= 0) {
+			renderOverviewPrimaryLinkFailure("Primary Link is unavailable because no tenant is selected.");
+			return;
+		}
+		final int activeCaseId = caseId;
+		final int generation = ++overviewPrimaryLinkLoadGeneration;
+		renderOverviewPrimaryLinkLoading();
+		new Thread(() -> {
+			try {
+				Optional<CaseLinkDto> primary = caseService.getPrimaryCaseLink(activeCaseId, tenantId);
+				Platform.runLater(() -> {
+					if (caseId == null || caseId != activeCaseId || generation != overviewPrimaryLinkLoadGeneration) return;
+					overviewPrimaryLink = primary == null ? Optional.empty() : primary;
+					overviewPrimaryLinkLoadedOnce = true;
+					overviewPrimaryLinkStale = false;
+					renderOverviewPrimaryLinkState();
+				});
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> {
+					if (caseId == null || caseId != activeCaseId || generation != overviewPrimaryLinkLoadGeneration) return;
+					renderOverviewPrimaryLinkFailure("Failed to load primary link. " + rootMessage(ex));
+				});
+			}
+		}, "case-overview-primary-link-load-" + activeCaseId).start();
+	}
+
+	private void renderOverviewPrimaryLinkLoading() {
+		if (ovPrimaryLinkBox != null) ovPrimaryLinkBox.getChildren().clear();
+		showOverviewPrimaryLinkMessage("Loading primary link…");
+	}
+
+	private void renderOverviewPrimaryLinkFailure(String message) {
+		if (ovPrimaryLinkBox != null) ovPrimaryLinkBox.getChildren().clear();
+		showOverviewPrimaryLinkMessage(message);
+	}
+
+	private void renderOverviewPrimaryLinkState() {
+		if (ovPrimaryLinkBox == null) return;
+		ovPrimaryLinkBox.getChildren().clear();
+		setVisibleManaged(ovPrimaryLinkStatusLabel, false);
+		if (overviewPrimaryLink.isEmpty()) {
+			Label empty = new Label("No primary link has been selected for this case.");
+			empty.setWrapText(true);
+			empty.getStyleClass().add("case-overview-row-value");
+			Button manage = ActionButtonFactory.cardAction("Manage Links", e -> navigateToCaseLinksForManagement());
+			ovPrimaryLinkBox.getChildren().addAll(empty, manage);
+			return;
+		}
+		CaseLinkDto link = overviewPrimaryLink.get();
+		VBox card = new VBox(6);
+		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-density-compact", "case-link-card", "case-overview-primary-link-card");
+		HBox header = new HBox(8);
+		header.setAlignment(Pos.CENTER_LEFT);
+		Label title = new Label(blankTo(link.displayName(), "Untitled link"));
+		title.getStyleClass().add("app-dialog-field-label");
+		title.setWrapText(true);
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		Label primary = new Label("Primary");
+		primary.getStyleClass().addAll("shale-status-pill", "shale-status-pill-small");
+		header.getChildren().addAll(title, spacer, LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor(), LinkTypeIndicatorFactory.PillSize.COMPACT), primary);
+		Label url = new Label(blankTo(link.url(), "—"));
+		url.getStyleClass().add("search-summary-text");
+		url.setWrapText(true);
+		url.setTextOverrun(OverrunStyle.ELLIPSIS);
+		url.setTooltip(new Tooltip(blankTo(link.url(), "—")));
+		HBox buttons = new HBox(6);
+		buttons.setAlignment(Pos.CENTER_LEFT);
+		buttons.getChildren().addAll(ActionButtonFactory.cardAction("Open Link", e -> onOpenOverviewPrimaryLink(link)), ActionButtonFactory.cardAction("Manage Links", e -> navigateToCaseLinksForManagement()));
+		card.getChildren().addAll(header, url, buttons);
+		ovPrimaryLinkBox.getChildren().add(card);
+	}
+
+	private void showOverviewPrimaryLinkMessage(String message) {
+		if (ovPrimaryLinkStatusLabel != null) {
+			ovPrimaryLinkStatusLabel.setText(message == null ? "" : message);
+			setVisibleManaged(ovPrimaryLinkStatusLabel, message != null && !message.isBlank());
+		}
+	}
+
+	private void onOpenOverviewPrimaryLink(CaseLinkDto link) {
+		try { externalBrowserHelper.openHttpOrHttps(link.url()); }
+		catch (RuntimeException ex) { AppDialogs.showError(caseOverviewOwner(), "Open Link", rootMessage(ex)); }
+	}
+
+	private void navigateToCaseLinksForManagement() {
+		onSectionSelected("Links", true);
+	}
+
 	private void showLinksTab() {
 		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
@@ -1905,8 +2028,14 @@ public class CaseController {
 	}
 
 	private void runCaseLinkMutation(String successMessage, java.util.concurrent.Callable<?> action) {
-		try { action.call(); loadCaseLinksAsync(successMessage); }
-		catch (Exception ex) { AppDialogs.showError(caseLinksOwner(), "Case Links", rootMessage(ex)); renderCaseLinks(null); }
+		try {
+			action.call();
+			invalidateOverviewPrimaryLinkAfterCaseLinkMutation();
+			loadCaseLinksAsync(successMessage);
+		} catch (Exception ex) {
+			AppDialogs.showError(caseLinksOwner(), "Case Links", rootMessage(ex));
+			renderCaseLinks(null);
+		}
 	}
 
 	private Optional<List<LinkTypeDto>> loadLinkTypesForDialog(CaseLinkDto currentLink) {
@@ -1935,6 +2064,8 @@ public class CaseController {
 	}
 
 	private static String rootMessage(Throwable ex) { Throwable cur = ex; while (cur != null && cur.getCause() != null) cur = cur.getCause(); String msg = cur == null ? null : cur.getMessage(); return msg == null || msg.isBlank() ? "Unexpected error." : msg; }
+	private static boolean blank(String s) { return s == null || s.trim().isEmpty(); }
+	private static String blankTo(String s, String fallback) { return blank(s) ? fallback : s.trim(); }
 	private static String trimLimit(String value, String label, int max, boolean required) { String out = value == null ? "" : value.trim(); if (required && out.isBlank()) throw new IllegalArgumentException(label + " is required."); if (out.length() > max) throw new IllegalArgumentException(label + " must be " + max + " characters or fewer."); return out.isBlank() ? null : out; }
 	private Window caseLinksOwner() { return caseLinksTabPane != null && caseLinksTabPane.getScene() != null ? caseLinksTabPane.getScene().getWindow() : taskDialogOwner(); }
 	private int requireTenantId() { Integer id = appState == null ? null : appState.getShaleClientId(); if (id == null || id <= 0) throw new IllegalStateException("No tenant is selected."); return id; }
@@ -2013,6 +2144,11 @@ public class CaseController {
 		return taskDialogOwner();
 	}
 
+	private Window caseOverviewOwner() {
+		if (overviewScrollPane != null && overviewScrollPane.getScene() != null) return overviewScrollPane.getScene().getWindow();
+		return taskDialogOwner();
+	}
+
 	private void showOverview() {
 		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, true);
@@ -2026,6 +2162,7 @@ public class CaseController {
 			contentTitleLabel.setText("Overview");
 		loadCaseUpdatesAsync();
 		loadOverviewOnce();
+		loadOverviewPrimaryLinkIfNeeded();
 		auditCaseRead("Case.Overview.Read", "Case.Overview");
 	}
 
