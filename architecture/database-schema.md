@@ -803,3 +803,49 @@ Integrity protections:
 * `UX_CaseLinks_CaseId_Primary_Active` allows at most one active primary link per case.
 * Both filtered indexes ignore soft-deleted rows so legitimate replacements are not blocked.
 * Service code must keep `CaseLinks.ShaleClientId` equal to the linked case and external link tenants; the legacy single-column primary keys on `dbo.Cases` and `dbo.ExternalLinks` prevent this tenant boundary from being enforced with a verified composite foreign key in phase 1.
+
+## dbo.CaseLinkShares
+
+Strict tenant-owned associations recording Contacts with whom a case-specific Case Link has been shared.
+
+| Column            | Type            | Notes |
+| ----------------- | --------------- | ----- |
+| `Id`              | int             | Identity primary key |
+| `ShaleClientId`   | int             | Tenant id; strict RLS ownership |
+| `CaseLinkId`      | int             | Reference to `dbo.CaseLinks.Id`; stores the case-specific link, not the reusable ExternalLink |
+| `ContactId`       | int             | Reference to `dbo.Contacts.Id`; first release supports Contact recipients only |
+| `SharedAt`        | datetime2       | User-asserted date/time the link was shared; defaults to current UTC time but is distinct from `CreatedAt` |
+| `Notes`           | nvarchar(1000)  | Optional sharing/access notes |
+| `IsDeleted`       | bit             | Soft-delete/unshared marker |
+| `DeletedAt`       | datetime2       | Date/time the association was removed |
+| `DeletedByUserId` | int             | User who removed/unshared the association when known |
+| `CreatedByUserId` | int             | User who recorded the share |
+| `UpdatedByUserId` | int             | Last editing user |
+| `CreatedAt`       | datetime2       | Database record creation timestamp; defaults to current UTC time |
+| `UpdatedAt`       | datetime2       | Last database record update timestamp |
+| `RowVer`          | rowversion      | Row version for optimistic concurrency |
+
+Relationship semantics:
+
+* `dbo.CaseLinkShares` is a many-to-many association between `dbo.CaseLinks` and `dbo.Contacts`: one Case Link may be shared with multiple Contacts, and one Contact may receive links from multiple cases.
+* Sharing is tracked by `CaseLinkId`, not by `ExternalLinkId`, so reused external URLs retain the case context of the share.
+* The table records Shale's knowledge that a link was shared. It does not verify permissions with Box, Clio, another external system, or a remote URL.
+* Only Contact sharing is represented in this phase; organization, user, generic entity, preview, credential, token, and permission-verification fields are intentionally out of scope.
+
+Integrity protections:
+
+* `PK_CaseLinkShares` is the single-column primary key on `Id`.
+* Single-column foreign keys reference `dbo.ShaleClients(Id)`, `dbo.CaseLinks(Id)`, `dbo.Contacts(Id)`, and `dbo.Users(Id)` for `CreatedByUserId`, `UpdatedByUserId`, and `DeletedByUserId`.
+* No cascade delete behavior is used; Shale preserves sharing history through soft deletion.
+* `UX_CaseLinkShares_CaseLinkId_ContactId_Active` enforces at most one active association for the same `(ShaleClientId, CaseLinkId, ContactId)` while allowing historical soft-deleted rows and later re-shares.
+* `IX_CaseLinkShares_ShaleClientId_ContactId_Active` supports future Contact views answering which active links have been shared with a Contact and includes `CaseLinkId` and `SharedAt`.
+* Loading active shares for a Case Link is supported by the filtered unique active index prefix `(ShaleClientId, CaseLinkId, ContactId)`; avoid redundant indexes unless a future query plan proves they are needed.
+
+Tenant consistency and lifecycle requirements:
+
+* `CaseLinkShares.ShaleClientId` must match the referenced Case Link, Contact, and runtime actor Users tenant. Phase 5.2 keeps single-column foreign keys because the migration does not verify existing composite unique keys on `dbo.CaseLinks(ShaleClientId, Id)` or `dbo.Contacts(ShaleClientId, Id)` and must not redesign base tables solely for composite foreign keys.
+* Services must validate Case Link, Contact, and actor tenant compatibility before inserting or mutating shares; strict RLS remains defense in depth.
+* Active rows use `IsDeleted = 0`, `DeletedAt IS NULL`, and `DeletedByUserId IS NULL`.
+* Removed/unshared rows use `IsDeleted = 1`, with `DeletedAt` populated and `DeletedByUserId` populated when an actor is known. Soft-deleted rows must not be treated as currently shared.
+* Phase 5.3 Case Link deletion must soft-delete active `CaseLinkShares` rows in the same transaction that soft-deletes the parent Case Link.
+* Contact soft deletion must not cascade-delete shares. Historical reads should preserve records where appropriate, but Phase 5.3 services must reject new active shares to deleted or unavailable Contacts.
