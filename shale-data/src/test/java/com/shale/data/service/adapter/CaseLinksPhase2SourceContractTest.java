@@ -5,11 +5,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
 import com.shale.core.dto.LinkTypeDto;
+import com.shale.data.dao.CaseDao;
 
 class CaseLinksPhase2SourceContractTest {
 	@Test
@@ -41,15 +43,45 @@ class CaseLinksPhase2SourceContractTest {
 	}
 
 	@Test
+	void sqlConflictTranslationTargetsUniqueViolationsOnly() {
+		SQLException duplicateSystemKey = new SQLException(
+				"Violation of UNIQUE KEY UX_LinkTypes_ShaleClientId_SystemKey_NonNull", "23000", 2601);
+		RuntimeException translated = CaseDao.translateSql("Failed to update link type", duplicateSystemKey);
+		assertTrue(translated instanceof IllegalArgumentException);
+		assertSame(duplicateSystemKey, translated.getCause());
+
+		SQLException connectionFailure = new SQLException("connection failed", "08001", 0);
+		RuntimeException preserved = CaseDao.translateSql("Failed to update link type", connectionFailure);
+		assertFalse(preserved instanceof IllegalArgumentException);
+		assertSame(connectionFailure, preserved.getCause());
+	}
+
+	@Test
 	void caseDaoContainsRequiredTenantSafeSqlAndTransactions() throws IOException {
 		String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+		String reorderMethod = methodSource(source, "public List<CaseLinkDto> reorderCaseLinks");
+		String updateLinkTypeMethod = methodSource(source, "public LinkTypeDto updateLinkType");
 		assertAll(
-				() -> assertTrue(source.contains("cl.ShaleClientId=?")),
-				() -> assertTrue(source.contains("el.ShaleClientId=cl.ShaleClientId")),
-				() -> assertTrue(source.contains("(lt.ShaleClientId IS NULL OR lt.ShaleClientId=cl.ShaleClientId)")),
-				() -> assertTrue(source.contains("cl.IsDeleted=0 AND el.IsDeleted=0")),
+				() -> assertTrue(source.contains("cl.ShaleClientId = ?")),
+				() -> assertTrue(source.contains("el.ShaleClientId = cl.ShaleClientId")),
+				() -> assertTrue(source.contains("lt.ShaleClientId IS NULL OR lt.ShaleClientId = cl.ShaleClientId")),
+				() -> assertTrue(source.contains("cl.IsDeleted = 0")),
+				() -> assertTrue(source.contains("el.IsDeleted = 0")),
 				() -> assertTrue(source.contains("con.setAutoCommit(false)")),
 				() -> assertTrue(source.contains("ORDER BY SortOrder, Id")),
+				() -> assertTrue(source.contains("TOP (1)")),
+				() -> assertTrue(source.contains("AND RowVer = ?")),
+				() -> assertTrue(source.contains("if (ps.executeUpdate() != 1)")),
+				() -> assertFalse(reorderMethod.contains("listCaseLinks(caseId, shaleClientId)")),
+				() -> assertFalse(updateLinkTypeMethod.contains("return updateLinkType(")),
+				() -> assertFalse(updateLinkTypeMethod.contains("return createLinkType(")),
 				() -> assertFalse(source.contains("javafx")));
+	}
+
+	private static String methodSource(String source, String signature) {
+		int start = source.indexOf(signature);
+		assertTrue(start >= 0, signature);
+		int nextPublic = source.indexOf("\n\tpublic ", start + signature.length());
+		return nextPublic < 0 ? source.substring(start) : source.substring(start, nextPublic);
 	}
 }

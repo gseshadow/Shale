@@ -159,58 +159,280 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	static List<LinkTypeDto> resolveEffectiveLinkTypes(List<LinkTypeDto> rows, int shaleClientId, boolean includeInactive) {
-		if (rows == null || rows.isEmpty() || shaleClientId <= 0) return List.of();
-		Map<String, LinkTypeDto> keyed = new LinkedHashMap<>();
+		if (rows == null || rows.isEmpty() || shaleClientId <= 0) {
+			return List.of();
+		}
+
+		Map<String, LinkTypeDto> bySystemKey = new LinkedHashMap<>();
 		List<LinkTypeDto> unkeyed = new ArrayList<>();
 		for (LinkTypeDto type : rows) {
-			if (type == null) continue;
+			if (type == null) {
+				continue;
+			}
 			Integer tenantId = type.shaleClientId();
-			if (tenantId != null && tenantId != shaleClientId) continue;
-			if (!includeInactive && (!type.active() || type.deleted())) continue;
+			if (tenantId != null && tenantId != shaleClientId) {
+				continue;
+			}
+
 			String key = normalizeSystemKey(type.systemKey());
-			if (key == null) { unkeyed.add(type); continue; }
-			LinkTypeDto existing = keyed.get(key);
+			if (key == null) {
+				if (includeInactive || (type.active() && !type.deleted())) {
+					unkeyed.add(type);
+				}
+				continue;
+			}
+
+			if (tenantId != null && tenantId == shaleClientId && type.deleted()) {
+				// A deleted tenant override is a reset/removal marker and must not suppress the global row.
+				continue;
+			}
+
+			LinkTypeDto existing = bySystemKey.get(key);
 			boolean tenantRow = tenantId != null && tenantId == shaleClientId;
-			boolean existingTenant = existing != null && existing.shaleClientId() != null && existing.shaleClientId() == shaleClientId;
-			if (existing == null || (tenantRow && !existingTenant)) keyed.put(key, type);
+			boolean existingTenantRow = existing != null
+					&& existing.shaleClientId() != null
+					&& existing.shaleClientId() == shaleClientId;
+			if (existing == null || (tenantRow && !existingTenantRow)) {
+				bySystemKey.put(key, type);
+			}
 		}
-		List<LinkTypeDto> effective = new ArrayList<>(keyed.size() + unkeyed.size());
-		effective.addAll(keyed.values());
+
+		List<LinkTypeDto> effective = new ArrayList<>(bySystemKey.size() + unkeyed.size());
+		for (LinkTypeDto winner : bySystemKey.values()) {
+			if (includeInactive || (winner.active() && !winner.deleted())) {
+				effective.add(winner);
+			}
+		}
 		effective.addAll(unkeyed);
-		effective.sort(Comparator.comparing((LinkTypeDto t) -> t.name() == null ? "" : t.name(), String.CASE_INSENSITIVE_ORDER).thenComparingInt(LinkTypeDto::id));
+		effective.sort(Comparator
+				.comparing((LinkTypeDto type) -> type.name() == null ? "" : type.name(), String.CASE_INSENSITIVE_ORDER)
+				.thenComparingInt(LinkTypeDto::id));
 		return List.copyOf(effective);
 	}
 
-	@Override public List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive) { return caseGateway.listTenantLinkTypes(shaleClientId, includeInactive); }
-	@Override public LinkTypeDto createLinkType(LinkTypeCommand command) { Objects.requireNonNull(command, "command"); return caseGateway.createLinkType(command.shaleClientId(), command.actorUserId(), command.name(), command.color(), command.active(), command.systemKey()); }
-	@Override public LinkTypeDto updateLinkType(LinkTypeCommand command) { Objects.requireNonNull(command, "command"); if (command.id() == null) throw new IllegalArgumentException("Link type id is required."); return caseGateway.updateLinkType(command.shaleClientId(), command.actorUserId(), command.id(), command.name(), command.color(), command.active(), command.systemKey(), command.expectedRowVer()); }
-	@Override public LinkTypeDto setLinkTypeActive(SetLinkTypeActiveCommand command) { Objects.requireNonNull(command, "command"); return caseGateway.setLinkTypeActive(command.shaleClientId(), command.actorUserId(), command.linkTypeId(), command.active(), command.expectedRowVer()); }
-	@Override public void resetLinkTypeOverride(ResetLinkTypeOverrideCommand command) { Objects.requireNonNull(command, "command"); caseGateway.resetLinkTypeOverride(command.shaleClientId(), command.actorUserId(), command.linkTypeId()); }
-	@Override public List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId) { return caseGateway.listCaseLinks(caseId, shaleClientId); }
-	@Override public Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId) { return caseGateway.getPrimaryCaseLink(caseId, shaleClientId); }
-	@Override public CaseLinkDto createCaseLink(CreateCaseLinkCommand command) { Objects.requireNonNull(command, "command"); return caseGateway.createCaseLink(command.shaleClientId(), command.actorUserId(), command.caseId(), command.linkTypeId(), validateDisplayName(command.displayName()), validateUrl(command.url()), validateDescription(command.description()), command.primary(), validateNotes(command.notes()), command.sortOrder()); }
-	@Override public CaseLinkDto updateCaseLink(UpdateCaseLinkCommand command) { Objects.requireNonNull(command, "command"); return caseGateway.updateCaseLink(command.shaleClientId(), command.actorUserId(), command.caseId(), command.caseLinkId(), command.externalLinkId(), command.linkTypeId(), validateDisplayName(command.displayName()), validateUrl(command.url()), validateDescription(command.description()), command.primary(), validateNotes(command.notes()), command.sortOrder(), command.expectedCaseLinkRowVer(), command.expectedExternalLinkRowVer()); }
-	@Override public CaseLinkDto setPrimaryCaseLink(SetPrimaryCaseLinkCommand command) { Objects.requireNonNull(command, "command"); return caseGateway.setPrimaryCaseLink(command.shaleClientId(), command.actorUserId(), command.caseId(), command.caseLinkId()); }
-	@Override public List<CaseLinkDto> reorderCaseLinks(ReorderCaseLinksCommand command) { Objects.requireNonNull(command, "command"); return caseGateway.reorderCaseLinks(command.shaleClientId(), command.actorUserId(), command.caseId(), command.orderedCaseLinkIds()); }
-	@Override public void deleteCaseLink(DeleteCaseLinkCommand command) { Objects.requireNonNull(command, "command"); caseGateway.deleteCaseLink(command.shaleClientId(), command.actorUserId(), command.caseId(), command.caseLinkId(), command.expectedCaseLinkRowVer()); }
+	@Override
+	public List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive) {
+		return caseGateway.listTenantLinkTypes(shaleClientId, includeInactive);
+	}
 
-	private static String validateDisplayName(String value) { String v = value == null ? "" : value.trim(); if (v.isBlank()) throw new IllegalArgumentException("Display name is required."); if (v.length() > 255) throw new IllegalArgumentException("Display name must be 255 characters or fewer."); return v; }
-	private static String validateDescription(String value) { return value == null ? null : value; }
-	private static String validateNotes(String value) { if (value != null && value.length() > 2000) throw new IllegalArgumentException("Notes must be 2000 characters or fewer."); return value; }
+	@Override
+	public LinkTypeDto createLinkType(LinkTypeCommand command) {
+		Objects.requireNonNull(command, "command");
+		validateLinkTypeName(command.name());
+		validateLinkTypeColor(command.color());
+		validateSystemKey(command.systemKey());
+		return caseGateway.createLinkType(
+				command.shaleClientId(),
+				command.actorUserId(),
+				command.name(),
+				command.color(),
+				command.active(),
+				command.systemKey());
+	}
+
+	@Override
+	public LinkTypeDto updateLinkType(LinkTypeCommand command) {
+		Objects.requireNonNull(command, "command");
+		if (command.id() == null) {
+			throw new IllegalArgumentException("Link type id is required.");
+		}
+		validateRequiredRowVer(command.expectedRowVer(), "expectedRowVer");
+		validateLinkTypeName(command.name());
+		validateLinkTypeColor(command.color());
+		validateSystemKey(command.systemKey());
+		return caseGateway.updateLinkType(
+				command.shaleClientId(),
+				command.actorUserId(),
+				command.id(),
+				command.name(),
+				command.color(),
+				command.active(),
+				command.systemKey(),
+				command.expectedRowVer());
+	}
+
+	@Override
+	public LinkTypeDto setLinkTypeActive(SetLinkTypeActiveCommand command) {
+		Objects.requireNonNull(command, "command");
+		validateRequiredRowVer(command.expectedRowVer(), "expectedRowVer");
+		return caseGateway.setLinkTypeActive(
+				command.shaleClientId(),
+				command.actorUserId(),
+				command.linkTypeId(),
+				command.active(),
+				command.expectedRowVer());
+	}
+
+	@Override
+	public void resetLinkTypeOverride(ResetLinkTypeOverrideCommand command) {
+		Objects.requireNonNull(command, "command");
+		caseGateway.resetLinkTypeOverride(command.shaleClientId(), command.actorUserId(), command.linkTypeId());
+	}
+
+	@Override
+	public List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId) {
+		return caseGateway.listCaseLinks(caseId, shaleClientId);
+	}
+
+	@Override
+	public Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId) {
+		return caseGateway.getPrimaryCaseLink(caseId, shaleClientId);
+	}
+
+	@Override
+	public CaseLinkDto createCaseLink(CreateCaseLinkCommand command) {
+		Objects.requireNonNull(command, "command");
+		return caseGateway.createCaseLink(
+				command.shaleClientId(),
+				command.actorUserId(),
+				command.caseId(),
+				command.linkTypeId(),
+				validateDisplayName(command.displayName()),
+				validateUrl(command.url()),
+				validateDescription(command.description()),
+				command.primary(),
+				validateNotes(command.notes()),
+				command.sortOrder());
+	}
+
+	@Override
+	public CaseLinkDto updateCaseLink(UpdateCaseLinkCommand command) {
+		Objects.requireNonNull(command, "command");
+		validateRequiredRowVer(command.expectedCaseLinkRowVer(), "expectedCaseLinkRowVer");
+		validateRequiredRowVer(command.expectedExternalLinkRowVer(), "expectedExternalLinkRowVer");
+		return caseGateway.updateCaseLink(
+				command.shaleClientId(),
+				command.actorUserId(),
+				command.caseId(),
+				command.caseLinkId(),
+				command.externalLinkId(),
+				command.linkTypeId(),
+				validateDisplayName(command.displayName()),
+				validateUrl(command.url()),
+				validateDescription(command.description()),
+				command.primary(),
+				validateNotes(command.notes()),
+				command.sortOrder(),
+				command.expectedCaseLinkRowVer(),
+				command.expectedExternalLinkRowVer());
+	}
+
+	@Override
+	public CaseLinkDto setPrimaryCaseLink(SetPrimaryCaseLinkCommand command) {
+		Objects.requireNonNull(command, "command");
+		return caseGateway.setPrimaryCaseLink(command.shaleClientId(), command.actorUserId(), command.caseId(), command.caseLinkId());
+	}
+
+	@Override
+	public List<CaseLinkDto> reorderCaseLinks(ReorderCaseLinksCommand command) {
+		Objects.requireNonNull(command, "command");
+		validateOrderedCaseLinkIds(command.orderedCaseLinkIds());
+		return caseGateway.reorderCaseLinks(command.shaleClientId(), command.actorUserId(), command.caseId(), command.orderedCaseLinkIds());
+	}
+
+	@Override
+	public void deleteCaseLink(DeleteCaseLinkCommand command) {
+		Objects.requireNonNull(command, "command");
+		validateRequiredRowVer(command.expectedCaseLinkRowVer(), "expectedCaseLinkRowVer");
+		caseGateway.deleteCaseLink(
+				command.shaleClientId(),
+				command.actorUserId(),
+				command.caseId(),
+				command.caseLinkId(),
+				command.expectedCaseLinkRowVer());
+	}
+
+	private static String validateLinkTypeName(String value) {
+		return validateRequiredLength(value, "Name", 100);
+	}
+
+	private static String validateLinkTypeColor(String value) {
+		if (value != null && value.trim().length() > 20) {
+			throw new IllegalArgumentException("Color must be 20 characters or fewer.");
+		}
+		return value;
+	}
+
+	private static String validateSystemKey(String value) {
+		String normalized = normalizeSystemKey(value);
+		if (normalized != null && normalized.length() > 64) {
+			throw new IllegalArgumentException("System key must be 64 characters or fewer.");
+		}
+		return normalized;
+	}
+
+	private static String validateDisplayName(String value) {
+		return validateRequiredLength(value, "Display name", 255);
+	}
+
+	private static String validateRequiredLength(String value, String label, int maxLength) {
+		String trimmed = value == null ? "" : value.trim();
+		if (trimmed.isBlank()) {
+			throw new IllegalArgumentException(label + " is required.");
+		}
+		if (trimmed.length() > maxLength) {
+			throw new IllegalArgumentException(label + " must be " + maxLength + " characters or fewer.");
+		}
+		return trimmed;
+	}
+
+	private static String validateDescription(String value) {
+		return value;
+	}
+
+	private static String validateNotes(String value) {
+		if (value != null && value.length() > 2000) {
+			throw new IllegalArgumentException("Notes must be 2000 characters or fewer.");
+		}
+		return value;
+	}
+
 	static String validateUrl(String value) {
 		String url = value == null ? "" : value.trim();
-		if (url.isBlank()) throw new IllegalArgumentException("URL is required.");
-		if (url.length() > 2048) throw new IllegalArgumentException("URL must be 2048 characters or fewer.");
-		for (int i = 0; i < url.length(); i++) if (Character.isISOControl(url.charAt(i))) throw new IllegalArgumentException("URL must not contain control characters.");
+		if (url.isBlank()) {
+			throw new IllegalArgumentException("URL is required.");
+		}
+		if (url.length() > 2048) {
+			throw new IllegalArgumentException("URL must be 2048 characters or fewer.");
+		}
+		for (int i = 0; i < url.length(); i++) {
+			if (Character.isISOControl(url.charAt(i))) {
+				throw new IllegalArgumentException("URL must not contain control characters.");
+			}
+		}
 		try {
 			URI uri = new URI(url);
 			String scheme = uri.getScheme();
-			if (!uri.isAbsolute() || scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) throw new IllegalArgumentException("URL must be an absolute http or https URL.");
-			if (uri.getHost() == null || uri.getHost().isBlank()) throw new IllegalArgumentException("URL must include a host.");
-			if (uri.getUserInfo() != null) throw new IllegalArgumentException("URL must not include credentials.");
+			if (!uri.isAbsolute() || scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+				throw new IllegalArgumentException("URL must be an absolute http or https URL.");
+			}
+			if (uri.getHost() == null || uri.getHost().isBlank()) {
+				throw new IllegalArgumentException("URL must include a host.");
+			}
+			if (uri.getUserInfo() != null) {
+				throw new IllegalArgumentException("URL must not include credentials.");
+			}
 			return url;
 		} catch (URISyntaxException ex) {
 			throw new IllegalArgumentException("URL is not valid.");
+		}
+	}
+
+	private static void validateRequiredRowVer(byte[] rowVer, String label) {
+		if (rowVer == null || rowVer.length == 0) {
+			throw new IllegalArgumentException(label + " is required.");
+		}
+	}
+
+	private static void validateOrderedCaseLinkIds(List<Long> ids) {
+		if (ids == null || ids.isEmpty()) {
+			throw new IllegalArgumentException("Ordered case link ids are required.");
+		}
+		if (ids.stream().anyMatch(Objects::isNull)) {
+			throw new IllegalArgumentException("Ordered case link ids must not contain null values.");
+		}
+		if (ids.stream().distinct().count() != ids.size()) {
+			throw new IllegalArgumentException("Ordered case link ids must not contain duplicates.");
 		}
 	}
 

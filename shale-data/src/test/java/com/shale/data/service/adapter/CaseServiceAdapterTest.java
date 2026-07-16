@@ -4,9 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -21,6 +24,11 @@ import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
 import com.shale.core.service.CaseServicePort.CaseStatusCommand;
+import com.shale.core.service.CaseServicePort.CreateCaseLinkCommand;
+import com.shale.core.service.CaseServicePort.DeleteCaseLinkCommand;
+import com.shale.core.service.CaseServicePort.LinkTypeCommand;
+import com.shale.core.service.CaseServicePort.ReorderCaseLinksCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseLinkCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
 import com.shale.data.dao.CaseDao;
 
@@ -154,6 +162,80 @@ class CaseServiceAdapterTest {
 		assertEquals("closed", updated.systemKey());
 	}
 
+
+	@Test
+	void linkTypeOverlayHonorsInactiveMaskDeletedResetAndSorting() {
+		List<LinkTypeDto> rows = List.of(
+				new LinkTypeDto(1, null, "Zulu Global", "#111", true, false, "shared", new byte[] {1}),
+				new LinkTypeDto(2, 7, "Alpha Tenant", "#222", true, false, "shared", new byte[] {2}),
+				new LinkTypeDto(3, null, "Visible Global", "#333", true, false, "visible", new byte[] {3}),
+				new LinkTypeDto(4, 7, "Inactive Mask", "#444", false, false, "visible", new byte[] {4}),
+				new LinkTypeDto(5, null, "Reset Global", "#555", true, false, "reset", new byte[] {5}),
+				new LinkTypeDto(6, 7, "Deleted Override", "#666", false, true, "reset", new byte[] {6}),
+				new LinkTypeDto(7, 8, "Other Tenant", "#777", true, false, "other", new byte[] {7}),
+				new LinkTypeDto(8, 7, "Custom Tenant", "#888", true, false, null, new byte[] {8}));
+
+		List<LinkTypeDto> active = CaseServiceAdapter.resolveEffectiveLinkTypes(rows, 7, false);
+		assertEquals(List.of("Alpha Tenant", "Custom Tenant", "Reset Global"), active.stream().map(LinkTypeDto::name).toList());
+
+		List<LinkTypeDto> admin = CaseServiceAdapter.resolveEffectiveLinkTypes(rows, 7, true);
+		assertEquals(List.of("Alpha Tenant", "Custom Tenant", "Inactive Mask", "Reset Global"), admin.stream().map(LinkTypeDto::name).toList());
+	}
+
+	@Test
+	void linkTypeValidationEnforcesConfiguredLimitsAndRowVer() {
+		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
+		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
+		String maxName = "N".repeat(100);
+		String maxColor = "C".repeat(20);
+		String maxSystemKey = "S".repeat(64);
+
+		adapter.createLinkType(new LinkTypeCommand(null, 7, 5, maxName, maxColor, true, maxSystemKey, null));
+		assertEquals(maxName, gateway.lastLinkTypeName);
+		assertEquals(maxColor, gateway.lastLinkTypeColor);
+		assertEquals(maxSystemKey, gateway.lastLinkTypeSystemKey);
+
+		assertThrows(IllegalArgumentException.class,
+				() -> adapter.createLinkType(new LinkTypeCommand(null, 7, 5, "N".repeat(101), maxColor, true, maxSystemKey, null)));
+		assertThrows(IllegalArgumentException.class,
+				() -> adapter.createLinkType(new LinkTypeCommand(null, 7, 5, maxName, "C".repeat(21), true, maxSystemKey, null)));
+		assertThrows(IllegalArgumentException.class,
+				() -> adapter.createLinkType(new LinkTypeCommand(null, 7, 5, maxName, maxColor, true, "S".repeat(65), null)));
+		assertThrows(IllegalArgumentException.class,
+				() -> adapter.updateLinkType(new LinkTypeCommand(1, 7, 5, maxName, maxColor, true, maxSystemKey, null)));
+	}
+
+	@Test
+	void caseLinkCommandsValidateBeforeDelegatingAndPreservePrimaryContract() {
+		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
+		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
+		byte[] caseRowVer = new byte[] {1};
+		byte[] externalRowVer = new byte[] {2};
+
+		adapter.createCaseLink(new CreateCaseLinkCommand(7, 5, 99, 3, " Court ", " https://Example.com/a?b=c#D ", "desc", true, "notes", 4));
+		assertEquals("Court", gateway.lastCaseLinkDisplayName);
+		assertEquals("https://Example.com/a?b=c#D", gateway.lastCaseLinkUrl);
+		assertTrue(gateway.lastCaseLinkPrimary);
+
+		adapter.updateCaseLink(new UpdateCaseLinkCommand(7, 5, 99, 11, 12, 3, "Updated", "https://example.com", null, null, null, null, caseRowVer, externalRowVer));
+		assertNull(gateway.lastUpdateCaseLinkPrimary);
+		adapter.updateCaseLink(new UpdateCaseLinkCommand(7, 5, 99, 11, 12, 3, "Updated", "https://example.com", null, true, null, null, caseRowVer, externalRowVer));
+		assertEquals(Boolean.TRUE, gateway.lastUpdateCaseLinkPrimary);
+		adapter.updateCaseLink(new UpdateCaseLinkCommand(7, 5, 99, 11, 12, 3, "Updated", "https://example.com", null, false, null, null, caseRowVer, externalRowVer));
+		assertEquals(Boolean.FALSE, gateway.lastUpdateCaseLinkPrimary);
+
+		assertThrows(IllegalArgumentException.class,
+				() -> adapter.updateCaseLink(new UpdateCaseLinkCommand(7, 5, 99, 11, 12, 3, "Updated", "https://example.com", null, true, null, null, null, externalRowVer)));
+		assertThrows(IllegalArgumentException.class,
+				() -> adapter.updateCaseLink(new UpdateCaseLinkCommand(7, 5, 99, 11, 12, 3, "Updated", "https://example.com", null, true, null, null, caseRowVer, null)));
+		assertThrows(IllegalArgumentException.class,
+				() -> adapter.deleteCaseLink(new DeleteCaseLinkCommand(7, 5, 99, 11, null)));
+		assertThrows(IllegalArgumentException.class,
+				() -> adapter.reorderCaseLinks(new ReorderCaseLinksCommand(7, 5, 99, List.of(1L, 1L))));
+		assertThrows(IllegalArgumentException.class,
+				() -> adapter.reorderCaseLinks(new ReorderCaseLinksCommand(7, 5, 99, Arrays.asList(1L, null))));
+	}
+
 	private static CaseDetailDto detail(long caseId, String caseName) {
 		return new CaseDetailDto(caseId, "C-1", caseName, "description", "open", null,
 				null, null, null, null, null, null, null, null, null, null, null,
@@ -180,6 +262,13 @@ class CaseServiceAdapterTest {
 		private String lastUpdateSummary;
 		private byte[] lastUpdateRowVer;
 		private Integer lastUpdateActorUserId;
+		private String lastLinkTypeName;
+		private String lastLinkTypeColor;
+		private String lastLinkTypeSystemKey;
+		private String lastCaseLinkDisplayName;
+		private String lastCaseLinkUrl;
+		private boolean lastCaseLinkPrimary;
+		private Boolean lastUpdateCaseLinkPrimary;
 
 		private FakeCaseGateway(List<CaseUpdateDto> caseUpdates) {
 			this.caseUpdates = caseUpdates;
@@ -293,6 +382,62 @@ class CaseServiceAdapterTest {
 		@Override public CaseLinkDto setPrimaryCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId) { return null; }
 		@Override public List<CaseLinkDto> reorderCaseLinks(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds) { return List.of(); }
 		@Override public void deleteCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer) {}
+
+		@Override
+		public List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive) { return List.of(); }
+
+		@Override
+		public List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive) { return List.of(); }
+
+		@Override
+		public LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey) {
+			lastLinkTypeName = name;
+			lastLinkTypeColor = color;
+			lastLinkTypeSystemKey = systemKey;
+			return new LinkTypeDto(1, shaleClientId, name, color, active, false, systemKey, new byte[] {1});
+		}
+
+		@Override
+		public LinkTypeDto updateLinkType(int shaleClientId, int actorUserId, int linkTypeId, String name, String color, boolean active, String systemKey, byte[] expectedRowVer) {
+			return new LinkTypeDto(linkTypeId, shaleClientId, name, color, active, false, systemKey, new byte[] {2});
+		}
+
+		@Override
+		public LinkTypeDto setLinkTypeActive(int shaleClientId, int actorUserId, int linkTypeId, boolean active, byte[] expectedRowVer) {
+			return new LinkTypeDto(linkTypeId, shaleClientId, "Link", "#fff", active, false, "link", new byte[] {2});
+		}
+
+		@Override
+		public void resetLinkTypeOverride(int shaleClientId, int actorUserId, int linkTypeId) {}
+
+		@Override
+		public List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId) { return List.of(); }
+
+		@Override
+		public java.util.Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId) { return java.util.Optional.empty(); }
+
+		@Override
+		public CaseLinkDto createCaseLink(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder) {
+			lastCaseLinkDisplayName = displayName;
+			lastCaseLinkUrl = url;
+			lastCaseLinkPrimary = primary;
+			return null;
+		}
+
+		@Override
+		public CaseLinkDto updateCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer) {
+			lastUpdateCaseLinkPrimary = primary;
+			return null;
+		}
+
+		@Override
+		public CaseLinkDto setPrimaryCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId) { return null; }
+
+		@Override
+		public List<CaseLinkDto> reorderCaseLinks(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds) { return List.of(); }
+
+		@Override
+		public void deleteCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer) {}
 
 		@Override
 		public void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId) {

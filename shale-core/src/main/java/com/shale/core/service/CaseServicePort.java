@@ -1,6 +1,7 @@
 package com.shale.core.service;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -122,9 +123,25 @@ public interface CaseServicePort {
 			boolean active,
 			String systemKey,
 			byte[] expectedRowVer) {
+		public LinkTypeCommand {
+			expectedRowVer = copyRowVer(expectedRowVer);
+		}
+
+		@Override
+		public byte[] expectedRowVer() {
+			return copyRowVer(expectedRowVer);
+		}
 	}
 
 	record SetLinkTypeActiveCommand(int shaleClientId, int actorUserId, int linkTypeId, boolean active, byte[] expectedRowVer) {
+		public SetLinkTypeActiveCommand {
+			expectedRowVer = copyRowVer(expectedRowVer);
+		}
+
+		@Override
+		public byte[] expectedRowVer() {
+			return copyRowVer(expectedRowVer);
+		}
 	}
 
 	record ResetLinkTypeOverrideCommand(int shaleClientId, int actorUserId, int linkTypeId) {
@@ -137,6 +154,20 @@ public interface CaseServicePort {
 	record UpdateCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId,
 			int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder,
 			byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer) {
+		public UpdateCaseLinkCommand {
+			expectedCaseLinkRowVer = copyRowVer(expectedCaseLinkRowVer);
+			expectedExternalLinkRowVer = copyRowVer(expectedExternalLinkRowVer);
+		}
+
+		@Override
+		public byte[] expectedCaseLinkRowVer() {
+			return copyRowVer(expectedCaseLinkRowVer);
+		}
+
+		@Override
+		public byte[] expectedExternalLinkRowVer() {
+			return copyRowVer(expectedExternalLinkRowVer);
+		}
 	}
 
 	record SetPrimaryCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId) {
@@ -146,6 +177,18 @@ public interface CaseServicePort {
 	}
 
 	record DeleteCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer) {
+		public DeleteCaseLinkCommand {
+			expectedCaseLinkRowVer = copyRowVer(expectedCaseLinkRowVer);
+		}
+
+		@Override
+		public byte[] expectedCaseLinkRowVer() {
+			return copyRowVer(expectedCaseLinkRowVer);
+		}
+	}
+
+	private static byte[] copyRowVer(byte[] rowVer) {
+		return rowVer == null ? null : Arrays.copyOf(rowVer, rowVer.length);
 	}
 
 	record CaseStatusCommand(
