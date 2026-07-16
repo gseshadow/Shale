@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CaseLinksFoundationMigrationTest {
@@ -28,14 +29,41 @@ class CaseLinksFoundationMigrationTest {
     }
 
     @Test
-    void migrationClassifiesLinkTypesAsOverlayAndOwnedTablesAsStrictRls() throws IOException {
+    void migrationUsesExplicitOverlayPredicateForLinkTypesAndStrictPredicateForOwnedTables() throws IOException {
         String sql = readMigration();
 
-        assertContains(sql, "ADD FILTER PREDICATE sec.' + QUOTENAME(@OverlayPredicate) + N'(ShaleClientId) ON dbo.LinkTypes");
+        assertContains(sql, "CREATE FUNCTION sec.fn_FilterByTenantOrGlobal(@ShaleClientId int)");
+        assertContains(sql, "WHERE @ShaleClientId IS NULL");
+        assertContains(sql, "OR @ShaleClientId = TRY_CONVERT(int, SESSION_CONTEXT");
+        assertContains(sql, "ADD FILTER PREDICATE sec.fn_FilterByTenantOrGlobal(ShaleClientId) ON dbo.LinkTypes");
         assertContains(sql, "ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.ExternalLinks");
         assertContains(sql, "ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.CaseLinks");
-        assertContains(sql, "Required security policy TenantFilter is missing");
+        assertFalse(sql.contains("@BasePredicateAllowsNull"), "LinkTypes overlay must not depend on brittle base-predicate text detection");
+        assertFalse(sql.contains("%is null%"), "Migration must not use generic %is null% predicate sniffing");
+    }
+
+    @Test
+    void migrationFailsFastForPolicyAmbiguityAndDisabledPolicy() throws IOException {
+        String sql = readMigration();
+
+        assertContains(sql, "SELECT @PolicyCount = COUNT(*)");
+        assertContains(sql, "Multiple security policies named TenantFilter exist");
+        assertContains(sql, "@PolicyEnabled = is_enabled");
+        assertContains(sql, "Security policy TenantFilter is disabled");
+        assertContains(sql, "SET @PolicyQualified = QUOTENAME(@PolicySchemaName) + N'.' + QUOTENAME(@PolicyName)");
         assertEquals(0, countOccurrences(sql, "CREATE SECURITY POLICY"));
+    }
+
+    @Test
+    void migrationValidatesExistingTableContractsBeforeContinuing() throws IOException {
+        String sql = readMigration();
+
+        assertContains(sql, "DECLARE @RequiredColumns TABLE");
+        assertContains(sql, "Existing Case Links foundation table is missing required columns or has incompatible column definitions");
+        assertContains(sql, "ExpectedType = rc.TypeName");
+        assertContains(sql, "ActualNullable = c.is_nullable");
+        assertContains(sql, "CreatedByUserId");
+        assertContains(sql, "UpdatedByUserId");
     }
 
     @Test
@@ -66,14 +94,32 @@ class CaseLinksFoundationMigrationTest {
         }) {
             assertContains(sql, "N'" + key + "'");
         }
-        assertContains(sql, "SELECT NULL, v.SystemKey, v.Name, v.Color, 1, 0");
+        assertContains(sql, "SELECT NULL, v.SystemKey, v.Name, v.Color, 1, 0, NULL, NULL");
+    }
+
+    @Test
+    void migrationIncludesExplicitCrossTenantVerificationAndSessionCleanup() throws IOException {
+        String sql = readMigration();
+
+        assertContains(sql, "Tenant 7 should see zero tenant 8 LinkTypes");
+        assertContains(sql, "Tenant 7 should see zero tenant 8 ExternalLinks");
+        assertContains(sql, "Tenant 7 should see zero tenant 8 CaseLinks");
+        assertContains(sql, "Tenant 8 should see zero tenant 7 LinkTypes");
+        assertContains(sql, "Tenant 8 should see zero tenant 7 ExternalLinks");
+        assertContains(sql, "Tenant 8 should see zero tenant 7 CaseLinks");
+        assertContains(sql, "Tenant 7 should see global LinkTypes");
+        assertContains(sql, "Tenant 8 should see global LinkTypes");
+        assertContains(sql, "Tenant 7 should see own custom LinkTypes");
+        assertContains(sql, "Tenant 8 should see own custom LinkTypes");
+        assertContains(sql, "read_only");
+        assertContains(sql, "@value = NULL");
     }
 
     @Test
     void migrationDoesNotCreateCompetingRlsArchitecture() throws IOException {
         String sql = readMigration();
 
-        assertContains(sql, "Required predicate sec.fn_FilterByTenant is missing");
+        assertContains(sql, "Required strict predicate sec.fn_FilterByTenant is missing");
         assertContains(sql, "Required security policy TenantFilter is missing");
         assertEquals(0, countOccurrences(sql, "CREATE SECURITY POLICY"));
         assertEquals(0, countOccurrences(sql, "CREATE SCHEMA security"));

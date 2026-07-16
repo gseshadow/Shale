@@ -721,6 +721,8 @@ Link type lookup table for case/external links. This table follows the same glob
 | `IsActive`      | bit           | Active flag                                |
 | `IsDeleted`     | bit           | Soft delete flag                           |
 | `SystemKey`     | nvarchar(64)  | Normalized lowercase overlay key           |
+| `CreatedByUserId` | int        | Creator user id, nullable for global seed rows |
+| `UpdatedByUserId` | int        | Last updater user id, nullable for global seed rows |
 | `CreatedAt`     | datetime2     | Created timestamp                          |
 | `UpdatedAt`     | datetime2     | Updated timestamp                          |
 | `RowVer`        | rowversion    | Row version                                |
@@ -763,6 +765,8 @@ Tenant-owned reusable hyperlink records.
 | `IsDeleted`       | bit            | Soft delete flag                                             |
 | `DeletedAt`       | datetime2      | Deleted timestamp                                            |
 | `DeletedByUserId` | int            | Deleted by user id                                           |
+| `CreatedByUserId` | int            | Creator user id                                              |
+| `UpdatedByUserId` | int            | Last updater user id                                         |
 | `CreatedAt`       | datetime2      | Created timestamp                                            |
 | `UpdatedAt`       | datetime2      | Updated timestamp                                            |
 | `RowVer`          | rowversion     | Row version                                                  |
@@ -787,6 +791,8 @@ Tenant-owned associations between cases and reusable external links.
 | `IsDeleted`       | bit            | Soft delete flag                |
 | `DeletedAt`       | datetime2      | Deleted timestamp               |
 | `DeletedByUserId` | int            | Deleted by user id              |
+| `CreatedByUserId` | int            | Creator user id                 |
+| `UpdatedByUserId` | int            | Last updater user id            |
 | `CreatedAt`       | datetime2      | Created timestamp               |
 | `UpdatedAt`       | datetime2      | Updated timestamp               |
 | `RowVer`          | rowversion     | Row version                     |
