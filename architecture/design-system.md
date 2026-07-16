@@ -384,3 +384,19 @@ A future contributor should be able to add a screen by choosing the correct surf
 ### Link Type indicators
 
 Case Link Type settings use a reusable `LinkTypeIndicatorFactory` modeled on the existing practice-area pill treatment. The indicator accepts database-driven colors from seeded `#RRGGBB` values and existing stored `0xRRGGBBAA` values, preserving the Shale compact pill/card visual language instead of introducing a separate link-type visual system.
+
+### Case Link Cards
+
+Case Links use a reusable JavaFX `CaseLinkCardFactory` with three official variants: Full, Compact, and Mini. The factory is display-focused: controllers provide the complete link DTO and Open, Edit, Set Primary, and Delete callbacks, while service calls, dialogs, tenant context, browser-launch error handling, and optimistic-concurrency behavior remain in the Case controller/service-port flow.
+
+Full Link Cards are used in Case > Links. They show the bold link title, description or a muted no-description state, the Link Type pill, the Primary badge when applicable, optional case-specific notes, Set Primary for non-primary links, Delete, and a small bottom-right Edit action. Full management remains in Case > Links, but the card itself opens the destination; the screen does not expose Open Link, Move Up, or Move Down controls.
+
+Compact Link Cards are used for the Case > Overview Primary Link. They show the bold title, description or muted fallback, Link Type pill, Primary badge, and only a small bottom-right Edit action. The compact Overview card itself opens the destination and does not expose Open Link or Manage Links buttons.
+
+Mini Link Cards are intended for future dense lists. They show only the link title and compact Link Type pill, open the destination when activated, and do not include management actions, notes, descriptions, or primary badges by default.
+
+For every Case Link Card variant, clicking the card or activating it with Enter/Space opens the stored destination through the existing external-browser helper path owned by the controller. Child action controls must isolate their mouse and keyboard events so Edit, Set Primary, and Delete do not also trigger card opening.
+
+The Link Type pill remains visible on every variant. The Link Type database color also drives a restrained type-identity treatment: a low-opacity background wash that fades back to the normal Shale card surface and a narrow left accent rail. The accent rail currently represents Link Type identity only; it does not communicate status, severity, or workflow state. Invalid or missing colors use the neutral Shale fallback supported by the shared color utility.
+
+Shared With content is not implemented in the Phase 5.1 Link Card system and remains future work.

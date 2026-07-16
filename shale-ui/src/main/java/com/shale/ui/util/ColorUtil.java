@@ -67,6 +67,16 @@ public final class ColorUtil {
 		return readableTextColor(toFxColor(storedColor));
 	}
 
+	public static String toCssRgba(String storedColor, double opacity) {
+		Color color = toFxColor(storedColor);
+		double resolvedOpacity = Math.max(0.0, Math.min(1.0, opacity)) * color.getOpacity();
+		return String.format(Locale.ROOT, "rgba(%d,%d,%d,%.3f)",
+				(int) Math.round(color.getRed() * 255.0),
+				(int) Math.round(color.getGreen() * 255.0),
+				(int) Math.round(color.getBlue() * 255.0),
+				resolvedOpacity);
+	}
+
 	public static String readableTextColor(Color color) {
 		Color resolved = color == null ? Color.WHITE : color;
 		double luminance = 0.2126 * linearized(resolved.getRed())

@@ -3,6 +3,7 @@ package com.shale.ui.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.net.URI;
 import java.nio.file.Files;
@@ -56,9 +57,9 @@ final class CaseLinksPhase4UiTest {
     void primaryDeleteAndReorderRelyOnServiceRefresh() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
         String card = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/CaseLinkCardFactory.java"));
-        assertTrue(card.contains("primary.setVisible(!link.primary())"));
-        assertTrue(card.contains("up.setDisable(index <= 0)"));
-        assertTrue(card.contains("down.setDisable(index >= total - 1)"));
+        assertTrue(card.contains("if (!link.primary()) footer.getChildren().add"));
+        assertFalse(card.contains("Move Up"));
+        assertFalse(card.contains("Move Down"));
         assertTrue(source.contains("loadCaseLinksAsync(successMessage)"));
         assertTrue(source.contains("ids.stream().distinct().count() != ids.size()"));
         assertTrue(source.contains("java.util.Collections.swap(ids, index, target)"));

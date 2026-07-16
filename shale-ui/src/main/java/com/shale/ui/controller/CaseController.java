@@ -1898,33 +1898,12 @@ public class CaseController {
 			Label empty = new Label("No primary link has been selected for this case.");
 			empty.setWrapText(true);
 			empty.getStyleClass().add("case-overview-row-value");
-			Button manage = ActionButtonFactory.cardAction("Manage Links", e -> navigateToCaseLinksForManagement());
-			ovPrimaryLinkBox.getChildren().addAll(empty, manage);
+			ovPrimaryLinkBox.getChildren().add(empty);
 			return;
 		}
 		CaseLinkDto link = overviewPrimaryLink.get();
-		VBox card = new VBox(6);
-		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-density-compact", "case-link-card", "case-overview-primary-link-card");
-		HBox header = new HBox(8);
-		header.setAlignment(Pos.CENTER_LEFT);
-		Label title = new Label(blankTo(link.displayName(), "Untitled link"));
-		title.getStyleClass().add("app-dialog-field-label");
-		title.setWrapText(true);
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		Label primary = new Label("Primary");
-		primary.getStyleClass().addAll("shale-status-pill", "shale-status-pill-small");
-		header.getChildren().addAll(title, spacer, LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor(), LinkTypeIndicatorFactory.PillSize.COMPACT), primary);
-		Label url = new Label(blankTo(link.url(), "—"));
-		url.getStyleClass().add("search-summary-text");
-		url.setWrapText(true);
-		url.setTextOverrun(OverrunStyle.ELLIPSIS);
-		url.setTooltip(new Tooltip(blankTo(link.url(), "—")));
-		HBox buttons = new HBox(6);
-		buttons.setAlignment(Pos.CENTER_LEFT);
-		buttons.getChildren().addAll(ActionButtonFactory.cardAction("Open Link", e -> onOpenOverviewPrimaryLink(link)), ActionButtonFactory.cardAction("Manage Links", e -> navigateToCaseLinksForManagement()));
-		card.getChildren().addAll(header, url, buttons);
-		ovPrimaryLinkBox.getChildren().add(card);
+		ovPrimaryLinkBox.getChildren().add(caseLinkCardFactory.create(link, CaseLinkCardFactory.Variant.COMPACT, new CaseLinkCardFactory.Actions(
+				() -> onOpenOverviewPrimaryLink(link), () -> onEditCaseLink(link), null, null)));
 	}
 
 	private void showOverviewPrimaryLinkMessage(String message) {
@@ -1984,12 +1963,41 @@ public class CaseController {
 		caseLinksCardsBox.getChildren().clear();
 		if (message != null && !message.isBlank()) showCaseLinksMessage(message); else setVisibleManaged(caseLinksStatusLabel, false);
 		if (caseLinks.isEmpty()) { showCaseLinksMessage("No links have been added to this case yet."); return; }
-		for (int i = 0; i < caseLinks.size(); i++) {
-			CaseLinkDto link = caseLinks.get(i); final int index = i;
-			caseLinksCardsBox.getChildren().add(caseLinkCardFactory.create(link, i, caseLinks.size(), new CaseLinkCardFactory.Actions(
-					() -> onOpenCaseLink(link), () -> onEditCaseLink(link), () -> onSetPrimaryCaseLink(link), () -> onMoveCaseLink(index, -1), () -> onMoveCaseLink(index, 1), () -> onDeleteCaseLink(link))));
-		}
+		groupCaseLinksByType(caseLinks).forEach((group, links) -> {
+			VBox section = new VBox(8);
+			section.getStyleClass().add("case-link-type-group");
+			HBox heading = new HBox(8);
+			heading.setAlignment(Pos.CENTER_LEFT);
+			heading.getStyleClass().add("case-link-type-group-heading");
+			heading.getChildren().add(LinkTypeIndicatorFactory.createLinkTypePill(group.name(), group.color(), LinkTypeIndicatorFactory.PillSize.DEFAULT));
+			Label count = new Label(links.size() + (links.size() == 1 ? " link" : " links"));
+			count.getStyleClass().add("search-summary-text");
+			heading.getChildren().add(count);
+			section.getChildren().add(heading);
+			for (CaseLinkDto link : links) {
+				section.getChildren().add(caseLinkCardFactory.create(link, CaseLinkCardFactory.Variant.FULL, new CaseLinkCardFactory.Actions(
+						() -> onOpenCaseLink(link), () -> onEditCaseLink(link), () -> onSetPrimaryCaseLink(link), () -> onDeleteCaseLink(link))));
+			}
+			caseLinksCardsBox.getChildren().add(section);
+		});
 	}
+
+	private LinkedHashMap<LinkTypeGroup, List<CaseLinkDto>> groupCaseLinksByType(List<CaseLinkDto> links) {
+		return links.stream()
+				.collect(Collectors.groupingBy(
+						link -> new LinkTypeGroup(link.linkTypeId(), blankTo(link.linkTypeName(), "Link Type"), link.linkTypeColor()),
+						() -> new java.util.TreeMap<>(Comparator.comparing(LinkTypeGroup::name, String.CASE_INSENSITIVE_ORDER).thenComparingInt(LinkTypeGroup::id)),
+						Collectors.collectingAndThen(Collectors.toList(), list -> list.stream()
+								.sorted(Comparator.comparing(CaseLinkDto::primary).reversed()
+										.thenComparingInt(CaseLinkDto::sortOrder)
+										.thenComparing(CaseLinkDto::displayName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+										.thenComparingLong(CaseLinkDto::caseLinkId))
+								.toList())))
+				.entrySet().stream()
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
+	}
+
+	private record LinkTypeGroup(int id, String name, String color) {}
 
 	private void showCaseLinksMessage(String message) {
 		if (caseLinksStatusLabel != null) { caseLinksStatusLabel.setText(message == null ? "" : message); setVisibleManaged(caseLinksStatusLabel, message != null && !message.isBlank()); }
