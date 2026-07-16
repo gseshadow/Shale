@@ -8,6 +8,8 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.PracticeAreaDto;
 
 /**
@@ -38,6 +40,32 @@ public interface CaseServicePort {
 	List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive);
 
 	List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive);
+
+	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
+
+	List<LinkTypeDto> listTenantLinkTypes(int shaleClientId, boolean includeInactive);
+
+	LinkTypeDto createLinkType(LinkTypeCommand command);
+
+	LinkTypeDto updateLinkType(LinkTypeCommand command);
+
+	LinkTypeDto setLinkTypeActive(SetLinkTypeActiveCommand command);
+
+	void resetLinkTypeOverride(ResetLinkTypeOverrideCommand command);
+
+	List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId);
+
+	Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId);
+
+	CaseLinkDto createCaseLink(CreateCaseLinkCommand command);
+
+	CaseLinkDto updateCaseLink(UpdateCaseLinkCommand command);
+
+	CaseLinkDto setPrimaryCaseLink(SetPrimaryCaseLinkCommand command);
+
+	List<CaseLinkDto> reorderCaseLinks(ReorderCaseLinksCommand command);
+
+	void deleteCaseLink(DeleteCaseLinkCommand command);
 
 	PracticeAreaDto createPracticeArea(PracticeAreaCommand command);
 
@@ -83,6 +111,41 @@ public interface CaseServicePort {
 			String color,
 			boolean active,
 			String systemKey) {
+	}
+
+	record LinkTypeCommand(
+			Integer id,
+			int shaleClientId,
+			int actorUserId,
+			String name,
+			String color,
+			boolean active,
+			String systemKey,
+			byte[] expectedRowVer) {
+	}
+
+	record SetLinkTypeActiveCommand(int shaleClientId, int actorUserId, int linkTypeId, boolean active, byte[] expectedRowVer) {
+	}
+
+	record ResetLinkTypeOverrideCommand(int shaleClientId, int actorUserId, int linkTypeId) {
+	}
+
+	record CreateCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName,
+			String url, String description, boolean primary, String notes, Integer sortOrder) {
+	}
+
+	record UpdateCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId,
+			int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder,
+			byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer) {
+	}
+
+	record SetPrimaryCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId) {
+	}
+
+	record ReorderCaseLinksCommand(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds) {
+	}
+
+	record DeleteCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer) {
 	}
 
 	record CaseStatusCommand(
