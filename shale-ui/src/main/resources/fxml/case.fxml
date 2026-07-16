@@ -220,6 +220,29 @@
 							</GridPane>
 						</VBox>
 
+						<VBox fx:id="ovPrimaryLinkSection" spacing="5">
+							<styleClass>
+								<String fx:value="shale-surface-section" />
+								<String fx:value="case-overview-section" />
+								<String fx:value="case-overview-section-region" />
+								<String fx:value="case-overview-section-region-case-details" />
+							</styleClass>
+							<HBox spacing="8" alignment="CENTER_LEFT" styleClass="case-overview-section-header">
+								<Region>
+									<styleClass>
+										<String fx:value="shale-indicator-practice-area" />
+										<String fx:value="case-overview-section-accent" />
+										<String fx:value="case-overview-section-accent-case-details" />
+									</styleClass>
+								</Region>
+								<Label text="🔗" styleClass="case-overview-section-icon" />
+								<Label text="Primary Link" styleClass="case-overview-section-title" />
+								<Region HBox.hgrow="ALWAYS" styleClass="case-overview-section-line" />
+							</HBox>
+							<VBox fx:id="ovPrimaryLinkBox" spacing="6" />
+							<Label fx:id="ovPrimaryLinkStatusLabel" text="Loading primary link…" wrapText="true" styleClass="case-overview-row-value" />
+						</VBox>
+
 						<VBox spacing="5">
 							<styleClass>
 								<String fx:value="shale-surface-section" />
