@@ -43,6 +43,7 @@ Phase 1 case-link tables use the existing `TenantFilter` security policy and `se
 | `dbo.LinkTypes` | Global overlay lookup | Current tenant sees global rows (`ShaleClientId IS NULL`) plus its own rows. Tenant rows override global rows with the same `SystemKey` in effective lists. Other tenants' custom rows are hidden. |
 | `dbo.ExternalLinks` | Strict tenant-owned | Current tenant sees only rows where `ShaleClientId` matches `SESSION_CONTEXT(N'ShaleClientId')`. |
 | `dbo.CaseLinks` | Strict tenant-owned | Current tenant sees only rows where `ShaleClientId` matches `SESSION_CONTEXT(N'ShaleClientId')`. |
+| `dbo.CaseLinkShares` | Strict tenant-owned | Current tenant sees only share rows where `ShaleClientId` matches `SESSION_CONTEXT(N'ShaleClientId')`; uses `sec.fn_FilterByTenant`, never overlay/global filtering. |
 
 `dbo.LinkTypes` uses normalized lowercase `SystemKey` values with a filtered unique index per scope. Services should build effective Link Type lists by loading global and current-tenant rows, partitioning by non-null `SystemKey`, and preferring the tenant row when both scopes define the same key.
 
@@ -51,6 +52,10 @@ Remaining service-layer validation requirements:
 * `dbo.ExternalLinks.LinkTypeId` must reference either a global Link Type or a Link Type with the same tenant id as the ExternalLink. This cannot be represented as a verified declarative composite foreign key while Link Types support global rows.
 * `dbo.CaseLinks.ShaleClientId` must match both the linked `dbo.Cases.ShaleClientId` and `dbo.ExternalLinks.ShaleClientId`. Phase 1 keeps single-column foreign keys because the referenced tables do not expose a verified tenant composite key for direct enforcement.
 * Soft-deleted CaseLinks do not block later replacements. Active uniqueness is enforced by filtered indexes for duplicate case/link pairs and one primary active link per case.
+
+* `dbo.CaseLinkShares` records Shale's knowledge that a case-specific Case Link was shared with a Contact; it performs no Box, Clio, URL, or other external-service permission verification.
+* `dbo.CaseLinkShares.ShaleClientId` must match the referenced Case Link, Contact, and actor Users tenant. Phase 5.2 keeps verified single-column foreign keys and requires Phase 5.3 services to validate CaseLink/Contact/actor tenant compatibility before mutations.
+* `dbo.CaseLinkShares` is never global or overlay data and must not use `sec.fn_FilterByTenantOrGlobal`.
 
 ## Case Links Phase 3 Link Type administration
 
