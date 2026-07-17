@@ -81,7 +81,11 @@ final class CaseLinksPhase51LinkCardTest {
         assertTrue(card.contains("ColorUtil.toCssRgba(storedColor"));
         assertTrue(card.contains("-shale-link-type-accent"));
         assertTrue(css.contains("linear-gradient(to right, -shale-link-type-wash"));
-        assertTrue(css.contains("-fx-border-width: 1 1 1 -shale-link-type-rail-width"));
+        assertFalse(card.contains("-shale-link-type-rail-width"));
+        assertFalse(css.contains("-fx-border-width: 1 1 1 -shale-link-type-rail-width"));
+        assertTrue(css.contains("-fx-border-width: 1px 1px 1px 5px"));
+        assertTrue(css.contains("-fx-border-width: 1px 1px 1px 4px"));
+        assertTrue(css.contains("-fx-border-width: 1px 1px 1px 3px"));
         assertTrue(color.contains("normalizeStoredColor"));
         assertTrue(color.contains("normalized.startsWith(\"#\")"));
         assertTrue(color.contains("normalized.startsWith(\"0x\") || normalized.startsWith(\"0X\")"));

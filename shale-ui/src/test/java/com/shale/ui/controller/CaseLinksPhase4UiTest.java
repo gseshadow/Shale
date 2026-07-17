@@ -27,7 +27,7 @@ final class CaseLinksPhase4UiTest {
         assertTrue(fxml.contains("fx:id=\"caseLinksTabPane\""));
         assertTrue(fxml.contains("fx:id=\"addCaseLinkButton\""));
         assertTrue(source.contains("caseService.listCaseLinks(activeCaseId, tenantId)"));
-        assertTrue(source.contains("new Thread(() ->"));
+        assertTrue(source.contains("caseLinkExecutor.submit(() ->"));
         assertTrue(source.contains("Platform.runLater(() ->"));
         assertTrue(source.contains("generation != caseLinksLoadGeneration"));
         assertTrue(source.contains("caseId == null || caseId != activeCaseId"));
@@ -39,17 +39,17 @@ final class CaseLinksPhase4UiTest {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
         assertTrue(source.contains("appState.getShaleClientId()"));
         assertTrue(source.contains("appState.getUserId()"));
-        assertTrue(source.contains("new CaseServicePort.CreateCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId"));
-        assertTrue(source.contains("new CaseServicePort.UpdateCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, link.caseLinkId(), link.externalLinkId()"));
+        assertTrue(source.contains("new CaseServicePort.CreateCaseLinkCommand(tenantId, actorId, activeCaseId"));
+        assertTrue(source.contains("new CaseServicePort.UpdateCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.externalLinkId()"));
         assertTrue(source.contains("null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer()"));
-        assertTrue(source.contains("new CaseServicePort.SetPrimaryCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, link.caseLinkId())"));
-        assertTrue(source.contains("new CaseServicePort.DeleteCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, link.caseLinkId(), link.caseLinkRowVer())"));
-        assertTrue(source.contains("new CaseServicePort.ReorderCaseLinksCommand(requireTenantId(), requireActorUserId(), caseId, ids)"));
-        assertTrue(source.contains("listLinkTypes(requireTenantId(), false)"));
+        assertTrue(source.contains("new CaseServicePort.SetPrimaryCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId())"));
+        assertTrue(source.contains("new CaseServicePort.DeleteCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.caseLinkRowVer())"));
+        assertTrue(source.contains("new CaseServicePort.ReorderCaseLinksCommand(tenantId, actorId, activeCaseId, ids)"));
+        assertTrue(source.contains("caseService.listLinkTypes(tenantId, false)"));
         assertTrue(source.contains("input.displayName()"));
-        assertTrue(source.contains("trimLimit(name.getText(), \"Display name\", 255, true)"));
-        assertTrue(source.contains("trimLimit(url.getText(), \"URL\", 2048, true)"));
-        assertTrue(source.contains("trimLimit(notes.getText(), \"Notes\", 2000, false)"));
+        assertTrue(source.contains("trimLimit(name, \"Display name\", 255, true)"));
+        assertTrue(source.contains("trimLimit(url, \"URL\", 2048, true)"));
+        assertTrue(source.contains("trimLimit(notes, \"Notes\", 2000, false)"));
         assertTrue(source.contains("if (!selected.active()) throw new IllegalArgumentException"));
     }
 
@@ -60,7 +60,7 @@ final class CaseLinksPhase4UiTest {
         assertTrue(card.contains("if (!link.primary()) footer.getChildren().add"));
         assertFalse(card.contains("Move Up"));
         assertFalse(card.contains("Move Down"));
-        assertTrue(source.contains("loadCaseLinksAsync(successMessage)"));
+        assertTrue(source.contains("caseService.listCaseLinks(activeCaseId, tenantId)"));
         assertTrue(source.contains("ids.stream().distinct().count() != ids.size()"));
         assertTrue(source.contains("java.util.Collections.swap(ids, index, target)"));
         assertTrue(source.contains("AppDialogs.showConfirmation"));

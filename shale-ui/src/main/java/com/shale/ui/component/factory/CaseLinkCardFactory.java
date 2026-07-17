@@ -112,8 +112,7 @@ public final class CaseLinkCardFactory {
     private static void applyTypeColorStyle(VBox card, String storedColor, Variant variant) {
         String accent = ColorUtil.toCssBackgroundColor(storedColor);
         String wash = ColorUtil.toCssRgba(storedColor, switch (variant) { case FULL -> 0.14; case COMPACT -> 0.10; case MINI -> 0.07; });
-        int rail = switch (variant) { case FULL -> 5; case COMPACT -> 4; case MINI -> 3; };
-        card.setStyle("-shale-link-type-accent: " + accent + "; -shale-link-type-wash: " + wash + "; -shale-link-type-rail-width: " + rail + "px;");
+        card.setStyle("-shale-link-type-accent: " + accent + "; -shale-link-type-wash: " + wash + ";");
     }
 
     private static boolean blank(String s) { return s == null || s.trim().isEmpty(); }
