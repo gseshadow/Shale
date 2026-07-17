@@ -50,12 +50,14 @@ final class CaseLinkSharesPhase533ContactLoadingTest {
         String method = source.substring(source.indexOf("public List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts"),
                 source.indexOf("private static String caseLinkShareContactDisplayNameExpression"));
 
-        assertTrue(method.contains("JOIN dbo.CaseContacts cc ON cc.CaseId = c.Id"));
-        assertTrue(method.contains("JOIN dbo.Contacts ct ON ct.Id = cc.ContactId"));
+        assertTrue(method.contains("FROM dbo.CaseParties cp"));
+        assertFalse(method.contains("dbo.CaseContacts"));
+        assertTrue(method.contains("JOIN dbo.Contacts ct ON ct.Id = cp.ContactId"));
+        assertTrue(method.contains("cp.ContactId IS NOT NULL"));
         assertTrue(method.contains("c.ShaleClientId = ?"));
         assertTrue(method.contains("ct.ShaleClientId = ?"));
         assertTrue(method.contains("ISNULL(ct.IsDeleted, 0) = 0"));
-        assertTrue(method.contains("SELECT DISTINCT ct.Id AS ContactId"));
+        assertTrue(method.contains("GROUP BY ct.Id"));
         assertTrue(method.contains("ORDER BY DisplayName ASC, ct.Id ASC"));
     }
 }
