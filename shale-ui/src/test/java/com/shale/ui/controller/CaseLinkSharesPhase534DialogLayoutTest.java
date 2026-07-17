@@ -20,7 +20,7 @@ final class CaseLinkSharesPhase534DialogLayoutTest {
         assertTrue(source.contains("ScrollPane.ScrollBarPolicy.NEVER"));
         assertTrue(method.contains("dialog.setResizable(true)"));
         assertTrue(method.contains("dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL)"));
-        assertTrue(method.contains("applyScreenSafeDialogBounds(dialog, caseLinksOwner()"));
+        assertTrue(method.contains("applyContentSizedDialogBounds(dialog, caseLinksOwner()"));
         assertTrue(method.contains("scrollFocusedNodeIntoView(formScroll)"));
     }
 
