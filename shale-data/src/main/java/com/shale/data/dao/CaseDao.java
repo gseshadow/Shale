@@ -19,6 +19,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
@@ -43,6 +45,7 @@ import com.shale.core.service.CaseServicePort.CaseLinkShareRemoval;
 
 public final class CaseDao {
 
+	private static final Logger LOG = Logger.getLogger(CaseDao.class.getName());
 	private static final String CASES_TABLE = "Cases";
 	private static final String CASE_USERS_TABLE = "CaseUsers";
 	private static final String USERS_TABLE = "Users";
@@ -7824,7 +7827,6 @@ public final class CaseDao {
 					 AND lt.IsDeleted = 0
 					JOIN dbo.Cases c ON c.Id = cl.CaseId
 					 AND c.ShaleClientId = cls.ShaleClientId
-					 AND c.IsDeleted = 0
 					JOIN dbo.Contacts targetContact ON targetContact.Id = cls.ContactId
 					 AND targetContact.ShaleClientId = cls.ShaleClientId
 					 AND ISNULL(targetContact.IsDeleted, 0) = 0
@@ -7852,12 +7854,49 @@ public final class CaseDao {
 						CaseLinkDto link = mapCaseLinkDto(rs);
 						links.add(link); ids.add(link.caseLinkId()); caseIds.add(rs.getLong("SharedCaseId")); names.add(rs.getString("SharedCaseDisplayName"));
 					}
+					if (links.isEmpty()) logContactSharedLinkJoinStages(con, shaleClientId, contactId, 0);
 					Map<Long, List<CaseLinkShareDto>> shares = listCaseLinkSharesForLinks(con, shaleClientId, ids);
 					for (int i = 0; i < links.size(); i++) rows.add(new ContactSharedCaseLinkDto(caseIds.get(i), names.get(i), withShares(links.get(i), shares.get(links.get(i).caseLinkId()))));
 					return List.copyOf(rows);
 				}
 			}
 		} catch (SQLException e) { throw new RuntimeException("Failed to list case links shared with contact", e); }
+	}
+
+	private void logContactSharedLinkJoinStages(Connection con, int tenant, int contactId, int finalReturnedCount) {
+		if (!LOG.isLoggable(Level.FINE)) return;
+		String sql = """
+				SELECT
+				  SUM(CASE WHEN cls.Id IS NOT NULL THEN 1 ELSE 0 END) AS ActiveShareCount,
+				  SUM(CASE WHEN cls.Id IS NOT NULL AND cl.Id IS NOT NULL AND el.Id IS NOT NULL THEN 1 ELSE 0 END) AS CaseLinkExternalLinkJoinCount
+				FROM dbo.CaseLinkShares cls
+				LEFT JOIN dbo.CaseLinks cl ON cl.Id = cls.CaseLinkId
+				 AND cl.ShaleClientId = cls.ShaleClientId
+				 AND cl.IsDeleted = 0
+				LEFT JOIN dbo.ExternalLinks el ON el.Id = cl.ExternalLinkId
+				 AND el.ShaleClientId = cl.ShaleClientId
+				 AND el.IsDeleted = 0
+				WHERE cls.ShaleClientId = ?
+				  AND cls.ContactId = ?
+				  AND cls.IsDeleted = 0
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, tenant);
+			ps.setInt(2, contactId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) {
+					int activeShareCount = rs.getInt("ActiveShareCount");
+					int caseLinkExternalLinkJoinCount = rs.getInt("CaseLinkExternalLinkJoinCount");
+					LOG.fine(() -> "operation=contacts.sharedLinks.daoStages tenantId=" + tenant
+							+ " contactId=" + contactId
+							+ " activeShareCount=" + activeShareCount
+							+ " caseLinkExternalLinkJoinCount=" + caseLinkExternalLinkJoinCount
+							+ " finalReturnedCount=" + finalReturnedCount);
+				}
+			}
+		} catch (SQLException e) {
+			LOG.log(Level.FINE, "operation=contacts.sharedLinks.daoStages.failure tenantId=" + tenant + " contactId=" + contactId, e);
+		}
 	}
 
 	public List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) {
