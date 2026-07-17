@@ -97,6 +97,7 @@ import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.AppSectionTabs;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.ExternalBrowserHelper;
+import com.shale.core.util.CaseLinkUrlNormalizer;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
@@ -2168,7 +2169,7 @@ public class CaseController {
 		final CaseLinkInput[] validated = new CaseLinkInput[1];
 		Node ok = dialog.getDialogPane().lookupButton(ButtonType.OK);
 		ok.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-			try { validated[0] = validateCaseLinkDialogInput(type.getValue(), name.getText(), url.getText(), description.getText(), primary.isSelected(), notes.getText()); error.setText(""); error.setVisible(false); error.setManaged(false); }
+			try { validated[0] = validateCaseLinkDialogInput(type.getValue(), name.getText(), url.getText(), description.getText(), primary.isSelected(), notes.getText()); url.setText(validated[0].url()); error.setText(""); error.setVisible(false); error.setManaged(false); }
 			catch (RuntimeException ex) { validated[0] = null; error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); LOG.info("Case Link dialog validation blocked save tenantId={} actorId={} caseId={} reason={}", safeTenantId(), safeActorUserId(), caseId, rootMessage(ex)); focusFirstInvalidCaseLinkField(type, name, url, description, notes); event.consume(); }
 		});
 		dialog.setResultConverter(button -> button == ButtonType.OK ? validated[0] : null);
@@ -2179,8 +2180,8 @@ public class CaseController {
 		if (selected == null) throw new IllegalArgumentException("Link Type is required.");
 		if (!selected.active()) throw new IllegalArgumentException("Select an active Link Type before saving.");
 		String display = trimLimit(name, "Display name", 255, true);
-		String cleanUrl = trimLimit(url, "URL", 2048, true);
-		ExternalBrowserHelper.validateHttpOrHttps(cleanUrl);
+		String rawUrl = trimLimit(url, "URL", 2048, true);
+		String cleanUrl = CaseLinkUrlNormalizer.normalize(rawUrl);
 		String desc = trimLimit(description, "Description", 2048, false);
 		String note = trimLimit(notes, "Notes", 2000, false);
 		return new CaseLinkInput(selected, display, cleanUrl, desc, primary, note);

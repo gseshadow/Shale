@@ -243,7 +243,7 @@ class CaseServiceAdapterTest {
 				null, null, null, null, null, LocalDateTime.now(), new byte[] {1});
 	}
 
-	private static final class FakeCaseGateway implements CaseServiceAdapter.CaseGateway {
+	static final class FakeCaseGateway implements CaseServiceAdapter.CaseGateway {
 		private final List<CaseUpdateDto> caseUpdates;
 		private long lastCaseUpdatesCaseId;
 		private long lastNoteCaseId;
@@ -266,11 +266,11 @@ class CaseServiceAdapterTest {
 		private String lastLinkTypeColor;
 		private String lastLinkTypeSystemKey;
 		private String lastCaseLinkDisplayName;
-		private String lastCaseLinkUrl;
+		String lastCaseLinkUrl;
 		private boolean lastCaseLinkPrimary;
 		private Boolean lastUpdateCaseLinkPrimary;
 
-		private FakeCaseGateway(List<CaseUpdateDto> caseUpdates) {
+		FakeCaseGateway(List<CaseUpdateDto> caseUpdates) {
 			this.caseUpdates = caseUpdates;
 		}
 
@@ -413,6 +413,7 @@ class CaseServiceAdapterTest {
 
 		@Override
 		public CaseLinkDto updateCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer) {
+			lastCaseLinkUrl = url;
 			lastUpdateCaseLinkPrimary = primary;
 			return null;
 		}
