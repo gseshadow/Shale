@@ -3,6 +3,8 @@ package com.shale.ui.util;
 import java.awt.Desktop;
 import java.net.URI;
 
+import com.shale.core.util.CaseLinkUrlNormalizer;
+
 /** Safely opens user-facing external HTTP(S) links without inspecting or fetching content. */
 public final class ExternalBrowserHelper {
     public interface BrowserLauncher { void browse(URI uri) throws Exception; }
@@ -24,22 +26,13 @@ public final class ExternalBrowserHelper {
     }
 
     public static URI validateHttpOrHttps(String rawUrl) {
-        String value = rawUrl == null ? "" : rawUrl.trim();
-        if (value.isBlank()) throw new IllegalArgumentException("URL is required.");
-        if (containsControlCharacter(value)) throw new IllegalArgumentException("URL cannot contain control characters.");
-        URI uri;
-        try { uri = URI.create(value); } catch (RuntimeException ex) { throw new IllegalArgumentException("Enter a valid absolute HTTP or HTTPS URL."); }
-        String scheme = uri.getScheme();
-        if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) throw new IllegalArgumentException("Only absolute HTTP or HTTPS URLs can be opened.");
-        if (uri.getHost() == null || uri.getHost().isBlank()) throw new IllegalArgumentException("URL host is required.");
-        if (uri.getUserInfo() != null && !uri.getUserInfo().isBlank()) throw new IllegalArgumentException("URLs with embedded credentials are not allowed.");
-        return uri;
+        return CaseLinkUrlNormalizer.normalizeToUri(rawUrl);
     }
 
     public static boolean containsControlCharacter(String value) {
         if (value == null) return false;
         for (int i = 0; i < value.length(); i++) if (Character.isISOControl(value.charAt(i))) return true;
-        return false;
+        return CaseLinkUrlNormalizer.containsControlCharacter(value);
     }
 
     private static String rootMessage(Throwable ex) {

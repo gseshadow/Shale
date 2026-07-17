@@ -1,7 +1,5 @@
 package com.shale.data.service.adapter;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -20,6 +18,7 @@ import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.service.CaseServicePort;
+import com.shale.core.util.CaseLinkUrlNormalizer;
 import com.shale.data.dao.CaseDao;
 
 /**
@@ -388,34 +387,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	static String validateUrl(String value) {
-		String url = value == null ? "" : value.trim();
-		if (url.isBlank()) {
-			throw new IllegalArgumentException("URL is required.");
-		}
-		if (url.length() > 2048) {
-			throw new IllegalArgumentException("URL must be 2048 characters or fewer.");
-		}
-		for (int i = 0; i < url.length(); i++) {
-			if (Character.isISOControl(url.charAt(i))) {
-				throw new IllegalArgumentException("URL must not contain control characters.");
-			}
-		}
-		try {
-			URI uri = new URI(url);
-			String scheme = uri.getScheme();
-			if (!uri.isAbsolute() || scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
-				throw new IllegalArgumentException("URL must be an absolute http or https URL.");
-			}
-			if (uri.getHost() == null || uri.getHost().isBlank()) {
-				throw new IllegalArgumentException("URL must include a host.");
-			}
-			if (uri.getUserInfo() != null) {
-				throw new IllegalArgumentException("URL must not include credentials.");
-			}
-			return url;
-		} catch (URISyntaxException ex) {
-			throw new IllegalArgumentException("URL is not valid.");
-		}
+		return CaseLinkUrlNormalizer.normalize(value);
 	}
 
 	private static void validateRequiredRowVer(byte[] rowVer, String label) {
