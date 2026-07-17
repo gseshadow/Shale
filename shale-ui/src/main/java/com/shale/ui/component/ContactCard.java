@@ -28,6 +28,7 @@ public class ContactCard extends HBox {
     private String backgroundCss;
     private boolean hovered;
     private boolean suppressPlaceholderLines;
+    private boolean interactive = true;
 
     public ContactCard() {
         buildUiMiniDefaults();
@@ -68,6 +69,11 @@ public class ContactCard extends HBox {
 
     public void setSuppressPlaceholderLines(boolean suppressPlaceholderLines) {
         this.suppressPlaceholderLines = suppressPlaceholderLines;
+    }
+
+    public void setInteractive(boolean interactive) {
+        this.interactive = interactive;
+        setCursor(interactive ? Cursor.HAND : Cursor.DEFAULT);
     }
 
     public void applyMini() {
@@ -172,17 +178,19 @@ public class ContactCard extends HBox {
 
     private void wireEvents() {
         setOnMouseEntered(e -> {
+            if (!interactive) return;
             hovered = true;
             setTranslateY(-1.5);
             refreshSurfaceStyle();
         });
         setOnMouseExited(e -> {
+            if (!interactive) return;
             hovered = false;
             setTranslateY(0);
             refreshSurfaceStyle();
         });
         setOnMouseClicked(e -> {
-            if (onOpen != null && contactId != null) {
+            if (interactive && onOpen != null && contactId != null) {
                 onOpen.accept(contactId);
             }
         });

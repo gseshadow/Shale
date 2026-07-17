@@ -29,7 +29,7 @@ final class CaseLinkSharesPhase534DialogLayoutTest {
         String source = Files.readString(CASE_CONTROLLER);
         String editor = source.substring(source.indexOf("private final class SharedWithEditor"),
                 source.indexOf("private record ShareDetails"));
-        assertTrue(editor.contains("boundedVerticalScrollPane(cards"));
+        assertTrue(editor.contains("adaptiveContactScrollPane(cards"));
         assertTrue(editor.contains("Shared With Contact Cards"));
         assertTrue(editor.contains("root.getChildren().addAll(heading, cardsScroll, edit)"));
         assertTrue(editor.contains("Edit Shared With"));

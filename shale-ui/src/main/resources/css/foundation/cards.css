@@ -114,3 +114,88 @@
 
 .case-link-card-footer { -fx-padding: 4 0 0 0; }
 .case-link-primary-badge { -fx-font-size: 10px; }
+
+.case-link-card-shared-with {
+    -fx-padding: 4 0 0 0;
+}
+
+.case-link-card-shared-with-label,
+.case-link-dialog-label {
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -shale-color-text-muted;
+}
+
+.case-link-card-shared-contact-flow,
+.case-link-shared-contact-flow,
+.case-link-share-selection-flow {
+    -fx-hgap: 6;
+    -fx-vgap: 6;
+}
+
+.case-link-embedded-contact-card {
+    -fx-padding: 4 9 4 9;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+}
+
+.case-link-selectable-contact-wrapper {
+    -fx-padding: 2;
+    -fx-cursor: hand;
+}
+
+.case-link-selectable-contact-card {
+    -fx-border-color: -shale-color-card-border;
+}
+
+.case-link-selectable-contact-card-selected {
+    -fx-border-color: -shale-color-primary-accent;
+    -fx-border-width: 2;
+}
+
+.case-link-selection-checkmark {
+    -fx-background-color: -shale-color-primary-accent;
+    -fx-background-radius: 99;
+    -fx-text-fill: white;
+    -fx-font-weight: 800;
+    -fx-font-size: 10px;
+    -fx-padding: 0 4 1 4;
+}
+
+.case-link-dialog-form,
+.case-link-share-modal-form {
+    -fx-padding: 18;
+    -fx-hgap: 12;
+    -fx-vgap: 12;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-border-color: -shale-color-border;
+}
+
+.case-link-dialog-scroll,
+.case-link-styled-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.case-link-dialog-scroll > .viewport,
+.case-link-styled-scroll > .viewport {
+    -fx-background-color: -shale-color-content-surface;
+    -fx-background-radius: 16;
+}
+
+.case-link-dialog-section,
+.case-link-shared-with-summary {
+    -fx-padding: 10;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+}
+
+.case-link-selected-contact-row {
+    -fx-padding: 4 0 4 0;
+}
+
+.case-link-contact-cell-selected {
+    -fx-background-color: -shale-color-card-hover-surface;
+}

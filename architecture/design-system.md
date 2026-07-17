@@ -433,3 +433,16 @@ All three sections share one modal-scoped selection model keyed by ContactId. Ap
 Share `Details` edits only the share-specific `SharedAt` and optional Notes values. `SharedAt` is required, share notes follow the 500-character service/schema contract, and invalid details keep the dialog open with inline validation. Persisted unavailable/deleted Contacts remain visible in the selected and summary views with an unavailable marker, retain stored identity, can be edited/unshared when service rules allow, and are excluded from new selectable Case/All Contact lists.
 
 Accessibility expectations: all share buttons expose clear accessible text, search focus remains in the child modal, Enter/Space toggles Contact selection inside the list rather than saving the parent Link dialog, selected state is communicated by a checkmark and accessible text rather than color alone, and Escape/Cancel closes only the active modal.
+
+## Case Link sharing visual integration (Phase 5.3.5)
+
+Case Link sharing composes the existing Contact Card and Shale dialog primitives rather than generic selector buttons or raw text rows.
+
+* Share Link / Edit Shared With uses selectable MINI Contact Cards for Case Contacts. These cards wrap in a responsive FlowPane, toggle the modal-scoped selection on click or keyboard activation, show a checkmark and selected style, and never navigate to Contact View from inside the modal.
+* All Contacts remains a virtualized ListView. Cells render a lightweight MINI Contact Card graphic that shares the Contact Card styling, clears graphic/text/style/accessibility state on reuse, and toggles selection without leaving the modal.
+* Selected Contacts continues to show Contact identity first and Details / Remove / Unshare as secondary row actions. Missing email/phone placeholders are suppressed; unavailable persisted Contacts retain an explicit unavailable marker.
+* Add/Edit Link dialogs use the secondary dialog shell plus a styled form surface, padded interior, styled ScrollPane viewport, Shale section surfaces, consistent labels, and a distinct Shared With section so the dialog does not appear as an unstyled white document.
+* Empty Shared With state renders only the `Share Link` action and reserves no blank card viewport. One or a few Contacts size to content height without unnecessary scrollbars. Many Contacts wrap and grow up to a modest bounded height before the embedded contact area scrolls, while Edit Shared With and the dialog OK/Cancel footer remain reachable.
+* FULL and COMPACT Case Link Cards render active shares as embedded, display-only MINI Contact Cards in a wrapping FlowPane beneath a subtle Shared With label. MINI Link Cards remain unchanged and do not render share summaries.
+* Embedded Contact Cards on Link Cards are mouse-transparent/display-only by design: clicking them passes through to the parent Link Card and opens the external URL; they do not navigate to Contact View. Edit, Delete, and Set Primary remain isolated child actions.
+* Share display names continue to use the existing Case Link Contact option mapping. Legacy Contact records that store a phone number in the Name field are treated as valid Contact display names and are not filtered, rewritten, or flagged as invalid by this presentation layer.
