@@ -7744,42 +7744,62 @@ public final class CaseDao {
 		String like = "%" + q.toLowerCase(Locale.ROOT) + "%";
 		String sql = """
 			SELECT TOP (?) ct.Id AS ContactId,
-			       CASE WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL
-			            THEN LTRIM(RTRIM(COALESCE(ct.FirstName,'') + CASE WHEN COALESCE(ct.FirstName,'') = '' OR COALESCE(ct.LastName,'') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName,'')))
-			            ELSE NULLIF(LTRIM(RTRIM(ct.Name)), '') END AS DisplayName
+			       %s AS DisplayName
 			FROM dbo.Contacts ct
-			WHERE ct.ShaleClientId = ? AND ct.IsDeleted = 0
-			  AND (? = '' OR LOWER(COALESCE(ct.FirstName,'') + ' ' + COALESCE(ct.LastName,'') + ' ' + COALESCE(ct.Name,'') + ' ' + COALESCE(ct.Email,'')) LIKE ?)
+			WHERE ct.ShaleClientId = ? AND ISNULL(ct.IsDeleted, 0) = 0
+			  AND %s IS NOT NULL
+			  AND (? = '' OR LOWER(COALESCE(ct.Name,'') + ' ' + COALESCE(ct.FirstName,'') + ' ' + COALESCE(ct.LastName,'') + ' ' + COALESCE(ct.WorkName,'') + ' ' + COALESCE(ct.EmailPersonal,'') + ' ' + COALESCE(ct.EmailWork,'') + ' ' + COALESCE(ct.EmailOther,'')) LIKE ?)
 			ORDER BY DisplayName ASC, ct.Id ASC
-			""";
+			""".formatted(caseLinkShareContactDisplayNameExpression("ct"), caseLinkShareContactDisplayNameExpression("ct"));
 		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setInt(1, resolvedLimit); ps.setInt(2, tenant); ps.setString(3, q); ps.setString(4, like);
-			try (ResultSet rs = ps.executeQuery()) { List<CaseLinkContactOptionDto> out = new ArrayList<>(); while (rs.next()) out.add(new CaseLinkContactOptionDto(rs.getInt("ContactId"), rs.getString("DisplayName"))); return out; }
+			try (ResultSet rs = ps.executeQuery()) { return mapCaseLinkContactOptions(rs); }
 		} catch (SQLException e) { throw new RuntimeException("Failed to search share contacts", e); }
 	}
 
+	public List<CaseLinkContactOptionDto> listCaseLinkShareContacts(int tenant) {
+		String sql = """
+			SELECT ct.Id AS ContactId,
+			       %s AS DisplayName
+			FROM dbo.Contacts ct
+			WHERE ct.ShaleClientId = ? AND ISNULL(ct.IsDeleted, 0) = 0
+			  AND %s IS NOT NULL
+			ORDER BY DisplayName ASC, ct.Id ASC
+			""".formatted(caseLinkShareContactDisplayNameExpression("ct"), caseLinkShareContactDisplayNameExpression("ct"));
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, tenant);
+			try (ResultSet rs = ps.executeQuery()) { return mapCaseLinkContactOptions(rs); }
+		} catch (SQLException e) { throw new RuntimeException("Failed to list share contacts", e); }
+	}
 
 	public List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int tenant) {
 		String sql = """
 			SELECT DISTINCT ct.Id AS ContactId,
-			       CASE WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL
-			            THEN LTRIM(RTRIM(COALESCE(ct.FirstName,'') + CASE WHEN COALESCE(ct.FirstName,'') = '' OR COALESCE(ct.LastName,'') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName,'')))
-			            ELSE NULLIF(LTRIM(RTRIM(ct.Name)), '') END AS DisplayName
+			       %s AS DisplayName
 			FROM dbo.Cases c
 			JOIN dbo.CaseContacts cc ON cc.CaseId = c.Id
 			JOIN dbo.Contacts ct ON ct.Id = cc.ContactId
-			WHERE c.Id = ? AND c.ShaleClientId = ? AND c.IsDeleted = 0
-			  AND ct.ShaleClientId = ? AND ct.IsDeleted = 0
+			WHERE c.Id = ? AND c.ShaleClientId = ? AND ISNULL(c.IsDeleted, 0) = 0
+			  AND ct.ShaleClientId = ? AND ISNULL(ct.IsDeleted, 0) = 0
+			  AND %s IS NOT NULL
 			ORDER BY DisplayName ASC, ct.Id ASC
-			""";
+			""".formatted(caseLinkShareContactDisplayNameExpression("ct"), caseLinkShareContactDisplayNameExpression("ct"));
 		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId); ps.setInt(2, tenant); ps.setInt(3, tenant);
-			try (ResultSet rs = ps.executeQuery()) {
-				List<CaseLinkContactOptionDto> out = new ArrayList<>();
-				while (rs.next()) out.add(new CaseLinkContactOptionDto(rs.getInt("ContactId"), rs.getString("DisplayName")));
-				return out;
-			}
+			try (ResultSet rs = ps.executeQuery()) { return mapCaseLinkContactOptions(rs); }
 		} catch (SQLException e) { throw new RuntimeException("Failed to list case share contacts", e); }
+	}
+
+	private static String caseLinkShareContactDisplayNameExpression(String alias) {
+		return "COALESCE(NULLIF(LTRIM(RTRIM(" + alias + ".Name)), ''), "
+				+ "NULLIF(LTRIM(RTRIM(CONCAT(" + alias + ".FirstName, ' ', " + alias + ".LastName))), ''), "
+				+ "NULLIF(LTRIM(RTRIM(" + alias + ".WorkName)), ''))";
+	}
+
+	private static List<CaseLinkContactOptionDto> mapCaseLinkContactOptions(ResultSet rs) throws SQLException {
+		List<CaseLinkContactOptionDto> out = new ArrayList<>();
+		while (rs.next()) out.add(new CaseLinkContactOptionDto(rs.getInt("ContactId"), rs.getString("DisplayName")));
+		return out;
 	}
 
 	public List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) {
