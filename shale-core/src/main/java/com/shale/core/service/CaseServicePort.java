@@ -1,6 +1,7 @@
 package com.shale.core.service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +11,8 @@ import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.dto.CaseLinkShareDto;
+import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.PracticeAreaDto;
 
@@ -61,13 +64,27 @@ public interface CaseServicePort {
 
 	CaseLinkDto createCaseLink(CreateCaseLinkCommand command);
 
+	default CaseLinkDto createCaseLinkWithShares(CreateCaseLinkWithSharesCommand command) { throw new UnsupportedOperationException(); }
+
 	CaseLinkDto updateCaseLink(UpdateCaseLinkCommand command);
+
+	default CaseLinkDto updateCaseLinkWithShares(UpdateCaseLinkWithSharesCommand command) { throw new UnsupportedOperationException(); }
 
 	CaseLinkDto setPrimaryCaseLink(SetPrimaryCaseLinkCommand command);
 
 	List<CaseLinkDto> reorderCaseLinks(ReorderCaseLinksCommand command);
 
 	void deleteCaseLink(DeleteCaseLinkCommand command);
+
+	default List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { return List.of(); }
+
+	default List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { return List.of(); }
+
+	default CaseLinkShareDto addCaseLinkShare(AddCaseLinkShareCommand command) { throw new UnsupportedOperationException(); }
+
+	default CaseLinkShareDto updateCaseLinkShare(UpdateCaseLinkShareCommand command) { throw new UnsupportedOperationException(); }
+
+	default void removeCaseLinkShare(RemoveCaseLinkShareCommand command) { throw new UnsupportedOperationException(); }
 
 	PracticeAreaDto createPracticeArea(PracticeAreaCommand command);
 
@@ -152,6 +169,41 @@ public interface CaseServicePort {
 			String url, String description, boolean primary, String notes, Integer sortOrder) {
 	}
 
+
+	record CaseLinkShareDraft(int contactId, LocalDateTime sharedAt, String notes) {
+	}
+
+	record CaseLinkShareUpdate(long caseLinkShareId, int contactId, LocalDateTime sharedAt, String notes, byte[] expectedRowVer) {
+		public CaseLinkShareUpdate { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record CaseLinkShareRemoval(long caseLinkShareId, byte[] expectedRowVer) {
+		public CaseLinkShareRemoval { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record CreateCaseLinkWithSharesCommand(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName,
+			String url, String description, boolean primary, String notes, Integer sortOrder, List<CaseLinkShareDraft> shares) {
+		public CreateCaseLinkWithSharesCommand { shares = shares == null ? List.of() : List.copyOf(shares); }
+		@Override public List<CaseLinkShareDraft> shares() { return shares == null ? List.of() : List.copyOf(shares); }
+	}
+
+	record UpdateCaseLinkWithSharesCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId,
+			int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder,
+			byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer, List<CaseLinkShareDraft> shareAdds,
+			List<CaseLinkShareUpdate> shareUpdates, List<CaseLinkShareRemoval> shareRemovals) {
+		public UpdateCaseLinkWithSharesCommand {
+			expectedCaseLinkRowVer = copyRowVer(expectedCaseLinkRowVer); expectedExternalLinkRowVer = copyRowVer(expectedExternalLinkRowVer);
+			shareAdds = shareAdds == null ? List.of() : List.copyOf(shareAdds); shareUpdates = shareUpdates == null ? List.of() : List.copyOf(shareUpdates); shareRemovals = shareRemovals == null ? List.of() : List.copyOf(shareRemovals);
+		}
+		@Override public byte[] expectedCaseLinkRowVer() { return copyRowVer(expectedCaseLinkRowVer); }
+		@Override public byte[] expectedExternalLinkRowVer() { return copyRowVer(expectedExternalLinkRowVer); }
+		@Override public List<CaseLinkShareDraft> shareAdds() { return shareAdds == null ? List.of() : List.copyOf(shareAdds); }
+		@Override public List<CaseLinkShareUpdate> shareUpdates() { return shareUpdates == null ? List.of() : List.copyOf(shareUpdates); }
+		@Override public List<CaseLinkShareRemoval> shareRemovals() { return shareRemovals == null ? List.of() : List.copyOf(shareRemovals); }
+	}
+
 	record UpdateCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId,
 			int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder,
 			byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer) {
@@ -175,6 +227,23 @@ public interface CaseServicePort {
 	}
 
 	record ReorderCaseLinksCommand(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds) {
+	}
+
+
+	record AddCaseLinkShareCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, int contactId,
+			LocalDateTime sharedAt, String notes) {
+	}
+
+	record UpdateCaseLinkShareCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId,
+			long caseLinkShareId, int contactId, LocalDateTime sharedAt, String notes, byte[] expectedRowVer) {
+		public UpdateCaseLinkShareCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record RemoveCaseLinkShareCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId,
+			long caseLinkShareId, byte[] expectedRowVer) {
+		public RemoveCaseLinkShareCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
 	}
 
 	record DeleteCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer) {

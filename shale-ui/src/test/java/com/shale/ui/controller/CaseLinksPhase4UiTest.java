@@ -39,9 +39,10 @@ final class CaseLinksPhase4UiTest {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
         assertTrue(source.contains("appState.getShaleClientId()"));
         assertTrue(source.contains("appState.getUserId()"));
-        assertTrue(source.contains("new CaseServicePort.CreateCaseLinkCommand(tenantId, actorId, activeCaseId"));
-        assertTrue(source.contains("new CaseServicePort.UpdateCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.externalLinkId()"));
-        assertTrue(source.contains("null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer()"));
+        assertTrue(source.contains("new CaseServicePort.CreateCaseLinkWithSharesCommand(tenantId, actorId, activeCaseId"));
+        assertTrue(source.contains("input.shareAdds()"));
+        assertTrue(source.contains("new CaseServicePort.UpdateCaseLinkWithSharesCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.externalLinkId()"));
+        assertTrue(source.contains("null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer(), input.shareAdds(), input.shareUpdates(), input.shareRemovals()"));
         assertTrue(source.contains("new CaseServicePort.SetPrimaryCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId())"));
         assertTrue(source.contains("new CaseServicePort.DeleteCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.caseLinkRowVer())"));
         assertTrue(source.contains("new CaseServicePort.ReorderCaseLinksCommand(tenantId, actorId, activeCaseId, ids)"));

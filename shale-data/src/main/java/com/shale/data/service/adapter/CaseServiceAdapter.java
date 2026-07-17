@@ -1,6 +1,7 @@
 package com.shale.data.service.adapter;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -14,6 +15,8 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.dto.CaseLinkContactOptionDto;
+import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
@@ -295,6 +298,22 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public CaseLinkDto createCaseLinkWithShares(CreateCaseLinkWithSharesCommand command) {
+		Objects.requireNonNull(command, "command");
+		validateShareDrafts(command.shares());
+		return caseGateway.createCaseLinkWithShares(command.shaleClientId(), command.actorUserId(), command.caseId(), command.linkTypeId(), validateDisplayName(command.displayName()), validateUrl(command.url()), validateDescription(command.description()), command.primary(), validateNotes(command.notes()), command.sortOrder(), command.shares());
+	}
+
+	@Override
+	public CaseLinkDto updateCaseLinkWithShares(UpdateCaseLinkWithSharesCommand command) {
+		Objects.requireNonNull(command, "command");
+		validateRequiredRowVer(command.expectedCaseLinkRowVer(), "expectedCaseLinkRowVer");
+		validateRequiredRowVer(command.expectedExternalLinkRowVer(), "expectedExternalLinkRowVer");
+		validateShareChangeSet(command.shareAdds(), command.shareUpdates(), command.shareRemovals());
+		return caseGateway.updateCaseLinkWithShares(command.shaleClientId(), command.actorUserId(), command.caseId(), command.caseLinkId(), command.externalLinkId(), command.linkTypeId(), validateDisplayName(command.displayName()), validateUrl(command.url()), validateDescription(command.description()), command.primary(), validateNotes(command.notes()), command.sortOrder(), command.expectedCaseLinkRowVer(), command.expectedExternalLinkRowVer(), command.shareAdds(), command.shareUpdates(), command.shareRemovals());
+	}
+
+	@Override
 	public CaseLinkDto updateCaseLink(UpdateCaseLinkCommand command) {
 		Objects.requireNonNull(command, "command");
 		validateRequiredRowVer(command.expectedCaseLinkRowVer(), "expectedCaseLinkRowVer");
@@ -339,6 +358,44 @@ public final class CaseServiceAdapter implements CaseServicePort {
 				command.caseId(),
 				command.caseLinkId(),
 				command.expectedCaseLinkRowVer());
+	}
+
+	@Override
+	public List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) {
+		int resolvedLimit = limit <= 0 ? 25 : Math.min(limit, 100);
+		return caseGateway.searchCaseLinkShareContacts(shaleClientId, query == null ? "" : query.trim(), resolvedLimit);
+	}
+
+	@Override
+	public List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) {
+		return caseGateway.listCaseLinkShares(caseId, caseLinkId, shaleClientId);
+	}
+
+	@Override
+	public CaseLinkShareDto addCaseLinkShare(AddCaseLinkShareCommand command) {
+		Objects.requireNonNull(command, "command");
+		validatePositive(command.shaleClientId(), "ShaleClientId");
+		validatePositive(command.actorUserId(), "ActorUserId");
+		validatePositive(command.caseId(), "CaseId");
+		validatePositive(command.caseLinkId(), "CaseLinkId");
+		validatePositive(command.contactId(), "ContactId");
+		return caseGateway.addCaseLinkShare(command.shaleClientId(), command.actorUserId(), command.caseId(), command.caseLinkId(), command.contactId(), requireSharedAt(command.sharedAt()), validateShareNotes(command.notes()));
+	}
+
+	@Override
+	public CaseLinkShareDto updateCaseLinkShare(UpdateCaseLinkShareCommand command) {
+		Objects.requireNonNull(command, "command");
+		validatePositive(command.caseLinkShareId(), "CaseLinkShareId");
+		validateRequiredRowVer(command.expectedRowVer(), "expectedRowVer");
+		return caseGateway.updateCaseLinkShare(command.shaleClientId(), command.actorUserId(), command.caseId(), command.caseLinkId(), command.caseLinkShareId(), command.contactId(), requireSharedAt(command.sharedAt()), validateShareNotes(command.notes()), command.expectedRowVer());
+	}
+
+	@Override
+	public void removeCaseLinkShare(RemoveCaseLinkShareCommand command) {
+		Objects.requireNonNull(command, "command");
+		validatePositive(command.caseLinkShareId(), "CaseLinkShareId");
+		validateRequiredRowVer(command.expectedRowVer(), "expectedRowVer");
+		caseGateway.removeCaseLinkShare(command.shaleClientId(), command.actorUserId(), command.caseId(), command.caseLinkId(), command.caseLinkShareId(), command.expectedRowVer());
 	}
 
 	private static String validateLinkTypeName(String value) {
@@ -389,6 +446,26 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	static String validateUrl(String value) {
 		return CaseLinkUrlNormalizer.normalize(value);
 	}
+
+	private static void validateShareDrafts(List<CaseLinkShareDraft> drafts) {
+		if (drafts == null) throw new IllegalArgumentException("Share drafts are required.");
+		for (CaseLinkShareDraft d : drafts) { if (d == null) throw new IllegalArgumentException("Share drafts must not contain null values."); validatePositive(d.contactId(), "ContactId"); requireSharedAt(d.sharedAt()); validateShareNotes(d.notes()); }
+		if (drafts.stream().map(CaseLinkShareDraft::contactId).distinct().count() != drafts.size()) throw new IllegalArgumentException("Shared With contacts must not contain duplicates.");
+	}
+
+	private static void validateShareChangeSet(List<CaseLinkShareDraft> adds, List<CaseLinkShareUpdate> updates, List<CaseLinkShareRemoval> removals) {
+		validateShareDrafts(adds == null ? List.of() : adds);
+		if (updates == null || removals == null) throw new IllegalArgumentException("Share change sets are required.");
+		java.util.Set<Long> seenShares = new java.util.HashSet<>();
+		java.util.Set<Integer> contactIds = new java.util.HashSet<>();
+		for (CaseLinkShareDraft add : adds) { if (!contactIds.add(add.contactId())) throw new IllegalArgumentException("Shared With contacts must not contain duplicates."); }
+		for (CaseLinkShareUpdate u : updates) { if (u == null) throw new IllegalArgumentException("Share updates must not contain null values."); validatePositive(u.caseLinkShareId(), "CaseLinkShareId"); validatePositive(u.contactId(), "ContactId"); requireSharedAt(u.sharedAt()); validateShareNotes(u.notes()); validateRequiredRowVer(u.expectedRowVer(), "expectedRowVer"); if (!seenShares.add(u.caseLinkShareId())) throw new IllegalArgumentException("Share changes must not contain duplicate share ids."); if (!contactIds.add(u.contactId())) throw new IllegalArgumentException("Shared With contacts must not contain duplicates."); }
+		for (CaseLinkShareRemoval r : removals) { if (r == null) throw new IllegalArgumentException("Share removals must not contain null values."); validatePositive(r.caseLinkShareId(), "CaseLinkShareId"); validateRequiredRowVer(r.expectedRowVer(), "expectedRowVer"); if (!seenShares.add(r.caseLinkShareId())) throw new IllegalArgumentException("Share changes must not contain duplicate share ids."); }
+	}
+
+	private static void validatePositive(long value, String label) { if (value <= 0) throw new IllegalArgumentException(label + " must be positive."); }
+	private static LocalDateTime requireSharedAt(LocalDateTime value) { if (value == null) throw new IllegalArgumentException("Shared at is required."); return value; }
+	private static String validateShareNotes(String value) { String out = value == null ? null : value.trim(); if (out != null && out.length() > 500) throw new IllegalArgumentException("Notes must be 500 characters or fewer."); if (out != null && out.chars().anyMatch(ch -> Character.isISOControl(ch) && ch != '\n' && ch != '\r' && ch != '\t')) throw new IllegalArgumentException("Notes contain unsupported control characters."); return out == null || out.isBlank() ? null : out; }
 
 	private static void validateRequiredRowVer(byte[] rowVer, String label) {
 		if (rowVer == null || rowVer.length == 0) {
@@ -520,10 +597,17 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId);
 		Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId);
 		CaseLinkDto createCaseLink(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder);
+		default CaseLinkDto createCaseLinkWithShares(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder, List<CaseLinkShareDraft> shares) { return createCaseLink(shaleClientId, actorUserId, caseId, linkTypeId, displayName, url, description, primary, notes, sortOrder); }
 		CaseLinkDto updateCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer);
+		default CaseLinkDto updateCaseLinkWithShares(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer, List<CaseLinkShareDraft> adds, List<CaseLinkShareUpdate> updates, List<CaseLinkShareRemoval> removals) { return updateCaseLink(shaleClientId, actorUserId, caseId, caseLinkId, externalLinkId, linkTypeId, displayName, url, description, primary, notes, sortOrder, expectedCaseLinkRowVer, expectedExternalLinkRowVer); }
+		default List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { return List.of(); }
 		CaseLinkDto setPrimaryCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId);
 		List<CaseLinkDto> reorderCaseLinks(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds);
 		void deleteCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer);
+		default List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { return List.of(); }
+		default CaseLinkShareDto addCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, int contactId, LocalDateTime sharedAt, String notes) { throw new UnsupportedOperationException(); }
+		default CaseLinkShareDto updateCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long caseLinkShareId, int contactId, LocalDateTime sharedAt, String notes, byte[] expectedRowVer) { throw new UnsupportedOperationException(); }
+		default void removeCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long caseLinkShareId, byte[] expectedRowVer) { throw new UnsupportedOperationException(); }
 
 		PracticeAreaDto createPracticeArea(int shaleClientId, String name, String color, boolean active, String systemKey);
 
@@ -668,10 +752,17 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override public List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId) { return caseDao.listCaseLinks(caseId, shaleClientId); }
 		@Override public Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId) { return caseDao.getPrimaryCaseLink(caseId, shaleClientId); }
 		@Override public CaseLinkDto createCaseLink(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder) { return caseDao.createCaseLink(shaleClientId, actorUserId, caseId, linkTypeId, displayName, url, description, primary, notes, sortOrder); }
+		@Override public CaseLinkDto createCaseLinkWithShares(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder, List<CaseLinkShareDraft> shares) { return caseDao.createCaseLinkWithShares(shaleClientId, actorUserId, caseId, linkTypeId, displayName, url, description, primary, notes, sortOrder, shares); }
 		@Override public CaseLinkDto updateCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer) { return caseDao.updateCaseLink(shaleClientId, actorUserId, caseId, caseLinkId, externalLinkId, linkTypeId, displayName, url, description, primary, notes, sortOrder, expectedCaseLinkRowVer, expectedExternalLinkRowVer); }
+		@Override public CaseLinkDto updateCaseLinkWithShares(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer, List<CaseLinkShareDraft> adds, List<CaseLinkShareUpdate> updates, List<CaseLinkShareRemoval> removals) { return caseDao.updateCaseLinkWithShares(shaleClientId, actorUserId, caseId, caseLinkId, externalLinkId, linkTypeId, displayName, url, description, primary, notes, sortOrder, expectedCaseLinkRowVer, expectedExternalLinkRowVer, adds, updates, removals); }
+		@Override public List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { return caseDao.searchCaseLinkShareContacts(shaleClientId, query, limit); }
 		@Override public CaseLinkDto setPrimaryCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId) { return caseDao.setPrimaryCaseLink(shaleClientId, actorUserId, caseId, caseLinkId); }
 		@Override public List<CaseLinkDto> reorderCaseLinks(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds) { return caseDao.reorderCaseLinks(shaleClientId, actorUserId, caseId, orderedCaseLinkIds); }
 		@Override public void deleteCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer) { caseDao.deleteCaseLink(shaleClientId, actorUserId, caseId, caseLinkId, expectedCaseLinkRowVer); }
+		@Override public List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { return caseDao.listCaseLinkShares(caseId, caseLinkId, shaleClientId); }
+		@Override public CaseLinkShareDto addCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, int contactId, LocalDateTime sharedAt, String notes) { return caseDao.addCaseLinkShare(shaleClientId, actorUserId, caseId, caseLinkId, contactId, sharedAt, notes); }
+		@Override public CaseLinkShareDto updateCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long caseLinkShareId, int contactId, LocalDateTime sharedAt, String notes, byte[] expectedRowVer) { return caseDao.updateCaseLinkShare(shaleClientId, actorUserId, caseId, caseLinkId, caseLinkShareId, contactId, sharedAt, notes, expectedRowVer); }
+		@Override public void removeCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long caseLinkShareId, byte[] expectedRowVer) { caseDao.removeCaseLinkShare(shaleClientId, actorUserId, caseId, caseLinkId, caseLinkShareId, expectedRowVer); }
 
 		@Override
 		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,

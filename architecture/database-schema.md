@@ -849,3 +849,25 @@ Tenant consistency and lifecycle requirements:
 * Removed/unshared rows use `IsDeleted = 1`, with `DeletedAt` populated and `DeletedByUserId` populated when an actor is known. Soft-deleted rows must not be treated as currently shared.
 * Phase 5.3 Case Link deletion must soft-delete active `CaseLinkShares` rows in the same transaction that soft-deletes the parent Case Link.
 * Contact soft deletion must not cascade-delete shares. Historical reads should preserve records where appropriate, but Phase 5.3 services must reject new active shares to deleted or unavailable Contacts.
+
+## Case Link Shares service lifecycle (Phase 5.3)
+
+`dbo.CaseLinkShares` records that a tenant-owned `dbo.CaseLinks` row was shared with, or made available to, a tenant-owned `dbo.Contacts` row. Phase 5.3 uses the existing `CaseServicePort -> CaseServiceAdapter -> CaseDao -> dbo.CaseLinkShares` path; no separate service stack or UI-owned persistence path is introduced.
+
+Service and DAO rules:
+
+* `ShaleClientId`, actor user id, case id, case link id, contact id, share id, `SharedAt`, and expected `RowVer` values for update/remove operations are validated at the service boundary.
+* Share notes are trimmed and limited to 500 Unicode characters, matching `dbo.CaseLinkShares.Notes nvarchar(1000-byte schema output / 500 UTF-16 characters)`.
+* Reads and writes explicitly prove tenant ownership through `dbo.Cases`, active `dbo.CaseLinks`, tenant-compatible `dbo.ExternalLinks`, same-tenant active actor `dbo.Users`, and same-tenant `dbo.Contacts` predicates.
+* `dbo.CaseLinkShares` has strict tenant RLS through `sec.fn_FilterByTenant(ShaleClientId)`, but services still apply explicit tenant predicates as defense in depth.
+* Current live `dbo.Contacts` rows have `ShaleClientId` and `IsDeleted`, but Contacts are treated as having an RLS gap for this feature; every share contact read/validation therefore includes `ct.ShaleClientId = ?` or `ct.ShaleClientId = cls.ShaleClientId` explicitly. Phase 5.3 does not attach Contacts to RLS.
+* Active duplicate semantics are enforced by `UX_CaseLinkShares_CaseLinkId_ContactId_Active`; SQL Server 2601/2627 violations from that index are translated to “This contact is already shared on this link.”
+* Update and remove operations include active-state and expected `RowVer` predicates and report optimistic conflicts when no row is affected.
+* Removing a share soft-deletes it by setting `IsDeleted`, `DeletedAt`, `DeletedByUserId`, `UpdatedAt`, and `UpdatedByUserId`; rows are not physically deleted.
+* Deleting a Case Link soft-deletes active `dbo.CaseLinkShares` rows for that link in the same transaction before the link/external-link cleanup finishes. If either side fails, the transaction rolls back.
+* Contact deletion does not cascade to `dbo.CaseLinkShares`. Existing share rows remain historical records and can still be displayed using best available contact display information with an unavailable marker; new active shares reject deleted, unavailable, or cross-tenant Contacts.
+* `listCaseLinks` batch-loads shares for the returned Case Link set and groups them by `CaseLinkId` to avoid per-card N+1 queries. `getPrimaryCaseLink` uses a focused share load for the one primary link.
+* Active shares are ordered deterministically by contact display name, contact id, then share id.
+* Phase 5.3.1 adds aggregate create/update operations for the Case Link editor. `createCaseLinkWithShares` inserts the ExternalLink, CaseLink, staged CaseLinkShares, and primary-state changes on one connection and transaction. `updateCaseLinkWithShares` updates Link fields, inserts new shares, updates edited shares with expected share `RowVer`, soft-deletes unshared rows with expected share `RowVer`, and applies primary-state changes in one transaction. Any validation, duplicate-key, or optimistic-concurrency failure rolls back the complete aggregate save.
+* Contact selector options for the Shared With editor are loaded through the same Case service boundary, sorted deterministically by display name and Contact id, exclude deleted/unavailable Contacts, and include an explicit `Contacts.ShaleClientId` predicate because Contacts currently do not have their own TenantFilter predicate.
+* The UI stages share additions, edits, and unshares until the main Add/Edit Link dialog is saved. Cancel creates or changes no ExternalLink, CaseLink, or CaseLinkShares rows.

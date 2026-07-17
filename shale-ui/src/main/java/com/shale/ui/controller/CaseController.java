@@ -31,6 +31,8 @@ import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.dto.CaseLinkContactOptionDto;
+import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.dto.CaseTimelineEventDto;
@@ -2038,7 +2040,7 @@ public class CaseController {
 			final int tenantId = requireTenantId();
 			final int actorId = requireActorUserId();
 			final int activeCaseId = caseId;
-			runCaseLinkMutation("create", "Link added.", activeCaseId, null, () -> caseService.createCaseLink(new CaseServicePort.CreateCaseLinkCommand(tenantId, actorId, activeCaseId, input.linkType().id(), input.displayName(), input.url(), input.description(), input.primary(), input.notes(), null)));
+			runCaseLinkMutation("create", "Link added.", activeCaseId, null, () -> caseService.createCaseLinkWithShares(new CaseServicePort.CreateCaseLinkWithSharesCommand(tenantId, actorId, activeCaseId, input.linkType().id(), input.displayName(), input.url(), input.description(), input.primary(), input.notes(), null, input.shareAdds())));
 		}));
 	}
 
@@ -2047,7 +2049,7 @@ public class CaseController {
 			final int tenantId = requireTenantId();
 			final int actorId = requireActorUserId();
 			final int activeCaseId = caseId;
-			runCaseLinkMutation("update", "Link updated.", activeCaseId, link.caseLinkId(), () -> caseService.updateCaseLink(new CaseServicePort.UpdateCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.externalLinkId(), input.linkType().id(), input.displayName(), input.url(), input.description(), null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer())));
+			runCaseLinkMutation("update", "Link updated.", activeCaseId, link.caseLinkId(), () -> caseService.updateCaseLinkWithShares(new CaseServicePort.UpdateCaseLinkWithSharesCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.externalLinkId(), input.linkType().id(), input.displayName(), input.url(), input.description(), null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer(), input.shareAdds(), input.shareUpdates(), input.shareRemovals())));
 		}));
 	}
 
@@ -2163,20 +2165,140 @@ public class CaseController {
 		type.setCellFactory(list -> new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); setGraphic(empty || item == null ? null : LinkTypeIndicatorFactory.createLinkTypePill(item.name(), item.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); }});
 		type.setButtonCell(new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); }});
 		TextField name = new TextField(existing == null ? "" : safeText(existing.displayName())); TextField url = new TextField(existing == null ? "" : safeText(existing.url())); TextArea description = new TextArea(existing == null ? "" : safeText(existing.description())); description.setPrefRowCount(3); TextArea notes = new TextArea(existing == null ? "" : safeText(existing.notes())); notes.setPrefRowCount(3); CheckBox primary = new CheckBox("Make primary"); primary.setSelected(existing != null && existing.primary());
+		SharedWithEditor sharedWithEditor = new SharedWithEditor(existing);
+		VBox sharedWithBox = sharedWithEditor.root();
 		if (existing != null) type.getSelectionModel().select(linkTypes.stream().filter(t -> t.id() == existing.linkTypeId()).findFirst().orElse(null)); else if (!linkTypes.isEmpty()) type.getSelectionModel().selectFirst();
 		Label error = new Label(); error.setTextFill(Color.web("#b42318")); error.setVisible(false); error.setManaged(false);
-		GridPane grid = new GridPane(); grid.setHgap(10); grid.setVgap(8); grid.addRow(0, new Label("Link Type"), type); grid.addRow(1, new Label("Display Name"), name); grid.addRow(2, new Label("URL"), url); grid.addRow(3, new Label("Description"), description); grid.addRow(4, new Label("Notes"), notes); grid.add(primary, 1, 5); grid.add(error, 0, 6, 2, 1); dialog.getDialogPane().setContent(grid);
+		GridPane grid = new GridPane(); grid.setHgap(10); grid.setVgap(8); grid.addRow(0, new Label("Link Type"), type); grid.addRow(1, new Label("Display Name"), name); grid.addRow(2, new Label("URL"), url); grid.addRow(3, new Label("Description"), description); grid.addRow(4, new Label("Notes"), notes); grid.add(primary, 1, 5); grid.add(new Label("Shared With"), 0, 6); grid.add(sharedWithBox, 1, 6); grid.add(error, 0, 7, 2, 1); dialog.getDialogPane().setContent(grid);
 		final CaseLinkInput[] validated = new CaseLinkInput[1];
 		Node ok = dialog.getDialogPane().lookupButton(ButtonType.OK);
 		ok.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-			try { validated[0] = validateCaseLinkDialogInput(type.getValue(), name.getText(), url.getText(), description.getText(), primary.isSelected(), notes.getText()); url.setText(validated[0].url()); error.setText(""); error.setVisible(false); error.setManaged(false); }
+			try { validated[0] = validateCaseLinkDialogInput(type.getValue(), name.getText(), url.getText(), description.getText(), primary.isSelected(), notes.getText(), sharedWithEditor.shareAdds(), sharedWithEditor.shareUpdates(), sharedWithEditor.shareRemovals()); url.setText(validated[0].url()); error.setText(""); error.setVisible(false); error.setManaged(false); }
 			catch (RuntimeException ex) { validated[0] = null; error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); LOG.info("Case Link dialog validation blocked save tenantId={} actorId={} caseId={} reason={}", safeTenantId(), safeActorUserId(), caseId, rootMessage(ex)); focusFirstInvalidCaseLinkField(type, name, url, description, notes); event.consume(); }
 		});
 		dialog.setResultConverter(button -> button == ButtonType.OK ? validated[0] : null);
 		return dialog.showAndWait();
 	}
 
-	static CaseLinkInput validateCaseLinkDialogInput(LinkTypeDto selected, String name, String url, String description, boolean primary, String notes) {
+	private final class SharedWithEditor {
+		private final VBox root = new VBox(8);
+		private final TextField search = new TextField();
+		private final ComboBox<CaseLinkContactOptionDto> contacts = new ComboBox<>();
+		private final VBox rows = new VBox(6);
+		private final List<StagedShare> staged = new ArrayList<>();
+		private int searchGeneration;
+
+		SharedWithEditor(CaseLinkDto existing) {
+			root.getStyleClass().add("case-link-shared-with-section");
+			for (CaseLinkShareDto share : existing == null || existing.shares() == null ? List.<CaseLinkShareDto>of() : existing.shares()) {
+				staged.add(StagedShare.persisted(share));
+			}
+			search.setPromptText("Search tenant Contacts...");
+			contacts.setMaxWidth(Double.MAX_VALUE);
+			contacts.setConverter(new javafx.util.StringConverter<>() {
+				@Override public String toString(CaseLinkContactOptionDto option) { return option == null ? "" : option.displayName(); }
+				@Override public CaseLinkContactOptionDto fromString(String value) { return null; }
+			});
+			Button add = ActionButtonFactory.cardAction("Add Contact", e -> onAdd());
+			HBox picker = new HBox(6, search, contacts, add);
+			HBox.setHgrow(search, Priority.ALWAYS); HBox.setHgrow(contacts, Priority.ALWAYS);
+			Label help = new Label("Stage Shared With changes here. Save applies Link and share changes atomically; Cancel persists nothing.");
+			help.getStyleClass().add("search-summary-text"); help.setWrapText(true);
+			ScrollPane scroller = new ScrollPane(rows); scroller.setFitToWidth(true); scroller.setPrefViewportHeight(150); scroller.setMaxHeight(190);
+			root.getChildren().addAll(help, picker, scroller);
+			search.textProperty().addListener((obs, oldV, newV) -> loadContactOptions(newV));
+			loadContactOptions(""); renderRows();
+		}
+
+		VBox root() { return root; }
+
+		List<CaseServicePort.CaseLinkShareDraft> shareAdds() {
+			return staged.stream().filter(s -> !s.removed && s.shareId <= 0).map(s -> new CaseServicePort.CaseLinkShareDraft(s.contactId, s.sharedAt, s.notes)).toList();
+		}
+		List<CaseServicePort.CaseLinkShareUpdate> shareUpdates() {
+			return staged.stream().filter(s -> !s.removed && s.shareId > 0 && s.dirty).map(s -> new CaseServicePort.CaseLinkShareUpdate(s.shareId, s.contactId, s.sharedAt, s.notes, s.rowVer)).toList();
+		}
+		List<CaseServicePort.CaseLinkShareRemoval> shareRemovals() {
+			return staged.stream().filter(s -> s.removed && s.shareId > 0).map(s -> new CaseServicePort.CaseLinkShareRemoval(s.shareId, s.rowVer)).toList();
+		}
+
+		private void onAdd() {
+			CaseLinkContactOptionDto option = contacts.getValue();
+			if (option == null || option.contactId() <= 0) { AppDialogs.showInfo(caseLinksOwner(), "Shared With", "Select a Contact to add."); return; }
+			if (staged.stream().anyMatch(s -> !s.removed && s.contactId == option.contactId())) { AppDialogs.showInfo(caseLinksOwner(), "Shared With", "This contact is already staged for this link."); return; }
+			showShareDetailsDialog(option.displayName(), LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES), null).ifPresent(details -> {
+				staged.add(StagedShare.newShare(option.contactId(), option.displayName(), details.sharedAt(), details.notes()));
+				contacts.getSelectionModel().clearSelection(); loadContactOptions(search.getText()); renderRows();
+			});
+		}
+
+		private void onEdit(StagedShare share) {
+			showShareDetailsDialog(share.displayName, share.sharedAt, share.notes).ifPresent(details -> { share.sharedAt = details.sharedAt(); share.notes = details.notes(); share.dirty = true; renderRows(); });
+		}
+
+		private void onRemove(StagedShare share) {
+			if (share.shareId > 0) {
+				boolean ok = AppDialogs.showConfirmation(caseLinksOwner(), "Unshare Contact", "Unshare this contact from the link?", "The Contact will no longer appear as actively shared on this link. The Contact record itself will not be deleted, and historical share data is preserved.", "Unshare", DialogActionKind.DANGER);
+				if (!ok) return; share.removed = true;
+			} else {
+				staged.remove(share);
+			}
+			loadContactOptions(search.getText()); renderRows();
+		}
+
+		private void renderRows() {
+			rows.getChildren().clear();
+			List<StagedShare> active = staged.stream().filter(s -> !s.removed).sorted(Comparator.comparing((StagedShare s) -> safeText(s.displayName), String.CASE_INSENSITIVE_ORDER).thenComparingInt(s -> s.contactId)).toList();
+			if (active.isEmpty()) { Label empty = new Label("No contacts are staged as shared on this link."); empty.getStyleClass().add("search-summary-text"); rows.getChildren().add(empty); return; }
+			for (StagedShare share : active) {
+				Label name = new Label(share.displayName + (share.unavailable ? " (unavailable)" : "")); name.getStyleClass().addAll("shale-status-pill", "shale-status-pill-small", "case-link-shared-with-chip");
+				Label meta = new Label("Shared " + share.sharedAt.format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")) + (blank(share.notes) ? "" : " · Notes: " + share.notes)); meta.getStyleClass().add("search-summary-text");
+				Button edit = ActionButtonFactory.cardAction("Edit", e -> onEdit(share)); Button remove = ActionButtonFactory.danger(share.shareId > 0 ? "Unshare" : "Remove", e -> onRemove(share));
+				Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); HBox row = new HBox(8, name, meta, spacer, edit, remove); row.setAlignment(Pos.CENTER_LEFT); rows.getChildren().add(row);
+			}
+		}
+
+		private void loadContactOptions(String rawQuery) {
+			if (caseService == null) return;
+			final int tenantId = safeTenantId(); if (tenantId <= 0) return;
+			final int generation = ++searchGeneration; final String query = rawQuery == null ? "" : rawQuery.trim();
+			caseLinkExecutor.submit(() -> {
+				try {
+					List<CaseLinkContactOptionDto> loaded = caseService.searchCaseLinkShareContacts(tenantId, query, 50);
+					java.util.Set<Integer> excluded = staged.stream().filter(s -> !s.removed).map(s -> s.contactId).collect(java.util.stream.Collectors.toSet());
+					List<CaseLinkContactOptionDto> filtered = loaded.stream().filter(o -> o != null && !excluded.contains(o.contactId())).sorted(Comparator.comparing(CaseLinkContactOptionDto::displayName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)).thenComparingInt(CaseLinkContactOptionDto::contactId)).toList();
+					Platform.runLater(() -> { if (generation == searchGeneration) contacts.getItems().setAll(filtered); });
+				} catch (RuntimeException ex) { Platform.runLater(() -> { if (generation == searchGeneration) contacts.getItems().clear(); }); }
+			});
+		}
+	}
+
+	private record ShareDetails(LocalDateTime sharedAt, String notes) {}
+
+	private Optional<ShareDetails> showShareDetailsDialog(String contactName, LocalDateTime initialSharedAt, String initialNotes) {
+		Dialog<ShareDetails> dialog = new Dialog<>(); dialog.setTitle("Share Details"); AppDialogs.applySecondaryDialogShell(dialog, "Share Details"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		Label contact = new Label("Contact: " + blankTo(contactName, "Selected contact"));
+		DatePicker date = new DatePicker((initialSharedAt == null ? LocalDateTime.now() : initialSharedAt).toLocalDate());
+		TextField time = new TextField((initialSharedAt == null ? LocalDateTime.now() : initialSharedAt).toLocalTime().truncatedTo(ChronoUnit.MINUTES).toString());
+		TextArea notes = new TextArea(safeText(initialNotes)); notes.setPrefRowCount(3); notes.setPromptText("Share Notes (not Link Notes)");
+		Label error = new Label(); error.setTextFill(Color.web("#b42318")); error.setVisible(false); error.setManaged(false);
+		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(contact, 0, 0, 2, 1); grid.addRow(1, new Label("Shared Date"), date); grid.addRow(2, new Label("Shared Time"), time); grid.addRow(3, new Label("Share Notes"), notes); grid.add(error, 0, 4, 2, 1); dialog.getDialogPane().setContent(grid);
+		final ShareDetails[] result = new ShareDetails[1];
+		dialog.getDialogPane().lookupButton(ButtonType.OK).addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+			try { LocalDate d = date.getValue(); if (d == null) throw new IllegalArgumentException("Shared date is required."); java.time.LocalTime t = java.time.LocalTime.parse(time.getText().trim()); String n = trimLimit(notes.getText(), "Share Notes", 500, false); result[0] = new ShareDetails(LocalDateTime.of(d, t), n); error.setVisible(false); error.setManaged(false); }
+			catch (RuntimeException ex) { result[0] = null; error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); event.consume(); }
+		});
+		dialog.setResultConverter(button -> button == ButtonType.OK ? result[0] : null);
+		return dialog.showAndWait();
+	}
+
+	private static final class StagedShare {
+		long shareId; int contactId; String displayName; boolean unavailable; LocalDateTime sharedAt; String notes; byte[] rowVer; boolean dirty; boolean removed;
+		static StagedShare persisted(CaseLinkShareDto dto) { StagedShare s = new StagedShare(); s.shareId = dto.caseLinkShareId(); s.contactId = dto.contactId(); s.displayName = blankTo(dto.contactDisplayName(), "Contact #" + dto.contactId()); s.unavailable = dto.contactUnavailable(); s.sharedAt = dto.sharedAt() == null ? LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) : dto.sharedAt(); s.notes = dto.notes(); s.rowVer = dto.rowVer(); return s; }
+		static StagedShare newShare(int contactId, String displayName, LocalDateTime sharedAt, String notes) { StagedShare s = new StagedShare(); s.contactId = contactId; s.displayName = blankTo(displayName, "Contact #" + contactId); s.sharedAt = sharedAt; s.notes = notes; s.dirty = true; return s; }
+	}
+
+	static CaseLinkInput validateCaseLinkDialogInput(LinkTypeDto selected, String name, String url, String description, boolean primary, String notes, List<CaseServicePort.CaseLinkShareDraft> shareAdds, List<CaseServicePort.CaseLinkShareUpdate> shareUpdates, List<CaseServicePort.CaseLinkShareRemoval> shareRemovals) {
 		if (selected == null) throw new IllegalArgumentException("Link Type is required.");
 		if (!selected.active()) throw new IllegalArgumentException("Select an active Link Type before saving.");
 		String display = trimLimit(name, "Display name", 255, true);
@@ -2184,8 +2306,10 @@ public class CaseController {
 		String cleanUrl = CaseLinkUrlNormalizer.normalize(rawUrl);
 		String desc = trimLimit(description, "Description", 2048, false);
 		String note = trimLimit(notes, "Notes", 2000, false);
-		return new CaseLinkInput(selected, display, cleanUrl, desc, primary, note);
+		return new CaseLinkInput(selected, display, cleanUrl, desc, primary, note, shareAdds == null ? List.of() : List.copyOf(shareAdds), shareUpdates == null ? List.of() : List.copyOf(shareUpdates), shareRemovals == null ? List.of() : List.copyOf(shareRemovals));
 	}
+
+	static CaseLinkInput validateCaseLinkDialogInput(LinkTypeDto selected, String name, String url, String description, boolean primary, String notes) { return validateCaseLinkDialogInput(selected, name, url, description, primary, notes, List.of(), List.of(), List.of()); }
 
 	private void focusFirstInvalidCaseLinkField(ComboBox<LinkTypeDto> type, TextField name, TextField url, TextArea description, TextArea notes) {
 		if (type.getValue() == null || !type.getValue().active()) type.requestFocus();
@@ -2208,7 +2332,7 @@ public class CaseController {
 	private Window caseLinksOwner() { return caseLinksTabPane != null && caseLinksTabPane.getScene() != null ? caseLinksTabPane.getScene().getWindow() : taskDialogOwner(); }
 	private int requireTenantId() { Integer id = appState == null ? null : appState.getShaleClientId(); if (id == null || id <= 0) throw new IllegalStateException("No tenant is selected."); return id; }
 	private int requireActorUserId() { Integer id = appState == null ? null : appState.getUserId(); if (id == null || id <= 0) throw new IllegalStateException("No active user is selected."); return id; }
-	record CaseLinkInput(LinkTypeDto linkType, String displayName, String url, String description, boolean primary, String notes) {}
+	record CaseLinkInput(LinkTypeDto linkType, String displayName, String url, String description, boolean primary, String notes, List<CaseServicePort.CaseLinkShareDraft> shareAdds, List<CaseServicePort.CaseLinkShareUpdate> shareUpdates, List<CaseServicePort.CaseLinkShareRemoval> shareRemovals) {}
 
 	private void refreshCaseCalendar() {
 		caseCalendarStale = true;
