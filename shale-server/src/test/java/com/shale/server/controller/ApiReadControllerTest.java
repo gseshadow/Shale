@@ -941,6 +941,11 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public List<com.shale.core.dto.ContactSharedCaseLinkDto> listCaseLinksSharedWithContact(int contactId, int shaleClientId) {
+            throw new AssertionError("listCaseLinksSharedWithContact should not be called");
+        }
+
+        @Override
         public com.shale.core.dto.CaseLinkDto createCaseLink(CreateCaseLinkCommand command) {
             throw new AssertionError("createCaseLink should not be called");
         }

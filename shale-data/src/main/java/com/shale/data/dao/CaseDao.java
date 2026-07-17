@@ -7821,6 +7821,7 @@ public final class CaseDao {
 					 AND el.IsDeleted = 0
 					JOIN dbo.LinkTypes lt ON lt.Id = el.LinkTypeId
 					 AND (lt.ShaleClientId IS NULL OR lt.ShaleClientId = cls.ShaleClientId)
+					 AND lt.IsDeleted = 0
 					JOIN dbo.Cases c ON c.Id = cl.CaseId
 					 AND c.ShaleClientId = cls.ShaleClientId
 					 AND c.IsDeleted = 0
