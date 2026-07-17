@@ -25,6 +25,7 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseStatusHistoryDto;
@@ -7539,7 +7540,9 @@ public final class CaseDao {
 			ps.setLong(1, caseId);
 			ps.setInt(2, shaleClientId);
 			try (ResultSet rs = ps.executeQuery()) {
-				return rs.next() ? java.util.Optional.of(mapCaseLinkDto(rs)) : java.util.Optional.empty();
+				if (!rs.next()) return java.util.Optional.empty();
+				CaseLinkDto link = mapCaseLinkDto(rs);
+				return java.util.Optional.of(withShares(link, listCaseLinkShares(con, caseId, link.caseLinkId(), shaleClientId)));
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load primary case link", e);
@@ -7672,6 +7675,7 @@ public final class CaseDao {
 				if (dto == null) {
 					throw new IllegalArgumentException("Case link is not available for this tenant.");
 				}
+				softDeleteCaseLinkSharesForLink(con, shaleClientId, actorUserId, caseLinkId);
 				softDeleteCaseLink(con, shaleClientId, actorUserId, caseId, caseLinkId, expectedCaseLinkRowVer);
 				if (dto.primary()) {
 					selectNextPrimary(con, shaleClientId, caseId, actorUserId);
@@ -7687,6 +7691,109 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to delete case link", e);
 		}
+	}
+
+
+	public List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) {
+		try (Connection con = db.requireConnection()) {
+			validateCaseForTenant(con, shaleClientId, caseId);
+			validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, null);
+			return listCaseLinkShares(con, caseId, caseLinkId, shaleClientId);
+		} catch (SQLException e) { throw new RuntimeException("Failed to list case link shares", e); }
+	}
+
+	public CaseLinkShareDto addCaseLinkShare(int tenant, int actor, long caseId, long caseLinkId, int contactId, LocalDateTime sharedAt, String notes) {
+		try (Connection con = db.requireConnection()) {
+			validateCaseForTenant(con, tenant, caseId); validateActorForTenant(con, tenant, actor); validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null); validateActiveContactForTenant(con, tenant, contactId);
+			String sql = """
+				INSERT INTO dbo.CaseLinkShares (ShaleClientId, CaseLinkId, ContactId, SharedAt, Notes, IsDeleted, CreatedByUserId, CreatedAt)
+				VALUES (?, ?, ?, ?, ?, 0, ?, SYSUTCDATETIME())
+				""";
+			try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+				ps.setInt(1, tenant); ps.setLong(2, caseLinkId); ps.setInt(3, contactId); ps.setTimestamp(4, Timestamp.valueOf(sharedAt)); ps.setString(5, notes); ps.setInt(6, actor); ps.executeUpdate();
+				try (ResultSet rs = ps.getGeneratedKeys()) { if (rs.next()) return findCaseLinkShare(con, tenant, caseId, caseLinkId, rs.getLong(1)); }
+			}
+			throw new RuntimeException("Failed to create case link share.");
+		} catch (SQLException e) { throw translateSql("Failed to create case link share", e); }
+	}
+
+	public CaseLinkShareDto updateCaseLinkShare(int tenant, int actor, long caseId, long caseLinkId, long shareId, int contactId, LocalDateTime sharedAt, String notes, byte[] rowVer) {
+		requireRowVer(rowVer, "expectedRowVer");
+		try (Connection con = db.requireConnection()) {
+			validateCaseForTenant(con, tenant, caseId); validateActorForTenant(con, tenant, actor); validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null); validateActiveContactForTenant(con, tenant, contactId);
+			String sql = """
+				UPDATE dbo.CaseLinkShares
+				SET ContactId = ?, SharedAt = ?, Notes = ?, UpdatedByUserId = ?, UpdatedAt = SYSUTCDATETIME()
+				WHERE Id = ? AND ShaleClientId = ? AND CaseLinkId = ? AND IsDeleted = 0 AND RowVer = ?
+				""";
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, contactId); ps.setTimestamp(2, Timestamp.valueOf(sharedAt)); ps.setString(3, notes); ps.setInt(4, actor); ps.setLong(5, shareId); ps.setInt(6, tenant); ps.setLong(7, caseLinkId); ps.setBytes(8, rowVer);
+				if (ps.executeUpdate() != 1) throw new IllegalStateException("Optimistic conflict: case link share changed.");
+			}
+			return findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId);
+		} catch (SQLException e) { throw translateSql("Failed to update case link share", e); }
+	}
+
+	public void removeCaseLinkShare(int tenant, int actor, long caseId, long caseLinkId, long shareId, byte[] rowVer) {
+		requireRowVer(rowVer, "expectedRowVer");
+		try (Connection con = db.requireConnection()) {
+			validateCaseForTenant(con, tenant, caseId); validateActorForTenant(con, tenant, actor); validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null);
+			softDeleteCaseLinkShare(con, tenant, actor, caseLinkId, shareId, rowVer);
+		} catch (SQLException e) { throw new RuntimeException("Failed to remove case link share", e); }
+	}
+
+	private static CaseLinkDto withShares(CaseLinkDto link, List<CaseLinkShareDto> shares) {
+		return new CaseLinkDto(link.caseLinkId(), link.externalLinkId(), link.caseId(), link.shaleClientId(), link.linkTypeId(), link.linkTypeName(), link.linkTypeColor(), link.linkTypeSystemKey(), link.displayName(), link.url(), link.description(), link.primary(), link.notes(), link.sortOrder(), link.createdAt(), link.updatedAt(), link.caseLinkRowVer(), link.externalLinkRowVer(), shares == null ? List.of() : shares);
+	}
+
+	private List<CaseLinkShareDto> listCaseLinkShares(Connection con, long caseId, long caseLinkId, int tenant) throws SQLException { return listCaseLinkSharesForLinks(con, tenant, List.of(caseLinkId)).getOrDefault(caseLinkId, List.of()); }
+
+	private Map<Long, List<CaseLinkShareDto>> listCaseLinkSharesForLinks(Connection con, int tenant, List<Long> linkIds) throws SQLException {
+		if (linkIds == null || linkIds.isEmpty()) return Map.of();
+		String placeholders = String.join(",", java.util.Collections.nCopies(linkIds.size(), "?"));
+		String sql = """
+			SELECT cls.Id AS CaseLinkShareId, cls.ShaleClientId, cls.CaseLinkId, cls.ContactId,
+			       LTRIM(RTRIM(CONCAT(COALESCE(ct.FirstName, ''), ' ', COALESCE(ct.LastName, '')))) AS ContactDisplayName,
+			       ct.Name AS ContactName, ct.IsDeleted AS ContactIsDeleted,
+			       cls.SharedAt, cls.Notes, cls.IsDeleted, cls.CreatedByUserId, cls.CreatedAt, cls.UpdatedAt, cls.RowVer
+			FROM dbo.CaseLinkShares cls
+			JOIN dbo.CaseLinks cl ON cl.Id = cls.CaseLinkId AND cl.ShaleClientId = cls.ShaleClientId AND cl.IsDeleted = 0
+			JOIN dbo.Cases c ON c.Id = cl.CaseId AND c.ShaleClientId = cls.ShaleClientId AND c.IsDeleted = 0
+			LEFT JOIN dbo.Contacts ct ON ct.Id = cls.ContactId AND ct.ShaleClientId = cls.ShaleClientId
+			WHERE cls.ShaleClientId = ? AND cls.IsDeleted = 0 AND cls.CaseLinkId IN (""" + placeholders + ") ORDER BY ContactDisplayName, cls.ContactId, cls.Id";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, tenant); int i=2; for (Long id: linkIds) ps.setLong(i++, id);
+			try (ResultSet rs = ps.executeQuery()) { Map<Long, List<CaseLinkShareDto>> out = new LinkedHashMap<>(); while (rs.next()) out.computeIfAbsent(rs.getLong("CaseLinkId"), k -> new ArrayList<>()).add(mapCaseLinkShareDto(rs)); return out; }
+		}
+	}
+
+	private CaseLinkShareDto findCaseLinkShare(Connection con, int tenant, long caseId, long caseLinkId, long shareId) throws SQLException {
+		List<CaseLinkShareDto> shares = listCaseLinkShares(con, caseId, caseLinkId, tenant); return shares.stream().filter(s -> s.caseLinkShareId() == shareId).findFirst().orElse(null);
+	}
+
+	private static CaseLinkShareDto mapCaseLinkShareDto(ResultSet rs) throws SQLException {
+		String display = rs.getString("ContactDisplayName"); if (display == null || display.isBlank()) display = rs.getString("ContactName"); boolean unavailable = rs.getBoolean("ContactIsDeleted") || display == null || display.isBlank(); if (display == null || display.isBlank()) display = "Contact #" + rs.getInt("ContactId"); if (unavailable && !display.contains("unavailable")) display += " (unavailable)";
+		return new CaseLinkShareDto(rs.getLong("CaseLinkShareId"), rs.getInt("ShaleClientId"), rs.getLong("CaseLinkId"), rs.getInt("ContactId"), display, unavailable, toLocalDateTime(rs.getTimestamp("SharedAt")), rs.getString("Notes"), rs.getBoolean("IsDeleted"), rs.getInt("CreatedByUserId"), toLocalDateTime(rs.getTimestamp("CreatedAt")), toLocalDateTime(rs.getTimestamp("UpdatedAt")), rs.getBytes("RowVer"));
+	}
+
+	private void validateActiveContactForTenant(Connection con, int tenant, int contactId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("SELECT 1 FROM dbo.Contacts WHERE Id = ? AND ShaleClientId = ? AND IsDeleted = 0")) { ps.setInt(1, contactId); ps.setInt(2, tenant); try (ResultSet rs = ps.executeQuery()) { if (!rs.next()) throw new IllegalArgumentException("Contact is not available for this tenant."); } }
+	}
+
+	private void softDeleteCaseLinkShare(Connection con, int tenant, int actor, long caseLinkId, long shareId, byte[] rowVer) throws SQLException {
+		String sql = """
+			UPDATE dbo.CaseLinkShares SET IsDeleted = 1, DeletedAt = SYSUTCDATETIME(), DeletedByUserId = ?, UpdatedByUserId = ?, UpdatedAt = SYSUTCDATETIME()
+			WHERE Id = ? AND ShaleClientId = ? AND CaseLinkId = ? AND IsDeleted = 0 AND RowVer = ?
+			""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, actor); ps.setInt(2, actor); ps.setLong(3, shareId); ps.setInt(4, tenant); ps.setLong(5, caseLinkId); ps.setBytes(6, rowVer); if (ps.executeUpdate() != 1) throw new IllegalStateException("Optimistic conflict: case link share changed."); }
+	}
+
+	private void softDeleteCaseLinkSharesForLink(Connection con, int tenant, int actor, long caseLinkId) throws SQLException {
+		String sql = """
+			UPDATE dbo.CaseLinkShares SET IsDeleted = 1, DeletedAt = SYSUTCDATETIME(), DeletedByUserId = ?, UpdatedByUserId = ?, UpdatedAt = SYSUTCDATETIME()
+			WHERE ShaleClientId = ? AND CaseLinkId = ? AND IsDeleted = 0
+			""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, actor); ps.setInt(2, actor); ps.setInt(3, tenant); ps.setLong(4, caseLinkId); ps.executeUpdate(); }
 	}
 
 	private List<LinkTypeDto> mapLinkTypes(PreparedStatement ps) throws SQLException {
@@ -7887,10 +7994,9 @@ public final class CaseDao {
 			ps.setInt(2, shaleClientId);
 			try (ResultSet rs = ps.executeQuery()) {
 				List<CaseLinkDto> out = new ArrayList<>();
-				while (rs.next()) {
-					out.add(mapCaseLinkDto(rs));
-				}
-				return out;
+				while (rs.next()) out.add(mapCaseLinkDto(rs));
+				Map<Long, List<CaseLinkShareDto>> shares = listCaseLinkSharesForLinks(con, shaleClientId, out.stream().map(CaseLinkDto::caseLinkId).toList());
+				return out.stream().map(link -> withShares(link, shares.get(link.caseLinkId()))).toList();
 			}
 		}
 	}
@@ -7902,7 +8008,7 @@ public final class CaseDao {
 				rs.getString("DisplayName"), rs.getString("Url"), rs.getString("Description"),
 				rs.getBoolean("IsPrimary"), rs.getString("Notes"), rs.getInt("SortOrder"),
 				toLocalDateTime(rs.getTimestamp("CreatedAt")), toLocalDateTime(rs.getTimestamp("UpdatedAt")),
-				rs.getBytes("CaseLinkRowVer"), rs.getBytes("ExternalLinkRowVer"));
+				rs.getBytes("CaseLinkRowVer"), rs.getBytes("ExternalLinkRowVer"), List.of());
 	}
 
 	private CaseLinkDto findCaseLinkDto(Connection con, int tenant, long caseId, long id) throws SQLException {
@@ -7911,7 +8017,7 @@ public final class CaseDao {
 			ps.setInt(2, tenant);
 			ps.setLong(3, id);
 			try (ResultSet rs = ps.executeQuery()) {
-				return rs.next() ? mapCaseLinkDto(rs) : null;
+				return rs.next() ? withShares(mapCaseLinkDto(rs), listCaseLinkShares(con, caseId, id, tenant)) : null;
 			}
 		}
 	}
@@ -8385,6 +8491,9 @@ public final class CaseDao {
 			}
 			if (message.contains("UX_CaseLinks_CaseId_Primary_Active")) {
 				return new IllegalArgumentException("Only one active primary link is allowed for a case.", e);
+			}
+			if (message.contains("UX_CaseLinkShares_CaseLinkId_ContactId_Active")) {
+				return new IllegalArgumentException("This contact is already shared on this link.", e);
 			}
 			return new IllegalArgumentException("A duplicate active value already exists.", e);
 		}

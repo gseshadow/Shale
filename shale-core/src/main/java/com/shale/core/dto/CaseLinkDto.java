@@ -2,6 +2,7 @@ package com.shale.core.dto;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
 public record CaseLinkDto(
 		long caseLinkId,
@@ -21,14 +22,18 @@ public record CaseLinkDto(
 		LocalDateTime createdAt,
 		LocalDateTime updatedAt,
 		byte[] caseLinkRowVer,
-		byte[] externalLinkRowVer) {
+		byte[] externalLinkRowVer,
+		List<CaseLinkShareDto> shares) {
 	public CaseLinkDto {
 		caseLinkRowVer = caseLinkRowVer == null ? null : Arrays.copyOf(caseLinkRowVer, caseLinkRowVer.length);
 		externalLinkRowVer = externalLinkRowVer == null ? null : Arrays.copyOf(externalLinkRowVer, externalLinkRowVer.length);
+		shares = shares == null ? List.of() : List.copyOf(shares);
 	}
 
 	@Override
 	public byte[] caseLinkRowVer() { return caseLinkRowVer == null ? null : Arrays.copyOf(caseLinkRowVer, caseLinkRowVer.length); }
 	@Override
 	public byte[] externalLinkRowVer() { return externalLinkRowVer == null ? null : Arrays.copyOf(externalLinkRowVer, externalLinkRowVer.length); }
+	@Override
+	public List<CaseLinkShareDto> shares() { return shares == null ? List.of() : List.copyOf(shares); }
 }

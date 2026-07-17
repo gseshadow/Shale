@@ -399,10 +399,20 @@ For every Case Link Card variant, clicking the card or activating it with Enter/
 
 The Link Type pill remains visible on every variant. The Link Type database color also drives a restrained type-identity treatment: a low-opacity background wash that fades back to the normal Shale card surface and a narrow left accent rail. The accent rail currently represents Link Type identity only; it does not communicate status, severity, or workflow state. Invalid or missing colors use the neutral Shale fallback supported by the shared color utility.
 
-Shared With content is not implemented in the Phase 5.1 Link Card system and remains future work.
-
 Phase 5.1.1 reliability clarification: Case Link Card rail widths are fixed CSS sizes per variant (Full 5px, Compact 4px, Mini 3px) while the database-driven Link Type color continues to drive the left rail color/accent and the low-opacity gradient wash. The rail width must not be supplied through a looked-up dynamic CSS property used by `-fx-border-width`.
 
 Case Link dialogs must validate through the JavaFX dialog button action-event filter pattern so invalid input consumes the Save/OK action, keeps inline validation visible, keeps the dialog open, and focuses the first invalid field where practical. Result converters should only return the already-validated result or normal cancel/window-close empty state.
 
 Case Link mutations and DAO-backed dialog prerequisite loads, including Link Type loading, must execute off the JavaFX application thread using the controller's bounded background executor pattern. UI updates, stale-case rejection, success messages, and error dialogs must be applied back on the JavaFX application thread after service-backed reloads complete.
+
+## Case Link “Shared With” presentation (Phase 5.3)
+
+Case Link cards remain display-only UI. `CaseLinkCardFactory` receives all share data through `CaseLinkDto` and must not call services, DAOs, application state, or browser helpers.
+
+* FULL cards show a subtle “Shared With” line beneath description/notes when one or more active shares exist.
+* COMPACT cards show a concise “Shared” presentation when active shares exist.
+* MINI cards intentionally remain minimal: title plus Link Type pill only.
+* Empty cards do not show a noisy “Shared With: nobody” row.
+* Child controls keep click isolation so Edit/Delete/Set Primary interactions do not launch the URL; the card background remains the primary click target.
+* The Case Link Add/Edit dialog owns the editing workflow surface. For a brand-new unsaved Case Link, Shared With management is disabled with an explanation that the Case Link must be saved first; `CaseLinkShares` are never inserted without a persisted `CaseLinkId`.
+* SharedAt means the time the contact was recorded as receiving or being granted access to the Case Link. Unsharing is a soft-delete of the share record and is distinct from deleting a Contact.

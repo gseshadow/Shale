@@ -1,6 +1,7 @@
 package com.shale.ui.component.factory;
 
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.ui.util.ActionButtonFactory;
@@ -81,9 +82,20 @@ public final class CaseLinkCardFactory {
             notes.getStyleClass().addAll("case-link-card-notes", "search-summary-text");
             card.getChildren().add(notes);
         }
+        if (variant == Variant.FULL) addSharedWith(card, link, false);
+        if (variant == Variant.COMPACT) addSharedWith(card, link, true);
         if (variant == Variant.FULL) card.getChildren().add(fullFooter(link, safeActions));
         if (variant == Variant.COMPACT) card.getChildren().add(compactFooter(safeActions));
         return card;
+    }
+
+    private static void addSharedWith(VBox card, CaseLinkDto link, boolean compact) {
+        if (link.shares() == null || link.shares().isEmpty()) return;
+        String names = link.shares().stream().map(s -> blankTo(s.contactDisplayName(), "Contact #" + s.contactId())).collect(Collectors.joining(", "));
+        Label shared = new Label((compact ? "Shared: " : "Shared With: ") + names);
+        shared.getStyleClass().addAll("case-link-card-shared-with", "search-summary-text");
+        shared.setWrapText(!compact);
+        card.getChildren().add(shared);
     }
 
     private static HBox fullFooter(CaseLinkDto link, Actions actions) {

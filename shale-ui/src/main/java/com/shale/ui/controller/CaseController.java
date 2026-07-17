@@ -2163,9 +2163,10 @@ public class CaseController {
 		type.setCellFactory(list -> new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); setGraphic(empty || item == null ? null : LinkTypeIndicatorFactory.createLinkTypePill(item.name(), item.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); }});
 		type.setButtonCell(new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); }});
 		TextField name = new TextField(existing == null ? "" : safeText(existing.displayName())); TextField url = new TextField(existing == null ? "" : safeText(existing.url())); TextArea description = new TextArea(existing == null ? "" : safeText(existing.description())); description.setPrefRowCount(3); TextArea notes = new TextArea(existing == null ? "" : safeText(existing.notes())); notes.setPrefRowCount(3); CheckBox primary = new CheckBox("Make primary"); primary.setSelected(existing != null && existing.primary());
+		VBox sharedWithBox = buildCaseLinkSharedWithSection(existing);
 		if (existing != null) type.getSelectionModel().select(linkTypes.stream().filter(t -> t.id() == existing.linkTypeId()).findFirst().orElse(null)); else if (!linkTypes.isEmpty()) type.getSelectionModel().selectFirst();
 		Label error = new Label(); error.setTextFill(Color.web("#b42318")); error.setVisible(false); error.setManaged(false);
-		GridPane grid = new GridPane(); grid.setHgap(10); grid.setVgap(8); grid.addRow(0, new Label("Link Type"), type); grid.addRow(1, new Label("Display Name"), name); grid.addRow(2, new Label("URL"), url); grid.addRow(3, new Label("Description"), description); grid.addRow(4, new Label("Notes"), notes); grid.add(primary, 1, 5); grid.add(error, 0, 6, 2, 1); dialog.getDialogPane().setContent(grid);
+		GridPane grid = new GridPane(); grid.setHgap(10); grid.setVgap(8); grid.addRow(0, new Label("Link Type"), type); grid.addRow(1, new Label("Display Name"), name); grid.addRow(2, new Label("URL"), url); grid.addRow(3, new Label("Description"), description); grid.addRow(4, new Label("Notes"), notes); grid.add(primary, 1, 5); grid.add(new Label("Shared With"), 0, 6); grid.add(sharedWithBox, 1, 6); grid.add(error, 0, 7, 2, 1); dialog.getDialogPane().setContent(grid);
 		final CaseLinkInput[] validated = new CaseLinkInput[1];
 		Node ok = dialog.getDialogPane().lookupButton(ButtonType.OK);
 		ok.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
@@ -2174,6 +2175,29 @@ public class CaseController {
 		});
 		dialog.setResultConverter(button -> button == ButtonType.OK ? validated[0] : null);
 		return dialog.showAndWait();
+	}
+
+	private VBox buildCaseLinkSharedWithSection(CaseLinkDto existing) {
+		VBox box = new VBox(6);
+		box.getStyleClass().add("case-link-shared-with-section");
+		Label help = new Label(existing == null
+				? "Save the Case Link before managing Shared With contacts."
+				: "Contacts recorded as having received or having access to this Case Link. Removing a share does not delete the Contact.");
+		help.getStyleClass().add("search-summary-text");
+		help.setWrapText(true);
+		box.getChildren().add(help);
+		if (existing != null && existing.shares() != null && !existing.shares().isEmpty()) {
+			for (var share : existing.shares()) {
+				Label chip = new Label(blankTo(share.contactDisplayName(), "Contact #" + share.contactId()));
+				chip.getStyleClass().addAll("shale-status-pill", "shale-status-pill-small", "case-link-shared-with-chip");
+				box.getChildren().add(chip);
+			}
+		} else if (existing != null) {
+			Label empty = new Label("No contacts are currently shared on this link.");
+			empty.getStyleClass().add("search-summary-text");
+			box.getChildren().add(empty);
+		}
+		return box;
 	}
 
 	static CaseLinkInput validateCaseLinkDialogInput(LinkTypeDto selected, String name, String url, String description, boolean primary, String notes) {

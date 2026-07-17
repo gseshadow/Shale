@@ -1,6 +1,7 @@
 package com.shale.core.service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +11,7 @@ import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.PracticeAreaDto;
 
@@ -68,6 +70,14 @@ public interface CaseServicePort {
 	List<CaseLinkDto> reorderCaseLinks(ReorderCaseLinksCommand command);
 
 	void deleteCaseLink(DeleteCaseLinkCommand command);
+
+	default List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { return List.of(); }
+
+	default CaseLinkShareDto addCaseLinkShare(AddCaseLinkShareCommand command) { throw new UnsupportedOperationException(); }
+
+	default CaseLinkShareDto updateCaseLinkShare(UpdateCaseLinkShareCommand command) { throw new UnsupportedOperationException(); }
+
+	default void removeCaseLinkShare(RemoveCaseLinkShareCommand command) { throw new UnsupportedOperationException(); }
 
 	PracticeAreaDto createPracticeArea(PracticeAreaCommand command);
 
@@ -175,6 +185,23 @@ public interface CaseServicePort {
 	}
 
 	record ReorderCaseLinksCommand(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds) {
+	}
+
+
+	record AddCaseLinkShareCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, int contactId,
+			LocalDateTime sharedAt, String notes) {
+	}
+
+	record UpdateCaseLinkShareCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId,
+			long caseLinkShareId, int contactId, LocalDateTime sharedAt, String notes, byte[] expectedRowVer) {
+		public UpdateCaseLinkShareCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record RemoveCaseLinkShareCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId,
+			long caseLinkShareId, byte[] expectedRowVer) {
+		public RemoveCaseLinkShareCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
 	}
 
 	record DeleteCaseLinkCommand(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer) {
