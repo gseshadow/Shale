@@ -213,10 +213,13 @@
 								<StackPane fx:id="ovResponsibleAttorneyHost" styleClass="case-overview-row-value-host" GridPane.rowIndex="9" GridPane.columnIndex="1" />
 								<Button fx:id="changeResponsibleAttorneyButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="9" GridPane.columnIndex="2" />
 
-								<Label text="Description" styleClass="case-overview-row-label" GridPane.rowIndex="10" GridPane.columnIndex="0" />
-								<Label fx:id="ovDescriptionValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="10" GridPane.columnIndex="1" />
-								<TextArea fx:id="ovDescriptionEditor" visible="false" managed="false" wrapText="true" prefRowCount="4" GridPane.rowIndex="10" GridPane.columnIndex="1" />
-								<Button fx:id="editDescriptionButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="10" GridPane.columnIndex="2" />
+								<Label text="Primary legal assistant" styleClass="case-overview-row-label" GridPane.rowIndex="10" GridPane.columnIndex="0" />
+								<StackPane fx:id="ovPrimaryLegalAssistantHost" styleClass="case-overview-row-value-host" GridPane.rowIndex="10" GridPane.columnIndex="1" />
+
+								<Label text="Description" styleClass="case-overview-row-label" GridPane.rowIndex="11" GridPane.columnIndex="0" />
+								<Label fx:id="ovDescriptionValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="11" GridPane.columnIndex="1" />
+								<TextArea fx:id="ovDescriptionEditor" visible="false" managed="false" wrapText="true" prefRowCount="4" GridPane.rowIndex="11" GridPane.columnIndex="1" />
+								<Button fx:id="editDescriptionButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="11" GridPane.columnIndex="2" />
 							</GridPane>
 						</VBox>
 
