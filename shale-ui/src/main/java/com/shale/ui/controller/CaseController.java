@@ -2176,7 +2176,7 @@ public class CaseController {
 		grid.getStyleClass().addAll("case-link-dialog-form", "shale-card-surface");
 		grid.getChildren().stream().filter(n -> n instanceof Label).forEach(n -> n.getStyleClass().add("case-link-dialog-label"));
 		sharedWithBox.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface");
-		ScrollPane formScroll = screenSafeDialogScrollPane(grid); formScroll.getStyleClass().add("case-link-dialog-scroll"); formScroll.setPrefViewportWidth(720); formScroll.setPrefViewportHeight(520); dialog.getDialogPane().setContent(formScroll); dialog.setResizable(true); applyScreenSafeDialogBounds(dialog, caseLinksOwner(), 780, 680, 560, 420);
+		ScrollPane formScroll = screenSafeDialogScrollPane(grid); formScroll.getStyleClass().add("case-link-dialog-scroll"); formScroll.setPrefViewportWidth(720); dialog.getDialogPane().setContent(formScroll); dialog.setResizable(true); Runnable resizeCaseLinkDialog = () -> applyContentSizedDialogBounds(dialog, caseLinksOwner(), formScroll, grid, 780, 560, 420); sharedWithEditor.setOnSummaryChanged(resizeCaseLinkDialog); applyContentSizedDialogBounds(dialog, caseLinksOwner(), formScroll, grid, 780, 560, 420);
 		final CaseLinkInput[] validated = new CaseLinkInput[1];
 		Node ok = dialog.getDialogPane().lookupButton(ButtonType.OK);
 		ok.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
@@ -2221,6 +2221,18 @@ public class CaseController {
 		return scroll;
 	}
 
+	private static void applyContentSizedDialogBounds(Dialog<?> dialog, Window owner, ScrollPane scrollPane, Node content, double prefWidth, double minWidth, double minHeight) {
+		dialog.setResizable(true);
+		Runnable resize = () -> {
+			Window window = dialog.getDialogPane().getScene() == null ? null : dialog.getDialogPane().getScene().getWindow();
+			if (window instanceof Stage stage) {
+				WindowSizingUtil.sizeContentModalStage(stage, owner, dialog.getDialogPane(), scrollPane, content, prefWidth, minWidth, minHeight);
+			}
+		};
+		dialog.setOnShown(event -> Platform.runLater(resize));
+		if (dialog.getDialogPane().getScene() != null) Platform.runLater(resize);
+	}
+
 	private static void applyScreenSafeDialogBounds(Dialog<?> dialog, Window owner, double prefWidth, double prefHeight, double minWidth, double minHeight) {
 		dialog.setResizable(true);
 		dialog.setOnShown(event -> {
@@ -2240,8 +2252,10 @@ public class CaseController {
 		private final VBox root = new VBox(8);
 		private final FlowPane cards = new FlowPane(8, 8);
 		private final List<StagedShare> staged = new ArrayList<>();
+		private Runnable onSummaryChanged = () -> { };
 		SharedWithEditor(CaseLinkDto existing) { root.getStyleClass().add("case-link-shared-with-section"); for (CaseLinkShareDto share : existing == null || existing.shares() == null ? List.<CaseLinkShareDto>of() : existing.shares()) staged.add(StagedShare.persisted(share)); renderSummary(); }
 		VBox root() { return root; }
+		void setOnSummaryChanged(Runnable onSummaryChanged) { this.onSummaryChanged = onSummaryChanged == null ? () -> { } : onSummaryChanged; Platform.runLater(this.onSummaryChanged); }
 		List<CaseServicePort.CaseLinkShareDraft> shareAdds() { return staged.stream().filter(s -> !s.removed && s.shareId <= 0).map(s -> new CaseServicePort.CaseLinkShareDraft(s.contactId, s.sharedAt, s.notes)).toList(); }
 		List<CaseServicePort.CaseLinkShareUpdate> shareUpdates() { return staged.stream().filter(s -> !s.removed && s.shareId > 0 && s.changedFromOriginal()).map(s -> new CaseServicePort.CaseLinkShareUpdate(s.shareId, s.contactId, s.sharedAt, s.notes, s.rowVer == null ? null : s.rowVer.clone())).toList(); }
 		List<CaseServicePort.CaseLinkShareRemoval> shareRemovals() { return staged.stream().filter(s -> s.removed && s.shareId > 0).map(s -> new CaseServicePort.CaseLinkShareRemoval(s.shareId, s.rowVer == null ? null : s.rowVer.clone())).toList(); }
@@ -2253,6 +2267,8 @@ public class CaseController {
 				Button share = ActionButtonFactory.cardAction("Share Link", e -> openShareModal());
 				share.setAccessibleText("Share Link");
 				root.getChildren().add(share);
+				root.requestLayout();
+				Platform.runLater(onSummaryChanged);
 				return;
 			}
 			Label heading = new Label("Shared With");
@@ -2268,6 +2284,8 @@ public class CaseController {
 			Button edit = ActionButtonFactory.cardAction("Edit Shared With", e -> openShareModal());
 			edit.setAccessibleText("Edit Shared With");
 			root.getChildren().addAll(heading, cardsScroll, edit);
+			root.requestLayout();
+			Platform.runLater(onSummaryChanged);
 		}
 		private Node createShareContactCard(StagedShare share) {
 			ContactCardFactory factory = new ContactCardFactory(id -> { });
