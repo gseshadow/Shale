@@ -405,7 +405,7 @@ Case Link dialogs must validate through the JavaFX dialog button action-event fi
 
 Case Link mutations and DAO-backed dialog prerequisite loads, including Link Type loading, must execute off the JavaFX application thread using the controller's bounded background executor pattern. UI updates, stale-case rejection, success messages, and error dialogs must be applied back on the JavaFX application thread after service-backed reloads complete.
 
-## Case Link “Shared With” presentation (Phase 5.3)
+## Case Link “Shared With” presentation and editor (Phase 5.3.1)
 
 Case Link cards remain display-only UI. `CaseLinkCardFactory` receives all share data through `CaseLinkDto` and must not call services, DAOs, application state, or browser helpers.
 
@@ -414,5 +414,8 @@ Case Link cards remain display-only UI. `CaseLinkCardFactory` receives all share
 * MINI cards intentionally remain minimal: title plus Link Type pill only.
 * Empty cards do not show a noisy “Shared With: nobody” row.
 * Child controls keep click isolation so Edit/Delete/Set Primary interactions do not launch the URL; the card background remains the primary click target.
-* The Case Link Add/Edit dialog owns the editing workflow surface. For a brand-new unsaved Case Link, Shared With management is disabled with an explanation that the Case Link must be saved first; `CaseLinkShares` are never inserted without a persisted `CaseLinkId`.
+* The Case Link Add/Edit dialog owns the editing workflow surface. Add and Edit dialogs include a functional Shared With editor with a tenant-scoped searchable Contact selector, Add Contact action, staged rows, SharedAt editing, share-specific Notes editing, and Unshare/Remove actions.
+* New Case Link dialogs may stage Shared With contacts before the Case Link exists. Cancel persists nothing; Save creates the ExternalLink, CaseLink, and all staged shares through one aggregate service/DAO transaction.
+* Existing Case Link dialogs initialize from persisted shares, stage additions/edits/unshares locally, and persist them only when the main dialog is saved. Cancel leaves Link fields and shares unchanged.
+* Persisted shares referencing later-unavailable Contacts remain visible with an unavailable marker and may be unshared; unavailable Contacts are not offered as new selector options.
 * SharedAt means the time the contact was recorded as receiving or being granted access to the Case Link. Unsharing is a soft-delete of the share record and is distinct from deleting a Contact.
