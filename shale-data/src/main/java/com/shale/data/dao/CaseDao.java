@@ -7773,21 +7773,25 @@ public final class CaseDao {
 	}
 
 	public List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int tenant) {
+		String displayName = caseLinkShareContactDisplayNameExpression("ct");
 		String sql = """
-			SELECT DISTINCT ct.Id AS ContactId,
+			SELECT ct.Id AS ContactId,
 			       %s AS DisplayName
-			FROM dbo.Cases c
-			JOIN dbo.CaseContacts cc ON cc.CaseId = c.Id
-			JOIN dbo.Contacts ct ON ct.Id = cc.ContactId
-			WHERE c.Id = ? AND c.ShaleClientId = ? AND ISNULL(c.IsDeleted, 0) = 0
+			FROM dbo.CaseParties cp
+			JOIN dbo.Cases c ON c.Id = cp.CaseId
+			JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
+			WHERE cp.CaseId = ?
+			  AND cp.ContactId IS NOT NULL
+			  AND c.ShaleClientId = ? AND ISNULL(c.IsDeleted, 0) = 0
 			  AND ct.ShaleClientId = ? AND ISNULL(ct.IsDeleted, 0) = 0
 			  AND %s IS NOT NULL
+			GROUP BY ct.Id, %s
 			ORDER BY DisplayName ASC, ct.Id ASC
-			""".formatted(caseLinkShareContactDisplayNameExpression("ct"), caseLinkShareContactDisplayNameExpression("ct"));
+			""".formatted(displayName, displayName, displayName);
 		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId); ps.setInt(2, tenant); ps.setInt(3, tenant);
 			try (ResultSet rs = ps.executeQuery()) { return mapCaseLinkContactOptions(rs); }
-		} catch (SQLException e) { throw new RuntimeException("Failed to list case share contacts", e); }
+		} catch (SQLException e) { throw new RuntimeException("Failed to list CaseParties-backed case share contacts", e); }
 	}
 
 	private static String caseLinkShareContactDisplayNameExpression(String alias) {
