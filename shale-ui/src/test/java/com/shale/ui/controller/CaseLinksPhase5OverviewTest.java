@@ -86,7 +86,9 @@ final class CaseLinksPhase5OverviewTest {
         assertTrue(source.contains("overviewPrimaryLinkStale = true"));
         assertTrue(source.contains("overviewPrimaryLinkLoadedOnce = false"));
         assertTrue(source.contains("if (\"Overview\".equals(activeSectionName)) loadOverviewPrimaryLinkIfNeeded();"));
-        assertTrue(source.contains("action.call();\n\t\t\tinvalidateOverviewPrimaryLinkAfterCaseLinkMutation();\n\t\t\tloadCaseLinksAsync(successMessage);"));
+        assertTrue(source.contains("Object result = action.call();"));
+        assertTrue(source.contains("caseService.listCaseLinks(activeCaseId, tenantId)"));
+        assertTrue(source.contains("invalidateOverviewPrimaryLinkAfterCaseLinkMutation();"));
         assertTrue(source.contains("createCaseLink"));
         assertTrue(source.contains("updateCaseLink"));
         assertTrue(source.contains("setPrimaryCaseLink"));

@@ -20,6 +20,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -98,6 +101,9 @@ import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -158,6 +164,7 @@ import javafx.stage.Window;
  * </ul>
  */
 public class CaseController {
+	private static final Logger LOG = LoggerFactory.getLogger(CaseController.class);
 	private static final String CASE_TASKS_SORT_DUE_ASC = "Due Date (Soonest)";
 	private static final String CASE_TASKS_SORT_DUE_DESC = "Due Date (Latest)";
 	private static final String CASE_TASKS_SORT_PRIORITY_ASC = "Priority (Low to High)";
@@ -603,6 +610,15 @@ public class CaseController {
 	private CalendarFeedDao calendarFeedDao;
 	private CaseServicePort caseService;
 	private final CaseLinkCardFactory caseLinkCardFactory = new CaseLinkCardFactory();
+	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
+		private final java.util.concurrent.atomic.AtomicInteger sequence = new java.util.concurrent.atomic.AtomicInteger();
+		@Override public Thread newThread(Runnable runnable) {
+			Thread thread = new Thread(runnable, "case-links-worker-" + sequence.incrementAndGet());
+			thread.setDaemon(true);
+			return thread;
+		}
+	});
+	private final AtomicBoolean caseLinkMutationInFlight = new AtomicBoolean(false);
 	private ExternalBrowserHelper externalBrowserHelper = new ExternalBrowserHelper();
 
 	private OrganizationCardFactory organizationCardFactory;
@@ -638,6 +654,7 @@ public class CaseController {
 	private boolean caseLinksLoadedOnce;
 	private boolean caseLinksStale = true;
 	private int caseLinksLoadGeneration;
+	private int caseLinkDialogLoadGeneration;
 	private Optional<CaseLinkDto> overviewPrimaryLink = Optional.empty();
 	private boolean overviewPrimaryLinkLoadedOnce;
 	private boolean overviewPrimaryLinkStale = true;
@@ -1941,21 +1958,28 @@ public class CaseController {
 		if (tenantId == null || tenantId <= 0) { showCaseLinksMessage("Links are unavailable because no tenant is selected."); return; }
 		final int activeCaseId = caseId;
 		final int generation = ++caseLinksLoadGeneration;
+		final long started = System.nanoTime();
 		showCaseLinksMessage("Loading links…");
-		new Thread(() -> {
+		caseLinkExecutor.submit(() -> {
 			try {
 				List<CaseLinkDto> links = caseService.listCaseLinks(activeCaseId, tenantId);
+				List<CaseLinkDto> safeLinks = links == null ? List.of() : List.copyOf(links);
 				Platform.runLater(() -> {
-					if (caseId == null || caseId != activeCaseId || generation != caseLinksLoadGeneration) return;
-					caseLinks = links == null ? List.of() : List.copyOf(links);
+					if (caseId == null || caseId != activeCaseId || generation != caseLinksLoadGeneration) {
+						LOG.info("Case Links reload stale op=list tenantId={} caseId={} requestId={} rows={} elapsedMs={}", tenantId, activeCaseId, generation, safeLinks.size(), elapsedMs(started));
+						return;
+					}
+					caseLinks = safeLinks;
 					caseLinksLoadedOnce = true;
 					caseLinksStale = false;
+					LOG.info("Case Links reload success op=list tenantId={} caseId={} requestId={} rows={} elapsedMs={}", tenantId, activeCaseId, generation, safeLinks.size(), elapsedMs(started));
 					renderCaseLinks(successMessage);
 				});
 			} catch (RuntimeException ex) {
-				Platform.runLater(() -> { if (generation == caseLinksLoadGeneration) showCaseLinksMessage("Failed to load links. " + rootMessage(ex)); });
+				LOG.warn("Case Links reload failure op=list tenantId={} caseId={} requestId={} elapsedMs={}", tenantId, activeCaseId, generation, elapsedMs(started), ex);
+				Platform.runLater(() -> { if (generation == caseLinksLoadGeneration && caseId != null && caseId == activeCaseId) showCaseLinksMessage("Failed to load links. " + rootMessage(ex)); });
 			}
-		}, "case-links-load-" + activeCaseId).start();
+		});
 	}
 
 	private void renderCaseLinks(String message) {
@@ -2009,21 +2033,37 @@ public class CaseController {
 	}
 
 	private void onAddCaseLink() {
-		loadLinkTypesForDialog(null).ifPresent(types -> showCaseLinkDialog(null, types).ifPresent(input -> runCaseLinkMutation("Link added.", () -> caseService.createCaseLink(new CaseServicePort.CreateCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, input.linkType().id(), input.displayName(), input.url(), input.description(), input.primary(), input.notes(), null)))));
+		loadLinkTypesForDialog(null, types -> showCaseLinkDialog(null, types).ifPresent(input -> {
+			final int tenantId = requireTenantId();
+			final int actorId = requireActorUserId();
+			final int activeCaseId = caseId;
+			runCaseLinkMutation("create", "Link added.", activeCaseId, null, () -> caseService.createCaseLink(new CaseServicePort.CreateCaseLinkCommand(tenantId, actorId, activeCaseId, input.linkType().id(), input.displayName(), input.url(), input.description(), input.primary(), input.notes(), null)));
+		}));
 	}
 
 	private void onEditCaseLink(CaseLinkDto link) {
-		loadLinkTypesForDialog(link).ifPresent(types -> showCaseLinkDialog(link, types).ifPresent(input -> runCaseLinkMutation("Link updated.", () -> caseService.updateCaseLink(new CaseServicePort.UpdateCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, link.caseLinkId(), link.externalLinkId(), input.linkType().id(), input.displayName(), input.url(), input.description(), null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer())))));
+		loadLinkTypesForDialog(link, types -> showCaseLinkDialog(link, types).ifPresent(input -> {
+			final int tenantId = requireTenantId();
+			final int actorId = requireActorUserId();
+			final int activeCaseId = caseId;
+			runCaseLinkMutation("update", "Link updated.", activeCaseId, link.caseLinkId(), () -> caseService.updateCaseLink(new CaseServicePort.UpdateCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.externalLinkId(), input.linkType().id(), input.displayName(), input.url(), input.description(), null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer())));
+		}));
 	}
 
 	private void onSetPrimaryCaseLink(CaseLinkDto link) {
-		runCaseLinkMutation("Primary link updated.", () -> caseService.setPrimaryCaseLink(new CaseServicePort.SetPrimaryCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, link.caseLinkId())));
+		final int tenantId = requireTenantId();
+		final int actorId = requireActorUserId();
+		final int activeCaseId = caseId;
+		runCaseLinkMutation("set-primary", "Primary link updated.", activeCaseId, link.caseLinkId(), () -> caseService.setPrimaryCaseLink(new CaseServicePort.SetPrimaryCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId())));
 	}
 
 	private void onDeleteCaseLink(CaseLinkDto link) {
 		boolean ok = AppDialogs.showConfirmation(caseLinksOwner(), "Delete Link", "Remove this link from the case?", "The link will be removed from this case. Shared external-link records are left to the service/DAO to manage safely.", "Delete", DialogActionKind.DANGER);
 		if (!ok) return;
-		runCaseLinkMutation("Link deleted.", () -> { caseService.deleteCaseLink(new CaseServicePort.DeleteCaseLinkCommand(requireTenantId(), requireActorUserId(), caseId, link.caseLinkId(), link.caseLinkRowVer())); return null; });
+		final int tenantId = requireTenantId();
+		final int actorId = requireActorUserId();
+		final int activeCaseId = caseId;
+		runCaseLinkMutation("delete", "Link deleted.", activeCaseId, link.caseLinkId(), () -> { caseService.deleteCaseLink(new CaseServicePort.DeleteCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.caseLinkRowVer())); return null; });
 	}
 
 	private void onMoveCaseLink(int index, int delta) {
@@ -2032,30 +2072,88 @@ public class CaseController {
 		List<Long> ids = new ArrayList<>(caseLinks.stream().map(CaseLinkDto::caseLinkId).toList());
 		java.util.Collections.swap(ids, index, target);
 		if (ids.size() != caseLinks.size() || ids.stream().distinct().count() != ids.size()) { showCaseLinksMessage("Cannot reorder links because the active link list is invalid."); return; }
-		runCaseLinkMutation("Links reordered.", () -> caseService.reorderCaseLinks(new CaseServicePort.ReorderCaseLinksCommand(requireTenantId(), requireActorUserId(), caseId, ids)));
+		final int tenantId = requireTenantId();
+		final int actorId = requireActorUserId();
+		final int activeCaseId = caseId;
+		runCaseLinkMutation("reorder", "Links reordered.", activeCaseId, null, () -> caseService.reorderCaseLinks(new CaseServicePort.ReorderCaseLinksCommand(tenantId, actorId, activeCaseId, ids)));
 	}
 
-	private void runCaseLinkMutation(String successMessage, java.util.concurrent.Callable<?> action) {
-		try {
-			action.call();
-			invalidateOverviewPrimaryLinkAfterCaseLinkMutation();
-			loadCaseLinksAsync(successMessage);
-		} catch (Exception ex) {
-			AppDialogs.showError(caseLinksOwner(), "Case Links", rootMessage(ex));
-			renderCaseLinks(null);
+	private void runCaseLinkMutation(String operation, String successMessage, int activeCaseId, Long caseLinkIdForLog, java.util.concurrent.Callable<?> action) {
+		if (!caseLinkMutationInFlight.compareAndSet(false, true)) {
+			LOG.info("Case Link mutation duplicate blocked op={} tenantId={} actorId={} caseId={} caseLinkId={}", operation, safeTenantId(), safeActorUserId(), activeCaseId, caseLinkIdForLog);
+			showCaseLinksMessage("Saving link changes…");
+			return;
 		}
+		setCaseLinkControlsDisabled(true);
+		final int tenantId = safeTenantId();
+		final int actorId = safeActorUserId();
+		final int requestId = ++caseLinksLoadGeneration;
+		final long started = System.nanoTime();
+		LOG.info("Case Link mutation start op={} tenantId={} actorId={} caseId={} caseLinkId={} requestId={}", operation, tenantId, actorId, activeCaseId, caseLinkIdForLog, requestId);
+		caseLinkExecutor.submit(() -> {
+			try {
+				Object result = action.call();
+				List<CaseLinkDto> reloaded = caseService.listCaseLinks(activeCaseId, tenantId);
+				List<CaseLinkDto> safeReloaded = reloaded == null ? List.of() : List.copyOf(reloaded);
+				Platform.runLater(() -> {
+					caseLinkMutationInFlight.set(false);
+					setCaseLinkControlsDisabled(false);
+					caseLinksStale = true;
+					invalidateOverviewPrimaryLinkAfterCaseLinkMutation();
+					if (caseId == null || caseId != activeCaseId || requestId != caseLinksLoadGeneration) {
+						LOG.info("Case Link mutation reload rejected stale op={} tenantId={} actorId={} caseId={} caseLinkId={} requestId={} rows={} elapsedMs={}", operation, tenantId, actorId, activeCaseId, resolvedCaseLinkId(caseLinkIdForLog, result), requestId, safeReloaded.size(), elapsedMs(started));
+						return;
+					}
+					caseLinks = safeReloaded;
+					caseLinksLoadedOnce = true;
+					caseLinksStale = false;
+					LOG.info("Case Link mutation success op={} tenantId={} actorId={} caseId={} caseLinkId={} requestId={} rows={} elapsedMs={}", operation, tenantId, actorId, activeCaseId, resolvedCaseLinkId(caseLinkIdForLog, result), requestId, safeReloaded.size(), elapsedMs(started));
+					renderCaseLinks(successMessage);
+				});
+			} catch (Exception ex) {
+				LOG.warn("Case Link mutation failure op={} tenantId={} actorId={} caseId={} caseLinkId={} requestId={} elapsedMs={}", operation, tenantId, actorId, activeCaseId, caseLinkIdForLog, requestId, elapsedMs(started), ex);
+				Platform.runLater(() -> {
+					caseLinkMutationInFlight.set(false);
+					setCaseLinkControlsDisabled(false);
+					if (caseId != null && caseId == activeCaseId) {
+						AppDialogs.showError(caseLinksOwner(), "Case Links", rootMessage(ex));
+						renderCaseLinks(null);
+					}
+				});
+			}
+		});
 	}
 
-	private Optional<List<LinkTypeDto>> loadLinkTypesForDialog(CaseLinkDto currentLink) {
-		try {
-			List<LinkTypeDto> active = caseService.listLinkTypes(requireTenantId(), false);
-			if (currentLink != null && active.stream().noneMatch(t -> t.id() == currentLink.linkTypeId())) {
-				LinkTypeDto unavailable = new LinkTypeDto(currentLink.linkTypeId(), null, currentLink.linkTypeName() + " (unavailable)", currentLink.linkTypeColor(), false, false, currentLink.linkTypeSystemKey(), null);
-				List<LinkTypeDto> copy = new ArrayList<>(); copy.add(unavailable); copy.addAll(active); active = copy;
+	private void loadLinkTypesForDialog(CaseLinkDto currentLink, Consumer<List<LinkTypeDto>> onLoaded) {
+		if (caseService == null || caseId == null) return;
+		final int activeCaseId = caseId;
+		final int tenantId = requireTenantId();
+		final int requestId = ++caseLinkDialogLoadGeneration;
+		setCaseLinkControlsDisabled(true);
+		showCaseLinksMessage("Loading Link Types…");
+		caseLinkExecutor.submit(() -> {
+			try {
+				List<LinkTypeDto> active = caseService.listLinkTypes(tenantId, false);
+				if (currentLink != null && active.stream().noneMatch(t -> t.id() == currentLink.linkTypeId())) {
+					LinkTypeDto unavailable = new LinkTypeDto(currentLink.linkTypeId(), null, currentLink.linkTypeName() + " (unavailable)", currentLink.linkTypeColor(), false, false, currentLink.linkTypeSystemKey(), null);
+					List<LinkTypeDto> copy = new ArrayList<>(); copy.add(unavailable); copy.addAll(active); active = copy;
+				}
+				List<LinkTypeDto> result = List.copyOf(active);
+				Platform.runLater(() -> {
+					setCaseLinkControlsDisabled(false);
+					if (caseId == null || caseId != activeCaseId || requestId != caseLinkDialogLoadGeneration) {
+						LOG.info("Case Link dialog Link Type load rejected stale tenantId={} caseId={} requestId={} rows={}", tenantId, activeCaseId, requestId, result.size());
+						return;
+					}
+					setVisibleManaged(caseLinksStatusLabel, false);
+					if (result.isEmpty()) { AppDialogs.showInfo(caseLinksOwner(), "Add Link", "No active Link Types are available for this tenant."); return; }
+					onLoaded.accept(result);
+				});
+			} catch (RuntimeException ex) {
+				LOG.warn("Case Link dialog Link Type load failure tenantId={} caseId={} requestId={}", tenantId, activeCaseId, requestId, ex);
+				Platform.runLater(() -> { setCaseLinkControlsDisabled(false); if (caseId != null && caseId == activeCaseId && requestId == caseLinkDialogLoadGeneration) AppDialogs.showError(caseLinksOwner(), "Case Links", rootMessage(ex)); });
 			}
-			if (active.isEmpty()) { AppDialogs.showInfo(caseLinksOwner(), "Add Link", "No active Link Types are available for this tenant."); return Optional.empty(); }
-			return Optional.of(active);
-		} catch (RuntimeException ex) { AppDialogs.showError(caseLinksOwner(), "Case Links", rootMessage(ex)); return Optional.empty(); }
+		});
 	}
 
 	private Optional<CaseLinkInput> showCaseLinkDialog(CaseLinkDto existing, List<LinkTypeDto> linkTypes) {
@@ -2067,18 +2165,49 @@ public class CaseController {
 		if (existing != null) type.getSelectionModel().select(linkTypes.stream().filter(t -> t.id() == existing.linkTypeId()).findFirst().orElse(null)); else if (!linkTypes.isEmpty()) type.getSelectionModel().selectFirst();
 		Label error = new Label(); error.setTextFill(Color.web("#b42318")); error.setVisible(false); error.setManaged(false);
 		GridPane grid = new GridPane(); grid.setHgap(10); grid.setVgap(8); grid.addRow(0, new Label("Link Type"), type); grid.addRow(1, new Label("Display Name"), name); grid.addRow(2, new Label("URL"), url); grid.addRow(3, new Label("Description"), description); grid.addRow(4, new Label("Notes"), notes); grid.add(primary, 1, 5); grid.add(error, 0, 6, 2, 1); dialog.getDialogPane().setContent(grid);
-		dialog.setResultConverter(button -> { if (button != ButtonType.OK) return null; try { LinkTypeDto selected = type.getValue(); if (selected == null) throw new IllegalArgumentException("Link Type is required."); if (!selected.active()) throw new IllegalArgumentException("Select an active Link Type before saving."); String display = trimLimit(name.getText(), "Display name", 255, true); String cleanUrl = trimLimit(url.getText(), "URL", 2048, true); ExternalBrowserHelper.validateHttpOrHttps(cleanUrl); String desc = trimLimit(description.getText(), "Description", 2048, false); String note = trimLimit(notes.getText(), "Notes", 2000, false); return new CaseLinkInput(selected, display, cleanUrl, desc, primary.isSelected(), note); } catch (RuntimeException ex) { error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); return null; } });
+		final CaseLinkInput[] validated = new CaseLinkInput[1];
+		Node ok = dialog.getDialogPane().lookupButton(ButtonType.OK);
+		ok.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+			try { validated[0] = validateCaseLinkDialogInput(type.getValue(), name.getText(), url.getText(), description.getText(), primary.isSelected(), notes.getText()); error.setText(""); error.setVisible(false); error.setManaged(false); }
+			catch (RuntimeException ex) { validated[0] = null; error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); LOG.info("Case Link dialog validation blocked save tenantId={} actorId={} caseId={} reason={}", safeTenantId(), safeActorUserId(), caseId, rootMessage(ex)); focusFirstInvalidCaseLinkField(type, name, url, description, notes); event.consume(); }
+		});
+		dialog.setResultConverter(button -> button == ButtonType.OK ? validated[0] : null);
 		return dialog.showAndWait();
 	}
 
+	static CaseLinkInput validateCaseLinkDialogInput(LinkTypeDto selected, String name, String url, String description, boolean primary, String notes) {
+		if (selected == null) throw new IllegalArgumentException("Link Type is required.");
+		if (!selected.active()) throw new IllegalArgumentException("Select an active Link Type before saving.");
+		String display = trimLimit(name, "Display name", 255, true);
+		String cleanUrl = trimLimit(url, "URL", 2048, true);
+		ExternalBrowserHelper.validateHttpOrHttps(cleanUrl);
+		String desc = trimLimit(description, "Description", 2048, false);
+		String note = trimLimit(notes, "Notes", 2000, false);
+		return new CaseLinkInput(selected, display, cleanUrl, desc, primary, note);
+	}
+
+	private void focusFirstInvalidCaseLinkField(ComboBox<LinkTypeDto> type, TextField name, TextField url, TextArea description, TextArea notes) {
+		if (type.getValue() == null || !type.getValue().active()) type.requestFocus();
+		else if (blank(name.getText()) || name.getText().trim().length() > 255) name.requestFocus();
+		else if (blank(url.getText()) || url.getText().trim().length() > 2048) url.requestFocus();
+		else if (description != null && description.getText() != null && description.getText().trim().length() > 2048) description.requestFocus();
+		else if (notes != null && notes.getText() != null && notes.getText().trim().length() > 2000) notes.requestFocus();
+	}
+
+	private void setCaseLinkControlsDisabled(boolean disabled) { if (addCaseLinkButton != null) addCaseLinkButton.setDisable(disabled); }
+	private int safeTenantId() { Integer id = appState == null ? null : appState.getShaleClientId(); return id == null ? -1 : id; }
+	private int safeActorUserId() { Integer id = appState == null ? null : appState.getUserId(); return id == null ? -1 : id; }
+	private static long elapsedMs(long started) { return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started); }
+	private static Long resolvedCaseLinkId(Long fallback, Object result) { return result instanceof CaseLinkDto dto ? dto.caseLinkId() : fallback; }
+
 	private static String rootMessage(Throwable ex) { Throwable cur = ex; while (cur != null && cur.getCause() != null) cur = cur.getCause(); String msg = cur == null ? null : cur.getMessage(); return msg == null || msg.isBlank() ? "Unexpected error." : msg; }
-	private static boolean blank(String s) { return s == null || s.trim().isEmpty(); }
-	private static String blankTo(String s, String fallback) { return blank(s) ? fallback : s.trim(); }
+	private static boolean blank(String text) { return text == null || text.trim().isEmpty(); }
+	private static String blankTo(String text, String fallback) { return blank(text) ? fallback : text.trim(); }
 	private static String trimLimit(String value, String label, int max, boolean required) { String out = value == null ? "" : value.trim(); if (required && out.isBlank()) throw new IllegalArgumentException(label + " is required."); if (out.length() > max) throw new IllegalArgumentException(label + " must be " + max + " characters or fewer."); return out.isBlank() ? null : out; }
 	private Window caseLinksOwner() { return caseLinksTabPane != null && caseLinksTabPane.getScene() != null ? caseLinksTabPane.getScene().getWindow() : taskDialogOwner(); }
 	private int requireTenantId() { Integer id = appState == null ? null : appState.getShaleClientId(); if (id == null || id <= 0) throw new IllegalStateException("No tenant is selected."); return id; }
 	private int requireActorUserId() { Integer id = appState == null ? null : appState.getUserId(); if (id == null || id <= 0) throw new IllegalStateException("No active user is selected."); return id; }
-	private record CaseLinkInput(LinkTypeDto linkType, String displayName, String url, String description, boolean primary, String notes) {}
+	record CaseLinkInput(LinkTypeDto linkType, String displayName, String url, String description, boolean primary, String notes) {}
 
 	private void refreshCaseCalendar() {
 		caseCalendarStale = true;
