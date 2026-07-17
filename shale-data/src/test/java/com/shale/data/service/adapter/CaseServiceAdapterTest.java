@@ -20,6 +20,7 @@ import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.AddCaseNoteCommand;
@@ -162,6 +163,22 @@ class CaseServiceAdapterTest {
 		assertEquals("closed", updated.systemKey());
 	}
 
+	@Test
+	void listCaseLinksSharedWithContactDelegatesToGateway() {
+		CaseLinkDto link = new CaseLinkDto(3, 3, 6502, 7, 5, "Box", "#123456", "box",
+				"Shared Link", "https://example.invalid", null, false, null, 0, null, null, new byte[] {1}, new byte[] {2}, List.of());
+		ContactSharedCaseLinkDto row = new ContactSharedCaseLinkDto(6502, "Test Case", link);
+		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
+		gateway.contactSharedCaseLinks = List.of(row);
+		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
+
+		List<ContactSharedCaseLinkDto> actual = adapter.listCaseLinksSharedWithContact(10192, 7);
+
+		assertEquals(10192, gateway.lastSharedContactId);
+		assertEquals(7, gateway.lastSharedShaleClientId);
+		assertEquals(List.of(row), actual);
+	}
+
 
 	@Test
 	void linkTypeOverlayHonorsInactiveMaskDeletedResetAndSorting() {
@@ -269,6 +286,9 @@ class CaseServiceAdapterTest {
 		String lastCaseLinkUrl;
 		private boolean lastCaseLinkPrimary;
 		private Boolean lastUpdateCaseLinkPrimary;
+		private List<ContactSharedCaseLinkDto> contactSharedCaseLinks = List.of();
+		private int lastSharedContactId;
+		private int lastSharedShaleClientId;
 
 		FakeCaseGateway(List<CaseUpdateDto> caseUpdates) {
 			this.caseUpdates = caseUpdates;
@@ -402,6 +422,13 @@ class CaseServiceAdapterTest {
 
 		@Override
 		public java.util.Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId) { return java.util.Optional.empty(); }
+
+		@Override
+		public List<ContactSharedCaseLinkDto> listCaseLinksSharedWithContact(int contactId, int shaleClientId) {
+			lastSharedContactId = contactId;
+			lastSharedShaleClientId = shaleClientId;
+			return contactSharedCaseLinks;
+		}
 
 		@Override
 		public CaseLinkDto createCaseLink(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder) {

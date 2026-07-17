@@ -7811,7 +7811,13 @@ public final class CaseDao {
 	}
 
 	public List<ContactSharedCaseLinkDto> listCaseLinksSharedWithContact(int contactId, int shaleClientId) {
+		long startedNanos = System.nanoTime();
 		try (Connection con = db.requireConnection()) {
+			int sessionShaleClientId = requireCurrentShaleClientId(con);
+			if (sessionShaleClientId != shaleClientId) {
+				throw new IllegalStateException("ShaleClientId session context " + sessionShaleClientId
+						+ " does not match requested ShaleClientId " + shaleClientId + ".");
+			}
 			validateActiveContactForTenant(con, shaleClientId, contactId);
 			String sql = """
 					SELECT c.Id AS SharedCaseId, c.Name AS SharedCaseDisplayName, linkRows.*
@@ -7854,7 +7860,7 @@ public final class CaseDao {
 						CaseLinkDto link = mapCaseLinkDto(rs);
 						links.add(link); ids.add(link.caseLinkId()); caseIds.add(rs.getLong("SharedCaseId")); names.add(rs.getString("SharedCaseDisplayName"));
 					}
-					if (links.isEmpty()) logContactSharedLinkJoinStages(con, shaleClientId, contactId, 0);
+					if (links.isEmpty()) logContactSharedLinkJoinStages(con, shaleClientId, contactId, 0, startedNanos);
 					Map<Long, List<CaseLinkShareDto>> shares = listCaseLinkSharesForLinks(con, shaleClientId, ids);
 					for (int i = 0; i < links.size(); i++) rows.add(new ContactSharedCaseLinkDto(caseIds.get(i), names.get(i), withShares(links.get(i), shares.get(links.get(i).caseLinkId()))));
 					return List.copyOf(rows);
@@ -7863,39 +7869,84 @@ public final class CaseDao {
 		} catch (SQLException e) { throw new RuntimeException("Failed to list case links shared with contact", e); }
 	}
 
-	private void logContactSharedLinkJoinStages(Connection con, int tenant, int contactId, int finalReturnedCount) {
-		if (!LOG.isLoggable(Level.FINE)) return;
-		String sql = """
-				SELECT
-				  SUM(CASE WHEN cls.Id IS NOT NULL THEN 1 ELSE 0 END) AS ActiveShareCount,
-				  SUM(CASE WHEN cls.Id IS NOT NULL AND cl.Id IS NOT NULL AND el.Id IS NOT NULL THEN 1 ELSE 0 END) AS CaseLinkExternalLinkJoinCount
-				FROM dbo.CaseLinkShares cls
-				LEFT JOIN dbo.CaseLinks cl ON cl.Id = cls.CaseLinkId
+	private void logContactSharedLinkJoinStages(Connection con, int tenant, int contactId, int finalReturnedCount, long startedNanos) {
+		String dbUser = null;
+		Integer sessionTenant = null;
+		try (PreparedStatement ps = con.prepareStatement("SELECT USER_NAME(), TRY_CONVERT(int, SESSION_CONTEXT(N'ShaleClientId'))");
+				ResultSet rs = ps.executeQuery()) {
+			if (rs.next()) {
+				dbUser = rs.getString(1);
+				sessionTenant = getNullableInt(rs, 2);
+			}
+		} catch (SQLException e) {
+			LOG.log(Level.FINE, "operation=contacts.sharedLinks.sessionDiagnostic.failure tenantId=" + tenant + " contactId=" + contactId, e);
+		}
+		int activeShareCount = countContactSharedLinksStage(con, tenant, contactId, """
+				SELECT COUNT(*)
+				FROM dbo.CaseLinkShares AS cls
+				WHERE cls.ShaleClientId = ?
+				  AND cls.ContactId = ?
+				  AND cls.IsDeleted = 0
+				""");
+		int caseLinkExternalLinkJoinCount = countContactSharedLinksStage(con, tenant, contactId, """
+				SELECT COUNT(*)
+				FROM dbo.CaseLinkShares AS cls
+				JOIN dbo.CaseLinks cl ON cl.Id = cls.CaseLinkId
 				 AND cl.ShaleClientId = cls.ShaleClientId
 				 AND cl.IsDeleted = 0
-				LEFT JOIN dbo.ExternalLinks el ON el.Id = cl.ExternalLinkId
+				JOIN dbo.ExternalLinks el ON el.Id = cl.ExternalLinkId
 				 AND el.ShaleClientId = cl.ShaleClientId
 				 AND el.IsDeleted = 0
 				WHERE cls.ShaleClientId = ?
 				  AND cls.ContactId = ?
 				  AND cls.IsDeleted = 0
-				""";
+				""");
+		int completeProductionJoinCount = countContactSharedLinksStage(con, tenant, contactId, """
+				SELECT COUNT(*)
+				FROM dbo.CaseLinkShares AS cls
+				JOIN dbo.CaseLinks cl ON cl.Id = cls.CaseLinkId
+				 AND cl.ShaleClientId = cls.ShaleClientId
+				 AND cl.IsDeleted = 0
+				JOIN dbo.ExternalLinks el ON el.Id = cl.ExternalLinkId
+				 AND el.ShaleClientId = cl.ShaleClientId
+				 AND el.IsDeleted = 0
+				JOIN dbo.LinkTypes lt ON lt.Id = el.LinkTypeId
+				 AND (lt.ShaleClientId IS NULL OR lt.ShaleClientId = cls.ShaleClientId)
+				 AND lt.IsDeleted = 0
+				JOIN dbo.Cases c ON c.Id = cl.CaseId
+				 AND c.ShaleClientId = cls.ShaleClientId
+				JOIN dbo.Contacts targetContact ON targetContact.Id = cls.ContactId
+				 AND targetContact.ShaleClientId = cls.ShaleClientId
+				 AND ISNULL(targetContact.IsDeleted, 0) = 0
+				WHERE cls.ShaleClientId = ?
+				  AND cls.ContactId = ?
+				  AND cls.IsDeleted = 0
+				""");
+		long elapsedMs = (System.nanoTime() - startedNanos) / 1_000_000L;
+		String message = "operation=contacts.sharedLinks.daoZeroResult tenantId=" + tenant
+				+ " contactId=" + contactId
+				+ " databaseUser=" + dbUser
+				+ " sessionTenantId=" + sessionTenant
+				+ " activeShareCount=" + activeShareCount
+				+ " caseLinkExternalLinkJoinCount=" + caseLinkExternalLinkJoinCount
+				+ " completeProductionJoinCount=" + completeProductionJoinCount
+				+ " finalCount=" + finalReturnedCount
+				+ " sqlParameterCount=2 parameter1TenantId=" + tenant
+				+ " parameter2ContactId=" + contactId
+				+ " elapsedMs=" + elapsedMs;
+		LOG.info(message);
+	}
+
+	private int countContactSharedLinksStage(Connection con, int tenant, int contactId, String sql) {
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setInt(1, tenant);
 			ps.setInt(2, contactId);
 			try (ResultSet rs = ps.executeQuery()) {
-				if (rs.next()) {
-					int activeShareCount = rs.getInt("ActiveShareCount");
-					int caseLinkExternalLinkJoinCount = rs.getInt("CaseLinkExternalLinkJoinCount");
-					LOG.fine(() -> "operation=contacts.sharedLinks.daoStages tenantId=" + tenant
-							+ " contactId=" + contactId
-							+ " activeShareCount=" + activeShareCount
-							+ " caseLinkExternalLinkJoinCount=" + caseLinkExternalLinkJoinCount
-							+ " finalReturnedCount=" + finalReturnedCount);
-				}
+				return rs.next() ? rs.getInt(1) : -1;
 			}
 		} catch (SQLException e) {
-			LOG.log(Level.FINE, "operation=contacts.sharedLinks.daoStages.failure tenantId=" + tenant + " contactId=" + contactId, e);
+			LOG.log(Level.FINE, "operation=contacts.sharedLinks.stageCount.failure tenantId=" + tenant + " contactId=" + contactId, e);
+			return -1;
 		}
 	}
 
