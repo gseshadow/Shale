@@ -1925,7 +1925,7 @@ public class CaseController {
 		}
 		CaseLinkDto link = overviewPrimaryLink.get();
 		ovPrimaryLinkBox.getChildren().add(caseLinkCardFactory.create(link, CaseLinkCardFactory.Variant.COMPACT, new CaseLinkCardFactory.Actions(
-				() -> onOpenOverviewPrimaryLink(link), () -> onEditCaseLink(link), null, null)));
+				() -> onOpenOverviewPrimaryLink(link), () -> onEditCaseLink(link), null, null), onOpenContact));
 	}
 
 	private void showOverviewPrimaryLinkMessage(String message) {
@@ -2005,7 +2005,7 @@ public class CaseController {
 			section.getChildren().add(heading);
 			for (CaseLinkDto link : links) {
 				section.getChildren().add(caseLinkCardFactory.create(link, CaseLinkCardFactory.Variant.FULL, new CaseLinkCardFactory.Actions(
-						() -> onOpenCaseLink(link), () -> onEditCaseLink(link), () -> onSetPrimaryCaseLink(link), () -> onDeleteCaseLink(link))));
+						() -> onOpenCaseLink(link), () -> onEditCaseLink(link), () -> onSetPrimaryCaseLink(link), () -> onDeleteCaseLink(link)), onOpenContact));
 			}
 			caseLinksCardsBox.getChildren().add(section);
 		});

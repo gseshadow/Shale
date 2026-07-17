@@ -740,7 +740,7 @@ public final class SceneManager {
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			ContactDetailService contactDetailService = new ContactDetailService(contactDao);
-				c.init(contactId, contactDetailService, appState, onOpenCase, onContactDeleted, phiReadAuditService);
+				c.init(contactId, contactDetailService, appState, onOpenCase, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), onContactDeleted, phiReadAuditService, this::openContactProfile);
 				return c;
 			});
 	}

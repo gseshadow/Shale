@@ -17,6 +17,7 @@ import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.CaseLinkShareDto;
+import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
@@ -279,6 +280,13 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override
 	public Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId) {
 		return caseGateway.getPrimaryCaseLink(caseId, shaleClientId);
+	}
+
+	@Override
+	public List<ContactSharedCaseLinkDto> listCaseLinksSharedWithContact(int contactId, int shaleClientId) {
+		validatePositive(contactId, "ContactId");
+		validatePositive(shaleClientId, "ShaleClientId");
+		return caseGateway.listCaseLinksSharedWithContact(contactId, shaleClientId);
 	}
 
 	@Override
@@ -606,6 +614,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		void resetLinkTypeOverride(int shaleClientId, int actorUserId, int linkTypeId);
 		List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId);
 		Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId);
+		default List<ContactSharedCaseLinkDto> listCaseLinksSharedWithContact(int contactId, int shaleClientId) { return List.of(); }
 		CaseLinkDto createCaseLink(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder);
 		default CaseLinkDto createCaseLinkWithShares(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder, List<CaseLinkShareDraft> shares) { return createCaseLink(shaleClientId, actorUserId, caseId, linkTypeId, displayName, url, description, primary, notes, sortOrder); }
 		CaseLinkDto updateCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer);
