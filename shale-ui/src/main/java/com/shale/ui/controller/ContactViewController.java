@@ -8,6 +8,8 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.CaseLinkDto;
@@ -49,6 +51,8 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 public final class ContactViewController {
+
+    private static final Logger LOG = Logger.getLogger(ContactViewController.class.getName());
 
     @FXML private Label contactTitleLabel;
     @FXML private Label contactSubtitleLabel;
@@ -111,6 +115,7 @@ public final class ContactViewController {
     private CaseServicePort caseService;
     private final CaseLinkCardFactory caseLinkCardFactory = new CaseLinkCardFactory();
     private ExternalBrowserHelper externalBrowserHelper = new ExternalBrowserHelper();
+    private boolean initialized;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contact-view-loader");
@@ -147,6 +152,11 @@ public final class ContactViewController {
         this.phiReadAuditService = phiReadAuditService;
         this.caseCardFactory = new CaseCardFactory(onOpenCase);
         auditContactRead();
+        if (initialized) {
+            resetSharedLinksState();
+            loadContact();
+            loadSharedLinks();
+        }
     }
 
     private void auditContactRead() {
@@ -174,9 +184,10 @@ public final class ContactViewController {
             setVisibleManaged(deleteContactButton, false);
         }
 
+        initialized = true;
         setEditMode(false);
         renderRelatedCases();
-        renderSharedLinksLoading();
+        resetSharedLinksState();
         Platform.runLater(() -> { loadContact(); loadSharedLinks(); });
     }
 
@@ -693,16 +704,25 @@ public final class ContactViewController {
     }
 
 
+    private void resetSharedLinksState() {
+        sharedLinks = List.of();
+        sharedLinksLoaded = false;
+        renderSharedLinksLoading();
+    }
+
     private void loadSharedLinks() {
         final int generation = ++sharedLinksLoadGeneration;
         final int requestedContactId = contactId;
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
         if (caseService == null || tenantId == null || tenantId <= 0 || requestedContactId <= 0) {
+            LOG.info(() -> "operation=contacts.sharedLinks.skip tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation);
             sharedLinks = List.of();
             sharedLinksLoaded = true;
             renderSharedLinksEmpty();
             return;
         }
+        long loadStarted = PerfLog.start();
+        LOG.info(() -> "operation=contacts.sharedLinks.load tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation);
         renderSharedLinksLoading();
         dbExec.submit(() -> {
             try {
@@ -710,16 +730,22 @@ public final class ContactViewController {
                 List<ContactSharedCaseLinkDto> safe = loaded == null ? List.of() : List.copyOf(loaded);
                 Platform.runLater(() -> {
                     if (generation != sharedLinksLoadGeneration || contactId != requestedContactId) {
+                        LOG.info(() -> "operation=contacts.sharedLinks.stale tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation + " daoResultCount=" + safe.size() + " elapsedMs=" + (PerfLog.elapsedMs(loadStarted)));
                         PerfLog.log("contacts.sharedLinks", "discard", "contactId=" + requestedContactId + " tenantId=" + tenantId + " generation=" + generation + " rows=" + safe.size());
                         return;
                     }
                     sharedLinks = safe;
                     sharedLinksLoaded = true;
                     renderSharedLinks();
+                    LOG.info(() -> "operation=contacts.sharedLinks.success tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation + " daoResultCount=" + safe.size() + " mappedResultCount=" + sharedLinks.size() + " caseGroupCount=" + sharedLinks.stream().map(ContactSharedCaseLinkDto::caseId).distinct().count() + " elapsedMs=" + (PerfLog.elapsedMs(loadStarted)));
                 });
             } catch (RuntimeException ex) {
+                LOG.log(Level.WARNING, "operation=contacts.sharedLinks.failure tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation + " elapsedMs=" + (PerfLog.elapsedMs(loadStarted)), ex);
                 Platform.runLater(() -> {
-                    if (generation != sharedLinksLoadGeneration || contactId != requestedContactId) return;
+                    if (generation != sharedLinksLoadGeneration || contactId != requestedContactId) {
+                        LOG.info(() -> "operation=contacts.sharedLinks.failureStale tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation);
+                        return;
+                    }
                     sharedLinks = List.of();
                     sharedLinksLoaded = false;
                     renderSharedLinksFailure();
