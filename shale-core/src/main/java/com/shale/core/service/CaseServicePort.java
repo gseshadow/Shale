@@ -77,6 +77,7 @@ public interface CaseServicePort {
 	void deleteCaseLink(DeleteCaseLinkCommand command);
 
 	default List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { return List.of(); }
+	default List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int shaleClientId) { return List.of(); }
 
 	default List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { return List.of(); }
 

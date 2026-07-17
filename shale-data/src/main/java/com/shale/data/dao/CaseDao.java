@@ -7758,6 +7758,30 @@ public final class CaseDao {
 		} catch (SQLException e) { throw new RuntimeException("Failed to search share contacts", e); }
 	}
 
+
+	public List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int tenant) {
+		String sql = """
+			SELECT DISTINCT ct.Id AS ContactId,
+			       CASE WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName,''))), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName,''))), '') IS NOT NULL
+			            THEN LTRIM(RTRIM(COALESCE(ct.FirstName,'') + CASE WHEN COALESCE(ct.FirstName,'') = '' OR COALESCE(ct.LastName,'') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName,'')))
+			            ELSE NULLIF(LTRIM(RTRIM(ct.Name)), '') END AS DisplayName
+			FROM dbo.Cases c
+			JOIN dbo.CaseContacts cc ON cc.CaseId = c.Id
+			JOIN dbo.Contacts ct ON ct.Id = cc.ContactId
+			WHERE c.Id = ? AND c.ShaleClientId = ? AND c.IsDeleted = 0
+			  AND ct.ShaleClientId = ? AND ct.IsDeleted = 0
+			ORDER BY DisplayName ASC, ct.Id ASC
+			""";
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setLong(1, caseId); ps.setInt(2, tenant); ps.setInt(3, tenant);
+			try (ResultSet rs = ps.executeQuery()) {
+				List<CaseLinkContactOptionDto> out = new ArrayList<>();
+				while (rs.next()) out.add(new CaseLinkContactOptionDto(rs.getInt("ContactId"), rs.getString("DisplayName")));
+				return out;
+			}
+		} catch (SQLException e) { throw new RuntimeException("Failed to list case share contacts", e); }
+	}
+
 	public List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) {
 		try (Connection con = db.requireConnection()) {
 			validateCaseForTenant(con, shaleClientId, caseId);

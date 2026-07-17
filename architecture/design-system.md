@@ -419,3 +419,17 @@ Case Link cards remain display-only UI. `CaseLinkCardFactory` receives all share
 * Existing Case Link dialogs initialize from persisted shares, stage additions/edits/unshares locally, and persist them only when the main dialog is saved. Cancel leaves Link fields and shares unchanged.
 * Persisted shares referencing later-unavailable Contacts remain visible with an unavailable marker and may be unshared; unavailable Contacts are not offered as new selector options.
 * SharedAt means the time the contact was recorded as receiving or being granted access to the Case Link. Unsharing is a soft-delete of the share record and is distinct from deleting a Contact.
+
+## Case Link Shared With Modal Pattern
+
+Case Link Add/Edit dialogs keep Link fields, the primary checkbox, and the save footer as the primary visual hierarchy. Contact selection is not embedded directly in the Link form. When no active shares are staged, the form shows a Shale secondary action labeled `Share Link` near the bottom of the dialog. When one or more staged or persisted shares are active, the form shows a `Shared With` summary containing compact, display-only Contact Cards and an `Edit Shared With` action.
+
+The `Share Link` / `Edit Shared With` workflow uses a secondary, resizable modal owned by the parent Link dialog. The modal contains three logical sections: `Selected Contacts`, `Case Contacts`, and `All Contacts`. The selected section is the source of truth for the modal session and shows the selected count, compact cards/rows, `Remove` for unsaved selections, `Unshare` for persisted shares, and a `Details` action for share-specific metadata.
+
+Case Contacts are convenience suggestions loaded from the authoritative `dbo.CaseContacts` relationship and validated through `dbo.Contacts.ShaleClientId`; they are deduplicated and exclude deleted/unavailable Contacts from new selection. All Contacts uses a searchable, keyboard-operable, virtualized list of active tenant Contacts so blank search still permits browsing without rendering an unbounded card stack.
+
+All three sections share one modal-scoped selection model keyed by ContactId. Applying the modal replaces the parent Link dialog's staged selection; canceling the modal discards the modal copy and leaves the parent staging unchanged. The modal never persists. The parent Add/Edit Link OK button remains the only persistence point and continues to save Link fields plus share additions, updates, and removals as one aggregate transaction.
+
+Share `Details` edits only the share-specific `SharedAt` and optional Notes values. `SharedAt` is required, share notes follow the 500-character service/schema contract, and invalid details keep the dialog open with inline validation. Persisted unavailable/deleted Contacts remain visible in the selected and summary views with an unavailable marker, retain stored identity, can be edited/unshared when service rules allow, and are excluded from new selectable Case/All Contact lists.
+
+Accessibility expectations: all share buttons expose clear accessible text, search focus remains in the child modal, Enter/Space toggles Contact selection inside the list rather than saving the parent Link dialog, selected state is communicated by a checkmark and accessible text rather than color alone, and Escape/Cancel closes only the active modal.
