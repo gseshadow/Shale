@@ -80,6 +80,26 @@
     -fx-spacing: 6;
 }
 
+
+.contact-card-name {
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.contact-card-name-mini {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.contact-card-name-compact-mini {
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
+.contact-card-name-secondary-mini {
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+}
+
 /* Case Link Card variants: Link Type identity drives the wash and accent rail. */
 .case-link-card {
     -fx-background-color: linear-gradient(to right, -shale-link-type-wash 0%, -shale-color-card-surface 44%, -shale-color-card-surface 100%);
@@ -144,6 +164,16 @@
     -fx-cursor: hand;
 }
 
+.case-link-selectable-contact-wrapper .case-link-selection-checkmark {
+    -fx-min-width: 17;
+    -fx-min-height: 17;
+    -fx-pref-width: 17;
+    -fx-pref-height: 17;
+    -fx-max-width: 17;
+    -fx-max-height: 17;
+    -fx-alignment: center;
+}
+
 .case-link-selectable-contact-card {
     -fx-border-color: -shale-color-card-border;
 }
@@ -159,7 +189,7 @@
     -fx-text-fill: white;
     -fx-font-weight: 800;
     -fx-font-size: 10px;
-    -fx-padding: 0 4 1 4;
+    -fx-padding: 0;
 }
 
 .case-link-dialog-form,

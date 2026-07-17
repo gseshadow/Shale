@@ -446,3 +446,11 @@ Case Link sharing composes the existing Contact Card and Shale dialog primitives
 * FULL and COMPACT Case Link Cards render active shares as embedded, display-only MINI Contact Cards in a wrapping FlowPane beneath a subtle Shared With label. MINI Link Cards remain unchanged and do not render share summaries.
 * Embedded Contact Cards on Link Cards are mouse-transparent/display-only by design: clicking them passes through to the parent Link Card and opens the external URL; they do not navigate to Contact View. Edit, Delete, and Set Primary remain isolated child actions.
 * Share display names continue to use the existing Case Link Contact option mapping. Legacy Contact records that store a phone number in the Name field are treated as valid Contact display names and are not filtered, rewritten, or flagged as invalid by this presentation layer.
+
+## Phase 5.3.6 Contact Card and Secondary Dialog Visual Contracts
+
+MINI Contact Cards use primary text on light card surfaces. The MINI, compact-mini, and secondary-mini name labels must carry a reusable Contact Card name style that resolves to the Shale primary text token, so embedded Link Card contacts, selected contact chips, hover surfaces, and dialog section surfaces remain readable.
+
+Selectable MINI Contact Cards use the card border/accent plus an explicit checkmark for selected state. Unselected selectable MINI Contact Cards show no indicator, reserve no checkmark footprint, and must not render an empty blue bar at the right edge. When selected, the checkmark is a compact circular indicator inset inside the top-right corner of the card/wrapper bounds so long names retain ellipsis behavior and the rounded card edge remains intact. Selection must also remain exposed through accessible text and keyboard operation rather than color alone.
+
+The transparent secondary dialog shell contract requires transparent scene fill outside the rounded shell and contained painting inside all four rounded corners. Header surfaces own rounded upper corners. Dialog content and scroll surfaces must remain transparent or clipped within the shell contract rather than painting square white areas outside the shell. The fixed footer/button-bar surfaces use the same dialog background and rounded lower corners so OK/Cancel or Apply/Cancel remain visible without lower-corner overlap or seams.
