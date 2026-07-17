@@ -1832,6 +1832,30 @@
     -fx-padding: 8 14 14 14;
 }
 
+
+.dialog-pane.secondary-window-shell.case-link-dialog-shell {
+    -fx-background-color: #F8FAFD;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+}
+
+.dialog-pane.secondary-window-shell.case-link-dialog-shell > .content {
+    -fx-background-color: #F8FAFD;
+    -fx-background-radius: 0;
+}
+
+.dialog-pane.secondary-window-shell.case-link-dialog-shell > .button-bar {
+    -fx-background-color: #F8FAFD;
+    -fx-background-radius: 0 0 14 14;
+    -fx-border-radius: 0 0 14 14;
+}
+
+.dialog-pane.secondary-window-shell.case-link-dialog-shell .case-link-dialog-scroll,
+.dialog-pane.secondary-window-shell.case-link-dialog-shell .case-link-styled-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
 .field-edit-dialog-body {
     -fx-padding: 14 16 8 16;
     -fx-background-color: #F8FAFD;

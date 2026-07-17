@@ -2162,7 +2162,7 @@ public class CaseController {
 	}
 
 	private Optional<CaseLinkInput> showCaseLinkDialog(CaseLinkDto existing, List<LinkTypeDto> linkTypes) {
-		Dialog<CaseLinkInput> dialog = new Dialog<>(); String title = existing == null ? "Add Link" : "Edit Link"; dialog.setTitle(title); if (caseLinksOwner() != null) dialog.initOwner(caseLinksOwner()); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		Dialog<CaseLinkInput> dialog = new Dialog<>(); String title = existing == null ? "Add Link" : "Edit Link"; dialog.setTitle(title); if (caseLinksOwner() != null) dialog.initOwner(caseLinksOwner()); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		ComboBox<LinkTypeDto> type = new ComboBox<>(); type.getItems().setAll(linkTypes); type.setMaxWidth(Double.MAX_VALUE); type.setConverter(new javafx.util.StringConverter<>() { public String toString(LinkTypeDto t) { return t == null ? "" : t.name(); } public LinkTypeDto fromString(String s) { return null; }});
 		type.setCellFactory(list -> new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); setGraphic(empty || item == null ? null : LinkTypeIndicatorFactory.createLinkTypePill(item.name(), item.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); }});
 		type.setButtonCell(new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); }});
@@ -2284,7 +2284,7 @@ public class CaseController {
 		}
 		private void openShareModal() { showShareSelectionDialog(activeShares()).ifPresent(applied -> { staged.clear(); staged.addAll(applied.stream().map(StagedShare::copy).toList()); renderSummary(); }); }
 		private Optional<List<StagedShare>> showShareSelectionDialog(List<StagedShare> parentShares) {
-			Dialog<List<StagedShare>> dialog = new Dialog<>(); String title = parentShares == null || parentShares.isEmpty() ? "Share Link" : "Edit Shared With"; dialog.setTitle(title); Window modalOwner = root.getScene() == null ? caseLinksOwner() : root.getScene().getWindow(); if (modalOwner != null) dialog.initOwner(modalOwner); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.APPLY, ButtonType.CANCEL); dialog.setResizable(true);
+			Dialog<List<StagedShare>> dialog = new Dialog<>(); String title = parentShares == null || parentShares.isEmpty() ? "Share Link" : "Edit Shared With"; dialog.setTitle(title); Window modalOwner = root.getScene() == null ? caseLinksOwner() : root.getScene().getWindow(); if (modalOwner != null) dialog.initOwner(modalOwner); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.APPLY, ButtonType.CANCEL); dialog.setResizable(true);
 			Map<Integer, StagedShare> working = new LinkedHashMap<>(); for (StagedShare s : parentShares == null ? List.<StagedShare>of() : parentShares) working.put(s.contactId, StagedShare.copy(s));
 			VBox selectedBox = new VBox(6); Label selectedHeading = new Label(); selectedHeading.getStyleClass().add("section-heading"); FlowPane caseRows = new FlowPane(8, 8); caseRows.getStyleClass().add("case-link-share-selection-flow"); caseRows.setPrefWrapLength(700); Label caseState = new Label("Loading Case Contacts..."); caseState.getStyleClass().add("search-summary-text"); caseRows.getChildren().add(caseState); AtomicReference<List<CaseLinkContactOptionDto>> caseOptions = new AtomicReference<>(List.of());
 			ScrollPane selectedScroll = boundedVerticalScrollPane(selectedBox, 96, 176); ScrollPane caseContactsScroll = boundedVerticalScrollPane(caseRows, 84, 150); caseContactsScroll.getStyleClass().add("case-link-case-contacts-scroll");
@@ -2319,14 +2319,20 @@ public class CaseController {
 			card.getStyleClass().addAll("shale-entity-card-selectable", "case-link-selectable-contact-card");
 			if (selected) card.getStyleClass().add("case-link-selectable-contact-card-selected");
 			card.setAccessibleText((selected ? "Selected " : "Not selected ") + option.displayName());
-			Label check = new Label(selected ? "✓" : "");
-			check.getStyleClass().add("case-link-selection-checkmark");
-			StackPane wrapper = new StackPane(card, check);
+			StackPane wrapper = new StackPane(card);
 			wrapper.getStyleClass().add("case-link-selectable-contact-wrapper");
-			if (selected) wrapper.getStyleClass().add("case-link-selectable-contact-wrapper-selected");
+			if (selected) {
+				Label check = new Label("✓");
+				check.getStyleClass().add("case-link-selection-checkmark");
+				check.setMouseTransparent(true);
+				check.setAccessibleText("Selected");
+				wrapper.getChildren().add(check);
+				wrapper.getStyleClass().add("case-link-selectable-contact-wrapper-selected");
+				StackPane.setAlignment(check, Pos.TOP_RIGHT);
+				StackPane.setMargin(check, new Insets(5, 5, 0, 0));
+			}
 			wrapper.setFocusTraversable(!cell);
 			wrapper.setAccessibleText((selected ? "Selected " : "Not selected ") + option.displayName());
-			StackPane.setAlignment(check, Pos.TOP_RIGHT);
 			wrapper.setOnMouseClicked(e -> { toggle.run(); e.consume(); });
 			wrapper.setOnKeyPressed(e -> { if (e.getCode() == javafx.scene.input.KeyCode.SPACE || e.getCode() == javafx.scene.input.KeyCode.ENTER) { toggle.run(); e.consume(); } });
 			return wrapper;
@@ -2337,7 +2343,7 @@ public class CaseController {
 	private record ShareDetails(LocalDateTime sharedAt, String notes) {}
 
 	private Optional<ShareDetails> showShareDetailsDialog(String contactName, LocalDateTime initialSharedAt, String initialNotes) {
-		Dialog<ShareDetails> dialog = new Dialog<>(); dialog.setTitle("Share Details"); AppDialogs.applySecondaryDialogShell(dialog, "Share Details"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		Dialog<ShareDetails> dialog = new Dialog<>(); dialog.setTitle("Share Details"); AppDialogs.applySecondaryDialogShell(dialog, "Share Details"); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		Label contact = new Label("Contact: " + blankTo(contactName, "Selected contact"));
 		DatePicker date = new DatePicker((initialSharedAt == null ? LocalDateTime.now() : initialSharedAt).toLocalDate());
 		TextField time = new TextField((initialSharedAt == null ? LocalDateTime.now() : initialSharedAt).toLocalTime().truncatedTo(ChronoUnit.MINUTES).toString());
