@@ -27,6 +27,7 @@ import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.CaseLinkShareDto;
+import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseStatusHistoryDto;
@@ -7804,6 +7805,58 @@ public final class CaseDao {
 		List<CaseLinkContactOptionDto> out = new ArrayList<>();
 		while (rs.next()) out.add(new CaseLinkContactOptionDto(rs.getInt("ContactId"), rs.getString("DisplayName")));
 		return out;
+	}
+
+	public List<ContactSharedCaseLinkDto> listCaseLinksSharedWithContact(int contactId, int shaleClientId) {
+		try (Connection con = db.requireConnection()) {
+			validateActiveContactForTenant(con, shaleClientId, contactId);
+			String sql = """
+					SELECT c.Id AS SharedCaseId, c.Name AS SharedCaseDisplayName, linkRows.*
+					FROM dbo.CaseLinkShares cls
+					JOIN dbo.CaseLinks cl ON cl.Id = cls.CaseLinkId
+					 AND cl.ShaleClientId = cls.ShaleClientId
+					 AND cl.IsDeleted = 0
+					JOIN dbo.ExternalLinks el ON el.Id = cl.ExternalLinkId
+					 AND el.ShaleClientId = cl.ShaleClientId
+					 AND el.IsDeleted = 0
+					JOIN dbo.LinkTypes lt ON lt.Id = el.LinkTypeId
+					 AND (lt.ShaleClientId IS NULL OR lt.ShaleClientId = cls.ShaleClientId)
+					JOIN dbo.Cases c ON c.Id = cl.CaseId
+					 AND c.ShaleClientId = cls.ShaleClientId
+					 AND c.IsDeleted = 0
+					JOIN dbo.Contacts targetContact ON targetContact.Id = cls.ContactId
+					 AND targetContact.ShaleClientId = cls.ShaleClientId
+					 AND ISNULL(targetContact.IsDeleted, 0) = 0
+					CROSS APPLY (
+						SELECT cl.Id AS CaseLinkId, cl.ExternalLinkId, cl.CaseId, cl.ShaleClientId, el.LinkTypeId,
+						       lt.Name AS LinkTypeName, lt.Color AS LinkTypeColor, lt.SystemKey AS LinkTypeSystemKey,
+						       el.DisplayName, el.Url, el.Description, cl.IsPrimary, cl.Notes, cl.SortOrder,
+						       cl.CreatedAt, cl.UpdatedAt, cl.RowVer AS CaseLinkRowVer, el.RowVer AS ExternalLinkRowVer
+					) linkRows
+					WHERE cls.ShaleClientId = ?
+					  AND cls.ContactId = ?
+					  AND cls.IsDeleted = 0
+					ORDER BY LOWER(c.Name), c.Id, cl.IsPrimary DESC, LOWER(lt.Name), cl.SortOrder, LOWER(el.DisplayName), cl.Id
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, shaleClientId);
+				ps.setInt(2, contactId);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<ContactSharedCaseLinkDto> rows = new ArrayList<>();
+					List<CaseLinkDto> links = new ArrayList<>();
+					List<Long> ids = new ArrayList<>();
+					List<String> names = new ArrayList<>();
+					List<Long> caseIds = new ArrayList<>();
+					while (rs.next()) {
+						CaseLinkDto link = mapCaseLinkDto(rs);
+						links.add(link); ids.add(link.caseLinkId()); caseIds.add(rs.getLong("SharedCaseId")); names.add(rs.getString("SharedCaseDisplayName"));
+					}
+					Map<Long, List<CaseLinkShareDto>> shares = listCaseLinkSharesForLinks(con, shaleClientId, ids);
+					for (int i = 0; i < links.size(); i++) rows.add(new ContactSharedCaseLinkDto(caseIds.get(i), names.get(i), withShares(links.get(i), shares.get(links.get(i).caseLinkId()))));
+					return List.copyOf(rows);
+				}
+			}
+		} catch (SQLException e) { throw new RuntimeException("Failed to list case links shared with contact", e); }
 	}
 
 	public List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) {

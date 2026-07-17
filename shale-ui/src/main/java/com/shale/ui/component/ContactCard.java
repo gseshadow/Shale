@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.input.KeyCode;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -208,6 +209,12 @@ public class ContactCard extends HBox {
         setOnMouseClicked(e -> {
             if (interactive && onOpen != null && contactId != null) {
                 onOpen.accept(contactId);
+            }
+        });
+        setOnKeyPressed(e -> {
+            if (interactive && onOpen != null && contactId != null && (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE)) {
+                onOpen.accept(contactId);
+                e.consume();
             }
         });
     }

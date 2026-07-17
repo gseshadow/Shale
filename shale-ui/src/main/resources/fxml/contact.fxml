@@ -152,6 +152,14 @@
                             <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
                             <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
                         </StackPane>
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="Links Shared With This Contact" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                            <Region HBox.hgrow="ALWAYS" />
+                        </HBox>
+                        <StackPane>
+                            <VBox fx:id="sharedLinksContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
+                            <Label fx:id="sharedLinksStatusLabel" text="Loading shared links…" wrapText="true" visible="false" managed="false" />
+                        </StackPane>
                     </VBox>
                 </GridPane>
             </ScrollPane>

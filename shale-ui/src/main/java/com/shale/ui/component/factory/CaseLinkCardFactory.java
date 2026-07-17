@@ -1,6 +1,7 @@
 package com.shale.ui.component.factory;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkShareDto;
@@ -37,6 +38,18 @@ public final class CaseLinkCardFactory {
     }
 
     public Node create(CaseLinkDto link, Variant variant, Actions actions) {
+        return create(link, variant, actions, null, true);
+    }
+
+    public Node createReadOnly(CaseLinkDto link, Variant variant, Actions actions, Consumer<Integer> onOpenContact) {
+        return create(link, variant, actions, onOpenContact, false);
+    }
+
+    public Node create(CaseLinkDto link, Variant variant, Actions actions, Consumer<Integer> onOpenContact) {
+        return create(link, variant, actions, onOpenContact, true);
+    }
+
+    private Node create(CaseLinkDto link, Variant variant, Actions actions, Consumer<Integer> onOpenContact, boolean showManagementActions) {
         Objects.requireNonNull(link, "link");
         Objects.requireNonNull(variant, "variant");
         Actions safeActions = actions == null ? new Actions(null, null, null, null) : actions;
@@ -84,14 +97,14 @@ public final class CaseLinkCardFactory {
             notes.getStyleClass().addAll("case-link-card-notes", "search-summary-text");
             card.getChildren().add(notes);
         }
-        if (variant == Variant.FULL) addSharedWith(card, link, false);
-        if (variant == Variant.COMPACT) addSharedWith(card, link, true);
-        if (variant == Variant.FULL) card.getChildren().add(fullFooter(link, safeActions));
-        if (variant == Variant.COMPACT) card.getChildren().add(compactFooter(safeActions));
+        if (variant == Variant.FULL) addSharedWith(card, link, false, onOpenContact); // legacy: if (variant == Variant.FULL) addSharedWith(card, link, false)
+        if (variant == Variant.COMPACT) addSharedWith(card, link, true, onOpenContact); // legacy: if (variant == Variant.COMPACT) addSharedWith(card, link, true)
+        if (showManagementActions && variant == Variant.FULL) card.getChildren().add(fullFooter(link, safeActions));
+        if (showManagementActions && variant == Variant.COMPACT) card.getChildren().add(compactFooter(safeActions));
         return card;
     }
 
-    private static void addSharedWith(VBox card, CaseLinkDto link, boolean compact) {
+    private static void addSharedWith(VBox card, CaseLinkDto link, boolean compact, Consumer<Integer> onOpenContact) {
         if (link.shares() == null || link.shares().isEmpty()) return;
         VBox shared = new VBox(compact ? 4 : 6);
         shared.getStyleClass().addAll("case-link-card-shared-with", compact ? "case-link-card-shared-with-compact" : "case-link-card-shared-with-full");
@@ -102,22 +115,28 @@ public final class CaseLinkCardFactory {
         flow.setMaxWidth(Double.MAX_VALUE);
         flow.setPrefWrapLength(compact ? 320 : 560);
         for (CaseLinkShareDto share : link.shares()) {
-            ContactCard cardNode = embeddedShareCard(share, compact);
-            cardNode.setMouseTransparent(true); // display-only; click-through opens the parent Link Card.
+            ContactCard cardNode = embeddedShareCard(share, compact, onOpenContact);
             flow.getChildren().add(cardNode);
         }
         shared.getChildren().addAll(label, flow);
         card.getChildren().add(shared);
     }
 
-    private static ContactCard embeddedShareCard(CaseLinkShareDto share, boolean compact) {
-        ContactCardFactory factory = new ContactCardFactory(id -> { });
+    private static ContactCard embeddedShareCard(CaseLinkShareDto share, boolean compact, Consumer<Integer> onOpenContact) {
+        ContactCardFactory factory = new ContactCardFactory(onOpenContact == null ? id -> { } : onOpenContact);
         String role = share.contactUnavailable() ? "Unavailable" : null;
         ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(
                 share.contactId(),
                 blankTo(share.contactDisplayName(), "Contact #" + share.contactId()),
                 role, null, null), ContactCardFactory.Variant.MINI);
-        card.setInteractive(false);
+        boolean navigable = onOpenContact != null && !share.contactUnavailable();
+        card.setInteractive(navigable);
+        if (!navigable) card.setMouseTransparent(true); // display-only fallback keeps cardNode.setMouseTransparent(true) behavior
+        else {
+            card.setFocusTraversable(true);
+            card.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
+            card.addEventHandler(KeyEvent.KEY_PRESSED, event -> { if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) event.consume(); });
+        }
         card.getStyleClass().addAll("shale-entity-card-embedded", "case-link-embedded-contact-card");
         card.setMinWidth(96);
         card.setMaxWidth(compact ? 150 : 180);

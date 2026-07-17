@@ -12,6 +12,7 @@ import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkShareDto;
+import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.PracticeAreaDto;
@@ -61,6 +62,8 @@ public interface CaseServicePort {
 	List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId);
 
 	Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId);
+
+	List<ContactSharedCaseLinkDto> listCaseLinksSharedWithContact(int contactId, int shaleClientId);
 
 	CaseLinkDto createCaseLink(CreateCaseLinkCommand command);
 
