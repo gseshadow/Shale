@@ -2266,7 +2266,6 @@ public final class CaseDao {
 					     AND pla_user.ShaleClientId = c.ShaleClientId
 					     AND %s
 					    WHERE pla_cu.CaseId = c.Id
-					      AND pla_cu.ShaleClientId = c.ShaleClientId
 					      AND pla_cu.RoleId = ?
 					      AND pla_cu.IsPrimary = 1
 					      AND %s

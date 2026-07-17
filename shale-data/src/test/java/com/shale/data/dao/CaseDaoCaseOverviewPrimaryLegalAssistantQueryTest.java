@@ -30,13 +30,30 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
         String method = method(source, "OUTER APPLY (\n\t\t\t\t\t    SELECT TOP (1) pla_cu.UserId", "\t\t\t\t\t) primary_legal_assistant");
 
         assertTrue(method.contains("pla_cu.CaseId = c.Id"));
-        assertTrue(method.contains("pla_cu.ShaleClientId = c.ShaleClientId"));
+        assertTrue(!method.contains("pla_cu.ShaleClientId"),
+                "CaseUsers does not have ShaleClientId; tenant isolation must be enforced through Users.ShaleClientId");
+        assertTrue(!method(source, "public com.shale.core.dto.CaseOverviewDto getOverview", "private List<com.shale.core.dto.CaseOverviewDto.ContactSummary>").contains("cu.ShaleClientId"),
+                "getOverview must not reference CaseUsers.ShaleClientId for any CaseUsers alias");
+        assertTrue(method.contains("pla_user.id = pla_cu.UserId"));
         assertTrue(method.contains("pla_user.ShaleClientId = c.ShaleClientId"));
         assertTrue(method.contains("pla_cu.RoleId = ?"));
         assertTrue(source.contains("ps.setInt(idx++, ROLE_LEGAL_ASSISTANT)"));
         assertTrue(method.contains("pla_cu.IsPrimary = 1"));
         assertTrue(source.contains("activeFilter(resolveCaseUsersDeletedColumn(con), \"pla_cu\")"));
         assertTrue(source.contains("activeFilter(resolveUsersDeletedColumn(con), \"pla_user\")"));
+    }
+
+    @Test
+    void overviewSelectKeepsExpectedParameterOrdering() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String overview = method(source, "public com.shale.core.dto.CaseOverviewDto getOverview", "private List<com.shale.core.dto.CaseOverviewDto.ContactSummary>");
+        int responsibleAttorneyParam = overview.indexOf("ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY)");
+        int legalAssistantParam = overview.indexOf("ps.setInt(idx++, ROLE_LEGAL_ASSISTANT)");
+        int caseIdParam = overview.indexOf("ps.setLong(idx++, caseId)");
+
+        assertTrue(responsibleAttorneyParam >= 0, "Responsible Attorney role parameter should be present");
+        assertTrue(legalAssistantParam > responsibleAttorneyParam, "Legal Assistant role parameter should follow Responsible Attorney");
+        assertTrue(caseIdParam > legalAssistantParam, "caseId parameter should follow role parameters");
     }
 
     @Test
