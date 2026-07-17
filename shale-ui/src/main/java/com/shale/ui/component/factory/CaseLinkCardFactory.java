@@ -1,9 +1,10 @@
 package com.shale.ui.component.factory;
 
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.dto.CaseLinkShareDto;
+import com.shale.ui.component.ContactCard;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ColorUtil;
 
@@ -16,6 +17,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -91,11 +93,35 @@ public final class CaseLinkCardFactory {
 
     private static void addSharedWith(VBox card, CaseLinkDto link, boolean compact) {
         if (link.shares() == null || link.shares().isEmpty()) return;
-        String names = link.shares().stream().map(s -> blankTo(s.contactDisplayName(), "Contact #" + s.contactId())).collect(Collectors.joining(", "));
-        Label shared = new Label((compact ? "Shared: " : "Shared With: ") + names);
-        shared.getStyleClass().addAll("case-link-card-shared-with", "search-summary-text");
-        shared.setWrapText(!compact);
+        VBox shared = new VBox(compact ? 4 : 6);
+        shared.getStyleClass().addAll("case-link-card-shared-with", compact ? "case-link-card-shared-with-compact" : "case-link-card-shared-with-full");
+        Label label = new Label(compact ? "Shared With" : "Shared With");
+        label.getStyleClass().addAll("case-link-card-shared-with-label", "search-summary-text");
+        FlowPane flow = new FlowPane(compact ? 4 : 6, compact ? 4 : 6);
+        flow.getStyleClass().add("case-link-card-shared-contact-flow");
+        flow.setMaxWidth(Double.MAX_VALUE);
+        flow.setPrefWrapLength(compact ? 320 : 560);
+        for (CaseLinkShareDto share : link.shares()) {
+            ContactCard cardNode = embeddedShareCard(share, compact);
+            cardNode.setMouseTransparent(true); // display-only; click-through opens the parent Link Card.
+            flow.getChildren().add(cardNode);
+        }
+        shared.getChildren().addAll(label, flow);
         card.getChildren().add(shared);
+    }
+
+    private static ContactCard embeddedShareCard(CaseLinkShareDto share, boolean compact) {
+        ContactCardFactory factory = new ContactCardFactory(id -> { });
+        String role = share.contactUnavailable() ? "Unavailable" : null;
+        ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(
+                share.contactId(),
+                blankTo(share.contactDisplayName(), "Contact #" + share.contactId()),
+                role, null, null), ContactCardFactory.Variant.MINI);
+        card.setInteractive(false);
+        card.getStyleClass().addAll("shale-entity-card-embedded", "case-link-embedded-contact-card");
+        card.setMinWidth(96);
+        card.setMaxWidth(compact ? 150 : 180);
+        return card;
     }
 
     private static HBox fullFooter(CaseLinkDto link, Actions actions) {

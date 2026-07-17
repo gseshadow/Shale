@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -2172,7 +2173,10 @@ public class CaseController {
 		Label error = new Label(); error.setTextFill(Color.web("#b42318")); error.setVisible(false); error.setManaged(false);
 		GridPane grid = new GridPane(); grid.setHgap(10); grid.setVgap(8); grid.addRow(0, new Label("Link Type"), type); grid.addRow(1, new Label("Display Name"), name); grid.addRow(2, new Label("URL"), url); grid.addRow(3, new Label("Description"), description); grid.addRow(4, new Label("Notes"), notes); grid.add(primary, 1, 5); grid.add(sharedWithBox, 0, 6, 2, 1); grid.add(error, 0, 7, 2, 1);
 		ColumnConstraints labels = new ColumnConstraints(); labels.setMinWidth(110); ColumnConstraints fields = new ColumnConstraints(); fields.setHgrow(Priority.ALWAYS); grid.getColumnConstraints().setAll(labels, fields); grid.setMaxWidth(Double.MAX_VALUE);
-		ScrollPane formScroll = screenSafeDialogScrollPane(grid); formScroll.setPrefViewportWidth(720); formScroll.setPrefViewportHeight(520); dialog.getDialogPane().setContent(formScroll); dialog.setResizable(true); applyScreenSafeDialogBounds(dialog, caseLinksOwner(), 780, 680, 560, 420);
+		grid.getStyleClass().addAll("case-link-dialog-form", "shale-card-surface");
+		grid.getChildren().stream().filter(n -> n instanceof Label).forEach(n -> n.getStyleClass().add("case-link-dialog-label"));
+		sharedWithBox.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface");
+		ScrollPane formScroll = screenSafeDialogScrollPane(grid); formScroll.getStyleClass().add("case-link-dialog-scroll"); formScroll.setPrefViewportWidth(720); formScroll.setPrefViewportHeight(520); dialog.getDialogPane().setContent(formScroll); dialog.setResizable(true); applyScreenSafeDialogBounds(dialog, caseLinksOwner(), 780, 680, 560, 420);
 		final CaseLinkInput[] validated = new CaseLinkInput[1];
 		Node ok = dialog.getDialogPane().lookupButton(ButtonType.OK);
 		ok.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
@@ -2189,6 +2193,7 @@ public class CaseController {
 		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 		scroll.getStyleClass().add("transparent-scroll");
+		scroll.getStyleClass().add("case-link-styled-scroll");
 		return scroll;
 	}
 
@@ -2197,6 +2202,22 @@ public class CaseController {
 		scroll.setMinHeight(minHeight);
 		scroll.setPrefHeight(prefHeight);
 		scroll.setMaxHeight(prefHeight);
+		return scroll;
+	}
+
+	private static ScrollPane adaptiveContactScrollPane(FlowPane content, double maxHeight) {
+		ScrollPane scroll = screenSafeDialogScrollPane(content);
+		scroll.getStyleClass().add("case-link-adaptive-contact-scroll");
+		scroll.setMinHeight(Region.USE_PREF_SIZE);
+		scroll.setMaxHeight(maxHeight);
+		Runnable update = () -> {
+			double h = Math.min(maxHeight, Math.max(42, content.prefHeight(Math.max(160, content.getWidth())) + 12));
+			scroll.setPrefHeight(h);
+			scroll.setVbarPolicy(h >= maxHeight - 1 ? ScrollPane.ScrollBarPolicy.AS_NEEDED : ScrollPane.ScrollBarPolicy.NEVER);
+		};
+		content.layoutBoundsProperty().addListener((obs, oldV, newV) -> update.run());
+		content.widthProperty().addListener((obs, oldV, newV) -> update.run());
+		Platform.runLater(update);
 		return scroll;
 	}
 
@@ -2225,24 +2246,90 @@ public class CaseController {
 		List<CaseServicePort.CaseLinkShareUpdate> shareUpdates() { return staged.stream().filter(s -> !s.removed && s.shareId > 0 && s.changedFromOriginal()).map(s -> new CaseServicePort.CaseLinkShareUpdate(s.shareId, s.contactId, s.sharedAt, s.notes, s.rowVer == null ? null : s.rowVer.clone())).toList(); }
 		List<CaseServicePort.CaseLinkShareRemoval> shareRemovals() { return staged.stream().filter(s -> s.removed && s.shareId > 0).map(s -> new CaseServicePort.CaseLinkShareRemoval(s.shareId, s.rowVer == null ? null : s.rowVer.clone())).toList(); }
 		private List<StagedShare> activeShares() { return staged.stream().filter(s -> !s.removed).sorted(Comparator.comparing((StagedShare s) -> safeText(s.displayName), String.CASE_INSENSITIVE_ORDER).thenComparingInt(s -> s.contactId)).toList(); }
-		private void renderSummary() { root.getChildren().clear(); List<StagedShare> active = activeShares(); if (active.isEmpty()) { Button share = ActionButtonFactory.cardAction("Share Link", e -> openShareModal()); share.setAccessibleText("Share Link"); root.getChildren().add(share); return; } Label heading = new Label("Shared With"); heading.getStyleClass().add("section-heading"); cards.getChildren().clear(); cards.setPrefWrapLength(520); cards.setMaxWidth(Double.MAX_VALUE); for (StagedShare share : active) cards.getChildren().add(createShareContactCard(share)); ScrollPane cardsScroll = boundedVerticalScrollPane(cards, 92, 172); cardsScroll.setAccessibleText("Shared With Contact Cards"); Button edit = ActionButtonFactory.cardAction("Edit Shared With", e -> openShareModal()); edit.setAccessibleText("Edit Shared With"); root.getChildren().addAll(heading, cardsScroll, edit); }
-		private Node createShareContactCard(StagedShare share) { ContactCardFactory factory = new ContactCardFactory(id -> { }); String role = (share.unavailable ? "Unavailable · " : "") + "Shared " + share.sharedAt.format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")); ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(share.contactId, share.displayName, role, null, null), ContactCardFactory.Variant.COMPACT); card.setSuppressPlaceholderLines(true); card.setMinWidth(180); card.setPrefWidth(240); card.setMaxWidth(Double.MAX_VALUE); card.setCursor(Cursor.DEFAULT); return card; }
+		private void renderSummary() {
+			root.getChildren().clear();
+			List<StagedShare> active = activeShares();
+			if (active.isEmpty()) {
+				Button share = ActionButtonFactory.cardAction("Share Link", e -> openShareModal());
+				share.setAccessibleText("Share Link");
+				root.getChildren().add(share);
+				return;
+			}
+			Label heading = new Label("Shared With");
+			heading.getStyleClass().add("section-heading");
+			cards.getChildren().clear();
+			cards.getStyleClass().add("case-link-shared-contact-flow");
+			cards.setPrefWrapLength(520);
+			cards.setMaxWidth(Double.MAX_VALUE);
+			for (StagedShare share : active) cards.getChildren().add(createShareContactCard(share));
+			ScrollPane cardsScroll = adaptiveContactScrollPane(cards, 176);
+			cardsScroll.getStyleClass().add("case-link-shared-with-summary");
+			cardsScroll.setAccessibleText("Shared With Contact Cards");
+			Button edit = ActionButtonFactory.cardAction("Edit Shared With", e -> openShareModal());
+			edit.setAccessibleText("Edit Shared With");
+			root.getChildren().addAll(heading, cardsScroll, edit);
+		}
+		private Node createShareContactCard(StagedShare share) {
+			ContactCardFactory factory = new ContactCardFactory(id -> { });
+			String role = (share.unavailable ? "Unavailable · " : "") + "Shared " + share.sharedAt.format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a"));
+			ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(share.contactId, share.displayName, role, null, null), ContactCardFactory.Variant.MINI);
+			card.setInteractive(false);
+			card.setSuppressPlaceholderLines(true);
+			card.getStyleClass().addAll("shale-entity-card-embedded", "case-link-embedded-contact-card");
+			card.setMinWidth(120);
+			card.setPrefWidth(Region.USE_COMPUTED_SIZE);
+			card.setMaxWidth(220);
+			card.setAccessibleText(role + " " + share.displayName);
+			return card;
+		}
 		private void openShareModal() { showShareSelectionDialog(activeShares()).ifPresent(applied -> { staged.clear(); staged.addAll(applied.stream().map(StagedShare::copy).toList()); renderSummary(); }); }
 		private Optional<List<StagedShare>> showShareSelectionDialog(List<StagedShare> parentShares) {
 			Dialog<List<StagedShare>> dialog = new Dialog<>(); String title = parentShares == null || parentShares.isEmpty() ? "Share Link" : "Edit Shared With"; dialog.setTitle(title); Window modalOwner = root.getScene() == null ? caseLinksOwner() : root.getScene().getWindow(); if (modalOwner != null) dialog.initOwner(modalOwner); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.APPLY, ButtonType.CANCEL); dialog.setResizable(true);
 			Map<Integer, StagedShare> working = new LinkedHashMap<>(); for (StagedShare s : parentShares == null ? List.<StagedShare>of() : parentShares) working.put(s.contactId, StagedShare.copy(s));
-			VBox selectedBox = new VBox(6); Label selectedHeading = new Label(); selectedHeading.getStyleClass().add("section-heading"); VBox caseRows = new VBox(6); Label caseState = new Label("Loading Case Contacts..."); caseState.getStyleClass().add("search-summary-text"); caseRows.getChildren().add(caseState);
-			ScrollPane selectedScroll = boundedVerticalScrollPane(selectedBox, 96, 176); ScrollPane caseContactsScroll = boundedVerticalScrollPane(caseRows, 84, 150);
+			VBox selectedBox = new VBox(6); Label selectedHeading = new Label(); selectedHeading.getStyleClass().add("section-heading"); FlowPane caseRows = new FlowPane(8, 8); caseRows.getStyleClass().add("case-link-share-selection-flow"); caseRows.setPrefWrapLength(700); Label caseState = new Label("Loading Case Contacts..."); caseState.getStyleClass().add("search-summary-text"); caseRows.getChildren().add(caseState); AtomicReference<List<CaseLinkContactOptionDto>> caseOptions = new AtomicReference<>(List.of());
+			ScrollPane selectedScroll = boundedVerticalScrollPane(selectedBox, 96, 176); ScrollPane caseContactsScroll = boundedVerticalScrollPane(caseRows, 84, 150); caseContactsScroll.getStyleClass().add("case-link-case-contacts-scroll");
 			TextField search = new TextField(); search.setPromptText("Search all Contacts..."); Button clear = ActionButtonFactory.cardAction("Clear", e -> search.clear()); HBox searchRow = new HBox(6, search, clear); HBox.setHgrow(search, Priority.ALWAYS);
 			javafx.collections.ObservableList<CaseLinkContactOptionDto> allOptions = javafx.collections.FXCollections.observableArrayList(); javafx.collections.transformation.FilteredList<CaseLinkContactOptionDto> filtered = new javafx.collections.transformation.FilteredList<>(allOptions, o -> true); javafx.scene.control.ListView<CaseLinkContactOptionDto> allList = new javafx.scene.control.ListView<>(filtered); allList.setPrefHeight(240); allList.setPlaceholder(new Label("Loading Contacts..."));
-			final Runnable[] refresh = new Runnable[1]; refresh[0] = () -> { selectedBox.getChildren().clear(); List<StagedShare> active = working.values().stream().filter(s -> !s.removed).sorted(Comparator.comparing((StagedShare s) -> safeText(s.displayName), String.CASE_INSENSITIVE_ORDER).thenComparingInt(s -> s.contactId)).toList(); selectedHeading.setText("Selected Contacts (" + active.size() + ")"); if (active.isEmpty()) { Label empty = new Label("No Contacts selected."); empty.getStyleClass().add("search-summary-text"); selectedBox.getChildren().add(empty); } else for (StagedShare share : active) { Button details = ActionButtonFactory.cardAction("Details", e -> showShareDetailsDialog(share.displayName, share.sharedAt, share.notes).ifPresent(d -> { share.sharedAt = d.sharedAt(); share.notes = d.notes(); share.dirty = true; refresh[0].run(); })); Button remove = ActionButtonFactory.danger(share.shareId > 0 ? "Unshare" : "Remove", e -> { if (share.shareId > 0) { boolean ok = AppDialogs.showConfirmation(dialog.getDialogPane().getScene().getWindow(), "Unshare Contact", "Unshare this contact from the link?", "The Contact record is not deleted. The unshare is staged until the parent Link dialog is saved.", "Unshare", DialogActionKind.DANGER); if (!ok) return; share.removed = true; } else working.remove(share.contactId); refresh[0].run(); }); FlowPane actions = new FlowPane(6, 6, details, remove); actions.setPrefWrapLength(170); HBox row = new HBox(8, createShareContactCard(share), actions); row.setAlignment(Pos.CENTER_LEFT); row.setMaxWidth(Double.MAX_VALUE); HBox.setHgrow(row.getChildren().get(0), Priority.ALWAYS); selectedBox.getChildren().add(row); } allList.refresh(); };
-			allList.setCellFactory(lv -> new javafx.scene.control.ListCell<>() { @Override protected void updateItem(CaseLinkContactOptionDto item, boolean empty) { super.updateItem(item, empty); if (empty || item == null) { setText(null); return; } boolean selected = working.containsKey(item.contactId()) && !working.get(item.contactId()).removed; setText((selected ? "✓ " : "") + item.displayName()); setAccessibleText((selected ? "Selected " : "Not selected ") + item.displayName()); } });
+			final Runnable[] refresh = new Runnable[1]; refresh[0] = () -> { selectedBox.getChildren().clear(); List<StagedShare> active = working.values().stream().filter(s -> !s.removed).sorted(Comparator.comparing((StagedShare s) -> safeText(s.displayName), String.CASE_INSENSITIVE_ORDER).thenComparingInt(s -> s.contactId)).toList(); selectedHeading.setText("Selected Contacts (" + active.size() + ")"); if (active.isEmpty()) { Label empty = new Label("No Contacts selected."); empty.getStyleClass().add("search-summary-text"); selectedBox.getChildren().add(empty); } else for (StagedShare share : active) { Button details = ActionButtonFactory.cardAction("Details", e -> showShareDetailsDialog(share.displayName, share.sharedAt, share.notes).ifPresent(d -> { share.sharedAt = d.sharedAt(); share.notes = d.notes(); share.dirty = true; refresh[0].run(); })); Button remove = ActionButtonFactory.danger(share.shareId > 0 ? "Unshare" : "Remove", e -> { if (share.shareId > 0) { boolean ok = AppDialogs.showConfirmation(dialog.getDialogPane().getScene().getWindow(), "Unshare Contact", "Unshare this contact from the link?", "The Contact record is not deleted. The unshare is staged until the parent Link dialog is saved.", "Unshare", DialogActionKind.DANGER); if (!ok) return; share.removed = true; } else working.remove(share.contactId); refresh[0].run(); }); FlowPane actions = new FlowPane(6, 6, details, remove); actions.setPrefWrapLength(170); HBox row = new HBox(8, createShareContactCard(share), actions); row.getStyleClass().add("case-link-selected-contact-row"); row.setAlignment(Pos.CENTER_LEFT); row.setMaxWidth(Double.MAX_VALUE); HBox.setHgrow(row.getChildren().get(0), Priority.ALWAYS); selectedBox.getChildren().add(row); } renderCaseContactOptions(caseRows, caseOptions.get(), working, refresh[0]); allList.refresh(); };
+			allList.setCellFactory(lv -> new javafx.scene.control.ListCell<>() { @Override protected void updateItem(CaseLinkContactOptionDto item, boolean empty) { super.updateItem(item, empty); getStyleClass().removeAll("case-link-contact-cell-selected"); setText(null); setGraphic(null); setAccessibleText(null); if (empty || item == null) return; boolean selected = working.containsKey(item.contactId()) && !working.get(item.contactId()).removed; setGraphic(createSelectableContactCard(item, selected, () -> { toggleWorking(working, item); refresh[0].run(); }, true)); if (selected) getStyleClass().add("case-link-contact-cell-selected"); setAccessibleText((selected ? "Selected " : "Not selected ") + item.displayName()); } });
 			allList.setOnMouseClicked(e -> { CaseLinkContactOptionDto o = allList.getSelectionModel().getSelectedItem(); if (o != null) { toggleWorking(working, o); refresh[0].run(); } }); allList.setOnKeyPressed(e -> { if (e.getCode() == javafx.scene.input.KeyCode.SPACE || e.getCode() == javafx.scene.input.KeyCode.ENTER) { CaseLinkContactOptionDto o = allList.getSelectionModel().getSelectedItem(); if (o != null) { toggleWorking(working, o); refresh[0].run(); e.consume(); } } }); search.textProperty().addListener((obs, oldV, newV) -> { String q = safeText(newV).toLowerCase(Locale.ROOT); filtered.setPredicate(o -> q.isBlank() || safeText(o.displayName()).toLowerCase(Locale.ROOT).contains(q)); allList.setPlaceholder(new Label(q.isBlank() ? "No available Contacts." : "No Contacts match this search.")); });
-			VBox allContactsSection = new VBox(8, new Label("All Contacts"), searchRow, allList); VBox.setVgrow(allList, Priority.ALWAYS); VBox content = new VBox(12, selectedHeading, selectedScroll, new Label("Case Contacts"), caseContactsScroll, allContactsSection); content.setPadding(new Insets(10)); content.setPrefWidth(760); content.setPrefHeight(620); VBox.setVgrow(allContactsSection, Priority.ALWAYS); dialog.getDialogPane().setContent(content); applyScreenSafeDialogBounds(dialog, modalOwner, 820, 700, 600, 460); refresh[0].run();
+			Label allContactsHeading = new Label("All Contacts"); allContactsHeading.getStyleClass().add("section-heading"); VBox allContactsSection = new VBox(8, allContactsHeading, searchRow, allList); allContactsSection.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface"); VBox.setVgrow(allList, Priority.ALWAYS); Label caseContactsHeading = new Label("Case Contacts"); caseContactsHeading.getStyleClass().add("section-heading"); VBox selectedSection = new VBox(8, selectedHeading, selectedScroll); selectedSection.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface"); VBox caseContactsSection = new VBox(8, caseContactsHeading, caseContactsScroll); caseContactsSection.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface"); VBox content = new VBox(12, selectedSection, caseContactsSection, allContactsSection); content.getStyleClass().add("case-link-share-modal-form"); content.setPadding(new Insets(16)); content.setPrefWidth(760); content.setPrefHeight(620); VBox.setVgrow(allContactsSection, Priority.ALWAYS); dialog.getDialogPane().setContent(content); applyScreenSafeDialogBounds(dialog, modalOwner, 820, 700, 600, 460); refresh[0].run();
 			AtomicBoolean open = new AtomicBoolean(true); dialog.setOnHidden(e -> open.set(false)); final int caseIdSnapshot = CaseController.this.caseId == null ? -1 : CaseController.this.caseId; final int tenantId = safeTenantId(); final int generation = ++caseLinkDialogLoadGeneration;
-			caseLinkExecutor.submit(() -> { long started = System.nanoTime(); try { List<CaseLinkContactOptionDto> caseContacts = caseService == null ? List.of() : caseService.listCaseLinkShareCaseContacts(caseIdSnapshot, tenantId); Platform.runLater(() -> { if (!open.get() || generation != caseLinkDialogLoadGeneration || CaseController.this.caseId == null || caseIdSnapshot != CaseController.this.caseId) { LOG.info("Case Link share modal stale result op=list-case-contacts tenantId={} caseId={} requestId={} rows={} elapsedMs={}", tenantId, caseIdSnapshot, generation, caseContacts.size(), elapsedMs(started)); return; } LOG.info("Case Link share modal load success op=list-case-contacts tenantId={} caseId={} requestId={} rows={} elapsedMs={}", tenantId, caseIdSnapshot, generation, caseContacts.size(), elapsedMs(started)); caseRows.getChildren().clear(); if (caseContacts.isEmpty()) { Label empty = new Label("No available Case Contacts."); empty.getStyleClass().add("search-summary-text"); caseRows.getChildren().add(empty); } for (CaseLinkContactOptionDto o : caseContacts) { Button b = ActionButtonFactory.cardAction(o.displayName(), e -> { toggleWorking(working, o); refresh[0].run(); }); b.setMaxWidth(Double.MAX_VALUE); caseRows.getChildren().add(b); } }); } catch (RuntimeException ex) { LOG.warn("Case Link share modal load failure op=list-case-contacts tenantId={} caseId={} requestId={} elapsedMs={}", tenantId, caseIdSnapshot, generation, elapsedMs(started), ex); Platform.runLater(() -> { if (open.get() && generation == caseLinkDialogLoadGeneration) caseRows.getChildren().setAll(new Label("Unable to load Case Contacts.")); }); } });
+			caseLinkExecutor.submit(() -> { long started = System.nanoTime(); try { List<CaseLinkContactOptionDto> caseContacts = caseService == null ? List.of() : caseService.listCaseLinkShareCaseContacts(caseIdSnapshot, tenantId); Platform.runLater(() -> { if (!open.get() || generation != caseLinkDialogLoadGeneration || CaseController.this.caseId == null || caseIdSnapshot != CaseController.this.caseId) { LOG.info("Case Link share modal stale result op=list-case-contacts tenantId={} caseId={} requestId={} rows={} elapsedMs={}", tenantId, caseIdSnapshot, generation, caseContacts.size(), elapsedMs(started)); return; } LOG.info("Case Link share modal load success op=list-case-contacts tenantId={} caseId={} requestId={} rows={} elapsedMs={}", tenantId, caseIdSnapshot, generation, caseContacts.size(), elapsedMs(started)); caseOptions.set(List.copyOf(caseContacts)); renderCaseContactOptions(caseRows, caseOptions.get(), working, refresh[0]); }); } catch (RuntimeException ex) { LOG.warn("Case Link share modal load failure op=list-case-contacts tenantId={} caseId={} requestId={} elapsedMs={}", tenantId, caseIdSnapshot, generation, elapsedMs(started), ex); Platform.runLater(() -> { if (open.get() && generation == caseLinkDialogLoadGeneration) caseRows.getChildren().setAll(new Label("Unable to load Case Contacts.")); }); } });
 			caseLinkExecutor.submit(() -> { long started = System.nanoTime(); try { List<CaseLinkContactOptionDto> all = caseService == null ? List.of() : caseService.listCaseLinkShareContacts(tenantId); Platform.runLater(() -> { if (!open.get() || generation != caseLinkDialogLoadGeneration || CaseController.this.caseId == null || caseIdSnapshot != CaseController.this.caseId) { LOG.info("Case Link share modal stale result op=list-all-contacts tenantId={} caseId={} requestId={} rows={} elapsedMs={}", tenantId, caseIdSnapshot, generation, all.size(), elapsedMs(started)); return; } LOG.info("Case Link share modal load success op=list-all-contacts tenantId={} caseId={} requestId={} rows={} elapsedMs={}", tenantId, caseIdSnapshot, generation, all.size(), elapsedMs(started)); allOptions.setAll(all); allList.setPlaceholder(new Label(all.isEmpty() ? "No available Contacts." : "No Contacts match this search.")); }); } catch (RuntimeException ex) { LOG.warn("Case Link share modal load failure op=list-all-contacts tenantId={} caseId={} requestId={} elapsedMs={}", tenantId, caseIdSnapshot, generation, elapsedMs(started), ex); Platform.runLater(() -> { if (open.get() && generation == caseLinkDialogLoadGeneration) allList.setPlaceholder(new Label("Unable to load All Contacts.")); }); } });
 			dialog.setResultConverter(button -> button == ButtonType.APPLY ? working.values().stream().map(StagedShare::copy).toList() : null); return dialog.showAndWait();
+		}
+		private void renderCaseContactOptions(FlowPane caseRows, List<CaseLinkContactOptionDto> options, Map<Integer, StagedShare> working, Runnable refresh) {
+			caseRows.getChildren().clear();
+			if (options == null || options.isEmpty()) {
+				Label empty = new Label("No available Case Contacts.");
+				empty.getStyleClass().add("search-summary-text");
+				caseRows.getChildren().add(empty);
+				return;
+			}
+			for (CaseLinkContactOptionDto option : options) {
+				boolean selected = working.containsKey(option.contactId()) && !working.get(option.contactId()).removed;
+				caseRows.getChildren().add(createSelectableContactCard(option, selected, () -> { toggleWorking(working, option); refresh.run(); }, false));
+			}
+		}
+		private Node createSelectableContactCard(CaseLinkContactOptionDto option, boolean selected, Runnable toggle, boolean cell) {
+			ContactCardFactory factory = new ContactCardFactory(id -> { });
+			ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(option.contactId(), option.displayName(), null, null, null), ContactCardFactory.Variant.MINI);
+			card.setInteractive(false);
+			card.getStyleClass().addAll("shale-entity-card-selectable", "case-link-selectable-contact-card");
+			if (selected) card.getStyleClass().add("case-link-selectable-contact-card-selected");
+			card.setAccessibleText((selected ? "Selected " : "Not selected ") + option.displayName());
+			Label check = new Label(selected ? "✓" : "");
+			check.getStyleClass().add("case-link-selection-checkmark");
+			StackPane wrapper = new StackPane(card, check);
+			wrapper.getStyleClass().add("case-link-selectable-contact-wrapper");
+			if (selected) wrapper.getStyleClass().add("case-link-selectable-contact-wrapper-selected");
+			wrapper.setFocusTraversable(!cell);
+			wrapper.setAccessibleText((selected ? "Selected " : "Not selected ") + option.displayName());
+			StackPane.setAlignment(check, Pos.TOP_RIGHT);
+			wrapper.setOnMouseClicked(e -> { toggle.run(); e.consume(); });
+			wrapper.setOnKeyPressed(e -> { if (e.getCode() == javafx.scene.input.KeyCode.SPACE || e.getCode() == javafx.scene.input.KeyCode.ENTER) { toggle.run(); e.consume(); } });
+			return wrapper;
 		}
 		private void toggleWorking(Map<Integer, StagedShare> working, CaseLinkContactOptionDto option) { StagedShare existing = working.get(option.contactId()); if (existing != null && !existing.removed) { if (existing.shareId > 0) existing.removed = true; else working.remove(option.contactId()); return; } if (existing != null) { existing.removed = false; return; } working.put(option.contactId(), StagedShare.newShare(option.contactId(), option.displayName(), LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES), null)); }
 	}
