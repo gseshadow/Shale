@@ -57,6 +57,7 @@ public final class CaseDao {
 	private static final String STATUSES_TABLE = "Statuses";
 	// CaseUsers.RoleId (int) for Responsible Attorney
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
+	private static final int ROLE_LEGAL_ASSISTANT = RoleSemantics.ROLE_LEGAL_ASSISTANT;
 	private static final String PARTY_ROLE_NAME_CALLER = "caller";
 	private static final String PARTY_ROLE_NAME_PARTY = "party";
 	private static final String PARTY_ROLE_NAME_COUNSEL = "counsel";
@@ -2196,7 +2197,96 @@ public final class CaseDao {
 			String counselRolePredicate = hasPartyRoleSystemKey
 					? "(LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'counsel' OR LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel')"
 					: "LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'";
-			String sql = """
+			String caseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "cu");
+			String legalAssistantCaseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "pla_cu");
+			String userActiveFilter = activeFilter(resolveUsersDeletedColumn(con), "u");
+			String legalAssistantUserActiveFilter = activeFilter(resolveUsersDeletedColumn(con), "pla_user");
+			String sql = buildOverviewSql(
+					caseUserActiveFilter,
+					userActiveFilter,
+					legalAssistantUserActiveFilter,
+					legalAssistantCaseUserActiveFilter,
+					callerRolePredicate,
+					counselRolePredicate,
+					activeFilter(schema.deletedColumn(), "c"));
+			System.err.println("[GET_OVERVIEW SQL]\n" + sql);
+			logGetOverviewTenantColumnMetadata(con);
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, ROLE_LEGAL_ASSISTANT);
+				ps.setLong(idx++, caseId);
+
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next())
+						return null;
+					List<String> team = loadTeamMembers(con, caseId);
+					List<com.shale.core.dto.CaseOverviewDto.ContactSummary> clients = listCasePartiesContactsByRoleAndSide(con, caseId, PARTY_ROLE_NAME_PARTY, PARTY_SIDE_KEY_REPRESENTED);
+					Integer primaryClientContactId = clients.isEmpty() ? null : clients.get(0).contactId();
+					String primaryClientName = clients.isEmpty() ? null : clients.get(0).displayName();
+					return new com.shale.core.dto.CaseOverviewDto(
+							rs.getLong("Id"),
+							rs.getString("CaseNumber"),
+							rs.getString("Name"),
+							rs.getString("CurrentStatusName"),
+							getNullableInt(rs, "PrimaryStatusId"),
+							rs.getString("PrimaryStatusColor"),
+							getNullableInt(rs, "ResponsibleAttorneyUserId"),
+							rs.getString("ResponsibleAttorneyName"),
+							rs.getString("ResponsibleAttorneyColor"),
+							getNullableInt(rs, "PrimaryLegalAssistantUserId"),
+							rs.getString("PrimaryLegalAssistantName"),
+							rs.getString("PrimaryLegalAssistantColor"),
+							getNullableInt(rs, "PracticeAreaId"),
+							rs.getString("PracticeAreaName"),
+							rs.getString("PracticeAreaColor"),
+							toLocalDate(rs.getDate("CallerDate")),
+							toLocalDate(rs.getDate("DateOfInjury")),
+							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							toLocalDate(rs.getDate("TortNoticeDeadline")),
+							getNullableInt(rs, "PrimaryCallerContactId"),
+							primaryClientContactId,
+							getNullableInt(rs, "PrimaryOpposingCounselContactId"),
+							rs.getString("CallerName"),
+							primaryClientName,
+							clients,
+							rs.getString("OpposingCounselName"),
+							team,
+							rs.getString("Description")
+					);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load case overview (caseId=" + caseId + ")", e);
+		}
+	}
+
+
+	private static void logGetOverviewTenantColumnMetadata(Connection con) throws SQLException {
+		String metadataSql = """
+				SELECT DB_NAME() AS DatabaseName,
+				       COL_LENGTH('dbo.Cases','ShaleClientId') AS CasesShaleClientIdLength,
+				       COL_LENGTH('dbo.Users','ShaleClientId') AS UsersShaleClientIdLength
+				""";
+		try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery(metadataSql)) {
+			if (rs.next()) {
+				System.err.println("[GET_OVERVIEW METADATA] DB_NAME=" + rs.getString("DatabaseName")
+						+ " dbo.Cases.ShaleClientId.COL_LENGTH=" + rs.getObject("CasesShaleClientIdLength")
+						+ " dbo.Users.ShaleClientId.COL_LENGTH=" + rs.getObject("UsersShaleClientIdLength"));
+			}
+		}
+	}
+
+	static String buildOverviewSql(
+			String caseUserActiveFilter,
+			String userActiveFilter,
+			String legalAssistantUserActiveFilter,
+			String legalAssistantCaseUserActiveFilter,
+			String callerRolePredicate,
+			String counselRolePredicate,
+			String caseActiveFilter) {
+		return """
 					SELECT
 					  c.Id,
 					  c.Name,
@@ -2220,6 +2310,14 @@ public final class CaseDao {
 					    COALESCE(u.name_last, '')
 					  )) AS ResponsibleAttorneyName,
 
+					  primary_legal_assistant.UserId AS PrimaryLegalAssistantUserId,
+					  pla_user.color AS PrimaryLegalAssistantColor,
+					  LTRIM(RTRIM(
+					    COALESCE(pla_user.name_first, '') +
+					    CASE WHEN COALESCE(pla_user.name_first, '') = '' OR COALESCE(pla_user.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(pla_user.name_last, '')
+					  )) AS PrimaryLegalAssistantName,
+
 					  current_status.CurrentStatusName,
 					  current_status.PrimaryStatusId,
 					  current_status.PrimaryStatusColor,
@@ -2230,24 +2328,44 @@ public final class CaseDao {
 					  oppContact.PrimaryOpposingCounselContactId,
 					  oppContact.FullName AS OpposingCounselName
 
-					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
+					FROM dbo.Cases c
+					LEFT JOIN dbo.PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
+					    FROM dbo.CaseUsers cu
 					    WHERE cu.CaseId = c.Id
 					      AND cu.RoleId = ?
 					      AND cu.IsPrimary = 1
+					      AND %s
 					    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
 					) ra
-					LEFT JOIN %s u ON u.id = ra.UserId
+					LEFT JOIN dbo.Users u ON u.id = ra.UserId
+					 AND u.ShaleClientId = c.ShaleClientId
+					 AND %s
+					OUTER APPLY (
+					    SELECT TOP (1) pla_cu.UserId
+					    FROM dbo.CaseUsers pla_cu
+					    INNER JOIN dbo.Users pla_user
+					      ON pla_user.id = pla_cu.UserId
+					     AND pla_user.ShaleClientId = c.ShaleClientId
+					     AND %s
+					    WHERE pla_cu.CaseId = c.Id
+					      AND pla_cu.RoleId = ?
+					      AND pla_cu.IsPrimary = 1
+					      AND %s
+					    ORDER BY pla_cu.UpdatedAt DESC, pla_cu.CreatedAt DESC, pla_cu.Id DESC
+					) primary_legal_assistant
+					LEFT JOIN dbo.Users pla_user
+					  ON pla_user.id = primary_legal_assistant.UserId
+					 AND pla_user.ShaleClientId = c.ShaleClientId
+					 AND %s
 					OUTER APPLY (
 					    SELECT TOP (1)
 					      s.Id    AS PrimaryStatusId,
 					      s.Color AS PrimaryStatusColor,
 					      s.Name  AS CurrentStatusName
-					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    FROM dbo.CaseStatuses cs
+					    INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
 					    ORDER BY
 					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
@@ -2270,7 +2388,7 @@ public final class CaseDao {
 					      END AS CallerName
 					    FROM dbo.CaseParties cp
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
 					      AND %s
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
@@ -2293,7 +2411,7 @@ public final class CaseDao {
 					      END AS FullName
 					    FROM dbo.CaseParties cp
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
 					      AND %s
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = '%s'
@@ -2305,60 +2423,15 @@ public final class CaseDao {
 					WHERE c.Id = ?
 					  AND %s;
 					""".formatted(
-							CASES_TABLE,
-							CASE_USERS_TABLE,
-							USERS_TABLE,
-								CASE_STATUSES_TABLE,
-								STATUSES_TABLE,
-								callerRolePredicate,
-								counselRolePredicate,
-								PARTY_SIDE_KEY_OPPOSING,
-								activeFilter(schema.deletedColumn(), "c"));
-
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				int idx = 1;
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setLong(idx++, caseId);
-
-				try (ResultSet rs = ps.executeQuery()) {
-					if (!rs.next())
-						return null;
-					List<String> team = loadTeamMembers(con, caseId);
-					List<com.shale.core.dto.CaseOverviewDto.ContactSummary> clients = listCasePartiesContactsByRoleAndSide(con, caseId, PARTY_ROLE_NAME_PARTY, PARTY_SIDE_KEY_REPRESENTED);
-					Integer primaryClientContactId = clients.isEmpty() ? null : clients.get(0).contactId();
-					String primaryClientName = clients.isEmpty() ? null : clients.get(0).displayName();
-					return new com.shale.core.dto.CaseOverviewDto(
-							rs.getLong("Id"),
-							rs.getString("CaseNumber"),
-							rs.getString("Name"),
-							rs.getString("CurrentStatusName"),
-							getNullableInt(rs, "PrimaryStatusId"),
-							rs.getString("PrimaryStatusColor"),
-							getNullableInt(rs, "ResponsibleAttorneyUserId"),
-							rs.getString("ResponsibleAttorneyName"),
-							rs.getString("ResponsibleAttorneyColor"),
-							getNullableInt(rs, "PracticeAreaId"),
-							rs.getString("PracticeAreaName"),
-							rs.getString("PracticeAreaColor"),
-							toLocalDate(rs.getDate("CallerDate")),
-							toLocalDate(rs.getDate("DateOfInjury")),
-							toLocalDate(rs.getDate("StatuteOfLimitations")),
-							toLocalDate(rs.getDate("TortNoticeDeadline")),
-							getNullableInt(rs, "PrimaryCallerContactId"),
-							primaryClientContactId,
-							getNullableInt(rs, "PrimaryOpposingCounselContactId"),
-							rs.getString("CallerName"),
-							primaryClientName,
-							clients,
-							rs.getString("OpposingCounselName"),
-							team,
-							rs.getString("Description")
-					);
-				}
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to load case overview (caseId=" + caseId + ")", e);
-		}
+							caseUserActiveFilter,
+							userActiveFilter,
+							legalAssistantUserActiveFilter,
+							legalAssistantCaseUserActiveFilter,
+							legalAssistantUserActiveFilter,
+							callerRolePredicate,
+							counselRolePredicate,
+							PARTY_SIDE_KEY_OPPOSING,
+							caseActiveFilter);
 	}
 
 	private List<com.shale.core.dto.CaseOverviewDto.ContactSummary> listCasePartiesContactsByRoleAndSide(
