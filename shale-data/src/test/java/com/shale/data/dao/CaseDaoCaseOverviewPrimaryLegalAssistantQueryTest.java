@@ -142,6 +142,36 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
         assertFalse(method.contains("ROLE_RESPONSIBLE_ATTORNEY"), "Responsible Attorney assignments must be untouched");
     }
 
+    @Test
+    void removePrimaryLegalAssistantDeletesOnlyPrimaryLegalAssistantRowsTransactionallyAndTouchesCase() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String method = method(source, "public void removePrimaryLegalAssistant", "public record UserRow");
+        assertTrue(method.contains("con.setAutoCommit(false)"));
+        assertTrue(method.contains("con.rollback()"));
+        assertTrue(method.contains("con.commit()"));
+        assertTrue(method.contains("FROM dbo.Cases c"));
+        assertTrue(method.contains("c.ShaleClientId = ?"));
+        assertTrue(method.contains("DELETE FROM dbo.CaseUsers"), "CaseUsers removal should follow the physical-delete convention used by the Team editor");
+        assertTrue(method.contains("WHERE CaseId = ?"));
+        assertTrue(method.contains("AND RoleId = ?"));
+        assertTrue(method.contains("AND IsPrimary = 1"));
+        assertTrue(method.contains("ps.setInt(2, ROLE_LEGAL_ASSISTANT)"));
+        assertTrue(method.contains("touchCaseUpdatedAt(con, caseId, shaleClientId)"));
+        assertFalse(method.contains("ROLE_RESPONSIBLE_ATTORNEY"), "Responsible Attorney assignments must never be targeted by removal");
+        assertFalse(method.contains("UserId ="), "Removal should clear all bad duplicate primary Legal Assistant rows regardless of user");
+        assertFalse(method.contains("CaseUsers.ShaleClientId"));
+        assertFalse(method.contains("CaseUsers.IsActive"));
+        assertFalse(method.contains("CaseUsers.IsDeleted"));
+    }
+
+    @Test
+    void noUnsupportedCaseUsersColumnsAreIntroducedAnywhereInCaseDao() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        assertFalse(source.contains("CaseUsers.ShaleClientId"));
+        assertFalse(source.contains("CaseUsers.IsActive"));
+        assertFalse(source.contains("CaseUsers.IsDeleted"));
+    }
+
     private static String renderedFromJoin(String sql) {
         StringBuilder out = new StringBuilder("Rendered FROM/JOIN clauses:\n");
         for (String line : sql.split("\n")) {
