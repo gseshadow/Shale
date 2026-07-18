@@ -296,6 +296,8 @@ public class CaseController {
 	private StackPane ovPrimaryLegalAssistantHost;
 	@FXML
 	private Button changeResponsibleAttorneyButton;
+	@FXML
+	private Button changePrimaryLegalAssistantButton;
 
 	@FXML
 	private Button changeCallerButton;
@@ -909,6 +911,8 @@ public class CaseController {
 
 		if (changeResponsibleAttorneyButton != null)
 			changeResponsibleAttorneyButton.setOnAction(e -> onEditResponsibleAttorneyField());
+		if (changePrimaryLegalAssistantButton != null)
+			changePrimaryLegalAssistantButton.setOnAction(e -> onEditPrimaryLegalAssistantField());
 		if (editCaseNameButton != null)
 			editCaseNameButton.setOnAction(e -> onEditCaseNameField());
 		if (editCaseNumberButton != null)
@@ -4575,6 +4579,8 @@ public class CaseController {
 				changePracticeAreaButton.setDisable(busy);
 			if (changeResponsibleAttorneyButton != null)
 				changeResponsibleAttorneyButton.setDisable(busy);
+			if (changePrimaryLegalAssistantButton != null)
+				changePrimaryLegalAssistantButton.setDisable(busy);
 			if (editCaseNameButton != null)
 				editCaseNameButton.setDisable(busy);
 			if (editCaseNumberButton != null)
@@ -5114,6 +5120,24 @@ public class CaseController {
 				changeResponsibleAttorneyButton).map(options::get).ifPresent(row -> saveResponsibleAttorneyField(row.id()));
 	}
 
+	private void onEditPrimaryLegalAssistantField() {
+		if (!ensureTenantAndCaseForFieldDialog("primary legal assistant"))
+			return;
+		int tenantId = appState.getShaleClientId();
+		List<CaseDao.UserRow> users = caseDao.listUsersForTenant(tenantId);
+		Map<String, CaseDao.UserRow> options = new LinkedHashMap<>();
+		for (CaseDao.UserRow row : users) {
+			options.put(safeText(row.displayName()).isBlank() ? "User #" + row.id() : row.displayName(), row);
+		}
+		showChoiceFieldDialog(
+				"Edit primary legal assistant",
+				"Primary legal assistant",
+				currentOverview == null ? "—" : safeText(currentOverview.getPrimaryLegalAssistant()),
+				currentOverview == null ? null : currentOverview.getPrimaryLegalAssistant(),
+				options.keySet(),
+				changePrimaryLegalAssistantButton).map(options::get).ifPresent(row -> savePrimaryLegalAssistantField(row.id()));
+	}
+
 	private Optional<String> showChoiceFieldDialog(String title, String fieldLabel, String currentValue, String selectedValue, java.util.Collection<String> options,
 			Button ownerButton) {
 		Dialog<String> dialog = new Dialog<>();
@@ -5234,6 +5258,30 @@ public class CaseController {
 				});
 			}
 		}, "case-responsible-attorney-field-save-" + activeCaseId).start();
+	}
+
+	private void savePrimaryLegalAssistantField(int userId) {
+		long activeCaseId = caseId.longValue();
+		setBusy(true);
+		new Thread(() ->
+		{
+			try {
+				caseDao.setPrimaryLegalAssistant(activeCaseId, appState.getShaleClientId(), userId);
+				addTeamChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId());
+				runOnFx(() ->
+				{
+					setBusy(false);
+					publishCaseFieldUpdated(activeCaseId, "primaryLegalAssistantUserId", userId);
+					reloadCurrentCaseForViewMode();
+				});
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					setBusy(false);
+					showError("Failed to save primary legal assistant. " + ex.getMessage());
+				});
+			}
+		}, "case-primary-legal-assistant-field-save-" + activeCaseId).start();
 	}
 
 	private void onChangeResponsibleAttorney() {
@@ -6844,6 +6892,7 @@ public class CaseController {
 				hideRemoteUpdateBanner();
 
 			setVisibleManaged(changeResponsibleAttorneyButton, true);
+			setVisibleManaged(changePrimaryLegalAssistantButton, true);
 			setVisibleManaged(changeStatusButton, true);
 			setVisibleManaged(changeCallerButton, false);
 			setVisibleManaged(changeClientButton, false);

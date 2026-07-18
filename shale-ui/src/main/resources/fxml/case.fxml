@@ -215,6 +215,7 @@
 
 								<Label text="Primary legal assistant" styleClass="case-overview-row-label" GridPane.rowIndex="10" GridPane.columnIndex="0" />
 								<StackPane fx:id="ovPrimaryLegalAssistantHost" styleClass="case-overview-row-value-host" GridPane.rowIndex="10" GridPane.columnIndex="1" />
+								<Button fx:id="changePrimaryLegalAssistantButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="10" GridPane.columnIndex="2" />
 
 								<Label text="Description" styleClass="case-overview-row-label" GridPane.rowIndex="11" GridPane.columnIndex="0" />
 								<Label fx:id="ovDescriptionValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="11" GridPane.columnIndex="1" />
