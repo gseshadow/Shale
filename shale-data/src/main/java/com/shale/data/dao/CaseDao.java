@@ -2938,21 +2938,21 @@ public final class CaseDao {
 					: "\n AND " + activeFilter(userDeletedColumn, "u");
 			String sql = """
 					SELECT TOP (?)
-					  cu.Id,
-					  cu.CaseId,
+					  caseUpdate.Id,
+					  caseUpdate.CaseId,
 					  c.Name AS CaseName,
-					  cu.NoteText,
-					  cu.CreatedAt,
-					  cu.CreatedByUserId,
+					  caseUpdate.NoteText,
+					  caseUpdate.CreatedAt,
+					  caseUpdate.CreatedByUserId,
 					  LTRIM(RTRIM(
 					    COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
 					    COALESCE(u.name_last, '')
 					  )) AS CreatedByDisplayName
-					FROM dbo.CaseUpdates cu
+					FROM dbo.CaseUpdates caseUpdate
 					JOIN dbo.Cases c
-					  ON c.Id = cu.CaseId
-					 AND c.ShaleClientId = cu.ShaleClientId
+					  ON c.Id = caseUpdate.CaseId
+					 AND c.ShaleClientId = caseUpdate.ShaleClientId
 					JOIN (
 					  SELECT DISTINCT caseUser.CaseId
 					  FROM dbo.CaseUsers caseUser
@@ -2961,14 +2961,14 @@ public final class CaseDao {
 					) assignedCase
 					  ON assignedCase.CaseId = c.Id
 					LEFT JOIN dbo.Users u
-					  ON u.Id = cu.CreatedByUserId
-					 AND u.ShaleClientId = cu.ShaleClientId%s
+					  ON u.Id = caseUpdate.CreatedByUserId
+					 AND u.ShaleClientId = caseUpdate.ShaleClientId%s
 					WHERE c.ShaleClientId = ?
-					  AND cu.ShaleClientId = ?
+					  AND caseUpdate.ShaleClientId = ?
 					  AND %s
-					  AND ISNULL(cu.IsDeleted, 0) = 0
-					  AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-					ORDER BY cu.CreatedAt DESC, cu.Id DESC;
+					  AND ISNULL(caseUpdate.IsDeleted, 0) = 0
+					  AND NULLIF(LTRIM(RTRIM(caseUpdate.NoteText)), '') IS NOT NULL
+					ORDER BY caseUpdate.CreatedAt DESC, caseUpdate.Id DESC;
 					""".formatted(caseUserActiveFilter, userDeletedPredicate, activeFilter(schema.deletedColumn(), "c"));
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -3009,7 +3009,7 @@ public final class CaseDao {
 	}
 
 	private List<CaseUpdateDto> listCaseUpdatesInternal(long caseId, Integer shaleClientId) {
-		String tenantPredicate = shaleClientId == null ? "" : "\n  AND cu.ShaleClientId = ?";
+		String tenantPredicate = shaleClientId == null ? "" : "\n  AND caseUpdate.ShaleClientId = ?";
 		try (Connection con = db.requireConnection()) {
 			String userDeletedColumn = resolveUsersDeletedColumn(con);
 			String userDeletedPredicate = userDeletedColumn == null || userDeletedColumn.isBlank()
@@ -3017,25 +3017,25 @@ public final class CaseDao {
 					: "\n AND " + activeFilter(userDeletedColumn, "u");
 			String sql = """
 					SELECT
-					  cu.Id,
-					  cu.CaseId,
-					  cu.NoteText,
-					  cu.CreatedAt,
-					  cu.UpdatedAt,
-					  cu.CreatedByUserId,
+					  caseUpdate.Id,
+					  caseUpdate.CaseId,
+					  caseUpdate.NoteText,
+					  caseUpdate.CreatedAt,
+					  caseUpdate.UpdatedAt,
+					  caseUpdate.CreatedByUserId,
 					  LTRIM(RTRIM(
 					    COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
 					    COALESCE(u.name_last, '')
 					  )) AS CreatedByDisplayName
-					FROM dbo.CaseUpdates cu
+					FROM dbo.CaseUpdates caseUpdate
 					LEFT JOIN dbo.Users u
-					  ON u.Id = cu.CreatedByUserId
-					 AND u.ShaleClientId = cu.ShaleClientId%s
-					WHERE cu.CaseId = ?%s
-					  AND ISNULL(cu.IsDeleted, 0) = 0
-					  AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-					ORDER BY cu.CreatedAt DESC, cu.Id DESC;
+					  ON u.Id = caseUpdate.CreatedByUserId
+					 AND u.ShaleClientId = caseUpdate.ShaleClientId%s
+					WHERE caseUpdate.CaseId = ?%s
+					  AND ISNULL(caseUpdate.IsDeleted, 0) = 0
+					  AND NULLIF(LTRIM(RTRIM(caseUpdate.NoteText)), '') IS NOT NULL
+					ORDER BY caseUpdate.CreatedAt DESC, caseUpdate.Id DESC;
 					""".formatted(userDeletedPredicate, tenantPredicate);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
