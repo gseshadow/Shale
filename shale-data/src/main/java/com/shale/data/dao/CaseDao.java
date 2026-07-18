@@ -6823,8 +6823,7 @@ public final class CaseDao {
 					  AND c.ShaleClientId = ?
 					  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
 					  AND u.Id = ?
-					  AND (u.IsActive = 1 OR u.IsActive IS NULL)
-					  AND (u.IsDeleted = 0 OR u.IsDeleted IS NULL);
+					  AND COALESCE(u.is_deleted, 0) = 0;
 					""")) {
 				ps.setLong(1, caseId);
 				ps.setInt(2, shaleClientId);

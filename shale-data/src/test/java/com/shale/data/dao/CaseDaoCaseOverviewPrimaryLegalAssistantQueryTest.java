@@ -122,16 +122,23 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
         assertTrue(method.contains("u.ShaleClientId = c.ShaleClientId"));
         assertTrue(method.contains("c.ShaleClientId = ?"));
         assertTrue(method.contains("u.Id = ?"));
-        assertTrue(method.contains("u.IsActive = 1 OR u.IsActive IS NULL"));
-        assertTrue(method.contains("u.IsDeleted = 0 OR u.IsDeleted IS NULL"));
+        assertFalse(method.contains("u.IsActive"));
+        assertFalse(method.contains("u.IsDeleted"));
+        assertTrue(method.contains("COALESCE(u.is_deleted, 0) = 0"));
         assertTrue(method.contains("RoleId = ?"));
         assertTrue(method.contains("AND UserId <> ?"), "Previous primary legal assistants should be demoted");
         assertTrue(method.contains("SET IsPrimary = CAST(1 AS bit)"), "Existing legal assistant assignment should be promoted");
         assertTrue(method.contains("INSERT INTO dbo.CaseUsers (CaseId, UserId, RoleId, IsPrimary"));
         assertTrue(method.contains("touchCaseUpdatedAt(con, caseId, shaleClientId)"));
         assertFalse(method.contains("CaseUsers.ShaleClientId"));
+        assertFalse(method.contains("CaseUsers.IsActive"));
+        assertFalse(method.contains("CaseUsers.IsDeleted"));
         assertFalse(method.contains("cu.ShaleClientId"));
+        assertFalse(method.contains("cu.IsActive"));
+        assertFalse(method.contains("cu.IsDeleted"));
         assertFalse(method.contains("pla_cu.ShaleClientId"));
+        assertFalse(method.contains("pla_cu.IsActive"));
+        assertFalse(method.contains("pla_cu.IsDeleted"));
         assertFalse(method.contains("ROLE_RESPONSIBLE_ATTORNEY"), "Responsible Attorney assignments must be untouched");
     }
 
