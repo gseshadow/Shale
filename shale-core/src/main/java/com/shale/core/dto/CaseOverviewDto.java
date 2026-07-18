@@ -27,6 +27,11 @@ public final class CaseOverviewDto {
 	private final String responsibleAttorney;
 	private final String responsibleAttorneyColor; // NEW (dbo.Users.Color)
 
+	// Primary legal assistant (for UserCard COMPACT + navigation)
+	private final Integer primaryLegalAssistantUserId;
+	private final String primaryLegalAssistant;
+	private final String primaryLegalAssistantColor;
+
 	// Practice Area
 	private final Integer practiceAreaId;
 	private final String practiceArea;
@@ -66,6 +71,10 @@ public final class CaseOverviewDto {
 			String responsibleAttorney,
 			String responsibleAttorneyColor,
 
+			Integer primaryLegalAssistantUserId,
+			String primaryLegalAssistant,
+			String primaryLegalAssistantColor,
+
 			Integer practiceAreaId,
 			String practiceArea,
 			String practiceAreaColor,
@@ -96,6 +105,9 @@ public final class CaseOverviewDto {
 		this.responsibleAttorneyUserId = responsibleAttorneyUserId;
 		this.responsibleAttorney = safe(responsibleAttorney);
 		this.responsibleAttorneyColor = safe(responsibleAttorneyColor);
+		this.primaryLegalAssistantUserId = primaryLegalAssistantUserId;
+		this.primaryLegalAssistant = safe(primaryLegalAssistant);
+		this.primaryLegalAssistantColor = safe(primaryLegalAssistantColor);
 
 		this.practiceAreaId = practiceAreaId;
 		this.practiceArea = safe(practiceArea);
@@ -152,6 +164,18 @@ public final class CaseOverviewDto {
 
 	public String getResponsibleAttorneyColor() {
 		return responsibleAttorneyColor;
+	}
+
+	public Integer getPrimaryLegalAssistantUserId() {
+		return primaryLegalAssistantUserId;
+	}
+
+	public String getPrimaryLegalAssistant() {
+		return primaryLegalAssistant;
+	}
+
+	public String getPrimaryLegalAssistantColor() {
+		return primaryLegalAssistantColor;
 	}
 
 	public Integer getPracticeAreaId() {
