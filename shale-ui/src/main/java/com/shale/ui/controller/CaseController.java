@@ -293,6 +293,8 @@ public class CaseController {
 	@FXML
 	private StackPane ovResponsibleAttorneyHost;
 	@FXML
+	private StackPane ovPrimaryLegalAssistantHost;
+	@FXML
 	private Button changeResponsibleAttorneyButton;
 
 	@FXML
@@ -4356,6 +4358,9 @@ public class CaseController {
 				overview.getResponsibleAttorneyUserId(),
 				overview.getResponsibleAttorney(),
 				overview.getResponsibleAttorneyColor(),
+				overview.getPrimaryLegalAssistantUserId(),
+				overview.getPrimaryLegalAssistant(),
+				overview.getPrimaryLegalAssistantColor(),
 				overview.getPracticeAreaId(),
 				overview.getPracticeArea(),
 				overview.getPracticeAreaColor(),
@@ -6097,6 +6102,24 @@ public class CaseController {
 			ovResponsibleAttorneyHost.getChildren().setAll(userCardFactory.create(model, Variant.COMPACT));
 	}
 
+	private void renderPrimaryLegalAssistantMini(Integer userId, String displayName, String userColorCss) {
+		if (userCardFactory == null) {
+			userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
+			{
+			} : onOpenUser);
+		}
+
+		UserCardModel model = new UserCardModel(
+				userId,
+				(displayName == null || displayName.isBlank()) ? "—" : displayName,
+				userColorCss,
+				null
+		);
+
+		if (ovPrimaryLegalAssistantHost != null)
+			ovPrimaryLegalAssistantHost.getChildren().setAll(userCardFactory.create(model, Variant.COMPACT));
+	}
+
 	private void renderPrimaryStatusMini(Integer statusId, String statusName, String statusColorCss) {
 		if (statusCardFactory == null) {
 			statusCardFactory = new StatusCardFactory(onOpenStatus == null ? id ->
@@ -6423,6 +6446,9 @@ public class CaseController {
 				base.getResponsibleAttorneyUserId(),
 				base.getResponsibleAttorney(),
 				base.getResponsibleAttorneyColor(),
+				base.getPrimaryLegalAssistantUserId(),
+				base.getPrimaryLegalAssistant(),
+				base.getPrimaryLegalAssistantColor(),
 				base.getPracticeAreaId(),
 				base.getPracticeArea(),
 				base.getPracticeAreaColor(),
@@ -6650,6 +6676,8 @@ public class CaseController {
 		private void renderResponsibleAttorney(CaseOverviewDto dto) {
 			renderResponsibleAttorneyMini(dto.getResponsibleAttorneyUserId(), safe(dto.getResponsibleAttorney()),
 					dto.getResponsibleAttorneyColor());
+			renderPrimaryLegalAssistantMini(dto.getPrimaryLegalAssistantUserId(), safe(dto.getPrimaryLegalAssistant()),
+					dto.getPrimaryLegalAssistantColor());
 		}
 
 		private void renderStatus(CaseOverviewDto dto) {
