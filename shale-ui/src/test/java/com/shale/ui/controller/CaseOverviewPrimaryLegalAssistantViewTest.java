@@ -38,6 +38,26 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
         assertTrue(source.contains("dto.getPrimaryLegalAssistantColor()"));
     }
 
+
+    @Test
+    void primaryLegalAssistantEditorUsesResponsibleAttorneyEditPattern() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
+        assertTrue(source.contains("changePrimaryLegalAssistantButton.setOnAction(e -> onEditPrimaryLegalAssistantField())"));
+        assertTrue(source.contains("setVisibleManaged(changePrimaryLegalAssistantButton, true)"));
+        assertTrue(source.contains("changePrimaryLegalAssistantButton.setDisable(busy)"));
+
+        String editor = method(source, "private void onEditPrimaryLegalAssistantField", "private Optional<String> showChoiceFieldDialog");
+        assertTrue(editor.contains("caseDao.listUsersForTenant(tenantId)"));
+        assertTrue(editor.contains("\"Edit primary legal assistant\""));
+        assertTrue(editor.contains("currentOverview.getPrimaryLegalAssistant()"), "Dialog should preselect the current assistant display value");
+        assertTrue(editor.contains("changePrimaryLegalAssistantButton).map(options::get).ifPresent(row -> savePrimaryLegalAssistantField(row.id()))"));
+
+        String saver = method(source, "private void savePrimaryLegalAssistantField", "private void onChangeResponsibleAttorney");
+        assertTrue(saver.contains("caseDao.setPrimaryLegalAssistant(activeCaseId, appState.getShaleClientId(), userId)"));
+        assertTrue(saver.contains("publishCaseFieldUpdated(activeCaseId, \"primaryLegalAssistantUserId\", userId)"));
+        assertTrue(saver.contains("reloadCurrentCaseForViewMode()"), "Overview should refresh after save without navigating away");
+    }
+
     private static String method(String source, String startNeedle, String endNeedle) {
         int start = source.indexOf(startNeedle);
         int end = source.indexOf(endNeedle, start + startNeedle.length());
