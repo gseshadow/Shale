@@ -114,6 +114,11 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
         assertTrue(method.contains("RoleSemantics.ROLE_LEGAL_ASSISTANT") || source.contains("ROLE_LEGAL_ASSISTANT = RoleSemantics.ROLE_LEGAL_ASSISTANT"));
         assertTrue(method.contains("con.setAutoCommit(false)"));
         assertTrue(method.contains("con.rollback()"));
+        assertTrue(method.contains("e.printStackTrace(System.err)"));
+        assertTrue(method.contains("SQLServerException"));
+        assertTrue(method.contains("getSQLServerError()"));
+        assertTrue(method.contains("errorNumber="));
+        assertTrue(method.contains("lineNumber="));
         assertTrue(method.contains("u.ShaleClientId = c.ShaleClientId"));
         assertTrue(method.contains("c.ShaleClientId = ?"));
         assertTrue(method.contains("u.Id = ?"));

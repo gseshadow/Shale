@@ -6882,7 +6882,19 @@ public final class CaseDao {
 			if (con != null) {
 				try { con.rollback(); } catch (SQLException ignored) { }
 			}
-			throw new RuntimeException("Failed to set primary legal assistant (caseId=" + caseId + ", userId=" + userId + ")", e);
+			System.err.println("[PRIMARY_LEGAL_ASSISTANT DAO SQL ERROR] caseId=" + caseId + ", userId=" + userId);
+			e.printStackTrace(System.err);
+			if (e instanceof com.microsoft.sqlserver.jdbc.SQLServerException sqlServerException) {
+				com.microsoft.sqlserver.jdbc.SQLServerError sqlServerError = sqlServerException.getSQLServerError();
+				System.err.println("[PRIMARY_LEGAL_ASSISTANT DAO SQLSERVER] errorNumber="
+						+ (sqlServerError == null ? sqlServerException.getErrorCode() : sqlServerError.getErrorNumber())
+						+ ", state=" + (sqlServerError == null ? sqlServerException.getSQLState() : sqlServerError.getErrorState())
+						+ ", lineNumber=" + (sqlServerError == null ? "unknown" : sqlServerError.getLineNumber())
+						+ ", message=" + sqlServerException.getMessage());
+			}
+			String sqlServerMessage = e.getMessage();
+			throw new RuntimeException("Failed to set primary legal assistant (caseId=" + caseId + ", userId=" + userId
+					+ "): " + (sqlServerMessage == null || sqlServerMessage.isBlank() ? e.getClass().getSimpleName() : sqlServerMessage), e);
 		} finally {
 			if (con != null) {
 				try { con.setAutoCommit(true); } catch (SQLException ignored) { }

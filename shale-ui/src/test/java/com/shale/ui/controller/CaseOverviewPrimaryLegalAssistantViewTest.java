@@ -54,8 +54,14 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
 
         String saver = method(source, "private void savePrimaryLegalAssistantField", "private void onChangeResponsibleAttorney");
         assertTrue(saver.contains("caseDao.setPrimaryLegalAssistant(activeCaseId, appState.getShaleClientId(), userId)"));
+        assertTrue(saver.contains("stage = \"LIVE_PUBLISH\""));
+        assertTrue(saver.contains("logPrimaryLegalAssistantSaveThrowable(\"LIVE_PUBLISH\", publishFailure)"));
+        assertTrue(saver.contains("logPrimaryLegalAssistantSaveThrowable(\"UI_REFRESH\", refreshFailure)"));
+        assertTrue(saver.contains("catch (Throwable ex)"));
         assertTrue(saver.contains("publishCaseFieldUpdated(activeCaseId, \"primaryLegalAssistantUserId\", userId)"));
         assertTrue(saver.contains("reloadCurrentCaseForViewMode()"), "Overview should refresh after save without navigating away");
+        assertTrue(source.contains("[PRIMARY_LEGAL_ASSISTANT SAVE ERROR] stage="));
+        assertTrue(source.contains("throwable.printStackTrace(System.err)"));
     }
 
     private static String method(String source, String startNeedle, String endNeedle) {
