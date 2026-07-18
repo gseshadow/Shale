@@ -2317,6 +2317,7 @@ public final class CaseDao {
 					    SELECT TOP (1) cu.UserId
 					    FROM dbo.CaseUsers cu
 					    WHERE cu.CaseId = c.Id
+					      AND cu.ShaleClientId = c.ShaleClientId
 					      AND cu.RoleId = ?
 					      AND cu.IsPrimary = 1
 					      AND %s
