@@ -2201,7 +2201,92 @@ public final class CaseDao {
 			String legalAssistantCaseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "pla_cu");
 			String userActiveFilter = activeFilter(resolveUsersDeletedColumn(con), "u");
 			String legalAssistantUserActiveFilter = activeFilter(resolveUsersDeletedColumn(con), "pla_user");
-			String sql = """
+			String sql = buildOverviewSql(
+					caseUserActiveFilter,
+					userActiveFilter,
+					legalAssistantUserActiveFilter,
+					legalAssistantCaseUserActiveFilter,
+					callerRolePredicate,
+					counselRolePredicate,
+					activeFilter(schema.deletedColumn(), "c"));
+			System.err.println("[GET_OVERVIEW SQL]\n" + sql);
+			logGetOverviewTenantColumnMetadata(con);
+
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int idx = 1;
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(idx++, ROLE_LEGAL_ASSISTANT);
+				ps.setLong(idx++, caseId);
+
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next())
+						return null;
+					List<String> team = loadTeamMembers(con, caseId);
+					List<com.shale.core.dto.CaseOverviewDto.ContactSummary> clients = listCasePartiesContactsByRoleAndSide(con, caseId, PARTY_ROLE_NAME_PARTY, PARTY_SIDE_KEY_REPRESENTED);
+					Integer primaryClientContactId = clients.isEmpty() ? null : clients.get(0).contactId();
+					String primaryClientName = clients.isEmpty() ? null : clients.get(0).displayName();
+					return new com.shale.core.dto.CaseOverviewDto(
+							rs.getLong("Id"),
+							rs.getString("CaseNumber"),
+							rs.getString("Name"),
+							rs.getString("CurrentStatusName"),
+							getNullableInt(rs, "PrimaryStatusId"),
+							rs.getString("PrimaryStatusColor"),
+							getNullableInt(rs, "ResponsibleAttorneyUserId"),
+							rs.getString("ResponsibleAttorneyName"),
+							rs.getString("ResponsibleAttorneyColor"),
+							getNullableInt(rs, "PrimaryLegalAssistantUserId"),
+							rs.getString("PrimaryLegalAssistantName"),
+							rs.getString("PrimaryLegalAssistantColor"),
+							getNullableInt(rs, "PracticeAreaId"),
+							rs.getString("PracticeAreaName"),
+							rs.getString("PracticeAreaColor"),
+							toLocalDate(rs.getDate("CallerDate")),
+							toLocalDate(rs.getDate("DateOfInjury")),
+							toLocalDate(rs.getDate("StatuteOfLimitations")),
+							toLocalDate(rs.getDate("TortNoticeDeadline")),
+							getNullableInt(rs, "PrimaryCallerContactId"),
+							primaryClientContactId,
+							getNullableInt(rs, "PrimaryOpposingCounselContactId"),
+							rs.getString("CallerName"),
+							primaryClientName,
+							clients,
+							rs.getString("OpposingCounselName"),
+							team,
+							rs.getString("Description")
+					);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load case overview (caseId=" + caseId + ")", e);
+		}
+	}
+
+
+	private static void logGetOverviewTenantColumnMetadata(Connection con) throws SQLException {
+		String metadataSql = """
+				SELECT DB_NAME() AS DatabaseName,
+				       COL_LENGTH('dbo.Cases','ShaleClientId') AS CasesShaleClientIdLength,
+				       COL_LENGTH('dbo.Users','ShaleClientId') AS UsersShaleClientIdLength
+				""";
+		try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery(metadataSql)) {
+			if (rs.next()) {
+				System.err.println("[GET_OVERVIEW METADATA] DB_NAME=" + rs.getString("DatabaseName")
+						+ " dbo.Cases.ShaleClientId.COL_LENGTH=" + rs.getObject("CasesShaleClientIdLength")
+						+ " dbo.Users.ShaleClientId.COL_LENGTH=" + rs.getObject("UsersShaleClientIdLength"));
+			}
+		}
+	}
+
+	static String buildOverviewSql(
+			String caseUserActiveFilter,
+			String userActiveFilter,
+			String legalAssistantUserActiveFilter,
+			String legalAssistantCaseUserActiveFilter,
+			String callerRolePredicate,
+			String counselRolePredicate,
+			String caseActiveFilter) {
+		return """
 					SELECT
 					  c.Id,
 					  c.Name,
@@ -2347,56 +2432,7 @@ public final class CaseDao {
 							callerRolePredicate,
 							counselRolePredicate,
 							PARTY_SIDE_KEY_OPPOSING,
-							activeFilter(schema.deletedColumn(), "c"));
-
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				int idx = 1;
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setInt(idx++, ROLE_LEGAL_ASSISTANT);
-				ps.setLong(idx++, caseId);
-
-				try (ResultSet rs = ps.executeQuery()) {
-					if (!rs.next())
-						return null;
-					List<String> team = loadTeamMembers(con, caseId);
-					List<com.shale.core.dto.CaseOverviewDto.ContactSummary> clients = listCasePartiesContactsByRoleAndSide(con, caseId, PARTY_ROLE_NAME_PARTY, PARTY_SIDE_KEY_REPRESENTED);
-					Integer primaryClientContactId = clients.isEmpty() ? null : clients.get(0).contactId();
-					String primaryClientName = clients.isEmpty() ? null : clients.get(0).displayName();
-					return new com.shale.core.dto.CaseOverviewDto(
-							rs.getLong("Id"),
-							rs.getString("CaseNumber"),
-							rs.getString("Name"),
-							rs.getString("CurrentStatusName"),
-							getNullableInt(rs, "PrimaryStatusId"),
-							rs.getString("PrimaryStatusColor"),
-							getNullableInt(rs, "ResponsibleAttorneyUserId"),
-							rs.getString("ResponsibleAttorneyName"),
-							rs.getString("ResponsibleAttorneyColor"),
-							getNullableInt(rs, "PrimaryLegalAssistantUserId"),
-							rs.getString("PrimaryLegalAssistantName"),
-							rs.getString("PrimaryLegalAssistantColor"),
-							getNullableInt(rs, "PracticeAreaId"),
-							rs.getString("PracticeAreaName"),
-							rs.getString("PracticeAreaColor"),
-							toLocalDate(rs.getDate("CallerDate")),
-							toLocalDate(rs.getDate("DateOfInjury")),
-							toLocalDate(rs.getDate("StatuteOfLimitations")),
-							toLocalDate(rs.getDate("TortNoticeDeadline")),
-							getNullableInt(rs, "PrimaryCallerContactId"),
-							primaryClientContactId,
-							getNullableInt(rs, "PrimaryOpposingCounselContactId"),
-							rs.getString("CallerName"),
-							primaryClientName,
-							clients,
-							rs.getString("OpposingCounselName"),
-							team,
-							rs.getString("Description")
-					);
-				}
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to load case overview (caseId=" + caseId + ")", e);
-		}
+							caseActiveFilter);
 	}
 
 	private List<com.shale.core.dto.CaseOverviewDto.ContactSummary> listCasePartiesContactsByRoleAndSide(

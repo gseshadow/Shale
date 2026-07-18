@@ -82,6 +82,40 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
                 "Bad duplicate primary data should still render one deterministic assignment using the existing primary-assignment ordering convention; duplicates remain a data-integrity concern.");
     }
 
+    @Test
+    void overviewProductionSqlBuilderRendersExpectedAliasTablesAndParameterShape() {
+        String sql = CaseDao.buildOverviewSql(
+                "(cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)",
+                "(u.IsDeleted = 0 OR u.IsDeleted IS NULL)",
+                "(pla_user.IsDeleted = 0 OR pla_user.IsDeleted IS NULL)",
+                "(pla_cu.IsDeleted = 0 OR pla_cu.IsDeleted IS NULL)",
+                "LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'caller'",
+                "LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'counsel'",
+                "(c.IsDeleted = 0 OR c.IsDeleted IS NULL)");
+
+        assertTrue(sql.contains("FROM dbo.Cases c"), renderedFromJoin(sql));
+        assertTrue(sql.contains("LEFT JOIN dbo.Users u ON u.id = ra.UserId"), renderedFromJoin(sql));
+        assertTrue(sql.contains("INNER JOIN dbo.Users pla_user"), renderedFromJoin(sql));
+        assertTrue(sql.contains("LEFT JOIN dbo.Users pla_user"), renderedFromJoin(sql));
+        assertTrue(!sql.contains("%s"), "Production SQL builder should return the fully formatted SQL string");
+        assertTrue(!sql.contains("cu.ShaleClientId"), renderedFromJoin(sql));
+        assertTrue(!sql.contains("pla_cu.ShaleClientId"), renderedFromJoin(sql));
+        assertTrue(!sql.contains("cs.ShaleClientId"), renderedFromJoin(sql));
+        assertTrue(!sql.contains("cp.ShaleClientId"), renderedFromJoin(sql));
+        assertTrue(sql.contains("WHERE c.Id = ?"), "caseId placeholder should remain in final prepared SQL");
+    }
+
+    private static String renderedFromJoin(String sql) {
+        StringBuilder out = new StringBuilder("Rendered FROM/JOIN clauses:\n");
+        for (String line : sql.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("FROM ") || trimmed.startsWith("LEFT JOIN ") || trimmed.startsWith("INNER JOIN ")) {
+                out.append(trimmed).append('\n');
+            }
+        }
+        return out.toString();
+    }
+
     private static String method(String source, String startNeedle, String endNeedle) {
         int start = source.indexOf(startNeedle);
         int end = source.indexOf(endNeedle, start + startNeedle.length());
