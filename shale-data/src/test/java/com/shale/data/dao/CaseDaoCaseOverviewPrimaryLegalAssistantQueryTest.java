@@ -106,6 +106,35 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
         assertTrue(sql.contains("WHERE c.Id = ?"), "caseId placeholder should remain in final prepared SQL");
     }
 
+
+    @Test
+    void primaryLegalAssistantMutationPromotesDemotesAndPreservesTenantBoundaries() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String method = method(source, "public void setPrimaryLegalAssistant", "public record UserRow");
+        assertTrue(method.contains("RoleSemantics.ROLE_LEGAL_ASSISTANT") || source.contains("ROLE_LEGAL_ASSISTANT = RoleSemantics.ROLE_LEGAL_ASSISTANT"));
+        assertTrue(method.contains("con.setAutoCommit(false)"));
+        assertTrue(method.contains("con.rollback()"));
+        assertTrue(method.contains("e.printStackTrace(System.err)"));
+        assertTrue(method.contains("SQLServerException"));
+        assertTrue(method.contains("getSQLServerError()"));
+        assertTrue(method.contains("errorNumber="));
+        assertTrue(method.contains("lineNumber="));
+        assertTrue(method.contains("u.ShaleClientId = c.ShaleClientId"));
+        assertTrue(method.contains("c.ShaleClientId = ?"));
+        assertTrue(method.contains("u.Id = ?"));
+        assertTrue(method.contains("u.IsActive = 1 OR u.IsActive IS NULL"));
+        assertTrue(method.contains("u.IsDeleted = 0 OR u.IsDeleted IS NULL"));
+        assertTrue(method.contains("RoleId = ?"));
+        assertTrue(method.contains("AND UserId <> ?"), "Previous primary legal assistants should be demoted");
+        assertTrue(method.contains("SET IsPrimary = CAST(1 AS bit)"), "Existing legal assistant assignment should be promoted");
+        assertTrue(method.contains("INSERT INTO dbo.CaseUsers (CaseId, UserId, RoleId, IsPrimary"));
+        assertTrue(method.contains("touchCaseUpdatedAt(con, caseId, shaleClientId)"));
+        assertFalse(method.contains("CaseUsers.ShaleClientId"));
+        assertFalse(method.contains("cu.ShaleClientId"));
+        assertFalse(method.contains("pla_cu.ShaleClientId"));
+        assertFalse(method.contains("ROLE_RESPONSIBLE_ATTORNEY"), "Responsible Attorney assignments must be untouched");
+    }
+
     private static String renderedFromJoin(String sql) {
         StringBuilder out = new StringBuilder("Rendered FROM/JOIN clauses:\n");
         for (String line : sql.split("\n")) {
