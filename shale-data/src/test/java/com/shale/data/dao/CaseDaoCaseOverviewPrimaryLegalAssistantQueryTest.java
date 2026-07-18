@@ -44,6 +44,22 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
     }
 
     @Test
+    void overviewShaleClientIdAliasesResolveOnlyToTablesThatOwnTenantColumn() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String overview = method(source, "public com.shale.core.dto.CaseOverviewDto getOverview", "private List<com.shale.core.dto.CaseOverviewDto.ContactSummary>");
+
+        assertTrue(overview.contains("FROM dbo.Cases c"), "Alias c must resolve to dbo.Cases, which owns ShaleClientId");
+        assertTrue(overview.contains("LEFT JOIN dbo.Users u ON u.id = ra.UserId"), "Alias u must resolve to dbo.Users, which owns ShaleClientId");
+        assertTrue(overview.contains("INNER JOIN dbo.Users pla_user"), "Apply alias pla_user must resolve to dbo.Users, which owns ShaleClientId");
+        assertTrue(overview.contains("LEFT JOIN dbo.Users pla_user"), "Outer alias pla_user must resolve to dbo.Users, which owns ShaleClientId");
+
+        assertTrue(!overview.contains("cu.ShaleClientId"), "dbo.CaseUsers does not own ShaleClientId");
+        assertTrue(!overview.contains("pla_cu.ShaleClientId"), "dbo.CaseUsers does not own ShaleClientId");
+        assertTrue(!overview.contains("cs.ShaleClientId"), "dbo.CaseStatuses should not be tenant-filtered by a direct ShaleClientId reference in getOverview");
+        assertTrue(!overview.contains("cp.ShaleClientId"), "dbo.CaseParties should not be tenant-filtered by a direct ShaleClientId reference in getOverview");
+    }
+
+    @Test
     void overviewSelectKeepsExpectedParameterOrdering() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String overview = method(source, "public com.shale.core.dto.CaseOverviewDto getOverview", "private List<com.shale.core.dto.CaseOverviewDto.ContactSummary>");

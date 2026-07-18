@@ -2243,11 +2243,11 @@ public final class CaseDao {
 					  oppContact.PrimaryOpposingCounselContactId,
 					  oppContact.FullName AS OpposingCounselName
 
-					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
+					FROM dbo.Cases c
+					LEFT JOIN dbo.PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
+					    FROM dbo.CaseUsers cu
 					    WHERE cu.CaseId = c.Id
 					      AND cu.ShaleClientId = c.ShaleClientId
 					      AND cu.RoleId = ?
@@ -2255,13 +2255,13 @@ public final class CaseDao {
 					      AND %s
 					    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
 					) ra
-					LEFT JOIN %s u ON u.id = ra.UserId
+					LEFT JOIN dbo.Users u ON u.id = ra.UserId
 					 AND u.ShaleClientId = c.ShaleClientId
 					 AND %s
 					OUTER APPLY (
 					    SELECT TOP (1) pla_cu.UserId
-					    FROM %s pla_cu
-					    INNER JOIN %s pla_user
+					    FROM dbo.CaseUsers pla_cu
+					    INNER JOIN dbo.Users pla_user
 					      ON pla_user.id = pla_cu.UserId
 					     AND pla_user.ShaleClientId = c.ShaleClientId
 					     AND %s
@@ -2271,7 +2271,7 @@ public final class CaseDao {
 					      AND %s
 					    ORDER BY pla_cu.UpdatedAt DESC, pla_cu.CreatedAt DESC, pla_cu.Id DESC
 					) primary_legal_assistant
-					LEFT JOIN %s pla_user
+					LEFT JOIN dbo.Users pla_user
 					  ON pla_user.id = primary_legal_assistant.UserId
 					 AND pla_user.ShaleClientId = c.ShaleClientId
 					 AND %s
@@ -2280,8 +2280,8 @@ public final class CaseDao {
 					      s.Id    AS PrimaryStatusId,
 					      s.Color AS PrimaryStatusColor,
 					      s.Name  AS CurrentStatusName
-					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    FROM dbo.CaseStatuses cs
+					    INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
 					    ORDER BY
 					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
@@ -2304,7 +2304,7 @@ public final class CaseDao {
 					      END AS CallerName
 					    FROM dbo.CaseParties cp
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
 					      AND %s
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
@@ -2327,7 +2327,7 @@ public final class CaseDao {
 					      END AS FullName
 					    FROM dbo.CaseParties cp
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
 					      AND %s
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = '%s'
@@ -2339,19 +2339,11 @@ public final class CaseDao {
 					WHERE c.Id = ?
 					  AND %s;
 					""".formatted(
-							CASES_TABLE,
-							CASE_USERS_TABLE,
 							caseUserActiveFilter,
-							USERS_TABLE,
 							userActiveFilter,
-							CASE_USERS_TABLE,
-							USERS_TABLE,
 							legalAssistantUserActiveFilter,
 							legalAssistantCaseUserActiveFilter,
-							USERS_TABLE,
 							legalAssistantUserActiveFilter,
-							CASE_STATUSES_TABLE,
-							STATUSES_TABLE,
 							callerRolePredicate,
 							counselRolePredicate,
 							PARTY_SIDE_KEY_OPPOSING,
