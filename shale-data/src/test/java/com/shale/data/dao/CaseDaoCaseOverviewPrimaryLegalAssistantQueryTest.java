@@ -1,5 +1,6 @@
 package com.shale.data.dao;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -98,8 +99,8 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
         assertTrue(sql.contains("INNER JOIN dbo.Users pla_user"), renderedFromJoin(sql));
         assertTrue(sql.contains("LEFT JOIN dbo.Users pla_user"), renderedFromJoin(sql));
         assertTrue(!sql.contains("%s"), "Production SQL builder should return the fully formatted SQL string");
-        assertTrue(!sql.contains("cu.ShaleClientId"), renderedFromJoin(sql));
-        assertTrue(!sql.contains("pla_cu.ShaleClientId"), renderedFromJoin(sql));
+        assertFalse(sql.contains("cu.ShaleClientId"), renderedFromJoin(sql));
+        assertFalse(sql.contains("pla_cu.ShaleClientId"), renderedFromJoin(sql));
         assertTrue(!sql.contains("cs.ShaleClientId"), renderedFromJoin(sql));
         assertTrue(!sql.contains("cp.ShaleClientId"), renderedFromJoin(sql));
         assertTrue(sql.contains("WHERE c.Id = ?"), "caseId placeholder should remain in final prepared SQL");

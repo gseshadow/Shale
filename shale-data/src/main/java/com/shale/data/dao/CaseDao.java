@@ -2209,8 +2209,6 @@ public final class CaseDao {
 					callerRolePredicate,
 					counselRolePredicate,
 					activeFilter(schema.deletedColumn(), "c"));
-			System.err.println("[GET_OVERVIEW SQL]\n" + sql);
-			logGetOverviewTenantColumnMetadata(con);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int idx = 1;
@@ -2262,21 +2260,6 @@ public final class CaseDao {
 		}
 	}
 
-
-	private static void logGetOverviewTenantColumnMetadata(Connection con) throws SQLException {
-		String metadataSql = """
-				SELECT DB_NAME() AS DatabaseName,
-				       COL_LENGTH('dbo.Cases','ShaleClientId') AS CasesShaleClientIdLength,
-				       COL_LENGTH('dbo.Users','ShaleClientId') AS UsersShaleClientIdLength
-				""";
-		try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery(metadataSql)) {
-			if (rs.next()) {
-				System.err.println("[GET_OVERVIEW METADATA] DB_NAME=" + rs.getString("DatabaseName")
-						+ " dbo.Cases.ShaleClientId.COL_LENGTH=" + rs.getObject("CasesShaleClientIdLength")
-						+ " dbo.Users.ShaleClientId.COL_LENGTH=" + rs.getObject("UsersShaleClientIdLength"));
-			}
-		}
-	}
 
 	static String buildOverviewSql(
 			String caseUserActiveFilter,
