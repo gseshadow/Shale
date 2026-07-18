@@ -6809,6 +6809,99 @@ public final class CaseDao {
 		}
 	}
 
+	public void setPrimaryLegalAssistant(long caseId, int shaleClientId, int userId) {
+		Connection con = null;
+		try {
+			con = db.requireConnection();
+			con.setAutoCommit(false);
+
+			try (PreparedStatement ps = con.prepareStatement("""
+					SELECT 1
+					FROM dbo.Cases c
+					INNER JOIN dbo.Users u ON u.ShaleClientId = c.ShaleClientId
+					WHERE c.Id = ?
+					  AND c.ShaleClientId = ?
+					  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
+					  AND u.Id = ?
+					  AND COALESCE(u.is_deleted, 0) = 0;
+					""")) {
+				ps.setLong(1, caseId);
+				ps.setInt(2, shaleClientId);
+				ps.setInt(3, userId);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next()) {
+						throw new SQLException("Case or active tenant user was not found.");
+					}
+				}
+			}
+
+			try (PreparedStatement ps = con.prepareStatement("""
+					UPDATE dbo.CaseUsers
+					SET IsPrimary = CAST(0 AS bit), UpdatedAt = SYSDATETIME()
+					WHERE CaseId = ?
+					  AND RoleId = ?
+					  AND IsPrimary = 1
+					  AND UserId <> ?;
+					""")) {
+				ps.setLong(1, caseId);
+				ps.setInt(2, ROLE_LEGAL_ASSISTANT);
+				ps.setInt(3, userId);
+				ps.executeUpdate();
+			}
+
+			int updated;
+			try (PreparedStatement ps = con.prepareStatement("""
+					UPDATE dbo.CaseUsers
+					SET IsPrimary = CAST(1 AS bit), UpdatedAt = SYSDATETIME()
+					WHERE CaseId = ?
+					  AND UserId = ?
+					  AND RoleId = ?;
+					""")) {
+				ps.setLong(1, caseId);
+				ps.setInt(2, userId);
+				ps.setInt(3, ROLE_LEGAL_ASSISTANT);
+				updated = ps.executeUpdate();
+			}
+
+			if (updated == 0) {
+				try (PreparedStatement ps = con.prepareStatement("""
+						INSERT INTO dbo.CaseUsers (CaseId, UserId, RoleId, IsPrimary, Notes, CreatedAt, UpdatedAt)
+						VALUES (?, ?, ?, CAST(1 AS bit), NULL, SYSDATETIME(), SYSDATETIME());
+						""")) {
+					ps.setLong(1, caseId);
+					ps.setInt(2, userId);
+					ps.setInt(3, ROLE_LEGAL_ASSISTANT);
+					ps.executeUpdate();
+				}
+			}
+
+			touchCaseUpdatedAt(con, caseId, shaleClientId);
+			con.commit();
+		} catch (SQLException e) {
+			if (con != null) {
+				try { con.rollback(); } catch (SQLException ignored) { }
+			}
+			System.err.println("[PRIMARY_LEGAL_ASSISTANT DAO SQL ERROR] caseId=" + caseId + ", userId=" + userId);
+			e.printStackTrace(System.err);
+			if (e instanceof com.microsoft.sqlserver.jdbc.SQLServerException sqlServerException) {
+				com.microsoft.sqlserver.jdbc.SQLServerError sqlServerError = sqlServerException.getSQLServerError();
+				System.err.println("[PRIMARY_LEGAL_ASSISTANT DAO SQLSERVER] errorNumber="
+						+ (sqlServerError == null ? sqlServerException.getErrorCode() : sqlServerError.getErrorNumber())
+						+ ", state=" + (sqlServerError == null ? sqlServerException.getSQLState() : sqlServerError.getErrorState())
+						+ ", lineNumber=" + (sqlServerError == null ? "unknown" : sqlServerError.getLineNumber())
+						+ ", message=" + sqlServerException.getMessage());
+			}
+			String sqlServerMessage = e.getMessage();
+			throw new RuntimeException("Failed to set primary legal assistant (caseId=" + caseId + ", userId=" + userId
+					+ "): " + (sqlServerMessage == null || sqlServerMessage.isBlank() ? e.getClass().getSimpleName() : sqlServerMessage), e);
+		} finally {
+			if (con != null) {
+				try { con.setAutoCommit(true); } catch (SQLException ignored) { }
+				try { con.close(); } catch (SQLException ignored) { }
+			}
+		}
+	}
+
 	public record UserRow(int id, String displayName, String color) {
 	}
 
