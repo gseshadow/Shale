@@ -1,5 +1,8 @@
 package com.shale.data.dao;
 
+import com.microsoft.sqlserver.jdbc.SQLServerError;
+import com.microsoft.sqlserver.jdbc.SQLServerException;
+
 import java.sql.Connection;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -2187,6 +2190,7 @@ public final class CaseDao {
 	}
 
 	public com.shale.core.dto.CaseOverviewDto getOverview(long caseId) {
+		String sql = null;
 
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
@@ -2201,7 +2205,7 @@ public final class CaseDao {
 			String legalAssistantCaseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "pla_cu");
 			String userActiveFilter = activeFilter(resolveUsersDeletedColumn(con), "u");
 			String legalAssistantUserActiveFilter = activeFilter(resolveUsersDeletedColumn(con), "pla_user");
-			String sql = buildOverviewSql(
+			sql = buildOverviewSql(
 					caseUserActiveFilter,
 					userActiveFilter,
 					legalAssistantUserActiveFilter,
@@ -2256,10 +2260,38 @@ public final class CaseDao {
 				}
 			}
 		} catch (SQLException e) {
+			logGetOverviewSqlServerFailure(e, sql);
 			throw new RuntimeException("Failed to load case overview (caseId=" + caseId + ")", e);
 		}
 	}
 
+	private static void logGetOverviewSqlServerFailure(SQLException e, String sql) {
+		if (!(e instanceof SQLServerException sqlServerException)) {
+			return;
+		}
+
+		SQLServerError error = sqlServerException.getSQLServerError();
+		long lineNumber = error == null ? -1L : error.getLineNumber();
+		String message = error == null ? sqlServerException.getMessage() : error.getErrorMessage();
+		System.err.println("[GET_OVERVIEW SQLSERVER ERROR] number="
+				+ (error == null ? "<unavailable>" : error.getErrorNumber())
+				+ " line=" + (lineNumber > 0 ? lineNumber : "<unavailable>")
+				+ " message=" + message);
+
+		if (sql == null || sql.isBlank()) {
+			return;
+		}
+
+		String[] lines = sql.split("\\R", -1);
+		if (lineNumber > 0 && lineNumber <= lines.length) {
+			System.err.printf("[GET_OVERVIEW SQLSERVER ERROR LINE] %03d | %s%n", lineNumber, lines[(int) lineNumber - 1]);
+		}
+
+		System.err.println("[GET_OVERVIEW SQL NUMBERED]");
+		for (int i = 0; i < lines.length; i++) {
+			System.err.printf("%03d | %s%n", i + 1, lines[i]);
+		}
+	}
 
 	static String buildOverviewSql(
 			String caseUserActiveFilter,
