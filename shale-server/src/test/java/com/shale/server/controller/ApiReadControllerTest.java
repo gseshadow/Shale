@@ -1024,7 +1024,7 @@ class ApiReadControllerTest {
 
         private static CaseOverviewDto caseOverview(long caseId, String caseNumber) {
             return new CaseOverviewDto(caseId, caseNumber, "Smith v. Example", "Open", 1, "#00AA00",
-                    31, "Ada Attorney", "#111111", 10, "PI", "#222222",
+                    31, "Ada Attorney", "#111111", 41, "Lara Assistant", "#333333", 10, "PI", "#222222",
                     null, null, null, null, null, null, null, "Caller", "Client", List.of(),
                     "Opposing", List.of("Ada Attorney"), "Overview");
         }
