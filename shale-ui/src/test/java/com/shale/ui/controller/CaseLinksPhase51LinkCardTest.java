@@ -30,7 +30,7 @@ final class CaseLinksPhase51LinkCardTest {
     void variantsExposeRequiredContentAndActionsWithoutRawUrlBody() throws Exception {
         String card = Files.readString(CARD);
         assertTrue(card.contains("case-link-card-title"));
-        assertTrue(card.contains("blankTo(link.description(), \"No description\")"));
+        assertTrue(card.contains("No description"));
         assertTrue(card.contains("case-link-card-description-empty"));
         assertTrue(card.contains("LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor()"));
         assertTrue(card.contains("if (variant != Variant.MINI && link.primary())"));

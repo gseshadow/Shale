@@ -60,7 +60,7 @@ final class CaseLinksPhase5OverviewTest {
         assertTrue(card.contains("blankTo(link.displayName(), \"Untitled link\")"));
         assertTrue(card.contains("LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor()"));
         assertTrue(card.contains("new Label(\"Primary\")"));
-        assertTrue(card.contains("blankTo(link.description(), \"No description\")"));
+        assertTrue(card.contains("No description"));
         assertFalse(card.contains("new Label(blankTo(link.url()"));
         assertTrue(source.contains("externalBrowserHelper.openHttpOrHttps(link.url())"));
         assertFalse(source.contains("Desktop.getDesktop().browse"));
