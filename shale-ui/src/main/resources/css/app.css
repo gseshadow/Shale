@@ -2489,3 +2489,12 @@
 .calendar-event-shared-marker {
     -fx-text-fill: rgba(91, 103, 122, 0.78);
 }
+
+.task-detail-dialog-heading {
+    -fx-text-overrun: ellipsis;
+}
+
+.task-detail-dialog-action-bar {
+    -fx-background-radius: 0 0 16 16;
+    -fx-border-radius: 0 0 16 16;
+}
