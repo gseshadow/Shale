@@ -402,6 +402,7 @@ public final class SearchController {
 			CalendarFeedItem item = new CalendarFeedItem(
 					"EVENT:" + safe(row.calendarEventId()),
 					row.title(),
+					row.description(),
 					row.startsAt(),
 					row.endsAt(),
 					false,

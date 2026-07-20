@@ -139,6 +139,7 @@ public final class CalendarFeedDao {
                     rows.add(new CalendarFeedItem(
                             rs.getString("KeyValue"),
                             rs.getString("Title"),
+                            rs.getString("Details"),
                             rs.getTimestamp("StartsAt").toLocalDateTime(),
                             rs.getTimestamp("EndsAt") == null ? null : rs.getTimestamp("EndsAt").toLocalDateTime(),
                             rs.getBoolean("AllDay"),
@@ -172,10 +173,11 @@ public final class CalendarFeedDao {
 
     static String buildCalendarFeedSql(boolean caseFiltered, boolean userScheduleScoped) {
         StringBuilder sql = new StringBuilder("""
-                SELECT KeyValue, Title, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, CaseName, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex, AssignedUserColor, AssignedToUserId, AssignedUserDisplayName
+                SELECT KeyValue, Title, Details, StartsAt, EndsAt, AllDay, SourceType, SourceField, CaseId, CaseName, TaskId, RelatedDisplayName, CalendarEventTypeSystemKey, DisplayTypeName, ColorHex, AssignedUserColor, AssignedToUserId, AssignedUserDisplayName
                 FROM (
                     SELECT CONCAT('EVENT:', CAST(e.CalendarEventId AS varchar(20))) AS KeyValue,
                            e.Title,
+                           e.Description AS Details,
                            e.StartsAt,
                            e.EndsAt,
                            e.AllDay,
@@ -204,6 +206,7 @@ public final class CalendarFeedDao {
 
                     SELECT CONCAT('TASK:', CAST(t.Id AS varchar(20))),
                            t.Title,
+                           NULL AS Details,
                            t.DueAt,
                            NULL,
                            CASE WHEN CONVERT(time(0), t.DueAt) = '00:00:00' THEN 1 ELSE 0 END,
@@ -261,6 +264,7 @@ public final class CalendarFeedDao {
         return ("""
                     SELECT CONCAT('%s:', CAST(c.Id AS varchar(20))),
                            CONCAT('%s', N' — ', c.Name),
+                           NULL AS Details,
                            CAST(c.%s AS datetime2),
                            NULL,
                            1,

@@ -53,7 +53,7 @@ class CalendarOverlaySelectionTest {
     }
 
     private static CalendarFeedItem item(String key, String sourceField, Integer taskId, Integer caseId, Integer assignedToUserId) {
-        return new CalendarFeedItem(key, "Title", LocalDateTime.of(2026, 7, 10, 9, 0), null, true,
+        return new CalendarFeedItem(key, "Title", null, LocalDateTime.of(2026, 7, 10, 9, 0), null, true,
                 key.startsWith("EVENT:") ? "MANUAL" : "PROJECTED", sourceField, caseId, "Case", taskId,
                 "Related", key.startsWith("EVENT:") ? "MEETING" : "CASE_DATE", key.startsWith("EVENT:") ? "Meeting" : "Case Date",
                 null, null, assignedToUserId, "User");
