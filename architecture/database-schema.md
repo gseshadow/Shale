@@ -912,3 +912,19 @@ Phase 6.1 adds a dedicated append-only entity-action audit table because existin
 | `Metadata` | nvarchar(1000) | Optional strictly allowlisted ID/state metadata only |
 
 Audit metadata may contain only stable IDs and non-sensitive state markers, including CaseId, CaseLinkId, CaseLinkShareId, ExternalLinkId, LinkTypeId, ContactId, previous/new Primary CaseLinkId, reordered link count, and activation state. It must not contain URLs, descriptions, link notes, share notes, Contact names/emails/phones, credentials, RowVer bytes, raw commands/DTOs, SQL, or exception text. Ordinary application paths insert only and must not update/delete audit history.
+
+## Phase 6.2 unified Audit Log viewer
+
+The desktop Audit Log viewer now supports three read-only modes on one screen: **All**, **PHI Audit**, and **Entity Activity**. PHI Audit rows retain the `dbo.AuditLog` field/value semantics; Entity Activity rows retain the `dbo.EntityActionAuditLog` action/entity semantics and are not projected into fake `FieldName`, old-value, or new-value changes.
+
+All mode loads bounded PHI and entity-action first-page result sets, maps them to a typed presentation row, merges by occurrence timestamp descending, applies a deterministic source/id tie-breaker, and then applies the final visible row limit. This is a bounded viewer merge, not a schema-level `UNION`.
+
+Entity activity viewer reads are tenant scoped and read-only: the DAO requires `SESSION_CONTEXT(N'ShaleClientId')`, verifies it matches the requested tenant, predicates `EntityActionAuditLog.ShaleClientId`, joins `dbo.Users` by actor id and matching tenant for safe display names without requiring active users, and sorts by `OccurredAt DESC, Id DESC`. Audit history remains append-only; no update/delete viewer operations are introduced.
+
+The viewer remains admin-only through the existing Settings/SceneManager/controller checks. Ordinary users must not gain Entity Activity visibility if they cannot view PHI Audit rows.
+
+Entity activity timestamps are stored as UTC `OccurredAt` values and converted through the same application-local Java time path used by the viewer presentation before display while retaining UTC instants for ordering.
+
+Entity activity metadata rendering is allowlist based. Only stable ID/state keys such as case, case-link, share, external-link, link-type, contact, primary-link, reorder count, and active state are rendered. Unknown, malformed, nested, oversized, or sensitive metadata is ignored; raw Metadata JSON is never displayed. Prohibited content includes URLs, link titles/descriptions/notes, share notes, Contact names/emails/phones, RowVer, credentials, SQL, exception text, commands, and DTO payloads.
+
+If a combined All-mode load partially fails, the viewer must not present incomplete history as complete; it should report the failed category, log the exception, and provide a retry/refresh path. Future API Source values may be shown only as subtle safe labels such as Desktop, API, or System.

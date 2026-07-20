@@ -474,3 +474,9 @@ Shared With editing is staged in the Link dialog. Share modal Apply updates only
 Async loads and post-mutation refreshes must keep database work off the JavaFX Application Thread, update UI through JavaFX-safe callbacks, and use case/contact generation tokens or equivalent stale-result checks. Stale case or contact results must not render after navigation. Local section failures should not clear unrelated sections.
 
 Case Link URL handling is intentionally limited to normalization and browser launch of HTTP/HTTPS URLs. Shale does not fetch URLs, inspect metadata, follow redirects, store external credentials, accept embedded credentials, or perform Box/API authentication in this desktop phase.
+
+## Unified Audit Log viewer treatment
+
+The Audit Log viewer uses the existing light table-in-glass-panel administration visual language and adds a compact mode filter at the top of the existing screen rather than a second administration page. The selector offers All, PHI Audit, and Entity Activity, with All as the default.
+
+PHI Audit rows keep the established field-audit columns and meaning. Entity Activity rows use the same dense audit table treatment but present a subtle category label, friendly action/entity wording, stable entity ids, safe parent context, actor, and local occurrence time. Entity Activity presentation must not add URL previews, Contact-name hydration, raw JSON details, or other rich content that would break the compact audit-row pattern or expose sensitive Case Link content.
