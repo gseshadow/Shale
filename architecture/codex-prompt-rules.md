@@ -349,3 +349,8 @@ When adding service-port or gateway methods, add explicit production delegation 
 Tests that inspect source or FXML must be resilient to LF and CRLF line endings and harmless formatting changes. Prefer behavioral tests, XML parsing, reflection, or brace-depth method extraction over exact multiline string blocks, indentation, tabs, or neighboring-method assumptions.
 
 Every new feature and mutation must be reviewed for audit-log compatibility before completion. If the established audit architecture cannot safely represent the mutation without leaking sensitive values or changing schema, document the exact gap and defer a scoped audit enhancement rather than creating timeline events or ad-hoc audit records. When a filtered unique index enforces one active selected row, replacement transactions must clear the old selected row and insert the replacement in the same transaction, and raw database constraint text must not be shown to ordinary users.
+
+
+### Entity-action audit rules
+
+For every mutation, inspect audit compatibility before coding. Identify the authoritative DAO/service seam that owns the business transaction, write entity-action audit events on the same SQL `Connection` before commit, and roll back the business mutation if the audit insert fails. Do not let UI code construct authoritative audit rows, do not audit after commit/asynchronously, and do not serialize sensitive payloads, DTOs, RowVer bytes, SQL, or exception text. Completion reports must state whether audit integration used the existing schema, required a migration, or was deferred for scoped architecture work.
