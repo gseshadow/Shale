@@ -341,3 +341,11 @@ A task is complete when:
 5. The actual user-reported issue is resolved.
 6. No existing functionality is broken.
 7. Architecture rules remain satisfied.
+
+## Service/gateway, test portability, and audit-review rules
+
+When adding service-port or gateway methods, add explicit production delegation and a regression test proving the production adapter/gateway reaches the intended DAO method. Interface defaults must not mimic legitimate empty results or successful no-op mutations; unsupported defaults should throw an actionable `UnsupportedOperationException`.
+
+Tests that inspect source or FXML must be resilient to LF and CRLF line endings and harmless formatting changes. Prefer behavioral tests, XML parsing, reflection, or brace-depth method extraction over exact multiline string blocks, indentation, tabs, or neighboring-method assumptions.
+
+Every new feature and mutation must be reviewed for audit-log compatibility before completion. If the established audit architecture cannot safely represent the mutation without leaking sensitive values or changing schema, document the exact gap and defer a scoped audit enhancement rather than creating timeline events or ad-hoc audit records.

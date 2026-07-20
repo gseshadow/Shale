@@ -67,11 +67,11 @@ public interface CaseServicePort {
 
 	CaseLinkDto createCaseLink(CreateCaseLinkCommand command);
 
-	default CaseLinkDto createCaseLinkWithShares(CreateCaseLinkWithSharesCommand command) { throw new UnsupportedOperationException(); }
+	default CaseLinkDto createCaseLinkWithShares(CreateCaseLinkWithSharesCommand command) { throw unsupportedCaseLinkOperation("createCaseLinkWithShares"); }
 
 	CaseLinkDto updateCaseLink(UpdateCaseLinkCommand command);
 
-	default CaseLinkDto updateCaseLinkWithShares(UpdateCaseLinkWithSharesCommand command) { throw new UnsupportedOperationException(); }
+	default CaseLinkDto updateCaseLinkWithShares(UpdateCaseLinkWithSharesCommand command) { throw unsupportedCaseLinkOperation("updateCaseLinkWithShares"); }
 
 	CaseLinkDto setPrimaryCaseLink(SetPrimaryCaseLinkCommand command);
 
@@ -79,17 +79,17 @@ public interface CaseServicePort {
 
 	void deleteCaseLink(DeleteCaseLinkCommand command);
 
-	default List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { return List.of(); }
-	default List<CaseLinkContactOptionDto> listCaseLinkShareContacts(int shaleClientId) { return List.of(); }
-	default List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int shaleClientId) { return List.of(); }
+	default List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { throw unsupportedCaseLinkOperation("searchCaseLinkShareContacts"); }
+	default List<CaseLinkContactOptionDto> listCaseLinkShareContacts(int shaleClientId) { throw unsupportedCaseLinkOperation("listCaseLinkShareContacts"); }
+	default List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int shaleClientId) { throw unsupportedCaseLinkOperation("listCaseLinkShareCaseContacts"); }
 
-	default List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { return List.of(); }
+	default List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { throw unsupportedCaseLinkOperation("listCaseLinkShares"); }
 
-	default CaseLinkShareDto addCaseLinkShare(AddCaseLinkShareCommand command) { throw new UnsupportedOperationException(); }
+	default CaseLinkShareDto addCaseLinkShare(AddCaseLinkShareCommand command) { throw unsupportedCaseLinkOperation("addCaseLinkShare"); }
 
-	default CaseLinkShareDto updateCaseLinkShare(UpdateCaseLinkShareCommand command) { throw new UnsupportedOperationException(); }
+	default CaseLinkShareDto updateCaseLinkShare(UpdateCaseLinkShareCommand command) { throw unsupportedCaseLinkOperation("updateCaseLinkShare"); }
 
-	default void removeCaseLinkShare(RemoveCaseLinkShareCommand command) { throw new UnsupportedOperationException(); }
+	default void removeCaseLinkShare(RemoveCaseLinkShareCommand command) { throw unsupportedCaseLinkOperation("removeCaseLinkShare"); }
 
 	PracticeAreaDto createPracticeArea(PracticeAreaCommand command);
 
@@ -260,6 +260,10 @@ public interface CaseServicePort {
 		public byte[] expectedCaseLinkRowVer() {
 			return copyRowVer(expectedCaseLinkRowVer);
 		}
+	}
+
+	private static UnsupportedOperationException unsupportedCaseLinkOperation(String methodName) {
+		return new UnsupportedOperationException(methodName + " requires an explicit CaseServicePort implementation; missing Case Link delegation must not mimic an empty or successful result.");
 	}
 
 	private static byte[] copyRowVer(byte[] rowVer) {
