@@ -49,10 +49,26 @@ public final class AuditLogDao {
             Integer objectTypeId,
             LocalDate startDate,
             LocalDate endDateInclusive) {
+        return listAuditLogEntries(shaleClientId, userId, objectId, fieldName, objectTypeId, startDate, endDateInclusive, 500);
+    }
+
+    public List<AuditLogEntryRow> listAuditLogEntries(
+            Integer shaleClientId,
+            Integer userId,
+            Long objectId,
+            String fieldName,
+            Integer objectTypeId,
+            LocalDate startDate,
+            LocalDate endDateInclusive,
+            int limit) {
         try (Connection con = db.requireConnection()) {
             int currentTenantId = requireCurrentShaleClientId(con);
+            if (shaleClientId == null || shaleClientId <= 0 || shaleClientId.intValue() != currentTenantId) {
+                throw new IllegalStateException("Requested tenant does not match session context.");
+            }
+            int boundedLimit = Math.max(1, Math.min(limit, 500));
             StringBuilder sql = new StringBuilder("""
-                    SELECT
+                    SELECT TOP (?)
                       EntryDate,
                       UserId,
                       ObjectTypeId,
@@ -67,6 +83,7 @@ public final class AuditLogDao {
                     WHERE 1=1
                     """);
             List<Object> bindValues = new java.util.ArrayList<>();
+            bindValues.add(boundedLimit);
             sql.append(" AND ShaleClientId = ?");
             bindValues.add(currentTenantId);
             if (userId != null && userId > 0) {
