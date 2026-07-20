@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 final class CaseOverviewPrimaryLegalAssistantViewTest {
     @Test
     void primaryLegalAssistantRowAppearsImmediatelyBelowResponsibleAttorneyAndAboveDescription() throws Exception {
-        String fxml = Files.readString(Path.of("src/main/resources/fxml/case.fxml"));
+        String fxml = caseFxml();
 
         int responsible = fxml.indexOf("text=\"Responsible attorney\"");
         int legalAssistant = fxml.indexOf("text=\"Primary legal assistant\"");
@@ -27,7 +27,7 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
 
     @Test
     void controllerRendersPrimaryLegalAssistantWithSharedUserCardFactoryAndEmptyState() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
+        String source = caseControllerSource();
         String renderer = method(source, "private void renderPrimaryLegalAssistantMini", "private void renderPrimaryStatusMini");
 
         assertTrue(renderer.contains("new UserCardFactory"));
@@ -39,10 +39,9 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
         assertTrue(source.contains("dto.getPrimaryLegalAssistantColor()"));
     }
 
-
     @Test
     void primaryLegalAssistantEditorUsesResponsibleAttorneyEditPattern() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
+        String source = caseControllerSource();
         assertTrue(source.contains("changePrimaryLegalAssistantButton.setOnAction(e -> onEditPrimaryLegalAssistantField())"));
         assertTrue(source.contains("setVisibleManaged(changePrimaryLegalAssistantButton, true)"));
         assertTrue(source.contains("changePrimaryLegalAssistantButton.setDisable(busy)"));
@@ -63,7 +62,7 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
 
     @Test
     void temporaryPrimaryLegalAssistantSaveDiagnosticsAreRemoved() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
+        String source = caseControllerSource();
         assertFalse(source.contains("[PRIMARY_LEGAL_ASSISTANT " + "SAVE ERROR]"));
         assertFalse(source.contains("DAO_" + "MUTATION"));
         assertFalse(source.contains("LIVE_" + "PUBLISH"));
@@ -73,7 +72,7 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
 
     @Test
     void primaryLegalAssistantEditorOffersRemoveOnlyWhenCurrentAssistantExistsAndPublishesSafeClear() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
+        String source = caseControllerSource();
         String editor = method(source, "private Optional<PrimaryLegalAssistantDialogAction> showPrimaryLegalAssistantDialog", "private Optional<String> showChoiceFieldDialog");
         assertTrue(editor.contains("boolean hasPrimaryLegalAssistant"));
         assertTrue(editor.contains("ButtonType removeType = new ButtonType(\"Remove primary legal assistant\""));
@@ -91,7 +90,7 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
 
     @Test
     void practiceTeamDisplayDeduplicatesByStableUserIdButLeavesTeamEditorAssignmentsUntouched() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
+        String source = caseControllerSource();
         String deduper = method(source, "private List<CaseDao.CaseUserTeamRow> deduplicatePracticeTeamRowsForDisplay", "private String roleLabel");
         assertTrue(deduper.contains("java.util.LinkedHashMap<Integer, CaseDao.CaseUserTeamRow> byUserId"));
         assertTrue(deduper.contains("byUserId.putIfAbsent(row.userId(), row)"), "Display dedupe should key by Users.Id, not display name");
@@ -105,38 +104,12 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
         assertFalse(deduper.contains("SELECT DISTINCT"));
     }
 
-    @Test
-    void primaryLegalAssistantEditorOffersRemoveOnlyWhenCurrentAssistantExistsAndPublishesSafeClear() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
-        String editor = method(source, "private Optional<PrimaryLegalAssistantDialogAction> showPrimaryLegalAssistantDialog", "private Optional<String> showChoiceFieldDialog");
-        assertTrue(editor.contains("boolean hasPrimaryLegalAssistant"));
-        assertTrue(editor.contains("ButtonType removeType = new ButtonType(\"Remove primary legal assistant\""));
-        assertTrue(editor.contains("if (hasPrimaryLegalAssistant)"));
-        assertTrue(editor.contains("dialog.getDialogPane().getButtonTypes().add(removeType)"));
-        assertTrue(editor.contains("app-dialog-button-danger"), "Remove should follow destructive-secondary styling convention");
-        assertTrue(editor.contains("ButtonType.CANCEL, saveType"), "Save and Cancel should remain available for changing users");
-
-        String remover = method(source, "private void removePrimaryLegalAssistantField", "private void savePrimaryLegalAssistantField");
-        assertTrue(remover.contains("caseDao.removePrimaryLegalAssistant(activeCaseId, appState.getShaleClientId())"));
-        assertTrue(remover.contains("publishCaseFieldUpdated(activeCaseId, \"primaryLegalAssistantUserId\", null)"));
-        assertTrue(remover.contains("reloadCurrentCaseForViewMode()"));
-        assertFalse(remover.contains("Map.of"), "Clearing publish path must not use Map.of with a null value");
+    private static String caseFxml() throws Exception {
+        return Files.readString(Path.of("src/main/resources/fxml/case.fxml"));
     }
 
-    @Test
-    void practiceTeamDisplayDeduplicatesByStableUserIdButLeavesTeamEditorAssignmentsUntouched() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
-        String deduper = method(source, "private List<CaseDao.CaseUserTeamRow> deduplicatePracticeTeamRowsForDisplay", "private String roleLabel");
-        assertTrue(deduper.contains("java.util.LinkedHashMap<Integer, CaseDao.CaseUserTeamRow> byUserId"));
-        assertTrue(deduper.contains("byUserId.putIfAbsent(row.userId(), row)"), "Display dedupe should key by Users.Id, not display name");
-        assertTrue(deduper.contains("isPrimaryResponsibleAttorney"));
-        assertTrue(deduper.contains("isPrimaryLegalAssistant"));
-        assertTrue(deduper.contains("thenComparingInt(CaseDao.CaseUserTeamRow::roleId)"));
-        assertTrue(deduper.contains("thenComparingInt(CaseDao.CaseUserTeamRow::userId)"));
-        assertTrue(source.contains("renderTeamCardsFromTeamRows(rows)"), "Draft/team editor path should still pass all underlying assignments before display-only consolidation");
-        assertTrue(source.contains("assignedRoles = caseDao.listCaseUserRoles(activeCaseId)"), "Team editor should still receive all role rows from DAO");
-        assertFalse(deduper.contains("displayName()).distinct"));
-        assertFalse(deduper.contains("SELECT DISTINCT"));
+    private static String caseControllerSource() throws Exception {
+        return Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
     }
 
     private static String method(String source, String startNeedle, String endNeedle) {
