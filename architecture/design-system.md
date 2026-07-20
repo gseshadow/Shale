@@ -467,7 +467,7 @@ Case Links remain a JavaFX desktop workflow in this phase. The supported desktop
 
 Mutating Case Link, share, and Link Type dialogs must validate before close, invoke exactly one service mutation per accepted save, wait for persistence, then reload authoritative data before showing success. If persistence commits but refresh fails, the view should preserve existing content, mark the section stale/refresh-needed, and report that the save completed but refresh failed. Exceptions must not be converted into empty states; only a successful zero-row response may render an empty-state message.
 
-Optimistic row-version conflicts should be reported as concurrent changes, not generic database failures. The UI must not retry stale mutations automatically or overwrite newer data. After conflicts, refresh the affected Case Link/Link Type data and preserve user-entered form values where practical so the user can reopen/reapply safely.
+Optimistic row-version conflicts and Primary Link unique-index conflicts should be reported as concurrent changes, not generic database failures. The UI must not retry stale mutations automatically, expose raw SQL Server table/index/key text, or overwrite newer data. After conflicts, refresh the affected Case Link/Link Type data and preserve user-entered form values where practical so the user can reopen/reapply safely.
 
 Shared With editing is staged in the Link dialog. Share modal Apply updates only parent dialog state; modal Cancel restores the parent staged state; parent Cancel persists nothing; parent Save uses the aggregate Case Link service operation so link fields and share additions/updates/removals commit or roll back together.
 
