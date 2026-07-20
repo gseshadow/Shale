@@ -1789,6 +1789,7 @@ public class CaseController {
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.setPadding(new Insets(8, 10, 8, 10));
 		row.setStyle("-fx-background-color: rgba(255,255,255,0.86); -fx-background-radius: 10; -fx-border-color: rgba(31,41,55,0.12); -fx-border-radius: 10;" + (past ? " -fx-opacity: 0.78;" : ""));
+		CalendarEventCardFactory.applyCalendarItemTooltip(row, item);
 		configureCaseCalendarClick(row, item);
 		return row;
 	}

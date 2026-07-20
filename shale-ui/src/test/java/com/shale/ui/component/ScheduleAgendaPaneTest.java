@@ -22,6 +22,6 @@ class ScheduleAgendaPaneTest {
     }
 
     private static CalendarFeedItem item(String key, LocalDateTime startsAt, boolean allDay, String sourceField, Integer taskId) {
-        return new CalendarFeedItem(key, "Title", startsAt, null, allDay, key.startsWith("EVENT:") ? "MANUAL" : "PROJECTED", sourceField, null, null, taskId, null, key.startsWith("TASK:") ? "TASK_DUE" : "MEETING", "Event", null, null, null, null);
+        return new CalendarFeedItem(key, "Title", null, startsAt, null, allDay, key.startsWith("EVENT:") ? "MANUAL" : "PROJECTED", sourceField, null, null, taskId, null, key.startsWith("TASK:") ? "TASK_DUE" : "MEETING", "Event", null, null, null, null);
     }
 }

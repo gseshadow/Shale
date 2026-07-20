@@ -6,6 +6,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
+import javafx.geometry.Insets;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -164,12 +165,44 @@ public final class CalendarEventCardFactory {
                 " -fx-background-radius: 8, 8;");
     }
 
-    private static void applyCalendarItemTooltip(Node card, CalendarFeedItem item) {
+    public static void applyCalendarItemTooltip(Node card, CalendarFeedItem item) {
         if (card == null || item == null) return;
+        if (isPersistedCalendarEvent(item)) {
+            Tooltip.install(card, buildEventDetailsTooltip(item));
+            return;
+        }
         String ownership = item.assignedToUserId() == null ? "Shared calendar" : "User calendar" + (safe(item.assignedUserDisplayName()).isBlank() ? "" : ": " + item.assignedUserDisplayName());
         String time = resolveTime(item);
         String type = resolveCategory(item);
         Tooltip.install(card, new Tooltip(safe(item.title()) + "\n" + time + " · " + type + "\n" + ownership));
+    }
+
+    static Tooltip buildEventDetailsTooltip(CalendarFeedItem item) {
+        Label content = new Label(buildEventDetailsTooltipText(item));
+        content.setWrapText(true);
+        content.setMaxWidth(360);
+        content.setPadding(new Insets(2, 4, 2, 4));
+        Tooltip tooltip = new Tooltip();
+        tooltip.setGraphic(content);
+        tooltip.setText(null);
+        tooltip.setMaxWidth(380);
+        return tooltip;
+    }
+
+    static String buildEventDetailsTooltipText(CalendarFeedItem item) {
+        String title = normalizeTooltipValue(item == null ? null : item.title());
+        String details = normalizeTooltipValue(item == null ? null : item.details());
+        if (details.isBlank()) return title;
+        return title + "\n" + details;
+    }
+
+    private static boolean isPersistedCalendarEvent(CalendarFeedItem item) {
+        String sourceType = normalize(item.sourceType());
+        return "MANUAL".equals(sourceType) || "CALENDAR_EVENT".equals(sourceType);
+    }
+
+    private static String normalizeTooltipValue(String value) {
+        return value == null ? "" : value.strip();
     }
 
     private static String resolveType(CalendarFeedItem item) {
