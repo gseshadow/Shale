@@ -614,21 +614,25 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		void resetLinkTypeOverride(int shaleClientId, int actorUserId, int linkTypeId);
 		List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId);
 		Optional<CaseLinkDto> getPrimaryCaseLink(long caseId, int shaleClientId);
-		default List<ContactSharedCaseLinkDto> listCaseLinksSharedWithContact(int contactId, int shaleClientId) { return List.of(); }
+		default List<ContactSharedCaseLinkDto> listCaseLinksSharedWithContact(int contactId, int shaleClientId) { throw unsupportedCaseLinkGatewayOperation("listCaseLinksSharedWithContact"); }
 		CaseLinkDto createCaseLink(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder);
-		default CaseLinkDto createCaseLinkWithShares(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder, List<CaseLinkShareDraft> shares) { return createCaseLink(shaleClientId, actorUserId, caseId, linkTypeId, displayName, url, description, primary, notes, sortOrder); }
+		default CaseLinkDto createCaseLinkWithShares(int shaleClientId, int actorUserId, long caseId, int linkTypeId, String displayName, String url, String description, boolean primary, String notes, Integer sortOrder, List<CaseLinkShareDraft> shares) { throw unsupportedCaseLinkGatewayOperation("createCaseLinkWithShares"); }
 		CaseLinkDto updateCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer);
-		default CaseLinkDto updateCaseLinkWithShares(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer, List<CaseLinkShareDraft> adds, List<CaseLinkShareUpdate> updates, List<CaseLinkShareRemoval> removals) { return updateCaseLink(shaleClientId, actorUserId, caseId, caseLinkId, externalLinkId, linkTypeId, displayName, url, description, primary, notes, sortOrder, expectedCaseLinkRowVer, expectedExternalLinkRowVer); }
-		default List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { return List.of(); }
-		default List<CaseLinkContactOptionDto> listCaseLinkShareContacts(int shaleClientId) { return List.of(); }
-		default List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int shaleClientId) { return List.of(); }
+		default CaseLinkDto updateCaseLinkWithShares(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long externalLinkId, int linkTypeId, String displayName, String url, String description, Boolean primary, String notes, Integer sortOrder, byte[] expectedCaseLinkRowVer, byte[] expectedExternalLinkRowVer, List<CaseLinkShareDraft> adds, List<CaseLinkShareUpdate> updates, List<CaseLinkShareRemoval> removals) { throw unsupportedCaseLinkGatewayOperation("updateCaseLinkWithShares"); }
+		default List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { throw unsupportedCaseLinkGatewayOperation("searchCaseLinkShareContacts"); }
+		default List<CaseLinkContactOptionDto> listCaseLinkShareContacts(int shaleClientId) { throw unsupportedCaseLinkGatewayOperation("listCaseLinkShareContacts"); }
+		default List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int shaleClientId) { throw unsupportedCaseLinkGatewayOperation("listCaseLinkShareCaseContacts"); }
 		CaseLinkDto setPrimaryCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId);
 		List<CaseLinkDto> reorderCaseLinks(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds);
 		void deleteCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer);
-		default List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { return List.of(); }
-		default CaseLinkShareDto addCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, int contactId, LocalDateTime sharedAt, String notes) { throw new UnsupportedOperationException(); }
-		default CaseLinkShareDto updateCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long caseLinkShareId, int contactId, LocalDateTime sharedAt, String notes, byte[] expectedRowVer) { throw new UnsupportedOperationException(); }
-		default void removeCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long caseLinkShareId, byte[] expectedRowVer) { throw new UnsupportedOperationException(); }
+		default List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { throw unsupportedCaseLinkGatewayOperation("listCaseLinkShares"); }
+		default CaseLinkShareDto addCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, int contactId, LocalDateTime sharedAt, String notes) { throw unsupportedCaseLinkGatewayOperation("addCaseLinkShare"); }
+		default CaseLinkShareDto updateCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long caseLinkShareId, int contactId, LocalDateTime sharedAt, String notes, byte[] expectedRowVer) { throw unsupportedCaseLinkGatewayOperation("updateCaseLinkShare"); }
+		default void removeCaseLinkShare(int shaleClientId, int actorUserId, long caseId, long caseLinkId, long caseLinkShareId, byte[] expectedRowVer) { throw unsupportedCaseLinkGatewayOperation("removeCaseLinkShare"); }
+
+		private static UnsupportedOperationException unsupportedCaseLinkGatewayOperation(String methodName) {
+			return new UnsupportedOperationException(methodName + " requires explicit CaseGateway delegation to CaseDao; missing delegation must not mimic empty or successful persistence.");
+		}
 
 		PracticeAreaDto createPracticeArea(int shaleClientId, String name, String color, boolean active, String systemKey);
 

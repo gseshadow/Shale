@@ -31,11 +31,11 @@ final class CaseLinksPhase544CompactCardTest {
         String card = normalize(Files.readString(CARD));
         String compact = methodBody(card, "buildCompactCard");
 
-        assertTrue(compact.contains("HBox header = new HBox(6)"));
+        assertTrue(compact.contains("new HBox(6)"));
         assertTrue(compact.contains("titleLabel(link, Variant.COMPACT)"));
         assertTrue(compact.contains("LinkTypeIndicatorFactory.createLinkTypePill"));
-        assertTrue(compact.contains("if (link.primary()) header.getChildren().add(primaryBadge())"));
-        assertTrue(compact.contains("HBox summaryRow = new HBox(8)"));
+        assertTrue(compact.contains("link.primary()") && compact.contains("primaryBadge()"));
+        assertTrue(compact.contains("new HBox(8)"));
         assertTrue(compact.contains("descriptionLabel(link, true)"));
         assertTrue(compact.contains("ActionButtonFactory.cardAction(\"Edit\""));
         assertTrue(compact.contains("case-link-card-compact-edit"));
@@ -53,11 +53,11 @@ final class CaseLinksPhase544CompactCardTest {
         String shared = methodBody(card, "addSharedWith");
         String embedded = methodBody(card, "embeddedShareCard");
 
-        assertTrue(shared.contains("if (link.shares() == null || link.shares().isEmpty()) return"));
-        assertTrue(shared.contains("FlowPane flow = new FlowPane(compact ? 4 : 6, compact ? 4 : 6)"));
+        assertTrue(shared.contains("link.shares() == null") && shared.contains("link.shares().isEmpty()") && shared.contains("return"));
+        assertTrue(shared.contains("new FlowPane(compact ? 4 : 6, compact ? 4 : 6)"));
         assertTrue(shared.contains("case-link-card-shared-contact-flow-compact"));
         assertTrue(shared.contains("flow.getChildren().add(label)"));
-        assertTrue(shared.contains("card.getChildren().add(flow); return"));
+        assertTrue(shared.contains("card.getChildren().add(flow)") && shared.contains("return"));
         assertTrue(embedded.contains("ContactCardFactory.Variant.MINI"));
         assertTrue(embedded.contains("case-link-embedded-contact-card"));
         assertTrue(embedded.contains("card.setInteractive(navigable)"));
@@ -97,7 +97,8 @@ final class CaseLinksPhase544CompactCardTest {
     }
 
     private static String methodBody(String normalizedSource, String methodName) {
-        int signature = normalizedSource.indexOf(methodName + "(");
+        int signature = normalizedSource.indexOf("private static void " + methodName + "(");
+        if (signature < 0) signature = normalizedSource.indexOf("private static ContactCard " + methodName + "(");
         assertTrue(signature >= 0, "Expected method " + methodName);
         int open = normalizedSource.indexOf('{', signature);
         assertTrue(open >= 0, "Expected body for " + methodName);

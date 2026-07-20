@@ -2125,13 +2125,32 @@ public class CaseController {
 					renderCaseLinks(successMessage);
 				});
 			} catch (Exception ex) {
-				LOG.warn("Case Link mutation failure op={} tenantId={} actorId={} caseId={} caseLinkId={} requestId={} elapsedMs={}", operation, tenantId, actorId, activeCaseId, caseLinkIdForLog, requestId, elapsedMs(started), ex);
+				boolean primaryConflict = isPrimaryCaseLinkConflict(ex);
+				List<CaseLinkDto> conflictReload = null;
+				if (primaryConflict) {
+					try {
+						List<CaseLinkDto> reloaded = caseService.listCaseLinks(activeCaseId, tenantId);
+						conflictReload = reloaded == null ? List.of() : List.copyOf(reloaded);
+					} catch (Exception reloadEx) {
+						LOG.warn("Case Link mutation conflict reload failed op={} tenantId={} actorId={} caseId={} caseLinkId={} requestId={}", operation, tenantId, actorId, activeCaseId, caseLinkIdForLog, requestId, reloadEx);
+					}
+				}
+				List<CaseLinkDto> safeConflictReload = conflictReload;
+				LOG.warn("Case Link mutation failure op={} tenantId={} actorId={} caseId={} caseLinkId={} requestId={} primaryConflict={} elapsedMs={}", operation, tenantId, actorId, activeCaseId, caseLinkIdForLog, requestId, primaryConflict, elapsedMs(started), ex);
 				Platform.runLater(() -> {
 					caseLinkMutationInFlight.set(false);
 					setCaseLinkControlsDisabled(false);
 					if (caseId != null && caseId == activeCaseId) {
-						AppDialogs.showError(caseLinksOwner(), "Case Links", rootMessage(ex));
-						renderCaseLinks(null);
+						if (primaryConflict && safeConflictReload != null) {
+							caseLinks = safeConflictReload;
+							caseLinksLoadedOnce = true;
+							caseLinksStale = false;
+							invalidateOverviewPrimaryLinkAfterCaseLinkMutation();
+							renderCaseLinks(null);
+						} else {
+							renderCaseLinks(null);
+						}
+						AppDialogs.showError(caseLinksOwner(), "Case Links", caseLinkUserMessage(ex));
 					}
 				});
 			}
@@ -2421,6 +2440,19 @@ public class CaseController {
 	private int safeActorUserId() { Integer id = appState == null ? null : appState.getUserId(); return id == null ? -1 : id; }
 	private static long elapsedMs(long started) { return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started); }
 	private static Long resolvedCaseLinkId(Long fallback, Object result) { return result instanceof CaseLinkDto dto ? dto.caseLinkId() : fallback; }
+
+	private static boolean isPrimaryCaseLinkConflict(Throwable ex) {
+		for (Throwable cur = ex; cur != null; cur = cur.getCause()) {
+			String message = cur.getMessage();
+			if (message != null && message.contains("Primary Link changed while you were saving")) return true;
+		}
+		return false;
+	}
+
+	private static String caseLinkUserMessage(Throwable ex) {
+		String message = ex == null ? null : ex.getMessage();
+		return message == null || message.isBlank() ? rootMessage(ex) : message;
+	}
 
 	private static String rootMessage(Throwable ex) { Throwable cur = ex; while (cur != null && cur.getCause() != null) cur = cur.getCause(); String msg = cur == null ? null : cur.getMessage(); return msg == null || msg.isBlank() ? "Unexpected error." : msg; }
 	private static boolean blank(String text) { return text == null || text.trim().isEmpty(); }

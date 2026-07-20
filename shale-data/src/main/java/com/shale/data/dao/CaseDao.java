@@ -7752,12 +7752,17 @@ public final class CaseDao {
 				validateCaseForTenant(con, shaleClientId, caseId);
 				validateActorForTenant(con, shaleClientId, actorUserId);
 				validateActiveLinkTypeForTenant(con, shaleClientId, linkTypeId);
-				boolean first = !hasActiveCaseLinks(con, shaleClientId, caseId);
+				boolean hasActiveLinks = hasActiveCaseLinks(con, shaleClientId, caseId);
+				boolean hasActivePrimary = hasActivePrimaryCaseLink(con, shaleClientId, caseId);
+				boolean makePrimaryOnInsert = primary || !hasActiveLinks;
+				if (makePrimaryOnInsert && hasActivePrimary) {
+					clearActivePrimaryForCreate(con, shaleClientId, caseId, actorUserId);
+				}
 				long externalId = insertExternalLink(con, shaleClientId, actorUserId, linkTypeId, displayName, url, description);
-				long caseLinkId = insertCaseLink(con, shaleClientId, actorUserId, caseId, externalId, primary || first,
+				long caseLinkId = insertCaseLink(con, shaleClientId, actorUserId, caseId, externalId, makePrimaryOnInsert,
 						notes, sortOrder == null ? nextSortOrder(con, shaleClientId, caseId) : sortOrder);
-				if (primary || first) {
-					setOnlyPrimary(con, shaleClientId, caseId, caseLinkId, actorUserId);
+				if (!makePrimaryOnInsert && !hasActivePrimary) {
+					ensurePrimaryCandidate(con, shaleClientId, caseId, actorUserId);
 				}
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
@@ -7781,11 +7786,14 @@ public final class CaseDao {
 				validateActorForTenant(con, shaleClientId, actorUserId);
 				validateActiveLinkTypeForTenant(con, shaleClientId, linkTypeId);
 				validateShareDraftContacts(con, shaleClientId, shares);
-				boolean first = !hasActiveCaseLinks(con, shaleClientId, caseId);
+				boolean hasActiveLinks = hasActiveCaseLinks(con, shaleClientId, caseId);
+				boolean hasActivePrimary = hasActivePrimaryCaseLink(con, shaleClientId, caseId);
+				boolean makePrimaryOnInsert = primary || !hasActiveLinks;
+				if (makePrimaryOnInsert && hasActivePrimary) clearActivePrimaryForCreate(con, shaleClientId, caseId, actorUserId);
 				long externalId = insertExternalLink(con, shaleClientId, actorUserId, linkTypeId, displayName, url, description);
-				long caseLinkId = insertCaseLink(con, shaleClientId, actorUserId, caseId, externalId, primary || first, notes, sortOrder == null ? nextSortOrder(con, shaleClientId, caseId) : sortOrder);
+				long caseLinkId = insertCaseLink(con, shaleClientId, actorUserId, caseId, externalId, makePrimaryOnInsert, notes, sortOrder == null ? nextSortOrder(con, shaleClientId, caseId) : sortOrder);
 				for (CaseLinkShareDraft share : shares == null ? List.<CaseLinkShareDraft>of() : shares) insertCaseLinkShare(con, shaleClientId, actorUserId, caseLinkId, share.contactId(), share.sharedAt(), share.notes());
-				if (primary || first) setOnlyPrimary(con, shaleClientId, caseId, caseLinkId, actorUserId);
+				if (!makePrimaryOnInsert && !hasActivePrimary) ensurePrimaryCandidate(con, shaleClientId, caseId, actorUserId);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
@@ -8593,6 +8601,49 @@ public final class CaseDao {
 		}
 	}
 
+	private boolean hasActivePrimaryCaseLink(Connection con, int tenant, long caseId) throws SQLException {
+		String sql = """
+				SELECT TOP (1) 1
+				FROM dbo.CaseLinks
+				WHERE ShaleClientId = ?
+				  AND CaseId = ?
+				  AND IsDeleted = 0
+				  AND IsPrimary = 1
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, tenant);
+			ps.setLong(2, caseId);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next();
+			}
+		}
+	}
+
+	private void clearActivePrimaryForCreate(Connection con, int tenant, long caseId, int actor) throws SQLException {
+		String sql = """
+				UPDATE dbo.CaseLinks
+				SET IsPrimary = 0,
+				    UpdatedByUserId = ?,
+				    UpdatedAt = SYSUTCDATETIME()
+				WHERE ShaleClientId = ?
+				  AND CaseId = ?
+				  AND IsDeleted = 0
+				  AND IsPrimary = 1
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, actor);
+			ps.setInt(2, tenant);
+			ps.setLong(3, caseId);
+			ps.executeUpdate();
+		}
+	}
+
+	private void ensurePrimaryCandidate(Connection con, int tenant, long caseId, int actor) throws SQLException {
+		if (hasActivePrimaryCaseLink(con, tenant, caseId)) return;
+		Long candidate = findNextPrimaryCandidate(con, tenant, caseId, -1);
+		if (candidate != null) setOnlyPrimary(con, tenant, caseId, candidate, actor);
+	}
+
 	private long insertCaseLink(Connection con, int tenant, int actor, long caseId, long externalId, boolean primary,
 			String notes, int sort) throws SQLException {
 		String sql = """
@@ -8952,7 +9003,7 @@ public final class CaseDao {
 				return new IllegalArgumentException("This external link is already associated with the case.", e);
 			}
 			if (message.contains("UX_CaseLinks_CaseId_Primary_Active")) {
-				return new IllegalArgumentException("Only one active primary link is allowed for a case.", e);
+				return new IllegalStateException("The Primary Link changed while you were saving. The Links list has been refreshed; please review it and try again.", e);
 			}
 			if (message.contains("UX_CaseLinkShares_CaseLinkId_ContactId_Active")) {
 				return new IllegalArgumentException("This contact is already shared on this link.", e);
