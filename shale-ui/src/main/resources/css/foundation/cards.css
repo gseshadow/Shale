@@ -115,7 +115,7 @@
 }
 
 .case-link-card-full { -fx-padding: 16 16 16 18; }
-.case-link-card-compact { -fx-padding: 12 12 12 14; -fx-border-width: 1px 1px 1px 4px; }
+.case-link-card-compact { -fx-padding: 8 10 8 12; -fx-spacing: 4; -fx-border-width: 1px 1px 1px 4px; }
 .case-link-card-mini { -fx-padding: 7 9 7 11; -fx-spacing: 4; -fx-border-width: 1px 1px 1px 3px; }
 
 .case-link-card-title {
@@ -133,6 +133,8 @@
 }
 
 .case-link-card-footer { -fx-padding: 4 0 0 0; }
+.case-link-card-compact-edit { -fx-padding: 3 8 3 8; -fx-font-size: 11px; }
+.case-link-card-description-compact { -fx-font-size: 12px; }
 .case-link-primary-badge { -fx-font-size: 10px; }
 
 .case-link-card-shared-with {
@@ -153,8 +155,14 @@
     -fx-vgap: 6;
 }
 
+.case-link-card-shared-contact-flow-compact {
+    -fx-padding: 2 0 0 0;
+    -fx-hgap: 5;
+    -fx-vgap: 4;
+}
+
 .case-link-embedded-contact-card {
-    -fx-padding: 4 9 4 9;
+    -fx-padding: 3 8 3 8;
     -fx-background-radius: 10;
     -fx-border-radius: 10;
 }

@@ -74,11 +74,18 @@ public final class CaseLinkCardFactory {
             }
         });
 
+        if (variant == Variant.COMPACT) {
+            buildCompactCard(card, link, safeActions, onOpenContact, showManagementActions);
+        } else {
+            buildFullOrMiniCard(card, link, variant, safeActions, onOpenContact, showManagementActions);
+        }
+        return card;
+    }
+
+    private static void buildFullOrMiniCard(VBox card, CaseLinkDto link, Variant variant, Actions safeActions,
+            Consumer<Integer> onOpenContact, boolean showManagementActions) {
         HBox header = new HBox(8); header.setAlignment(Pos.CENTER_LEFT);
-        Label title = new Label(blankTo(link.displayName(), "Untitled link"));
-        title.getStyleClass().addAll("case-link-card-title", "case-link-card-title-" + variant.name().toLowerCase());
-        title.setWrapText(variant != Variant.MINI);
-        title.setTextOverrun(OverrunStyle.ELLIPSIS);
+        Label title = titleLabel(link, variant);
         Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
         Label typePill = LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor(), LinkTypeIndicatorFactory.PillSize.COMPACT);
         header.getChildren().addAll(title, spacer, typePill);
@@ -86,10 +93,7 @@ public final class CaseLinkCardFactory {
         card.getChildren().add(header);
 
         if (variant != Variant.MINI) {
-            Label description = new Label(blankTo(link.description(), "No description"));
-            description.getStyleClass().addAll("case-link-card-description", blank(link.description()) ? "case-link-card-description-empty" : "search-summary-text");
-            description.setWrapText(true);
-            card.getChildren().add(description);
+            card.getChildren().add(descriptionLabel(link, false));
         }
         if (variant == Variant.FULL && !blank(link.notes())) {
             Label notes = new Label("Notes: " + link.notes().trim());
@@ -98,26 +102,81 @@ public final class CaseLinkCardFactory {
             card.getChildren().add(notes);
         }
         if (variant == Variant.FULL) addSharedWith(card, link, false, onOpenContact); // legacy: if (variant == Variant.FULL) addSharedWith(card, link, false)
-        if (variant == Variant.COMPACT) addSharedWith(card, link, true, onOpenContact); // legacy: if (variant == Variant.COMPACT) addSharedWith(card, link, true)
         if (showManagementActions && variant == Variant.FULL) card.getChildren().add(fullFooter(link, safeActions));
-        if (showManagementActions && variant == Variant.COMPACT) card.getChildren().add(compactFooter(safeActions));
-        return card;
     }
+
+    private static void buildCompactCard(VBox card, CaseLinkDto link, Actions safeActions,
+            Consumer<Integer> onOpenContact, boolean showManagementActions) {
+        HBox header = new HBox(6); header.setAlignment(Pos.CENTER_LEFT);
+        Label title = titleLabel(link, Variant.COMPACT);
+        title.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(title, Priority.ALWAYS);
+        Label typePill = LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor(), LinkTypeIndicatorFactory.PillSize.COMPACT);
+        header.getChildren().addAll(title, typePill);
+        if (link.primary()) header.getChildren().add(primaryBadge());
+        card.getChildren().add(header);
+
+        HBox summaryRow = new HBox(8); summaryRow.setAlignment(Pos.CENTER_LEFT);
+        Label description = descriptionLabel(link, true);
+        description.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(description, Priority.ALWAYS);
+        summaryRow.getChildren().add(description);
+        if (showManagementActions) {
+            Button edit = isolated(ActionButtonFactory.cardAction("Edit", e -> safeActions.edit().run()));
+            edit.getStyleClass().add("case-link-card-compact-edit");
+            summaryRow.getChildren().add(edit);
+        }
+        card.getChildren().add(summaryRow);
+
+        addSharedWith(card, link, true, onOpenContact); // legacy: if (variant == Variant.COMPACT) addSharedWith(card, link, true)
+    }
+
+    private static Label titleLabel(CaseLinkDto link, Variant variant) {
+        Label title = new Label(blankTo(link.displayName(), "Untitled link"));
+        title.getStyleClass().addAll("case-link-card-title", "case-link-card-title-" + variant.name().toLowerCase());
+        title.setWrapText(variant != Variant.MINI);
+        title.setTextOverrun(OverrunStyle.ELLIPSIS);
+        return title;
+    }
+
+    private static Label descriptionLabel(CaseLinkDto link, boolean compact) {
+        String text = blankTo(link.description(), compact ? "No description provided" : "No description");
+        Label description = new Label(text);
+        description.getStyleClass().addAll("case-link-card-description", blank(link.description()) ? "case-link-card-description-empty" : "search-summary-text");
+        description.setWrapText(true);
+        description.setTextOverrun(OverrunStyle.ELLIPSIS);
+        if (compact) {
+            description.getStyleClass().add("case-link-card-description-compact");
+            description.setMinHeight(Region.USE_PREF_SIZE);
+            description.setPrefHeight(Region.USE_COMPUTED_SIZE);
+            Tooltip.install(description, new Tooltip(text));
+        }
+        return description;
+    }
+
 
     private static void addSharedWith(VBox card, CaseLinkDto link, boolean compact, Consumer<Integer> onOpenContact) {
         if (link.shares() == null || link.shares().isEmpty()) return;
-        VBox shared = new VBox(compact ? 4 : 6);
-        shared.getStyleClass().addAll("case-link-card-shared-with", compact ? "case-link-card-shared-with-compact" : "case-link-card-shared-with-full");
-        Label label = new Label(compact ? "Shared With" : "Shared With");
+        Label label = new Label("Shared With");
         label.getStyleClass().addAll("case-link-card-shared-with-label", "search-summary-text");
         FlowPane flow = new FlowPane(compact ? 4 : 6, compact ? 4 : 6);
         flow.getStyleClass().add("case-link-card-shared-contact-flow");
         flow.setMaxWidth(Double.MAX_VALUE);
         flow.setPrefWrapLength(compact ? 320 : 560);
+        if (compact) {
+            flow.getStyleClass().add("case-link-card-shared-contact-flow-compact");
+            flow.getChildren().add(label);
+        }
         for (CaseLinkShareDto share : link.shares()) {
             ContactCard cardNode = embeddedShareCard(share, compact, onOpenContact);
             flow.getChildren().add(cardNode);
         }
+        if (compact) {
+            card.getChildren().add(flow);
+            return;
+        }
+        VBox shared = new VBox(6);
+        shared.getStyleClass().addAll("case-link-card-shared-with", "case-link-card-shared-with-full");
         shared.getChildren().addAll(label, flow);
         card.getChildren().add(shared);
     }
@@ -149,12 +208,6 @@ public final class CaseLinkCardFactory {
         footer.getChildren().add(isolated(ActionButtonFactory.danger("Delete", e -> actions.delete().run())));
         Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
         footer.getChildren().addAll(spacer, isolated(ActionButtonFactory.cardAction("Edit", e -> actions.edit().run())));
-        return footer;
-    }
-
-    private static HBox compactFooter(Actions actions) {
-        HBox footer = new HBox(6); footer.getStyleClass().add("case-link-card-footer"); footer.setAlignment(Pos.CENTER_RIGHT);
-        footer.getChildren().add(isolated(ActionButtonFactory.cardAction("Edit", e -> actions.edit().run())));
         return footer;
     }
 
