@@ -36,6 +36,36 @@ class TaskCardSharedUsageRegressionTest {
     }
 
     @Test
+    void myShaleOverviewUsesSharedCompactVariantWidthWithoutLocalOverrides() throws Exception {
+        String myShale = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+        String taskCard = Files.readString(Path.of("src/main/java/com/shale/ui/component/TaskCard.java"));
+        String factory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/TaskCardFactory.java"));
+
+        String overviewSection = myShale.substring(
+                myShale.indexOf("private Node buildOverviewTaskSection("),
+                myShale.indexOf("private Map<TaskLaneKey, List<CaseTaskListItemDto>> groupTasksByLane("));
+
+        assertTrue(overviewSection.contains("taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT, true)"),
+                "My Shale Overview should keep using the established shared COMPACT task-card variant.");
+        assertTrue(taskCard.contains("private static final double COMPACT_CARD_WIDTH = 280"),
+                "The shared COMPACT task-card variant should own the widened fixed card width.");
+        assertTrue(taskCard.contains("setMinWidth(COMPACT_CARD_WIDTH)")
+                        && taskCard.contains("setPrefWidth(COMPACT_CARD_WIDTH)")
+                        && taskCard.contains("setMaxWidth(COMPACT_CARD_WIDTH)"),
+                "The COMPACT variant should keep a fixed non-stretching width so FlowPane wrapping remains natural.");
+        assertTrue(factory.contains("case COMPACT -> card.applyCompact();"),
+                "The factory should continue routing COMPACT to the shared TaskCard implementation.");
+        assertFalse(myShale.contains("OVERVIEW_COMPACT_TASK_CARD_WIDTH"),
+                "My Shale must not carry an Overview-specific compact task-card width constant.");
+        assertFalse(overviewSection.contains("regionCard.setPrefWidth")
+                        || overviewSection.contains("regionCard.setMinWidth")
+                        || overviewSection.contains("regionCard.setMaxWidth"),
+                "My Shale Overview must not override the shared compact task-card width locally.");
+        assertFalse(factory.contains("MY_SHALE") || factory.contains("OVERVIEW"),
+                "TaskCardFactory must not introduce a My Shale-specific variant or branch.");
+    }
+
+    @Test
     void caseTasksAllowPhiDescriptionInAuthenticatedWorkSurface() throws Exception {
         String caseController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
 

@@ -37,7 +37,7 @@ public final class TaskCard extends VBox {
 
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
 	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
-	private static final double COMPACT_CARD_WIDTH = 210;
+	private static final double COMPACT_CARD_WIDTH = 280;
 	private static final Duration HOVER_REVEAL_DURATION = Duration.millis(180);
 	private static final int HOVER_DESCRIPTION_MAX_CHARS = 520;
 	private static final int HOVER_DESCRIPTION_MAX_LOGICAL_LINES = 8;
