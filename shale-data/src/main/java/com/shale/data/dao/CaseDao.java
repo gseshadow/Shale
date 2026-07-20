@@ -1,7 +1,5 @@
 package com.shale.data.dao;
 
-import com.microsoft.sqlserver.jdbc.SQLServerError;
-import com.microsoft.sqlserver.jdbc.SQLServerException;
 
 import java.sql.Connection;
 import java.sql.Time;
@@ -2260,36 +2258,7 @@ public final class CaseDao {
 				}
 			}
 		} catch (SQLException e) {
-			logGetOverviewSqlServerFailure(e, sql);
 			throw new RuntimeException("Failed to load case overview (caseId=" + caseId + ")", e);
-		}
-	}
-
-	private static void logGetOverviewSqlServerFailure(SQLException e, String sql) {
-		if (!(e instanceof SQLServerException sqlServerException)) {
-			return;
-		}
-
-		SQLServerError error = sqlServerException.getSQLServerError();
-		long lineNumber = error == null ? -1L : error.getLineNumber();
-		String message = error == null ? sqlServerException.getMessage() : error.getErrorMessage();
-		System.err.println("[GET_OVERVIEW SQLSERVER ERROR] number="
-				+ (error == null ? "<unavailable>" : error.getErrorNumber())
-				+ " line=" + (lineNumber > 0 ? lineNumber : "<unavailable>")
-				+ " message=" + message);
-
-		if (sql == null || sql.isBlank()) {
-			return;
-		}
-
-		String[] lines = sql.split("\\R", -1);
-		if (lineNumber > 0 && lineNumber <= lines.length) {
-			System.err.printf("[GET_OVERVIEW SQLSERVER ERROR LINE] %03d | %s%n", lineNumber, lines[(int) lineNumber - 1]);
-		}
-
-		System.err.println("[GET_OVERVIEW SQL NUMBERED]");
-		for (int i = 0; i < lines.length; i++) {
-			System.err.printf("%03d | %s%n", i + 1, lines[i]);
 		}
 	}
 
@@ -6881,19 +6850,55 @@ public final class CaseDao {
 			if (con != null) {
 				try { con.rollback(); } catch (SQLException ignored) { }
 			}
-			System.err.println("[PRIMARY_LEGAL_ASSISTANT DAO SQL ERROR] caseId=" + caseId + ", userId=" + userId);
-			e.printStackTrace(System.err);
-			if (e instanceof com.microsoft.sqlserver.jdbc.SQLServerException sqlServerException) {
-				com.microsoft.sqlserver.jdbc.SQLServerError sqlServerError = sqlServerException.getSQLServerError();
-				System.err.println("[PRIMARY_LEGAL_ASSISTANT DAO SQLSERVER] errorNumber="
-						+ (sqlServerError == null ? sqlServerException.getErrorCode() : sqlServerError.getErrorNumber())
-						+ ", state=" + (sqlServerError == null ? sqlServerException.getSQLState() : sqlServerError.getErrorState())
-						+ ", lineNumber=" + (sqlServerError == null ? "unknown" : sqlServerError.getLineNumber())
-						+ ", message=" + sqlServerException.getMessage());
+			throw new RuntimeException("Failed to set primary legal assistant (caseId=" + caseId + ", userId=" + userId + ")", e);
+		} finally {
+			if (con != null) {
+				try { con.setAutoCommit(true); } catch (SQLException ignored) { }
+				try { con.close(); } catch (SQLException ignored) { }
 			}
-			String sqlServerMessage = e.getMessage();
-			throw new RuntimeException("Failed to set primary legal assistant (caseId=" + caseId + ", userId=" + userId
-					+ "): " + (sqlServerMessage == null || sqlServerMessage.isBlank() ? e.getClass().getSimpleName() : sqlServerMessage), e);
+		}
+	}
+
+	public void removePrimaryLegalAssistant(long caseId, int shaleClientId) {
+		Connection con = null;
+		try {
+			con = db.requireConnection();
+			con.setAutoCommit(false);
+
+			try (PreparedStatement ps = con.prepareStatement("""
+					SELECT 1
+					FROM dbo.Cases c
+					WHERE c.Id = ?
+					  AND c.ShaleClientId = ?
+					  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
+					""")) {
+				ps.setLong(1, caseId);
+				ps.setInt(2, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next()) {
+						throw new SQLException("Case was not found for tenant.");
+					}
+				}
+			}
+
+			try (PreparedStatement ps = con.prepareStatement("""
+					DELETE FROM dbo.CaseUsers
+					WHERE CaseId = ?
+					  AND RoleId = ?
+					  AND IsPrimary = 1;
+					""")) {
+				ps.setLong(1, caseId);
+				ps.setInt(2, ROLE_LEGAL_ASSISTANT);
+				ps.executeUpdate();
+			}
+
+			touchCaseUpdatedAt(con, caseId, shaleClientId);
+			con.commit();
+		} catch (SQLException e) {
+			if (con != null) {
+				try { con.rollback(); } catch (SQLException ignored) { }
+			}
+			throw new RuntimeException("Failed to remove primary legal assistant (caseId=" + caseId + ")", e);
 		} finally {
 			if (con != null) {
 				try { con.setAutoCommit(true); } catch (SQLException ignored) { }

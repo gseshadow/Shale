@@ -114,11 +114,6 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
         assertTrue(method.contains("RoleSemantics.ROLE_LEGAL_ASSISTANT") || source.contains("ROLE_LEGAL_ASSISTANT = RoleSemantics.ROLE_LEGAL_ASSISTANT"));
         assertTrue(method.contains("con.setAutoCommit(false)"));
         assertTrue(method.contains("con.rollback()"));
-        assertTrue(method.contains("e.printStackTrace(System.err)"));
-        assertTrue(method.contains("SQLServerException"));
-        assertTrue(method.contains("getSQLServerError()"));
-        assertTrue(method.contains("errorNumber="));
-        assertTrue(method.contains("lineNumber="));
         assertTrue(method.contains("u.ShaleClientId = c.ShaleClientId"));
         assertTrue(method.contains("c.ShaleClientId = ?"));
         assertTrue(method.contains("u.Id = ?"));
@@ -140,6 +135,19 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
         assertFalse(method.contains("pla_cu.IsActive"));
         assertFalse(method.contains("pla_cu.IsDeleted"));
         assertFalse(method.contains("ROLE_RESPONSIBLE_ATTORNEY"), "Responsible Attorney assignments must be untouched");
+    }
+
+    @Test
+    void temporaryOverviewAndPrimaryLegalAssistantDiagnosticsAreRemoved() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        assertFalse(source.contains("[GET_OVERVIEW " + "SQLSERVER ERROR]"));
+        assertFalse(source.contains("[GET_OVERVIEW " + "SQLSERVER ERROR LINE]"));
+        assertFalse(source.contains("[GET_OVERVIEW " + "SQL NUMBERED]"));
+        assertFalse(source.contains("logGetOverviewSqlServerFailure"));
+        assertFalse(source.contains("[PRIMARY_LEGAL_ASSISTANT " + "DAO SQL ERROR]"));
+        assertFalse(source.contains("[PRIMARY_LEGAL_ASSISTANT " + "DAO SQLSERVER]"));
+        assertFalse(source.contains("SQLServer" + "Error"));
+        assertFalse(source.contains("SQLServer" + "Exception"));
     }
 
     @Test

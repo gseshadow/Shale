@@ -5322,29 +5322,16 @@ public class CaseController {
 		setBusy(true);
 		new Thread(() ->
 		{
-			String stage = "DAO_MUTATION";
 			try {
 				caseDao.removePrimaryLegalAssistant(activeCaseId, appState.getShaleClientId());
-				stage = "LIVE_PUBLISH";
 				addTeamChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId());
 				runOnFx(() ->
 				{
-					try {
-						setBusy(false);
-						publishCaseFieldUpdated(activeCaseId, "primaryLegalAssistantUserId", null);
-					} catch (Throwable publishFailure) {
-						logPrimaryLegalAssistantSaveThrowable("LIVE_PUBLISH", publishFailure);
-						throw publishFailure;
-					}
-					try {
-						reloadCurrentCaseForViewMode();
-					} catch (Throwable refreshFailure) {
-						logPrimaryLegalAssistantSaveThrowable("UI_REFRESH", refreshFailure);
-						throw refreshFailure;
-					}
+					setBusy(false);
+					publishCaseFieldUpdated(activeCaseId, "primaryLegalAssistantUserId", null);
+					reloadCurrentCaseForViewMode();
 				});
-			} catch (Throwable ex) {
-				logPrimaryLegalAssistantSaveThrowable(stage, ex);
+			} catch (Exception ex) {
 				runOnFx(() ->
 				{
 					setBusy(false);
@@ -5359,50 +5346,23 @@ public class CaseController {
 		setBusy(true);
 		new Thread(() ->
 		{
-			String stage = "DAO_MUTATION";
 			try {
 				caseDao.setPrimaryLegalAssistant(activeCaseId, appState.getShaleClientId(), userId);
-				stage = "LIVE_PUBLISH";
 				addTeamChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId());
 				runOnFx(() ->
 				{
-					try {
-						setBusy(false);
-						publishCaseFieldUpdated(activeCaseId, "primaryLegalAssistantUserId", userId);
-					} catch (Throwable publishFailure) {
-						logPrimaryLegalAssistantSaveThrowable("LIVE_PUBLISH", publishFailure);
-						throw publishFailure;
-					}
-					try {
-						reloadCurrentCaseForViewMode();
-					} catch (Throwable refreshFailure) {
-						logPrimaryLegalAssistantSaveThrowable("UI_REFRESH", refreshFailure);
-						throw refreshFailure;
-					}
+					setBusy(false);
+					publishCaseFieldUpdated(activeCaseId, "primaryLegalAssistantUserId", userId);
+					reloadCurrentCaseForViewMode();
 				});
-			} catch (Throwable ex) {
-				logPrimaryLegalAssistantSaveThrowable(stage, ex);
+			} catch (Exception ex) {
 				runOnFx(() ->
 				{
-					try {
-						setBusy(false);
-						showError("Failed to save primary legal assistant. " + ex.getMessage());
-					} catch (Throwable uiFailure) {
-						logPrimaryLegalAssistantSaveThrowable("UI_REFRESH", uiFailure);
-						throw uiFailure;
-					}
+					setBusy(false);
+					showError("Failed to save primary legal assistant. " + ex.getMessage());
 				});
 			}
 		}, "case-primary-legal-assistant-field-save-" + activeCaseId).start();
-	}
-
-	private static void logPrimaryLegalAssistantSaveThrowable(String stage, Throwable throwable) {
-		System.err.println("[PRIMARY_LEGAL_ASSISTANT SAVE ERROR] stage=" + stage);
-		if (throwable == null) {
-			System.err.println("[PRIMARY_LEGAL_ASSISTANT SAVE ERROR] throwable=null");
-			return;
-		}
-		throwable.printStackTrace(System.err);
 	}
 
 	private void onChangeResponsibleAttorney() {
