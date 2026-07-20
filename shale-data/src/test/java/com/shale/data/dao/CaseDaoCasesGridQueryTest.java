@@ -95,12 +95,31 @@ final class CaseDaoCasesGridQueryTest {
         assertTrue(method.contains("sqlPlaceholders(selectedStatusIds.size())"));
         assertTrue(method.contains("status.lifecycleKey()"));
         assertTrue(method.contains("status.sortOrder()"));
+        assertTrue(method.contains("status.color()"),
+                "Reports rows must carry the authoritative color from the effective status record.");
         assertFalse(method.contains("Cases.CaseStatusId"));
         assertFalse(method.contains("c.CaseStatusId"));
         assertFalse(method.contains("AcceptedDate"));
         assertFalse(method.contains("DeniedDate"));
         assertFalse(method.contains("ClosedDate"));
         assertFalse(method.contains("NonEngagementLetterSent"));
+    }
+    @Test
+    void caseStatusReportUsesEffectiveOverlayStatusesForNamesAndColors() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String reportMethod = source.substring(source.indexOf("public List<CaseStatusReportRowDto> listCaseStatusReport"), source.indexOf("private Map<Integer, Long> loadCaseStatusReportCounts"));
+        String overlayMethod = source.substring(source.indexOf("private static List<StatusRow> resolveEffectiveStatuses"), source.indexOf("public List<StatusRow> listStatusesForTenant"));
+
+        assertTrue(reportMethod.contains("List<StatusRow> availableStatuses = listStatusesForTenant(shaleClientId)"),
+                "Reports should use the shared effective tenant/global status lookup before creating report rows.");
+        assertTrue(reportMethod.contains("status.name()"));
+        assertTrue(reportMethod.contains("status.color()"));
+        assertTrue(overlayMethod.contains("bySystemKey.putIfAbsent(systemKey, status)"),
+                "Global statuses should be loaded first for effective overlay resolution.");
+        assertTrue(overlayMethod.contains("bySystemKey.put(systemKey, status)"),
+                "Tenant statuses with the same SystemKey should mask the global status name and color.");
+        assertTrue(overlayMethod.contains("merged.sort"),
+                "Effective status ordering should remain deterministic after overlay resolution.");
     }
 
     @Test
