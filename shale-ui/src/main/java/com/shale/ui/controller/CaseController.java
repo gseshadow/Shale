@@ -581,6 +581,7 @@ public class CaseController {
 
 	private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
 	private static final int ROLE_ATTORNEY = RoleSemantics.ROLE_ATTORNEY;
+	private static final int ROLE_LEGAL_ASSISTANT = RoleSemantics.ROLE_LEGAL_ASSISTANT;
 
 	private static final java.util.Set<Integer> TEAM_ROLE_IDS = java.util.Set.copyOf(RoleSemantics.CASE_TEAM_ROLE_IDS);
 
@@ -5129,13 +5130,69 @@ public class CaseController {
 		for (CaseDao.UserRow row : users) {
 			options.put(safeText(row.displayName()).isBlank() ? "User #" + row.id() : row.displayName(), row);
 		}
-		showChoiceFieldDialog(
-				"Edit primary legal assistant",
-				"Primary legal assistant",
+		showPrimaryLegalAssistantDialog(
 				currentOverview == null ? "—" : safeText(currentOverview.getPrimaryLegalAssistant()),
 				currentOverview == null ? null : currentOverview.getPrimaryLegalAssistant(),
 				options.keySet(),
-				changePrimaryLegalAssistantButton).map(options::get).ifPresent(row -> savePrimaryLegalAssistantField(row.id()));
+				currentOverview != null && currentOverview.getPrimaryLegalAssistantUserId() != null,
+				changePrimaryLegalAssistantButton).ifPresent(action -> {
+			if (action.remove()) {
+				removePrimaryLegalAssistantField();
+			} else {
+				CaseDao.UserRow row = options.get(action.selectedValue());
+				if (row != null)
+					savePrimaryLegalAssistantField(row.id());
+			}
+		});
+	}
+
+	private record PrimaryLegalAssistantDialogAction(String selectedValue, boolean remove) {
+	}
+
+	private Optional<PrimaryLegalAssistantDialogAction> showPrimaryLegalAssistantDialog(String currentValue, String selectedValue,
+			java.util.Collection<String> options, boolean hasPrimaryLegalAssistant, Button ownerButton) {
+		Dialog<PrimaryLegalAssistantDialogAction> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, "Edit primary legal assistant");
+		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType removeType = new ButtonType("Remove primary legal assistant", ButtonData.LEFT);
+		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		if (hasPrimaryLegalAssistant) {
+			dialog.getDialogPane().getButtonTypes().add(removeType);
+		}
+		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveType);
+		ChoiceBox<String> choice = new ChoiceBox<>();
+		choice.getItems().addAll(options == null ? List.of() : options);
+		if (selectedValue != null && choice.getItems().contains(selectedValue)) {
+			choice.getSelectionModel().select(selectedValue);
+		} else if (!choice.getItems().isEmpty()) {
+			choice.getSelectionModel().select(0);
+		}
+		choice.setMaxWidth(Double.MAX_VALUE);
+		Label currentLabel = new Label(safeText(currentValue).isBlank() ? "—" : currentValue);
+		currentLabel.getStyleClass().add("field-edit-current-value");
+		VBox content = new VBox(10,
+				new Label("Current Primary legal assistant"),
+				currentLabel,
+				new Label("New Primary legal assistant"),
+				choice);
+		content.getStyleClass().add("field-edit-dialog-body");
+		dialog.getDialogPane().setContent(content);
+		Node saveButtonNode = dialog.getDialogPane().lookupButton(saveType);
+		if (saveButtonNode != null) {
+			saveButtonNode.disableProperty().bind(choice.valueProperty().isNull());
+		}
+		Node removeButtonNode = dialog.getDialogPane().lookupButton(removeType);
+		if (removeButtonNode != null) {
+			removeButtonNode.getStyleClass().add("app-dialog-button-danger");
+		}
+		dialog.setResultConverter(button -> {
+			if (button == saveType)
+				return new PrimaryLegalAssistantDialogAction(choice.getValue(), false);
+			if (button == removeType)
+				return new PrimaryLegalAssistantDialogAction(null, true);
+			return null;
+		});
+		return dialog.showAndWait();
 	}
 
 	private Optional<String> showChoiceFieldDialog(String title, String fieldLabel, String currentValue, String selectedValue, java.util.Collection<String> options,
@@ -5260,55 +5317,52 @@ public class CaseController {
 		}, "case-responsible-attorney-field-save-" + activeCaseId).start();
 	}
 
+	private void removePrimaryLegalAssistantField() {
+		long activeCaseId = caseId.longValue();
+		setBusy(true);
+		new Thread(() ->
+		{
+			try {
+				caseDao.removePrimaryLegalAssistant(activeCaseId, appState.getShaleClientId());
+				addTeamChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId());
+				runOnFx(() ->
+				{
+					setBusy(false);
+					publishCaseFieldUpdated(activeCaseId, "primaryLegalAssistantUserId", null);
+					reloadCurrentCaseForViewMode();
+				});
+			} catch (Exception ex) {
+				runOnFx(() ->
+				{
+					setBusy(false);
+					showError("Failed to remove primary legal assistant. " + ex.getMessage());
+				});
+			}
+		}, "case-primary-legal-assistant-field-remove-" + activeCaseId).start();
+	}
+
 	private void savePrimaryLegalAssistantField(int userId) {
 		long activeCaseId = caseId.longValue();
 		setBusy(true);
 		new Thread(() ->
 		{
-			String stage = "DAO_MUTATION";
 			try {
 				caseDao.setPrimaryLegalAssistant(activeCaseId, appState.getShaleClientId(), userId);
-				stage = "LIVE_PUBLISH";
 				addTeamChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId());
 				runOnFx(() ->
 				{
-					try {
-						setBusy(false);
-						publishCaseFieldUpdated(activeCaseId, "primaryLegalAssistantUserId", userId);
-					} catch (Throwable publishFailure) {
-						logPrimaryLegalAssistantSaveThrowable("LIVE_PUBLISH", publishFailure);
-						throw publishFailure;
-					}
-					try {
-						reloadCurrentCaseForViewMode();
-					} catch (Throwable refreshFailure) {
-						logPrimaryLegalAssistantSaveThrowable("UI_REFRESH", refreshFailure);
-						throw refreshFailure;
-					}
+					setBusy(false);
+					publishCaseFieldUpdated(activeCaseId, "primaryLegalAssistantUserId", userId);
+					reloadCurrentCaseForViewMode();
 				});
-			} catch (Throwable ex) {
-				logPrimaryLegalAssistantSaveThrowable(stage, ex);
+			} catch (Exception ex) {
 				runOnFx(() ->
 				{
-					try {
-						setBusy(false);
-						showError("Failed to save primary legal assistant. " + ex.getMessage());
-					} catch (Throwable uiFailure) {
-						logPrimaryLegalAssistantSaveThrowable("UI_REFRESH", uiFailure);
-						throw uiFailure;
-					}
+					setBusy(false);
+					showError("Failed to save primary legal assistant. " + ex.getMessage());
 				});
 			}
 		}, "case-primary-legal-assistant-field-save-" + activeCaseId).start();
-	}
-
-	private static void logPrimaryLegalAssistantSaveThrowable(String stage, Throwable throwable) {
-		System.err.println("[PRIMARY_LEGAL_ASSISTANT SAVE ERROR] stage=" + stage);
-		if (throwable == null) {
-			System.err.println("[PRIMARY_LEGAL_ASSISTANT SAVE ERROR] throwable=null");
-			return;
-		}
-		throwable.printStackTrace(System.err);
 	}
 
 	private void onChangeResponsibleAttorney() {
@@ -5575,13 +5629,7 @@ public class CaseController {
 		if (rows == null)
 			rows = List.of();
 
-		List<CaseDao.CaseUserTeamRow> filtered = rows.stream()
-				.filter(r -> r != null && TEAM_ROLE_IDS.contains(r.roleId()))
-				.sorted(java.util.Comparator
-						.comparing((CaseDao.CaseUserTeamRow r) -> !(RoleSemantics.isResponsibleAttorneyRoleId(r.roleId()) && r.isPrimary()))
-						.thenComparingInt(CaseDao.CaseUserTeamRow::roleId)
-						.thenComparing(r -> safeText(r.displayName()), String.CASE_INSENSITIVE_ORDER))
-				.toList();
+		List<CaseDao.CaseUserTeamRow> filtered = deduplicatePracticeTeamRowsForDisplay(rows);
 
 		if (filtered.isEmpty()) {
 			teamFlow.getChildren().add(new Label("—"));
@@ -5597,6 +5645,33 @@ public class CaseController {
 			teamFlow.getChildren().add(card);
 		}
 		PerfLog.logDone("RENDER", "panel=team page=case_view caseId=" + caseId + " childCount=" + teamFlow.getChildren().size(), renderStartNanos);
+	}
+
+	private List<CaseDao.CaseUserTeamRow> deduplicatePracticeTeamRowsForDisplay(List<CaseDao.CaseUserTeamRow> rows) {
+		if (rows == null || rows.isEmpty())
+			return List.of();
+		List<CaseDao.CaseUserTeamRow> ordered = rows.stream()
+				.filter(r -> r != null && TEAM_ROLE_IDS.contains(r.roleId()))
+				.sorted(java.util.Comparator
+						.comparing((CaseDao.CaseUserTeamRow r) -> !isPrimaryResponsibleAttorney(r))
+						.thenComparing(r -> !isPrimaryLegalAssistant(r))
+						.thenComparingInt(CaseDao.CaseUserTeamRow::roleId)
+						.thenComparing(r -> safeText(r.displayName()), String.CASE_INSENSITIVE_ORDER)
+						.thenComparingInt(CaseDao.CaseUserTeamRow::userId))
+				.toList();
+		java.util.LinkedHashMap<Integer, CaseDao.CaseUserTeamRow> byUserId = new java.util.LinkedHashMap<>();
+		for (CaseDao.CaseUserTeamRow row : ordered) {
+			byUserId.putIfAbsent(row.userId(), row);
+		}
+		return new ArrayList<>(byUserId.values());
+	}
+
+	private static boolean isPrimaryResponsibleAttorney(CaseDao.CaseUserTeamRow row) {
+		return row != null && RoleSemantics.isResponsibleAttorneyRoleId(row.roleId()) && row.isPrimary();
+	}
+
+	private static boolean isPrimaryLegalAssistant(CaseDao.CaseUserTeamRow row) {
+		return row != null && row.roleId() == ROLE_LEGAL_ASSISTANT && row.isPrimary();
 	}
 
 	private String roleLabel(int roleId) {
