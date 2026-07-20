@@ -6,11 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.lang.reflect.Method;
 
 import org.junit.jupiter.api.Test;
 
@@ -253,6 +255,51 @@ class CaseServiceAdapterTest {
 				() -> adapter.reorderCaseLinks(new ReorderCaseLinksCommand(7, 5, 99, Arrays.asList(1L, null))));
 	}
 
+	@Test
+	void caseLinkGatewayDefaultsFailExplicitlyInsteadOfReturningPlausibleSuccess() throws Exception {
+		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+				"src/main/java/com/shale/data/service/adapter/CaseServiceAdapter.java"));
+		for (Method method : CaseServiceAdapter.CaseGateway.class.getDeclaredMethods()) {
+			if (!method.getName().matches("listCaseLinksSharedWithContact|createCaseLinkWithShares|updateCaseLinkWithShares|searchCaseLinkShareContacts|listCaseLinkShareContacts|listCaseLinkShareCaseContacts|listCaseLinkShares|addCaseLinkShare|updateCaseLinkShare|removeCaseLinkShare")) {
+				continue;
+			}
+			assertTrue(method.isDefault(), () -> method.getName() + " must be an explicit rejecting default when not implemented");
+			String body = extractMethodBody(source.replace("\r\n", "\n"), method.getName());
+			assertTrue(body.contains("unsupportedCaseLinkGatewayOperation"), method.getName() + " must reject explicitly");
+		}
+	}
+
+	@Test
+	void daoCaseGatewayOverridesEveryCaseLinkDefault() throws Exception {
+		for (Method method : CaseServiceAdapter.CaseGateway.class.getDeclaredMethods()) {
+			if (!method.isDefault() || !method.getName().matches("listCaseLinksSharedWithContact|createCaseLinkWithShares|updateCaseLinkWithShares|searchCaseLinkShareContacts|listCaseLinkShareContacts|listCaseLinkShareCaseContacts|listCaseLinkShares|addCaseLinkShare|updateCaseLinkShare|removeCaseLinkShare")) {
+				continue;
+			}
+			try {
+				Class.forName("com.shale.data.service.adapter.CaseServiceAdapter$DaoCaseGateway").getDeclaredMethod(method.getName(), method.getParameterTypes());
+			} catch (NoSuchMethodException ex) {
+				fail("DaoCaseGateway must override " + method.getName() + " so production reaches CaseDao");
+			}
+		}
+	}
+
+	private static String extractMethodBody(String source, String methodName) {
+		int name = source.indexOf("default ");
+		while (name >= 0 && !source.substring(name, Math.min(source.length(), source.indexOf('{', name) < 0 ? source.length() : source.indexOf('{', name))).contains(methodName + "(")) {
+			name = source.indexOf("default ", name + 1);
+		}
+		assertTrue(name >= 0, () -> "method missing: " + methodName);
+		int open = source.indexOf('{', name);
+		int depth = 0;
+		for (int i = open; i < source.length(); i++) {
+			char ch = source.charAt(i);
+			if (ch == '{') depth++;
+			else if (ch == '}' && --depth == 0) return source.substring(open + 1, i);
+		}
+		throw new AssertionError("unterminated method: " + methodName);
+	}
+
+
 	private static CaseDetailDto detail(long caseId, String caseName) {
 		return new CaseDetailDto(caseId, "C-1", caseName, "description", "open", null,
 				null, null, null, null, null, null, null, null, null, null, null,
@@ -260,7 +307,7 @@ class CaseServiceAdapterTest {
 				null, null, null, null, null, LocalDateTime.now(), new byte[] {1});
 	}
 
-	static final class FakeCaseGateway implements CaseServiceAdapter.CaseGateway {
+	static class FakeCaseGateway implements CaseServiceAdapter.CaseGateway {
 		private final List<CaseUpdateDto> caseUpdates;
 		private long lastCaseUpdatesCaseId;
 		private long lastNoteCaseId;
