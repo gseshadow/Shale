@@ -889,3 +889,26 @@ Transaction expectations remain connection-scoped and DAO-owned. Aggregate creat
 Primary invariants are enforced by DAO transaction logic and the filtered unique active-primary index: first active Link becomes primary, at most one active primary exists per Case, setting primary clears the previous active primary, non-primary updates do not demote the primary unless explicitly requested, deleting the primary promotes the deterministic next active Link by established SortOrder/Id ordering, deleting the only Link leaves no primary, and soft-deleted Links cannot remain primary. When creating a new explicitly Primary Link, the DAO must clear any existing active Primary in the same transaction before inserting the replacement CaseLink with `IsPrimary = 1`; rollback restores the previous Primary and prevents orphan ExternalLinks or partial shares. If the filtered unique index still rejects a concurrent Primary replacement, services/UI must present it as a concurrent Primary Link change rather than exposing SQL Server table, index, or key details.
 
 Audit compatibility status: Shale's current PHI audit helper writes field-level values for known PHI-bearing Case/Contact/Task fields. Case Link and Link Type mutations have tenant and actor IDs available, but safe audit entries for these entities require a broader audit contract that records action plus stable entity IDs without URL, description, note, Contact PII, or RowVer contents. No migration or ad-hoc timeline substitute is introduced in Phase 5.5; follow-up should add first-class non-PHI entity-action audit support or extend the existing audit schema/DAO safely.
+
+---
+
+## dbo.EntityActionAuditLog
+
+Phase 6.1 adds a dedicated append-only entity-action audit table because existing `dbo.AuditLog` is PHI/field oriented (`EntryDate`, `UserId`, `ObjectTypeId`, `ObjectId`, `FieldName`, `FieldCode`, typed value columns) and cannot safely represent entity actions without fake fields or sensitive value payloads.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `Id` | bigint | Identity primary key |
+| `ShaleClientId` | int | Required tenant owner; strict RLS |
+| `ActorUserId` | int | Required `dbo.Users.id` actor |
+| `EntityType` | varchar(64) | Allowlisted entity type such as `LINK_TYPE`, `CASE_LINK`, `CASE_LINK_SHARE` |
+| `EntityId` | bigint | Stable changed entity id |
+| `Action` | varchar(64) | Allowlisted action such as `CREATED`, `UPDATED`, `DELETED`, `PRIMARY_SET`, `REORDERED`, `OVERRIDE_CREATED`, `OVERRIDE_RESET`, `ADDED`, `REMOVED` |
+| `OccurredAt` | datetime2(7) | Immutable UTC event timestamp, default `SYSUTCDATETIME()` |
+| `ParentEntityType` | varchar(64) | Optional safe parent type |
+| `ParentEntityId` | bigint | Optional safe parent id |
+| `CorrelationId` | uniqueidentifier | Optional operation correlation id |
+| `Source` | varchar(64) | Optional source such as desktop/API |
+| `Metadata` | nvarchar(1000) | Optional strictly allowlisted ID/state metadata only |
+
+Audit metadata may contain only stable IDs and non-sensitive state markers, including CaseId, CaseLinkId, CaseLinkShareId, ExternalLinkId, LinkTypeId, ContactId, previous/new Primary CaseLinkId, reordered link count, and activation state. It must not contain URLs, descriptions, link notes, share notes, Contact names/emails/phones, credentials, RowVer bytes, raw commands/DTOs, SQL, or exception text. Ordinary application paths insert only and must not update/delete audit history.

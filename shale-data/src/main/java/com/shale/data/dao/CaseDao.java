@@ -180,6 +180,7 @@ public final class CaseDao {
 
 	private final DbSessionProvider db;
 	private final PhiAuditService phiAuditService;
+	private final EntityActionAuditDao entityActionAuditDao = new EntityActionAuditDao();
 
 	public CaseDao(DbSessionProvider dbSessionProvider) {
 		this.db = Objects.requireNonNull(dbSessionProvider, "dbSessionProvider");
@@ -7646,10 +7647,16 @@ public final class CaseDao {
 
 	public LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey) {
 		try (Connection con = db.requireConnection()) {
-			validateAdminActorForTenant(con, shaleClientId, actorUserId);
-			return insertTenantLinkType(con, shaleClientId, actorUserId, name, color, active, normalizeSystemKey(systemKey));
+			con.setAutoCommit(false);
+			try {
+				validateAdminActorForTenant(con, shaleClientId, actorUserId);
+				LinkTypeDto created = insertTenantLinkType(con, shaleClientId, actorUserId, name, color, active, normalizeSystemKey(systemKey));
+				auditLinkType(con, shaleClientId, actorUserId, created.id(), EntityActionAuditEvent.Action.CREATED, active);
+				con.commit();
+				return created;
+			} catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
 		} catch (SQLException e) {
-			throw translateSql("Failed to create link type", e);
+			throw translateSql("The change could not be saved because its audit record could not be completed.", e);
 		}
 	}
 
@@ -7657,59 +7664,69 @@ public final class CaseDao {
 			boolean active, String systemKey, byte[] expectedRowVer) {
 		requireRowVer(expectedRowVer, "expectedRowVer");
 		try (Connection con = db.requireConnection()) {
+			con.setAutoCommit(false);
+			try {
 			validateAdminActorForTenant(con, shaleClientId, actorUserId);
 			LinkTypeDto existing = findLinkTypeById(con, linkTypeId);
 			if (existing == null || (existing.shaleClientId() != null && existing.shaleClientId() != shaleClientId)) {
 				throw new IllegalArgumentException("Link type is not available for this tenant.");
 			}
+			LinkTypeDto result;
+			EntityActionAuditEvent.Action action;
 			if (existing.shaleClientId() == null) {
 				assertRowVerMatches("dbo.LinkTypes", linkTypeId, expectedRowVer, con, "Link type changed.");
-				return customizeGlobalLinkType(con, shaleClientId, actorUserId, existing, name, color, active, systemKey);
+				result = customizeGlobalLinkType(con, shaleClientId, actorUserId, existing, name, color, active, systemKey);
+				action = EntityActionAuditEvent.Action.OVERRIDE_CREATED;
+			} else {
+				result = updateTenantLinkType(con, shaleClientId, actorUserId, linkTypeId, name, color, active,
+						normalizeSystemKey(systemKey == null ? existing.systemKey() : systemKey), expectedRowVer);
+				action = EntityActionAuditEvent.Action.UPDATED;
 			}
-			return updateTenantLinkType(con, shaleClientId, actorUserId, linkTypeId, name, color, active,
-					normalizeSystemKey(systemKey == null ? existing.systemKey() : systemKey), expectedRowVer);
+			auditLinkType(con, shaleClientId, actorUserId, result.id(), action, result.active());
+			con.commit();
+			return result;
+			} catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
 		} catch (SQLException e) {
-			throw translateSql("Failed to update link type", e);
+			throw translateSql("The change could not be saved because its audit record could not be completed.", e);
 		}
 	}
 
 	public LinkTypeDto setLinkTypeActive(int shaleClientId, int actorUserId, int linkTypeId, boolean active, byte[] expectedRowVer) {
 		requireRowVer(expectedRowVer, "expectedRowVer");
 		try (Connection con = db.requireConnection()) {
-			validateAdminActorForTenant(con, shaleClientId, actorUserId);
-			LinkTypeDto existing = findLinkTypeById(con, linkTypeId);
-			if (existing == null || (existing.shaleClientId() != null && existing.shaleClientId() != shaleClientId)) {
-				throw new IllegalArgumentException("Link type is not available for this tenant.");
-			}
-			if (existing.shaleClientId() == null) {
-				assertRowVerMatches("dbo.LinkTypes", linkTypeId, expectedRowVer, con, "Link type changed.");
-				return customizeGlobalLinkType(con, shaleClientId, actorUserId, existing, existing.name(),
-						existing.color(), active, existing.systemKey());
-			}
-			return updateTenantLinkType(con, shaleClientId, actorUserId, linkTypeId, existing.name(),
-					existing.color(), active, existing.systemKey(), expectedRowVer);
-		} catch (SQLException e) {
-			throw translateSql("Failed to set link type active", e);
-		}
+			con.setAutoCommit(false);
+			try {
+				validateAdminActorForTenant(con, shaleClientId, actorUserId);
+				LinkTypeDto existing = findLinkTypeById(con, linkTypeId);
+				if (existing == null || (existing.shaleClientId() != null && existing.shaleClientId() != shaleClientId)) throw new IllegalArgumentException("Link type is not available for this tenant.");
+				LinkTypeDto result;
+				EntityActionAuditEvent.Action action = active ? EntityActionAuditEvent.Action.ACTIVATED : EntityActionAuditEvent.Action.DEACTIVATED;
+				if (existing.shaleClientId() == null) {
+					assertRowVerMatches("dbo.LinkTypes", linkTypeId, expectedRowVer, con, "Link type changed.");
+					result = customizeGlobalLinkType(con, shaleClientId, actorUserId, existing, existing.name(), existing.color(), active, existing.systemKey());
+				} else {
+					result = updateTenantLinkType(con, shaleClientId, actorUserId, linkTypeId, existing.name(), existing.color(), active, existing.systemKey(), expectedRowVer);
+				}
+				auditLinkType(con, shaleClientId, actorUserId, result.id(), action, result.active());
+				con.commit(); return result;
+			} catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
+		} catch (SQLException e) { throw translateSql("The change could not be saved because its audit record could not be completed.", e); }
 	}
 
 	public void resetLinkTypeOverride(int shaleClientId, int actorUserId, int linkTypeId) {
 		try (Connection con = db.requireConnection()) {
-			validateAdminActorForTenant(con, shaleClientId, actorUserId);
-			LinkTypeDto requested = findLinkTypeById(con, linkTypeId);
-			if (requested == null || (requested.shaleClientId() != null && requested.shaleClientId() != shaleClientId)) {
-				throw new IllegalArgumentException("Link type is not available for this tenant.");
-			}
-			LinkTypeDto override = requested.shaleClientId() == null
-					? findTenantLinkTypeBySystemKey(con, shaleClientId, requested.systemKey())
-					: requested;
-			if (override == null) {
-				return;
-			}
-			softDeleteTenantLinkType(con, shaleClientId, actorUserId, override.id());
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to reset link type override", e);
-		}
+			con.setAutoCommit(false);
+			try {
+				validateAdminActorForTenant(con, shaleClientId, actorUserId);
+				LinkTypeDto requested = findLinkTypeById(con, linkTypeId);
+				if (requested == null || (requested.shaleClientId() != null && requested.shaleClientId() != shaleClientId)) throw new IllegalArgumentException("Link type is not available for this tenant.");
+				LinkTypeDto override = requested.shaleClientId() == null ? findTenantLinkTypeBySystemKey(con, shaleClientId, requested.systemKey()) : requested;
+				if (override == null) { con.commit(); return; }
+				softDeleteTenantLinkType(con, shaleClientId, actorUserId, override.id());
+				auditLinkType(con, shaleClientId, actorUserId, override.id(), EntityActionAuditEvent.Action.OVERRIDE_RESET, false);
+				con.commit();
+			} catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
+		} catch (SQLException e) { throw new RuntimeException("The change could not be saved because its audit record could not be completed.", e); }
 	}
 
 	public List<CaseLinkDto> listCaseLinks(long caseId, int shaleClientId) {
@@ -7764,6 +7781,7 @@ public final class CaseDao {
 				if (!makePrimaryOnInsert && !hasActivePrimary) {
 					ensurePrimaryCandidate(con, shaleClientId, caseId, actorUserId);
 				}
+				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.CREATED, Map.of(EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, externalId));
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -7794,6 +7812,8 @@ public final class CaseDao {
 				long caseLinkId = insertCaseLink(con, shaleClientId, actorUserId, caseId, externalId, makePrimaryOnInsert, notes, sortOrder == null ? nextSortOrder(con, shaleClientId, caseId) : sortOrder);
 				for (CaseLinkShareDraft share : shares == null ? List.<CaseLinkShareDraft>of() : shares) insertCaseLinkShare(con, shaleClientId, actorUserId, caseLinkId, share.contactId(), share.sharedAt(), share.notes());
 				if (!makePrimaryOnInsert && !hasActivePrimary) ensurePrimaryCandidate(con, shaleClientId, caseId, actorUserId);
+				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.CREATED, Map.of(EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, externalId));
+				for (CaseLinkShareDraft share : shares == null ? List.<CaseLinkShareDraft>of() : shares) auditCaseLinkShare(con, shaleClientId, actorUserId, caseLinkId, caseId, share.contactId(), EntityActionAuditEvent.Action.ADDED, null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
@@ -7816,6 +7836,8 @@ public final class CaseDao {
 						description, expectedExternalLinkRowVer);
 				updateCaseLinkRow(con, shaleClientId, actorUserId, caseLinkId, notes, sortOrder, expectedCaseLinkRowVer);
 				applyPrimaryUpdate(con, shaleClientId, actorUserId, caseId, caseLinkId, existing.primary(), primary);
+				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.UPDATED, Map.of(EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, externalLinkId));
+				if (Boolean.TRUE.equals(primary) && !existing.primary()) auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.PRIMARY_SET, Map.of(EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId));
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -7845,6 +7867,11 @@ public final class CaseDao {
 				for (CaseLinkShareUpdate share : updates == null ? List.<CaseLinkShareUpdate>of() : updates) updateCaseLinkShareRow(con, shaleClientId, actorUserId, caseLinkId, share.caseLinkShareId(), share.contactId(), share.sharedAt(), share.notes(), share.expectedRowVer());
 				for (CaseLinkShareRemoval share : removals == null ? List.<CaseLinkShareRemoval>of() : removals) softDeleteCaseLinkShare(con, shaleClientId, actorUserId, caseLinkId, share.caseLinkShareId(), share.expectedRowVer());
 				applyPrimaryUpdate(con, shaleClientId, actorUserId, caseId, caseLinkId, existing.primary(), primary);
+				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.UPDATED, Map.of(EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, externalLinkId));
+				for (CaseLinkShareDraft share : adds == null ? List.<CaseLinkShareDraft>of() : adds) auditCaseLinkShare(con, shaleClientId, actorUserId, caseLinkId, caseId, share.contactId(), EntityActionAuditEvent.Action.ADDED, null);
+				for (CaseLinkShareUpdate share : updates == null ? List.<CaseLinkShareUpdate>of() : updates) auditCaseLinkShare(con, shaleClientId, actorUserId, caseLinkId, caseId, share.contactId(), EntityActionAuditEvent.Action.UPDATED, share.caseLinkShareId());
+				for (CaseLinkShareRemoval share : removals == null ? List.<CaseLinkShareRemoval>of() : removals) auditCaseLinkShare(con, shaleClientId, actorUserId, caseLinkId, caseId, null, EntityActionAuditEvent.Action.REMOVED, share.caseLinkShareId());
+				if (Boolean.TRUE.equals(primary) && !existing.primary()) auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.PRIMARY_SET, Map.of(EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId));
 				con.commit(); return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
 		} catch (SQLException e) { throw translateSql("Failed to update case link with shares", e); }
@@ -7857,7 +7884,9 @@ public final class CaseDao {
 				validateCaseForTenant(con, shaleClientId, caseId);
 				validateActorForTenant(con, shaleClientId, actorUserId);
 				validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, null);
+				Long previousPrimary = findCurrentPrimaryCaseLinkId(con, shaleClientId, caseId);
 				setOnlyPrimary(con, shaleClientId, caseId, caseLinkId, actorUserId);
+				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.PRIMARY_SET, previousPrimary == null ? Map.of(EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId) : Map.of(EntityActionAuditEvent.MetadataKey.PREVIOUS_PRIMARY_CASE_LINK_ID, previousPrimary, EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId));
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -7895,6 +7924,7 @@ public final class CaseDao {
 				for (Long id : ids) {
 					updateCaseLinkSortOrder(con, shaleClientId, caseId, actorUserId, id, order++);
 				}
+				auditCaseLink(con, shaleClientId, actorUserId, caseId, caseId, EntityActionAuditEvent.Action.REORDERED, Map.of(EntityActionAuditEvent.MetadataKey.REORDERED_LINK_COUNT, ids.size()));
 				con.commit();
 				return listCaseLinks(con, caseId, shaleClientId);
 			} catch (Exception e) {
@@ -7925,6 +7955,7 @@ public final class CaseDao {
 					selectNextPrimary(con, shaleClientId, caseId, actorUserId);
 				}
 				softDeleteExternalIfUnreferenced(con, shaleClientId, dto.externalLinkId(), actorUserId);
+				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.DELETED, Map.of(EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, dto.externalLinkId()));
 				con.commit();
 			} catch (Exception e) {
 				con.rollback();
@@ -8155,27 +8186,65 @@ public final class CaseDao {
 
 	public CaseLinkShareDto addCaseLinkShare(int tenant, int actor, long caseId, long caseLinkId, int contactId, LocalDateTime sharedAt, String notes) {
 		try (Connection con = db.requireConnection()) {
-			validateCaseForTenant(con, tenant, caseId); validateActorForTenant(con, tenant, actor); validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null); validateActiveContactForTenant(con, tenant, contactId);
+			con.setAutoCommit(false);
+			try { validateCaseForTenant(con, tenant, caseId); validateActorForTenant(con, tenant, actor); validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null); validateActiveContactForTenant(con, tenant, contactId);
 			long shareId = insertCaseLinkShare(con, tenant, actor, caseLinkId, contactId, sharedAt, notes);
-			return findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId);
-		} catch (SQLException e) { throw translateSql("Failed to create case link share", e); }
+			auditCaseLinkShare(con, tenant, actor, caseLinkId, caseId, contactId, EntityActionAuditEvent.Action.ADDED, shareId);
+			con.commit(); return findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId); } catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
+		} catch (SQLException e) { throw translateSql("The change could not be saved because its audit record could not be completed.", e); }
 	}
 
 	public CaseLinkShareDto updateCaseLinkShare(int tenant, int actor, long caseId, long caseLinkId, long shareId, int contactId, LocalDateTime sharedAt, String notes, byte[] rowVer) {
 		requireRowVer(rowVer, "expectedRowVer");
 		try (Connection con = db.requireConnection()) {
-			validateCaseForTenant(con, tenant, caseId); validateActorForTenant(con, tenant, actor); validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null); validateActiveContactForTenant(con, tenant, contactId);
+			con.setAutoCommit(false);
+			try { validateCaseForTenant(con, tenant, caseId); validateActorForTenant(con, tenant, actor); validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null); validateActiveContactForTenant(con, tenant, contactId);
 			updateCaseLinkShareRow(con, tenant, actor, caseLinkId, shareId, contactId, sharedAt, notes, rowVer);
-			return findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId);
-		} catch (SQLException e) { throw translateSql("Failed to update case link share", e); }
+			auditCaseLinkShare(con, tenant, actor, caseLinkId, caseId, contactId, EntityActionAuditEvent.Action.UPDATED, shareId);
+			con.commit(); return findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId); } catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
+		} catch (SQLException e) { throw translateSql("The change could not be saved because its audit record could not be completed.", e); }
 	}
 
 	public void removeCaseLinkShare(int tenant, int actor, long caseId, long caseLinkId, long shareId, byte[] rowVer) {
 		requireRowVer(rowVer, "expectedRowVer");
 		try (Connection con = db.requireConnection()) {
-			validateCaseForTenant(con, tenant, caseId); validateActorForTenant(con, tenant, actor); validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null);
+			con.setAutoCommit(false);
+			try { validateCaseForTenant(con, tenant, caseId); validateActorForTenant(con, tenant, actor); validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null);
 			softDeleteCaseLinkShare(con, tenant, actor, caseLinkId, shareId, rowVer);
-		} catch (SQLException e) { throw new RuntimeException("Failed to remove case link share", e); }
+			auditCaseLinkShare(con, tenant, actor, caseLinkId, caseId, null, EntityActionAuditEvent.Action.REMOVED, shareId);
+			con.commit(); } catch (Exception e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
+		} catch (SQLException e) { throw new RuntimeException("The change could not be saved because its audit record could not be completed.", e); }
+	}
+
+
+	private void auditLinkType(Connection con, int tenant, int actor, int linkTypeId, EntityActionAuditEvent.Action action, boolean active) throws SQLException {
+		entityActionAuditDao.append(con, EntityActionAuditEvent.now(tenant, actor, EntityActionAuditEvent.EntityType.LINK_TYPE, linkTypeId, action, null, null,
+				Map.of(EntityActionAuditEvent.MetadataKey.LINK_TYPE_ID, linkTypeId, EntityActionAuditEvent.MetadataKey.ACTIVE, active)));
+	}
+
+	private void auditCaseLink(Connection con, int tenant, int actor, long caseLinkId, long caseId, EntityActionAuditEvent.Action action, Map<EntityActionAuditEvent.MetadataKey, ?> metadata) throws SQLException {
+		Map<EntityActionAuditEvent.MetadataKey, Object> safe = new java.util.EnumMap<>(EntityActionAuditEvent.MetadataKey.class);
+		safe.put(EntityActionAuditEvent.MetadataKey.CASE_ID, caseId);
+		safe.put(EntityActionAuditEvent.MetadataKey.CASE_LINK_ID, caseLinkId);
+		if (metadata != null) safe.putAll(metadata);
+		entityActionAuditDao.append(con, EntityActionAuditEvent.now(tenant, actor, EntityActionAuditEvent.EntityType.CASE_LINK, caseLinkId, action, null, null, safe));
+	}
+
+	private void auditCaseLinkShare(Connection con, int tenant, int actor, long caseLinkId, long caseId, Integer contactId, EntityActionAuditEvent.Action action, Long shareId) throws SQLException {
+		long entityId = shareId == null ? caseLinkId : shareId;
+		Map<EntityActionAuditEvent.MetadataKey, Object> safe = new java.util.EnumMap<>(EntityActionAuditEvent.MetadataKey.class);
+		safe.put(EntityActionAuditEvent.MetadataKey.CASE_ID, caseId);
+		safe.put(EntityActionAuditEvent.MetadataKey.CASE_LINK_ID, caseLinkId);
+		if (shareId != null) safe.put(EntityActionAuditEvent.MetadataKey.CASE_LINK_SHARE_ID, shareId);
+		if (contactId != null) safe.put(EntityActionAuditEvent.MetadataKey.CONTACT_ID, contactId);
+		entityActionAuditDao.append(con, EntityActionAuditEvent.now(tenant, actor, EntityActionAuditEvent.EntityType.CASE_LINK_SHARE, entityId, action, EntityActionAuditEvent.EntityType.CASE_LINK, caseLinkId, safe));
+	}
+
+	private Long findCurrentPrimaryCaseLinkId(Connection con, int tenant, long caseId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement("SELECT TOP (1) Id FROM dbo.CaseLinks WHERE ShaleClientId = ? AND CaseId = ? AND IsDeleted = 0 AND IsPrimary = 1 ORDER BY Id")) {
+			ps.setInt(1, tenant); ps.setLong(2, caseId);
+			try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getLong(1) : null; }
+		}
 	}
 
 	private static CaseLinkDto withShares(CaseLinkDto link, List<CaseLinkShareDto> shares) {
