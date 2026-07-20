@@ -66,6 +66,7 @@ import com.shale.ui.document.CaseDocumentType;
 import com.shale.ui.document.GeneratedDocument;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
+import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;

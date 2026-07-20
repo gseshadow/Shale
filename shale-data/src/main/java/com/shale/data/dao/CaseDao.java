@@ -6907,53 +6907,6 @@ public final class CaseDao {
 		}
 	}
 
-	public void removePrimaryLegalAssistant(long caseId, int shaleClientId) {
-		Connection con = null;
-		try {
-			con = db.requireConnection();
-			con.setAutoCommit(false);
-
-			try (PreparedStatement ps = con.prepareStatement("""
-					SELECT 1
-					FROM dbo.Cases c
-					WHERE c.Id = ?
-					  AND c.ShaleClientId = ?
-					  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL);
-					""")) {
-				ps.setLong(1, caseId);
-				ps.setInt(2, shaleClientId);
-				try (ResultSet rs = ps.executeQuery()) {
-					if (!rs.next()) {
-						throw new SQLException("Case was not found for tenant.");
-					}
-				}
-			}
-
-			try (PreparedStatement ps = con.prepareStatement("""
-					DELETE FROM dbo.CaseUsers
-					WHERE CaseId = ?
-					  AND RoleId = ?
-					  AND IsPrimary = 1;
-					""")) {
-				ps.setLong(1, caseId);
-				ps.setInt(2, ROLE_LEGAL_ASSISTANT);
-				ps.executeUpdate();
-			}
-
-			touchCaseUpdatedAt(con, caseId, shaleClientId);
-			con.commit();
-		} catch (SQLException e) {
-			if (con != null) {
-				try { con.rollback(); } catch (SQLException ignored) { }
-			}
-			throw new RuntimeException("Failed to remove primary legal assistant (caseId=" + caseId + ")", e);
-		} finally {
-			if (con != null) {
-				try { con.setAutoCommit(true); } catch (SQLException ignored) { }
-				try { con.close(); } catch (SQLException ignored) { }
-			}
-		}
-	}
 
 	public record UserRow(int id, String displayName, String color) {
 	}
