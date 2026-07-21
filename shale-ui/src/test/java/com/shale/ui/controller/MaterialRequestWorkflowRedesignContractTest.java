@@ -17,7 +17,8 @@ final class MaterialRequestWorkflowRedesignContractTest {
     assertFalse(REQ_FORM.contains("Relevant start"));
     assertFalse(REQ_FORM.contains("Relevant end"));
     assertTrue(REQ_FORM.contains("Requested From *"));
-    assertTrue(REQ_FORM.contains("Generated Title"));
+    assertTrue(REQ_FORM.contains("Title *"));
+    assertFalse(REQ_FORM.contains("Generated Title"));
   }
 
   @Test void requestFormUsesUserFacingGroupsAndDefaults() {
@@ -26,7 +27,7 @@ final class MaterialRequestWorkflowRedesignContractTest {
     assertTrue(REQ_FORM.contains("plusWeeks(2)"));
     assertTrue(REQ_FORM.contains("REQUESTED"));
     assertTrue(REQ_FORM.contains("colored-lookup-selector"));
-    assertTrue(REQ_FORM.contains("mini-user-card"));
+    assertTrue(REQ_FORM.contains("UserCardFactory.Variant.MINI"));
   }
 
   @Test void titleGenerationAndMutualExclusiveSourceAreExplicit() {
@@ -34,5 +35,15 @@ final class MaterialRequestWorkflowRedesignContractTest {
     assertTrue(REQ_FORM.contains("replaceAll(\"(?i)"));
     assertTrue(REQ_FORM.contains("source.kind()==SourceKind.CONTACT?source.id():null"));
     assertTrue(REQ_FORM.contains("source.kind()==SourceKind.ORGANIZATION?source.id():null"));
+  }
+
+  @Test void requestedFromButtonsAndUserSelectorAreReal() {
+    assertTrue(REQ_FORM.contains("new Button(\"Contact\")"));
+    assertTrue(REQ_FORM.contains("new Button(\"Organization\")"));
+    assertTrue(REQ_FORM.contains("new Button(\"Add New\")"));
+    assertFalse(REQ_FORM.contains("new Button(\"Add Contact\")"));
+    assertFalse(REQ_FORM.contains("new Button(\"Add Organization\")"));
+    assertTrue(REQ_FORM.contains("AssignedUserPickerDialog.show"));
+    assertFalse(REQ_FORM.contains("Search active users using the Task Details user selector."));
   }
 }

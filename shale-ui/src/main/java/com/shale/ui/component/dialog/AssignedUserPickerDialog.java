@@ -23,7 +23,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
-final class AssignedUserPickerDialog {
+public final class AssignedUserPickerDialog {
 
     private static final double PICKER_PREF_WIDTH = 440;
     private static final double PICKER_INITIAL_HEIGHT = 700;
@@ -35,7 +35,7 @@ final class AssignedUserPickerDialog {
     private AssignedUserPickerDialog() {
     }
 
-    static Optional<CaseTaskService.AssignableUserOption> show(
+    public static Optional<CaseTaskService.AssignableUserOption> show(
             Window owner,
             List<CaseTaskService.AssignableUserOption> candidates,
             Class<?> cssAnchor) {

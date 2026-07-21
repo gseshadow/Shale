@@ -48,7 +48,7 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(MAT.contains("final class MaterialRequestForm extends Dialog"));
     assertTrue(MAT.contains("CreateMaterialRequestCommand"));
     assertTrue(MAT.contains("Material Type *"));
-    assertTrue(MAT.contains("Generated Title"));
+    assertTrue(MAT.contains("Title *"));
     assertTrue(MAT.contains("Requested From *"));
     assertTrue(MAT.contains("Requested by *"));
     assertTrue(MAT.contains("Initial Note"));
