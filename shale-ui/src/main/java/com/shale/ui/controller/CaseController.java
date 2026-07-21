@@ -36,6 +36,8 @@ import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.MaterialItemServicePort;
+import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.caseupdates.MedicalRecordRequestKeywordMatcher;
@@ -227,6 +229,10 @@ public class CaseController {
 	private VBox caseCalendarTabPane;
 	@FXML
 	private VBox caseLinksTabPane;
+	@FXML
+	private VBox caseMaterialsTabPane;
+	@FXML
+	private StackPane caseMaterialsContentHost;
 	@FXML
 	private VBox caseLinksCardsBox;
 	@FXML
@@ -593,6 +599,7 @@ public class CaseController {
 			"Parties",
 			"Tasks",
 			"Calendar",
+			"Materials",
 			"Links",
 			"Timeline"
 	);
@@ -621,6 +628,9 @@ public class CaseController {
 	private CalendarService calendarService;
 	private CalendarFeedDao calendarFeedDao;
 	private CaseServicePort caseService;
+	private MaterialRequestServicePort materialRequestService;
+	private MaterialItemServicePort materialItemService;
+	private final CaseMaterialsTabController caseMaterialsTabController = new CaseMaterialsTabController();
 	private final CaseLinkCardFactory caseLinkCardFactory = new CaseLinkCardFactory();
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
 		private final java.util.concurrent.atomic.AtomicInteger sequence = new java.util.concurrent.atomic.AtomicInteger();
@@ -791,6 +801,7 @@ public class CaseController {
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
 		resetCaseLinksState();
+		resetCaseMaterialsState();
 		resetOverviewPrimaryLinkState();
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
@@ -809,6 +820,7 @@ public class CaseController {
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
 		resetCaseLinksState();
+		resetCaseMaterialsState();
 		resetOverviewPrimaryLinkState();
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
@@ -833,6 +845,12 @@ public class CaseController {
 		PerfLog.log("NAV", "start", "page=case_view caseId=" + caseId);
 		PerfLog.log("CTRL", "start", "controller=CaseController page=case_view caseId=" + caseId);
 		refreshHeader();
+	}
+
+	public void setMaterialServices(MaterialRequestServicePort materialRequestService, MaterialItemServicePort materialItemService) {
+		this.materialRequestService = materialRequestService;
+		this.materialItemService = materialItemService;
+		caseMaterialsTabController.init(materialRequestService, materialItemService, appState, () -> caseId == null ? 0L : caseId.longValue(), this::caseMaterialsOwner);
 	}
 
 	public void setOnOpenUser(Consumer<Integer> onOpenUser) {
@@ -1453,6 +1471,7 @@ public class CaseController {
 		case "Parties" -> showParties();
 		case "Tasks" -> showTasksTab();
 		case "Calendar" -> showCalendarTab();
+		case "Materials" -> showMaterialsTab();
 		case "Links" -> showLinksTab();
 		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
@@ -1690,6 +1709,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, true);
+		setPaneVisible(caseMaterialsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -1954,12 +1974,40 @@ public class CaseController {
 		onSectionSelected("Links", true);
 	}
 
+	private void resetCaseMaterialsState() {
+		if (caseMaterialsContentHost != null) {
+			caseMaterialsContentHost.getChildren().clear();
+		}
+	}
+
+	private void showMaterialsTab() {
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
+		setPaneVisible(overviewScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseMaterialsTabPane, true);
+		setPaneVisible(caseLinksTabPane, false);
+		setPaneVisible(genericPane, false);
+		setPaneVisible(tasksPanel, false);
+		if (caseMaterialsContentHost != null && caseMaterialsContentHost.getChildren().isEmpty() && materialRequestService != null && materialItemService != null) {
+			caseMaterialsContentHost.getChildren().setAll(caseMaterialsTabController.view());
+		}
+		if (materialRequestService != null && materialItemService != null) {
+			caseMaterialsTabController.load();
+		}
+		loadCaseUpdatesAsync();
+	}
+
+	private Window caseMaterialsOwner() { return caseMaterialsTabPane != null && caseMaterialsTabPane.getScene() != null ? caseMaterialsTabPane.getScene().getWindow() : taskDialogOwner(); }
+
 	private void showLinksTab() {
 		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseMaterialsTabPane, false);
 		setPaneVisible(caseLinksTabPane, true);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -2627,6 +2675,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseMaterialsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, true);
@@ -2644,6 +2693,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseMaterialsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -2664,6 +2714,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseMaterialsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -2680,6 +2731,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseMaterialsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -2707,6 +2759,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseMaterialsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -2733,6 +2786,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseMaterialsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
