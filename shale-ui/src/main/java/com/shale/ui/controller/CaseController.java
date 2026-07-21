@@ -92,6 +92,7 @@ import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -2092,6 +2093,23 @@ public class CaseController {
 		runCaseLinkMutation("reorder", "Links reordered.", activeCaseId, null, () -> caseService.reorderCaseLinks(new CaseServicePort.ReorderCaseLinksCommand(tenantId, actorId, activeCaseId, ids)));
 	}
 
+	private void publishCaseLinkLiveInvalidations(String operation, long caseId, Long caseLinkIdForLog, Object result, int tenantId, int actorId) {
+		if (runtimeBridge == null || tenantId <= 0 || actorId <= 0) return;
+		Long caseLinkId = resolvedCaseLinkId(caseLinkIdForLog, result);
+		Long externalLinkId = result instanceof CaseLinkDto dto ? dto.externalLinkId() : null;
+		Integer linkTypeId = result instanceof CaseLinkDto dto ? dto.linkTypeId() : null;
+		String change = switch (operation == null ? "" : operation) {
+			case "create" -> LiveUpdateEvents.CHANGE_CREATED;
+			case "update" -> LiveUpdateEvents.CHANGE_UPDATED;
+			case "set-primary" -> LiveUpdateEvents.CHANGE_PRIMARY_CHANGED;
+			case "delete" -> LiveUpdateEvents.CHANGE_DELETED;
+			case "reorder" -> LiveUpdateEvents.CHANGE_REORDERED;
+			default -> LiveUpdateEvents.CHANGE_UPDATED;
+		};
+		runtimeBridge.publishCaseLinkChanged(caseId, caseLinkId, externalLinkId, linkTypeId, tenantId, actorId, change);
+		runtimeBridge.publishEntityAuditActivityAdded(null, tenantId, actorId);
+	}
+
 	private void runCaseLinkMutation(String operation, String successMessage, int activeCaseId, Long caseLinkIdForLog, java.util.concurrent.Callable<?> action) {
 		if (!caseLinkMutationInFlight.compareAndSet(false, true)) {
 			LOG.info("Case Link mutation duplicate blocked op={} tenantId={} actorId={} caseId={} caseLinkId={}", operation, safeTenantId(), safeActorUserId(), activeCaseId, caseLinkIdForLog);
@@ -2107,6 +2125,7 @@ public class CaseController {
 		caseLinkExecutor.submit(() -> {
 			try {
 				Object result = action.call();
+				publishCaseLinkLiveInvalidations(operation, activeCaseId, caseLinkIdForLog, result, tenantId, actorId);
 				List<CaseLinkDto> reloaded = caseService.listCaseLinks(activeCaseId, tenantId);
 				List<CaseLinkDto> safeReloaded = reloaded == null ? List.of() : List.copyOf(reloaded);
 				Platform.runLater(() -> {
@@ -8110,6 +8129,7 @@ public class CaseController {
 
 	private final class CaseOverviewLiveUpdateHandler {
 		private final Consumer<UiRuntimeBridge.CaseUpdatedEvent> eventHandler = this::handleEvent;
+		private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> entityEventHandler = this::handleEntityEvent;
 		private boolean subscribed;
 
 		void subscribe() {
@@ -8117,6 +8137,7 @@ public class CaseController {
 				return;
 
 			runtimeBridge.subscribeCaseUpdated(eventHandler);
+			runtimeBridge.subscribeEntityUpdated(entityEventHandler);
 			subscribed = true;
 		}
 
@@ -8125,7 +8146,36 @@ public class CaseController {
 				return;
 			}
 			runtimeBridge.unsubscribeCaseUpdated(eventHandler);
+			runtimeBridge.unsubscribeEntityUpdated(entityEventHandler);
 			subscribed = false;
+		}
+
+		private void handleEntityEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+			if (event == null || appState == null || caseId == null) return;
+			Integer tenantId = appState.getShaleClientId();
+			if (tenantId == null || event.shaleClientId() != tenantId) return;
+			String entityType = event.entityType();
+			if (!LiveUpdateEvents.ENTITY_CASE_LINK.equals(entityType)
+					&& !LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(entityType)
+					&& !LiveUpdateEvents.ENTITY_LINK_TYPE.equals(entityType)) return;
+			long eventCaseId = getPatchLong(event, "caseId", -1L);
+			if ((LiveUpdateEvents.ENTITY_CASE_LINK.equals(entityType) || LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(entityType))
+					&& eventCaseId != caseId.longValue()) return;
+			if (runtimeBridge != null) {
+				String mine = runtimeBridge.getClientInstanceId();
+				if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId())) return;
+			}
+			runOnFx(() -> {
+				caseLinksStale = true;
+				invalidateOverviewPrimaryLinkAfterCaseLinkMutation();
+				if (caseLinksTabPane != null && caseLinksTabPane.isVisible()) loadCaseLinksAsync(null);
+			});
+		}
+
+		private long getPatchLong(UiRuntimeBridge.EntityUpdatedEvent event, String key, long fallback) {
+			Object value = event.patch() == null ? null : event.patch().get(key);
+			if (value instanceof Number number) return number.longValue();
+			try { return value == null ? fallback : Long.parseLong(String.valueOf(value)); } catch (NumberFormatException ex) { return fallback; }
 		}
 
 		private void handleEvent(UiRuntimeBridge.CaseUpdatedEvent event) {

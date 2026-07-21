@@ -9,6 +9,8 @@ import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
+import com.shale.ui.services.LiveUpdateEvents;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
 import javafx.application.Platform;
@@ -130,6 +132,8 @@ public final class SettingsController {
 	private final List<CaseStatusViewRow> caseStatusRows = new ArrayList<>();
 	private final List<PracticeAreaViewRow> practiceAreaRows = new ArrayList<>();
 	private final List<LinkTypeViewRow> linkTypeRows = new ArrayList<>();
+	private UiRuntimeBridge runtimeBridge;
+	private final java.util.function.Consumer<UiRuntimeBridge.EntityUpdatedEvent> linkTypeLiveHandler = this::handleLinkTypeLiveEvent;
 	private CaseStatusViewRow selectedCaseStatusRow;
 	private PracticeAreaViewRow selectedPracticeAreaRow;
 	private LinkTypeViewRow selectedLinkTypeRow;
@@ -156,10 +160,12 @@ public final class SettingsController {
 		loadAdminSectionsAsync();
 	}
 
-	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao) {
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.onOpenAuditLog = Objects.requireNonNull(onOpenAuditLog, "onOpenAuditLog");
+		this.runtimeBridge = runtimeBridge;
+		if (this.runtimeBridge != null) this.runtimeBridge.subscribeEntityUpdated(linkTypeLiveHandler);
 		this.caseService = Objects.requireNonNull(caseService, "caseService");
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		if (fxmlReady) {
@@ -194,6 +200,21 @@ public final class SettingsController {
 	}
 
 	@FXML
+	private void publishLinkTypeChanged(int linkTypeId, String change) {
+		if (runtimeBridge == null) return;
+		try {
+			runtimeBridge.publishLinkTypeChanged(linkTypeId, requireTenantId(), requireActorUserId(), change);
+			runtimeBridge.publishEntityAuditActivityAdded(null, requireTenantId(), requireActorUserId());
+		} catch (RuntimeException ignored) { }
+	}
+
+	private void handleLinkTypeLiveEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (event == null || appState == null || !LiveUpdateEvents.ENTITY_LINK_TYPE.equals(event.entityType())) return;
+		Integer tenantId = appState.getShaleClientId();
+		if (tenantId == null || event.shaleClientId() != tenantId || !isAdminUser()) return;
+		Platform.runLater(() -> loadLinkTypesAsync(null));
+	}
+
 	private void onViewAuditLog() {
 		if (!isAdminUser() || onOpenAuditLog == null) {
 			return;
@@ -284,7 +305,8 @@ public final class SettingsController {
 		if (!requireAdminLookupManagement("Link Types")) return;
 		showLinkTypeDialog(null).ifPresent(input -> {
 			try {
-				caseService.createLinkType(new CaseServicePort.LinkTypeCommand(null, requireTenantId(), requireActorUserId(), input.name(), input.color(), input.active(), input.systemKey(), null));
+				LinkTypeDto saved = caseService.createLinkType(new CaseServicePort.LinkTypeCommand(null, requireTenantId(), requireActorUserId(), input.name(), input.color(), input.active(), input.systemKey(), null));
+				publishLinkTypeChanged(saved.id(), LiveUpdateEvents.CHANGE_CREATED);
 				loadLinkTypesAsync("Link type added.");
 			} catch (RuntimeException ex) { showLinkTypeError(ex); }
 		});
@@ -297,7 +319,8 @@ public final class SettingsController {
 		if (selected == null) return;
 		showLinkTypeDialog(selected.linkType()).ifPresent(input -> {
 			try {
-				caseService.updateLinkType(new CaseServicePort.LinkTypeCommand(selected.id(), requireTenantId(), requireActorUserId(), input.name(), input.color(), input.active(), linkTypeSystemKeyForSave(selected.linkType()), selected.rowVer()));
+				LinkTypeDto saved = caseService.updateLinkType(new CaseServicePort.LinkTypeCommand(selected.id(), requireTenantId(), requireActorUserId(), input.name(), input.color(), input.active(), linkTypeSystemKeyForSave(selected.linkType()), selected.rowVer()));
+				publishLinkTypeChanged(saved.id(), selected.global() ? LiveUpdateEvents.CHANGE_CREATED : LiveUpdateEvents.CHANGE_UPDATED);
 				loadLinkTypesAsync(selected.global() ? "Tenant override saved for global link type." : "Link type updated.");
 			} catch (RuntimeException ex) { showLinkTypeError(ex); }
 		});
@@ -309,7 +332,8 @@ public final class SettingsController {
 		LinkTypeViewRow selected = selectedLinkTypeRow();
 		if (selected == null) return;
 		try {
-			caseService.setLinkTypeActive(new CaseServicePort.SetLinkTypeActiveCommand(requireTenantId(), requireActorUserId(), selected.id(), !selected.active(), selected.rowVer()));
+			LinkTypeDto saved = caseService.setLinkTypeActive(new CaseServicePort.SetLinkTypeActiveCommand(requireTenantId(), requireActorUserId(), selected.id(), !selected.active(), selected.rowVer()));
+			publishLinkTypeChanged(saved.id(), selected.active() ? LiveUpdateEvents.CHANGE_DEACTIVATED : LiveUpdateEvents.CHANGE_ACTIVATED);
 			loadLinkTypesAsync(selected.active() ? "Link type deactivated for future selections." : "Link type activated.");
 		} catch (RuntimeException ex) { showLinkTypeError(ex); }
 	}
@@ -330,6 +354,7 @@ public final class SettingsController {
 		if (!confirmed) return;
 		try {
 			caseService.resetLinkTypeOverride(new CaseServicePort.ResetLinkTypeOverrideCommand(requireTenantId(), requireActorUserId(), selected.id()));
+			publishLinkTypeChanged(selected.id(), LiveUpdateEvents.CHANGE_OVERRIDE_RESET);
 			loadLinkTypesAsync(selected.custom() ? "Custom link type removed from future selections. Existing links retain their stored Link Type relationship." : "Tenant override reset to global default for future selections. Existing links retain their stored Link Type relationship.");
 		} catch (RuntimeException ex) { showLinkTypeError(ex); }
 	}
