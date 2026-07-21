@@ -16,14 +16,18 @@ public final class PhiReadAuditService {
     // - Phase 3 READ auditing is screen/section-level (view-open intent), not field-render-level.
     private static final int FIELD_CODE_STRING = 4;
     private static final Duration DEDUPE_WINDOW = Duration.ofSeconds(2);
-    private static final Map<String, Integer> OBJECT_TYPE_IDS = Map.of(
-            "Case", 1,
-            "CaseTimeline", 2,
-            "CaseUpdate", 3,
-            "Contact", 4,
-            "Task", 5,
-            "TaskTimeline", 6,
-            "TaskUpdate", 7);
+    private static final Map<String, Integer> OBJECT_TYPE_IDS = Map.ofEntries(
+            Map.entry("Case", 1),
+            Map.entry("CaseTimeline", 2),
+            Map.entry("CaseUpdate", 3),
+            Map.entry("Contact", 4),
+            Map.entry("Task", 5),
+            Map.entry("TaskTimeline", 6),
+            Map.entry("TaskUpdate", 7),
+            Map.entry("MaterialType", 8),
+            Map.entry("MaterialRequest", 9),
+            Map.entry("MaterialRequestFollowUp", 10),
+            Map.entry("MaterialItem", 11));
 
     private final AuditLogDao auditLogDao;
     private final AppState appState;

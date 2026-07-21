@@ -7,14 +7,18 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class PhiAuditService {
-    private static final Map<String, Integer> OBJECT_TYPE_IDS = Map.of(
-            "cases", 1,
-            "casetimelineevents", 2,
-            "caseupdates", 3,
-            "contacts", 4,
-            "tasks", 5,
-            "tasktimelineevents", 6,
-            "taskupdates", 7);
+    private static final Map<String, Integer> OBJECT_TYPE_IDS = Map.ofEntries(
+            Map.entry("cases", 1),
+            Map.entry("casetimelineevents", 2),
+            Map.entry("caseupdates", 3),
+            Map.entry("contacts", 4),
+            Map.entry("tasks", 5),
+            Map.entry("tasktimelineevents", 6),
+            Map.entry("taskupdates", 7),
+            Map.entry("materialtypes", 8),
+            Map.entry("materialrequests", 9),
+            Map.entry("materialrequestfollowups", 10),
+            Map.entry("materialitems", 11));
 
     private final AuditLogDao auditLogDao;
 
