@@ -95,8 +95,7 @@ public final class NegotiateClient {
 		String body = res.body() == null ? "" : res.body().trim();
 		String wss = extractWssUrl(body);
 		if (wss == null || !wss.startsWith("wss://")) {
-			throw new IllegalStateException("Negotiate response did not contain a valid wss:// URL: "
-					+ preview(body, 200));
+			throw new IllegalStateException("Negotiate response did not contain a valid WebSocket URL");
 		}
 		return wss; // IMPORTANT: use verbatim; do not modify the returned URL.
 	}
@@ -147,7 +146,16 @@ public final class NegotiateClient {
 		return s;
 	}
 
+	static String redactForLog(String value) {
+		if (value == null) {
+			return "<null>";
+		}
+		String redacted = value.replaceAll("(?i)([?&](?:code|access_token|token|connectionToken|sig)=)[^&\\s]+", "$1<redacted>");
+		redacted = redacted.replaceAll("(?i)(authorization\\s*[:=]\\s*)\\S+", "$1<redacted>");
+		return redacted;
+	}
+
 	private static String preview(String s, int n) {
-		return s == null ? "<null>" : s.substring(0, Math.min(n, s.length())).replaceAll("\\s+", " ");
+		return s == null ? "<null>" : redactForLog(s.substring(0, Math.min(n, s.length())).replaceAll("\\s+", " "));
 	}
 }

@@ -6,6 +6,9 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.shale.data.runtime.RuntimeSessionService;
 import com.shale.desktop.live.LiveEventDispatcher;
 import com.shale.desktop.net.LiveBus;
@@ -18,6 +21,8 @@ import com.shale.ui.services.UiRuntimeBridge;
  * runtime services (DB, RLS, live bus).
  */
 public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
+
+	private static final Logger log = LoggerFactory.getLogger(DesktopUiRuntimeBridge.class);
 
 	private final LiveEventDispatcher dispatcher;
 	private final DesktopRuntimeSessionProvider dbProvider;
@@ -41,10 +46,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	@Override
 	public void onLoginSuccess(int userId, int shaleClientId, String email) {
 
-		System.out.printf(
-				"Login success: user=%d, client=%d, email=%s%n",
-				userId, shaleClientId, email
-		);
+		log.info("Login success: userId={} tenantId={} emailConfigured={}", userId, shaleClientId, email != null && !email.isBlank());
 
 		runtimeSessionService.initialize(shaleClientId, userId);
 		dbProvider.setRuntime(runtimeSessionService);
@@ -56,13 +58,13 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	private void tryConnectLiveBus(int shaleClientId, int userId) {
 		if (negotiateEndpointUrl == null || negotiateEndpointUrl.isBlank()) {
-			System.out.println("LiveBus disabled: negotiate endpoint is not configured.");
+			log.info("LiveBus disabled: negotiate endpoint is not configured.");
 			return;
 		}
 
 		try {
 			String base = negotiateEndpointUrl.trim();
-			System.out.println("NEGOTIATE BASE URL: " + base);
+			log.info("Live negotiate endpoint configured");
 
 			NegotiateClient negotiateClient = new NegotiateClient(base);
 
@@ -74,16 +76,16 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 					.whenComplete((ok, ex) ->
 					{
 						if (ex != null) {
-							System.out.println("LiveBus connect failed: " + ex.getMessage());
+							log.warn("LiveBus connect failed: {}", ex.getMessage());
 							dispatcher.dispatchConnectivity(false, "Connect failed");
 							return;
 						}
 						liveBus = bus;
-						System.out.println("LiveBus connected.");
+						log.info("LiveBus connected.");
 					});
 
 		} catch (Exception ex) {
-			System.out.println("LiveBus unavailable: " + ex.getMessage());
+			log.warn("LiveBus unavailable: {}", ex.getMessage());
 		}
 	}
 
@@ -103,7 +105,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			runtimeSessionService.clear();
 		}
 
-		System.out.println("Logout requested");
+		log.info("Logout requested");
 	}
 
 	// --- Back-compat wrappers now route through the generic API ---
@@ -138,10 +140,10 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 				.whenComplete((ok, ex) ->
 				{
 					if (ex != null) {
-						System.out.println("[LIVE] publish failed: " + ex.getMessage());
+						log.warn("Live publish failed: {}", ex.getMessage());
 						return;
 					}
-					System.out.println("[LIVE] publish ok");
+					log.debug("Live publish ok");
 				});
 	}
 
@@ -173,7 +175,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			desktop.browse(path.toUri());
 			return true;
 		} catch (IOException | UnsupportedOperationException | SecurityException ex) {
-			System.err.println("Failed to open path: " + path + " error=" + ex.getMessage());
+			log.warn("Failed to open path: {}", path, ex);
 			return false;
 		}
 	}
@@ -226,12 +228,12 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 				previous.shutdown();
 			}
 			dispatcher.dispatchConnectivity(true, "Reconnected");
-			System.out.println("LiveBus connectivity recheck succeeded.");
+			log.info("LiveBus connectivity recheck succeeded.");
 			return Optional.of(true);
 		} catch (RuntimeException ex) {
 			reconnectBus.shutdown();
 			dispatcher.dispatchConnectivity(false, "Reconnect failed");
-			System.out.println("LiveBus connectivity recheck failed: " + ex.getMessage());
+			log.warn("LiveBus connectivity recheck failed: {}", ex.getMessage());
 			return Optional.of(false);
 		}
 	}

@@ -1,0 +1,17 @@
+<configuration>
+    <property name="SHALE_LOG_LEVEL" value="${SHALE_LOG_LEVEL:-INFO}" />
+    <property name="SHALE_HIKARI_LOG_LEVEL" value="${SHALE_HIKARI_LOG_LEVEL:-INFO}" />
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="com.shale" level="${SHALE_LOG_LEVEL}" />
+    <logger name="com.zaxxer.hikari" level="${SHALE_HIKARI_LOG_LEVEL}" />
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+    </root>
+</configuration>

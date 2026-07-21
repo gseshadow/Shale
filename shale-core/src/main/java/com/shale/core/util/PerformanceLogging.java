@@ -13,7 +13,9 @@ import java.util.Locale;
 public final class PerformanceLogging {
     public static final String ENABLED_KEY = "SHALE_PERF_LOGGING";
     public static final String THRESHOLD_KEY = "SHALE_PERF_SLOW_THRESHOLD_MS";
-    public static final long DEFAULT_SLOW_THRESHOLD_MS = 500L;
+    public static final long INFO_THRESHOLD_MS = 1_000L;
+    public static final long WARN_THRESHOLD_MS = 2_000L;
+    public static final long DEFAULT_SLOW_THRESHOLD_MS = WARN_THRESHOLD_MS;
 
     private PerformanceLogging() {
     }
@@ -52,7 +54,24 @@ public final class PerformanceLogging {
     }
 
     public static boolean isSlow(long elapsedMs) {
-        return elapsedMs >= slowThresholdMs();
+        return elapsedMs >= WARN_THRESHOLD_MS;
+    }
+
+    public static Level levelForElapsed(long elapsedMs) {
+        if (elapsedMs >= WARN_THRESHOLD_MS) {
+            return Level.WARN;
+        }
+        if (elapsedMs >= INFO_THRESHOLD_MS) {
+            return Level.INFO;
+        }
+        return Level.DEBUG;
+    }
+
+    public enum Level {
+        DEBUG,
+        INFO,
+        WARN,
+        ERROR
     }
 
     public static boolean shouldLogNormal() {

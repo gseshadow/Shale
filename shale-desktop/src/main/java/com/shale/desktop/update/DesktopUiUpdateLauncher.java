@@ -1,9 +1,10 @@
 package com.shale.desktop.update;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Objects;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.shale.core.platform.AppPaths;
 import com.shale.updater.UpdateManifest;
@@ -13,6 +14,8 @@ import com.shale.ui.services.AppVersionProvider;
 import com.shale.ui.services.UiUpdateLauncher;
 
 public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
+
+	private static final Logger log = LoggerFactory.getLogger(DesktopUiUpdateLauncher.class);
 
 	@FunctionalInterface
 	interface UpdaterLauncher {
@@ -60,9 +63,9 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 		// Platform-specific restrictions belong in launchUpdater()/installer execution, not detection.
 		Platform platform = Platform.detect();
 		String currentVersion = AppVersionProvider.currentVersion();
-		log("Detection entry: platform=" + platform);
-		log("Current version: " + currentVersion);
-		log("Manifest URL: " + manifestUrl);
+		log.debug("Updater detection entry: platform={}", platform);
+		log.debug("Updater current version: {}", currentVersion);
+		log.info("Updater manifest endpoint configured");
 
 		try {
 			UpdateManifest manifest = updateService.fetchManifest(manifestUrl);
@@ -76,20 +79,19 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 			boolean updateAvailable = versionUpdateAvailable && macAssetAvailable;
 			boolean mandatory = updateAvailable && manifest != null && manifest.isMandatory();
 
-			log("Manifest fetch result: " + (manifest == null ? "manifest=<null>" : "manifest=ok"));
-			log("Parsed remote version: " + printable(remoteVersion));
-			log("Comparison result: remoteIsNewer=" + versionUpdateAvailable + " (compare=" + comparison + ")");
-			log("Parsed " + platform + " asset: zipUrl=" + printable(zipUrl)
-					+ ", installerUrl=" + printable(installerUrl)
-					+ ", sha256=" + printable(sha256));
+			log.debug("Updater manifest fetch result: {}", manifest == null ? "manifest=<null>" : "manifest=ok");
+			log.info("Updater parsed remote version: {}", printable(remoteVersion));
+			log.debug("Updater comparison result: remoteIsNewer={} compare={}", versionUpdateAvailable, comparison);
+			log.debug("Updater parsed {} asset: zipUrlConfigured={} installerUrlConfigured={} sha256Configured={}",
+					platform, !isBlank(zipUrl), !isBlank(installerUrl), !isBlank(sha256));
 			if (platform == Platform.MAC) {
-				log("macOS asset selection result: macZipUrl=" + printable(zipUrl) + ", available=" + macAssetAvailable);
+				log.debug("Updater macOS asset selection result: macZipConfigured={} available={}", !isBlank(zipUrl), macAssetAvailable);
 			}
-			log("Final updateAvailable decision: updateAvailable=" + updateAvailable + ", mandatory=" + mandatory);
+			log.info("Updater decision: updateAvailable={} mandatory={}", updateAvailable, mandatory);
 
 			return new UiUpdateLauncher.UpdateCheckResult(updateAvailable, mandatory);
 		} catch (IOException | InterruptedException | RuntimeException ex) {
-			log("Update check exception: " + stackTrace(ex));
+			log.warn("Update check failed", ex);
 			throw new RuntimeException("Failed to check for updates", ex);
 		}
 	}
@@ -97,19 +99,19 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 	@Override
 	public void launchUpdater() {
 		String currentVersion = AppVersionProvider.currentVersion();
-		log("launchUpdater entry");
-		log("Selected platform: " + AppPaths.platform());
-		log("Current version for updater launch: " + currentVersion);
+		log.debug("Updater launch entry");
+		log.debug("Updater selected platform: {}", AppPaths.platform());
+		log.debug("Updater current version for launch: {}", currentVersion);
 
 		try {
 			updaterLauncher.launch(currentVersion);
-			log("Updater launch handoff reported success");
+			log.info("Updater launch handoff reported success");
 			if (AppPaths.isMac()) {
-				log("macOS updater handoff succeeded; app self-shutdown initiated");
+				log.info("macOS updater handoff succeeded; app self-shutdown initiated");
 				appShutdownHandler.shutdown();
 			}
 		} catch (RuntimeException ex) {
-			log("Updater launch failure: " + stackTrace(ex));
+			log.error("Updater launch failure", ex);
 			throw ex;
 		}
 	}
@@ -128,13 +130,4 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 		return value == null || value.isBlank();
 	}
 
-	private static void log(String message) {
-		System.out.println("[Updater] " + message);
-	}
-
-	private static String stackTrace(Throwable error) {
-		StringWriter buffer = new StringWriter();
-		error.printStackTrace(new PrintWriter(buffer));
-		return buffer.toString();
-	}
 }
