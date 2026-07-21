@@ -18,7 +18,7 @@ final class LiveUpdateEventsPhase63PayloadTest {
 
     @Test
     void sharePayloadContainsContactIdButNoContactPiiOrNotes() {
-        String payload = LiveUpdateEvents.caseLinkSharePatch(101L, 202L, 505L, 606, LiveUpdateEvents.CHANGE_SHARED);
+        String payload = LiveUpdateEvents.caseLinkSharePatch(101L, 202L, 505L, 606, LiveUpdateEvents.CHANGE_ADDED);
         assertTrue(payload.contains("\"contactId\":606"));
         assertTrue(payload.contains("\"caseLinkShareId\":505"));
         assertSensitiveFieldsAbsent(payload);

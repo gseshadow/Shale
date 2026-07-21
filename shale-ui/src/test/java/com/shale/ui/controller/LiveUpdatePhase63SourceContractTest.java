@@ -23,6 +23,21 @@ final class LiveUpdatePhase63SourceContractTest {
     }
 
     @Test
+    void caseLinkShareChangesPublishIndependentRoutableEventsAfterMutationReturns() throws Exception {
+        String source = read("src/main/java/com/shale/ui/controller/CaseController.java");
+        int mutation = source.indexOf("Object result = action.call();");
+        int domainPublish = source.indexOf("publishCaseLinkLiveInvalidations(operation, activeCaseId", mutation);
+        int catchBlock = source.indexOf("} catch (Exception ex)", mutation);
+        assertTrue(domainPublish > mutation && domainPublish < catchBlock, "Share invalidations must be derived at the successful mutation boundary.");
+        assertTrue(source.contains("shareLiveChangesForCreate(input.shareAdds())"));
+        assertTrue(source.contains("shareLiveChangesForUpdate(input.shareAdds(), input.shareUpdates(), input.shareRemovals(), link.shares())"));
+        assertTrue(source.contains("LiveUpdateEvents.CHANGE_ADDED"));
+        assertTrue(source.contains("LiveUpdateEvents.CHANGE_UPDATED"));
+        assertTrue(source.contains("LiveUpdateEvents.CHANGE_REMOVED"));
+        assertTrue(source.contains("runtimeBridge.publishCaseLinkShareChanged(caseId, caseLinkId"));
+    }
+
+    @Test
     void subscribersFilterByTenantAndRouteByStableIdentifiers() throws Exception {
         String caseSource = read("src/main/java/com/shale/ui/controller/CaseController.java");
         String contactSource = read("src/main/java/com/shale/ui/controller/ContactViewController.java");

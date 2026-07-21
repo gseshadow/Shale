@@ -16,9 +16,11 @@ public final class LiveUpdateEvents {
     public static final String CHANGE_DELETED = "DELETED";
     public static final String CHANGE_PRIMARY_CHANGED = "PRIMARY_CHANGED";
     public static final String CHANGE_REORDERED = "REORDERED";
-    public static final String CHANGE_SHARED = "SHARED";
-    public static final String CHANGE_SHARE_UPDATED = "SHARE_UPDATED";
-    public static final String CHANGE_UNSHARED = "UNSHARED";
+    public static final String CHANGE_ADDED = "ADDED";
+    public static final String CHANGE_REMOVED = "REMOVED";
+    public static final String CHANGE_SHARED = CHANGE_ADDED;
+    public static final String CHANGE_SHARE_UPDATED = CHANGE_UPDATED;
+    public static final String CHANGE_UNSHARED = CHANGE_REMOVED;
     public static final String CHANGE_ACTIVATED = "ACTIVATED";
     public static final String CHANGE_DEACTIVATED = "DEACTIVATED";
     public static final String CHANGE_OVERRIDE_RESET = "OVERRIDE_RESET";
