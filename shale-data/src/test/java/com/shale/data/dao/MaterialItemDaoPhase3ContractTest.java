@@ -28,6 +28,29 @@ final class MaterialItemDaoPhase3ContractTest {
         assertTrue(ADAPTER.contains("CASE_MATERIALS_ITEM_DETAIL"));
     }
 
+    @Test void readsUseSchemaCompatibleDisplayExpressionsAndMapperAliases(){
+        assertFalse(DAO.contains("ru.DisplayName"));
+        assertTrue(DAO.contains("name_first"));
+        assertTrue(DAO.contains("name_last"));
+        assertTrue(DAO.contains("AS ReceivedByDisplayName"));
+        assertTrue(DAO.contains("COALESCE(NULLIF(LTRIM(RTRIM("));
+        assertTrue(DAO.contains(".Name)), '')"));
+        assertTrue(DAO.contains("CONCAT("));
+        assertTrue(DAO.contains(".FirstName"));
+        assertTrue(DAO.contains(".LastName"));
+        assertTrue(DAO.contains(".WorkName"));
+        assertTrue(DAO.contains("so.Name AS SourceOrganizationName"));
+        assertTrue(DAO.contains("ro.Name AS ReturnedOrReleasedToOrganizationName"));
+        assertTrue(DAO.contains("mr.Title AS MaterialRequestTitle"));
+        assertTrue(DAO.contains("el.DisplayName AS ExternalLinkDisplayName"));
+        for(String label:new String[]{"Id","ShaleClientId","CaseId","MaterialRequestId","MaterialRequestTitle","MaterialTypeId","MaterialTypeName","MaterialTypeSystemKey","Format","Name","SourceContactId","SourceContactDisplayName","SourceOrganizationId","SourceOrganizationName","ReceivedByUserId","ReceivedByDisplayName","ReceivedAt","Completeness","QuantityCount","PageCount","FileCount","StorageLocation","ExternalLinkId","ExternalLinkDisplayName","CustodyStatus","ReturnedOrReleasedToContactDisplayName","ReturnedOrReleasedToOrganizationName","UpdatedAt","RowVer"}) {
+            assertTrue(DAO.contains("\""+label+"\""), label);
+        }
+        assertTrue(DAO.contains("baseSelect(false)"));
+        assertTrue(DAO.contains("baseSelect(true)"));
+        assertTrue(DAO.contains("findForUpdate(con"));
+    }
+
     @Test void mutationsUseTenantContextRowVerTransactionsCaseTouchAndAudits(){
         assertTrue(DAO.contains("SESSION_CONTEXT(N'ShaleClientId')"));
         assertTrue(DAO.contains("con.setAutoCommit(false)"));

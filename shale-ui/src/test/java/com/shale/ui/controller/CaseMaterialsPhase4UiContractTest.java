@@ -33,6 +33,17 @@ final class CaseMaterialsPhase4UiContractTest {
     assertFalse(MAT.contains("The materials change could not be completed"));
   }
 
+  @Test void caseMaterialsPrimaryLoadIsDecoupledFromRequestChoices() {
+    String refresh = MAT.substring(MAT.indexOf("void refresh(){long c=cid();int t=tenant();int g=gen.incrementAndGet();", MAT.indexOf("final class CaseMaterialItemsTabController")), MAT.indexOf("private void render(List<MaterialItemSummaryDto>", MAT.indexOf("final class CaseMaterialItemsTabController")));
+    assertTrue(refresh.contains("runRead(\"list-material-items\",()->svc.listMaterialItems(c,t)"));
+    assertFalse(refresh.contains("req.listMaterialRequests"));
+    assertTrue(MAT.contains("requestChoiceGen"));
+    assertTrue(MAT.contains("requestChoicesOrShowError"));
+    assertTrue(MAT.contains("Material request choices could not be loaded"));
+    assertTrue(MAT.contains("Case Materials auxiliary lookup failed"));
+    assertFalse(MAT.contains("list-material-items\",()->{activeRequests=req.listMaterialRequests"));
+  }
+
   @Test void creationUsesFullCommandBackedFormsNotTitleOnlyDialogs() {
     assertTrue(MAT.contains("final class MaterialRequestForm extends Dialog"));
     assertTrue(MAT.contains("CreateMaterialRequestCommand"));
