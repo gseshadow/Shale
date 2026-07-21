@@ -116,7 +116,7 @@
                 <Label text="Manage Material Types, Request Methods, and Request Statuses together. Tenant/global overlay behavior preserves active, inactive, system-key, color, origin, RowVer, and admin authorization semantics."
                        styleClass="search-summary-text" wrapText="true"/>
                 <VBox spacing="6" styleClass="shale-density-card-compact">
-                    <Label text="Material Types — colored tenant/global lookup values used by New Request selectors." wrapText="true"/>
+                    <Label text="Material Types — colored tenant/global lookup values used by material selectors." wrapText="true"/>
                     <Label text="Request Methods — effective active lookup values seeded from Email, Phone, Fax, Mail, Portal, In Person, and Other." wrapText="true"/>
                     <Label text="Request Statuses — colored lifecycle lookup values, defaulting creation by SystemKey requested while preserving inactive historical values." wrapText="true"/>
                 </VBox>
