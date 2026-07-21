@@ -33,6 +33,13 @@ public final class ColoredLookupComboBoxCellFactory {
                     content.setAlignment(Pos.CENTER_LEFT);
                     setText(null);
                     setGraphic(content);
+                    System.err.println("NEW REQUEST MATERIAL TYPE RENDERER V4 updateItem");
+                    System.err.println("item=" + displayName);
+                    System.err.println("pillNode=" + pill.getClass().getName());
+                    System.err.println("pillText=" + pill.getText());
+                    System.err.println("pillStyleClasses=" + pill.getStyleClass());
+                    System.err.println("pillInlineStyle=" + pill.getStyle());
+                    System.err.println("listCellGraphic=" + content + " children=" + content.getChildren());
                 }
             }
         };
