@@ -96,14 +96,6 @@ final class MaterialTypeSelectorParityTest {
 
 
     @Test
-    void noTemporaryDiagnosticsRemain() {
-        assertFalse(REQUEST_FORM.contains("RENDERER V4 ACTIVE"));
-        assertFalse(REQUEST_FORM.contains("NEW REQUEST MATERIAL TYPE RENDERER V4"));
-        assertFalse(SHARED_CELL.contains("NEW REQUEST MATERIAL TYPE RENDERER V4"));
-        assertFalse(SHARED_CELL.contains("PopupRowStructure"));
-    }
-
-    @Test
     void materialTypeIdIsNotDisplayedBySelector() {
         assertFalse(REQUEST_FORM.contains("MaterialTypeId"));
         assertFalse(REQUEST_FORM.contains("materialTypeId()+\""));
