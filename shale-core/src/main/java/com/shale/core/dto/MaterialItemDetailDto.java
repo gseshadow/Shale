@@ -1,0 +1,6 @@
+package com.shale.core.dto;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+public record MaterialItemDetailDto(long id, int shaleClientId, long caseId, Long materialRequestId, String materialRequestTitle, int materialTypeId, String materialTypeName, String materialTypeSystemKey, String format, String name, String description, Integer sourceContactId, String sourceContactDisplayName, Integer sourceOrganizationId, String sourceOrganizationName, String sourceText, int receivedByUserId, String receivedByDisplayName, LocalDateTime receivedAt, LocalDate relevantStartDate, LocalDate relevantEndDate, String completeness, Integer quantityCount, Integer pageCount, Integer fileCount, String storageLocation, Integer externalLinkId, String externalLinkDisplayName, String physicalCondition, String custodyStatus, LocalDateTime returnedOrReleasedAt, Integer returnedOrReleasedToContactId, String returnedOrReleasedToContactDisplayName, Integer returnedOrReleasedToOrganizationId, String returnedOrReleasedToOrganizationName, String returnedOrReleasedToText, String returnReleaseMethod, String returnReleaseNotes, LocalDateTime createdAt, int createdByUserId, LocalDateTime updatedAt, Integer updatedByUserId, byte[] rowVer) {}
