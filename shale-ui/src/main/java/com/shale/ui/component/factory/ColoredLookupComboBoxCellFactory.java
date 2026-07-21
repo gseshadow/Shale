@@ -2,7 +2,10 @@ package com.shale.ui.component.factory;
 
 import java.util.function.Function;
 
+import javafx.geometry.Pos;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.layout.HBox;
 
 /** Shared colored lookup ComboBox cells used by Add Link Link Type and matching lookup selectors. */
 public final class ColoredLookupComboBoxCellFactory {
@@ -18,8 +21,12 @@ public final class ColoredLookupComboBoxCellFactory {
                     setGraphic(null);
                 } else {
                     String displayName = name.apply(item);
-                    setText(displayName);
-                    setGraphic(LinkTypeIndicatorFactory.createLinkTypePill(displayName, color.apply(item), LinkTypeIndicatorFactory.PillSize.COMPACT));
+                    Label pill = LinkTypeIndicatorFactory.createLinkTypePill(displayName, color.apply(item), LinkTypeIndicatorFactory.PillSize.COMPACT);
+                    Label display = new Label(displayName);
+                    HBox content = new HBox(getGraphicTextGap(), pill, display);
+                    content.setAlignment(Pos.CENTER_LEFT);
+                    setText(null);
+                    setGraphic(content);
                 }
             }
         };
