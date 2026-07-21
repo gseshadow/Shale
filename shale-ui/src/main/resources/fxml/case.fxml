@@ -813,7 +813,14 @@
 				</HBox>
 			</VBox>
 
-			<!-- MATERIALS TAB PANE (center) -->
+			<!-- REQUESTS TAB PANE (center) -->
+			<VBox fx:id="caseRequestsTabPane" spacing="8" maxWidth="1.7976931348623157E308"
+				maxHeight="1.7976931348623157E308" visible="false" managed="false">
+				<padding><Insets top="8" right="8" bottom="8" left="8" /></padding>
+				<StackPane fx:id="caseRequestsContentHost" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308" />
+			</VBox>
+
+			<!-- CASE MATERIALS TAB PANE (center) -->
 			<VBox fx:id="caseMaterialsTabPane" spacing="8" maxWidth="1.7976931348623157E308"
 				maxHeight="1.7976931348623157E308" visible="false" managed="false">
 				<padding><Insets top="8" right="8" bottom="8" left="8" /></padding>
