@@ -32,6 +32,30 @@ final class MaterialRequestDaoPhase2ContractTest {
         assertTrue(DAO.contains("rs.getBytes(\"RowVer\")"));
     }
 
+    @Test void materialRequestListUsesSchemaCompatibleDisplayExpressionsAndMapperAliases() {
+        assertFalse(DAO.contains("rbu.DisplayName"));
+        assertFalse(DAO.contains("au.DisplayName"));
+        assertFalse(DAO.contains("u.DisplayName AS AttemptedByDisplayName"));
+        assertTrue(DAO.contains("mt.Name AS MaterialTypeName"));
+        assertTrue(DAO.contains("mt.SystemKey AS MaterialTypeSystemKey"));
+        assertTrue(DAO.contains("org.Name AS RequestedFromOrganizationName"));
+        assertTrue(DAO.contains("name_first"));
+        assertTrue(DAO.contains("name_last"));
+        assertTrue(DAO.contains("AS RequestedByDisplayName"));
+        assertTrue(DAO.contains("AS AssignedToDisplayName"));
+        assertTrue(DAO.contains("COALESCE(NULLIF(LTRIM(RTRIM("));
+        assertTrue(DAO.contains(".Name)), '')"));
+        assertTrue(DAO.contains("CONCAT("));
+        assertTrue(DAO.contains(".FirstName"));
+        assertTrue(DAO.contains(".LastName"));
+        assertTrue(DAO.contains(".WorkName"));
+        for (String label : new String[]{"Id","ShaleClientId","CaseId","MaterialTypeId","MaterialTypeName","MaterialTypeSystemKey","Status","RequestedByDisplayName","AssignedToDisplayName","RequestedFromContactDisplayName","RequestedFromOrganizationName","RequestedAt","ExpectedResponseDate","NextFollowUpAt","LastFollowUpAt","UpdatedAt","RowVer"}) {
+            assertTrue(DAO.contains("\"" + label + "\""), label);
+        }
+        assertTrue(DAO.contains("mr.ShaleClientId=? AND mr.CaseId=? AND mr.IsDeleted=0"));
+        assertTrue(DAO.contains("ISNULL(c.IsDeleted,0)=0"));
+    }
+
     @Test void mutationsOwnTransactionTouchCaseAndAppendEntityAudit() {
         assertTrue(DAO.contains("con.setAutoCommit(false)"));
         assertTrue(DAO.contains("rollback(con)"));
