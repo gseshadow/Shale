@@ -68,6 +68,7 @@ import com.shale.ui.document.CaseDocumentType;
 import com.shale.ui.document.GeneratedDocument;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
+import com.shale.ui.component.factory.ColoredLookupComboBoxCellFactory;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
@@ -2304,8 +2305,8 @@ public class CaseController {
 	private Optional<CaseLinkInput> showCaseLinkDialog(CaseLinkDto existing, List<LinkTypeDto> linkTypes) {
 		Dialog<CaseLinkInput> dialog = new Dialog<>(); String title = existing == null ? "Add Link" : "Edit Link"; dialog.setTitle(title); if (caseLinksOwner() != null) dialog.initOwner(caseLinksOwner()); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		ComboBox<LinkTypeDto> type = new ComboBox<>(); type.getItems().setAll(linkTypes); type.setMaxWidth(Double.MAX_VALUE); type.setConverter(new javafx.util.StringConverter<>() { public String toString(LinkTypeDto t) { return t == null ? "" : t.name(); } public LinkTypeDto fromString(String s) { return null; }});
-		type.setCellFactory(list -> new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); setGraphic(empty || item == null ? null : LinkTypeIndicatorFactory.createLinkTypePill(item.name(), item.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); }});
-		type.setButtonCell(new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); }});
+		type.setCellFactory(list -> ColoredLookupComboBoxCellFactory.popupCell(LinkTypeDto::name, LinkTypeDto::color));
+		type.setButtonCell(ColoredLookupComboBoxCellFactory.buttonCell(LinkTypeDto::name));
 		TextField name = new TextField(existing == null ? "" : safeText(existing.displayName())); TextField url = new TextField(existing == null ? "" : safeText(existing.url())); TextArea description = new TextArea(existing == null ? "" : safeText(existing.description())); description.setPrefRowCount(3); TextArea notes = new TextArea(existing == null ? "" : safeText(existing.notes())); notes.setPrefRowCount(3); CheckBox primary = new CheckBox("Make primary"); primary.setSelected(existing != null && existing.primary());
 		SharedWithEditor sharedWithEditor = new SharedWithEditor(existing);
 		VBox sharedWithBox = sharedWithEditor.root();
