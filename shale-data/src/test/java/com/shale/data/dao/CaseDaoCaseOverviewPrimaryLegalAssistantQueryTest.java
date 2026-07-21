@@ -28,18 +28,18 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
     @Test
     void overviewSelectRejectsNonPrimaryWrongRoleOtherTenantAndSoftDeletedAssignments() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String method = method(source, "OUTER APPLY (\n\t\t\t\t\t    SELECT TOP (1) pla_cu.UserId", "\t\t\t\t\t) primary_legal_assistant");
+        String apply = primaryLegalAssistantApply(source);
 
-        assertTrue(method.contains("pla_cu.CaseId = c.Id"));
-        assertTrue(!method.contains("pla_cu.ShaleClientId"),
+        assertTrue(apply.contains("pla_cu.CaseId = c.Id"));
+        assertTrue(!apply.contains("pla_cu.ShaleClientId"),
                 "CaseUsers does not have ShaleClientId; tenant isolation must be enforced through Users.ShaleClientId");
         assertTrue(!method(source, "public com.shale.core.dto.CaseOverviewDto getOverview", "private List<com.shale.core.dto.CaseOverviewDto.ContactSummary>").contains("cu.ShaleClientId"),
                 "getOverview must not reference CaseUsers.ShaleClientId for any CaseUsers alias");
-        assertTrue(method.contains("pla_user.id = pla_cu.UserId"));
-        assertTrue(method.contains("pla_user.ShaleClientId = c.ShaleClientId"));
-        assertTrue(method.contains("pla_cu.RoleId = ?"));
+        assertTrue(apply.contains("pla_user.id = pla_cu.UserId"));
+        assertTrue(apply.contains("pla_user.ShaleClientId = c.ShaleClientId"));
+        assertTrue(apply.contains("pla_cu.RoleId = ?"));
         assertTrue(source.contains("ps.setInt(idx++, ROLE_LEGAL_ASSISTANT)"));
-        assertTrue(method.contains("pla_cu.IsPrimary = 1"));
+        assertTrue(apply.contains("pla_cu.IsPrimary = 1"));
         assertTrue(source.contains("activeFilter(resolveCaseUsersDeletedColumn(con), \"pla_cu\")"));
         assertTrue(source.contains("activeFilter(resolveUsersDeletedColumn(con), \"pla_user\")"));
     }
@@ -76,10 +76,10 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
     @Test
     void duplicatePrimaryLegalAssistantsResolveDeterministicallyToOneCardConvention() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String method = method(source, "OUTER APPLY (\n\t\t\t\t\t    SELECT TOP (1) pla_cu.UserId", "\t\t\t\t\t) primary_legal_assistant");
+        String apply = primaryLegalAssistantApply(source);
 
-        assertTrue(method.contains("SELECT TOP (1) pla_cu.UserId"));
-        assertTrue(method.contains("ORDER BY pla_cu.UpdatedAt DESC, pla_cu.CreatedAt DESC, pla_cu.Id DESC"),
+        assertTrue(apply.contains("SELECT TOP (1) pla_cu.UserId"));
+        assertTrue(apply.contains("ORDER BY pla_cu.UpdatedAt DESC, pla_cu.CreatedAt DESC, pla_cu.Id DESC"),
                 "Bad duplicate primary data should still render one deterministic assignment using the existing primary-assignment ordering convention; duplicates remain a data-integrity concern.");
     }
 
@@ -189,6 +189,10 @@ final class CaseDaoCaseOverviewPrimaryLegalAssistantQueryTest {
             }
         }
         return out.toString();
+    }
+
+    private static String primaryLegalAssistantApply(String source) {
+        return method(source, "SELECT TOP (1) pla_cu.UserId", ") primary_legal_assistant");
     }
 
     private static String method(String source, String startNeedle, String endNeedle) {
