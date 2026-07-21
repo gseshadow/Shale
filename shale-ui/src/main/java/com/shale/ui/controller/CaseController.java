@@ -92,6 +92,7 @@ import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -2051,7 +2052,9 @@ public class CaseController {
 			final int tenantId = requireTenantId();
 			final int actorId = requireActorUserId();
 			final int activeCaseId = caseId;
-			runCaseLinkMutation("create", "Link added.", activeCaseId, null, () -> caseService.createCaseLinkWithShares(new CaseServicePort.CreateCaseLinkWithSharesCommand(tenantId, actorId, activeCaseId, input.linkType().id(), input.displayName(), input.url(), input.description(), input.primary(), input.notes(), null, input.shareAdds())));
+			runCaseLinkMutation("create", "Link added.", activeCaseId, null,
+					shareLiveChangesForCreate(input.shareAdds()),
+					() -> caseService.createCaseLinkWithShares(new CaseServicePort.CreateCaseLinkWithSharesCommand(tenantId, actorId, activeCaseId, input.linkType().id(), input.displayName(), input.url(), input.description(), input.primary(), input.notes(), null, input.shareAdds())));
 		}));
 	}
 
@@ -2060,7 +2063,9 @@ public class CaseController {
 			final int tenantId = requireTenantId();
 			final int actorId = requireActorUserId();
 			final int activeCaseId = caseId;
-			runCaseLinkMutation("update", "Link updated.", activeCaseId, link.caseLinkId(), () -> caseService.updateCaseLinkWithShares(new CaseServicePort.UpdateCaseLinkWithSharesCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.externalLinkId(), input.linkType().id(), input.displayName(), input.url(), input.description(), null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer(), input.shareAdds(), input.shareUpdates(), input.shareRemovals())));
+			runCaseLinkMutation("update", "Link updated.", activeCaseId, link.caseLinkId(),
+					shareLiveChangesForUpdate(input.shareAdds(), input.shareUpdates(), input.shareRemovals(), link.shares()),
+					() -> caseService.updateCaseLinkWithShares(new CaseServicePort.UpdateCaseLinkWithSharesCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.externalLinkId(), input.linkType().id(), input.displayName(), input.url(), input.description(), null, input.notes(), null, link.caseLinkRowVer(), link.externalLinkRowVer(), input.shareAdds(), input.shareUpdates(), input.shareRemovals())));
 		}));
 	}
 
@@ -2068,7 +2073,7 @@ public class CaseController {
 		final int tenantId = requireTenantId();
 		final int actorId = requireActorUserId();
 		final int activeCaseId = caseId;
-		runCaseLinkMutation("set-primary", "Primary link updated.", activeCaseId, link.caseLinkId(), () -> caseService.setPrimaryCaseLink(new CaseServicePort.SetPrimaryCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId())));
+		runCaseLinkMutation("set-primary", "Primary link updated.", activeCaseId, link.caseLinkId(), CaseLinkShareLiveChanges.NONE, () -> caseService.setPrimaryCaseLink(new CaseServicePort.SetPrimaryCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId())));
 	}
 
 	private void onDeleteCaseLink(CaseLinkDto link) {
@@ -2077,7 +2082,7 @@ public class CaseController {
 		final int tenantId = requireTenantId();
 		final int actorId = requireActorUserId();
 		final int activeCaseId = caseId;
-		runCaseLinkMutation("delete", "Link deleted.", activeCaseId, link.caseLinkId(), () -> { caseService.deleteCaseLink(new CaseServicePort.DeleteCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.caseLinkRowVer())); return null; });
+		runCaseLinkMutation("delete", "Link deleted.", activeCaseId, link.caseLinkId(), CaseLinkShareLiveChanges.NONE, () -> { caseService.deleteCaseLink(new CaseServicePort.DeleteCaseLinkCommand(tenantId, actorId, activeCaseId, link.caseLinkId(), link.caseLinkRowVer())); return null; });
 	}
 
 	private void onMoveCaseLink(int index, int delta) {
@@ -2089,10 +2094,44 @@ public class CaseController {
 		final int tenantId = requireTenantId();
 		final int actorId = requireActorUserId();
 		final int activeCaseId = caseId;
-		runCaseLinkMutation("reorder", "Links reordered.", activeCaseId, null, () -> caseService.reorderCaseLinks(new CaseServicePort.ReorderCaseLinksCommand(tenantId, actorId, activeCaseId, ids)));
+		runCaseLinkMutation("reorder", "Links reordered.", activeCaseId, null, CaseLinkShareLiveChanges.NONE, () -> caseService.reorderCaseLinks(new CaseServicePort.ReorderCaseLinksCommand(tenantId, actorId, activeCaseId, ids)));
 	}
 
-	private void runCaseLinkMutation(String operation, String successMessage, int activeCaseId, Long caseLinkIdForLog, java.util.concurrent.Callable<?> action) {
+	private void publishCaseLinkLiveInvalidations(String operation, long caseId, Long caseLinkIdForLog, Object result, int tenantId, int actorId, CaseLinkShareLiveChanges shareChanges) {
+		if (runtimeBridge == null || tenantId <= 0 || actorId <= 0) return;
+		Long caseLinkId = resolvedCaseLinkId(caseLinkIdForLog, result);
+		Long externalLinkId = result instanceof CaseLinkDto dto ? dto.externalLinkId() : null;
+		Integer linkTypeId = result instanceof CaseLinkDto dto ? dto.linkTypeId() : null;
+		String change = switch (operation == null ? "" : operation) {
+			case "create" -> LiveUpdateEvents.CHANGE_CREATED;
+			case "update" -> LiveUpdateEvents.CHANGE_UPDATED;
+			case "set-primary" -> LiveUpdateEvents.CHANGE_PRIMARY_CHANGED;
+			case "delete" -> LiveUpdateEvents.CHANGE_DELETED;
+			case "reorder" -> LiveUpdateEvents.CHANGE_REORDERED;
+			default -> LiveUpdateEvents.CHANGE_UPDATED;
+		};
+		runtimeBridge.publishCaseLinkChanged(caseId, caseLinkId, externalLinkId, linkTypeId, tenantId, actorId, change);
+		publishCaseLinkShareLiveInvalidations(caseId, caseLinkId, result, tenantId, actorId, shareChanges);
+		runtimeBridge.publishEntityAuditActivityAdded(null, tenantId, actorId);
+	}
+
+	private void publishCaseLinkShareLiveInvalidations(long caseId, Long fallbackCaseLinkId, Object result, int tenantId, int actorId, CaseLinkShareLiveChanges shareChanges) {
+		if (runtimeBridge == null || shareChanges == null || shareChanges.isEmpty()) return;
+		List<CaseLinkShareDto> committedShares = result instanceof CaseLinkDto dto && dto.shares() != null ? dto.shares() : List.of();
+		long caseLinkId = fallbackCaseLinkId == null ? 0L : fallbackCaseLinkId;
+		for (CaseLinkShareLiveChange add : shareChanges.added()) {
+			Long shareId = committedShares.stream().filter(s -> s.contactId() == add.contactId()).map(CaseLinkShareDto::caseLinkShareId).findFirst().orElse(null);
+			runtimeBridge.publishCaseLinkShareChanged(caseId, caseLinkId, shareId, add.contactId(), tenantId, actorId, LiveUpdateEvents.CHANGE_ADDED);
+		}
+		for (CaseLinkShareLiveChange update : shareChanges.updated()) {
+			runtimeBridge.publishCaseLinkShareChanged(caseId, caseLinkId, update.caseLinkShareId(), update.contactId(), tenantId, actorId, LiveUpdateEvents.CHANGE_UPDATED);
+		}
+		for (CaseLinkShareLiveChange removal : shareChanges.removed()) {
+			runtimeBridge.publishCaseLinkShareChanged(caseId, caseLinkId, removal.caseLinkShareId(), removal.contactId(), tenantId, actorId, LiveUpdateEvents.CHANGE_REMOVED);
+		}
+	}
+
+	private void runCaseLinkMutation(String operation, String successMessage, int activeCaseId, Long caseLinkIdForLog, CaseLinkShareLiveChanges shareChanges, java.util.concurrent.Callable<?> action) {
 		if (!caseLinkMutationInFlight.compareAndSet(false, true)) {
 			LOG.info("Case Link mutation duplicate blocked op={} tenantId={} actorId={} caseId={} caseLinkId={}", operation, safeTenantId(), safeActorUserId(), activeCaseId, caseLinkIdForLog);
 			showCaseLinksMessage("Saving link changes…");
@@ -2107,6 +2146,7 @@ public class CaseController {
 		caseLinkExecutor.submit(() -> {
 			try {
 				Object result = action.call();
+				publishCaseLinkLiveInvalidations(operation, activeCaseId, caseLinkIdForLog, result, tenantId, actorId, shareChanges);
 				List<CaseLinkDto> reloaded = caseService.listCaseLinks(activeCaseId, tenantId);
 				List<CaseLinkDto> safeReloaded = reloaded == null ? List.of() : List.copyOf(reloaded);
 				Platform.runLater(() -> {
@@ -2412,6 +2452,47 @@ public class CaseController {
 		static StagedShare copy(StagedShare src) { StagedShare s = new StagedShare(); s.shareId = src.shareId; s.contactId = src.contactId; s.displayName = src.displayName; s.unavailable = src.unavailable; s.sharedAt = src.sharedAt; s.notes = src.notes; s.rowVer = src.rowVer == null ? null : src.rowVer.clone(); s.dirty = src.dirty; s.removed = src.removed; s.originalSharedAt = src.originalSharedAt; s.originalNotes = src.originalNotes; return s; }
 		LocalDateTime originalSharedAt; String originalNotes;
 		boolean changedFromOriginal() { return dirty || !Objects.equals(sharedAt, originalSharedAt) || !Objects.equals(safeText(notes), safeText(originalNotes)); }
+	}
+
+	private static CaseLinkShareLiveChanges shareLiveChangesForCreate(List<CaseServicePort.CaseLinkShareDraft> adds) {
+		return new CaseLinkShareLiveChanges(
+				(adds == null ? List.<CaseServicePort.CaseLinkShareDraft>of() : adds).stream()
+						.map(add -> new CaseLinkShareLiveChange(null, add.contactId()))
+						.toList(),
+				List.of(),
+				List.of());
+	}
+
+	private static CaseLinkShareLiveChanges shareLiveChangesForUpdate(
+			List<CaseServicePort.CaseLinkShareDraft> adds,
+			List<CaseServicePort.CaseLinkShareUpdate> updates,
+			List<CaseServicePort.CaseLinkShareRemoval> removals,
+			List<CaseLinkShareDto> originalShares) {
+		Map<Long, Integer> originalContactByShareId = (originalShares == null ? List.<CaseLinkShareDto>of() : originalShares).stream()
+				.collect(Collectors.toMap(CaseLinkShareDto::caseLinkShareId, CaseLinkShareDto::contactId, (a, b) -> a));
+		return new CaseLinkShareLiveChanges(
+				(adds == null ? List.<CaseServicePort.CaseLinkShareDraft>of() : adds).stream()
+						.map(add -> new CaseLinkShareLiveChange(null, add.contactId()))
+						.toList(),
+				(updates == null ? List.<CaseServicePort.CaseLinkShareUpdate>of() : updates).stream()
+						.map(update -> new CaseLinkShareLiveChange(update.caseLinkShareId(), update.contactId()))
+						.toList(),
+				(removals == null ? List.<CaseServicePort.CaseLinkShareRemoval>of() : removals).stream()
+						.map(removal -> new CaseLinkShareLiveChange(removal.caseLinkShareId(), originalContactByShareId.get(removal.caseLinkShareId())))
+						.filter(change -> change.contactId() != null)
+						.toList());
+	}
+
+	private record CaseLinkShareLiveChange(Long caseLinkShareId, Integer contactId) {}
+
+	private record CaseLinkShareLiveChanges(List<CaseLinkShareLiveChange> added, List<CaseLinkShareLiveChange> updated, List<CaseLinkShareLiveChange> removed) {
+		private static final CaseLinkShareLiveChanges NONE = new CaseLinkShareLiveChanges(List.of(), List.of(), List.of());
+		private CaseLinkShareLiveChanges {
+			added = added == null ? List.of() : List.copyOf(added);
+			updated = updated == null ? List.of() : List.copyOf(updated);
+			removed = removed == null ? List.of() : List.copyOf(removed);
+		}
+		private boolean isEmpty() { return added.isEmpty() && updated.isEmpty() && removed.isEmpty(); }
 	}
 
 	static CaseLinkInput validateCaseLinkDialogInput(LinkTypeDto selected, String name, String url, String description, boolean primary, String notes, List<CaseServicePort.CaseLinkShareDraft> shareAdds, List<CaseServicePort.CaseLinkShareUpdate> shareUpdates, List<CaseServicePort.CaseLinkShareRemoval> shareRemovals) {
@@ -8110,6 +8191,7 @@ public class CaseController {
 
 	private final class CaseOverviewLiveUpdateHandler {
 		private final Consumer<UiRuntimeBridge.CaseUpdatedEvent> eventHandler = this::handleEvent;
+		private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> entityEventHandler = this::handleEntityEvent;
 		private boolean subscribed;
 
 		void subscribe() {
@@ -8117,6 +8199,7 @@ public class CaseController {
 				return;
 
 			runtimeBridge.subscribeCaseUpdated(eventHandler);
+			runtimeBridge.subscribeEntityUpdated(entityEventHandler);
 			subscribed = true;
 		}
 
@@ -8125,7 +8208,36 @@ public class CaseController {
 				return;
 			}
 			runtimeBridge.unsubscribeCaseUpdated(eventHandler);
+			runtimeBridge.unsubscribeEntityUpdated(entityEventHandler);
 			subscribed = false;
+		}
+
+		private void handleEntityEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+			if (event == null || appState == null || caseId == null) return;
+			Integer tenantId = appState.getShaleClientId();
+			if (tenantId == null || event.shaleClientId() != tenantId) return;
+			String entityType = event.entityType();
+			if (!LiveUpdateEvents.ENTITY_CASE_LINK.equals(entityType)
+					&& !LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(entityType)
+					&& !LiveUpdateEvents.ENTITY_LINK_TYPE.equals(entityType)) return;
+			long eventCaseId = getPatchLong(event, "caseId", -1L);
+			if ((LiveUpdateEvents.ENTITY_CASE_LINK.equals(entityType) || LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(entityType))
+					&& eventCaseId != caseId.longValue()) return;
+			if (runtimeBridge != null) {
+				String mine = runtimeBridge.getClientInstanceId();
+				if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId())) return;
+			}
+			runOnFx(() -> {
+				caseLinksStale = true;
+				invalidateOverviewPrimaryLinkAfterCaseLinkMutation();
+				if (caseLinksTabPane != null && caseLinksTabPane.isVisible()) loadCaseLinksAsync(null);
+			});
+		}
+
+		private long getPatchLong(UiRuntimeBridge.EntityUpdatedEvent event, String key, long fallback) {
+			Object value = event.patch() == null ? null : event.patch().get(key);
+			if (value instanceof Number number) return number.longValue();
+			try { return value == null ? fallback : Long.parseLong(String.valueOf(value)); } catch (NumberFormatException ex) { return fallback; }
 		}
 
 		private void handleEvent(UiRuntimeBridge.CaseUpdatedEvent event) {

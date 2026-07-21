@@ -6,6 +6,8 @@ import com.shale.data.dao.EntityActionAuditViewerRow;
 import com.shale.data.dao.UserDao;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.services.LiveUpdateEvents;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -74,6 +76,8 @@ public final class AuditLogViewerController {
     private EntityActionAuditDao entityActionAuditDao;
     private UserDao userDao;
     private DbSessionProvider dbSessionProvider;
+    private UiRuntimeBridge runtimeBridge;
+    private final java.util.function.Consumer<UiRuntimeBridge.EntityUpdatedEvent> auditLiveHandler = this::handleAuditLiveEvent;
     private final Map<Integer, String> userDisplayNamesById = new HashMap<>();
     private final AtomicLong requestGeneration = new AtomicLong();
     private boolean fxmlReady;
@@ -87,13 +91,24 @@ public final class AuditLogViewerController {
         configureColumns(); configureTableReadability(); configureFilterFieldActions(); runInitialLoadIfReady();
     }
 
-    public void init(AppState appState, AuditLogDao auditLogDao, EntityActionAuditDao entityActionAuditDao, UserDao userDao, DbSessionProvider dbSessionProvider) {
+    public void init(AppState appState, AuditLogDao auditLogDao, EntityActionAuditDao entityActionAuditDao, UserDao userDao, DbSessionProvider dbSessionProvider, UiRuntimeBridge runtimeBridge) {
         this.appState = Objects.requireNonNull(appState, "appState");
         this.auditLogDao = Objects.requireNonNull(auditLogDao, "auditLogDao");
         this.entityActionAuditDao = Objects.requireNonNull(entityActionAuditDao, "entityActionAuditDao");
         this.userDao = Objects.requireNonNull(userDao, "userDao");
         this.dbSessionProvider = Objects.requireNonNull(dbSessionProvider, "dbSessionProvider");
+        this.runtimeBridge = runtimeBridge;
+        if (this.runtimeBridge != null) this.runtimeBridge.subscribeEntityUpdated(auditLiveHandler);
         initialLoadPending = true; runInitialLoadIfReady();
+    }
+
+    private void handleAuditLiveEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+        if (event == null || appState == null || !LiveUpdateEvents.ENTITY_AUDIT_ACTIVITY.equals(event.entityType())) return;
+        Integer tenantId = appState.getShaleClientId();
+        if (tenantId == null || event.shaleClientId() != tenantId || !appState.isAdmin()) return;
+        ViewerMode selectedMode = mode();
+        if (selectedMode == ViewerMode.PHI_AUDIT) return;
+        Platform.runLater(this::loadAuditRows);
     }
 
     private void runInitialLoadIfReady() { if (!fxmlReady || !initialLoadPending) return; initialLoadPending = false; if (!appState.isAdmin()) { auditTable.setItems(FXCollections.emptyObservableList()); setStatus("Only admin users can view audit logs."); return; } loadAuditRows(); }

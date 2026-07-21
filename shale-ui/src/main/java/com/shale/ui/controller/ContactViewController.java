@@ -24,6 +24,8 @@ import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.PhiReadAuditService;
+import com.shale.ui.services.LiveUpdateEvents;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.util.ExternalBrowserHelper;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.state.AppState;
@@ -112,6 +114,8 @@ public final class ContactViewController {
     private int sharedLinksLoadGeneration = 0;
     private List<ContactSharedCaseLinkDto> sharedLinks = List.of();
     private boolean sharedLinksLoaded;
+    private UiRuntimeBridge runtimeBridge;
+    private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> sharedLinksLiveHandler = this::handleSharedLinksLiveEvent;
     private CaseServicePort caseService;
     private final CaseLinkCardFactory caseLinkCardFactory = new CaseLinkCardFactory();
     private ExternalBrowserHelper externalBrowserHelper = new ExternalBrowserHelper();
@@ -130,7 +134,7 @@ public final class ContactViewController {
             Consumer<Integer> onOpenCase,
             Runnable onContactDeleted,
             PhiReadAuditService phiReadAuditService) {
-        init(contactId, contactDetailService, appState, onOpenCase, null, onContactDeleted, phiReadAuditService, null);
+        init(contactId, contactDetailService, appState, onOpenCase, null, onContactDeleted, phiReadAuditService, null, null);
     }
 
     public void init(
@@ -141,7 +145,7 @@ public final class ContactViewController {
             CaseServicePort caseService,
             Runnable onContactDeleted,
             PhiReadAuditService phiReadAuditService,
-            Consumer<Integer> onOpenContact) {
+            Consumer<Integer> onOpenContact, UiRuntimeBridge runtimeBridge) {
         this.contactId = contactId;
         this.contactDetailService = contactDetailService;
         this.appState = appState;
@@ -150,6 +154,8 @@ public final class ContactViewController {
         this.caseService = caseService;
         this.onOpenContact = onOpenContact;
         this.phiReadAuditService = phiReadAuditService;
+        this.runtimeBridge = runtimeBridge;
+        if (this.runtimeBridge != null) this.runtimeBridge.subscribeEntityUpdated(sharedLinksLiveHandler);
         this.caseCardFactory = new CaseCardFactory(onOpenCase);
         auditContactRead();
         if (initialized) {
@@ -157,6 +163,18 @@ public final class ContactViewController {
             loadContact();
             loadSharedLinks();
         }
+    }
+
+    private void handleSharedLinksLiveEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+        if (event == null || appState == null || !LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(event.entityType())) return;
+        Integer tenantId = appState.getShaleClientId();
+        if (tenantId == null || event.shaleClientId() != tenantId) return;
+        Object rawContactId = event.patch() == null ? null : event.patch().get("contactId");
+        long eventContactId;
+        try { eventContactId = rawContactId instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(rawContactId)); }
+        catch (RuntimeException ex) { return; }
+        if (eventContactId != contactId) return;
+        Platform.runLater(this::loadSharedLinks);
     }
 
     private void auditContactRead() {
