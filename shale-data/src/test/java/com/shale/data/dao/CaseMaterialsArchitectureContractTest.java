@@ -28,4 +28,20 @@ final class CaseMaterialsArchitectureContractTest {
         assertTrue(doc.contains("Phase 1 recommended boundary"));
         assertTrue(doc.contains("Blocking conflict before Phase 1"));
     }
+
+    @Test
+    void phiRegistriesIncludeCaseMaterialsObjectsAndFields() throws Exception {
+        assertTrue(com.shale.core.privacy.PhiFieldRegistry.isPhi("MaterialRequests", "Title"));
+        assertTrue(com.shale.core.privacy.PhiFieldRegistry.isPhi("MaterialRequestFollowUps", "Notes"));
+        assertTrue(com.shale.core.privacy.PhiFieldRegistry.isPhi("MaterialItems", "StorageLocation"));
+        String writeAudit = Files.readString(Path.of("src", "main", "java", "com", "shale", "data", "dao", "PhiAuditService.java"));
+        assertTrue(writeAudit.contains("\"materialrequests\", 9"));
+        assertTrue(writeAudit.contains("\"materialrequestfollowups\", 10"));
+        assertTrue(writeAudit.contains("\"materialitems\", 11"));
+        String readAudit = Files.readString(Path.of("..", "shale-ui", "src", "main", "java", "com", "shale", "ui", "services", "PhiReadAuditService.java"));
+        assertTrue(readAudit.contains("\"MaterialRequest\", 9"));
+        assertTrue(readAudit.contains("\"MaterialRequestFollowUp\", 10"));
+        assertTrue(readAudit.contains("\"MaterialItem\", 11"));
+    }
+
 }

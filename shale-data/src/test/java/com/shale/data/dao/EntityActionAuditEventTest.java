@@ -55,4 +55,23 @@ final class EntityActionAuditEventTest {
 		EntityActionAuditEvent event = new EntityActionAuditEvent(0, 7, 9, EntityActionAuditEvent.EntityType.LINK_TYPE, 3, EntityActionAuditEvent.Action.CREATED, now, null, null, null, "TEST", Map.of());
 		assertSame(now, event.occurredAtUtc());
 	}
+	@Test
+	void allowsCaseMaterialsEntitiesActionsAndSafeMetadata() {
+		var metadata = new java.util.EnumMap<EntityActionAuditEvent.MetadataKey, Object>(EntityActionAuditEvent.MetadataKey.class);
+		metadata.put(EntityActionAuditEvent.MetadataKey.CASE_ID, 42L);
+		metadata.put(EntityActionAuditEvent.MetadataKey.MATERIAL_REQUEST_ID, 77L);
+		metadata.put(EntityActionAuditEvent.MetadataKey.REQUEST_STATUS, "REQUESTED");
+		EntityActionAuditEvent event = EntityActionAuditEvent.now(7, 9, EntityActionAuditEvent.EntityType.MATERIAL_REQUEST, 77, EntityActionAuditEvent.Action.STATUS_CHANGED, null, null, metadata);
+		assertEquals("77", event.metadata().get(EntityActionAuditEvent.MetadataKey.MATERIAL_REQUEST_ID));
+		assertEquals("REQUESTED", event.metadata().get(EntityActionAuditEvent.MetadataKey.REQUEST_STATUS));
+
+		assertNotNull(EntityActionAuditEvent.EntityType.valueOf("MATERIAL_TYPE"));
+		assertNotNull(EntityActionAuditEvent.EntityType.valueOf("MATERIAL_REQUEST_FOLLOW_UP"));
+		assertNotNull(EntityActionAuditEvent.EntityType.valueOf("MATERIAL_ITEM"));
+		assertNotNull(EntityActionAuditEvent.Action.valueOf("FOLLOW_UP_ADDED"));
+		assertNotNull(EntityActionAuditEvent.Action.valueOf("LOCATION_UPDATED"));
+		assertNotNull(EntityActionAuditEvent.Action.valueOf("RELEASED"));
+		assertThrows(IllegalArgumentException.class, () -> EntityActionAuditEvent.now(7, 9, EntityActionAuditEvent.EntityType.MATERIAL_ITEM, 88, EntityActionAuditEvent.Action.PRIMARY_SET, null, null, Map.of()));
+	}
+
 }

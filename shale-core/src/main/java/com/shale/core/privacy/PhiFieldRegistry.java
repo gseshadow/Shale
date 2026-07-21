@@ -22,7 +22,24 @@ public final class PhiFieldRegistry {
             field("Tasks", "Title"),
             field("Tasks", "Description"),
             field("TaskTimelineEvents", "Body"),
-            field("TaskUpdates", "Body"));
+            field("TaskUpdates", "Body"),
+            field("MaterialTypes", "Description"),
+            field("MaterialRequests", "Title"),
+            field("MaterialRequests", "Description"),
+            field("MaterialRequests", "RequestedFromText"),
+            field("MaterialRequests", "RelevantStartDate"),
+            field("MaterialRequests", "RelevantEndDate"),
+            field("MaterialRequests", "Notes"),
+            field("MaterialRequestFollowUps", "Outcome"),
+            field("MaterialRequestFollowUps", "Notes"),
+            field("MaterialItems", "Name"),
+            field("MaterialItems", "Description"),
+            field("MaterialItems", "SourceText"),
+            field("MaterialItems", "RelevantStartDate"),
+            field("MaterialItems", "RelevantEndDate"),
+            field("MaterialItems", "StorageLocation"),
+            field("MaterialItems", "PhysicalCondition"),
+            field("MaterialItems", "ReturnReleaseNotes"));
 
     private PhiFieldRegistry() {
     }
