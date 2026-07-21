@@ -9,7 +9,12 @@ import javafx.scene.layout.HBox;
 
 /** Shared colored lookup ComboBox cells used by Add Link Link Type and matching lookup selectors. */
 public final class ColoredLookupComboBoxCellFactory {
+    public record PopupRowStructure(String rootType, String pillType, String pillText, String plainText, String color, String pillSize, boolean hasCircle, boolean fixedEqualPillSize) {}
     private ColoredLookupComboBoxCellFactory() {}
+
+    public static PopupRowStructure popupRowStructure(String displayName, String color) {
+        return new PopupRowStructure("HBox", "Label", displayName, displayName, color, LinkTypeIndicatorFactory.PillSize.COMPACT.name(), false, false);
+    }
 
     public static <T> ListCell<T> popupCell(Function<T, String> name, Function<T, String> color) {
         return new ListCell<>() {
@@ -21,8 +26,9 @@ public final class ColoredLookupComboBoxCellFactory {
                     setGraphic(null);
                 } else {
                     String displayName = name.apply(item);
-                    Label pill = LinkTypeIndicatorFactory.createLinkTypePill(displayName, color.apply(item), LinkTypeIndicatorFactory.PillSize.COMPACT);
-                    Label display = new Label(displayName);
+                    PopupRowStructure structure = popupRowStructure(displayName, color.apply(item));
+                    Label pill = LinkTypeIndicatorFactory.createLinkTypePill(structure.pillText(), structure.color(), LinkTypeIndicatorFactory.PillSize.COMPACT);
+                    Label display = new Label(structure.plainText());
                     HBox content = new HBox(getGraphicTextGap(), pill, display);
                     content.setAlignment(Pos.CENTER_LEFT);
                     setText(null);

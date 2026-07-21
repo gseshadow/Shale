@@ -41,7 +41,7 @@ final class MaterialTypeSelectorParityTest {
 
     @Test
     void popupRowsRenderConfiguredColoredPillAndDisplayNameText() {
-        assertTrue(SHARED_CELL.contains("LinkTypeIndicatorFactory.createLinkTypePill(displayName, color.apply(item), LinkTypeIndicatorFactory.PillSize.COMPACT)"));
+        assertTrue(SHARED_CELL.contains("LinkTypeIndicatorFactory.createLinkTypePill(structure.pillText(), structure.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)"));
         assertTrue(SHARED_CELL.contains("new HBox(getGraphicTextGap(), pill, display)"));
         assertTrue(REQUEST_FORM.contains("MaterialTypeDto::color"));
         assertTrue(REQUEST_FORM.contains("MaterialTypeDto::name"));
@@ -87,6 +87,23 @@ final class MaterialTypeSelectorParityTest {
         assertEquals(sharedButton.getGraphic(), materialButton.getGraphic());
         assertEquals("Medical records", materialButton.getText());
         assertNull(materialButton.getGraphic());
+    }
+
+
+    @Test
+    void nonSkippedStructuralModelMatchesAddLinkAndMaterialTypeRows() {
+        var addLink = ColoredLookupComboBoxCellFactory.popupRowStructure("Medical records", "#2563EB");
+        var materialType = ColoredLookupComboBoxCellFactory.popupRowStructure("Medical records", "#2563EB");
+
+        assertEquals(addLink, materialType);
+        assertEquals("HBox", materialType.rootType());
+        assertEquals("Label", materialType.pillType());
+        assertEquals("Medical records", materialType.pillText());
+        assertEquals("Medical records", materialType.plainText());
+        assertEquals("#2563EB", materialType.color());
+        assertEquals("COMPACT", materialType.pillSize());
+        assertFalse(materialType.hasCircle());
+        assertFalse(materialType.fixedEqualPillSize());
     }
 
     @Test
