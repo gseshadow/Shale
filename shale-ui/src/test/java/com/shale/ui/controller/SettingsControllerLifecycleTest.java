@@ -194,6 +194,26 @@ final class SettingsControllerLifecycleTest {
     }
 
 
+    @Test
+    void settingsAuditButtonUsesImplementedAdminGuardedHandler() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+        String method = methodSource(source, "onViewAuditLog");
+
+        assertTrue(fxml.contains("fx:id=\"viewAuditLogButton\""));
+        assertTrue(fxml.contains("onAction=\"#onViewAuditLog\""));
+        assertTrue(source.contains("@FXML\n\tprivate void onViewAuditLog(javafx.event.ActionEvent event)")
+                        || source.contains("@FXML\n\tprivate void onViewAuditLog(ActionEvent event)"),
+                "FXML action handlers declared private must be annotated and accept the JavaFX action event.");
+        assertTrue(method.contains("if (!isAdminUser() || onOpenAuditLog == null)"),
+                "Settings audit-log navigation must preserve the existing admin permission guard.");
+        assertTrue(method.contains("onOpenAuditLog.run();"),
+                "Settings audit-log action should route through the SceneManager-supplied navigation callback.");
+        assertTrue(method.contains("AppDialogs.showError"),
+                "Audit-log navigation failures should be shown as sanitized user-facing errors.");
+    }
+
+
     private static String methodSource(String source, String methodName) {
         Pattern signaturePattern = Pattern.compile("(?m)^\\s*(?:@FXML\\s*)?(?:private|public|protected|static|final|\\s)+[^{;=]*\\b"
                 + Pattern.quote(methodName) + "\\s*\\([^)]*\\)\\s*\\{");

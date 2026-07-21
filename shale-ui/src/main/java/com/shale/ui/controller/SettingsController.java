@@ -14,6 +14,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ButtonType;
@@ -27,6 +28,7 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.Button;
 import javafx.scene.Node;
 import javafx.scene.paint.Color;
+import javafx.stage.Window;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.geometry.Pos;
 import javafx.scene.layout.HBox;
@@ -215,11 +217,23 @@ public final class SettingsController {
 		Platform.runLater(() -> loadLinkTypesAsync(null));
 	}
 
-	private void onViewAuditLog() {
+	@FXML
+	private void onViewAuditLog(ActionEvent event) {
 		if (!isAdminUser() || onOpenAuditLog == null) {
 			return;
 		}
-		onOpenAuditLog.run();
+		try {
+			onOpenAuditLog.run();
+		} catch (RuntimeException ex) {
+			AppDialogs.showError(settingsWindow(event), "Audit Log", "Unable to open the audit log. " + rootMessage(ex));
+		}
+	}
+
+	private Window settingsWindow(ActionEvent event) {
+		if (event != null && event.getSource() instanceof Node node && node.getScene() != null) {
+			return node.getScene().getWindow();
+		}
+		return auditSection == null || auditSection.getScene() == null ? null : auditSection.getScene().getWindow();
 	}
 
 	private void loadAdminSectionsAsync() {
