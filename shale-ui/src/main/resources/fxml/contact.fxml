@@ -143,15 +143,27 @@
                         </GridPane>
                     </VBox>
 
-                    <VBox minWidth="430" prefWidth="460" maxWidth="520" spacing="8" styleClass="secondary-panel" GridPane.columnIndex="1">
-                        <HBox spacing="8" alignment="CENTER_LEFT">
-                            <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                            <Region HBox.hgrow="ALWAYS" />
-                        </HBox>
-                        <StackPane>
-                            <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
-                            <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
-                        </StackPane>
+                    <VBox minWidth="430" prefWidth="460" maxWidth="520" spacing="16" GridPane.columnIndex="1">
+                        <VBox spacing="8" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
+                            <HBox spacing="8" alignment="CENTER_LEFT">
+                                <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                                <Region HBox.hgrow="ALWAYS" />
+                            </HBox>
+                            <StackPane>
+                                <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
+                                <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
+                            </StackPane>
+                        </VBox>
+                        <VBox spacing="8" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
+                            <HBox spacing="8" alignment="CENTER_LEFT">
+                                <Label text="Links Shared With This Contact" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                                <Region HBox.hgrow="ALWAYS" />
+                            </HBox>
+                            <StackPane>
+                                <VBox fx:id="sharedLinksContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
+                                <Label fx:id="sharedLinksStatusLabel" text="Loading shared links…" wrapText="true" visible="false" managed="false" />
+                            </StackPane>
+                        </VBox>
                     </VBox>
                 </GridPane>
             </ScrollPane>

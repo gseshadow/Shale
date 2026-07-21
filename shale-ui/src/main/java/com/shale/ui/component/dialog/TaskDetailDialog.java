@@ -37,6 +37,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
@@ -86,8 +87,12 @@ public final class TaskDetailDialog {
 
         ResultHolder result = new ResultHolder();
 
-        Label heading = new Label("Task details");
-        heading.getStyleClass().add("app-dialog-title");
+        Label heading = new Label(taskHeadingText(model));
+        heading.getStyleClass().addAll("app-dialog-title", "task-detail-dialog-heading");
+        heading.setWrapText(true);
+        heading.setTextOverrun(OverrunStyle.ELLIPSIS);
+        heading.setMaxWidth(Double.MAX_VALUE);
+        heading.setMaxHeight(72);
         Label message = new Label("Update task fields, assigned users, completion, or delete the task.");
         message.getStyleClass().add("app-dialog-message");
         Label createdByLabel = new Label("Created by: " + displayCreatedBy(model.createdByDisplayName()));
@@ -482,7 +487,7 @@ public final class TaskDetailDialog {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox actions = new HBox(10, deleteButton, spacer, cancelButton, completionToggleButton, saveButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        actions.getStyleClass().add("app-dialog-action-bar");
+        actions.getStyleClass().addAll("app-dialog-action-bar", "task-detail-dialog-action-bar");
         actions.setMaxWidth(Double.MAX_VALUE);
 
         VBox headerContent = new VBox(8, heading, message);
@@ -705,6 +710,11 @@ public final class TaskDetailDialog {
                 });
             }
         }, "task-detail-dialog-load-" + sectionName + "-" + taskId).start();
+    }
+
+    static String taskHeadingText(TaskDetailModel model) {
+        String title = model == null ? "" : safe(model.title()).trim();
+        return title.isBlank() ? "Untitled task" : title;
     }
 
     private static Label loadingLabel(String text) {

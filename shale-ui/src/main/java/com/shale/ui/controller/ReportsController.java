@@ -19,6 +19,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
+import javafx.scene.control.Labeled;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
@@ -26,6 +27,7 @@ import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.Tooltip;
+import javafx.scene.Node;
 import javafx.scene.control.ButtonType;
 import javafx.scene.layout.BorderPane;
 
@@ -208,7 +210,7 @@ public final class ReportsController {
             if (row.caseCount() <= 0) continue;
             double percentage = (row.caseCount() * 100.0) / total;
             String sliceName = row.caseStatus() + " " + PERCENT_FORMAT.format(percentage) + "%";
-            String color = ColorUtil.toCssBackgroundColorOrNull(row.color());
+            String color = resolvedStatusColor(row.color());
             PieChart.Data slice = new PieChart.Data(sliceName, row.caseCount());
             if (color != null) {
                 slice.nodeProperty().addListener((obs, oldNode, node) -> {
@@ -235,8 +237,24 @@ public final class ReportsController {
                 slice.getNode().setStyle("-fx-pie-color: " + color + ";");
             }
         }
+        applyPieLegendColors(colorsBySliceName);
     }
 
+    private void applyPieLegendColors(Map<String, String> colorsBySliceName) {
+        if (statusPieChart == null || colorsBySliceName == null || colorsBySliceName.isEmpty()) return;
+        for (Node legendItem : statusPieChart.lookupAll(".chart-legend-item")) {
+            if (!(legendItem instanceof Labeled labeled)) continue;
+            String color = colorsBySliceName.get(labeled.getText());
+            Node symbol = labeled.getGraphic();
+            if (color != null && symbol != null) {
+                symbol.setStyle("-fx-background-color: " + color + ";");
+            }
+        }
+    }
+
+    private String resolvedStatusColor(String storedColor) {
+        return ColorUtil.toCssBackgroundColor(storedColor);
+    }
 
     private void attachPieSliceHandlers() {
         for (PieChart.Data slice : statusPieChart.getData()) {

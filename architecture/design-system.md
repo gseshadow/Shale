@@ -380,3 +380,103 @@ This applies to:
 These features should naturally inherit the Shale design language through shared surfaces, tokens, density, indicators, controls, and Entity Card composition.
 
 A future contributor should be able to add a screen by choosing the correct surface layer, composing shared primitives, selecting appropriate density, and applying semantic tokens. If a new primitive is required, it should be designed as a reusable addition to the Shale system rather than as a one-off screen style.
+
+### Link Type indicators
+
+Case Link Type settings use a reusable `LinkTypeIndicatorFactory` modeled on the existing practice-area pill treatment. The indicator accepts database-driven colors from seeded `#RRGGBB` values and existing stored `0xRRGGBBAA` values, preserving the Shale compact pill/card visual language instead of introducing a separate link-type visual system.
+
+### Case Link Cards
+
+Case Links use a reusable JavaFX `CaseLinkCardFactory` with three official variants: Full, Compact, and Mini. The factory is display-focused: controllers provide the complete link DTO and Open, Edit, Set Primary, and Delete callbacks, while service calls, dialogs, tenant context, browser-launch error handling, and optimistic-concurrency behavior remain in the Case controller/service-port flow.
+
+Full Link Cards are used in Case > Links. They show the bold link title, description or a muted no-description state, the Link Type pill, the Primary badge when applicable, optional case-specific notes, Set Primary for non-primary links, Delete, and a small bottom-right Edit action. Full management remains in Case > Links, but the card itself opens the destination; the screen does not expose Open Link, Move Up, or Move Down controls.
+
+Compact Link Cards are dense summary/reference cards used for the Case > Overview Primary Link and other reference contexts. They use a content-sized hierarchy: first row bold title with Link Type and Primary pills, second row one-line preferred description or muted fallback with the small secondary Edit action, and a third Shared With row only when active shares exist. Shared With content remains embedded MINI Contact Cards in a responsive wrapping row and is not replaced by raw text. Compact cards must not reserve a management footer, growable bottom spacer, empty Shared With container, or fixed large minimum/preferred height; they grow naturally only when long text or shared Contact cards wrap to additional rows. The compact Overview card itself opens the destination and does not expose Open Link or Manage Links buttons.
+
+Full Link Cards remain the management-oriented variant for Case > Links, with management actions, notes, and fuller spacing preserved. Mini Link Cards remain the smallest title/type-only variant for future dense lists; they show only the link title and compact Link Type pill, open the destination when activated, and do not include management actions, notes, descriptions, shares, or primary badges by default.
+
+For every Case Link Card variant, clicking the card or activating it with Enter/Space opens the stored destination through the existing external-browser helper path owned by the controller. Child action controls must isolate their mouse and keyboard events so Edit, Set Primary, and Delete do not also trigger card opening.
+
+The Link Type pill remains visible on every variant. The Link Type database color also drives a restrained type-identity treatment: a low-opacity background wash that fades back to the normal Shale card surface and a narrow left accent rail. The accent rail currently represents Link Type identity only; it does not communicate status, severity, or workflow state. Invalid or missing colors use the neutral Shale fallback supported by the shared color utility.
+
+Phase 5.1.1 reliability clarification: Case Link Card rail widths are fixed CSS sizes per variant (Full 5px, Compact 4px, Mini 3px) while the database-driven Link Type color continues to drive the left rail color/accent and the low-opacity gradient wash. The rail width must not be supplied through a looked-up dynamic CSS property used by `-fx-border-width`.
+
+Case Link dialogs must validate through the JavaFX dialog button action-event filter pattern so invalid input consumes the Save/OK action, keeps inline validation visible, keeps the dialog open, and focuses the first invalid field where practical. Result converters should only return the already-validated result or normal cancel/window-close empty state.
+
+Case Link mutations and DAO-backed dialog prerequisite loads, including Link Type loading, must execute off the JavaFX application thread using the controller's bounded background executor pattern. UI updates, stale-case rejection, success messages, and error dialogs must be applied back on the JavaFX application thread after service-backed reloads complete.
+
+## Case Link “Shared With” presentation and editor (Phase 5.3.1)
+
+Case Link cards remain display-only UI. `CaseLinkCardFactory` receives all share data through `CaseLinkDto` and must not call services, DAOs, application state, or browser helpers.
+
+* FULL cards show a subtle “Shared With” line beneath description/notes when one or more active shares exist.
+* COMPACT cards show a concise “Shared” presentation when active shares exist.
+* MINI cards intentionally remain minimal: title plus Link Type pill only.
+* Empty cards do not show a noisy “Shared With: nobody” row.
+* Child controls keep click isolation so Edit/Delete/Set Primary interactions do not launch the URL; the card background remains the primary click target.
+* The Case Link Add/Edit dialog owns the editing workflow surface. Add and Edit dialogs include a functional Shared With editor with a tenant-scoped searchable Contact selector, Add Contact action, staged rows, SharedAt editing, share-specific Notes editing, and Unshare/Remove actions.
+* New Case Link dialogs may stage Shared With contacts before the Case Link exists. Cancel persists nothing; Save creates the ExternalLink, CaseLink, and all staged shares through one aggregate service/DAO transaction.
+* Existing Case Link dialogs initialize from persisted shares, stage additions/edits/unshares locally, and persist them only when the main dialog is saved. Cancel leaves Link fields and shares unchanged.
+* Persisted shares referencing later-unavailable Contacts remain visible with an unavailable marker and may be unshared; unavailable Contacts are not offered as new selector options.
+* SharedAt means the time the contact was recorded as receiving or being granted access to the Case Link. Unsharing is a soft-delete of the share record and is distinct from deleting a Contact.
+
+## Case Link Shared With Modal Pattern
+
+Case Link Add/Edit dialogs keep Link fields, the primary checkbox, and the save footer as the primary visual hierarchy. Contact selection is not embedded directly in the Link form. When no active shares are staged, the form shows a Shale secondary action labeled `Share Link` near the bottom of the dialog. When one or more staged or persisted shares are active, the form shows a `Shared With` summary containing compact, display-only Contact Cards and an `Edit Shared With` action.
+
+The `Share Link` / `Edit Shared With` workflow uses a secondary, resizable modal owned by the parent Link dialog. The modal contains three logical sections: `Selected Contacts`, `Case Contacts`, and `All Contacts`. The selected section is the source of truth for the modal session and shows the selected count, compact cards/rows, `Remove` for unsaved selections, `Unshare` for persisted shares, and a `Details` action for share-specific metadata.
+
+Case Contacts are convenience suggestions loaded from Contact-backed entries in the current `dbo.CaseParties` model, joined through `dbo.Cases` and `dbo.Contacts` for tenant validation. They do not read legacy `dbo.CaseContacts`, do not include organization-only Case Parties, and do not represent every tenant Contact. They are deduplicated by ContactId and exclude deleted/unavailable Contacts from new selection. All Contacts uses a searchable, keyboard-operable, virtualized list of active tenant Contacts so blank search still permits browsing without rendering an unbounded card stack.
+
+All three sections share one modal-scoped selection model keyed by ContactId. Applying the modal replaces the parent Link dialog's staged selection; canceling the modal discards the modal copy and leaves the parent staging unchanged. The modal never persists. The parent Add/Edit Link OK button remains the only persistence point and continues to save Link fields plus share additions, updates, and removals as one aggregate transaction.
+
+Share `Details` edits only the share-specific `SharedAt` and optional Notes values. `SharedAt` is required, share notes follow the 500-character service/schema contract, and invalid details keep the dialog open with inline validation. Persisted unavailable/deleted Contacts remain visible in the selected and summary views with an unavailable marker, retain stored identity, can be edited/unshared when service rules allow, and are excluded from new selectable Case/All Contact lists.
+
+Accessibility expectations: all share buttons expose clear accessible text, search focus remains in the child modal, Enter/Space toggles Contact selection inside the list rather than saving the parent Link dialog, selected state is communicated by a checkmark and accessible text rather than color alone, and Escape/Cancel closes only the active modal.
+
+## Case Link sharing visual integration (Phase 5.3.5)
+
+Case Link sharing composes the existing Contact Card and Shale dialog primitives rather than generic selector buttons or raw text rows.
+
+* Share Link / Edit Shared With uses selectable MINI Contact Cards for Case Contacts. These cards wrap in a responsive FlowPane, toggle the modal-scoped selection on click or keyboard activation, show a checkmark and selected style, and never navigate to Contact View from inside the modal.
+* All Contacts remains a virtualized ListView. Cells render a lightweight MINI Contact Card graphic that shares the Contact Card styling, clears graphic/text/style/accessibility state on reuse, and toggles selection without leaving the modal.
+* Selected Contacts continues to show Contact identity first and Details / Remove / Unshare as secondary row actions. Missing email/phone placeholders are suppressed; unavailable persisted Contacts retain an explicit unavailable marker.
+* Add/Edit Link dialogs use the secondary dialog shell plus a styled form surface, padded interior, styled ScrollPane viewport, Shale section surfaces, consistent labels, and a distinct Shared With section so the dialog does not appear as an unstyled white document.
+* Empty Shared With state renders only the `Share Link` action and reserves no blank card viewport. One or a few Contacts size to content height without unnecessary scrollbars. Many Contacts wrap and grow up to a modest bounded height before the embedded contact area scrolls, while Edit Shared With and the dialog OK/Cancel footer remain reachable.
+* FULL and COMPACT Case Link Cards render active shares as embedded, display-only MINI Contact Cards in a wrapping FlowPane beneath a subtle Shared With label. MINI Link Cards remain unchanged and do not render share summaries.
+* Embedded Contact Cards on Link Cards are display-only unless the rendering context explicitly injects Contact navigation. With no Contact navigation callback they remain mouse-transparent and parent Link Card activation opens the external URL; with a Contact navigation callback they consume child events and open Contact View. Edit, Delete, and Set Primary remain isolated child actions.
+* Share display names continue to use the existing Case Link Contact option mapping. Legacy Contact records that store a phone number in the Name field are treated as valid Contact display names and are not filtered, rewritten, or flagged as invalid by this presentation layer.
+
+## Phase 5.3.6 Contact Card and Secondary Dialog Visual Contracts
+
+MINI Contact Cards use primary text on light card surfaces. The MINI, compact-mini, and secondary-mini name labels must carry a reusable Contact Card name style that resolves to the Shale primary text token, so embedded Link Card contacts, selected contact chips, hover surfaces, and dialog section surfaces remain readable.
+
+Selectable MINI Contact Cards use the card border/accent plus an explicit checkmark for selected state. Unselected selectable MINI Contact Cards show no indicator, reserve no checkmark footprint, and must not render an empty blue bar at the right edge. When selected, the checkmark is a compact circular indicator inset inside the top-right corner of the card/wrapper bounds so long names retain ellipsis behavior and the rounded card edge remains intact. Selection must also remain exposed through accessible text and keyboard operation rather than color alone.
+
+The transparent secondary dialog shell contract requires transparent scene fill outside the rounded shell and contained painting inside all four rounded corners. Header surfaces own rounded upper corners. Dialog content and scroll surfaces must remain transparent or clipped within the shell contract rather than painting square white areas outside the shell. The fixed footer/button-bar surfaces use the same dialog background and rounded lower corners so OK/Cancel or Apply/Cancel remain visible without lower-corner overlap or seams.
+
+## Contact shared link navigation and grouping
+
+Case Link cards remain the official presentation primitive for external links. FULL and COMPACT display cards may render embedded MINI Contact Cards for active share recipients. In read-only navigation contexts those embedded Contact Cards receive an injected Contact navigation callback, consume child mouse and keyboard activation events, and must not allow the parent Link Card background activation to open the external URL from the same user action. Selector/editor Contact Cards remain context-specific selection controls and do not opt into profile navigation.
+
+Contact View treats Related Cases and “Links Shared With This Contact” as separate first-class sibling section surfaces in the secondary column, each with its own Shale card container, heading, and state/content area. Shared Links load independently from the Contact detail snapshot and Related Cases to avoid stale session-cache state after Case Link share mutations; only successful zero-row loads show the empty state, while service/DAO failures show the local failure state. Shared Links are grouped by Case, with groups sorted by Case display name (case-insensitive) then CaseId; links within each Case sort primary first, Link Type name, SortOrder, display name, and CaseLinkId. Contact View reuses read-only COMPACT Case Link cards, omitting Edit/Delete/Set Primary/reorder actions while preserving title, Link Type pill, description, Primary badge, shared Contact MINI cards, and ExternalBrowserHelper HTTP/HTTPS URL handling. Embedded Contact MINI cards navigate to Contact View through callbacks and must consume their event so Contact navigation does not also open the parent Link URL.
+
+## Case Links desktop production readiness
+
+Case Links remain a JavaFX desktop workflow in this phase. The supported desktop surfaces are Case > Links, Case > Overview primary-link display, Settings > Link Types, the Share Link/Edit Shared With modal, embedded Contact MINI cards, and Contact View shared-link reverse lookup. The card factory remains callback-driven and display-only: controllers own service calls, navigation callbacks, dialog lifecycle, URL-open error handling, and optimistic-concurrency messaging.
+
+Mutating Case Link, share, and Link Type dialogs must validate before close, invoke exactly one service mutation per accepted save, wait for persistence, then reload authoritative data before showing success. If persistence commits but refresh fails, the view should preserve existing content, mark the section stale/refresh-needed, and report that the save completed but refresh failed. Exceptions must not be converted into empty states; only a successful zero-row response may render an empty-state message.
+
+Optimistic row-version conflicts and Primary Link unique-index conflicts should be reported as concurrent changes, not generic database failures. The UI must not retry stale mutations automatically, expose raw SQL Server table/index/key text, or overwrite newer data. After conflicts, refresh the affected Case Link/Link Type data and preserve user-entered form values where practical so the user can reopen/reapply safely.
+
+Shared With editing is staged in the Link dialog. Share modal Apply updates only parent dialog state; modal Cancel restores the parent staged state; parent Cancel persists nothing; parent Save uses the aggregate Case Link service operation so link fields and share additions/updates/removals commit or roll back together.
+
+Async loads and post-mutation refreshes must keep database work off the JavaFX Application Thread, update UI through JavaFX-safe callbacks, and use case/contact generation tokens or equivalent stale-result checks. Stale case or contact results must not render after navigation. Local section failures should not clear unrelated sections.
+
+Case Link URL handling is intentionally limited to normalization and browser launch of HTTP/HTTPS URLs. Shale does not fetch URLs, inspect metadata, follow redirects, store external credentials, accept embedded credentials, or perform Box/API authentication in this desktop phase.
+
+## Unified Audit Log viewer treatment
+
+The Audit Log viewer uses the existing light table-in-glass-panel administration visual language and adds a compact mode filter at the top of the existing screen rather than a second administration page. The selector offers All, PHI Audit, and Entity Activity, with All as the default.
+
+PHI Audit rows keep the established field-audit columns and meaning. Entity Activity rows use the same dense audit table treatment but present a subtle category label, friendly action/entity wording, stable entity ids, safe parent context, actor, and local occurrence time. Entity Activity presentation must not add URL previews, Contact-name hydration, raw JSON details, or other rich content that would break the compact audit-row pattern or expose sensitive Case Link content.

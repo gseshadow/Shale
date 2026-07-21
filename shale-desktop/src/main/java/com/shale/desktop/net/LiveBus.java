@@ -18,7 +18,11 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public final class LiveBus {
+	private static final Logger log = LoggerFactory.getLogger(LiveBus.class);
 	private static final int HTTP_TIMEOUT_SECS = 12;
 
 	public static final class Event {
@@ -116,10 +120,10 @@ public final class LiveBus {
 			});
 			return wsClient.connect(wss);
 		}).thenCompose(ws -> wsClient.joinGroup(groupName, 1)
-				.thenRun(() -> System.out.println("[LIVE] group joined: " + groupName))
+				.thenRun(() -> log.info("Live group joined: {}", groupName))
 				.exceptionally(ex ->
 				{
-					System.out.println("[LIVE] join group failed: " + ex.getMessage());
+					log.warn("Live join group failed: {}", ex.getMessage());
 					throw new RuntimeException(ex);
 				}));
 	}
@@ -152,11 +156,9 @@ public final class LiveBus {
 				+ ",\"timestamp\":\"" + Instant.now() + "\""
 				+ (patchJsonOrNull == null || patchJsonOrNull.isBlank() ? "" : ",\"patch\":" + patchJsonOrNull)
 				+ "}";
-		System.out.println("[LIVE] LIVE_PUBLISH_ENDPOINT_URL:" + getConfig("LIVE_PUBLISH_ENDPOINT_URL"));
-		System.out.println("[LIVE] server publish requested: entityType=" + entityType
-				+ " entityId=" + entityId
-				+ " clientId=" + shaleClientId
-				+ " updatedBy=" + updatedByUserId);
+		log.debug("Live publish endpoint configured: {}", publishEndpointUrl != null && !publishEndpointUrl.isBlank());
+		log.debug("Live publish requested: entityType={} entityId={} tenantId={} updatedByUserId={}",
+				entityType, entityId, shaleClientId, updatedByUserId);
 
 		HttpRequest.Builder builder = HttpRequest.newBuilder()
 				.uri(URI.create(publishEndpointUrl))
@@ -201,15 +203,16 @@ public final class LiveBus {
 
 	private void handleInbound(String text) {
 		String raw = text == null ? "" : text;
-		String preview = raw.length() > 200 ? raw.substring(0, 200) : raw;
-		System.out.println("[LIVE RX RAW] " + preview);
+		if (log.isTraceEnabled()) {
+			log.trace("Live inbound payload keys={}", String.join(",", patchKeys(raw)));
+		}
 
 		if (raw.contains("\"type\":\"connected\"")) {
 			String connId = extractString(raw, "connectionId");
 			if (connId != null && !connId.isBlank()) {
 				connectionId = connId;
 			}
-			System.out.println("[LIVE] client connected: userId=" + userId + ", clientId=" + shaleClientId + ", connectionId=" + (connectionId == null ? "?" : connectionId));
+			log.info("Live client connected: userId={} tenantId={} connectionIdPresent={}", userId, shaleClientId, connectionId != null && !connectionId.isBlank());
 			return;
 		}
 
@@ -262,7 +265,7 @@ public final class LiveBus {
 		if (type == null || by == null || entityType == null || entityId == null)
 			return;
 
-		System.out.println("[LIVE RX] type=" + type + " entityType=" + entityType + " entityId=" + entityId + " patchKeys=" + String.join(",", patchKeys(patchRaw)));
+		log.debug("Live message received: type={} entityType={} entityId={} patchKeys={}", type, entityType, entityId, String.join(",", patchKeys(patchRaw)));
 		Event ev = new Event(schemaVersion, eventId, timestamp,
 				type, entityType, entityId, by, tenantId, patchRaw, inboundClientInstanceId, raw);
 		for (var l : listeners)

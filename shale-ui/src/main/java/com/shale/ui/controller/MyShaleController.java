@@ -48,6 +48,9 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.util.AppSectionTabs;
 import com.shale.ui.util.PerfLog;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
@@ -72,6 +75,8 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 public final class MyShaleController {
+
+	private static final Logger log = LoggerFactory.getLogger(MyShaleController.class);
 
 	private static final String SORT_NAME = "Name";
 	private static final String SORT_INTAKE = "Date of Intake";
@@ -99,7 +104,6 @@ public final class MyShaleController {
 	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 416;
 	private static final double OVERVIEW_CARD_GAP = 10;
 	private static final double OVERVIEW_SECTION_HORIZONTAL_PADDING = 10;
-	private static final double OVERVIEW_COMPACT_TASK_CARD_WIDTH = 210;
 	private static final String OVERVIEW_SORT_DUE_ASC = "Due Date (earliest first)";
 	private static final String OVERVIEW_SORT_DUE_DESC = "Due Date (latest first)";
 	private static final String OVERVIEW_SORT_PRIORITY = "Priority";
@@ -246,6 +250,7 @@ public final class MyShaleController {
 	private boolean myTasksDirty = true;
 	private boolean myCasesLoadedOnce;
 	private boolean myCasesDirty = true;
+	private String lastMyCasesBoardRenderSignature = "";
 	private Integer cachedTasksUserId;
 	private Integer cachedTasksTenantId;
 	private Integer cachedCasesUserId;
@@ -516,7 +521,7 @@ public final class MyShaleController {
 		if (myCasesFlow != null) {
 			myCasesFlow.sceneProperty().addListener((obs, oldScene, newScene) ->
 			{
-				System.out.println("[DEBUG LIVE][MY_CASES] scene changed old=" + (oldScene != null) + " new=" + (newScene != null));
+				log.debug("My Cases live scene changed oldPresent={} newPresent={}", oldScene != null, newScene != null);
 				if (newScene == null) {
 					unsubscribeLiveCaseUpdates();
 				} else {
@@ -671,18 +676,18 @@ public final class MyShaleController {
 
 	private void subscribeLiveCaseUpdates() {
 		if (runtimeBridge == null) {
-			System.out.println("[DEBUG LIVE][MY_CASES] subscribe skipped: runtimeBridge is null");
+			log.debug("My Cases live subscribe skipped: runtimeBridge is null");
 			return;
 		}
 		if (liveSubscribed) {
-			System.out.println("[DEBUG LIVE][MY_CASES] subscribe skipped: already subscribed");
+			log.debug("My Cases live subscribe skipped: already subscribed");
 			return;
 		}
 
 		liveCaseUpdatedHandler = this::handleLiveCaseUpdatedEvent;
 		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
 		liveSubscribed = true;
-		System.out.println("[DEBUG LIVE][MY_CASES] subscribed to case updates");
+		log.debug("My Cases live subscribed to case updates");
 	}
 
 	private void unsubscribeLiveCaseUpdates() {
@@ -691,23 +696,22 @@ public final class MyShaleController {
 		}
 		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
 		liveSubscribed = false;
-		System.out.println("[DEBUG LIVE][MY_CASES] unsubscribed from case updates");
+		log.debug("My Cases live unsubscribed from case updates");
 	}
 
 	private void handleLiveCaseUpdatedEvent(UiRuntimeBridge.CaseUpdatedEvent event) {
 		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
-		System.out.println("[DEBUG LIVE][MY_CASES] event received caseId=" + event.caseId()
-				+ " updatedBy=" + event.updatedByUserId()
-				+ " mineInstance=" + mine
-				+ " eventInstance=" + event.clientInstanceId()
-				+ " patchLen=" + (event.rawPatchJson() == null ? 0 : event.rawPatchJson().length()));
+		log.debug("My Cases live event received caseId={} updatedByUserId={} ownInstance={} eventInstancePresent={} patchPresent={}",
+				event.caseId(), event.updatedByUserId(), !mine.isBlank(),
+				event.clientInstanceId() != null && !event.clientInstanceId().isBlank(),
+				event.rawPatchJson() != null && !event.rawPatchJson().isBlank());
 
 		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
-			System.out.println("[DEBUG LIVE][MY_CASES] event ignored: own echo");
+			log.debug("My Cases live event ignored: own echo");
 			return;
 		}
 
-		System.out.println("[DEBUG LIVE][MY_CASES] event accepted -> scheduling targeted refresh");
+		log.debug("My Cases live event accepted; scheduling targeted refresh");
 		refreshCaseIncremental(event.caseId());
 		refreshRecentCaseActivity();
 	}
@@ -757,7 +761,7 @@ public final class MyShaleController {
 
 	private void refreshCaseIncremental(long caseId) {
 		if (caseDao == null || appState == null || appState.getUserId() == null || appState.getUserId() <= 0) {
-			System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh skipped: missing dependencies");
+			log.debug("My Cases targeted refresh skipped: missing dependencies");
 			return;
 		}
 
@@ -773,17 +777,17 @@ public final class MyShaleController {
 				Platform.runLater(() ->
 				{
 					if (generationAtSubmit != loadGeneration) {
-						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh ignored due to generation mismatch");
+						log.debug("My Cases targeted refresh ignored due to generation mismatch");
 						return;
 					}
 
 					boolean changed;
 					if (row == null) {
 						changed = removeLoadedCase(caseId);
-						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh row missing -> removed=" + changed + " caseId=" + caseId);
+						log.debug("My Cases targeted refresh row missing: removed={} caseId={}", changed, caseId);
 					} else {
 						changed = upsertLoadedCase(toVm(row));
-						System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh upsert changed=" + changed + " caseId=" + caseId);
+						log.debug("My Cases targeted refresh upsert changed={} caseId={}", changed, caseId);
 					}
 
 					if (changed) {
@@ -795,7 +799,7 @@ public final class MyShaleController {
 					}
 				});
 				} catch (Exception ex) {
-					System.out.println("[DEBUG LIVE][MY_CASES] targeted refresh failed caseId=" + caseId + " message=" + ex.getMessage());
+					log.warn("My Cases targeted refresh failed caseId={}: {}", caseId, ex.getMessage());
 					runOnFx(() -> {
 						myCasesDirty = true;
 						refreshMyCasesBoard(true);
@@ -861,8 +865,9 @@ public final class MyShaleController {
 	private void loadFirstPage() {
 		PerfLog.log("PAGE", "start", "page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		loadGeneration++;
-		System.out.println("[DEBUG LIVE][MY_CASES] loadFirstPage generation=" + loadGeneration + " sort=" + (myCasesSortChoice == null ? "<null>" : myCasesSortChoice.getValue())
-				+ " query='" + normalizedSearchQuery() + "' selectedStatuses=" + selectedStatusIds.size());
+		log.debug("My Cases loadFirstPage generation={} sort={} queryPresent={} selectedStatusCount={}",
+				loadGeneration, myCasesSortChoice == null ? "<null>" : myCasesSortChoice.getValue(),
+				!normalizedSearchQuery().isBlank(), selectedStatusIds.size());
 		currentPage = 0;
 		loading = false;
 		hasMore = true;
@@ -904,8 +909,7 @@ public final class MyShaleController {
 					for (CaseCardVm vm : newItems) {
 						upsertLoadedCase(vm);
 					}
-					System.out.println("[DEBUG LIVE][MY_CASES] page loaded page=" + pageToLoad + " items=" + newItems.size() + " total=" + page.total() + " loadedUnique=" + loaded
-							.size());
+					log.debug("My Cases page loaded page={} items={} total={} loadedUnique={}", pageToLoad, newItems.size(), page.total(), loaded.size());
 					currentPage++;
 					hasMore = loaded.size() < page.total();
 					loading = false;
@@ -916,7 +920,7 @@ public final class MyShaleController {
 				{
 					if (generationAtSubmit == loadGeneration) {
 						loading = false;
-						System.out.println("[DEBUG LIVE][MY_CASES] load failed generation=" + generationAtSubmit + " message=" + ex.getMessage());
+						log.warn("My Cases load failed generation={}: {}", generationAtSubmit, ex.getMessage());
 						ex.printStackTrace();
 					}
 				});
@@ -1216,7 +1220,7 @@ public final class MyShaleController {
 						refreshRecentCaseActivity();
 					});
 			} catch (Exception ex) {
-				System.err.println("My tasks load failed: " + ex.getMessage());
+				log.warn("My tasks load failed: {}", ex.getMessage());
 				ex.printStackTrace();
 				runOnFx(() -> {
 					loadingOverview = false;
@@ -1261,8 +1265,7 @@ public final class MyShaleController {
 		loadingMyCases = true;
 		Integer userId = appState.getUserId();
 		Integer shaleClientId = appState.getShaleClientId();
-		System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.refreshMyCasesBoard] load started userId=" + userId
-				+ " selectedUserId=" + userId);
+		log.debug("My Cases board load started userId={}", userId);
 		myCasesLoadFailed = false;
 		renderMyCasesBoard();
 		renderOverviewWidgets();
@@ -1289,8 +1292,7 @@ public final class MyShaleController {
 				List<CaseDao.CaseRow> rows = caseDao.listAssignedCasesForBoard(userIdValue);
 				PerfLog.logDone("DAO", "method=listAssignedCasesForBoard page=my_shale userId=" + userIdValue + " rows=" + (rows == null ? 0 : rows.size()), daoStartNanos);
 				int rowCount = rows == null ? 0 : rows.size();
-				System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.refreshMyCasesBoard] dao returned rowCount=" + rowCount
-						+ " userId=" + userIdValue);
+				log.debug("My Cases board DAO returned rowCount={} userId={}", rowCount, userIdValue);
 				List<CaseCardVm> cases = (rows == null ? List.<CaseDao.CaseRow>of() : rows).stream()
 						.filter(Objects::nonNull)
 						.map(this::toVm)
@@ -1314,7 +1316,7 @@ public final class MyShaleController {
 					refreshRecentCaseActivity();
 				});
 			} catch (Exception ex) {
-				System.err.println("My cases board load failed userId=" + userIdValue + ": " + ex.getMessage());
+				log.warn("My cases board load failed userId={}: {}", userIdValue, ex.getMessage());
 				ex.printStackTrace();
 				runOnFx(() -> {
 					loadingMyCases = false;
@@ -1349,7 +1351,8 @@ public final class MyShaleController {
 			myCasesBoardEmptyLabel.setText("Unable to load assigned cases.");
 			setVisibleManaged(myCasesBoardEmptyLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
-			System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.renderMyCasesBoard] error state rendered");
+			log.debug("My Cases board rendered state=error");
+			lastMyCasesBoardRenderSignature = "error";
 			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=error childCount=0", renderStartNanos);
 			return;
 		}
@@ -1415,16 +1418,32 @@ public final class MyShaleController {
 			myCasesBoardEmptyLabel.setText("No assigned cases found.");
 			setVisibleManaged(myCasesBoardEmptyLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
-			System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.renderMyCasesBoard] empty state rendered");
+			log.debug("My Cases board rendered state=empty");
+			lastMyCasesBoardRenderSignature = renderSignature("empty", laneCount, cardCount, searchQuery, selectedStatusId);
 			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=empty childCount=0", renderStartNanos);
 			return;
 		}
 
 		setVisibleManaged(myCasesBoardEmptyLabel, false);
 		setVisibleManaged(myCasesBoardScroll, true);
-		System.out.println("[TRACE ASSIGNED_CASES][MyShaleController.renderMyCasesBoard] board rendered laneCount=" + laneCount
-				+ " cardCount=" + cardCount);
+		String renderSignature = renderSignature("board", laneCount, cardCount, searchQuery, selectedStatusId);
+		if (Objects.equals(lastMyCasesBoardRenderSignature, renderSignature)
+				&& myCasesBoardList.getChildren().size() == laneCount) {
+			log.trace("My Cases board render skipped because state is unchanged");
+			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=unchanged", renderStartNanos);
+			return;
+		}
+		lastMyCasesBoardRenderSignature = renderSignature;
+		log.debug("My Cases board rendered laneCount={} cardCount={}", laneCount, cardCount);
 		PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale laneCount=" + laneCount + " childCount=" + cardCount, renderStartNanos);
+	}
+
+	private String renderSignature(String state, int laneCount, int cardCount, String searchQuery, Integer selectedStatusId) {
+		return state + "|" + laneCount + "|" + cardCount + "|" + safe(searchQuery) + "|" + selectedStatusId + "|"
+				+ myAssignedCasesBoard.stream()
+						.filter(Objects::nonNull)
+						.map(vm -> vm.id + ":" + vm.primaryStatusId)
+						.collect(java.util.stream.Collectors.joining(","));
 	}
 
 	private void syncMyCasesBoardStatusFilterOptions() {
@@ -1938,7 +1957,7 @@ public final class MyShaleController {
 					renderOverviewWidgets();
 				});
 			} catch (Exception ex) {
-				System.err.println("Recent case activity load failed: " + ex.getMessage());
+				log.warn("Recent case activity load failed: {}", ex.getMessage());
 				runOnFx(() -> {
 					if (generationAtSubmit != recentCaseActivityLoadGeneration) {
 						return;
@@ -3127,19 +3146,13 @@ public final class MyShaleController {
 						resolveMyTaskCardTitle(task),
 						task.description(),
 						task.createdByDisplayName(),
-							task.taskStatusName(),
-							task.taskStatusColorHex(),
-							task.priorityColorHex(),
-							task.dueAt(),
-							task.completedAt(),
-							myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
-				Node card = taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT, true);
-				if (card instanceof Region regionCard) {
-					regionCard.setMinWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
-					regionCard.setPrefWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
-					regionCard.setMaxWidth(OVERVIEW_COMPACT_TASK_CARD_WIDTH);
-				}
-				taskCards.getChildren().add(card);
+						task.taskStatusName(),
+						task.taskStatusColorHex(),
+						task.priorityColorHex(),
+						task.dueAt(),
+						task.completedAt(),
+						myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT, true));
 			}
 		}
 		section.getChildren().add(taskCards);

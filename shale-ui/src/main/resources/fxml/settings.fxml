@@ -94,6 +94,20 @@
             </VBox>
 
 
+            <VBox fx:id="linkTypeAdministrationSection" spacing="8" styleClass="strong-panel">
+                <padding>
+                    <Insets top="12" right="12" bottom="12" left="12"/>
+                </padding>
+                <Label text="Link Types" styleClass="search-section-title"/>
+                <Label text="Manage case link types for this tenant. Global defaults can be customized with tenant overrides."
+                       styleClass="search-summary-text" wrapText="true"/>
+                <VBox fx:id="linkTypeCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
+                <HBox fx:id="linkTypeActionRow" spacing="8">
+                    <Label fx:id="linkTypeSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+                </HBox>
+            </VBox>
+
+
             <VBox fx:id="userAdministrationSection" spacing="8" styleClass="strong-panel">
                 <padding>
                     <Insets top="12" right="12" bottom="12" left="12"/>

@@ -49,10 +49,26 @@ public final class AuditLogDao {
             Integer objectTypeId,
             LocalDate startDate,
             LocalDate endDateInclusive) {
+        return listAuditLogEntries(shaleClientId, userId, objectId, fieldName, objectTypeId, startDate, endDateInclusive, 500);
+    }
+
+    public List<AuditLogEntryRow> listAuditLogEntries(
+            Integer shaleClientId,
+            Integer userId,
+            Long objectId,
+            String fieldName,
+            Integer objectTypeId,
+            LocalDate startDate,
+            LocalDate endDateInclusive,
+            int limit) {
         try (Connection con = db.requireConnection()) {
             int currentTenantId = requireCurrentShaleClientId(con);
+            if (shaleClientId == null || shaleClientId <= 0 || shaleClientId.intValue() != currentTenantId) {
+                throw new IllegalStateException("Requested tenant does not match session context.");
+            }
+            int boundedLimit = Math.max(1, Math.min(limit, 500));
             StringBuilder sql = new StringBuilder("""
-                    SELECT
+                    SELECT TOP (?)
                       EntryDate,
                       UserId,
                       ObjectTypeId,
@@ -67,6 +83,7 @@ public final class AuditLogDao {
                     WHERE 1=1
                     """);
             List<Object> bindValues = new java.util.ArrayList<>();
+            bindValues.add(boundedLimit);
             sql.append(" AND ShaleClientId = ?");
             bindValues.add(currentTenantId);
             if (userId != null && userId > 0) {
@@ -133,6 +150,39 @@ public final class AuditLogDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to list audit log entries", e);
+        }
+    }
+
+
+    public void appendPhiWriteAudit(
+            Connection con,
+            Integer userId,
+            Integer objectTypeId,
+            Long objectId,
+            String fieldName,
+            Integer fieldCode,
+            String stringValue,
+            LocalDate dateValue) {
+        String sql = """
+                INSERT INTO dbo.AuditLog (
+                  ShaleClientId, UserId, ObjectTypeId, ObjectId, FieldName, FieldCode, StringValue, DateValue, BooleanValue, IntValue, EntryDate
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?);
+                """;
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            FieldCodeBindingMode bindingMode = resolveFieldCodeBindingMode(con);
+            ps.setInt(1, requireCurrentShaleClientId(con));
+            if (userId == null || userId <= 0) ps.setNull(2, java.sql.Types.INTEGER); else ps.setInt(2, userId);
+            if (objectTypeId == null || objectTypeId <= 0) ps.setNull(3, java.sql.Types.INTEGER); else ps.setInt(3, objectTypeId);
+            if (objectId == null || objectId <= 0) ps.setNull(4, java.sql.Types.BIGINT); else ps.setLong(4, objectId);
+            ps.setString(5, fieldName);
+            bindFieldCode(ps, 6, fieldCode, bindingMode);
+            ps.setString(7, stringValue);
+            if (dateValue == null) ps.setNull(8, java.sql.Types.DATE); else ps.setDate(8, Date.valueOf(dateValue));
+            ps.setTimestamp(9, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to append PHI write audit entry", e);
         }
     }
 

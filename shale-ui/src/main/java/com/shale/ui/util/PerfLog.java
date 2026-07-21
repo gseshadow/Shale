@@ -46,7 +46,11 @@ public final class PerfLog {
             return;
         }
         String suffix = (fields == null || fields.isBlank()) ? "" : " " + fields.trim();
-        System.Logger.Level level = isSlow(elapsedMs) ? System.Logger.Level.WARNING : System.Logger.Level.DEBUG;
+        System.Logger.Level level = switch (PerformanceLogging.levelForElapsed(elapsedMs)) {
+            case WARN, ERROR -> System.Logger.Level.WARNING;
+            case INFO -> System.Logger.Level.INFO;
+            case DEBUG -> System.Logger.Level.DEBUG;
+        };
         System.getLogger("PERF").log(level, "PERF " + area + " " + phase + suffix + " elapsedMs=" + elapsedMs);
     }
 
@@ -58,10 +62,14 @@ public final class PerfLog {
 
     public static void elapsed(Logger log, long startNanos, String message, Object... args) {
         long elapsedMs = elapsedMs(startNanos);
-        if (isSlow(elapsedMs)) {
-            log.warn(message + " slow=true thresholdMs={}", append(args, elapsedMs, slowThresholdMs()));
-        } else if (isEnabled()) {
-            log.debug(message, append(args, elapsedMs));
+        switch (PerformanceLogging.levelForElapsed(elapsedMs)) {
+            case WARN, ERROR -> log.warn(message, append(args, elapsedMs));
+            case INFO -> log.info(message, append(args, elapsedMs));
+            case DEBUG -> {
+                if (isEnabled()) {
+                    log.debug(message, append(args, elapsedMs));
+                }
+            }
         }
     }
 

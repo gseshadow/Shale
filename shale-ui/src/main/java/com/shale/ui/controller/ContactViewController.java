@@ -8,16 +8,25 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import com.shale.core.dto.ContactSharedCaseLinkDto;
+import com.shale.core.dto.CaseLinkDto;
+import com.shale.core.service.CaseServicePort;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.ContactDao.ContactDetailRow;
 import com.shale.data.dao.ContactDao.ContactProfileUpdateRequest;
 import com.shale.data.dao.ContactDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CaseCardFactory;
+import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.PhiReadAuditService;
+import com.shale.ui.services.LiveUpdateEvents;
+import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.util.ExternalBrowserHelper;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
@@ -38,10 +47,14 @@ import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
 import javafx.scene.paint.Color;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 public final class ContactViewController {
+
+    private static final Logger LOG = Logger.getLogger(ContactViewController.class.getName());
 
     @FXML private Label contactTitleLabel;
     @FXML private Label contactSubtitleLabel;
@@ -53,6 +66,8 @@ public final class ContactViewController {
     @FXML private Button deleteContactButton;
     @FXML private VBox relatedCasesContainer;
     @FXML private Label relatedCasesEmptyLabel;
+    @FXML private VBox sharedLinksContainer;
+    @FXML private Label sharedLinksStatusLabel;
 
     @FXML private Label displayNameValue;
     @FXML private Label nameValue;
@@ -90,11 +105,21 @@ public final class ContactViewController {
     private ContactDetailRow currentContact;
     private boolean editMode;
     private Consumer<Integer> onOpenCase;
+    private Consumer<Integer> onOpenContact;
     private Runnable onContactDeleted;
     private CaseCardFactory caseCardFactory;
     private List<RelatedCaseRow> relatedCases = List.of();
     private PhiReadAuditService phiReadAuditService;
     private int detailLoadGeneration = 0;
+    private int sharedLinksLoadGeneration = 0;
+    private List<ContactSharedCaseLinkDto> sharedLinks = List.of();
+    private boolean sharedLinksLoaded;
+    private UiRuntimeBridge runtimeBridge;
+    private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> sharedLinksLiveHandler = this::handleSharedLinksLiveEvent;
+    private CaseServicePort caseService;
+    private final CaseLinkCardFactory caseLinkCardFactory = new CaseLinkCardFactory();
+    private ExternalBrowserHelper externalBrowserHelper = new ExternalBrowserHelper();
+    private boolean initialized;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contact-view-loader");
@@ -109,14 +134,47 @@ public final class ContactViewController {
             Consumer<Integer> onOpenCase,
             Runnable onContactDeleted,
             PhiReadAuditService phiReadAuditService) {
+        init(contactId, contactDetailService, appState, onOpenCase, null, onContactDeleted, phiReadAuditService, null, null);
+    }
+
+    public void init(
+            int contactId,
+            ContactDetailService contactDetailService,
+            AppState appState,
+            Consumer<Integer> onOpenCase,
+            CaseServicePort caseService,
+            Runnable onContactDeleted,
+            PhiReadAuditService phiReadAuditService,
+            Consumer<Integer> onOpenContact, UiRuntimeBridge runtimeBridge) {
         this.contactId = contactId;
         this.contactDetailService = contactDetailService;
         this.appState = appState;
         this.onOpenCase = onOpenCase;
         this.onContactDeleted = onContactDeleted;
+        this.caseService = caseService;
+        this.onOpenContact = onOpenContact;
         this.phiReadAuditService = phiReadAuditService;
+        this.runtimeBridge = runtimeBridge;
+        if (this.runtimeBridge != null) this.runtimeBridge.subscribeEntityUpdated(sharedLinksLiveHandler);
         this.caseCardFactory = new CaseCardFactory(onOpenCase);
         auditContactRead();
+        if (initialized) {
+            resetSharedLinksState();
+            loadContact();
+            loadSharedLinks();
+        }
+    }
+
+    private void handleSharedLinksLiveEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+        if (event == null || appState == null || !LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(event.entityType())) return;
+        Integer tenantId = appState.getShaleClientId();
+        if (tenantId == null || event.shaleClientId() != tenantId) return;
+        Object rawContactId = event.patch() == null ? null : event.patch().get("contactId");
+        long eventContactId;
+        try { eventContactId = rawContactId instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(rawContactId)); }
+        catch (RuntimeException ex) { return; }
+        if (eventContactId != contactId) return;
+        Platform.runLater(this::loadSharedLinks);
     }
 
     private void auditContactRead() {
@@ -144,9 +202,11 @@ public final class ContactViewController {
             setVisibleManaged(deleteContactButton, false);
         }
 
+        initialized = true;
         setEditMode(false);
         renderRelatedCases();
-        Platform.runLater(this::loadContact);
+        resetSharedLinksState();
+        Platform.runLater(() -> { loadContact(); loadSharedLinks(); });
     }
 
     private void initializeInlineEditButtons() {
@@ -239,6 +299,7 @@ public final class ContactViewController {
                     long renderStarted = PerfLog.start();
                     renderFromCurrent();
                     renderRelatedCases();
+                    loadSharedLinks();
                     setEditMode(false);
                     clearError();
                     PerfLog.logDone("contacts.detail.render", "contactId=" + contactId + " relatedCases=" + relatedCases.size() + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
@@ -493,6 +554,7 @@ public final class ContactViewController {
                     relatedCases = reloadedRelatedCases == null ? List.of() : reloadedRelatedCases;
                     renderFromCurrent();
                     renderRelatedCases();
+                    loadSharedLinks();
                     setEditMode(false);
                     clearError();
                     PerfLog.logDone("contacts.save", "phase=apply contactId=" + currentContact.id() + " relatedCases=" + relatedCases.size(), saveStarted);
@@ -657,6 +719,115 @@ public final class ContactViewController {
         if (deceasedEditor != null) {
             deceasedEditor.setSelected(currentContact.deceased());
         }
+    }
+
+
+    private void resetSharedLinksState() {
+        sharedLinks = List.of();
+        sharedLinksLoaded = false;
+        renderSharedLinksLoading();
+    }
+
+    private void loadSharedLinks() {
+        final int generation = ++sharedLinksLoadGeneration;
+        final int requestedContactId = contactId;
+        Integer tenantId = appState == null ? null : appState.getShaleClientId();
+        if (caseService == null || tenantId == null || tenantId <= 0 || requestedContactId <= 0) {
+            LOG.info(() -> "operation=contacts.sharedLinks.skip tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation);
+            sharedLinks = List.of();
+            sharedLinksLoaded = true;
+            renderSharedLinksEmpty();
+            return;
+        }
+        long loadStarted = PerfLog.start();
+        LOG.info(() -> "operation=contacts.sharedLinks.load tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation);
+        renderSharedLinksLoading();
+        dbExec.submit(() -> {
+            try {
+                List<ContactSharedCaseLinkDto> loaded = caseService.listCaseLinksSharedWithContact(requestedContactId, tenantId);
+                List<ContactSharedCaseLinkDto> safe = loaded == null ? List.of() : List.copyOf(loaded);
+                Platform.runLater(() -> {
+                    if (generation != sharedLinksLoadGeneration || contactId != requestedContactId) {
+                        LOG.info(() -> "operation=contacts.sharedLinks.stale tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation + " daoResultCount=" + safe.size() + " elapsedMs=" + (PerfLog.elapsedMs(loadStarted)));
+                        PerfLog.log("contacts.sharedLinks", "discard", "contactId=" + requestedContactId + " tenantId=" + tenantId + " generation=" + generation + " rows=" + safe.size());
+                        return;
+                    }
+                    sharedLinks = safe;
+                    sharedLinksLoaded = true;
+                    renderSharedLinks();
+                    LOG.info(() -> "operation=contacts.sharedLinks.success tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation + " daoResultCount=" + safe.size() + " mappedResultCount=" + sharedLinks.size() + " caseGroupCount=" + sharedLinks.stream().map(ContactSharedCaseLinkDto::caseId).distinct().count() + " elapsedMs=" + (PerfLog.elapsedMs(loadStarted)));
+                });
+            } catch (RuntimeException ex) {
+                LOG.log(Level.WARNING, "operation=contacts.sharedLinks.failure tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation + " elapsedMs=" + (PerfLog.elapsedMs(loadStarted)), ex);
+                Platform.runLater(() -> {
+                    if (generation != sharedLinksLoadGeneration || contactId != requestedContactId) {
+                        LOG.info(() -> "operation=contacts.sharedLinks.failureStale tenantId=" + tenantId + " contactId=" + requestedContactId + " generation=" + generation);
+                        return;
+                    }
+                    sharedLinks = List.of();
+                    sharedLinksLoaded = false;
+                    renderSharedLinksFailure();
+                });
+            }
+        });
+    }
+
+    private void renderSharedLinksLoading() { showSharedLinksStatus("Loading shared links…"); }
+    private void renderSharedLinksEmpty() { showSharedLinksStatus("No active links are currently shared with this contact."); }
+    private void renderSharedLinksFailure() { showSharedLinksStatus("Unable to load links shared with this contact."); }
+
+    private void showSharedLinksStatus(String message) {
+        if (sharedLinksContainer != null) sharedLinksContainer.getChildren().clear();
+        if (sharedLinksStatusLabel != null) {
+            sharedLinksStatusLabel.setText(message == null ? "" : message);
+            setVisibleManaged(sharedLinksStatusLabel, message != null && !message.isBlank());
+        }
+    }
+
+    private void renderSharedLinks() {
+        if (!Platform.isFxApplicationThread()) { Platform.runLater(this::renderSharedLinks); return; }
+        if (sharedLinksContainer == null) return;
+        sharedLinksContainer.getChildren().clear();
+        if (sharedLinksStatusLabel != null) setVisibleManaged(sharedLinksStatusLabel, false);
+        if (sharedLinks == null || sharedLinks.isEmpty()) { renderSharedLinksEmpty(); return; }
+        var groups = sharedLinks.stream()
+                .sorted(Comparator.comparing((ContactSharedCaseLinkDto r) -> caseNameSortKey(r.caseDisplayName()), Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparingLong(ContactSharedCaseLinkDto::caseId)
+                        .thenComparing((ContactSharedCaseLinkDto r) -> !r.caseLink().primary())
+                        .thenComparing(r -> caseNameSortKey(r.caseLink().linkTypeName()), Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparingInt(r -> r.caseLink().sortOrder())
+                        .thenComparing(r -> caseNameSortKey(r.caseLink().displayName()), Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparingLong(r -> r.caseLink().caseLinkId()))
+                .collect(java.util.stream.Collectors.groupingBy(ContactSharedCaseLinkDto::caseId, java.util.LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        for (List<ContactSharedCaseLinkDto> rows : groups.values()) {
+            if (rows.isEmpty()) continue;
+            ContactSharedCaseLinkDto first = rows.get(0);
+            VBox group = new VBox(8);
+            group.getStyleClass().add("contact-shared-links-case-group");
+            HBox heading = new HBox(8);
+            Label title = new Label(fallback(first.caseDisplayName()) + " (" + rows.size() + (rows.size() == 1 ? " link" : " links") + ")");
+            title.setWrapText(true);
+            title.getStyleClass().add("case-overview-row-value");
+            Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
+            Button openCase = new Button("Open Case");
+            openCase.getStyleClass().add("secondary-button");
+            openCase.setOnAction(e -> { if (onOpenCase != null) onOpenCase.accept((int) first.caseId()); });
+            heading.getChildren().addAll(title, spacer, openCase);
+            group.getChildren().add(heading);
+            for (ContactSharedCaseLinkDto row : rows) {
+                CaseLinkDto link = row.caseLink();
+                Node card = caseLinkCardFactory.createReadOnly(link, CaseLinkCardFactory.Variant.COMPACT,
+                        new CaseLinkCardFactory.Actions(() -> openSharedLink(link), null, null, null), onOpenContact);
+                if (card instanceof Region region) region.setMaxWidth(Double.MAX_VALUE);
+                group.getChildren().add(card);
+            }
+            sharedLinksContainer.getChildren().add(group);
+        }
+    }
+
+    private void openSharedLink(CaseLinkDto link) {
+        try { externalBrowserHelper.openHttpOrHttps(link.url()); }
+        catch (RuntimeException ex) { AppDialogs.showError(dialogOwner(editButton), "Open Link", ex.getMessage() == null ? "Unable to open link." : ex.getMessage()); }
     }
 
     private void renderRelatedCases() {

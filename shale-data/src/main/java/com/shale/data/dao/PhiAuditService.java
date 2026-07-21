@@ -2,19 +2,24 @@ package com.shale.data.dao;
 
 import com.shale.core.privacy.PhiFieldRegistry;
 
+import java.sql.Connection;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.Objects;
 
 public final class PhiAuditService {
-    private static final Map<String, Integer> OBJECT_TYPE_IDS = Map.of(
-            "cases", 1,
-            "casetimelineevents", 2,
-            "caseupdates", 3,
-            "contacts", 4,
-            "tasks", 5,
-            "tasktimelineevents", 6,
-            "taskupdates", 7);
+    private static final Map<String, Integer> OBJECT_TYPE_IDS = Map.ofEntries(
+            Map.entry("cases", 1),
+            Map.entry("casetimelineevents", 2),
+            Map.entry("caseupdates", 3),
+            Map.entry("contacts", 4),
+            Map.entry("tasks", 5),
+            Map.entry("tasktimelineevents", 6),
+            Map.entry("taskupdates", 7),
+            Map.entry("materialtypes", 8),
+            Map.entry("materialrequests", 9),
+            Map.entry("materialrequestfollowups", 10),
+            Map.entry("materialitems", 11));
 
     private final AuditLogDao auditLogDao;
 
@@ -22,7 +27,7 @@ public final class PhiAuditService {
         this.auditLogDao = Objects.requireNonNull(auditLogDao, "auditLogDao");
     }
 
-    public void auditCreate(Integer userId, String tableName, String fieldName, Long recordId, Object newValue) {
+    public void auditCreate(Connection con, Integer userId, String tableName, String fieldName, Long recordId, Object newValue) {
         if (!PhiFieldRegistry.isPhi(tableName, fieldName)) {
             return;
         }
@@ -30,10 +35,10 @@ public final class PhiAuditService {
         if (normalizedNew == null) {
             return;
         }
-        append(userId, tableName, fieldName, recordId, "CREATE", null, normalizedNew);
+        append(con, userId, tableName, fieldName, recordId, "CREATE", null, normalizedNew);
     }
 
-    public void auditUpdate(Integer userId, String tableName, String fieldName, Long recordId, Object oldValue, Object newValue) {
+    public void auditUpdate(Connection con, Integer userId, String tableName, String fieldName, Long recordId, Object oldValue, Object newValue) {
         if (!PhiFieldRegistry.isPhi(tableName, fieldName)) {
             return;
         }
@@ -42,10 +47,10 @@ public final class PhiAuditService {
         if (Objects.equals(normalizedOld, normalizedNew)) {
             return;
         }
-        append(userId, tableName, fieldName, recordId, "UPDATE", normalizedOld, normalizedNew);
+        append(con, userId, tableName, fieldName, recordId, "UPDATE", normalizedOld, normalizedNew);
     }
 
-    public void auditDelete(Integer userId, String tableName, String fieldName, Long recordId, Object oldValue) {
+    public void auditDelete(Connection con, Integer userId, String tableName, String fieldName, Long recordId, Object oldValue) {
         if (!PhiFieldRegistry.isPhi(tableName, fieldName)) {
             return;
         }
@@ -53,15 +58,20 @@ public final class PhiAuditService {
         if (normalizedOld == null) {
             return;
         }
-        append(userId, tableName, fieldName, recordId, "DELETE", normalizedOld, null);
+        append(con, userId, tableName, fieldName, recordId, "DELETE", normalizedOld, null);
     }
 
-    private void append(Integer userId, String tableName, String fieldName, Long recordId, String action, Object oldValue, Object newValue) {
+    public void auditCreate(Integer userId, String tableName, String fieldName, Long recordId, Object newValue) { auditCreate(null, userId, tableName, fieldName, recordId, newValue); }
+    public void auditUpdate(Integer userId, String tableName, String fieldName, Long recordId, Object oldValue, Object newValue) { auditUpdate(null, userId, tableName, fieldName, recordId, oldValue, newValue); }
+    public void auditDelete(Integer userId, String tableName, String fieldName, Long recordId, Object oldValue) { auditDelete(null, userId, tableName, fieldName, recordId, oldValue); }
+
+    private void append(Connection con, Integer userId, String tableName, String fieldName, Long recordId, String action, Object oldValue, Object newValue) {
         LocalDate dateValue = (newValue instanceof LocalDate d) ? d : null;
         Integer fieldCode = inferFieldCode(oldValue, newValue);
         String payload = "old=" + asString(oldValue) + ";new=" + asString(newValue);
         try {
-            auditLogDao.appendPhiWriteAudit(
+            if (con == null) {
+                auditLogDao.appendPhiWriteAudit(
                     userId,
                     objectTypeId(tableName),
                     recordId,
@@ -69,6 +79,16 @@ public final class PhiAuditService {
                     fieldCode,
                     payload,
                     dateValue);
+            } else {
+                auditLogDao.appendPhiWriteAudit(con,
+                    userId,
+                    objectTypeId(tableName),
+                    recordId,
+                    tableName + "." + fieldName,
+                    fieldCode,
+                    payload,
+                    dateValue);
+            }
         } catch (RuntimeException ex) {
             System.err.println("[PHI_AUDIT] append suppressed"
                     + " table=" + tableName

@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.input.KeyCode;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -28,6 +29,7 @@ public class ContactCard extends HBox {
     private String backgroundCss;
     private boolean hovered;
     private boolean suppressPlaceholderLines;
+    private boolean interactive = true;
 
     public ContactCard() {
         buildUiMiniDefaults();
@@ -70,15 +72,22 @@ public class ContactCard extends HBox {
         this.suppressPlaceholderLines = suppressPlaceholderLines;
     }
 
+    public void setInteractive(boolean interactive) {
+        this.interactive = interactive;
+        setCursor(interactive ? Cursor.HAND : Cursor.DEFAULT);
+    }
+
     public void applyMini() {
         getChildren().clear();
+        resetNameLabelVariantStyles();
+        nameLabel.getStyleClass().addAll("contact-card-name", "contact-card-name-mini");
 
         setPrefWidth(Region.USE_COMPUTED_SIZE);
         setMaxWidth(Region.USE_COMPUTED_SIZE);
         setPadding(new Insets(4, 10, 4, 10));
         setSpacing(6);
 
-        nameLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600;");
+        nameLabel.setStyle(null);
 
         getChildren().add(nameLabel);
     }
@@ -89,7 +98,9 @@ public class ContactCard extends HBox {
         setPadding(new Insets(2, 6, 2, 6));
         setSpacing(4);
         setMaxWidth(96);
-        nameLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700;");
+        resetNameLabelVariantStyles();
+        nameLabel.getStyleClass().addAll("contact-card-name", "contact-card-name-compact-mini");
+        nameLabel.setStyle(null);
         nameLabel.setWrapText(false);
         nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
         nameLabel.setMinWidth(0);
@@ -101,7 +112,9 @@ public class ContactCard extends HBox {
         setPadding(new Insets(3, 8, 3, 8));
         setSpacing(5);
         setMaxWidth(124);
-        nameLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600;");
+        resetNameLabelVariantStyles();
+        nameLabel.getStyleClass().addAll("contact-card-name", "contact-card-name-secondary-mini");
+        nameLabel.setStyle(null);
         nameLabel.setWrapText(false);
         nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
         nameLabel.setMinWidth(0);
@@ -117,6 +130,7 @@ public class ContactCard extends HBox {
         setPadding(new Insets(10, 12, 10, 12));
         setSpacing(10);
 
+        resetNameLabelVariantStyles();
         nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
         roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
         emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
@@ -147,6 +161,7 @@ public class ContactCard extends HBox {
         setPadding(new Insets(14, 16, 14, 16));
         setSpacing(16);
 
+        resetNameLabelVariantStyles();
         nameLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: #112542;");
         roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
         emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.76);");
@@ -164,6 +179,14 @@ public class ContactCard extends HBox {
         getChildren().addAll(text, spacer, phoneLabel);
     }
 
+    private void resetNameLabelVariantStyles() {
+        nameLabel.getStyleClass().removeAll("contact-card-name", "contact-card-name-mini", "contact-card-name-compact-mini", "contact-card-name-secondary-mini");
+        nameLabel.setWrapText(false);
+        nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
+        nameLabel.setMinWidth(Region.USE_COMPUTED_SIZE);
+        nameLabel.setMaxWidth(Region.USE_COMPUTED_SIZE);
+    }
+
     private void buildUiMiniDefaults() {
         setCursor(Cursor.HAND);
         setBackgroundCssColor(null);
@@ -172,18 +195,26 @@ public class ContactCard extends HBox {
 
     private void wireEvents() {
         setOnMouseEntered(e -> {
+            if (!interactive) return;
             hovered = true;
             setTranslateY(-1.5);
             refreshSurfaceStyle();
         });
         setOnMouseExited(e -> {
+            if (!interactive) return;
             hovered = false;
             setTranslateY(0);
             refreshSurfaceStyle();
         });
         setOnMouseClicked(e -> {
-            if (onOpen != null && contactId != null) {
+            if (interactive && onOpen != null && contactId != null) {
                 onOpen.accept(contactId);
+            }
+        });
+        setOnKeyPressed(e -> {
+            if (interactive && onOpen != null && contactId != null && (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE)) {
+                onOpen.accept(contactId);
+                e.consume();
             }
         });
     }

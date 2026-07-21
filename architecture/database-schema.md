@@ -705,3 +705,226 @@ Reuse existing DAO mappings where possible.
 If a needed field is not documented, verify it from the live schema or existing code before using it.
 If a field cannot be verified, leave it blank/null rather than introducing a crashing SQL reference.
 ```
+
+---
+
+## dbo.LinkTypes
+
+Link type lookup table for case/external links. This table follows the same global/default plus tenant override model used by modularized lookup tables such as `dbo.Statuses` and `dbo.PracticeAreas`.
+
+| Column          | Type          | Notes                                      |
+| --------------- | ------------- | ------------------------------------------ |
+| `Id`            | int           | Primary key                                |
+| `ShaleClientId` | int           | Tenant id, nullable for global/default row |
+| `Name`          | nvarchar(100) | Display name                               |
+| `Color`         | nvarchar(20)  | Display color                              |
+| `IsActive`      | bit           | Active flag                                |
+| `IsDeleted`     | bit           | Soft delete flag                           |
+| `SystemKey`     | nvarchar(64)  | Normalized lowercase overlay key           |
+| `CreatedByUserId` | int        | Creator user id, nullable for global seed rows |
+| `UpdatedByUserId` | int        | Last updater user id, nullable for global seed rows |
+| `CreatedAt`     | datetime2     | Created timestamp                          |
+| `UpdatedAt`     | datetime2     | Updated timestamp                          |
+| `RowVer`        | rowversion    | Row version                                |
+
+Effective Link Type semantics:
+
+* Global/default rows use `ShaleClientId IS NULL`.
+* Tenant override rows use the same normalized `SystemKey` as a global row with the tenant's `ShaleClientId`.
+* Tenant-created custom types are represented as tenant rows with their own `SystemKey`.
+* Effective lists should read global rows plus current-tenant rows and choose the tenant row when a non-null `SystemKey` appears in both scopes.
+* `UX_LinkTypes_ShaleClientId_SystemKey_NonNull` prevents duplicate non-null `SystemKey` values within the same scope.
+
+Seeded global keys from `docs/sql/2026-07-16_case_links_foundation_phase1.sql`:
+
+| SystemKey                | Name                   |
+| ------------------------ | ---------------------- |
+| `court_docket`           | Court Docket           |
+| `claims_portal`          | Claims Portal          |
+| `medical_records_portal` | Medical Records Portal |
+| `insurance_portal`       | Insurance Portal       |
+| `document_repository`    | Document Repository    |
+| `government_record`      | Government Record      |
+| `research`               | Research               |
+| `other`                  | Other                  |
+
+---
+
+## dbo.ExternalLinks
+
+Tenant-owned reusable hyperlink records.
+
+| Column            | Type           | Notes                                                        |
+| ----------------- | -------------- | ------------------------------------------------------------ |
+| `Id`              | int            | Primary key                                                  |
+| `ShaleClientId`   | int            | Tenant id                                                    |
+| `LinkTypeId`      | int            | Reference to `dbo.LinkTypes.Id`                              |
+| `DisplayName`     | nvarchar(255)  | User-facing link label                                       |
+| `Url`             | nvarchar(2048) | Full web URL                                                 |
+| `Description`     | nvarchar(max)  | Optional description                                         |
+| `IsDeleted`       | bit            | Soft delete flag                                             |
+| `DeletedAt`       | datetime2      | Deleted timestamp                                            |
+| `DeletedByUserId` | int            | Deleted by user id                                           |
+| `CreatedByUserId` | int            | Creator user id                                              |
+| `UpdatedByUserId` | int            | Last updater user id                                         |
+| `CreatedAt`       | datetime2      | Created timestamp                                            |
+| `UpdatedAt`       | datetime2      | Updated timestamp                                            |
+| `RowVer`          | rowversion     | Row version                                                  |
+
+Tenant validation note: SQL Server cannot enforce the Link Type tenant boundary with a simple foreign key because `dbo.LinkTypes` intentionally allows global rows (`ShaleClientId IS NULL`) and tenant rows. Service code must ensure `ExternalLinks.LinkTypeId` references either a global Link Type or a Link Type owned by the same `ShaleClientId`.
+
+---
+
+## dbo.CaseLinks
+
+Tenant-owned associations between cases and reusable external links.
+
+| Column            | Type           | Notes                           |
+| ----------------- | -------------- | ------------------------------- |
+| `Id`              | int            | Primary key                     |
+| `ShaleClientId`   | int            | Tenant id                       |
+| `CaseId`          | int            | Reference to `dbo.Cases.Id`     |
+| `ExternalLinkId`  | int            | Reference to `dbo.ExternalLinks.Id` |
+| `IsPrimary`       | bit            | Primary case link flag          |
+| `Notes`           | nvarchar(2000) | Case-specific notes             |
+| `SortOrder`       | int            | Explicit user ordering          |
+| `IsDeleted`       | bit            | Soft delete flag                |
+| `DeletedAt`       | datetime2      | Deleted timestamp               |
+| `DeletedByUserId` | int            | Deleted by user id              |
+| `CreatedByUserId` | int            | Creator user id                 |
+| `UpdatedByUserId` | int            | Last updater user id            |
+| `CreatedAt`       | datetime2      | Created timestamp               |
+| `UpdatedAt`       | datetime2      | Updated timestamp               |
+| `RowVer`          | rowversion     | Row version                     |
+
+Integrity protections:
+
+* `UX_CaseLinks_CaseId_ExternalLinkId_Active` prevents the same active ExternalLink from being associated to the same case more than once.
+* `UX_CaseLinks_CaseId_Primary_Active` allows at most one active primary link per case.
+* Both filtered indexes ignore soft-deleted rows so legitimate replacements are not blocked.
+* Service code must keep `CaseLinks.ShaleClientId` equal to the linked case and external link tenants; the legacy single-column primary keys on `dbo.Cases` and `dbo.ExternalLinks` prevent this tenant boundary from being enforced with a verified composite foreign key in phase 1.
+
+## dbo.CaseLinkShares
+
+Strict tenant-owned associations recording Contacts with whom a case-specific Case Link has been shared.
+
+| Column            | Type            | Notes |
+| ----------------- | --------------- | ----- |
+| `Id`              | int             | Identity primary key |
+| `ShaleClientId`   | int             | Tenant id; strict RLS ownership |
+| `CaseLinkId`      | int             | Reference to `dbo.CaseLinks.Id`; stores the case-specific link, not the reusable ExternalLink |
+| `ContactId`       | int             | Reference to `dbo.Contacts.Id`; first release supports Contact recipients only |
+| `SharedAt`        | datetime2       | User-asserted date/time the link was shared; defaults to current UTC time but is distinct from `CreatedAt` |
+| `Notes`           | nvarchar(1000)  | Optional sharing/access notes |
+| `IsDeleted`       | bit             | Soft-delete/unshared marker |
+| `DeletedAt`       | datetime2       | Date/time the association was removed |
+| `DeletedByUserId` | int             | User who removed/unshared the association when known |
+| `CreatedByUserId` | int             | User who recorded the share |
+| `UpdatedByUserId` | int             | Last editing user |
+| `CreatedAt`       | datetime2       | Database record creation timestamp; defaults to current UTC time |
+| `UpdatedAt`       | datetime2       | Last database record update timestamp |
+| `RowVer`          | rowversion      | Row version for optimistic concurrency |
+
+Relationship semantics:
+
+* `dbo.CaseLinkShares` is a many-to-many association between `dbo.CaseLinks` and `dbo.Contacts`: one Case Link may be shared with multiple Contacts, and one Contact may receive links from multiple cases.
+* Sharing is tracked by `CaseLinkId`, not by `ExternalLinkId`, so reused external URLs retain the case context of the share.
+* The table records Shale's knowledge that a link was shared. It does not verify permissions with Box, Clio, another external system, or a remote URL.
+* Only Contact sharing is represented in this phase; organization, user, generic entity, preview, credential, token, and permission-verification fields are intentionally out of scope.
+
+Integrity protections:
+
+* `PK_CaseLinkShares` is the single-column primary key on `Id`.
+* Single-column foreign keys reference `dbo.ShaleClients(Id)`, `dbo.CaseLinks(Id)`, `dbo.Contacts(Id)`, and `dbo.Users(Id)` for `CreatedByUserId`, `UpdatedByUserId`, and `DeletedByUserId`.
+* No cascade delete behavior is used; Shale preserves sharing history through soft deletion.
+* `UX_CaseLinkShares_CaseLinkId_ContactId_Active` enforces at most one active association for the same `(ShaleClientId, CaseLinkId, ContactId)` while allowing historical soft-deleted rows and later re-shares.
+* `IX_CaseLinkShares_ShaleClientId_ContactId_Active` supports future Contact views answering which active links have been shared with a Contact and includes `CaseLinkId` and `SharedAt`.
+* Loading active shares for a Case Link is supported by the filtered unique active index prefix `(ShaleClientId, CaseLinkId, ContactId)`; avoid redundant indexes unless a future query plan proves they are needed.
+
+Tenant consistency and lifecycle requirements:
+
+* `CaseLinkShares.ShaleClientId` must match the referenced Case Link, Contact, and runtime actor Users tenant. Phase 5.2 keeps single-column foreign keys because the migration does not verify existing composite unique keys on `dbo.CaseLinks(ShaleClientId, Id)` or `dbo.Contacts(ShaleClientId, Id)` and must not redesign base tables solely for composite foreign keys.
+* Services must validate Case Link, Contact, and actor tenant compatibility before inserting or mutating shares; strict RLS remains defense in depth.
+* Active rows use `IsDeleted = 0`, `DeletedAt IS NULL`, and `DeletedByUserId IS NULL`.
+* Removed/unshared rows use `IsDeleted = 1`, with `DeletedAt` populated and `DeletedByUserId` populated when an actor is known. Soft-deleted rows must not be treated as currently shared.
+* Phase 5.3 Case Link deletion must soft-delete active `CaseLinkShares` rows in the same transaction that soft-deletes the parent Case Link.
+* Contact soft deletion must not cascade-delete shares. Historical reads should preserve records where appropriate, but Phase 5.3 services must reject new active shares to deleted or unavailable Contacts.
+
+## Case Link Shares service lifecycle (Phase 5.3)
+
+`dbo.CaseLinkShares` records that a tenant-owned `dbo.CaseLinks` row was shared with, or made available to, a tenant-owned `dbo.Contacts` row. Phase 5.3 uses the existing `CaseServicePort -> CaseServiceAdapter -> CaseDao -> dbo.CaseLinkShares` path; no separate service stack or UI-owned persistence path is introduced.
+
+Service and DAO rules:
+
+* `ShaleClientId`, actor user id, case id, case link id, contact id, share id, `SharedAt`, and expected `RowVer` values for update/remove operations are validated at the service boundary.
+* Share notes are trimmed and limited to 500 Unicode characters, matching `dbo.CaseLinkShares.Notes nvarchar(1000-byte schema output / 500 UTF-16 characters)`.
+* Reads and writes explicitly prove tenant ownership through `dbo.Cases`, active `dbo.CaseLinks`, tenant-compatible `dbo.ExternalLinks`, same-tenant active actor `dbo.Users`, and same-tenant `dbo.Contacts` predicates.
+* `dbo.CaseLinkShares` has strict tenant RLS through `sec.fn_FilterByTenant(ShaleClientId)`, but services still apply explicit tenant predicates as defense in depth.
+* Current live `dbo.Contacts` rows have `ShaleClientId` and `IsDeleted`, but Contacts are treated as having an RLS gap for this feature; every share contact read/validation therefore includes `ct.ShaleClientId = ?` or `ct.ShaleClientId = cls.ShaleClientId` explicitly. Phase 5.3 does not attach Contacts to RLS.
+* Active duplicate semantics are enforced by `UX_CaseLinkShares_CaseLinkId_ContactId_Active`; SQL Server 2601/2627 violations from that index are translated to “This contact is already shared on this link.”
+* Update and remove operations include active-state and expected `RowVer` predicates and report optimistic conflicts when no row is affected.
+* Removing a share soft-deletes it by setting `IsDeleted`, `DeletedAt`, `DeletedByUserId`, `UpdatedAt`, and `UpdatedByUserId`; rows are not physically deleted.
+* Deleting a Case Link soft-deletes active `dbo.CaseLinkShares` rows for that link in the same transaction before the link/external-link cleanup finishes. If either side fails, the transaction rolls back.
+* Contact deletion does not cascade to `dbo.CaseLinkShares`. Existing share rows remain historical records and can still be displayed using best available contact display information with an unavailable marker; new active shares reject deleted, unavailable, or cross-tenant Contacts.
+* `listCaseLinks` batch-loads shares for the returned Case Link set and groups them by `CaseLinkId` to avoid per-card N+1 queries. `getPrimaryCaseLink` uses a focused share load for the one primary link.
+* Active shares are ordered deterministically by contact display name, contact id, then share id.
+* Phase 5.3.1 adds aggregate create/update operations for the Case Link editor. `createCaseLinkWithShares` inserts the ExternalLink, CaseLink, staged CaseLinkShares, and primary-state changes on one connection and transaction. `updateCaseLinkWithShares` updates Link fields, inserts new shares, updates edited shares with expected share `RowVer`, soft-deletes unshared rows with expected share `RowVer`, and applies primary-state changes in one transaction. Any validation, duplicate-key, or optimistic-concurrency failure rolls back the complete aggregate save.
+* Contact selector options for the Shared With editor are loaded through the same Case service boundary, sorted deterministically by display name and Contact id, exclude deleted/unavailable Contacts, and include an explicit `Contacts.ShaleClientId` predicate because Contacts currently do not have their own TenantFilter predicate.
+* The UI stages share additions, edits, and unshares until the main Add/Edit Link dialog is saved. Cancel creates or changes no ExternalLink, CaseLink, or CaseLinkShares rows.
+
+## Case Links production-hardening notes (Phase 5.5)
+
+The supported persistence path for Case Link and Link Type desktop operations is unchanged: JavaFX controller -> `CaseServicePort` -> `CaseServiceAdapter` -> `CaseGateway`/DAO gateway -> `CaseDao` -> SQL Server. Production-supported service/gateway methods must have explicit adapter and DAO-gateway delegation; interface defaults must fail explicitly rather than returning plausible empty lists, empty optionals, null values, false/zero values, or no-op mutation success.
+
+Operation classification:
+
+* Ordinary workflow reads: effective Link Type listing, Case Link listing, primary Case Link lookup, active share listing, Case Contact options, tenant Contact options, and Contact reverse shared-link lookup.
+* Admin-only reads/mutations: Link Type administration listing, tenant custom Link Type creation, tenant override customization, activation/deactivation, and reset/remove override.
+* Aggregate transactional mutations: create Case Link with staged shares and update Case Link with share additions/detail updates/unshares.
+* Standalone lower-level mutations: create/update/delete Case Link, set Primary, backend reorder, add/update/remove CaseLinkShare. These remain available for desktop internals and future API use but must not bypass tenant, row-version, and audit review.
+* Deferred API/web/live-update scope: REST routes, React UI, live-update publication, reorder buttons, URL previews, external credential handling, and reverse Contact-to-Link editing.
+
+Transaction expectations remain connection-scoped and DAO-owned. Aggregate create commits or rolls back ExternalLink insert, CaseLink insert, primary-state changes, CaseLinkShare inserts, and actor audit fields together. Aggregate update commits or rolls back ExternalLink update, CaseLink update, primary-state changes, share additions, share detail updates, unshares, and row-version checks together. Case Link deletion soft-deletes active shares in the same transaction as parent Case Link deletion and primary replacement.
+
+Primary invariants are enforced by DAO transaction logic and the filtered unique active-primary index: first active Link becomes primary, at most one active primary exists per Case, setting primary clears the previous active primary, non-primary updates do not demote the primary unless explicitly requested, deleting the primary promotes the deterministic next active Link by established SortOrder/Id ordering, deleting the only Link leaves no primary, and soft-deleted Links cannot remain primary. When creating a new explicitly Primary Link, the DAO must clear any existing active Primary in the same transaction before inserting the replacement CaseLink with `IsPrimary = 1`; rollback restores the previous Primary and prevents orphan ExternalLinks or partial shares. If the filtered unique index still rejects a concurrent Primary replacement, services/UI must present it as a concurrent Primary Link change rather than exposing SQL Server table, index, or key details.
+
+Audit compatibility status: Shale's current PHI audit helper writes field-level values for known PHI-bearing Case/Contact/Task fields. Case Link and Link Type mutations have tenant and actor IDs available, but safe audit entries for these entities require a broader audit contract that records action plus stable entity IDs without URL, description, note, Contact PII, or RowVer contents. No migration or ad-hoc timeline substitute is introduced in Phase 5.5; follow-up should add first-class non-PHI entity-action audit support or extend the existing audit schema/DAO safely.
+
+---
+
+## dbo.EntityActionAuditLog
+
+Phase 6.1 adds a dedicated append-only entity-action audit table because existing `dbo.AuditLog` is PHI/field oriented (`EntryDate`, `UserId`, `ObjectTypeId`, `ObjectId`, `FieldName`, `FieldCode`, typed value columns) and cannot safely represent entity actions without fake fields or sensitive value payloads.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `Id` | bigint | Identity primary key |
+| `ShaleClientId` | int | Required tenant owner; strict RLS |
+| `ActorUserId` | int | Required `dbo.Users.id` actor |
+| `EntityType` | varchar(64) | Allowlisted entity type such as `LINK_TYPE`, `CASE_LINK`, `CASE_LINK_SHARE` |
+| `EntityId` | bigint | Stable changed entity id |
+| `Action` | varchar(64) | Allowlisted action such as `CREATED`, `UPDATED`, `DELETED`, `PRIMARY_SET`, `REORDERED`, `OVERRIDE_CREATED`, `OVERRIDE_RESET`, `ADDED`, `REMOVED` |
+| `OccurredAt` | datetime2(7) | Immutable UTC event timestamp, default `SYSUTCDATETIME()` |
+| `ParentEntityType` | varchar(64) | Optional safe parent type |
+| `ParentEntityId` | bigint | Optional safe parent id |
+| `CorrelationId` | uniqueidentifier | Optional operation correlation id |
+| `Source` | varchar(64) | Optional source such as desktop/API |
+| `Metadata` | nvarchar(1000) | Optional strictly allowlisted ID/state metadata only |
+
+Audit metadata may contain only stable IDs and non-sensitive state markers, including CaseId, CaseLinkId, CaseLinkShareId, ExternalLinkId, LinkTypeId, ContactId, previous/new Primary CaseLinkId, reordered link count, and activation state. It must not contain URLs, descriptions, link notes, share notes, Contact names/emails/phones, credentials, RowVer bytes, raw commands/DTOs, SQL, or exception text. Ordinary application paths insert only and must not update/delete audit history.
+
+## Phase 6.2 unified Audit Log viewer
+
+The desktop Audit Log viewer now supports three read-only modes on one screen: **All**, **PHI Audit**, and **Entity Activity**. PHI Audit rows retain the `dbo.AuditLog` field/value semantics; Entity Activity rows retain the `dbo.EntityActionAuditLog` action/entity semantics and are not projected into fake `FieldName`, old-value, or new-value changes.
+
+All mode loads bounded PHI and entity-action first-page result sets, maps them to a typed presentation row, merges by occurrence timestamp descending, applies a deterministic source/id tie-breaker, and then applies the final visible row limit. This is a bounded viewer merge, not a schema-level `UNION`.
+
+Entity activity viewer reads are tenant scoped and read-only: the DAO requires `SESSION_CONTEXT(N'ShaleClientId')`, verifies it matches the requested tenant, predicates `EntityActionAuditLog.ShaleClientId`, joins `dbo.Users` by actor id and matching tenant for safe display names without requiring active users, and sorts by `OccurredAt DESC, Id DESC`. Audit history remains append-only; no update/delete viewer operations are introduced.
+
+The viewer remains admin-only through the existing Settings/SceneManager/controller checks. Ordinary users must not gain Entity Activity visibility if they cannot view PHI Audit rows.
+
+Entity activity timestamps are stored as UTC `OccurredAt` values and converted through the same application-local Java time path used by the viewer presentation before display while retaining UTC instants for ordering.
+
+Entity activity metadata rendering is allowlist based. Only stable ID/state keys such as case, case-link, share, external-link, link-type, contact, primary-link, reorder count, and active state are rendered. Unknown, malformed, nested, oversized, or sensitive metadata is ignored; raw Metadata JSON is never displayed. Prohibited content includes URLs, link titles/descriptions/notes, share notes, Contact names/emails/phones, RowVer, credentials, SQL, exception text, commands, and DTO payloads.
+
+If a combined All-mode load partially fails, the viewer must not present incomplete history as complete; it should report the failed category, log the exception, and provide a retry/refresh path. Future API Source values may be shown only as subtle safe labels such as Desktop, API, or System.

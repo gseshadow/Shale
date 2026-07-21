@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record CalendarFeedItem(
         String key,
         String title,
+        String details,
         LocalDateTime startsAt,
         LocalDateTime endsAt,
         boolean allDay,

@@ -341,3 +341,16 @@ A task is complete when:
 5. The actual user-reported issue is resolved.
 6. No existing functionality is broken.
 7. Architecture rules remain satisfied.
+
+## Service/gateway, test portability, and audit-review rules
+
+When adding service-port or gateway methods, add explicit production delegation and a regression test proving the production adapter/gateway reaches the intended DAO method. Interface defaults must not mimic legitimate empty results or successful no-op mutations; unsupported defaults should throw an actionable `UnsupportedOperationException`.
+
+Tests that inspect source or FXML must be resilient to LF and CRLF line endings and harmless formatting changes. Prefer behavioral tests, XML parsing, reflection, or brace-depth method extraction over exact multiline string blocks, indentation, tabs, or neighboring-method assumptions.
+
+Every new feature, material domain change, and administrative/settings mutation must establish audit-log compatibility during architecture and implementation review before completion. This review must identify sensitive reads/views and all meaningful domain or administrative mutations; map them to Shale's established PHI audit, PHI read audit, or entity-action audit framework; preserve tenant, actor, entity, parent, and case context where applicable; apply the established PHI/sensitive-value sanitization and metadata allowlist rules; add focused audit-event tests; and explicitly document any action intentionally not audited and why. Architecture documents must include this audit-compatibility review whenever they are created or materially reviewed. Do not mandate audit rows for every trivial UI interaction; focus on sensitive access and meaningful domain or administrative actions. If the established audit architecture cannot safely represent an action without leaking sensitive values or changing schema, document the exact gap and defer a scoped audit enhancement rather than creating timeline events or ad-hoc audit records. When a filtered unique index enforces one active selected row, replacement transactions must clear the old selected row and insert the replacement in the same transaction, and raw database constraint text must not be shown to ordinary users.
+
+
+### Entity-action audit rules
+
+For every mutation, inspect audit compatibility before coding. Identify the authoritative DAO/service seam that owns the business transaction, write entity-action audit events on the same SQL `Connection` before commit, and roll back the business mutation if the audit insert fails. Do not let UI code construct authoritative audit rows, do not audit after commit/asynchronously, and do not serialize sensitive payloads, DTOs, RowVer bytes, SQL, or exception text. Completion reports must state whether audit integration used the existing schema, required a migration, or was deferred for scoped architecture work.

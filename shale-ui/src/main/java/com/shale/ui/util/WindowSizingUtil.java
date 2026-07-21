@@ -1,9 +1,13 @@
 package com.shale.ui.util;
 
 import javafx.geometry.Rectangle2D;
+import javafx.scene.Node;
+import javafx.scene.control.DialogPane;
+import javafx.scene.control.ScrollPane;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.scene.layout.Region;
 
 /**
  * Centralized screen-aware sizing for JavaFX top-level windows.
@@ -71,6 +75,69 @@ public final class WindowSizingUtil {
         stage.setWidth(width);
         stage.setHeight(height);
         centerModal(stage, owner, visualBounds, width, height);
+    }
+
+
+    public static void sizeContentModalStage(
+            Stage stage,
+            Window owner,
+            DialogPane dialogPane,
+            ScrollPane scrollPane,
+            Node content,
+            double preferredWidth,
+            double minimumWidth,
+            double minimumHeight) {
+        if (stage == null || dialogPane == null || scrollPane == null || content == null) {
+            return;
+        }
+        Rectangle2D visualBounds = getScreenForWindow(owner == null ? stage : owner).getVisualBounds();
+        double maxWidth = Math.min(DIALOG_MAX_WIDTH, visualBounds.getWidth() * MODAL_SCREEN_RATIO);
+        double maxHeight = Math.min(DIALOG_MAX_HEIGHT, visualBounds.getHeight() * MODAL_SCREEN_RATIO);
+        double safeMinWidth = clamp(minimumWidth, 0, maxWidth);
+        double safeMinHeight = clamp(minimumHeight, 0, maxHeight);
+        if (hasUsableSize(owner)) {
+            double ownerMaxWidth = owner.getWidth() * MODAL_OWNER_RATIO;
+            double ownerMaxHeight = owner.getHeight() * MODAL_OWNER_RATIO;
+            if (ownerMaxWidth >= safeMinWidth) {
+                maxWidth = Math.min(maxWidth, ownerMaxWidth);
+            }
+            if (ownerMaxHeight >= safeMinHeight) {
+                maxHeight = Math.min(maxHeight, ownerMaxHeight);
+            }
+        }
+        double width = clamp(preferredWidth, safeMinWidth, maxWidth);
+        dialogPane.applyCss();
+        dialogPane.resize(width, Region.USE_COMPUTED_SIZE);
+        dialogPane.layout();
+
+        double viewportWidth = Math.max(1, scrollPane.getPrefViewportWidth());
+        if (scrollPane.isFitToWidth()) {
+            viewportWidth = Math.max(1, width - 60);
+        }
+        double naturalViewportHeight = Math.max(1, content.prefHeight(viewportWidth));
+        scrollPane.setPrefViewportHeight(naturalViewportHeight);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        dialogPane.applyCss();
+        dialogPane.resize(width, Region.USE_COMPUTED_SIZE);
+        dialogPane.layout();
+
+        double naturalHeight = Math.max(safeMinHeight, dialogPane.prefHeight(width));
+        double height = clamp(naturalHeight, safeMinHeight, maxHeight);
+        if (naturalHeight > height) {
+            double chromeHeight = Math.max(0, naturalHeight - naturalViewportHeight);
+            double clampedViewportHeight = Math.max(1, height - chromeHeight);
+            scrollPane.setPrefViewportHeight(clampedViewportHeight);
+            scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        } else {
+            scrollPane.setPrefViewportHeight(naturalViewportHeight);
+            scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        }
+        stage.setMinWidth(Math.min(safeMinWidth, width));
+        stage.setMinHeight(Math.min(safeMinHeight, height));
+        stage.setWidth(width);
+        stage.setHeight(height);
+        centerModal(stage, owner, visualBounds, width, height);
+        constrainToVisualBounds(stage, owner);
     }
 
     public static void constrainToVisualBounds(Stage stage, Window owner) {

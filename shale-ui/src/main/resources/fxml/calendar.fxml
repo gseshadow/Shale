@@ -47,19 +47,31 @@
 
         <VBox spacing="12" HBox.hgrow="ALWAYS" styleClass="calendar-main-content">
             <children>
-                <HBox spacing="8" alignment="CENTER_LEFT" styleClass="shale-filter-panel">
+                <HBox spacing="8" alignment="CENTER_LEFT" styleClass="shale-filter-panel calendar-toolbar">
                     <children>
-                        <Button fx:id="todayButton" text="Today" onAction="#onToday" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-                        <Button fx:id="prevWeekButton" text="◀" onAction="#onPreviousWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-                        <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-                        <Label fx:id="weekRangeLabel" styleClass="search-section-title shale-toolbar-heading" />
+                        <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group calendar-toolbar-nav">
+                            <children>
+                                <Button fx:id="todayButton" text="Today" onAction="#onToday" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                                <Button fx:id="prevWeekButton" text="◀" onAction="#onPreviousWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact calendar-toolbar-icon-button" />
+                                <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact calendar-toolbar-icon-button" />
+                                <Label fx:id="weekRangeLabel" styleClass="search-section-title shale-toolbar-heading calendar-toolbar-range" />
+                            </children>
+                        </HBox>
                         <Region HBox.hgrow="ALWAYS" />
-                        <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
-                        <ChoiceBox fx:id="viewModeChoice" styleClass="shale-filter-combo" />
-                        <TextField fx:id="searchTextField" promptText="Search" prefWidth="180" styleClass="shale-search-field" />
-                        <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="170" styleClass="shale-filter-combo" />
-                        <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="150" styleClass="shale-filter-combo" />
-                        <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                        <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group calendar-toolbar-actions">
+                            <children>
+                                <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
+                                <ChoiceBox fx:id="viewModeChoice" styleClass="shale-filter-combo calendar-toolbar-view-select" />
+                            </children>
+                        </HBox>
+                        <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group calendar-toolbar-filters">
+                            <children>
+                                <TextField fx:id="searchTextField" promptText="Search" prefWidth="150" styleClass="shale-search-field calendar-toolbar-search" />
+                                <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="150" styleClass="shale-filter-combo calendar-toolbar-filter" />
+                                <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="130" styleClass="shale-filter-combo calendar-toolbar-filter" />
+                                <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                            </children>
+                        </HBox>
                     </children>
                 </HBox>
 

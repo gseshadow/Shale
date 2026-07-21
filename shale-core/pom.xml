@@ -6,7 +6,7 @@
 	<parent>
     <groupId>com.shale</groupId>
     <artifactId>shale-parent</artifactId>
-    <version>1.0.104</version>
+    <version>1.0.106</version>
     <relativePath>../pom.xml</relativePath>
 </parent>
 
@@ -19,7 +19,13 @@
 	</properties>
 
 	<dependencies>
-		<!-- keep core dependency-free to avoid JPMS ripple; add only if truly
+		<!-- keep core production dependency-free to avoid JPMS ripple; add only if truly
 		needed -->
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>5.10.2</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 </project>

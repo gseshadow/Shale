@@ -19,11 +19,11 @@ final class CaseDaoCaseUpdatesQueryTest {
 
         assertTrue(method.contains("resolveUsersDeletedColumn(con)"),
                 "Case updates should resolve the available Users soft-delete column before adding an author filter");
-        assertTrue(method.contains("u.ShaleClientId = cu.ShaleClientId"),
+        assertTrue(method.contains("u.ShaleClientId = caseUpdate.ShaleClientId"),
                 "Case update authors should remain tenant-scoped");
-        assertTrue(method.contains("AND ISNULL(cu.IsDeleted, 0) = 0"),
+        assertTrue(method.contains("AND ISNULL(caseUpdate.IsDeleted, 0) = 0"),
                 "Case updates should continue filtering soft-deleted notes");
-        assertTrue(method.contains("AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL"),
+        assertTrue(method.contains("AND NULLIF(LTRIM(RTRIM(caseUpdate.NoteText)), '') IS NOT NULL"),
                 "Case updates should continue excluding empty notes");
         assertFalse(method.contains("COALESCE(u.is_deleted, 0) = 0"),
                 "Case updates must not hard-code Users.is_deleted because some deployments expose Users.IsDeleted instead");
@@ -44,13 +44,13 @@ final class CaseDaoCaseUpdatesQueryTest {
                 "Recent Case Activity should restrict to cases assigned through CaseUsers");
         assertTrue(method.contains("caseUser.UserId = ?"),
                 "Recent Case Activity should bind the current user in the CaseUsers join");
-        assertTrue(method.contains("c.ShaleClientId = ?") && method.contains("cu.ShaleClientId = ?"),
+        assertTrue(method.contains("c.ShaleClientId = ?") && method.contains("caseUpdate.ShaleClientId = ?"),
                 "Recent Case Activity should preserve tenant filters on both Cases and CaseUpdates");
         assertTrue(method.contains("activeFilter(schema.deletedColumn(), \"c\")"),
                 "Recent Case Activity should exclude deleted Cases using the resolved schema column");
-        assertTrue(method.contains("ISNULL(cu.IsDeleted, 0) = 0"),
+        assertTrue(method.contains("ISNULL(caseUpdate.IsDeleted, 0) = 0"),
                 "Recent Case Activity should exclude deleted CaseUpdates");
-        assertTrue(method.contains("ORDER BY cu.CreatedAt DESC, cu.Id DESC"),
+        assertTrue(method.contains("ORDER BY caseUpdate.CreatedAt DESC, caseUpdate.Id DESC"),
                 "Recent Case Activity should let SQL Server order newest-first with a stable tie-breaker");
         assertFalse(method.contains("listCaseUpdates("),
                 "Recent Case Activity DAO batch method must not call the per-case update loader");

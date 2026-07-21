@@ -1,0 +1,107 @@
+package com.shale.ui.controller;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import org.junit.jupiter.api.Test;
+
+final class CaseLinksPhase5OverviewTest {
+    private static final Path CASE_CONTROLLER = Path.of("src/main/java/com/shale/ui/controller/CaseController.java");
+    private static final Path CASE_FXML = Path.of("src/main/resources/fxml/case.fxml");
+
+    @Test
+    void overviewPrimaryLinkSectionUsesExistingOverviewStylesAndReadOnlyActions() throws Exception {
+        String source = Files.readString(CASE_CONTROLLER);
+        String fxml = Files.readString(CASE_FXML);
+
+        assertTrue(fxml.contains("text=\"Primary Link\""));
+        assertTrue(fxml.contains("fx:id=\"ovPrimaryLinkBox\""));
+        assertTrue(fxml.contains("fx:id=\"ovPrimaryLinkStatusLabel\""));
+        assertTrue(fxml.contains("case-overview-section"));
+        assertTrue(fxml.contains("shale-surface-section"));
+        assertTrue(source.contains("No primary link has been selected for this case."));
+        assertFalse(source.contains("ActionButtonFactory.cardAction(\"Open Link\""));
+        assertFalse(source.contains("ActionButtonFactory.cardAction(\"Manage Links\""));
+        assertTrue(source.contains("CaseLinkCardFactory.Variant.COMPACT"));
+        assertTrue(source.contains("() -> onEditCaseLink(link)"));
+        assertFalse(source.contains("ActionButtonFactory.danger(\"Delete\", e -> onDeleteOverviewPrimaryLink"));
+        assertFalse(source.contains("onSetPrimaryOverviewPrimaryLink"));
+        assertFalse(source.contains("onMoveOverviewPrimaryLink"));
+    }
+
+    @Test
+    void overviewPrimaryLinkLoadsFocusedPrimaryThroughServicePortWithTenantAndStaleGuards() throws Exception {
+        String source = Files.readString(CASE_CONTROLLER);
+
+        assertTrue(source.contains("caseService.getPrimaryCaseLink(activeCaseId, tenantId)"));
+        assertTrue(source.contains("Integer tenantId = appState.getShaleClientId()"));
+        assertTrue(source.contains("final int activeCaseId = caseId"));
+        assertTrue(source.contains("new Thread(() ->"));
+        assertTrue(source.contains("case-overview-primary-link-load-"));
+        assertTrue(source.contains("Platform.runLater(() ->"));
+        assertTrue(source.contains("generation != overviewPrimaryLinkLoadGeneration"));
+        assertTrue(source.contains("caseId == null || caseId != activeCaseId"));
+        assertTrue(source.contains("resetOverviewPrimaryLinkState();"));
+        assertTrue(source.contains("overviewPrimaryLinkLoadedOnce && !overviewPrimaryLinkStale"));
+        assertTrue(source.contains("primary == null ? Optional.empty() : primary"));
+        assertTrue(source.contains("renderOverviewPrimaryLinkFailure(\"Failed to load primary link. \" + rootMessage(ex))"));
+        assertFalse(source.contains("listCaseLinks(activeCaseId, tenantId).stream"));
+        assertFalse(source.contains("caseDao.getPrimaryCaseLink"));
+    }
+
+    @Test
+    void overviewPrimaryLinkPresentationPreservesTypeColorPrimaryTextAndSafeUrlOpening() throws Exception {
+        String source = Files.readString(CASE_CONTROLLER);
+
+        String card = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/CaseLinkCardFactory.java"));
+        assertTrue(card.contains("blankTo(link.displayName(), \"Untitled link\")"));
+        assertTrue(card.contains("LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor()"));
+        assertTrue(card.contains("new Label(\"Primary\")"));
+        assertTrue(card.contains("No description"));
+        assertFalse(card.contains("new Label(blankTo(link.url()"));
+        assertTrue(source.contains("externalBrowserHelper.openHttpOrHttps(link.url())"));
+        assertFalse(source.contains("Desktop.getDesktop().browse"));
+        assertFalse(source.contains("getHostServices().showDocument"));
+    }
+
+    @Test
+    void overviewManageLinksUsesExistingSectionRoutingAndPreservesCurrentCase() throws Exception {
+        String source = Files.readString(CASE_CONTROLLER);
+
+        assertTrue(source.contains("caseLinkCardFactory.create(link, CaseLinkCardFactory.Variant.COMPACT"));
+        assertTrue(source.contains("case \"Links\" -> \"LINKS\";"));
+        assertTrue(source.contains("case \"Links\" -> showLinksTab();"));
+        assertFalse(source.contains("new Tab(\"Links\")"));
+        assertFalse(source.contains("this.caseId = null;\n\t\tonSectionSelected(\"Links\""));
+    }
+
+    @Test
+    void caseLinkMutationsInvalidateOverviewPrimaryLinkOnlyAfterSuccessfulPersistence() throws Exception {
+        String source = Files.readString(CASE_CONTROLLER);
+
+        assertTrue(source.contains("private void invalidateOverviewPrimaryLinkAfterCaseLinkMutation()"));
+        assertTrue(source.contains("overviewPrimaryLinkStale = true"));
+        assertTrue(source.contains("overviewPrimaryLinkLoadedOnce = false"));
+        assertTrue(source.contains("if (\"Overview\".equals(activeSectionName)) loadOverviewPrimaryLinkIfNeeded();"));
+        assertTrue(source.contains("Object result = action.call();"));
+        assertTrue(source.contains("caseService.listCaseLinks(activeCaseId, tenantId)"));
+        assertTrue(source.contains("invalidateOverviewPrimaryLinkAfterCaseLinkMutation();"));
+        assertTrue(source.contains("createCaseLink"));
+        assertTrue(source.contains("updateCaseLink"));
+        assertTrue(source.contains("setPrimaryCaseLink"));
+        assertTrue(source.contains("deleteCaseLink"));
+        assertTrue(source.contains("catch (Exception ex)"));
+    }
+
+    @Test
+    void phase5DoesNotAddDeferredApiWebLiveUpdateOrMigrationScope() throws Exception {
+        String source = Files.readString(CASE_CONTROLLER);
+        assertFalse(source.contains("@GetMapping"));
+        assertFalse(source.contains("@PostMapping"));
+        assertFalse(source.contains("Case UpdatedAt"));
+        assertFalse(source.contains("CREATE TABLE dbo.CaseLinks"));
+    }
+}
