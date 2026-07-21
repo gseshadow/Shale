@@ -7,6 +7,7 @@ import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.AssignedUserPickerDialog;
 import com.shale.ui.component.dialog.CreateContactDialog;
 import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.component.factory.ColoredLookupComboBoxCellFactory;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.ContactDao;
@@ -75,7 +76,7 @@ final class MaterialRequestForm extends Dialog<MaterialRequestForm.Values>{
     MaterialRequestForm(MaterialRequestDetailDto e,List<MaterialTypeDto> types,int actor,int tenant,long caseId,Supplier<Window> owner,CaseTaskService taskSvc,CaseDao caseDao,ContactDao contactDao,OrganizationDao orgDao){
         this.owner=owner;this.taskSvc=taskSvc;this.caseDao=caseDao;this.contactDao=contactDao;this.orgDao=orgDao;this.tenant=tenant;this.caseId=caseId;
         setTitle(e==null?"New Request":"Edit Request"); getDialogPane().setPrefSize(760,640);
-        ComboBox<MaterialTypeDto> type=new ComboBox<>(); type.getItems().setAll(types); type.getStyleClass().addAll("colored-lookup-selector","material-type-selector"); type.setCellFactory(cb->coloredTypeCell()); type.setButtonCell(coloredTypeCell()); type.setConverter(new javafx.util.StringConverter<>(){public String toString(MaterialTypeDto x){return x==null?"":x.name();}public MaterialTypeDto fromString(String s){return null;}});
+        ComboBox<MaterialTypeDto> type=new ComboBox<>(); type.getItems().setAll(types); type.getStyleClass().addAll("colored-lookup-selector","material-type-selector"); type.setCellFactory(cb->ColoredLookupComboBoxCellFactory.popupCell(MaterialTypeDto::name, MaterialTypeDto::color)); type.setButtonCell(ColoredLookupComboBoxCellFactory.buttonCell(MaterialTypeDto::name)); type.setConverter(new javafx.util.StringConverter<>(){public String toString(MaterialTypeDto x){return x==null?"":x.name();}public MaterialTypeDto fromString(String s){return null;}});
         if(e!=null) type.getSelectionModel().select(types.stream().filter(x->x.id()==e.materialTypeId()).findFirst().orElse(null)); else type.getSelectionModel().selectFirst();
         if(e!=null&&e.requestedFromContactId()!=null) source=new RequestedSource(SourceKind.CONTACT,e.requestedFromContactId(),nvl(e.requestedFromContactDisplayName(),"Selected contact")); if(e!=null&&e.requestedFromOrganizationId()!=null) source=new RequestedSource(SourceKind.ORGANIZATION,e.requestedFromOrganizationId(),nvl(e.requestedFromOrganizationName(),"Selected organization"));
         requestedBy=new CaseTaskService.AssignableUserOption(e==null?actor:e.requestedByUserId(), nvl(e==null?null:e.requestedByDisplayName(),"Signed-in user"), null);
@@ -101,7 +102,6 @@ final class MaterialRequestForm extends Dialog<MaterialRequestForm.Values>{
     private List<CaseTaskService.AssignableUserOption> loadUsers(){try{List<CaseTaskService.AssignableUserOption> users=taskSvc==null?List.of():taskSvc.loadAssignableUsers(tenant);return users.isEmpty()?List.of(requestedBy):users;}catch(Exception e){return List.of(requestedBy);}}
     private void autoUpdateTitle(MaterialTypeDto t){if(!titleManual)titleField.setText(autoTitle(t));}
     private String autoTitle(MaterialTypeDto t){return t==null||source==null?"":generatedTitle(t.name(),source.displayName());}
-    private ListCell<MaterialTypeDto> coloredTypeCell(){return new ListCell<>(){protected void updateItem(MaterialTypeDto x,boolean empty){super.updateItem(x,empty); if(empty||x==null){setText(null);setGraphic(null);}else{Label dot=new Label("●");dot.setStyle("-fx-text-fill:"+nvl(x.color(),"#64748b")+";");Label name=new Label(x.name());HBox h=new HBox(6,dot,name);h.setAlignment(Pos.CENTER_LEFT);setGraphic(h);setText(null);}}};}
     private VBox group(String title,Node... children){VBox v=new VBox(8,MaterialsUi.strong(title));v.getChildren().addAll(children);v.getStyleClass().add("shale-surface-section");v.setPadding(new Insets(10));return v;} private Node field(String label,Node n){VBox v=new VBox(4,new Label(label),n); if(n instanceof TextField) VBox.setVgrow(n,Priority.NEVER); return v;}
     static String generatedTitle(String type,String source){String clean=nvl(type,"Material").replaceAll("(?i)\\s+requested$","").trim();return clean+" requested from "+nvl(source,"selected source");}
     private static String displayStatus(String s){return switch(nvl(s,"").toUpperCase(Locale.ROOT)){case "FOLLOW_UP_DUE"->"Follow Up Due";case "PARTIALLY_RECEIVED"->"Partially Received";case "FULLY_RECEIVED"->"Fully Received";case "CLOSED"->"Closed";case "CANCELLED"->"Cancelled";default->"Requested";};}
