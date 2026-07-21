@@ -30,19 +30,24 @@ final class MaterialTypeSelectorParityTest {
     private static final String SHARED_CELL = read("src/main/java/com/shale/ui/component/factory/ColoredLookupComboBoxCellFactory.java");
 
     @Test
-    void newRequestAndAddLinkUseSameSharedColoredLookupCells() {
-        assertTrue(CASE_CONTROLLER.contains("ColoredLookupComboBoxCellFactory.popupCell(LinkTypeDto::name, LinkTypeDto::color)"));
-        assertTrue(CASE_CONTROLLER.contains("ColoredLookupComboBoxCellFactory.buttonCell(LinkTypeDto::name)"));
+    void newRequestAndAddLinkUseSameCompleteColoredLookupSelectorSetup() {
+        assertTrue(CASE_CONTROLLER.contains("ColoredLookupComboBoxCellFactory.configure(type, LinkTypeDto::name, LinkTypeDto::color)"));
         assertTrue(REQUEST_FORM.contains("configureMaterialTypeSelector(type)"));
-        assertTrue(REQUEST_FORM.contains("ColoredLookupComboBoxCellFactory.popupCell(MaterialTypeDto::name, MaterialTypeDto::color)"));
-        assertTrue(REQUEST_FORM.contains("ColoredLookupComboBoxCellFactory.buttonCell(MaterialTypeDto::name)"));
+        assertTrue(REQUEST_FORM.contains("ColoredLookupComboBoxCellFactory.configure(type, MaterialTypeDto::name, MaterialTypeDto::color)"));
+        assertTrue(SHARED_CELL.contains("comboBox.setMaxWidth(Double.MAX_VALUE)"));
+        assertTrue(SHARED_CELL.contains("comboBox.setConverter(new StringConverter<>()"));
+        assertTrue(SHARED_CELL.contains("comboBox.setCellFactory(list -> popupCell(name, color))"));
+        assertTrue(SHARED_CELL.contains("comboBox.setButtonCell(buttonCell(name))"));
         assertFalse(REQUEST_FORM.contains("coloredTypeCell"));
     }
 
     @Test
     void popupRowsRenderConfiguredColoredPillAndDisplayNameText() {
-        assertTrue(SHARED_CELL.contains("LinkTypeIndicatorFactory.createLinkTypePill(structure.pillText(), structure.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)"));
+        assertTrue(SHARED_CELL.contains("LinkTypeIndicatorFactory.createLinkTypePill(displayName, color.apply(item), LinkTypeIndicatorFactory.PillSize.COMPACT)"));
         assertTrue(SHARED_CELL.contains("new HBox(getGraphicTextGap(), pill, display)"));
+        assertTrue(SHARED_CELL.contains("content.setMinWidth(Region.USE_PREF_SIZE)"));
+        assertTrue(SHARED_CELL.contains("pill.setMinWidth(Region.USE_PREF_SIZE)"));
+        assertTrue(SHARED_CELL.contains("display.setMinWidth(Region.USE_PREF_SIZE)"));
         assertTrue(REQUEST_FORM.contains("MaterialTypeDto::color"));
         assertTrue(REQUEST_FORM.contains("MaterialTypeDto::name"));
     }
@@ -91,19 +96,11 @@ final class MaterialTypeSelectorParityTest {
 
 
     @Test
-    void nonSkippedStructuralModelMatchesAddLinkAndMaterialTypeRows() {
-        var addLink = ColoredLookupComboBoxCellFactory.popupRowStructure("Medical records", "#2563EB");
-        var materialType = ColoredLookupComboBoxCellFactory.popupRowStructure("Medical records", "#2563EB");
-
-        assertEquals(addLink, materialType);
-        assertEquals("HBox", materialType.rootType());
-        assertEquals("Label", materialType.pillType());
-        assertEquals("Medical records", materialType.pillText());
-        assertEquals("Medical records", materialType.plainText());
-        assertEquals("#2563EB", materialType.color());
-        assertEquals("COMPACT", materialType.pillSize());
-        assertFalse(materialType.hasCircle());
-        assertFalse(materialType.fixedEqualPillSize());
+    void noTemporaryDiagnosticsRemain() {
+        assertFalse(REQUEST_FORM.contains("RENDERER V4 ACTIVE"));
+        assertFalse(REQUEST_FORM.contains("NEW REQUEST MATERIAL TYPE RENDERER V4"));
+        assertFalse(SHARED_CELL.contains("NEW REQUEST MATERIAL TYPE RENDERER V4"));
+        assertFalse(SHARED_CELL.contains("PopupRowStructure"));
     }
 
     @Test
@@ -111,7 +108,7 @@ final class MaterialTypeSelectorParityTest {
         assertFalse(REQUEST_FORM.contains("MaterialTypeId"));
         assertFalse(REQUEST_FORM.contains("materialTypeId()+\""));
         assertFalse(REQUEST_FORM.contains("String.valueOf(x.id())"));
-        assertTrue(REQUEST_FORM.contains("setConverter(new javafx.util.StringConverter<>(){public String toString(MaterialTypeDto x){return x==null?\"\":x.name();}"));
+        assertTrue(SHARED_CELL.contains("return item == null ? \"\" : name.apply(item)"));
     }
 
     @Test

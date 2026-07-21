@@ -3,17 +3,25 @@ package com.shale.ui.component.factory;
 import java.util.function.Function;
 
 import javafx.geometry.Pos;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.util.StringConverter;
 
-/** Shared colored lookup ComboBox cells used by Add Link Link Type and matching lookup selectors. */
+/** Shared Shale colored lookup ComboBox setup used by Add Link Link Type and matching lookup selectors. */
 public final class ColoredLookupComboBoxCellFactory {
-    public record PopupRowStructure(String rootType, String pillType, String pillText, String plainText, String color, String pillSize, boolean hasCircle, boolean fixedEqualPillSize) {}
     private ColoredLookupComboBoxCellFactory() {}
 
-    public static PopupRowStructure popupRowStructure(String displayName, String color) {
-        return new PopupRowStructure("HBox", "Label", displayName, displayName, color, LinkTypeIndicatorFactory.PillSize.COMPACT.name(), false, false);
+    public static <T> void configure(ComboBox<T> comboBox, Function<T, String> name, Function<T, String> color) {
+        comboBox.setMaxWidth(Double.MAX_VALUE);
+        comboBox.setConverter(new StringConverter<>() {
+            @Override public String toString(T item) { return item == null ? "" : name.apply(item); }
+            @Override public T fromString(String value) { return null; }
+        });
+        comboBox.setCellFactory(list -> popupCell(name, color));
+        comboBox.setButtonCell(buttonCell(name));
     }
 
     public static <T> ListCell<T> popupCell(Function<T, String> name, Function<T, String> color) {
@@ -26,20 +34,15 @@ public final class ColoredLookupComboBoxCellFactory {
                     setGraphic(null);
                 } else {
                     String displayName = name.apply(item);
-                    PopupRowStructure structure = popupRowStructure(displayName, color.apply(item));
-                    Label pill = LinkTypeIndicatorFactory.createLinkTypePill(structure.pillText(), structure.color(), LinkTypeIndicatorFactory.PillSize.COMPACT);
-                    Label display = new Label(structure.plainText());
+                    Label pill = LinkTypeIndicatorFactory.createLinkTypePill(displayName, color.apply(item), LinkTypeIndicatorFactory.PillSize.COMPACT);
+                    Label display = new Label(displayName);
                     HBox content = new HBox(getGraphicTextGap(), pill, display);
                     content.setAlignment(Pos.CENTER_LEFT);
+                    content.setMinWidth(Region.USE_PREF_SIZE);
+                    pill.setMinWidth(Region.USE_PREF_SIZE);
+                    display.setMinWidth(Region.USE_PREF_SIZE);
                     setText(null);
                     setGraphic(content);
-                    System.err.println("NEW REQUEST MATERIAL TYPE RENDERER V4 updateItem");
-                    System.err.println("item=" + displayName);
-                    System.err.println("pillNode=" + pill.getClass().getName());
-                    System.err.println("pillText=" + pill.getText());
-                    System.err.println("pillStyleClasses=" + pill.getStyleClass());
-                    System.err.println("pillInlineStyle=" + pill.getStyle());
-                    System.err.println("listCellGraphic=" + content + " children=" + content.getChildren());
                 }
             }
         };
