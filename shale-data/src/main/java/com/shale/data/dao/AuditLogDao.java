@@ -153,6 +153,39 @@ public final class AuditLogDao {
         }
     }
 
+
+    public void appendPhiWriteAudit(
+            Connection con,
+            Integer userId,
+            Integer objectTypeId,
+            Long objectId,
+            String fieldName,
+            Integer fieldCode,
+            String stringValue,
+            LocalDate dateValue) {
+        String sql = """
+                INSERT INTO dbo.AuditLog (
+                  ShaleClientId, UserId, ObjectTypeId, ObjectId, FieldName, FieldCode, StringValue, DateValue, BooleanValue, IntValue, EntryDate
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?);
+                """;
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            FieldCodeBindingMode bindingMode = resolveFieldCodeBindingMode(con);
+            ps.setInt(1, requireCurrentShaleClientId(con));
+            if (userId == null || userId <= 0) ps.setNull(2, java.sql.Types.INTEGER); else ps.setInt(2, userId);
+            if (objectTypeId == null || objectTypeId <= 0) ps.setNull(3, java.sql.Types.INTEGER); else ps.setInt(3, objectTypeId);
+            if (objectId == null || objectId <= 0) ps.setNull(4, java.sql.Types.BIGINT); else ps.setLong(4, objectId);
+            ps.setString(5, fieldName);
+            bindFieldCode(ps, 6, fieldCode, bindingMode);
+            ps.setString(7, stringValue);
+            if (dateValue == null) ps.setNull(8, java.sql.Types.DATE); else ps.setDate(8, Date.valueOf(dateValue));
+            ps.setTimestamp(9, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to append PHI write audit entry", e);
+        }
+    }
+
     private static int countPlaceholders(String sql) {
         int count = 0;
         for (int i = 0; i < sql.length(); i++) {
