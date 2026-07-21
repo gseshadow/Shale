@@ -48,10 +48,14 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(MAT.contains("final class MaterialRequestForm extends Dialog"));
     assertTrue(MAT.contains("CreateMaterialRequestCommand"));
     assertTrue(MAT.contains("Material Type *"));
-    assertTrue(MAT.contains("Controlled free-text source"));
-    assertTrue(MAT.contains("Requested-by user *"));
-    assertTrue(MAT.contains("Assigned user selector"));
-    assertTrue(MAT.contains("Initial status"));
+    assertTrue(MAT.contains("Title *"));
+    assertTrue(MAT.contains("Requested From *"));
+    assertTrue(MAT.contains("Requested by *"));
+    assertTrue(MAT.contains("Initial Note"));
+    assertTrue(MAT.contains("Status *"));
+    assertFalse(MAT.substring(MAT.indexOf("final class MaterialRequestForm"), MAT.indexOf("final class MaterialItemForm")).contains("Controlled free-text source"));
+    assertFalse(MAT.substring(MAT.indexOf("final class MaterialRequestForm"), MAT.indexOf("final class MaterialItemForm")).contains("Assigned user selector"));
+    assertFalse(MAT.substring(MAT.indexOf("final class MaterialRequestForm"), MAT.indexOf("final class MaterialItemForm")).contains("Initial status"));
     assertTrue(MAT.contains("final class MaterialItemForm extends Dialog"));
     assertTrue(MAT.contains("CreateMaterialItemCommand"));
     assertTrue(MAT.contains("Identity: Material Type *"));
