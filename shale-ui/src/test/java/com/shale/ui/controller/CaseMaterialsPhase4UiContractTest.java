@@ -44,18 +44,17 @@ final class CaseMaterialsPhase4UiContractTest {
     assertFalse(MAT.contains("list-material-items\",()->{activeRequests=req.listMaterialRequests"));
   }
 
-  @Test void creationUsesFullCommandBackedFormsNotTitleOnlyDialogs() {
-    assertTrue(MAT.contains("final class MaterialRequestForm extends Dialog"));
-    assertTrue(MAT.contains("CreateMaterialRequestCommand"));
-    assertTrue(MAT.contains("Material Type *"));
-    assertTrue(MAT.contains("Title *"));
-    assertTrue(MAT.contains("Requested From *"));
-    assertTrue(MAT.contains("Requested by *"));
-    assertTrue(MAT.contains("Initial Note"));
-    assertTrue(MAT.contains("Status *"));
-    assertFalse(MAT.substring(MAT.indexOf("final class MaterialRequestForm"), MAT.indexOf("final class MaterialItemForm")).contains("Controlled free-text source"));
-    assertFalse(MAT.substring(MAT.indexOf("final class MaterialRequestForm"), MAT.indexOf("final class MaterialItemForm")).contains("Assigned user selector"));
-    assertFalse(MAT.substring(MAT.indexOf("final class MaterialRequestForm"), MAT.indexOf("final class MaterialItemForm")).contains("Initial status"));
+  @Test void requestTabIsReadOnlyWhileCaseMaterialsStillUseItemForms() {
+    String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
+    assertFalse(requestController.contains("New Request"));
+    assertFalse(requestController.contains("ButtonType(\"Edit\")"));
+    assertFalse(requestController.contains("openEditor"));
+    assertFalse(requestController.contains("createMaterialRequest"));
+    assertFalse(requestController.contains("updateMaterialRequest"));
+    assertFalse(MAT.contains("final class MaterialRequestForm"));
+    assertTrue(requestController.contains("listMaterialRequests(cid,tid)"));
+    assertTrue(requestController.contains("getMaterialRequest(c,id,t,a)"));
+    assertTrue(requestController.contains("ButtonType.CLOSE"));
     assertTrue(MAT.contains("final class MaterialItemForm extends Dialog"));
     assertTrue(MAT.contains("CreateMaterialItemCommand"));
     assertTrue(MAT.contains("Identity: Material Type *"));
@@ -65,9 +64,8 @@ final class CaseMaterialsPhase4UiContractTest {
     assertFalse(MAT.contains("setTitle(\"Confirmation\")"));
   }
 
-  @Test void detailsEditsAndExplicitItemOperationsRemainSeparated() {
-    for (String command : new String[]{"UpdateMaterialRequestCommand","ChangeMaterialRequestStatusCommand","DeleteMaterialRequestCommand","RecordMaterialRequestFollowUpCommand","UpdateMaterialItemCommand","ChangeMaterialItemLocationCommand","LinkMaterialItemToRequestCommand","UnlinkMaterialItemFromRequestCommand","ReleaseOrReturnMaterialItemCommand","SoftDeleteMaterialItemCommand"}) assertTrue(MAT.contains(command), command);
-    assertTrue(MAT.contains("Append-only follow-up history"));
+  @Test void itemDetailsAndExplicitItemOperationsRemainSeparated() {
+    for (String command : new String[]{"UpdateMaterialItemCommand","ChangeMaterialItemLocationCommand","LinkMaterialItemToRequestCommand","UnlinkMaterialItemFromRequestCommand","ReleaseOrReturnMaterialItemCommand","SoftDeleteMaterialItemCommand"}) assertTrue(MAT.contains(command), command);
     assertTrue(MAT.contains("Edit Metadata"));
     assertTrue(MAT.contains("Link/Unlink Request"));
     assertTrue(MAT.contains("Location/Reference"));

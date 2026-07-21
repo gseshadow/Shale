@@ -56,36 +56,31 @@ final class MaterialRequestDaoPhase2ContractTest {
         assertTrue(DAO.contains("ISNULL(c.IsDeleted,0)=0"));
     }
 
-    @Test void mutationsOwnTransactionTouchCaseAndAppendEntityAudit() {
-        assertTrue(DAO.contains("con.setAutoCommit(false)"));
-        assertTrue(DAO.contains("rollback(con)"));
-        assertTrue(DAO.contains("touchCase(con"));
-        assertTrue(DAO.contains("entityActionAuditDao.append(con"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.CREATED"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.UPDATED"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.STATUS_CHANGED"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.DELETED"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.FOLLOW_UP_ADDED"));
+    @Test void requestMutationCommandsAreRemovedForReadOnlyDesktopRequests() {
+        String port = read("shale-core/src/main/java/com/shale/core/service/MaterialRequestServicePort.java");
+        String adapter = read("shale-data/src/main/java/com/shale/data/service/adapter/MaterialRequestServiceAdapter.java");
+        assertFalse(port.contains("CreateMaterialRequestCommand"));
+        assertFalse(port.contains("UpdateMaterialRequestCommand"));
+        assertFalse(port.contains("ChangeMaterialRequestStatusCommand"));
+        assertFalse(port.contains("DeleteMaterialRequestCommand"));
+        assertFalse(port.contains("RecordMaterialRequestFollowUpCommand"));
+        assertFalse(adapter.contains("createMaterialRequest"));
+        assertFalse(adapter.contains("updateMaterialRequest"));
+        assertFalse(adapter.contains("changeMaterialRequestStatus"));
+        assertFalse(adapter.contains("deleteMaterialRequest"));
+        assertFalse(adapter.contains("recordFollowUp"));
+        assertFalse(DAO.contains("INSERT dbo.MaterialRequests"));
+        assertFalse(DAO.contains("UPDATE dbo.MaterialRequests SET MaterialTypeId"));
+        assertFalse(DAO.contains("UPDATE dbo.MaterialRequests SET Status"));
+        assertFalse(DAO.contains("UPDATE dbo.MaterialRequests SET IsDeleted=1"));
+        assertFalse(DAO.contains("INSERT dbo.MaterialRequestFollowUps"));
     }
 
-    @Test void validationCoversRelationshipsLifecycleConcurrencyAndPhi() {
-        assertTrue(DAO.contains("validateMaterialType"));
-        assertTrue(DAO.contains("masked by tenant override"));
-        assertTrue(DAO.contains("validateUser"));
-        assertTrue(DAO.contains("dbo.Contacts"));
-        assertTrue(DAO.contains("dbo.Organizations"));
-        assertTrue(DAO.contains("assertRowVer"));
-        assertTrue(DAO.contains("Closed material requests cannot be reopened"));
-        assertTrue(DAO.contains("phiAuditService.auditCreate"));
-        assertTrue(DAO.contains("phiAuditService.auditUpdate"));
-    }
-
-    @Test void followUpsAreAppendOnlyAndNoApplicationPortExposesUpdateOrDelete() {
-        assertTrue(DAO.contains("INSERT dbo.MaterialRequestFollowUps"));
+    @Test void followUpsRemainAppendOnlyReadHistoryInTheApplicationPort() {
         assertFalse(DAO.contains("UPDATE dbo.MaterialRequestFollowUps"));
         assertFalse(DAO.contains("DELETE FROM dbo.MaterialRequestFollowUps"));
         assertTrue(DAO.contains("ORDER BY f.AttemptedAt, f.Id"));
-        assertEquals(0, Arrays.stream(MaterialRequestServicePort.class.getMethods()).filter(m -> m.getName().toLowerCase().contains("followup") && (m.getName().toLowerCase().contains("update") || m.getName().toLowerCase().contains("delete"))).count());
+        assertEquals(0, Arrays.stream(MaterialRequestServicePort.class.getMethods()).filter(m -> m.getName().toLowerCase().contains("followup") && (m.getName().toLowerCase().contains("update") || m.getName().toLowerCase().contains("delete") || m.getName().toLowerCase().contains("record"))).count());
     }
 
     @Test void sensitiveDetailAndHistoryReadsUseEstablishedReadAuditSink() throws Exception {
