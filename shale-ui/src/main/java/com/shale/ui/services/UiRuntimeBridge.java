@@ -40,6 +40,28 @@ public interface UiRuntimeBridge {
 		publishEntityUpdated("Organization", organizationId, shaleClientId, updatedByUserId, null);
 	}
 
+	default void publishCaseLinkChanged(long caseId, Long caseLinkId, Long externalLinkId, Integer linkTypeId,
+			int shaleClientId, int updatedByUserId, String change) {
+		publishEntityUpdated(LiveUpdateEvents.ENTITY_CASE_LINK, caseLinkId == null ? caseId : caseLinkId, shaleClientId, updatedByUserId,
+				LiveUpdateEvents.caseLinkPatch(caseId, caseLinkId, externalLinkId, linkTypeId, change));
+	}
+
+	default void publishCaseLinkShareChanged(long caseId, long caseLinkId, Long shareId, Integer contactId,
+			int shaleClientId, int updatedByUserId, String change) {
+		publishEntityUpdated(LiveUpdateEvents.ENTITY_CASE_LINK_SHARE, shareId == null ? caseLinkId : shareId, shaleClientId, updatedByUserId,
+				LiveUpdateEvents.caseLinkSharePatch(caseId, caseLinkId, shareId, contactId, change));
+	}
+
+	default void publishLinkTypeChanged(int linkTypeId, int shaleClientId, int updatedByUserId, String change) {
+		publishEntityUpdated(LiveUpdateEvents.ENTITY_LINK_TYPE, linkTypeId, shaleClientId, updatedByUserId,
+				LiveUpdateEvents.linkTypePatch(linkTypeId, change));
+	}
+
+	default void publishEntityAuditActivityAdded(Long entityActionAuditLogId, int shaleClientId, int updatedByUserId) {
+		publishEntityUpdated(LiveUpdateEvents.ENTITY_AUDIT_ACTIVITY, entityActionAuditLogId == null ? 0L : entityActionAuditLogId, shaleClientId, updatedByUserId,
+				LiveUpdateEvents.auditActivityPatch(entityActionAuditLogId));
+	}
+
 	// --- Generic subscriptions (recommended)
 	default void subscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
 	}

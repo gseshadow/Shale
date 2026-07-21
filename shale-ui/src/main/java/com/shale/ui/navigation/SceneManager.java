@@ -649,7 +649,7 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new UserDao(dbSessionProvider));
+			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new UserDao(dbSessionProvider), runtimeBridge);
 			return c;
 		});
 	}
@@ -663,7 +663,7 @@ public final class SceneManager {
 		Parent viewerRoot = load("/fxml/audit-log-viewer.fxml", controller ->
 		{
 			AuditLogViewerController c = (AuditLogViewerController) controller;
-			c.init(appState, auditLogDao, new com.shale.data.dao.EntityActionAuditDao(), new UserDao(dbSessionProvider), dbSessionProvider);
+			c.init(appState, auditLogDao, new com.shale.data.dao.EntityActionAuditDao(), new UserDao(dbSessionProvider), dbSessionProvider, runtimeBridge);
 			return c;
 		});
 		Stage dialogStage = AppDialogs.createModalStage(stage, "Audit Log");
@@ -740,7 +740,7 @@ public final class SceneManager {
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			ContactDetailService contactDetailService = new ContactDetailService(contactDao);
-				c.init(contactId, contactDetailService, appState, onOpenCase, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), onContactDeleted, phiReadAuditService, this::openContactProfile);
+				c.init(contactId, contactDetailService, appState, onOpenCase, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), onContactDeleted, phiReadAuditService, this::openContactProfile, runtimeBridge);
 				return c;
 			});
 	}
