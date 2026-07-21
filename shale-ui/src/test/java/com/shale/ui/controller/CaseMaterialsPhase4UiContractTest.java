@@ -46,7 +46,7 @@ final class CaseMaterialsPhase4UiContractTest {
 
   @Test void requestTabIsReadOnlyWhileCaseMaterialsStillUseItemForms() {
     String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
-    assertFalse(requestController.contains("New Request"));
+    assertTrue(requestController.contains("primary(\"New Request\")"));
     assertFalse(requestController.contains("ButtonType(\"Edit\")"));
     assertFalse(requestController.contains("openEditor"));
     assertFalse(requestController.contains("createMaterialRequest"));
@@ -62,6 +62,36 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(MAT.contains("ExternalLink reference selector"));
     assertTrue(MAT.contains("Storage location (not a file upload)"));
     assertFalse(MAT.contains("setTitle(\"Confirmation\")"));
+  }
+
+
+  @Test void requestTabNewRequestActionIsHeaderOnlyStyledAndPlaceholderOnly() {
+    String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
+    String materialsUi = MAT.substring(MAT.indexOf("final class MaterialsUi"));
+    int headerAction = requestController.indexOf("Button add=primary(\"New Request\")");
+    int rootSection = requestController.indexOf("section(title,add,status,list)");
+    int listCreation = requestController.indexOf("list=new VBox(10)");
+    assertTrue(headerAction >= 0);
+    assertTrue(rootSection > headerAction);
+    assertTrue(listCreation >= 0 && headerAction > listCreation);
+    assertTrue(requestController.contains("add.setOnAction(e->openNewRequestWindow())"));
+    assertTrue(materialsUi.contains("ActionButtonFactory.primary(s,null)"));
+    assertTrue(requestController.contains("AppDialogs.createModalStage(owner.get(),\"New Request\")"));
+    assertTrue(requestController.contains("AppDialogs.createSecondaryWindowShell(stage,\"New Request\",stage::close,body)"));
+    assertTrue(requestController.contains("private void openNewRequestWindow()"));
+    String placeholder = requestController.substring(requestController.indexOf("private void openNewRequestWindow()"), requestController.indexOf("private void openDetail"));
+    assertTrue(placeholder.contains("Pane body=new Pane()"));
+    assertFalse(placeholder.contains("MaterialRequestForm"));
+    assertFalse(placeholder.contains("TextField"));
+    assertFalse(placeholder.contains("DatePicker"));
+    assertFalse(placeholder.contains("ComboBox"));
+    assertFalse(placeholder.contains("ChoiceBox"));
+    assertFalse(placeholder.contains("ButtonType.OK"));
+    assertFalse(placeholder.contains("Create"));
+    assertFalse(placeholder.contains("Save"));
+    assertFalse(requestController.contains("createMaterialRequest"));
+    assertFalse(requestController.contains("updateMaterialRequest"));
+    assertFalse(MAT.contains("final class MaterialRequestForm"));
   }
 
   @Test void itemDetailsAndExplicitItemOperationsRemainSeparated() {
