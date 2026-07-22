@@ -4679,11 +4679,7 @@ public class CaseController {
 			return false;
 		}
 		String partySystemKey = safeText(party.getPartyRoleSystemKey()).trim().toLowerCase(Locale.ROOT);
-		if (normalizedKey.equals(partySystemKey)) {
-			return true;
-		}
-		String legacyNameFallback = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
-		return normalizedKey.equals(legacyNameFallback);
+		return normalizedKey.equals(partySystemKey);
 	}
 
 	private void applyLastUpdatedLabel(LocalDateTime updatedAt) {

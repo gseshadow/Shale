@@ -290,7 +290,8 @@ public final class CaseDao {
 
 	public record PartyRoleRow(
 			long id,
-			String name
+			String name,
+			String systemKey
 	) {
 	}
 
@@ -1064,7 +1065,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -1565,7 +1566,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -1723,7 +1724,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -1913,7 +1914,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -2427,8 +2428,8 @@ public final class CaseDao {
 		boolean hasSystemKey = tableHasColumn(con, PARTY_ROLES_TABLE, "SystemKey");
 		String normalizedRole = roleName == null ? "" : roleName.trim().toLowerCase(Locale.ROOT);
 		String rolePredicate = hasSystemKey
-				? "(LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = ? OR LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?)"
-				: "LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?";
+				? "LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = ?"
+				: "1 = 0";
 		String sql = """
 				SELECT
 				  cp.ContactId,
@@ -2460,7 +2461,6 @@ public final class CaseDao {
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId);
 			int idx = 2;
-			ps.setString(idx++, normalizedRole);
 			if (hasSystemKey) {
 				ps.setString(idx++, normalizedRole);
 			}
@@ -3960,7 +3960,7 @@ public final class CaseDao {
 			for (PartyRoleLookupRow row : effective) {
 				if (row == null)
 					continue;
-				out.add(new PartyRoleRow(row.id(), row.name()));
+				out.add(new PartyRoleRow(row.id(), row.name(), row.systemKey()));
 			}
 			return out;
 		} catch (SQLException e) {
@@ -5588,19 +5588,13 @@ public final class CaseDao {
 		return normalized.isBlank() ? null : normalized;
 	}
 
-	private static String resolveLegacyPartyRoleSystemKeyFromName(String roleName) {
-		String normalized = (roleName == null) ? "" : roleName.trim().toLowerCase(Locale.ROOT);
-		return switch (normalized) {
-		case PARTY_ROLE_NAME_CALLER, PARTY_ROLE_NAME_PARTY, PARTY_ROLE_NAME_COUNSEL -> normalized;
-		default -> null;
-		};
+	static boolean isBuiltinPartyRoleSystemKey(String systemKey) {
+		String normalizedSystemKey = normalizeSystemKey(systemKey);
+		return PARTY_ROLE_NAME_PARTY.equals(normalizedSystemKey);
 	}
 
 	private static String resolvePartyRoleSystemKey(String systemKey, String roleName) {
-		String normalizedSystemKey = normalizeSystemKey(systemKey);
-		if (normalizedSystemKey != null)
-			return normalizedSystemKey;
-		return resolveLegacyPartyRoleSystemKeyFromName(roleName);
+		return normalizeSystemKey(systemKey);
 	}
 
 	private static String resolveLegacyPartySideSystemKeyFromName(String sideName) {
@@ -7068,7 +7062,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -7213,7 +7207,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
