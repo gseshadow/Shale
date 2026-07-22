@@ -68,7 +68,7 @@ import com.shale.ui.document.CaseDocumentType;
 import com.shale.ui.document.GeneratedDocument;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
-import com.shale.ui.component.factory.ColoredLookupComboBoxCellFactory;
+import com.shale.ui.component.ColorCodedComboBox;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
@@ -2304,7 +2304,7 @@ public class CaseController {
 
 	private Optional<CaseLinkInput> showCaseLinkDialog(CaseLinkDto existing, List<LinkTypeDto> linkTypes) {
 		Dialog<CaseLinkInput> dialog = new Dialog<>(); String title = existing == null ? "Add Link" : "Edit Link"; dialog.setTitle(title); if (caseLinksOwner() != null) dialog.initOwner(caseLinksOwner()); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
-		ComboBox<LinkTypeDto> type = new ComboBox<>(); type.getItems().setAll(linkTypes); ColoredLookupComboBoxCellFactory.configure(type, LinkTypeDto::name, LinkTypeDto::color);
+		ColorCodedComboBox<LinkTypeDto> type = new ColorCodedComboBox<>(LinkTypeDto::name, LinkTypeDto::color); type.getItems().setAll(linkTypes);
 		TextField name = new TextField(existing == null ? "" : safeText(existing.displayName())); TextField url = new TextField(existing == null ? "" : safeText(existing.url())); TextArea description = new TextArea(existing == null ? "" : safeText(existing.description())); description.setPrefRowCount(3); TextArea notes = new TextArea(existing == null ? "" : safeText(existing.notes())); notes.setPrefRowCount(3); CheckBox primary = new CheckBox("Make primary"); primary.setSelected(existing != null && existing.primary());
 		SharedWithEditor sharedWithEditor = new SharedWithEditor(existing);
 		VBox sharedWithBox = sharedWithEditor.root();

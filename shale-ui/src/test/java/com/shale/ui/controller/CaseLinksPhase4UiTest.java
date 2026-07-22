@@ -88,7 +88,7 @@ final class CaseLinksPhase4UiTest {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
         String card = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/CaseLinkCardFactory.java"));
         assertTrue(card.contains("LinkTypeIndicatorFactory.createLinkTypePill(link.linkTypeName(), link.linkTypeColor()"));
-        assertTrue(source.contains("ColoredLookupComboBoxCellFactory.configure(type, LinkTypeDto::name, LinkTypeDto::color)"));
+        assertTrue(source.contains("new ColorCodedComboBox<>(LinkTypeDto::name, LinkTypeDto::color)"));
         assertTrue(source.contains("currentLink.linkTypeName() + \" (unavailable)\""));
     }
 }
