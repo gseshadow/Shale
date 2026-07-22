@@ -85,11 +85,32 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(d.contains("results.setPrefHeight(420)"));
         assertTrue(d.contains("results.setMinHeight(300)"));
         assertTrue(d.contains("VBox.setVgrow(results, Priority.ALWAYS)"));
-        assertTrue(d.contains("dialog.getDialogPane().setPrefSize(state.step==3?800:560"));
+        assertTrue(d.contains("applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box)"));
+        assertTrue(d.contains("WindowSizingUtil.sizeModalStage(stage, owner, prefWidth, prefHeight, minWidth, minHeight)"));
+        assertTrue(d.contains("Platform.runLater(() ->"));
+        assertTrue(d.contains("stage.setResizable(true)"));
         assertTrue(css.contains(".requested-from-results .list-cell:filled:selected"));
         assertTrue(css.contains("-fx-background-color: transparent;"));
         assertTrue(css.contains("-fx-border-color: rgba(74, 131, 210, 0.82)"));
         assertFalse(css.contains(".list-cell:filled:selected {\n    -fx-background-color: white"));
+    }
+
+
+    @Test void workflowSizingUpdatesActualStageAfterContentIsInstalled() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        int renderContent = d.indexOf("box.getChildren().addAll(search, status, results)");
+        int sizing = d.indexOf("applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box)");
+        int helper = d.indexOf("static void applyWorkflowScreenSizing");
+        assertTrue(renderContent >= 0 && sizing > renderContent);
+        assertTrue(helper > sizing);
+        assertTrue(d.contains("boolean selectFinal = step == 3 && \"select\".equals(mode)"));
+        assertTrue(d.contains("boolean createFinal = step == 3 && \"create\".equals(mode)"));
+        assertTrue(d.contains("double prefHeight = selectFinal ? 700 : createFinal ? 520 : 300"));
+        assertTrue(d.contains("double minHeight = selectFinal ? 600 : createFinal ? 440 : 280"));
+        assertTrue(d.contains("Window window = pane.getScene() == null ? null : pane.getScene().getWindow()"));
+        assertTrue(d.contains("pane.resize(stage.getWidth(), stage.getHeight())"));
+        assertTrue(d.contains("WindowSizingUtil.constrainToVisualBounds(stage, owner)"));
+        assertTrue(d.contains("dialog.setOnShown(e -> applyWorkflowScreenSizing"));
     }
 
     @Test void normalAddPartyStillUsesLinkableCandidatesAndCasePartyFields() throws Exception {
