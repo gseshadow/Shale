@@ -5,6 +5,7 @@ Start here:
 
 Supporting documents:
 - database-schema.md
+- customizable-lookup-types.md
 - development-rules.md
 - tenancy-and-rls.md
 - system-overview.md

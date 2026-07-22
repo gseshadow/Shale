@@ -183,6 +183,11 @@ The live schema does **not** include these columns:
 | `CaseStatusId`             | Not present in the live `dbo.Cases` output. Do not use unless a future migration adds it. |
 | `CasePracticeAreaId`       | Not present in the live `dbo.Cases` output.                                               |
 
+
+### Customizable lookup type standard
+
+For future design and modernization of tenant/global overlay lookup definition tables, use [customizable-lookup-types.md](customizable-lookup-types.md). That standard distinguishes recommended future shape from this file's live-schema facts, including `Statuses` as the case-status definition table and `CaseStatuses` as transactional history.
+
 ### Case status warning
 
 `dbo.Statuses` exists, but the current live `dbo.Cases` schema output does **not** include `CaseStatusId`.
