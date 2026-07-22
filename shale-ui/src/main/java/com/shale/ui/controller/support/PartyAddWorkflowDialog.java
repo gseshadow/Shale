@@ -473,6 +473,10 @@ public final class PartyAddWorkflowDialog {
 		return String.join(" ", tokens);
 	}
 
+	public static void applySharedDialogButtonStyle(Button button, boolean primary) {
+		applyToolbarButtonClasses(button, primary ? "app-toolbar-button-primary" : "app-toolbar-button-neutral");
+	}
+
 	private static Button asButton(Node node) {
 		return node instanceof Button button ? button : null;
 	}
