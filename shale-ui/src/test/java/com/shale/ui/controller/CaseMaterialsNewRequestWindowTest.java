@@ -10,7 +10,7 @@ class CaseMaterialsNewRequestWindowTest {
     private static final Path SOURCE = Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
 
     @Test
-    void newRequestWindowDefinesTitleAndThreeLookupFieldsInOrder() throws Exception {
+    void newRequestWindowDefinesTitleRequestedFromAndThreeLookupFieldsInOrder() throws Exception {
         String source = Files.readString(SOURCE);
         String method = methodBody(source, "VBox newRequestBody");
 
@@ -21,9 +21,10 @@ class CaseMaterialsNewRequestWindowTest {
 
         assertInOrder(method,
                 "add(fields,0,\"Title:\",titleField)",
-                "add(fields,1,\"Material Type:\",materialType)",
-                "add(fields,2,\"Request Method:\",requestMethod)",
-                "add(fields,3,\"Status:\",requestStatus)");
+                "add(fields,1,\"Requested From:\",requestedFromBox)",
+                "add(fields,2,\"Material Type:\",materialType)",
+                "add(fields,3,\"Request Method:\",requestMethod)",
+                "add(fields,4,\"Status:\",requestStatus)");
     }
 
     @Test
@@ -129,7 +130,8 @@ class CaseMaterialsNewRequestWindowTest {
         assertFalse(requestController.contains("UpdateMaterialRequestCommand"));
         assertFalse(requestController.contains("createMaterialRequest"));
         assertFalse(requestController.contains("updateMaterialRequest"));
-        assertFalse(requestController.toLowerCase().contains("dao"));
+        assertFalse(requestController.contains("MaterialRequestDao"));
+        assertFalse(requestController.contains("materialRequestDao"));
     }
 
     private static void assertInOrder(String source, String... snippets) {

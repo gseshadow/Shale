@@ -857,7 +857,7 @@ public class CaseController {
 	public void setMaterialServices(MaterialRequestServicePort materialRequestService, MaterialItemServicePort materialItemService) {
 		this.materialRequestService = materialRequestService;
 		this.materialItemService = materialItemService;
-		caseMaterialRequestsTabController.init(materialRequestService, appState, () -> caseId == null ? 0L : caseId.longValue(), this::caseMaterialsOwner);
+		caseMaterialRequestsTabController.init(materialRequestService, appState, caseDao, contactDao, organizationDao, () -> caseId == null ? 0L : caseId.longValue(), this::caseMaterialsOwner);
 		caseMaterialItemsTabController.init(materialRequestService, materialItemService, appState, () -> caseId == null ? 0L : caseId.longValue(), this::caseMaterialsOwner);
 	}
 
