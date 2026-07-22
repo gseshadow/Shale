@@ -104,8 +104,9 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(body.contains("requestedFromAction.setText(v==null?\"Add\":\"Change\")"));
     assertTrue(body.contains("ActionButtonFactory.neutral(\"Remove\",null)"));
     assertTrue(body.contains("AtomicReference<RequestedFromSelection>"));
-    assertTrue(requestController.contains("record RequestedFromSelection(String entityType, Long entityId, String label)"));
-    assertTrue(body.contains("v.contact()?\"Contact\":\"Organization\""));
+    assertTrue(requestController.contains("record RequestedFromSelection(String entityType, Long entityId, String label, ContactCardFactory.ContactCardModel contactModel, OrganizationCardFactory.OrganizationCardModel organizationModel)"));
+    assertTrue(body.contains("contactCards.create(v.contactModel(),ContactCardFactory.Variant.MINI)"));
+    assertTrue(body.contains("organizationCards.create(v.organizationModel(),OrganizationCardFactory.Variant.MINI)"));
     assertTrue(body.contains("showRequestedFromChooser(stage)"));
     assertTrue(requestController.contains("RequestedFromWorkflowDialog.show"));
     assertTrue(requestController.contains("caseDao.findSelectableContactsForTenant()"));
