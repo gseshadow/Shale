@@ -24,6 +24,35 @@ class CaseMaterialsNewRequestWindowTest {
     }
 
     @Test
+    void newRequestWindowUsesColorCodedMaterialTypeSelector() throws Exception {
+        String source = Files.readString(SOURCE);
+        String method = methodBody(source, "VBox newRequestBody");
+
+        assertTrue(source.contains("import com.shale.ui.component.ColorCodedComboBox;"));
+        assertTrue(method.contains("ColorCodedComboBox<MaterialTypeDto> materialType=new ColorCodedComboBox<>(MaterialTypeDto::name, MaterialTypeDto::color)"));
+        assertTrue(method.contains("materialType.setPromptText(\"Select Material Type\")"));
+        assertTrue(method.contains("materialType.setMaxWidth(Double.MAX_VALUE)"));
+        assertTrue(method.contains("add(fields,1,\"Material Type:\",materialType)"));
+        assertTrue(method.contains("GridPane.setHgrow(materialType,Priority.ALWAYS)"));
+    }
+
+    @Test
+    void materialTypeChoicesLoadThroughExistingServicePathWithoutDefaultSelection() throws Exception {
+        String source = Files.readString(SOURCE);
+        String body = methodBody(source, "VBox newRequestBody");
+        String loader = methodBody(source, "private void loadNewRequestMaterialTypes");
+
+        assertTrue(body.contains("loadNewRequestMaterialTypes(materialType,stage)"));
+        assertTrue(loader.contains("ex.submit"));
+        assertTrue(loader.contains("svc.listEffectiveMaterialTypes(tid)"));
+        assertTrue(loader.contains("Platform.runLater(()->materialType.getItems().setAll(types==null?List.of():types))"));
+        assertTrue(loader.contains("AppDialogs.showError(dialogOwner,\"Requests\",\"Material Type choices could not be loaded. Please try again.\")"));
+        assertFalse(body.contains("materialType.getSelectionModel().selectFirst()"));
+        assertFalse(body.contains("materialType.getSelectionModel().select("));
+        assertFalse(loader.contains("selectFirst()"));
+    }
+
+    @Test
     void footerUsesAppStyledButtonsAndSaveIsIntentionallyEmpty() throws Exception {
         String method = methodBody(Files.readString(SOURCE), "VBox newRequestBody");
 
