@@ -32,6 +32,50 @@ public final class MaterialRequestDao {
         } catch (SQLException e) { throw sqlFailure(e); }
     }
 
+    public List<RequestMethodDto> listEffectiveRequestMethods(int shaleClientId) {
+        String sql = effectiveRequestLookupSql("dbo.RequestMethods");
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            verifyTenant(con, shaleClientId);
+            ps.setInt(1, shaleClientId); ps.setInt(2, shaleClientId); ps.setInt(3, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<RequestMethodDto> out = new ArrayList<>();
+                while (rs.next()) out.add(new RequestMethodDto(rs.getInt(1), (Integer) rs.getObject(2), rs.getString(3), rs.getString(4), rs.getInt(5), rs.getBoolean(6), rs.getBoolean(7)));
+                return out;
+            }
+        } catch (SQLException e) { throw sqlFailure(e); }
+    }
+
+    public List<RequestStatusDto> listEffectiveRequestStatuses(int shaleClientId) {
+        String sql = effectiveRequestLookupSql("dbo.RequestStatuses");
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            verifyTenant(con, shaleClientId);
+            ps.setInt(1, shaleClientId); ps.setInt(2, shaleClientId); ps.setInt(3, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<RequestStatusDto> out = new ArrayList<>();
+                while (rs.next()) out.add(new RequestStatusDto(rs.getInt(1), (Integer) rs.getObject(2), rs.getString(3), rs.getString(4), rs.getInt(5), rs.getBoolean(6), rs.getBoolean(7)));
+                return out;
+            }
+        } catch (SQLException e) { throw sqlFailure(e); }
+    }
+
+    private static String effectiveRequestLookupSql(String tableName) {
+        return """
+                WITH visible AS (
+                  SELECT Id, ShaleClientId, SystemKey, Name, SortOrder, IsActive, IsDeleted,
+                         ROW_NUMBER() OVER (PARTITION BY SystemKey ORDER BY CASE WHEN ShaleClientId = ? THEN 0 ELSE 1 END, Id) AS rn
+                  FROM %s
+                  WHERE (ShaleClientId = ? OR ShaleClientId IS NULL) AND SystemKey IS NOT NULL
+                )
+                SELECT Id, ShaleClientId, SystemKey, Name, SortOrder, IsActive, IsDeleted FROM visible
+                WHERE rn = 1 AND IsDeleted = 0 AND IsActive = 1
+                UNION ALL
+                SELECT Id, ShaleClientId, SystemKey, Name, SortOrder, IsActive, IsDeleted
+                FROM %s
+                WHERE ShaleClientId = ? AND SystemKey IS NULL AND IsDeleted = 0 AND IsActive = 1
+                ORDER BY SortOrder, Name, Id
+                """.formatted(tableName, tableName);
+    }
+
     public List<MaterialRequestSummaryDto> listMaterialRequests(long caseId, int tenant) {
         String sql = baseSelect(false) + " WHERE mr.ShaleClientId=? AND mr.CaseId=? AND mr.IsDeleted=0 AND ISNULL(c.IsDeleted,0)=0 ORDER BY mr.NextFollowUpAt, mr.RequestedAt DESC, mr.Id DESC";
         try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) { verifyTenant(con, tenant); ps.setInt(1,tenant); ps.setLong(2,caseId); try(ResultSet rs=ps.executeQuery()){List<MaterialRequestSummaryDto> out=new ArrayList<>(); while(rs.next()) out.add(mapSummary(rs)); return out;}} catch(SQLException e){throw sqlFailure(e);} }
