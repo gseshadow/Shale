@@ -60,7 +60,7 @@ public final class PartyAddWorkflowDialog {
 			List<OrganizationDao.OrganizationTypeRow> organizationTypes,
 			List<PartySideOption> sideOptions) {
 		Long defaultPartyRoleId = partyRoles.stream()
-				.filter(r -> "party".equalsIgnoreCase(safeText(r.name())))
+				.filter(r -> "party".equalsIgnoreCase(safeText(r.systemKey()).trim()))
 				.map(CaseDao.PartyRoleRow::id)
 				.findFirst()
 				.orElse(partyRoles.isEmpty() ? null : partyRoles.get(0).id());
