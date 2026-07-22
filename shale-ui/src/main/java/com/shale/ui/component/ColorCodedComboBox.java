@@ -5,7 +5,9 @@ import java.util.function.Function;
 
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
 
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -19,7 +21,8 @@ import javafx.util.StringConverter;
  * @param <T> lookup item type supplied by the caller
  */
 public class ColorCodedComboBox<T> extends ComboBox<T> {
-    private static final double GRAPHIC_TEXT_GAP = 4.0;
+    private static final Insets POPUP_ROW_PADDING = new Insets(4, 10, 4, 10);
+    private static final Insets BUTTON_CELL_PADDING = new Insets(3, 28, 3, 8);
 
     private final Function<T, String> displayTextExtractor;
     private final Function<T, String> colorExtractor;
@@ -45,21 +48,38 @@ public class ColorCodedComboBox<T> extends ComboBox<T> {
             @Override public T fromString(String value) { return null; }
         });
         setCellFactory(list -> createColorCodedCell());
-        setButtonCell(createColorCodedCell());
+        setButtonCell(createColorCodedButtonCell());
     }
 
     public ListCell<T> createColorCodedCell() {
+        return createColorCodedCell(false);
+    }
+
+    private ListCell<T> createColorCodedButtonCell() {
+        return createColorCodedCell(true);
+    }
+
+    private ListCell<T> createColorCodedCell(boolean buttonCell) {
         return new ListCell<>() {
+            {
+                setAlignment(Pos.CENTER_LEFT);
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+                setPadding(buttonCell ? BUTTON_CELL_PADDING : POPUP_ROW_PADDING);
+                setMaxWidth(Double.MAX_VALUE);
+            }
+
             @Override
             protected void updateItem(T item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
-                    setText(null);
                     setGraphic(null);
+                    setText(buttonCell ? getComboBoxPromptText() : null);
+                    setContentDisplay(buttonCell ? ContentDisplay.TEXT_ONLY : ContentDisplay.GRAPHIC_ONLY);
                     return;
                 }
                 setText(null);
                 setGraphic(createDisplayNode(item));
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
             }
         };
     }
@@ -67,13 +87,17 @@ public class ColorCodedComboBox<T> extends ComboBox<T> {
     public HBox createDisplayNode(T item) {
         String displayText = displayText(item);
         Label pill = LinkTypeIndicatorFactory.createLinkTypePill(displayText, color(item), LinkTypeIndicatorFactory.PillSize.COMPACT);
-        Label display = new Label(displayText);
-        HBox content = new HBox(GRAPHIC_TEXT_GAP, pill, display);
+        HBox content = new HBox(pill);
         content.setAlignment(Pos.CENTER_LEFT);
+        content.setMaxWidth(Double.MAX_VALUE);
         content.setMinWidth(Region.USE_PREF_SIZE);
         pill.setMinWidth(Region.USE_PREF_SIZE);
-        display.setMinWidth(Region.USE_PREF_SIZE);
         return content;
+    }
+
+    private String getComboBoxPromptText() {
+        String prompt = getPromptText();
+        return prompt == null ? "" : prompt;
     }
 
     private String displayText(T item) {
