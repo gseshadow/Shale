@@ -29,7 +29,7 @@ class CaseMaterialsNewRequestWindowTest {
         String method = methodBody(source, "VBox newRequestBody");
 
         assertTrue(source.contains("import com.shale.ui.component.ColorCodedComboBox;"));
-        assertTrue(method.contains("ColorCodedComboBox<MaterialTypeDto> materialType=new ColorCodedComboBox<>(MaterialTypeDto::name, MaterialTypeDto::color)"));
+        assertTrue(method.contains("ColorCodedComboBox<MaterialTypeDto> materialType=new ColorCodedComboBox<>(MaterialTypeDto::name, MaterialTypeDto::color, MaterialTypeDto::description)"));
         assertTrue(method.contains("materialType.setPromptText(\"Select Material Type\")"));
         assertTrue(method.contains("materialType.setMaxWidth(Double.MAX_VALUE)"));
         assertTrue(method.contains("add(fields,1,\"Material Type:\",materialType)"));

@@ -1,6 +1,7 @@
 package com.shale.ui.component;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
@@ -12,6 +13,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.util.StringConverter;
 
@@ -26,10 +28,16 @@ public class ColorCodedComboBox<T> extends ComboBox<T> {
 
     private final Function<T, String> displayTextExtractor;
     private final Function<T, String> colorExtractor;
+    private final Function<T, String> secondaryTextExtractor;
 
     public ColorCodedComboBox(Function<T, String> displayTextExtractor, Function<T, String> colorExtractor) {
+        this(displayTextExtractor, colorExtractor, null);
+    }
+
+    public ColorCodedComboBox(Function<T, String> displayTextExtractor, Function<T, String> colorExtractor, Function<T, String> secondaryTextExtractor) {
         this.displayTextExtractor = Objects.requireNonNull(displayTextExtractor, "displayTextExtractor");
         this.colorExtractor = Objects.requireNonNull(colorExtractor, "colorExtractor");
+        this.secondaryTextExtractor = secondaryTextExtractor;
         configureColorCodedRendering();
     }
 
@@ -39,6 +47,10 @@ public class ColorCodedComboBox<T> extends ComboBox<T> {
 
     public Function<T, String> colorExtractor() {
         return colorExtractor;
+    }
+
+    public Optional<Function<T, String>> secondaryTextExtractor() {
+        return Optional.ofNullable(secondaryTextExtractor);
     }
 
     private void configureColorCodedRendering() {
@@ -78,21 +90,36 @@ public class ColorCodedComboBox<T> extends ComboBox<T> {
                     return;
                 }
                 setText(null);
-                setGraphic(createDisplayNode(item));
+                setGraphic(createDisplayNode(item, !buttonCell));
                 setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
             }
         };
     }
 
     public HBox createDisplayNode(T item) {
+        return createDisplayNode(item, false);
+    }
+
+    private HBox createDisplayNode(T item, boolean includeSecondaryText) {
         String displayText = displayText(item);
         Label pill = LinkTypeIndicatorFactory.createLinkTypePill(displayText, color(item), LinkTypeIndicatorFactory.PillSize.COMPACT);
-        HBox content = new HBox(pill);
+        String secondaryText = includeSecondaryText ? secondaryText(item) : "";
+        HBox content = blank(secondaryText) ? new HBox(pill) : new HBox(8, pill, secondaryLabel(secondaryText));
         content.setAlignment(Pos.CENTER_LEFT);
         content.setMaxWidth(Double.MAX_VALUE);
         content.setMinWidth(Region.USE_PREF_SIZE);
         pill.setMinWidth(Region.USE_PREF_SIZE);
         return content;
+    }
+
+    private Label secondaryLabel(String secondaryText) {
+        Label label = new Label(secondaryText);
+        label.setWrapText(true);
+        label.setMaxHeight(36);
+        label.setMaxWidth(Double.MAX_VALUE);
+        label.setStyle("-fx-text-fill: -shale-color-text-muted;");
+        HBox.setHgrow(label, Priority.ALWAYS);
+        return label;
     }
 
     private String getComboBoxPromptText() {
@@ -106,7 +133,17 @@ public class ColorCodedComboBox<T> extends ComboBox<T> {
         return value == null ? "" : value;
     }
 
+    private String secondaryText(T item) {
+        if (item == null || secondaryTextExtractor == null) return "";
+        String value = secondaryTextExtractor.apply(item);
+        return value == null ? "" : value.strip();
+    }
+
     private String color(T item) {
         return item == null ? null : colorExtractor.apply(item);
+    }
+
+    private static boolean blank(String value) {
+        return value == null || value.isBlank();
     }
 }

@@ -20,22 +20,42 @@ final class ColorCodedComboBoxContractTest {
         assertTrue(source.contains("Function<T, String> displayTextExtractor"));
         assertTrue(source.contains("Function<T, String> colorExtractor"));
         assertTrue(source.contains("public ColorCodedComboBox(Function<T, String> displayTextExtractor, Function<T, String> colorExtractor)"));
+        assertTrue(source.contains("public ColorCodedComboBox(Function<T, String> displayTextExtractor, Function<T, String> colorExtractor, Function<T, String> secondaryTextExtractor)"));
+        assertTrue(source.contains("this(displayTextExtractor, colorExtractor, null)"));
         assertTrue(!source.contains("LinkTypeDto"), "Reusable control must not know about LinkTypeDto or any other field-specific DTO.");
     }
 
     @Test
     void popupRowsAndSelectedValueShareSinglePillRendering() throws Exception {
         String source = Files.readString(COMPONENT);
-        String displayNode = methodBody(source, "public HBox createDisplayNode");
+        String displayNode = methodBody(source, "private HBox createDisplayNode");
 
         assertTrue(source.contains("setCellFactory(list -> createColorCodedCell())"));
         assertTrue(source.contains("setButtonCell(createColorCodedButtonCell())"));
         assertTrue(source.contains("return createColorCodedCell(false)"));
         assertTrue(source.contains("return createColorCodedCell(true)"));
-        assertTrue(source.contains("setGraphic(createDisplayNode(item))"));
+        assertTrue(source.contains("setGraphic(createDisplayNode(item, !buttonCell))"));
         assertTrue(displayNode.contains("LinkTypeIndicatorFactory.createLinkTypePill(displayText, color(item), LinkTypeIndicatorFactory.PillSize.COMPACT)"));
-        assertTrue(displayNode.contains("HBox content = new HBox(pill)"));
+        assertTrue(displayNode.contains("blank(secondaryText) ? new HBox(pill) : new HBox(8, pill, secondaryLabel(secondaryText))"));
         assertFalse(displayNode.contains("new Label(displayText)"));
+    }
+
+    @Test
+    void popupRowsMayIncludeSecondaryTextButButtonCellRemainsPillOnly() throws Exception {
+        String source = Files.readString(COMPONENT);
+        String displayNode = methodBody(source, "private HBox createDisplayNode");
+        String secondaryLabel = methodBody(source, "private Label secondaryLabel");
+        String secondaryText = methodBody(source, "private String secondaryText");
+
+        assertTrue(source.contains("private final Function<T, String> secondaryTextExtractor"));
+        assertTrue(source.contains("public Optional<Function<T, String>> secondaryTextExtractor()"));
+        assertTrue(source.contains("setGraphic(createDisplayNode(item, !buttonCell))"));
+        assertTrue(displayNode.contains("includeSecondaryText ? secondaryText(item) : \"\""));
+        assertTrue(displayNode.contains("blank(secondaryText) ? new HBox(pill) : new HBox(8, pill, secondaryLabel(secondaryText))"));
+        assertTrue(secondaryLabel.contains("label.setWrapText(true)"));
+        assertTrue(secondaryLabel.contains("HBox.setHgrow(label, Priority.ALWAYS)"));
+        assertTrue(secondaryText.contains("if (item == null || secondaryTextExtractor == null) return \"\""));
+        assertTrue(secondaryText.contains("return value == null ? \"\" : value.strip()"));
     }
 
     @Test
