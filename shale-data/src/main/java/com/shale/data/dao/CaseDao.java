@@ -5597,19 +5597,8 @@ public final class CaseDao {
 		return normalizeSystemKey(systemKey);
 	}
 
-	private static String resolveLegacyPartySideSystemKeyFromName(String sideName) {
-		String normalized = (sideName == null) ? "" : sideName.trim().toLowerCase(Locale.ROOT);
-		return switch (normalized) {
-		case PARTY_SIDE_KEY_REPRESENTED, PARTY_SIDE_KEY_OPPOSING, PARTY_SIDE_KEY_NEUTRAL -> normalized;
-		default -> null;
-		};
-	}
-
 	private static String resolvePartySideSystemKey(String systemKey, String sideName) {
-		String normalizedSystemKey = normalizeSystemKey(systemKey);
-		if (normalizedSystemKey != null)
-			return normalizedSystemKey;
-		return resolveLegacyPartySideSystemKeyFromName(sideName);
+		return normalizeSystemKey(systemKey);
 	}
 
 	private record PartyRoleLookupRow(
