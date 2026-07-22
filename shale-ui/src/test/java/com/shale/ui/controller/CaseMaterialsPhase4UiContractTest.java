@@ -97,7 +97,7 @@ final class CaseMaterialsPhase4UiContractTest {
   }
   @Test void newRequestRequestedFromUsesSharedPartyEntityChooserWithoutCasePartyMutation() {
     String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
-    String dialog = read("src/main/java/com/shale/ui/controller/support/PartyAddWorkflowDialog.java");
+    String dialog = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
     String body = requestController.substring(requestController.indexOf("VBox newRequestBody"), requestController.indexOf("private void loadNewRequestLookups"));
     assertTrue(body.contains("add(fields,1,\"Requested From:\",requestedFromBox)"));
     assertTrue(body.contains("ActionButtonFactory.primary(\"Add\",null)"));
@@ -107,20 +107,21 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(requestController.contains("record RequestedFromSelection(String entityType, Long entityId, String label)"));
     assertTrue(body.contains("v.contact()?\"Contact\":\"Organization\""));
     assertTrue(body.contains("showRequestedFromChooser(stage)"));
-    assertTrue(requestController.contains("PartyAddWorkflowDialog.showEntityChooser"));
-    assertTrue(requestController.contains("caseDao.findLinkableContacts(cid())"));
-    assertTrue(requestController.contains("caseDao.findLinkableOrganizations(cid())"));
+    assertTrue(requestController.contains("RequestedFromWorkflowDialog.show"));
+    assertTrue(requestController.contains("caseDao.findSelectableContactsForTenant()"));
+    assertTrue(requestController.contains("caseDao.findSelectableOrganizationsForTenant()"));
     assertTrue(requestController.contains("contactDao.createContact(new ContactDao.CreateContactRequest"));
     assertTrue(requestController.contains("organizationDao.create(new OrganizationDao.OrganizationCreateRequest"));
     assertFalse(requestController.contains("caseDao.addCaseParty"));
     assertFalse(requestController.contains("createMaterialRequest"));
     assertFalse(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
-    assertTrue(dialog.contains("public record PartyEntitySelection"));
-    assertTrue(dialog.contains("public static PartyEntitySelection showEntityChooser"));
-    assertTrue(dialog.contains("List.of(new PartySideOption(\"Requested From\", \"requested_from\"))"));
-    assertTrue(dialog.contains("Choose Requested From"));
+    assertTrue(dialog.contains("public record Selection"));
+    assertTrue(dialog.contains("public static Selection show"));
+    assertTrue(dialog.contains("Select Existing or Create New"));
+    assertTrue(dialog.contains("Contact or Organization"));
   }
+
 
 
   @Test void itemDetailsAndExplicitItemOperationsRemainSeparated() {
