@@ -116,13 +116,15 @@ public class OrganizationCard extends HBox {
 
 	public void applyMini() {
 		getChildren().clear();
+		resetNameLabelVariantStyles();
+		nameLabel.getStyleClass().addAll("organization-card-name", "organization-card-name-mini");
 
 		setPrefWidth(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
 		setMaxWidth(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
 		setPadding(new Insets(4, 10, 4, 10));
 		setSpacing(6);
 
-		nameLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600;");
+		nameLabel.setStyle(null);
 		getChildren().add(nameLabel);
 	}
 
@@ -135,6 +137,7 @@ public class OrganizationCard extends HBox {
 
 		Node avatar = buildAvatar(18);
 
+		resetNameLabelVariantStyles();
 		nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		typeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
 		phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
@@ -161,6 +164,7 @@ public class OrganizationCard extends HBox {
 
 		Node avatar = buildAvatar(28);
 
+		resetNameLabelVariantStyles();
 		nameLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: #112542;");
 		typeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
 		phoneLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.82);");
@@ -183,6 +187,10 @@ public class OrganizationCard extends HBox {
 
 	public Node asNode() {
 		return this;
+	}
+
+	private void resetNameLabelVariantStyles() {
+		nameLabel.getStyleClass().removeAll("organization-card-name", "organization-card-name-mini");
 	}
 
 	private void buildUiMiniDefaults() {

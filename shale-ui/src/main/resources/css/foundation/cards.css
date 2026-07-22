@@ -81,11 +81,13 @@
 }
 
 
-.contact-card-name {
+.contact-card-name,
+.organization-card-name {
     -fx-text-fill: -shale-color-text-primary;
 }
 
-.contact-card-name-mini {
+.contact-card-name-mini,
+.organization-card-name-mini {
     -fx-font-size: 12px;
     -fx-font-weight: 600;
 }
