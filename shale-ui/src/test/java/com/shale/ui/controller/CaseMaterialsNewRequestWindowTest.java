@@ -10,7 +10,7 @@ class CaseMaterialsNewRequestWindowTest {
     private static final Path SOURCE = Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
 
     @Test
-    void newRequestWindowDefinesTitleRequestedFromAndThreeLookupFieldsInOrder() throws Exception {
+    void newRequestWindowDefinesTitleRequestedFromLookupsDueDateReminderAndFooterInOrder() throws Exception {
         String source = Files.readString(SOURCE);
         String method = methodBody(source, "VBox newRequestBody");
 
@@ -39,7 +39,8 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(source.contains("private static <T> ColorCodedComboBox<T> newLookupSelector"));
         assertTrue(source.contains("return new ColorCodedComboBox<>(name,color,secondaryText)"));
         assertFalse(source.contains("private static <T> ComboBox<T> lookupCombo"));
-        assertFalse(method.contains("new ComboBox<"));
+        assertFalse(method.contains("new ComboBox<MaterialTypeDto>"));
+        assertTrue(method.contains("ComboBox<InactivityReminderPeriod> inactivityReminderPeriod=newReminderPeriodSelector()"));
         assertFalse(method.contains("setConverter(new javafx.util.StringConverter"));
     }
 
@@ -54,6 +55,9 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(method.contains("GridPane.setHgrow(materialType,Priority.ALWAYS)"));
         assertTrue(method.contains("GridPane.setHgrow(requestMethod,Priority.ALWAYS)"));
         assertTrue(method.contains("GridPane.setHgrow(requestStatus,Priority.ALWAYS)"));
+        assertTrue(method.contains("DatePicker dueDate=newDatePicker(\"Select due date\")"));
+        assertTrue(method.contains("GridPane.setHgrow(dueDate,Priority.ALWAYS)"));
+        assertTrue(method.contains("GridPane.setHgrow(inactivityReminderPeriod,Priority.ALWAYS)"));
     }
 
     @Test
@@ -132,6 +136,72 @@ class CaseMaterialsNewRequestWindowTest {
         assertFalse(requestController.contains("updateMaterialRequest"));
         assertFalse(requestController.contains("MaterialRequestDao"));
         assertFalse(requestController.contains("materialRequestDao"));
+    }
+
+    @Test
+    void dueDateAndReminderUseTypedOptionalDraftStateAndClearableControls() throws Exception {
+        String source = Files.readString(SOURCE);
+        String method = methodBody(source, "VBox newRequestBody");
+        String dateFactory = methodBody(source, "private static DatePicker newDatePicker");
+        String reminderFactory = methodBody(source, "private static ComboBox<InactivityReminderPeriod> newReminderPeriodSelector");
+
+        assertTrue(source.contains("static final class NewRequestDraft"));
+        assertTrue(source.contains("private LocalDate dueDate"));
+        assertTrue(source.contains("private InactivityReminderPeriod inactivityReminderPeriod"));
+        assertTrue(method.contains("NewRequestDraft draft=new NewRequestDraft()"));
+        assertTrue(method.contains("draft.dueDate=newValue"));
+        assertTrue(method.contains("draft.inactivityReminderPeriod=newValue"));
+        assertTrue(dateFactory.contains("new DatePicker()"));
+        assertTrue(dateFactory.contains("picker.setPromptText(prompt)"));
+        assertTrue(dateFactory.contains("picker.setEditable(true)"));
+        assertTrue(dateFactory.contains("picker.setMaxWidth(Double.MAX_VALUE)"));
+        assertTrue(reminderFactory.contains("reminder.setPromptText(\"Select reminder period\")"));
+        assertTrue(reminderFactory.contains("clearSelection()"));
+    }
+
+    @Test
+    void reminderPeriodsHaveStableSemanticTypedValuesAndNormalizedDays() throws Exception {
+        String source = Files.readString(SOURCE);
+        String enumBody = source.substring(source.indexOf("enum InactivityReminderPeriod"), source.indexOf("private static DatePicker newDatePicker"));
+        String reminderFactory = methodBody(source, "private static ComboBox<InactivityReminderPeriod> newReminderPeriodSelector");
+
+        assertTrue(enumBody.contains("THREE_DAYS(\"3 days\",3)"));
+        assertTrue(enumBody.contains("ONE_WEEK(\"1 week\",7)"));
+        assertTrue(enumBody.contains("TWO_WEEKS(\"2 weeks\",14)"));
+        assertTrue(enumBody.contains("THIRTY_DAYS(\"30 days\",30)"));
+        assertTrue(enumBody.contains("int days()"));
+        assertTrue(enumBody.contains("String label()"));
+        assertTrue(reminderFactory.contains("reminder.getItems().setAll(InactivityReminderPeriod.THREE_DAYS,InactivityReminderPeriod.ONE_WEEK,InactivityReminderPeriod.TWO_WEEKS,InactivityReminderPeriod.THIRTY_DAYS)"));
+        assertFalse(reminderFactory.contains("getSelectedIndex"));
+        assertFalse(source.contains("NextFollowUpAt"));
+        assertFalse(source.contains("nextFollowUpAt=draft"));
+    }
+
+    @Test
+    void newRequestStageSizingUsesOuterStagePathAndLargerMinimums() throws Exception {
+        String source = Files.readString(SOURCE);
+        String opener = methodBody(source, "private void openNewRequestWindow");
+        String sizing = methodBody(source, "private static void applyNewRequestStageSize");
+
+        assertTrue(source.contains("NEW_REQUEST_HEIGHT=760"));
+        assertTrue(source.contains("NEW_REQUEST_MIN_HEIGHT=720"));
+        assertTrue(opener.contains("root.setPrefSize(NEW_REQUEST_WIDTH,NEW_REQUEST_HEIGHT)"));
+        assertTrue(opener.contains("stage.setMinHeight(NEW_REQUEST_MIN_HEIGHT)"));
+        assertTrue(opener.contains("applyNewRequestStageSize(stage,root)"));
+        assertTrue(sizing.contains("applyCss()"));
+        assertTrue(sizing.contains("layout()"));
+        assertTrue(sizing.contains("Screen.getScreensForRectangle"));
+        assertTrue(sizing.contains("getVisualBounds()"));
+        assertFalse(opener.contains("stage.setHeight(640)"));
+    }
+
+    @Test
+    void newRequestScopeGuardsNoPersistenceNotificationsActivityOrRelationships() throws Exception {
+        String source = Files.readString(SOURCE);
+        String requestController = source.substring(source.indexOf("final class CaseMaterialRequestsTabController"), source.indexOf("final class CaseMaterialItemsTabController"));
+        for (String forbidden : new String[]{"createMaterialRequest","updateMaterialRequest","LastActivityAt","ReminderSentAt","Notification","Scheduler","schedule","addCaseParty","CaseParty","related-entity","RelatedEntity","MaterialRequestDao","NextFollowUpAt"}) {
+            assertFalse(requestController.contains(forbidden), forbidden);
+        }
     }
 
     private static void assertInOrder(String source, String... snippets) {
