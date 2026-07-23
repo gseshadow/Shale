@@ -7,42 +7,29 @@ import org.junit.jupiter.api.Test;
 class TaskCardHoverDescriptionPreviewTest {
     @Test
     void blankDescriptionsRemainHidden() {
-        assertEquals("", TaskCard.buildHoverDescriptionPreview(null));
-        assertEquals("", TaskCard.buildHoverDescriptionPreview("   \n\t  "));
+        assertEquals("", TaskCard.normalizeTaskDetailsText(null));
+        assertEquals("", TaskCard.normalizeTaskDetailsText("   \n\t  "));
     }
 
     @Test
-    void newlineHeavyDescriptionsPreserveUsefulLineBreaksWithoutEllipsisOnlyLine() {
-        String preview = TaskCard.buildHoverDescriptionPreview("first line\n\n\nsecond line\nthird line");
+    void newlineHeavyDescriptionsPreserveUsefulLineBreaksForTooltip() {
+        String normalized = TaskCard.normalizeTaskDetailsText("first line\n\n\nsecond line\nthird line");
 
-        assertEquals("first line\n\nsecond line\nthird line", preview);
-        assertFalse(preview.endsWith("\n..."));
+        assertEquals("first line\n\nsecond line\nthird line", normalized);
     }
 
     @Test
-    void longConsoleStyleDescriptionsAreBoundedAndStillUseful() {
-        StringBuilder console = new StringBuilder();
-        for (int i = 1; i <= 20; i++) {
-            console.append("[INFO] compiling module-").append(i).append(" with a long diagnostic message").append('\n');
-        }
-
-        String preview = TaskCard.buildHoverDescriptionPreview(console.toString());
-
-        assertTrue(preview.startsWith("[INFO] compiling module-1"));
-        assertTrue(preview.contains("[INFO] compiling module-2"));
-        assertTrue(preview.endsWith("..."));
-        assertTrue(preview.length() <= 523, "Preview should be bounded before JavaFX line-height clipping is applied.");
-        assertFalse(preview.endsWith("\n..."));
-    }
-
-    @Test
-    void singleLongLinesAreTrimmedToABoundedPreview() {
+    void longDescriptionsAreNotTruncatedBeforeTooltipDisplay() {
         String singleLine = "A".repeat(900);
 
-        String preview = TaskCard.buildHoverDescriptionPreview(singleLine);
+        String normalized = TaskCard.normalizeTaskDetailsText(singleLine);
 
-        assertTrue(preview.endsWith("..."));
-        assertTrue(preview.length() <= 523);
-        assertFalse(preview.contains("\n"));
+        assertEquals(900, normalized.length());
+        assertFalse(normalized.endsWith("..."));
+    }
+
+    @Test
+    void shortDescriptionsEstimateBelowScrollThreshold() {
+        assertTrue(TaskCard.estimatedTooltipDescriptionHeight("short task note") < 220);
     }
 }
