@@ -12,6 +12,7 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.TaskCardFactory.AssignedUserModel;
 import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.component.factory.DueProximityStyles;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 
@@ -257,29 +258,7 @@ public final class TaskCard extends VBox {
 	}
 
 	public void setBorderByDueState(LocalDateTime dueAt, LocalDateTime completedAt) {
-		if (completedAt != null) {
-			dueAccentCss = "#16a34a";
-			refreshSurfaceStyle();
-			return;
-		}
-		if (dueAt == null) {
-			dueAccentCss = null;
-			refreshSurfaceStyle();
-			return;
-		}
-
-		LocalDateTime now = LocalDateTime.now();
-		if (dueAt.isBefore(now)) {
-			dueAccentCss = "#7f1d1d";
-		} else if (!dueAt.isAfter(now.plusDays(1))) {
-			dueAccentCss = "#dc2626";
-		} else if (!dueAt.isAfter(now.plusWeeks(1))) {
-			dueAccentCss = "#f97316";
-		} else if (!dueAt.isAfter(now.plusWeeks(2))) {
-			dueAccentCss = "#eab308";
-		} else {
-			dueAccentCss = null;
-		}
+		dueAccentCss = DueProximityStyles.accentColor(dueAt, completedAt);
 		refreshSurfaceStyle();
 	}
 
