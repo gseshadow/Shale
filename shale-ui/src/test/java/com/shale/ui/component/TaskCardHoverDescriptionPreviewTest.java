@@ -7,42 +7,41 @@ import org.junit.jupiter.api.Test;
 class TaskCardHoverDescriptionPreviewTest {
     @Test
     void blankDescriptionsRemainHidden() {
-        assertEquals("", TaskCard.buildHoverDescriptionPreview(null));
-        assertEquals("", TaskCard.buildHoverDescriptionPreview("   \n\t  "));
+        assertEquals("", TaskCard.normalizeTaskDetailsText(null));
+        assertEquals("", TaskCard.normalizeTaskDetailsText("   \n\t  "));
     }
 
     @Test
-    void newlineHeavyDescriptionsPreserveUsefulLineBreaksWithoutEllipsisOnlyLine() {
-        String preview = TaskCard.buildHoverDescriptionPreview("first line\n\n\nsecond line\nthird line");
+    void newlineHeavyDescriptionsPreserveUsefulLineBreaksForTooltip() {
+        String normalized = TaskCard.normalizeTaskDetailsText("first line\n\n\nsecond line\nthird line");
 
-        assertEquals("first line\n\nsecond line\nthird line", preview);
-        assertFalse(preview.endsWith("\n..."));
+        assertEquals("first line\n\nsecond line\nthird line", normalized);
     }
 
     @Test
-    void longConsoleStyleDescriptionsAreBoundedAndStillUseful() {
-        StringBuilder console = new StringBuilder();
-        for (int i = 1; i <= 20; i++) {
-            console.append("[INFO] compiling module-").append(i).append(" with a long diagnostic message").append('\n');
-        }
+    void shortDescriptionsDisplayInFullAndStayCompact() {
+        String shortDescription = "Review the signed intake packet.";
 
-        String preview = TaskCard.buildHoverDescriptionPreview(console.toString());
-
-        assertTrue(preview.startsWith("[INFO] compiling module-1"));
-        assertTrue(preview.contains("[INFO] compiling module-2"));
-        assertTrue(preview.endsWith("..."));
-        assertTrue(preview.length() <= 523, "Preview should be bounded before JavaFX line-height clipping is applied.");
-        assertFalse(preview.endsWith("\n..."));
+        assertEquals(shortDescription, TaskCard.descriptionForTooltip(shortDescription));
+        assertTrue(TaskCard.wrappedDescriptionLineCount(shortDescription) <= 2);
     }
 
     @Test
-    void singleLongLinesAreTrimmedToABoundedPreview() {
-        String singleLine = "A".repeat(900);
+    void mediumDescriptionsExpandNaturallyWithoutTruncation() {
+        String mediumDescription = "Confirm the client uploaded the medical release, then send the records request to the provider before Friday afternoon.";
 
-        String preview = TaskCard.buildHoverDescriptionPreview(singleLine);
+        assertEquals(mediumDescription, TaskCard.descriptionForTooltip(mediumDescription));
+        assertTrue(TaskCard.wrappedDescriptionLineCount(mediumDescription) > 1);
+    }
 
-        assertTrue(preview.endsWith("..."));
-        assertTrue(preview.length() <= 523);
-        assertFalse(preview.contains("\n"));
+    @Test
+    void longDescriptionsAreTruncatedToWrappedLineLimitWithEllipsis() {
+        String longDescription = "Long task description. ".repeat(80);
+
+        String displayed = TaskCard.descriptionForTooltip(longDescription);
+
+        assertTrue(displayed.endsWith("..."));
+        assertTrue(displayed.length() < longDescription.length());
+        assertTrue(TaskCard.wrappedDescriptionLineCount(displayed) <= 8);
     }
 }
