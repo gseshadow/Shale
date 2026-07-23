@@ -30,6 +30,10 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("setOnMouseEntered"));
         assertTrue(source.contains("DueProximityStyles.presentation(request.expectedResponseDate(), null, true)"),
                 "Hover must recompute the urgency wash instead of installing a square hover fill.");
+        assertTrue(source.contains("installRoundedClip(card)"));
+        assertTrue(source.contains("clip.setArcWidth(CARD_RADIUS_PX * 2.0)"));
+        assertFalse(source.contains("card.getStyleClass().add(\"shale-entity-card-clickable\")"),
+                "The shared clickable hover selector supplies a square background when used without the base card class.");
         assertTrue(source.contains("materialTypePill(request.materialTypeName(), request.materialTypeColor())"));
         assertFalse(source.contains("ColorUtil.toCssRgba(request.materialTypeColor(), 0.08)"));
         assertFalse(source.contains("String accent = ColorUtil.toCssBackgroundColor(request.materialTypeColor())"));
@@ -61,16 +65,35 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("r.requestedFromOrganizationId() != null"));
         assertTrue(source.contains("if (has(r.requestedFromText())) return valueLabel(r.requestedFromText())"));
         assertTrue(source.contains("addEntityFact(entityFacts, \"Requested From\", requestedFromNode(request))"));
-        assertTrue(source.contains("addEntityFact(entityFacts, \"Requested By\", userNode(request.requestedByUserId(), request.requestedByDisplayName()))"));
-        assertTrue(source.contains("addEntityFact(entityFacts, \"Assigned To\", userNode(request.assignedToUserId(), request.assignedToDisplayName()))"));
+        assertTrue(source.contains("addEntityFact(entityFacts, \"Requested By\", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()))"));
+        assertTrue(source.contains("addEntityFact(entityFacts, \"Assigned To\", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()))"));
         assertTrue(source.contains("if (node == null) return;"));
         assertFalse(source.contains("MaterialRequestService"));
         assertFalse(source.contains("MaterialRequestDao"));
     }
 
     @Test
+    void miniCardsRemainCompactLeftAlignedAndKeepCanonicalColors() throws Exception {
+        String source = Files.readString(FACTORY);
+        assertTrue(source.contains("entityFacts.setFillWidth(false)"));
+        assertTrue(source.contains("entityFacts.setAlignment(Pos.CENTER_LEFT)"));
+        assertTrue(source.contains("fact.setAlignment(Pos.CENTER_LEFT)"));
+        assertTrue(source.contains("fact.setFillWidth(false)"));
+        assertTrue(source.contains("keepMiniCardCompact(node)"));
+        assertTrue(source.contains("region.setMaxWidth(Region.USE_PREF_SIZE)"));
+        assertTrue(source.contains("HBox.setHgrow(node, Priority.NEVER)"));
+        assertTrue(source.contains("GridPane.setFillWidth(node, false)"));
+        assertTrue(source.contains("new UserCardFactory.UserCardModel(userId, displayName, color, null)"));
+        assertTrue(source.contains("request.requestedByUserColor()"));
+        assertTrue(source.contains("request.assignedToUserColor()"));
+        assertFalse(source.contains("setStyle(\"-fx-background-color: transparent;\")"));
+    }
+
+    @Test
     void summaryQueryRemainsSingleTenantScopedJoinWithoutPerCardLoads() throws Exception {
         String dao = Files.readString(DAO);
+        assertTrue(dao.contains("rbu.Color AS RequestedByUserColor"));
+        assertTrue(dao.contains("au.Color AS AssignedToUserColor"));
         assertTrue(dao.contains("JOIN dbo.Users rbu ON rbu.Id=mr.RequestedByUserId AND rbu.ShaleClientId=mr.ShaleClientId"));
         assertTrue(dao.contains("LEFT JOIN dbo.Users au ON au.Id=mr.AssignedToUserId AND au.ShaleClientId=mr.ShaleClientId"));
         assertTrue(dao.contains("LEFT JOIN dbo.Contacts ct ON ct.Id=mr.RequestedFromContactId AND ct.ShaleClientId=mr.ShaleClientId"));

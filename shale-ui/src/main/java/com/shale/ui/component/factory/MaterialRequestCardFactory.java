@@ -12,6 +12,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,6 +29,7 @@ public final class MaterialRequestCardFactory {
     private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
     static final String NEUTRAL_STATUS_COLOR = "#E2E8F0";
     static final String CARD_RADIUS = DueProximityStyles.CARD_RADIUS;
+    private static final double CARD_RADIUS_PX = 14.0;
 
     public enum Variant { LIST }
 
@@ -64,9 +66,11 @@ public final class MaterialRequestCardFactory {
         HBox.setHgrow(title, Priority.ALWAYS);
 
         VBox entityFacts = new VBox(6);
+        entityFacts.setFillWidth(false);
+        entityFacts.setAlignment(Pos.CENTER_LEFT);
         addEntityFact(entityFacts, "Requested From", requestedFromNode(request));
-        addEntityFact(entityFacts, "Requested By", userNode(request.requestedByUserId(), request.requestedByDisplayName()));
-        addEntityFact(entityFacts, "Assigned To", userNode(request.assignedToUserId(), request.assignedToDisplayName()));
+        addEntityFact(entityFacts, "Requested By", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()));
+        addEntityFact(entityFacts, "Assigned To", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()));
 
         GridPane dates = new GridPane();
         dates.setHgap(16);
@@ -95,11 +99,11 @@ public final class MaterialRequestCardFactory {
         card.getStyleClass().addAll("material-request-card", "material-request-list-card");
         card.setMinWidth(0);
         card.setMaxWidth(Double.MAX_VALUE);
+        installRoundedClip(card);
         applyCardStyle(card, urgency, false);
         card.setOnMouseEntered(e -> applyCardStyle(card, DueProximityStyles.presentation(request.expectedResponseDate(), null, true), true));
         card.setOnMouseExited(e -> applyCardStyle(card, urgency, false));
         if (onOpenRequest != null) {
-            card.getStyleClass().add("shale-entity-card-clickable");
             card.setCursor(Cursor.HAND);
             card.setOnMouseClicked(e -> onOpenRequest.accept(request.id()));
         }
@@ -108,6 +112,15 @@ public final class MaterialRequestCardFactory {
 
     private static void applyCardStyle(HBox card, DueProximityStyles.Presentation urgency, boolean hovered) {
         card.setStyle("-fx-background-color: " + urgency.washCss() + "; -fx-background-radius: " + CARD_RADIUS + "; -fx-border-radius: " + CARD_RADIUS + "; -fx-border-color: " + (hovered ? "rgba(74,104,138,0.34)" : "rgba(74,104,138,0.24)") + "; -fx-border-width: 1; -fx-effect: dropshadow(gaussian, " + (hovered ? "rgba(7,23,44,0.18), 24, 0.2, 0, 8" : "rgba(7,23,44,0.14), 18, 0.18, 0, 4") + ");");
+    }
+
+    private static void installRoundedClip(Region card) {
+        Rectangle clip = new Rectangle();
+        clip.widthProperty().bind(card.widthProperty());
+        clip.heightProperty().bind(card.heightProperty());
+        clip.setArcWidth(CARD_RADIUS_PX * 2.0);
+        clip.setArcHeight(CARD_RADIUS_PX * 2.0);
+        card.setClip(clip);
     }
 
     static Label materialTypePill(String name, String color) {
@@ -122,6 +135,9 @@ public final class MaterialRequestCardFactory {
         if (node == null) return;
         VBox fact = new VBox(3, key(label), node);
         fact.setMinWidth(0);
+        fact.setAlignment(Pos.CENTER_LEFT);
+        fact.setFillWidth(false);
+        keepMiniCardCompact(node);
         box.getChildren().add(fact);
     }
 
@@ -146,9 +162,21 @@ public final class MaterialRequestCardFactory {
         return null;
     }
 
-    private Node userNode(Integer userId, String displayName) {
+    private Node userNode(Integer userId, String displayName, String color) {
         if (userId == null || !has(displayName)) return null;
-        return userCardFactory.create(new UserCardFactory.UserCardModel(userId, displayName, null, null), UserCardFactory.Variant.MINI);
+        return userCardFactory.create(new UserCardFactory.UserCardModel(userId, displayName, color, null), UserCardFactory.Variant.MINI);
+    }
+
+    private static void keepMiniCardCompact(Node node) {
+        if (node instanceof Region region) {
+            region.setMinWidth(Region.USE_PREF_SIZE);
+            region.setPrefWidth(Region.USE_COMPUTED_SIZE);
+            region.setMaxWidth(Region.USE_PREF_SIZE);
+        }
+        HBox.setHgrow(node, Priority.NEVER);
+        VBox.setVgrow(node, Priority.NEVER);
+        GridPane.setFillWidth(node, false);
+        GridPane.setHgrow(node, Priority.NEVER);
     }
 
     private static Label key(String label) {
