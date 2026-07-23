@@ -2533,3 +2533,8 @@
     -fx-border-width: 1;
     -fx-border-radius: 14;
 }
+
+.user-selector-empty {
+    -fx-font-size: 12px;
+    -fx-text-fill: rgba(17,37,66,0.70);
+}
