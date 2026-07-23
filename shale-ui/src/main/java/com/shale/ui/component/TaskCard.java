@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.Consumer;
 
+import javafx.animation.PauseTransition;
 import javafx.util.Duration;
 
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -28,6 +29,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.stage.Popup;
+import javafx.stage.Window;
 
 public final class TaskCard extends VBox {
 
@@ -101,7 +104,10 @@ public final class TaskCard extends VBox {
 	private boolean hovered;
 	private boolean fullExpanded;
 	private String fullDescription = "";
-	private Tooltip taskDetailsTooltip;
+	private Popup taskDetailsPopup;
+	private Label taskDetailsPopupContent;
+	private final PauseTransition taskDetailsPopupHideDelay = new PauseTransition(TASK_DETAILS_TOOLTIP_HIDE_DELAY);
+	private boolean taskDetailsPopupMouseOver;
 
 	public TaskCard() {
 		setCursor(Cursor.HAND);
@@ -431,12 +437,14 @@ public final class TaskCard extends VBox {
 			hovered = true;
 			setTranslateY(-1.5);
 			refreshSurfaceStyle();
+			showTaskDetailsPopup();
 		});
 		setOnMouseExited(e ->
 		{
 			hovered = false;
 			setTranslateY(0);
 			refreshSurfaceStyle();
+			scheduleTaskDetailsPopupHide();
 		});
 		setOnMouseClicked(e ->
 		{
@@ -445,6 +453,21 @@ public final class TaskCard extends VBox {
 			}
 			if (onOpen != null && taskId != null) {
 				onOpen.accept(taskId);
+			}
+		});
+		taskDetailsPopupHideDelay.setOnFinished(e -> {
+			if (!hovered && !taskDetailsPopupMouseOver) {
+				hideTaskDetailsPopup();
+			}
+		});
+		sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null) {
+				hideTaskDetailsPopup();
+			} else {
+				Window window = newScene.getWindow();
+				if (window != null) {
+					window.setOnHidden(e -> hideTaskDetailsPopup());
+				}
 			}
 		});
 		setAssignees(List.of());
@@ -461,38 +484,82 @@ public final class TaskCard extends VBox {
 	}
 
 	private void refreshTaskDetailsTooltip() {
-		if (taskDetailsTooltip != null) {
-			Tooltip.uninstall(this, taskDetailsTooltip);
-		}
-		taskDetailsTooltip = buildTaskDetailsTooltip(titleLabel.getText(), fullDescription);
-		Tooltip.install(this, taskDetailsTooltip);
+		hideTaskDetailsPopup();
+		taskDetailsPopup = buildTaskDetailsPopup(titleLabel.getText(), fullDescription);
+		taskDetailsPopupContent = (Label) taskDetailsPopup.getContent().getFirst();
+		taskDetailsPopupContent.setOnMouseEntered(e -> {
+			taskDetailsPopupHideDelay.stop();
+			taskDetailsPopupMouseOver = true;
+		});
+		taskDetailsPopupContent.setOnMouseExited(e -> {
+			taskDetailsPopupMouseOver = false;
+			scheduleTaskDetailsPopupHide();
+		});
 	}
 
-	static Tooltip buildTaskDetailsTooltip(String title, String description) {
-		Label titleNode = new Label((title == null || title.isBlank()) ? "Untitled task" : title.trim());
-		titleNode.setWrapText(true);
-		titleNode.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
-		titleNode.setStyle("-fx-font-size: 13px; -fx-font-weight: 800;");
+	Popup getTaskDetailsPopupForTesting() {
+		return taskDetailsPopup;
+	}
 
-		String displayedDescription = descriptionForTooltip(description);
-		VBox content = new VBox(4, titleNode);
-		content.setFillWidth(true);
-		content.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
-		if (!displayedDescription.isBlank()) {
-			Label descriptionNode = new Label(displayedDescription);
-			descriptionNode.setWrapText(true);
-			descriptionNode.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
-			descriptionNode.setStyle("-fx-font-size: 12px; -fx-line-spacing: 1px;");
-			content.getChildren().add(descriptionNode);
+	private void showTaskDetailsPopup() {
+		if (taskDetailsPopup == null || getScene() == null || getScene().getWindow() == null) {
+			return;
 		}
+		taskDetailsPopupHideDelay.stop();
+		if (taskDetailsPopup.isShowing()) {
+			return;
+		}
+		var screenBounds = localToScreen(getBoundsInLocal());
+		if (screenBounds == null) {
+			return;
+		}
+		taskDetailsPopup.show(this, screenBounds.getMinX(), screenBounds.getMaxY() + 6);
+		taskDetailsPopup.getScene().getRoot().applyCss();
+		taskDetailsPopup.getScene().getRoot().autosize();
+		taskDetailsPopup.getScene().getRoot().layout();
+	}
 
-		Tooltip tooltip = new Tooltip();
-		tooltip.setGraphic(content);
-		tooltip.setText(null);
-		tooltip.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
-		tooltip.setShowDuration(Duration.INDEFINITE);
-		tooltip.setHideDelay(TASK_DETAILS_TOOLTIP_HIDE_DELAY);
-		return tooltip;
+	private void scheduleTaskDetailsPopupHide() {
+		taskDetailsPopupHideDelay.playFromStart();
+	}
+
+	private void hideTaskDetailsPopup() {
+		taskDetailsPopupHideDelay.stop();
+		if (taskDetailsPopup != null) {
+			taskDetailsPopup.hide();
+		}
+	}
+
+	static Popup buildTaskDetailsPopup(String title, String description) {
+		Label content = new Label(buildTaskDetailsTooltipText(title, description));
+		content.getStyleClass().add("tooltip");
+		content.setWrapText(true);
+		content.setPrefWidth(tooltipWidthForText(content.getText()));
+		content.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
+		content.setStyle("-fx-font-size: 12px; -fx-line-spacing: 1px;");
+
+		Popup popup = new Popup();
+		popup.setAutoFix(true);
+		popup.setAutoHide(false);
+		popup.getContent().setAll(content);
+		return popup;
+	}
+
+	static String buildTaskDetailsTooltipText(String title, String description) {
+		String normalizedTitle = title == null || title.isBlank() ? "Untitled task" : title.trim();
+		String displayedDescription = descriptionForTooltip(description);
+		return displayedDescription.isBlank() ? normalizedTitle : normalizedTitle + "\n\n" + displayedDescription;
+	}
+
+	static double tooltipWidthForText(String text) {
+		String normalized = text == null ? "" : text;
+		double widestLine = 0;
+		for (String line : normalized.split("\n", -1)) {
+			Text measuringText = new Text(line);
+			measuringText.setFont(Font.font(TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE));
+			widestLine = Math.max(widestLine, measuringText.getLayoutBounds().getWidth());
+		}
+		return Math.min(TASK_DETAILS_TOOLTIP_MAX_WIDTH, Math.max(160, widestLine + 34));
 	}
 
 	static String descriptionForTooltip(String text) {

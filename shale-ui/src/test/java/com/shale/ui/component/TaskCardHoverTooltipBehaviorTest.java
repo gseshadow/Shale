@@ -22,12 +22,11 @@ final class TaskCardHoverTooltipBehaviorTest {
     }
 
     @Test
-    void hoverPopupContainsProminentTitleAndOptionalDescription() {
-        assertTrue(taskCard.contains("static Tooltip buildTaskDetailsTooltip(String title, String description)"));
-        assertTrue(taskCard.contains("titleNode.setStyle(\"-fx-font-size: 13px; -fx-font-weight: 800;\")"));
-        assertTrue(taskCard.contains("descriptionNode.setStyle(\"-fx-font-size: 12px; -fx-line-spacing: 1px;\")"));
-        assertTrue(taskCard.contains("descriptionNode.setWrapText(true)"));
-        assertTrue(taskCard.contains("tooltip.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH)"));
+    void hoverPopupUsesCaseStatusStyleTextPopupWithTitleAndOptionalDescription() {
+        assertTrue(taskCard.contains("buildTaskDetailsPopup(String title, String description)"));
+        assertTrue(taskCard.contains("content.setWrapText(true)"));
+        assertTrue(taskCard.contains("content.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH)"));
+        assertTrue(taskCard.contains("normalizedTitle + \"\\n\\n\" + displayedDescription"));
     }
 
     @Test
@@ -52,14 +51,13 @@ final class TaskCardHoverTooltipBehaviorTest {
 
     @Test
     void blankDescriptionLeavesPopupTitleOnly() {
-        assertTrue(taskCard.contains("if (!displayedDescription.isBlank())"));
-        assertTrue(taskCard.contains("VBox content = new VBox(4, titleNode)"));
+        assertTrue(taskCard.contains("displayedDescription.isBlank() ? normalizedTitle"));
         assertTrue(taskCard.contains("normalizeTaskDetailsText(description)"));
     }
 
     @Test
     void hoverPopupRemainsOpenBeyondDefaultTooltipTimeout() {
-        assertTrue(taskCard.contains("tooltip.setShowDuration(Duration.INDEFINITE)"));
+        assertTrue(taskCard.contains("Popup"));
         assertFalse(taskCard.contains("Duration.seconds(5)"));
         assertFalse(taskCard.contains("Duration.millis(5000)"));
     }
@@ -67,14 +65,14 @@ final class TaskCardHoverTooltipBehaviorTest {
     @Test
     void hoverPopupUsesGracefulExitDelayToAvoidCardPopupFlicker() {
         assertTrue(taskCard.contains("TASK_DETAILS_TOOLTIP_HIDE_DELAY = Duration.millis(120)"));
-        assertTrue(taskCard.contains("tooltip.setHideDelay(TASK_DETAILS_TOOLTIP_HIDE_DELAY)"));
+        assertTrue(taskCard.contains("taskDetailsPopupHideDelay.setOnFinished"));
     }
 
     @Test
     void hoverPopupIsCleanedUpWhenCardIsReused() {
-        assertTrue(taskCard.contains("if (taskDetailsTooltip != null)"));
-        assertTrue(taskCard.contains("Tooltip.uninstall(this, taskDetailsTooltip)"));
-        assertTrue(taskCard.contains("taskDetailsTooltip = buildTaskDetailsTooltip"));
-        assertTrue(taskCard.contains("Tooltip.install(this, taskDetailsTooltip)"));
+        assertTrue(taskCard.contains("if (taskDetailsPopup != null)"));
+        assertTrue(taskCard.contains("hideTaskDetailsPopup()"));
+        assertTrue(taskCard.contains("taskDetailsPopup = buildTaskDetailsPopup"));
+        assertTrue(taskCard.contains("showTaskDetailsPopup()"));
     }
 }

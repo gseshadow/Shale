@@ -66,10 +66,10 @@ class TaskCardDesignLanguageTest {
         assertFalse(taskCard.contains("hovered ? dueAccentCss"));
     }
 	@Test
-	void hoverDetailsUseSharedTooltipWithoutResizingCards() {
-		assertTrue(taskCard.contains("Tooltip.install(this, taskDetailsTooltip)"));
-		assertTrue(taskCard.contains("Tooltip.uninstall(this, taskDetailsTooltip)"));
-		assertTrue(taskCard.contains("buildTaskDetailsTooltip(titleLabel.getText(), fullDescription)"));
+	void hoverDetailsUseSharedPopupWithoutResizingCards() {
+		assertTrue(taskCard.contains("Popup taskDetailsPopup"));
+		assertTrue(taskCard.contains("hideTaskDetailsPopup()"));
+		assertTrue(taskCard.contains("buildTaskDetailsPopup(titleLabel.getText(), fullDescription)"));
 		assertFalse(taskCard.contains("HOVER_REVEAL_DURATION"));
 		assertFalse(taskCard.contains("setHoverRevealExpanded"));
 		assertFalse(taskCard.contains("hoverRevealPane"));
@@ -77,10 +77,10 @@ class TaskCardDesignLanguageTest {
 	}
 
 	@Test
-	void compactVariantsCanReceiveDescriptionForHoverTooltip() {
+	void compactVariantsCanReceiveDescriptionForHoverPopup() {
 		assertTrue(factory.contains("descriptionForCard(model, allowPhiDescription)"));
 		assertFalse(factory.contains("variant == Variant.FULL || variant == Variant.MY_TASKS"),
-				"Compact task cards should not lose descriptions before the shared hover tooltip can render them.");
+				"Compact task cards should not lose descriptions before the shared hover popup can render them.");
 	}
 
 }
