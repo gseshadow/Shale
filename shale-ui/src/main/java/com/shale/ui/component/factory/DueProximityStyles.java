@@ -17,7 +17,7 @@ public final class DueProximityStyles {
     public static final String HOVER_SURFACE = "rgba(255,255,255,0.985)";
     public static final String CARD_RADIUS = "14";
 
-    public record Presentation(String railColorCss, String washCss, boolean urgent) {}
+    public record Presentation(String dueColorCss, String washCss, boolean urgent) {}
 
     private DueProximityStyles() {}
 
@@ -44,12 +44,14 @@ public final class DueProximityStyles {
     public static Presentation presentation(LocalDateTime dueAt, LocalDateTime completedAt, boolean hovered, Clock clock) {
         String accent = accentColor(dueAt, completedAt, clock);
         String surface = hovered ? HOVER_SURFACE : DEFAULT_SURFACE;
-        if (accent == null || accent.isBlank()) return new Presentation(NEUTRAL_RAIL_COLOR, surface, false);
+        String dueColor = (accent == null || accent.isBlank()) ? NEUTRAL_RAIL_COLOR : accent;
+        double leadingOpacity = accent == null || accent.isBlank() ? (hovered ? 0.16 : 0.12) : (hovered ? 0.18 : 0.14);
+        double fadeOpacity = accent == null || accent.isBlank() ? (hovered ? 0.09 : 0.07) : (hovered ? 0.10 : 0.08);
         String wash = "linear-gradient(to right, "
-                + ColorUtil.toCssRgba(accent, hovered ? 0.18 : 0.14) + " 0%, "
-                + ColorUtil.toCssRgba(accent, hovered ? 0.10 : 0.08) + " 18%, "
+                + ColorUtil.toCssRgba(dueColor, leadingOpacity) + " 0%, "
+                + ColorUtil.toCssRgba(dueColor, fadeOpacity) + " 18%, "
                 + surface + " 58%, "
                 + surface + " 100%)";
-        return new Presentation(accent, wash, true);
+        return new Presentation(dueColor, wash, accent != null && !accent.isBlank());
     }
 }

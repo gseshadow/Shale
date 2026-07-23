@@ -25,7 +25,8 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("-fx-background-radius: " + "\" + CARD_RADIUS + \" 0 0 \" + CARD_RADIUS"),
                 "Accent rail must carry matching left-side rounded corners instead of a square rail over the card.");
         assertTrue(source.contains("DueProximityStyles.presentation(request.expectedResponseDate(), null, false)"));
-        assertTrue(source.contains("urgency.railColorCss()"));
+        assertTrue(source.contains("materialTypeRailColor = ColorUtil.toCssBackgroundColor(request.materialTypeColor())"));
+        assertTrue(source.contains("rail.setStyle(\"-fx-background-color: \" + materialTypeRailColor"));
         assertTrue(source.contains("urgency.washCss()"));
         assertTrue(source.contains("setOnMouseEntered"));
         assertTrue(source.contains("DueProximityStyles.presentation(request.expectedResponseDate(), null, true)"),
@@ -37,6 +38,7 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("materialTypePill(request.materialTypeName(), request.materialTypeColor())"));
         assertFalse(source.contains("ColorUtil.toCssRgba(request.materialTypeColor(), 0.08)"));
         assertFalse(source.contains("String accent = ColorUtil.toCssBackgroundColor(request.materialTypeColor())"));
+        assertFalse(source.contains("rail.setStyle(\"-fx-background-color: \" + urgency"));
     }
 
     @Test
@@ -51,8 +53,9 @@ class MaterialRequestCardFactoryTest {
         assertEquals(DueProximityStyles.DUE_WITHIN_TWO_WEEKS_COLOR, DueProximityStyles.accentColor(now.plusWeeks(2), null, fixed));
         assertNull(DueProximityStyles.accentColor(now.plusWeeks(2).plusSeconds(1), null, fixed));
         assertNull(DueProximityStyles.accentColor(null, null, fixed));
-        assertEquals(DueProximityStyles.NEUTRAL_RAIL_COLOR, DueProximityStyles.presentation(null, null, false, fixed).railColorCss());
+        assertEquals(DueProximityStyles.NEUTRAL_RAIL_COLOR, DueProximityStyles.presentation(null, null, false, fixed).dueColorCss());
         assertTrue(DueProximityStyles.presentation(now.minusSeconds(1), null, false, fixed).washCss().startsWith("linear-gradient(to right"));
+        assertTrue(DueProximityStyles.presentation(null, null, false, fixed).washCss().startsWith("linear-gradient(to right"));
     }
 
     @Test

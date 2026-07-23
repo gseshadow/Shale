@@ -49,7 +49,9 @@ public final class MaterialRequestCardFactory {
         if (variant != Variant.LIST) throw new IllegalArgumentException("Unsupported material request card variant: " + variant);
 
         DueProximityStyles.Presentation urgency = DueProximityStyles.presentation(request.expectedResponseDate(), null, false);
+        String materialTypeRailColor = ColorUtil.toCssBackgroundColor(request.materialTypeColor());
         VBox body = new VBox(7);
+        body.getStyleClass().add("material-request-card__body");
         body.setPadding(new Insets(10, 12, 10, 12));
         body.setMinWidth(0);
         body.setStyle("-fx-background-color: transparent; -fx-background-radius: 0 " + CARD_RADIUS + " " + CARD_RADIUS + " 0;");
@@ -66,6 +68,7 @@ public final class MaterialRequestCardFactory {
         HBox.setHgrow(title, Priority.ALWAYS);
 
         VBox entityFacts = new VBox(6);
+        entityFacts.getStyleClass().add("material-request-card__entity-facts");
         entityFacts.setFillWidth(false);
         entityFacts.setAlignment(Pos.CENTER_LEFT);
         addEntityFact(entityFacts, "Requested From", requestedFromNode(request));
@@ -92,8 +95,9 @@ public final class MaterialRequestCardFactory {
         body.getChildren().add(dates);
 
         Region rail = new Region();
+        rail.getStyleClass().add("material-request-card__material-type-rail");
         rail.setMinWidth(7); rail.setPrefWidth(7); rail.setMaxWidth(7);
-        rail.setStyle("-fx-background-color: " + urgency.railColorCss() + "; -fx-background-radius: " + CARD_RADIUS + " 0 0 " + CARD_RADIUS + ";");
+        rail.setStyle("-fx-background-color: " + materialTypeRailColor + "; -fx-background-radius: " + CARD_RADIUS + " 0 0 " + CARD_RADIUS + ";");
 
         HBox card = new HBox(0, rail, body);
         card.getStyleClass().addAll("material-request-card", "material-request-list-card");
