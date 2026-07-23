@@ -4,39 +4,94 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class MaterialRequestCardFactoryTest {
     private static final Path FACTORY = Path.of("src/main/java/com/shale/ui/component/factory/MaterialRequestCardFactory.java");
+    private static final Path TASK_CARD = Path.of("src/main/java/com/shale/ui/component/TaskCard.java");
+    private static final Path DAO = Path.of("../shale-data/src/main/java/com/shale/data/dao/MaterialRequestDao.java");
 
     @Test
-    void listCardPresentsRequiredFieldsWithSharedPillsAndMaterialTypeAccent() throws Exception {
+    void listCardUsesRoundedUrgencySurfaceInsteadOfMaterialTypeWash() throws Exception {
         String source = Files.readString(FACTORY);
-        assertTrue(source.contains("public enum Variant { LIST }"));
-        assertTrue(source.contains("request.materialTypeColor()"));
-        assertTrue(source.contains("ColorUtil.toCssRgba(request.materialTypeColor(), 0.08)"));
+        assertTrue(source.contains("CARD_RADIUS = DueProximityStyles.CARD_RADIUS"));
+        assertTrue(source.contains("-fx-background-radius: " + "\" + CARD_RADIUS"));
+        assertTrue(source.contains("-fx-border-radius: " + "\" + CARD_RADIUS"));
+        assertTrue(source.contains("-fx-background-radius: " + "\" + CARD_RADIUS + \" 0 0 \" + CARD_RADIUS"),
+                "Accent rail must carry matching left-side rounded corners instead of a square rail over the card.");
+        assertTrue(source.contains("DueProximityStyles.presentation(request.expectedResponseDate(), null, false)"));
+        assertTrue(source.contains("urgency.railColorCss()"));
+        assertTrue(source.contains("urgency.washCss()"));
+        assertTrue(source.contains("setOnMouseEntered"));
+        assertTrue(source.contains("DueProximityStyles.presentation(request.expectedResponseDate(), null, true)"),
+                "Hover must recompute the urgency wash instead of installing a square hover fill.");
+        assertTrue(source.contains("materialTypePill(request.materialTypeName(), request.materialTypeColor())"));
+        assertFalse(source.contains("ColorUtil.toCssRgba(request.materialTypeColor(), 0.08)"));
+        assertFalse(source.contains("String accent = ColorUtil.toCssBackgroundColor(request.materialTypeColor())"));
+    }
+
+    @Test
+    void dueProximityThresholdsAreSharedWithTaskCardsAndClockDeterministic() throws Exception {
+        String task = Files.readString(TASK_CARD);
+        assertTrue(task.contains("DueProximityStyles.accentColor(dueAt, completedAt)"));
+        Clock fixed = Clock.fixed(Instant.parse("2026-07-23T12:00:00Z"), ZoneId.of("UTC"));
+        LocalDateTime now = LocalDateTime.now(fixed);
+        assertEquals(DueProximityStyles.OVERDUE_COLOR, DueProximityStyles.accentColor(now.minusSeconds(1), null, fixed));
+        assertEquals(DueProximityStyles.DUE_WITHIN_ONE_DAY_COLOR, DueProximityStyles.accentColor(now.plusDays(1), null, fixed));
+        assertEquals(DueProximityStyles.DUE_WITHIN_ONE_WEEK_COLOR, DueProximityStyles.accentColor(now.plusWeeks(1), null, fixed));
+        assertEquals(DueProximityStyles.DUE_WITHIN_TWO_WEEKS_COLOR, DueProximityStyles.accentColor(now.plusWeeks(2), null, fixed));
+        assertNull(DueProximityStyles.accentColor(now.plusWeeks(2).plusSeconds(1), null, fixed));
+        assertNull(DueProximityStyles.accentColor(null, null, fixed));
+        assertEquals(DueProximityStyles.NEUTRAL_RAIL_COLOR, DueProximityStyles.presentation(null, null, false, fixed).railColorCss());
+        assertTrue(DueProximityStyles.presentation(now.minusSeconds(1), null, false, fixed).washCss().startsWith("linear-gradient(to right"));
+    }
+
+    @Test
+    void listCardUsesSharedMiniEntityFactoriesAndOmitsMissingValues() throws Exception {
+        String source = Files.readString(FACTORY);
+        assertTrue(source.contains("ContactCardFactory.Variant.MINI"));
+        assertTrue(source.contains("OrganizationCardFactory.Variant.MINI"));
+        assertTrue(source.contains("UserCardFactory.Variant.MINI"));
+        assertTrue(source.contains("r.requestedFromContactId() != null"));
+        assertTrue(source.contains("r.requestedFromOrganizationId() != null"));
+        assertTrue(source.contains("if (has(r.requestedFromText())) return valueLabel(r.requestedFromText())"));
+        assertTrue(source.contains("addEntityFact(entityFacts, \"Requested From\", requestedFromNode(request))"));
+        assertTrue(source.contains("addEntityFact(entityFacts, \"Requested By\", userNode(request.requestedByUserId(), request.requestedByDisplayName()))"));
+        assertTrue(source.contains("addEntityFact(entityFacts, \"Assigned To\", userNode(request.assignedToUserId(), request.assignedToDisplayName()))"));
+        assertTrue(source.contains("if (node == null) return;"));
+        assertFalse(source.contains("MaterialRequestService"));
+        assertFalse(source.contains("MaterialRequestDao"));
+    }
+
+    @Test
+    void summaryQueryRemainsSingleTenantScopedJoinWithoutPerCardLoads() throws Exception {
+        String dao = Files.readString(DAO);
+        assertTrue(dao.contains("JOIN dbo.Users rbu ON rbu.Id=mr.RequestedByUserId AND rbu.ShaleClientId=mr.ShaleClientId"));
+        assertTrue(dao.contains("LEFT JOIN dbo.Users au ON au.Id=mr.AssignedToUserId AND au.ShaleClientId=mr.ShaleClientId"));
+        assertTrue(dao.contains("LEFT JOIN dbo.Contacts ct ON ct.Id=mr.RequestedFromContactId AND ct.ShaleClientId=mr.ShaleClientId"));
+        assertTrue(dao.contains("LEFT JOIN dbo.Organizations org ON org.Id=mr.RequestedFromOrganizationId AND org.ShaleClientId=mr.ShaleClientId"));
+        assertTrue(dao.contains("WHERE mr.ShaleClientId=? AND mr.CaseId=? AND mr.IsDeleted=0"));
+        assertFalse(dao.contains("listMaterialRequests(long caseId, int tenant) {\n        for"));
+    }
+
+    @Test
+    void regressionFieldsAndNoSaveImplementationRemain() throws Exception {
+        String source = Files.readString(FACTORY);
+        assertTrue(source.contains("title.setWrapText(true)"));
         assertTrue(source.contains("StatusIndicatorFactory.createStatusPill(nvl(name, \"Material\"), color, StatusIndicatorFactory.PillSize.COMPACT)"));
         assertTrue(source.contains("StatusIndicatorFactory.createStatusPill(nvl(status, \"Unknown\"), nvl(configuredColor, NEUTRAL_STATUS_COLOR), StatusIndicatorFactory.PillSize.COMPACT)"));
-        assertTrue(source.contains("Requested From"));
-        assertTrue(source.contains("Requested By"));
-        assertTrue(source.contains("Assigned To"));
         assertTrue(source.contains("Requested"));
         assertTrue(source.contains("Due"));
         assertTrue(source.contains("Next Follow-up"));
         assertTrue(source.contains("Overdue since"));
         assertTrue(source.contains("Follow-up due"));
-        assertFalse(source.contains("Requested / Due / Follow-up"));
-    }
-
-    @Test
-    void cardIsBoundedReadableAndOmitEmptyValues() throws Exception {
-        String source = Files.readString(FACTORY);
-        assertTrue(source.contains("title.setWrapText(true)"));
-        assertTrue(source.contains("v.setWrapText(true)"));
-        assertTrue(source.contains("card.setMaxWidth(Double.MAX_VALUE)"));
-        assertTrue(source.contains("if (value == null || value.isBlank()) return;"));
-        assertTrue(source.contains("GridPane facts"));
-        assertFalse(source.contains("Description"), "Summary DTO does not expose description; card should not broaden queries just for decorative text.");
+        assertFalse(source.contains("save"));
+        assertFalse(source.contains("insert"));
+        assertFalse(source.contains("update"));
     }
 }
