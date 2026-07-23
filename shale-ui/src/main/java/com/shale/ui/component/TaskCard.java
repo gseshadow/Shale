@@ -17,6 +17,7 @@ import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -30,6 +31,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Popup;
+import javafx.stage.Screen;
 import javafx.stage.Window;
 
 public final class TaskCard extends VBox {
@@ -45,6 +47,8 @@ public final class TaskCard extends VBox {
 	private static final int TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES = 8;
 	private static final double TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE = 12;
 	private static final Duration TASK_DETAILS_TOOLTIP_HIDE_DELAY = Duration.millis(120);
+	private static final Duration TASK_DETAILS_POPUP_SHOW_DELAY = Duration.millis(400);
+	private static final double TASK_DETAILS_POPUP_CURSOR_OFFSET = 10;
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
@@ -107,7 +111,10 @@ public final class TaskCard extends VBox {
 	private Popup taskDetailsPopup;
 	private Label taskDetailsPopupContent;
 	private final PauseTransition taskDetailsPopupHideDelay = new PauseTransition(TASK_DETAILS_TOOLTIP_HIDE_DELAY);
+	private final PauseTransition taskDetailsPopupShowDelay = new PauseTransition(TASK_DETAILS_POPUP_SHOW_DELAY);
 	private boolean taskDetailsPopupMouseOver;
+	private double latestTaskDetailsPopupScreenX;
+	private double latestTaskDetailsPopupScreenY;
 
 	public TaskCard() {
 		setCursor(Cursor.HAND);
@@ -437,13 +444,16 @@ public final class TaskCard extends VBox {
 			hovered = true;
 			setTranslateY(-1.5);
 			refreshSurfaceStyle();
-			showTaskDetailsPopup();
+			captureTaskDetailsPopupPointer(e.getScreenX(), e.getScreenY());
+			scheduleTaskDetailsPopupShow();
 		});
+		setOnMouseMoved(e -> captureTaskDetailsPopupPointer(e.getScreenX(), e.getScreenY()));
 		setOnMouseExited(e ->
 		{
 			hovered = false;
 			setTranslateY(0);
 			refreshSurfaceStyle();
+			cancelTaskDetailsPopupShow();
 			scheduleTaskDetailsPopupHide();
 		});
 		setOnMouseClicked(e ->
@@ -453,6 +463,11 @@ public final class TaskCard extends VBox {
 			}
 			if (onOpen != null && taskId != null) {
 				onOpen.accept(taskId);
+			}
+		});
+		taskDetailsPopupShowDelay.setOnFinished(e -> {
+			if (hovered) {
+				showTaskDetailsPopup();
 			}
 		});
 		taskDetailsPopupHideDelay.setOnFinished(e -> {
@@ -501,6 +516,23 @@ public final class TaskCard extends VBox {
 		return taskDetailsPopup;
 	}
 
+	private void captureTaskDetailsPopupPointer(double screenX, double screenY) {
+		latestTaskDetailsPopupScreenX = screenX;
+		latestTaskDetailsPopupScreenY = screenY;
+	}
+
+	private void scheduleTaskDetailsPopupShow() {
+		if (taskDetailsPopup == null || taskDetailsPopup.isShowing()) {
+			return;
+		}
+		taskDetailsPopupHideDelay.stop();
+		taskDetailsPopupShowDelay.playFromStart();
+	}
+
+	private void cancelTaskDetailsPopupShow() {
+		taskDetailsPopupShowDelay.stop();
+	}
+
 	private void showTaskDetailsPopup() {
 		if (taskDetailsPopup == null || getScene() == null || getScene().getWindow() == null) {
 			return;
@@ -509,14 +541,25 @@ public final class TaskCard extends VBox {
 		if (taskDetailsPopup.isShowing()) {
 			return;
 		}
-		var screenBounds = localToScreen(getBoundsInLocal());
-		if (screenBounds == null) {
-			return;
-		}
-		taskDetailsPopup.show(this, screenBounds.getMinX(), screenBounds.getMaxY() + 6);
+		double requestedX = latestTaskDetailsPopupScreenX + TASK_DETAILS_POPUP_CURSOR_OFFSET;
+		double requestedY = latestTaskDetailsPopupScreenY + TASK_DETAILS_POPUP_CURSOR_OFFSET;
+		taskDetailsPopup.show(this, requestedX, requestedY);
 		taskDetailsPopup.getScene().getRoot().applyCss();
 		taskDetailsPopup.getScene().getRoot().autosize();
 		taskDetailsPopup.getScene().getRoot().layout();
+		correctTaskDetailsPopupForScreenEdges(requestedX, requestedY);
+	}
+
+	private void correctTaskDetailsPopupForScreenEdges(double requestedX, double requestedY) {
+		Window popupWindow = taskDetailsPopup.getScene().getWindow();
+		Rectangle2D bounds = Screen.getScreensForRectangle(requestedX, requestedY, 1, 1).stream()
+				.findFirst()
+				.orElse(Screen.getPrimary())
+				.getVisualBounds();
+		double correctedX = Math.min(requestedX, bounds.getMaxX() - popupWindow.getWidth() - TASK_DETAILS_POPUP_CURSOR_OFFSET);
+		double correctedY = Math.min(requestedY, bounds.getMaxY() - popupWindow.getHeight() - TASK_DETAILS_POPUP_CURSOR_OFFSET);
+		popupWindow.setX(Math.max(bounds.getMinX() + TASK_DETAILS_POPUP_CURSOR_OFFSET, correctedX));
+		popupWindow.setY(Math.max(bounds.getMinY() + TASK_DETAILS_POPUP_CURSOR_OFFSET, correctedY));
 	}
 
 	private void scheduleTaskDetailsPopupHide() {
@@ -524,6 +567,7 @@ public final class TaskCard extends VBox {
 	}
 
 	private void hideTaskDetailsPopup() {
+		taskDetailsPopupShowDelay.stop();
 		taskDetailsPopupHideDelay.stop();
 		if (taskDetailsPopup != null) {
 			taskDetailsPopup.hide();

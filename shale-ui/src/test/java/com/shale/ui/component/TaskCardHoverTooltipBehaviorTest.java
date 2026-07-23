@@ -56,6 +56,32 @@ final class TaskCardHoverTooltipBehaviorTest {
     }
 
     @Test
+    void hoverPopupWaitsBeforeShowingAndCanBeCanceled() {
+        assertTrue(taskCard.contains("TASK_DETAILS_POPUP_SHOW_DELAY = Duration.millis(400)"));
+        assertTrue(taskCard.contains("taskDetailsPopupShowDelay.playFromStart()"));
+        assertTrue(taskCard.contains("cancelTaskDetailsPopupShow()"));
+        assertTrue(taskCard.contains("taskDetailsPopupShowDelay.stop()"));
+        assertFalse(taskCard.contains("Duration.seconds(5)"));
+        assertFalse(taskCard.contains("Duration.millis(5000)"));
+    }
+
+    @Test
+    void hoverPopupUsesLatestCursorScreenCoordinatesWithSmallOffset() {
+        assertTrue(taskCard.contains("captureTaskDetailsPopupPointer(e.getScreenX(), e.getScreenY())"));
+        assertTrue(taskCard.contains("setOnMouseMoved(e -> captureTaskDetailsPopupPointer(e.getScreenX(), e.getScreenY()))"));
+        assertTrue(taskCard.contains("latestTaskDetailsPopupScreenX + TASK_DETAILS_POPUP_CURSOR_OFFSET"));
+        assertTrue(taskCard.contains("latestTaskDetailsPopupScreenY + TASK_DETAILS_POPUP_CURSOR_OFFSET"));
+    }
+
+    @Test
+    void hoverPopupCorrectsOnlyForScreenEdgesAfterInitialCursorPlacement() {
+        assertTrue(taskCard.contains("correctTaskDetailsPopupForScreenEdges(requestedX, requestedY)"));
+        assertTrue(taskCard.contains("Screen.getScreensForRectangle(requestedX, requestedY, 1, 1)"));
+        assertTrue(taskCard.contains("popupWindow.setX"));
+        assertTrue(taskCard.contains("popupWindow.setY"));
+    }
+
+    @Test
     void hoverPopupRemainsOpenBeyondDefaultTooltipTimeout() {
         assertTrue(taskCard.contains("Popup"));
         assertFalse(taskCard.contains("Duration.seconds(5)"));
