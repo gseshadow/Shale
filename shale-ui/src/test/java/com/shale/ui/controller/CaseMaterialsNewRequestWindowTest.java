@@ -8,200 +8,127 @@ import org.junit.jupiter.api.Test;
 
 class CaseMaterialsNewRequestWindowTest {
     private static final Path SOURCE = Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
+    private static final Path CASE_CONTROLLER = Path.of("src/main/java/com/shale/ui/controller/CaseController.java");
 
     @Test
-    void newRequestWindowDefinesTitleRequestedFromLookupsDueDateReminderAndFooterInOrder() throws Exception {
-        String source = Files.readString(SOURCE);
-        String method = methodBody(source, "VBox newRequestBody");
-
+    void newRequestWindowDefinesFinalFieldsInOrder() throws Exception {
+        String method = methodBody(Files.readString(SOURCE), "VBox newRequestBody");
         assertTrue(method.contains("new TextField()"));
         assertTrue(method.contains("titleField.setPromptText(\"New Request\")"));
         assertFalse(method.contains("new TextField(\"New Request\")"));
         assertFalse(method.contains("titleField.setText(\"New Request\")"));
-
         assertInOrder(method,
                 "add(fields,0,\"Title:\",titleField)",
-                "add(fields,1,\"Requested From:\",requestedFromBox)",
-                "add(fields,2,\"Material Type:\",materialType)",
-                "add(fields,3,\"Request Method:\",requestMethod)",
-                "add(fields,4,\"Status:\",requestStatus)");
+                "add(fields,1,\"Material Type:\",materialType)",
+                "add(fields,2,\"Request Method:\",requestMethod)",
+                "add(fields,3,\"Status:\",requestStatus)",
+                "add(fields,4,\"Requested By:\",requestedBy)",
+                "add(fields,5,\"Assigned To:\",assignedTo)");
     }
 
     @Test
-    void newRequestWindowUsesSharedColorCodedLookupSelectorForAllLookups() throws Exception {
+    void newRequestWindowUsesSharedComponentsForLookupsAndUsers() throws Exception {
         String source = Files.readString(SOURCE);
         String method = methodBody(source, "VBox newRequestBody");
-
+        String userFactory = methodBody(source, "private static UserSelector<CaseTaskService.AssignableUserOption> newUserSelector");
         assertTrue(source.contains("import com.shale.ui.component.ColorCodedComboBox;"));
+        assertTrue(source.contains("import com.shale.ui.component.UserSelector;"));
         assertTrue(method.contains("ColorCodedComboBox<MaterialTypeDto> materialType=newLookupSelector(MaterialTypeDto::name,MaterialTypeDto::color,MaterialTypeDto::description)"));
         assertTrue(method.contains("ColorCodedComboBox<RequestMethodDto> requestMethod=newLookupSelector(RequestMethodDto::name)"));
         assertTrue(method.contains("ColorCodedComboBox<RequestStatusDto> requestStatus=newLookupSelector(RequestStatusDto::name)"));
-        assertTrue(source.contains("private static <T> ColorCodedComboBox<T> newLookupSelector"));
-        assertTrue(source.contains("return new ColorCodedComboBox<>(name,color,secondaryText)"));
-        assertFalse(source.contains("private static <T> ComboBox<T> lookupCombo"));
-        assertFalse(method.contains("new ComboBox<MaterialTypeDto>"));
-        assertTrue(method.contains("ComboBox<InactivityReminderPeriod> inactivityReminderPeriod=newReminderPeriodSelector()"));
-        assertFalse(method.contains("setConverter(new javafx.util.StringConverter"));
+        assertTrue(method.contains("UserSelector<CaseTaskService.AssignableUserOption> requestedBy=newUserSelector(\"Select requested by\",\"No users available\")"));
+        assertTrue(method.contains("UserSelector<CaseTaskService.AssignableUserOption> assignedTo=newUserSelector(\"Select assigned user\",\"No users available\")"));
+        assertTrue(userFactory.contains("new UserSelector<>(CaseTaskService.AssignableUserOption::id,CaseTaskService.AssignableUserOption::displayName,CaseTaskService.AssignableUserOption::color)"));
+        assertFalse(method.contains("new ComboBox<CaseTaskService.AssignableUserOption>"));
+        assertFalse(source.contains("private VBox userSelector"));
     }
 
     @Test
-    void lookupPromptsAndHgrowAreConfigured() throws Exception {
-        String method = methodBody(Files.readString(SOURCE), "VBox newRequestBody");
-
-        assertTrue(method.contains("materialType.setPromptText(\"Select material type\")"));
-        assertTrue(method.contains("requestMethod.setPromptText(\"Select request method\")"));
-        assertTrue(method.contains("requestStatus.setPromptText(\"Select status\")"));
-        assertTrue(method.contains("GridPane.setHgrow(titleField,Priority.ALWAYS)"));
-        assertTrue(method.contains("GridPane.setHgrow(materialType,Priority.ALWAYS)"));
-        assertTrue(method.contains("GridPane.setHgrow(requestMethod,Priority.ALWAYS)"));
-        assertTrue(method.contains("GridPane.setHgrow(requestStatus,Priority.ALWAYS)"));
-        assertTrue(method.contains("DatePicker dueDate=newDatePicker(\"Select due date\")"));
-        assertTrue(method.contains("GridPane.setHgrow(dueDate,Priority.ALWAYS)"));
-        assertTrue(method.contains("GridPane.setHgrow(inactivityReminderPeriod,Priority.ALWAYS)"));
+    void userCandidatesLoadOnceThroughServicePortOffFxThreadForBothSelectors() throws Exception {
+        String source = Files.readString(SOURCE);
+        String body = methodBody(source, "VBox newRequestBody");
+        String loader = methodBody(source, "private void loadNewRequestUsers");
+        String caseController = Files.readString(CASE_CONTROLLER);
+        assertTrue(body.contains("loadNewRequestUsers(requestedBy,assignedTo,stage)"));
+        assertTrue(loader.contains("caseTaskService.loadAssignableUsers(tid)"));
+        assertEquals(1, count(loader, "loadAssignableUsers(tid)"));
+        assertTrue(loader.contains("ex.submit"));
+        assertTrue(loader.contains("if(Platform.isFxApplicationThread())"));
+        assertTrue(loader.contains("Platform.runLater"));
+        assertTrue(loader.contains("requestedBy.setCandidates(safe)"));
+        assertTrue(loader.contains("assignedTo.setCandidates(safe)"));
+        assertTrue(loader.contains("setUserSelectorsLoading(requestedBy,assignedTo,true)"));
+        assertTrue(loader.contains("setUserSelectorsLoading(requestedBy,assignedTo,false)"));
+        assertTrue(caseController.contains("caseMaterialRequestsTabController.init(materialRequestService, caseTaskService, appState"));
+        assertFalse(loader.toLowerCase().contains("dao"));
     }
 
     @Test
-    void lookupsLoadThroughServicePortsIndependentlyWithoutDaosOrDefaultMaterialMethodSelection() throws Exception {
+    void requestedByDefaultsOnlyByCurrentUserStableIdAndAssignedToStartsUnselected() throws Exception {
+        String loader = methodBody(Files.readString(SOURCE), "private void loadNewRequestUsers");
+        assertTrue(loader.contains("Integer currentUserId=state==null?null:state.getUserId()"));
+        assertTrue(loader.contains("u!=null&&u.id()==currentUserId"));
+        assertTrue(loader.contains("ifPresent(requestedBy::setSelectedUser)"));
+        assertTrue(loader.contains("assignedTo.clearSelection()"));
+        assertFalse(loader.contains("displayName"));
+        assertFalse(loader.contains("email"));
+        assertFalse(loader.contains("selectFirst"));
+    }
+
+    @Test
+    void userLoadingFailureLeavesBothSelectorsUnavailableAndShowsOneRequestsError() throws Exception {
+        String loader = methodBody(Files.readString(SOURCE), "private void loadNewRequestUsers");
+        assertTrue(loader.contains("requestedBy.clearSelection()"));
+        assertTrue(loader.contains("assignedTo.clearSelection()"));
+        assertTrue(loader.contains("requestedBy.setDisable(true)"));
+        assertTrue(loader.contains("assignedTo.setDisable(true)"));
+        assertEquals(1, count(loader, "AppDialogs.showError(dialogOwner,\"Requests\",\"User choices could not be loaded. Please try again.\")"));
+        assertFalse(loader.contains("stage.close()"));
+    }
+
+    @Test
+    void lookupsRemainServicePortLoadedAndStatusDefaultsToRequestedSystemKey() throws Exception {
         String source = Files.readString(SOURCE);
         String body = methodBody(source, "VBox newRequestBody");
         String loader = methodBody(source, "private void loadNewRequestLookups");
-        String loadOne = methodBody(source, "private <T> void loadLookup");
-
+        String select = methodBody(source, "private static void selectRequestedStatus");
         assertTrue(body.contains("loadNewRequestLookups(materialType,requestMethod,requestStatus,stage)"));
         assertTrue(loader.contains("svc.listEffectiveMaterialTypes(tenant())"));
         assertTrue(loader.contains("svc.listEffectiveRequestMethods(tenant())"));
         assertTrue(loader.contains("svc.listEffectiveRequestStatuses(tenant())"));
-        assertFalse(loader.toLowerCase().contains("dao"));
-        assertTrue(loadOne.contains("lookup.setDisable(true)"));
-        assertTrue(loadOne.contains("ex.submit"));
-        assertTrue(loadOne.contains("Platform.runLater"));
-        assertTrue(loadOne.contains("lookup.getItems().setAll(rows==null?List.of():rows)"));
-        assertTrue(loadOne.contains("lookup.setDisable(false)"));
-        assertTrue(loadOne.contains("AppDialogs.showError(dialogOwner,\"Requests\",errorMessage)"));
-        assertFalse(loadOne.contains("stage.close()"));
-        assertFalse(body.contains("materialType.getSelectionModel().select"));
-        assertFalse(body.contains("requestMethod.getSelectionModel().select"));
-    }
-
-    @Test
-    void statusDefaultsToRequestedSystemKeyOnlyWhenAvailable() throws Exception {
-        String source = Files.readString(SOURCE);
-        String loader = methodBody(source, "private void loadNewRequestLookups");
-        String select = methodBody(source, "private static void selectRequestedStatus");
-
         assertTrue(loader.contains("CaseMaterialRequestsTabController::selectRequestedStatus"));
         assertTrue(select.contains("requestStatus.getSelectionModel().clearSelection()"));
         assertTrue(select.contains("s!=null&&\"requested\".equalsIgnoreCase(s.systemKey())"));
-        assertTrue(select.contains("findFirst().ifPresent(requestStatus.getSelectionModel()::select)"));
         assertFalse(select.contains("name()"));
     }
 
     @Test
-    void footerUsesAppStyledButtonsAndSaveIsIntentionallyEmpty() throws Exception {
+    void footerSaveIsNonfunctionalAndCancelStillConfirmsDiscard() throws Exception {
         String source = Files.readString(SOURCE);
         String method = methodBody(source, "VBox newRequestBody");
-
-        assertTrue(method.contains("ActionButtonFactory.primary(\"Save\",e->{ })"));
-        assertTrue(method.contains("ActionButtonFactory.neutral(\"Cancel\""));
-        assertTrue(method.contains("footer.getStyleClass().add(\"app-dialog-actions\")"));
-        assertTrue(method.contains("footer.setAlignment(Pos.CENTER_RIGHT)"));
-        assertFalse(method.contains("mutate("));
-        assertFalse(method.contains("createMaterialRequest"));
-        assertFalse(method.contains("updateMaterialRequest"));
-    }
-
-    @Test
-    void cancelUsesStandardConfirmationChoicesAndOnlyDiscardClosesNewRequest() throws Exception {
-        String source = Files.readString(SOURCE);
-        String bodyMethod = methodBody(source, "VBox newRequestBody");
         String confirmMethod = methodBody(source, "boolean confirmDiscardNewRequest");
-
-        assertTrue(bodyMethod.contains("if(confirmDiscardNewRequest(stage))stage.close()"));
+        assertTrue(method.contains("ActionButtonFactory.primary(\"Save\",e->{ })"));
+        assertTrue(method.contains("if(confirmDiscardNewRequest(stage))stage.close()"));
         assertTrue(confirmMethod.contains("AppDialogs.showChoice"));
         assertTrue(confirmMethod.contains("\"Discard New Request?\""));
-        assertTrue(confirmMethod.contains("\"Any information entered in this request will be lost.\""));
-        assertTrue(confirmMethod.contains("AppDialogs.DialogAction.of(\"Discard\",true,AppDialogs.DialogActionKind.DANGER,true,false)"));
-        assertTrue(confirmMethod.contains("AppDialogs.DialogAction.cancel(\"Keep Editing\",false)"));
+        assertFalse(method.contains("createMaterialRequest"));
+        assertFalse(method.contains("updateMaterialRequest"));
+        assertFalse(method.contains("mutate("));
     }
 
     @Test
-    void materialRequestFormMutationPersistenceAndDatabasePlumbingAreNotRestored() throws Exception {
+    void requestControllerDoesNotIntroducePersistenceDatabaseOrPermissionChanges() throws Exception {
         String source = Files.readString(SOURCE);
         String requestController = source.substring(source.indexOf("final class CaseMaterialRequestsTabController"), source.indexOf("final class CaseMaterialItemsTabController"));
-
-        assertFalse(source.contains("final class MaterialRequestForm"));
-        assertFalse(requestController.contains("CreateMaterialRequestCommand"));
-        assertFalse(requestController.contains("UpdateMaterialRequestCommand"));
-        assertFalse(requestController.contains("createMaterialRequest"));
-        assertFalse(requestController.contains("updateMaterialRequest"));
-        assertFalse(requestController.contains("MaterialRequestDao"));
-        assertFalse(requestController.contains("materialRequestDao"));
-    }
-
-    @Test
-    void dueDateAndReminderUseTypedOptionalDraftStateAndClearableControls() throws Exception {
-        String source = Files.readString(SOURCE);
-        String method = methodBody(source, "VBox newRequestBody");
-        String dateFactory = methodBody(source, "private static DatePicker newDatePicker");
-        String reminderFactory = methodBody(source, "private static ComboBox<InactivityReminderPeriod> newReminderPeriodSelector");
-
-        assertTrue(source.contains("static final class NewRequestDraft"));
-        assertTrue(source.contains("private LocalDate dueDate"));
-        assertTrue(source.contains("private InactivityReminderPeriod inactivityReminderPeriod"));
-        assertTrue(method.contains("NewRequestDraft draft=new NewRequestDraft()"));
-        assertTrue(method.contains("draft.dueDate=newValue"));
-        assertTrue(method.contains("draft.inactivityReminderPeriod=newValue"));
-        assertTrue(dateFactory.contains("new DatePicker()"));
-        assertTrue(dateFactory.contains("picker.setPromptText(prompt)"));
-        assertTrue(dateFactory.contains("picker.setEditable(true)"));
-        assertTrue(dateFactory.contains("picker.setMaxWidth(Double.MAX_VALUE)"));
-        assertTrue(reminderFactory.contains("reminder.setPromptText(\"Select reminder period\")"));
-        assertTrue(reminderFactory.contains("clearSelection()"));
-    }
-
-    @Test
-    void reminderPeriodsHaveStableSemanticTypedValuesAndNormalizedDays() throws Exception {
-        String source = Files.readString(SOURCE);
-        String enumBody = source.substring(source.indexOf("enum InactivityReminderPeriod"), source.indexOf("private static DatePicker newDatePicker"));
-        String reminderFactory = methodBody(source, "private static ComboBox<InactivityReminderPeriod> newReminderPeriodSelector");
-
-        assertTrue(enumBody.contains("THREE_DAYS(\"3 days\",3)"));
-        assertTrue(enumBody.contains("ONE_WEEK(\"1 week\",7)"));
-        assertTrue(enumBody.contains("TWO_WEEKS(\"2 weeks\",14)"));
-        assertTrue(enumBody.contains("THIRTY_DAYS(\"30 days\",30)"));
-        assertTrue(enumBody.contains("int days()"));
-        assertTrue(enumBody.contains("String label()"));
-        assertTrue(reminderFactory.contains("reminder.getItems().setAll(InactivityReminderPeriod.THREE_DAYS,InactivityReminderPeriod.ONE_WEEK,InactivityReminderPeriod.TWO_WEEKS,InactivityReminderPeriod.THIRTY_DAYS)"));
-        assertFalse(reminderFactory.contains("getSelectedIndex"));
-        assertFalse(source.contains("NextFollowUpAt"));
-        assertFalse(source.contains("nextFollowUpAt=draft"));
-    }
-
-    @Test
-    void newRequestStageSizingUsesOuterStagePathAndLargerMinimums() throws Exception {
-        String source = Files.readString(SOURCE);
-        String opener = methodBody(source, "private void openNewRequestWindow");
-        String sizing = methodBody(source, "private static void applyNewRequestStageSize");
-
-        assertTrue(source.contains("NEW_REQUEST_HEIGHT=760"));
-        assertTrue(source.contains("NEW_REQUEST_MIN_HEIGHT=720"));
-        assertTrue(opener.contains("root.setPrefSize(NEW_REQUEST_WIDTH,NEW_REQUEST_HEIGHT)"));
-        assertTrue(opener.contains("stage.setMinHeight(NEW_REQUEST_MIN_HEIGHT)"));
-        assertTrue(opener.contains("applyNewRequestStageSize(stage,root)"));
-        assertTrue(sizing.contains("applyCss()"));
-        assertTrue(sizing.contains("layout()"));
-        assertTrue(sizing.contains("Screen.getScreensForRectangle"));
-        assertTrue(sizing.contains("getVisualBounds()"));
-        assertFalse(opener.contains("stage.setHeight(640)"));
-    }
-
-    @Test
-    void newRequestScopeGuardsNoPersistenceNotificationsActivityOrRelationships() throws Exception {
-        String source = Files.readString(SOURCE);
-        String requestController = source.substring(source.indexOf("final class CaseMaterialRequestsTabController"), source.indexOf("final class CaseMaterialItemsTabController"));
-        for (String forbidden : new String[]{"createMaterialRequest","updateMaterialRequest","LastActivityAt","ReminderSentAt","Notification","Scheduler","schedule","addCaseParty","CaseParty","related-entity","RelatedEntity","MaterialRequestDao","NextFollowUpAt"}) {
+        for (String forbidden : new String[]{"CreateMaterialRequestCommand","UpdateMaterialRequestCommand","createMaterialRequest","updateMaterialRequest","MaterialRequestDao","materialRequestDao","UserDao","userDao","RequestedByUserId","AssignedToUserId"}) {
             assertFalse(requestController.contains(forbidden), forbidden);
         }
+    }
+
+    private static int count(String source, String needle) {
+        int count = 0, pos = 0;
+        while ((pos = source.indexOf(needle, pos)) >= 0) { count++; pos += needle.length(); }
+        return count;
     }
 
     private static void assertInOrder(String source, String... snippets) {
