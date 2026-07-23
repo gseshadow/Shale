@@ -57,7 +57,7 @@ final class TaskEmbeddedCaseCardReuseTest {
     void myTasksEmbeddedCaseCardHasOwnFullWidthMetadataRow() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/component/TaskCard.java"));
 
-        assertTrue(source.contains("bodyPane.getChildren().setAll(myTasksTitleRow, myTasksMetadataBlock, fullExpandedContent, hoverRevealPane)"),
+        assertTrue(source.contains("bodyPane.getChildren().setAll(myTasksTitleRow, myTasksMetadataBlock, fullExpandedContent)"),
                 "My Tasks should place the title on its own full-width row before metadata and embedded case content.");
         assertTrue(source.contains("myTasksTitleRow.getChildren().setAll(titleLabel)"),
                 "The My Tasks title row should reserve horizontal space for the task title only.");
