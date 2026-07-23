@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.*;
 import org.junit.jupiter.api.Test;
 
 class CaseMaterialsNewRequestWindowTest {
@@ -15,17 +16,20 @@ class CaseMaterialsNewRequestWindowTest {
     @Test
     void newRequestWindowDefinesFinalFieldsInOrder() throws Exception {
         String method = methodBody(Files.readString(SOURCE), "VBox newRequestBody");
-        assertTrue(method.contains("new TextField()"));
+        assertTrue(method.contains("new TextField(draft.title())"));
         assertTrue(method.contains("titleField.setPromptText(\"New Request\")"));
         assertFalse(method.contains("new TextField(\"New Request\")"));
         assertFalse(method.contains("titleField.setText(\"New Request\")"));
         assertInOrder(method,
                 "add(fields,0,\"Title:\",titleField)",
-                "add(fields,1,\"Material Type:\",materialType)",
-                "add(fields,2,\"Request Method:\",requestMethod)",
-                "add(fields,3,\"Status:\",requestStatus)",
-                "add(fields,4,\"Requested By:\",requestedBy)",
-                "add(fields,5,\"Assigned To:\",assignedTo)");
+                "add(fields,1,\"Requested From:\",requestedBy)",
+                "add(fields,2,\"Material Type:\",materialType)",
+                "add(fields,3,\"Request Method:\",requestMethod)",
+                "add(fields,4,\"Status:\",requestStatus)",
+                "add(fields,5,\"Due Date:\",dueDate)",
+                "add(fields,6,\"Inactivity Reminder Period:\",reminder)",
+                "add(fields,7,\"Description:\",description)",
+                "HBox footer=new HBox(10,save,cancel)");
     }
 
     @Test
@@ -44,6 +48,8 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(method.contains("ColorCodedComboBox<RequestStatusDto> requestStatus=newLookupSelector(RequestStatusDto::name)"));
         assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> requestedBy=newUserSelectionField(stage,false)"));
         assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> assignedTo=newUserSelectionField(stage,true)"));
+        assertTrue(method.contains("DatePicker dueDate=newDatePicker(\"Select due date\")"));
+        assertTrue(method.contains("TextArea description=newRequestDescriptionArea(draft.description())"));
         assertTrue(userFactory.contains("new UserSelectionField<>(CaseTaskService.AssignableUserOption::id,CaseTaskService.AssignableUserOption::displayName,CaseTaskService.AssignableUserOption::color"));
         assertTrue(userFactory.contains("AssignedUserPickerDialog.show(pickerOwner,candidates,CaseMaterialRequestsTabController.class)"));
         assertFalse(method.contains("new ComboBox<CaseTaskService.AssignableUserOption>"));
@@ -168,9 +174,56 @@ class CaseMaterialsNewRequestWindowTest {
     @Test
     void newRequestDialogUsesCompactHeightInsteadOfExpandedSelectorHeight() throws Exception {
         String source = Files.readString(SOURCE);
-        assertTrue(source.contains("NEW_REQUEST_WIDTH=560, NEW_REQUEST_HEIGHT=500, NEW_REQUEST_MIN_WIDTH=500, NEW_REQUEST_MIN_HEIGHT=460"));
+        assertTrue(source.contains("NEW_REQUEST_WIDTH=640, NEW_REQUEST_HEIGHT=700, NEW_REQUEST_MIN_WIDTH=560, NEW_REQUEST_MIN_HEIGHT=620"));
         assertFalse(source.contains("NEW_REQUEST_HEIGHT=760"));
         assertFalse(source.contains("NEW_REQUEST_MIN_HEIGHT=720"));
+    }
+
+
+    @Test
+    void dueDateDefaultUsesInjectableClockCalendarMonthAndDraftAllowsClearOrChange() {
+        CaseMaterialRequestsTabController c = new CaseMaterialRequestsTabController();
+        c.setNewRequestClock(Clock.fixed(LocalDate.of(2024, 1, 31).atStartOfDay(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
+        CaseMaterialRequestsTabController.NewRequestDraft leap = c.newRequestDraft();
+        assertEquals(LocalDate.of(2024, 2, 29), leap.dueDate());
+        leap.dueDate(null);
+        assertNull(leap.dueDate());
+        leap.dueDate(LocalDate.of(2024, 4, 15));
+        assertEquals(LocalDate.of(2024, 4, 15), leap.dueDate());
+        c.setNewRequestClock(Clock.fixed(LocalDate.of(2023, 1, 31).atStartOfDay(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
+        assertEquals(LocalDate.of(2023, 2, 28), c.newRequestDraft().dueDate());
+        c.setNewRequestClock(Clock.fixed(LocalDate.of(2024, 3, 31).atStartOfDay(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
+        assertEquals(LocalDate.of(2024, 4, 30), c.newRequestDraft().dueDate());
+    }
+
+    @Test
+    void descriptionDraftPreservesMultilineTextAndTextareaIsBoundedWrappingOptional() throws Exception {
+        CaseMaterialRequestsTabController.NewRequestDraft draft = new CaseMaterialRequestsTabController.NewRequestDraft(LocalDate.of(2024, 5, 1));
+        draft.description("Line one\nLine two");
+        assertEquals("Line one\nLine two", draft.description());
+        draft.description(null);
+        assertEquals("", draft.description());
+        String source = Files.readString(SOURCE);
+        String area = methodBody(source, "private static TextArea newRequestDescriptionArea");
+        assertTrue(area.contains("area.setPromptText(\"Add request details\")"));
+        assertTrue(area.contains("area.setWrapText(true)"));
+        assertTrue(area.contains("area.setPrefRowCount(4)"));
+        assertTrue(area.contains("area.setMaxHeight(140)"));
+    }
+
+    @Test
+    void stageSizingTargetsActualStageAndKeepsFooterFixedBelowScrollableForm() throws Exception {
+        String source = Files.readString(SOURCE);
+        String method = methodBody(source, "VBox newRequestBody");
+        String sizing = methodBody(source, "private static void applyNewRequestStageSize");
+        assertTrue(method.contains("ScrollPane scroller=new ScrollPane(formBody)"));
+        assertTrue(method.contains("VBox body=new VBox(14,scroller,footer)"));
+        assertTrue(method.contains("VBox.setVgrow(scroller,Priority.ALWAYS)"));
+        assertFalse(method.contains("VBox.setVgrow(description,Priority.ALWAYS)"));
+        assertTrue(sizing.contains("stage.setWidth(width)"));
+        assertTrue(sizing.contains("stage.setHeight(height)"));
+        assertTrue(sizing.contains("stage.getOwner()"));
+        assertTrue(sizing.contains("getVisualBounds()"));
     }
 
     private static int count(String source, String needle) {
