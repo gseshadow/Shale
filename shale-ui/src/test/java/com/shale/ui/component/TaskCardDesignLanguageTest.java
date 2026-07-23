@@ -66,23 +66,21 @@ class TaskCardDesignLanguageTest {
         assertFalse(taskCard.contains("hovered ? dueAccentCss"));
     }
 	@Test
-	void hoverRevealUsesSharedTaskCardAnimationAndConditionalContent() {
-		assertTrue(taskCard.contains("HOVER_REVEAL_DURATION = Duration.millis(180)"));
-		assertTrue(taskCard.contains("setHoverRevealExpanded(true)"));
-		assertTrue(taskCard.contains("setHoverRevealExpanded(false)"));
-		assertTrue(taskCard.contains("hoverRevealHasContent"));
-		assertTrue(taskCard.contains("hoverDescriptionSection.setManaged(!hoverText.isBlank())"));
-		assertTrue(taskCard.contains("hoverAssigneesSection.setManaged(!hoverAssigneesRow.getChildren().isEmpty())"));
-		assertTrue(taskCard.contains("buildHoverDescriptionPreview(fullText)"));
-		assertTrue(taskCard.contains("hoverRevealTargetHeight()"));
-		assertTrue(taskCard.contains("hoverRevealMaximumHeight(availableWidth)"));
+	void hoverDetailsUseSharedPopupWithoutResizingCards() {
+		assertTrue(taskCard.contains("Popup taskDetailsPopup"));
+		assertTrue(taskCard.contains("hideTaskDetailsPopup()"));
+		assertTrue(taskCard.contains("buildTaskDetailsPopup(titleLabel.getText(), fullDescription)"));
+		assertFalse(taskCard.contains("HOVER_REVEAL_DURATION"));
+		assertFalse(taskCard.contains("setHoverRevealExpanded"));
+		assertFalse(taskCard.contains("hoverRevealPane"));
+		assertFalse(taskCard.contains("maxHeightProperty()"));
 	}
 
 	@Test
-	void compactVariantsCanReceiveDescriptionForHoverReveal() {
+	void compactVariantsCanReceiveDescriptionForHoverPopup() {
 		assertTrue(factory.contains("descriptionForCard(model, allowPhiDescription)"));
 		assertFalse(factory.contains("variant == Variant.FULL || variant == Variant.MY_TASKS"),
-				"Compact task cards should not lose descriptions before the shared hover reveal can render them.");
+				"Compact task cards should not lose descriptions before the shared hover popup can render them.");
 	}
 
 }

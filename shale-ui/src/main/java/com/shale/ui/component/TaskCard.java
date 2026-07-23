@@ -5,9 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.Consumer;
 
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
-import javafx.animation.Timeline;
+import javafx.animation.PauseTransition;
 import javafx.util.Duration;
 
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -28,6 +26,10 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
+import javafx.stage.Popup;
+import javafx.stage.Window;
 
 public final class TaskCard extends VBox {
 
@@ -38,23 +40,15 @@ public final class TaskCard extends VBox {
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
 	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 	private static final double COMPACT_CARD_WIDTH = 280;
-	private static final Duration HOVER_REVEAL_DURATION = Duration.millis(180);
-	private static final int HOVER_DESCRIPTION_MAX_CHARS = 520;
-	private static final int HOVER_DESCRIPTION_MAX_LOGICAL_LINES = 8;
-	private static final double HOVER_DESCRIPTION_LINE_HEIGHT = 15;
-	private static final double HOVER_DESCRIPTION_MAX_HEIGHT = (HOVER_DESCRIPTION_LINE_HEIGHT * 3) + 4;
+	private static final double TASK_DETAILS_TOOLTIP_MAX_WIDTH = 360;
+	private static final int TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES = 8;
+	private static final double TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE = 12;
+	private static final Duration TASK_DETAILS_TOOLTIP_HIDE_DELAY = Duration.millis(120);
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
 	private final Label createdByLabel = new Label();
 	private final Label descriptionLabel = new Label();
-	private final Label hoverDescriptionLabel = new Label();
-	private final Label hoverDescriptionHeader = new Label("Description");
-	private final Label hoverAssigneesHeader = new Label("Assigned To");
-	private final VBox hoverDescriptionSection = new VBox(2, hoverDescriptionHeader, hoverDescriptionLabel);
-	private final HBox hoverAssigneesRow = new HBox(4);
-	private final VBox hoverAssigneesSection = new VBox(3, hoverAssigneesHeader, hoverAssigneesRow);
-	private final VBox hoverRevealPane = new VBox(6, hoverDescriptionSection, hoverAssigneesSection);
 	private final Label completedLabel = new Label();
 	private final Label statusPill = new Label();
 	private final Region dueAccentBar = new Region();
@@ -108,8 +102,11 @@ public final class TaskCard extends VBox {
 	private String statusColorCss = "#F1F5F9";
 	private boolean hovered;
 	private boolean fullExpanded;
-	private boolean hoverRevealHasContent;
-	private Timeline hoverRevealTimeline;
+	private String fullDescription = "";
+	private Popup taskDetailsPopup;
+	private Label taskDetailsPopupContent;
+	private final PauseTransition taskDetailsPopupHideDelay = new PauseTransition(TASK_DETAILS_TOOLTIP_HIDE_DELAY);
+	private boolean taskDetailsPopupMouseOver;
 
 	public TaskCard() {
 		setCursor(Cursor.HAND);
@@ -139,6 +136,7 @@ public final class TaskCard extends VBox {
 
 	public void setTitle(String title) {
 		titleLabel.setText((title == null || title.isBlank()) ? "Untitled task" : title.trim());
+		refreshTaskDetailsTooltip();
 	}
 
 	public void setDueAt(LocalDateTime dueAt) {
@@ -160,7 +158,8 @@ public final class TaskCard extends VBox {
 	}
 
 	public void setDescriptionPreview(String description) {
-		String fullText = description == null ? "" : description.trim();
+		String fullText = normalizeTaskDetailsText(description);
+		fullDescription = fullText;
 		String text = fullText;
 		if (text.length() > 140) {
 			text = text.substring(0, 137) + "...";
@@ -169,11 +168,7 @@ public final class TaskCard extends VBox {
 		boolean hasText = !text.isBlank();
 		descriptionLabel.setManaged(hasText);
 		descriptionLabel.setVisible(hasText);
-		String hoverText = buildHoverDescriptionPreview(fullText);
-		hoverDescriptionLabel.setText(hoverText);
-		hoverDescriptionSection.setManaged(!hoverText.isBlank());
-		hoverDescriptionSection.setVisible(!hoverText.isBlank());
-		refreshHoverRevealAvailability();
+		refreshTaskDetailsTooltip();
 	}
 
 	public void setCreatedByDisplayName(String createdByDisplayName) {
@@ -195,16 +190,11 @@ public final class TaskCard extends VBox {
 		List<AssignedUserModel> safeUsers = users == null ? List.of() : users;
 		if (safeUsers.isEmpty()) {
 			assigneeHost.getChildren().clear();
-			hoverAssigneesRow.getChildren().clear();
-			hoverAssigneesSection.setManaged(false);
-			hoverAssigneesSection.setVisible(false);
 			teamSection.setManaged(false);
 			teamSection.setVisible(false);
-			refreshHoverRevealAvailability();
 			return;
 		}
 		VBox cards = new VBox(4);
-		HBox hoverChips = new HBox(4);
 		int maxVisible = 3;
 		for (int i = 0; i < safeUsers.size() && i < maxVisible; i++) {
 			AssignedUserModel user = safeUsers.get(i);
@@ -222,32 +212,15 @@ public final class TaskCard extends VBox {
 				}
 			});
 			cards.getChildren().add(assigneeCard);
-			Label chip = new Label(user.displayName().trim());
-			chip.getStyleClass().add("task-card__hover-assignee-chip");
-			chip.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.74); -fx-background-color: rgba(255,255,255,0.58); -fx-background-radius: 999; -fx-border-color: rgba(74,104,138,0.18); -fx-border-radius: 999; -fx-border-width: 1; -fx-padding: 2 6 2 6;");
-			chip.setOnMouseClicked(e -> {
-				e.consume();
-				if (onOpenAssigneeUser != null) {
-					onOpenAssigneeUser.accept(selectedUserId);
-				}
-			});
-			hoverChips.getChildren().add(chip);
 		}
 		if (safeUsers.size() > maxVisible) {
 			Label moreLabel = new Label("+" + (safeUsers.size() - maxVisible) + " more");
 			moreLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.62);");
 			cards.getChildren().add(moreLabel);
-			Label moreChip = new Label("+" + (safeUsers.size() - maxVisible));
-			moreChip.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62); -fx-padding: 2 2 2 2;");
-			hoverChips.getChildren().add(moreChip);
 		}
 		assigneeHost.getChildren().setAll(cards);
-		hoverAssigneesRow.getChildren().setAll(hoverChips.getChildren());
-		hoverAssigneesSection.setManaged(!hoverAssigneesRow.getChildren().isEmpty());
-		hoverAssigneesSection.setVisible(!hoverAssigneesRow.getChildren().isEmpty());
 		teamSection.setManaged(true);
 		teamSection.setVisible(true);
-		refreshHoverRevealAvailability();
 	}
 
 	public void setRelatedCase(Long caseId, String caseName, String casePrimaryStatusName, String casePrimaryStatusColor,
@@ -304,7 +277,7 @@ public final class TaskCard extends VBox {
 
 	public void applyMini() {
 		currentVariant = Variant.MINI;
-		bodyPane.getChildren().setAll(titleLabel, hoverRevealPane);
+		bodyPane.getChildren().setAll(titleLabel);
 		getChildren().setAll(cardRow);
 		setSpacing(2);
 		setPadding(new Insets(4, 10, 4, 10));
@@ -319,7 +292,7 @@ public final class TaskCard extends VBox {
 		setDueAt(dueAtValue);
 		compactTitleBlock.getChildren().setAll(titleLabel, createdByLabel, dueLabel);
 		compactTitleRow.getChildren().setAll(compactTitleBlock, compactHeaderSpacer, statusPill);
-		bodyPane.getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel, hoverRevealPane);
+		bodyPane.getChildren().setAll(compactTitleRow, compactMetadataRow, completedLabel);
 		getChildren().setAll(cardRow);
 		setSpacing(3);
 		setPadding(new Insets(6, 8, 6, 8));
@@ -366,7 +339,7 @@ public final class TaskCard extends VBox {
 		myTasksTitleRow.getChildren().setAll(titleLabel);
 		myTasksMetadataRow.getChildren().setAll(dueLabel, myTasksMetadataSpacer, statusPill, expandDetailsButton);
 		myTasksMetadataBlock.getChildren().setAll(myTasksMetadataRow, relatedCaseHost);
-		bodyPane.getChildren().setAll(myTasksTitleRow, myTasksMetadataBlock, fullExpandedContent, hoverRevealPane);
+		bodyPane.getChildren().setAll(myTasksTitleRow, myTasksMetadataBlock, fullExpandedContent);
 		myTasksTitleRow.setAlignment(Pos.CENTER_LEFT);
 		myTasksTitleRow.setMinWidth(0);
 		myTasksTitleRow.setMaxWidth(Double.MAX_VALUE);
@@ -407,7 +380,7 @@ public final class TaskCard extends VBox {
 		setMaxWidth(Double.MAX_VALUE);
 		actionsRow.setAlignment(Pos.CENTER_RIGHT);
 
-		bodyPane.getChildren().setAll(fullHeaderRow, fullExpandedContent, hoverRevealPane);
+		bodyPane.getChildren().setAll(fullHeaderRow, fullExpandedContent);
 		getChildren().setAll(cardRow);
 		setFullExpanded(false);
 	}
@@ -434,7 +407,6 @@ public final class TaskCard extends VBox {
 		dueAccentBar.setMaxWidth(7);
 		HBox.setMargin(dueAccentBar, new Insets(8, 0, 8, 8));
 		bodyPane.setPadding(new Insets(8, 10, 8, 10));
-		configureHoverRevealPane();
 		toggleCompleteButton.getStyleClass().addAll(
 				"app-toolbar-button",
 				"app-toolbar-button-success",
@@ -464,14 +436,14 @@ public final class TaskCard extends VBox {
 			hovered = true;
 			setTranslateY(-1.5);
 			refreshSurfaceStyle();
-			setHoverRevealExpanded(true);
+			showTaskDetailsPopup();
 		});
 		setOnMouseExited(e ->
 		{
 			hovered = false;
 			setTranslateY(0);
 			refreshSurfaceStyle();
-			setHoverRevealExpanded(false);
+			scheduleTaskDetailsPopupHide();
 		});
 		setOnMouseClicked(e ->
 		{
@@ -480,6 +452,21 @@ public final class TaskCard extends VBox {
 			}
 			if (onOpen != null && taskId != null) {
 				onOpen.accept(taskId);
+			}
+		});
+		taskDetailsPopupHideDelay.setOnFinished(e -> {
+			if (!hovered && !taskDetailsPopupMouseOver) {
+				hideTaskDetailsPopup();
+			}
+		});
+		sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null) {
+				hideTaskDetailsPopup();
+			} else {
+				Window window = newScene.getWindow();
+				if (window != null) {
+					window.setOnHidden(e -> hideTaskDetailsPopup());
+				}
 			}
 		});
 		setAssignees(List.of());
@@ -492,144 +479,134 @@ public final class TaskCard extends VBox {
 			fullExpandedContent.setManaged(expanded);
 			fullExpandedContent.setVisible(expanded);
 			expandDetailsButton.setText(expanded ? "−" : "+");
-			if (expanded) {
-				setHoverRevealExpanded(false);
+		}
+	}
+
+	private void refreshTaskDetailsTooltip() {
+		hideTaskDetailsPopup();
+		taskDetailsPopup = buildTaskDetailsPopup(titleLabel.getText(), fullDescription);
+		taskDetailsPopupContent = (Label) taskDetailsPopup.getContent().getFirst();
+		taskDetailsPopupContent.setOnMouseEntered(e -> {
+			taskDetailsPopupHideDelay.stop();
+			taskDetailsPopupMouseOver = true;
+		});
+		taskDetailsPopupContent.setOnMouseExited(e -> {
+			taskDetailsPopupMouseOver = false;
+			scheduleTaskDetailsPopupHide();
+		});
+	}
+
+	Popup getTaskDetailsPopupForTesting() {
+		return taskDetailsPopup;
+	}
+
+	private void showTaskDetailsPopup() {
+		if (taskDetailsPopup == null || getScene() == null || getScene().getWindow() == null) {
+			return;
+		}
+		taskDetailsPopupHideDelay.stop();
+		if (taskDetailsPopup.isShowing()) {
+			return;
+		}
+		var screenBounds = localToScreen(getBoundsInLocal());
+		if (screenBounds == null) {
+			return;
+		}
+		taskDetailsPopup.show(this, screenBounds.getMinX(), screenBounds.getMaxY() + 6);
+		taskDetailsPopup.getScene().getRoot().applyCss();
+		taskDetailsPopup.getScene().getRoot().autosize();
+		taskDetailsPopup.getScene().getRoot().layout();
+	}
+
+	private void scheduleTaskDetailsPopupHide() {
+		taskDetailsPopupHideDelay.playFromStart();
+	}
+
+	private void hideTaskDetailsPopup() {
+		taskDetailsPopupHideDelay.stop();
+		if (taskDetailsPopup != null) {
+			taskDetailsPopup.hide();
+		}
+	}
+
+	static Popup buildTaskDetailsPopup(String title, String description) {
+		Label content = new Label(buildTaskDetailsTooltipText(title, description));
+		content.getStyleClass().add("tooltip");
+		content.setWrapText(true);
+		content.setPrefWidth(tooltipWidthForText(content.getText()));
+		content.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
+		content.setStyle("-fx-font-size: 12px; -fx-line-spacing: 1px;");
+
+		Popup popup = new Popup();
+		popup.setAutoFix(true);
+		popup.setAutoHide(false);
+		popup.getContent().setAll(content);
+		return popup;
+	}
+
+	static String buildTaskDetailsTooltipText(String title, String description) {
+		String normalizedTitle = title == null || title.isBlank() ? "Untitled task" : title.trim();
+		String displayedDescription = descriptionForTooltip(description);
+		return displayedDescription.isBlank() ? normalizedTitle : normalizedTitle + "\n\n" + displayedDescription;
+	}
+
+	static double tooltipWidthForText(String text) {
+		String normalized = text == null ? "" : text;
+		double widestLine = 0;
+		for (String line : normalized.split("\n", -1)) {
+			Text measuringText = new Text(line);
+			measuringText.setFont(Font.font(TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE));
+			widestLine = Math.max(widestLine, measuringText.getLayoutBounds().getWidth());
+		}
+		return Math.min(TASK_DETAILS_TOOLTIP_MAX_WIDTH, Math.max(160, widestLine + 34));
+	}
+
+	static String descriptionForTooltip(String text) {
+		String normalized = normalizeTaskDetailsText(text);
+		if (normalized.isBlank() || wrappedDescriptionLineCount(normalized) <= TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES) {
+			return normalized;
+		}
+		int low = 0;
+		int high = normalized.length();
+		String best = "...";
+		while (low <= high) {
+			int mid = (low + high) >>> 1;
+			String candidate = appendInlineEllipsis(normalized.substring(0, mid));
+			if (wrappedDescriptionLineCount(candidate) <= TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES) {
+				best = candidate;
+				low = mid + 1;
+			} else {
+				high = mid - 1;
 			}
 		}
+		return best;
 	}
 
-	private void configureHoverRevealPane() {
-		hoverRevealPane.getStyleClass().add("task-card__hover-reveal");
-		hoverRevealPane.setStyle("-fx-padding: 5 0 0 0; -fx-border-color: rgba(74,104,138,0.16) transparent transparent transparent; -fx-border-width: 1 0 0 0;");
-		hoverRevealPane.setManaged(false);
-		hoverRevealPane.setVisible(false);
-		hoverRevealPane.setOpacity(0);
-		hoverRevealPane.setMaxHeight(0);
-		hoverDescriptionHeader.setStyle(hoverRevealHeaderStyle());
-		hoverAssigneesHeader.setStyle(hoverRevealHeaderStyle());
-		hoverDescriptionLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70); -fx-line-spacing: 1px;");
-		hoverDescriptionLabel.setWrapText(true);
-		hoverDescriptionLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
-		hoverDescriptionLabel.setMaxHeight(HOVER_DESCRIPTION_MAX_HEIGHT);
-		hoverAssigneesRow.setAlignment(Pos.CENTER_LEFT);
-	}
-
-	private String hoverRevealHeaderStyle() {
-		return "-fx-font-size: 9px; -fx-font-weight: 800; -fx-text-fill: rgba(17,37,66,0.50);";
-	}
-
-	private void refreshHoverRevealAvailability() {
-		hoverRevealHasContent = hoverDescriptionSection.isManaged() || hoverAssigneesSection.isManaged();
-		if (!hoverRevealHasContent) {
-			setHoverRevealExpanded(false);
-		}
-	}
-
-	private void setHoverRevealExpanded(boolean expanded) {
-		if (!hoverRevealHasContent || fullExpanded) {
-			expanded = false;
-		}
-		if (hoverRevealTimeline != null) {
-			hoverRevealTimeline.stop();
-		}
-		if (expanded) {
-			hoverRevealPane.setManaged(true);
-			hoverRevealPane.setVisible(true);
-			double targetHeight = hoverRevealTargetHeight();
-			hoverRevealTimeline = new Timeline(
-					new KeyFrame(Duration.ZERO,
-							new KeyValue(hoverRevealPane.maxHeightProperty(), hoverRevealPane.getMaxHeight()),
-							new KeyValue(hoverRevealPane.opacityProperty(), hoverRevealPane.getOpacity())),
-					new KeyFrame(HOVER_REVEAL_DURATION,
-							new KeyValue(hoverRevealPane.maxHeightProperty(), targetHeight),
-							new KeyValue(hoverRevealPane.opacityProperty(), 1.0)));
-		} else {
-			hoverRevealTimeline = new Timeline(
-					new KeyFrame(Duration.ZERO,
-							new KeyValue(hoverRevealPane.maxHeightProperty(), hoverRevealPane.getMaxHeight()),
-							new KeyValue(hoverRevealPane.opacityProperty(), hoverRevealPane.getOpacity())),
-					new KeyFrame(HOVER_REVEAL_DURATION,
-							new KeyValue(hoverRevealPane.maxHeightProperty(), 0),
-							new KeyValue(hoverRevealPane.opacityProperty(), 0)));
-			hoverRevealTimeline.setOnFinished(e -> {
-				if (!hovered) {
-					hoverRevealPane.setManaged(false);
-					hoverRevealPane.setVisible(false);
-				}
-			});
-		}
-		hoverRevealTimeline.play();
-	}
-
-	private double hoverRevealTargetHeight() {
-		hoverRevealPane.applyCss();
-		double availableWidth = Math.max(1, bodyPane.getWidth() - bodyPane.snappedLeftInset() - bodyPane.snappedRightInset());
-		double preferredHeight = hoverRevealPane.prefHeight(availableWidth);
-		double maximumHeight = hoverRevealMaximumHeight(availableWidth);
-		return Math.min(Math.max(1, preferredHeight), maximumHeight);
-	}
-
-	private double hoverRevealMaximumHeight(double availableWidth) {
-		double total = hoverRevealPane.snappedTopInset() + hoverRevealPane.snappedBottomInset();
-		boolean hasDescription = hoverDescriptionSection.isManaged();
-		boolean hasAssignees = hoverAssigneesSection.isManaged();
-		if (hasDescription) {
-			total += hoverDescriptionHeader.prefHeight(availableWidth)
-					+ hoverDescriptionSection.getSpacing()
-					+ HOVER_DESCRIPTION_MAX_HEIGHT;
-		}
-		if (hasDescription && hasAssignees) {
-			total += hoverRevealPane.getSpacing();
-		}
-		if (hasAssignees) {
-			total += hoverAssigneesHeader.prefHeight(availableWidth)
-					+ hoverAssigneesSection.getSpacing()
-					+ hoverAssigneesRow.prefHeight(availableWidth);
-		}
-		return Math.max(1, total);
-	}
-
-	static String buildHoverDescriptionPreview(String text) {
-		String normalized = normalizeHoverDescription(text);
+	static int wrappedDescriptionLineCount(String text) {
+		String normalized = normalizeTaskDetailsText(text);
 		if (normalized.isBlank()) {
-			return "";
+			return 0;
 		}
-		String[] lines = normalized.split("\\n", -1);
-		StringBuilder preview = new StringBuilder();
-		boolean truncated = false;
-		for (int i = 0; i < lines.length; i++) {
-			if (i >= HOVER_DESCRIPTION_MAX_LOGICAL_LINES) {
-				truncated = true;
-				break;
-			}
-			String line = lines[i].stripTrailing();
-			int separatorLength = preview.isEmpty() ? 0 : 1;
-			int remaining = HOVER_DESCRIPTION_MAX_CHARS - preview.length() - separatorLength;
-			if (remaining <= 0) {
-				truncated = true;
-				break;
-			}
-			if (line.length() > remaining) {
-				if (!preview.isEmpty()) {
-					preview.append('\n');
-				}
-				preview.append(line, 0, Math.max(0, remaining)).append("...");
-				truncated = true;
-				break;
-			}
-			if (!preview.isEmpty()) {
-				preview.append('\n');
-			}
-			preview.append(line);
-		}
-		String result = preview.toString().stripTrailing();
-		if (truncated && !result.endsWith("...")) {
-			result = appendInlineEllipsis(result);
-		}
-		return result;
+		Text measuringText = new Text(normalized);
+		measuringText.setFont(Font.font(TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE));
+		measuringText.setWrappingWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
+		double lineHeight = Font.font(TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE).getSize() + 5;
+		return Math.max(1, (int) Math.ceil(measuringText.getLayoutBounds().getHeight() / lineHeight));
 	}
 
-	private static String normalizeHoverDescription(String text) {
+	static double estimatedTooltipDescriptionHeight(String text) {
+		return wrappedDescriptionLineCount(text) * (TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE + 5);
+	}
+
+	private static String appendInlineEllipsis(String text) {
+		String trimmed = text.stripTrailing();
+		while (!trimmed.isBlank() && (trimmed.endsWith(".") || trimmed.endsWith(",") || trimmed.endsWith(";") || trimmed.endsWith(":"))) {
+			trimmed = trimmed.substring(0, trimmed.length() - 1).stripTrailing();
+		}
+		return trimmed.isBlank() ? "..." : trimmed + "...";
+	}
+
+	static String normalizeTaskDetailsText(String text) {
 		if (text == null) {
 			return "";
 		}
@@ -640,14 +617,6 @@ public final class TaskCard extends VBox {
 				.replaceAll("\\n[\\t ]+", "\n")
 				.replaceAll("\\n{3,}", "\n\n")
 				.trim();
-	}
-
-	private static String appendInlineEllipsis(String text) {
-		String trimmed = text.stripTrailing();
-		if (trimmed.isBlank()) {
-			return "";
-		}
-		return trimmed + "...";
 	}
 
 	private void configureRelatedSections() {
