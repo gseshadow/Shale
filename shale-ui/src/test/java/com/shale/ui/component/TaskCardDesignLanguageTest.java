@@ -33,10 +33,17 @@ class TaskCardDesignLanguageTest {
     void dueDateStateDrivesLeftAccentBarNotCardBorder() {
         assertTrue(taskCard.contains("dueAccentBar"));
         assertTrue(taskCard.contains("setBorderByDueState(LocalDateTime dueAt, LocalDateTime completedAt)"));
-        assertTrue(taskCard.contains("dueAt.isBefore(now)"));
-        assertTrue(taskCard.contains("now.plusDays(1)"));
-        assertTrue(taskCard.contains("now.plusWeeks(1)"));
-        assertTrue(taskCard.contains("now.plusWeeks(2)"));
+        assertTrue(taskCard.contains("DueProximityStyles.accentColor(dueAt, completedAt)"));
+        String sharedDueStyles;
+        try {
+            sharedDueStyles = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/DueProximityStyles.java"));
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+        assertTrue(sharedDueStyles.contains("dueAt.isBefore(now)"));
+        assertTrue(sharedDueStyles.contains("now.plusDays(1)"));
+        assertTrue(sharedDueStyles.contains("now.plusWeeks(1)"));
+        assertTrue(sharedDueStyles.contains("now.plusWeeks(2)"));
         assertFalse(taskCard.contains("cardContainerStyle(backgroundCss, borderCss"));
     }
 
