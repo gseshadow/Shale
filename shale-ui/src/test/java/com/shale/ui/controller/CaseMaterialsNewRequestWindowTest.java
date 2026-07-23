@@ -167,6 +167,26 @@ class CaseMaterialsNewRequestWindowTest {
         assertFalse(fieldSource.toLowerCase().contains("dao"));
     }
 
+
+    @Test
+    void sharedFormGridKeepsReadableStableLabelColumnAndGrowingControls() throws Exception {
+        String source = Files.readString(SOURCE);
+        String grid = methodBody(source, "static GridPane grid");
+        String add = methodBody(source, "static void add");
+
+        assertTrue(grid.contains("ColumnConstraints labels=new ColumnConstraints(132,132,132)"));
+        assertTrue(grid.contains("labels.setHgrow(Priority.NEVER)"));
+        assertTrue(grid.contains("controls.setHgrow(Priority.ALWAYS)"));
+        assertTrue(grid.contains("controls.setFillWidth(true)"));
+        assertTrue(grid.contains("g.getColumnConstraints().setAll(labels,controls)"));
+        assertTrue(add.contains("Label l=new Label(label)"));
+        assertTrue(add.contains("l.setWrapText(false)"));
+        assertTrue(add.contains("l.setMinWidth(Region.USE_PREF_SIZE)"));
+        assertFalse(add.contains("label.equals"));
+        assertFalse(add.contains("setPrefWidth"));
+        assertFalse(add.contains("setWrapText(true)"));
+    }
+
     @Test
     void newRequestDialogUsesCompactHeightInsteadOfExpandedSelectorHeight() throws Exception {
         String source = Files.readString(SOURCE);
