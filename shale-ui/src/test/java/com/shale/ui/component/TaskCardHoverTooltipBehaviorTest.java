@@ -31,6 +31,25 @@ final class TaskCardHoverTooltipBehaviorTest {
     }
 
     @Test
+    void shortHoverPopupUsesContentSizedHeight() {
+        assertTrue(taskCard.contains("content.setMinHeight(Region.USE_PREF_SIZE)"));
+        assertTrue(taskCard.contains("content.setPrefHeight(Region.USE_COMPUTED_SIZE)"));
+        assertTrue(taskCard.contains("content.setMaxHeight(Region.USE_PREF_SIZE)"));
+        assertTrue(taskCard.contains("tooltip.setPrefHeight(Region.USE_COMPUTED_SIZE)"));
+        assertTrue(taskCard.contains("tooltip.setMaxHeight(Region.USE_PREF_SIZE)"));
+        assertTrue(taskCard.contains("VBox.setVgrow(descriptionNode, javafx.scene.layout.Priority.NEVER)"));
+    }
+
+    @Test
+    void longHoverDescriptionsScrollOnlyAfterMaximumContentHeight() {
+        assertTrue(taskCard.contains("TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT = 220"));
+        assertTrue(taskCard.contains("estimatedTooltipDescriptionHeight(normalizedDescription) > TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT"));
+        assertTrue(taskCard.contains("new ScrollPane(descriptionNode)"));
+        assertTrue(taskCard.contains("scroller.setPrefViewportHeight(TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT)"));
+        assertTrue(taskCard.contains("scroller.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED)"));
+    }
+
+    @Test
     void blankDescriptionLeavesPopupTitleOnly() {
         assertTrue(taskCard.contains("if (!normalizedDescription.isBlank())"));
         assertTrue(taskCard.contains("VBox content = new VBox(4, titleNode)"));

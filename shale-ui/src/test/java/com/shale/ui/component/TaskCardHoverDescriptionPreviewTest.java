@@ -27,4 +27,9 @@ class TaskCardHoverDescriptionPreviewTest {
         assertEquals(900, normalized.length());
         assertFalse(normalized.endsWith("..."));
     }
+
+    @Test
+    void shortDescriptionsEstimateBelowScrollThreshold() {
+        assertTrue(TaskCard.estimatedTooltipDescriptionHeight("short task note") < 220);
+    }
 }

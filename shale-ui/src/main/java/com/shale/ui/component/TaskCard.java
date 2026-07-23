@@ -19,6 +19,7 @@ import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
@@ -36,6 +37,8 @@ public final class TaskCard extends VBox {
 	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 	private static final double COMPACT_CARD_WIDTH = 280;
 	private static final double TASK_DETAILS_TOOLTIP_MAX_WIDTH = 360;
+	private static final double TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT = 220;
+	private static final double TASK_DETAILS_TOOLTIP_LINE_HEIGHT = 17;
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
@@ -465,25 +468,63 @@ public final class TaskCard extends VBox {
 	static Tooltip buildTaskDetailsTooltip(String title, String description) {
 		Label titleNode = new Label((title == null || title.isBlank()) ? "Untitled task" : title.trim());
 		titleNode.setWrapText(true);
+		titleNode.setMinHeight(Region.USE_PREF_SIZE);
+		titleNode.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		titleNode.setMaxHeight(Region.USE_PREF_SIZE);
 		titleNode.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
 		titleNode.setStyle("-fx-font-size: 13px; -fx-font-weight: 800;");
 
 		String normalizedDescription = normalizeTaskDetailsText(description);
 		VBox content = new VBox(4, titleNode);
+		content.setFillWidth(true);
+		content.setMinHeight(Region.USE_PREF_SIZE);
+		content.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		content.setMaxHeight(Region.USE_PREF_SIZE);
+		content.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
+		VBox.setVgrow(titleNode, javafx.scene.layout.Priority.NEVER);
 		if (!normalizedDescription.isBlank()) {
 			Label descriptionNode = new Label(normalizedDescription);
 			descriptionNode.setWrapText(true);
+			descriptionNode.setMinHeight(Region.USE_PREF_SIZE);
+			descriptionNode.setPrefHeight(Region.USE_COMPUTED_SIZE);
+			descriptionNode.setMaxHeight(Region.USE_PREF_SIZE);
 			descriptionNode.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
 			descriptionNode.setStyle("-fx-font-size: 12px; -fx-line-spacing: 1px;");
-			content.getChildren().add(descriptionNode);
+			if (estimatedTooltipDescriptionHeight(normalizedDescription) > TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT) {
+				ScrollPane scroller = new ScrollPane(descriptionNode);
+				scroller.setFitToWidth(true);
+				scroller.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+				scroller.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+				scroller.setMinHeight(Region.USE_PREF_SIZE);
+				scroller.setPrefViewportHeight(TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT);
+				scroller.setMaxHeight(TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT);
+				scroller.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
+				VBox.setVgrow(scroller, javafx.scene.layout.Priority.NEVER);
+				content.getChildren().add(scroller);
+			} else {
+				VBox.setVgrow(descriptionNode, javafx.scene.layout.Priority.NEVER);
+				content.getChildren().add(descriptionNode);
+			}
 		}
-		content.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
 
 		Tooltip tooltip = new Tooltip();
 		tooltip.setGraphic(content);
 		tooltip.setText(null);
+		tooltip.setMinHeight(Region.USE_PREF_SIZE);
+		tooltip.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		tooltip.setMaxHeight(Region.USE_PREF_SIZE);
 		tooltip.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
 		return tooltip;
+	}
+
+	static double estimatedTooltipDescriptionHeight(String text) {
+		String normalized = normalizeTaskDetailsText(text);
+		if (normalized.isBlank()) {
+			return 0;
+		}
+		int logicalLines = normalized.split("\n", -1).length;
+		int wrapLines = Math.max(0, normalized.length() / 54);
+		return Math.max(logicalLines, wrapLines + 1) * TASK_DETAILS_TOOLTIP_LINE_HEIGHT;
 	}
 
 	static String normalizeTaskDetailsText(String text) {
