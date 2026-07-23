@@ -44,6 +44,7 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(method.contains("ColorCodedComboBox<RequestStatusDto> requestStatus=newLookupSelector(RequestStatusDto::name)"));
         assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> requestedBy=newUserSelectionField(stage,false)"));
         assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> assignedTo=newUserSelectionField(stage,true)"));
+        assertTrue(method.contains("TextArea description=newRequestDescriptionArea()"));
         assertTrue(userFactory.contains("new UserSelectionField<>(CaseTaskService.AssignableUserOption::id,CaseTaskService.AssignableUserOption::displayName,CaseTaskService.AssignableUserOption::color"));
         assertTrue(userFactory.contains("AssignedUserPickerDialog.show(pickerOwner,candidates,CaseMaterialRequestsTabController.class)"));
         assertFalse(method.contains("new ComboBox<CaseTaskService.AssignableUserOption>"));
@@ -168,9 +169,29 @@ class CaseMaterialsNewRequestWindowTest {
     @Test
     void newRequestDialogUsesCompactHeightInsteadOfExpandedSelectorHeight() throws Exception {
         String source = Files.readString(SOURCE);
-        assertTrue(source.contains("NEW_REQUEST_WIDTH=560, NEW_REQUEST_HEIGHT=500, NEW_REQUEST_MIN_WIDTH=500, NEW_REQUEST_MIN_HEIGHT=460"));
+        assertTrue(source.contains("NEW_REQUEST_WIDTH=560, NEW_REQUEST_HEIGHT=560, NEW_REQUEST_MIN_WIDTH=500, NEW_REQUEST_MIN_HEIGHT=520"));
+        assertFalse(source.contains("NEW_REQUEST_WIDTH=640"));
+        assertFalse(source.contains("NEW_REQUEST_HEIGHT=700"));
+        assertFalse(source.contains("NEW_REQUEST_MIN_WIDTH=560"));
+        assertFalse(source.contains("NEW_REQUEST_MIN_HEIGHT=620"));
         assertFalse(source.contains("NEW_REQUEST_HEIGHT=760"));
         assertFalse(source.contains("NEW_REQUEST_MIN_HEIGHT=720"));
+    }
+
+    @Test
+    void descriptionIsMinimalBoundedWrappingTextAreaWithoutFormScrollOrClockSeam() throws Exception {
+        String source = Files.readString(SOURCE);
+        String method = methodBody(source, "VBox newRequestBody");
+        String area = methodBody(source, "private static TextArea newRequestDescriptionArea");
+        assertTrue(area.contains("new TextArea()"));
+        assertTrue(area.contains("area.setPromptText(\"Add request details\")"));
+        assertTrue(area.contains("area.setWrapText(true)"));
+        assertTrue(area.contains("area.setPrefRowCount(3)"));
+        assertTrue(area.contains("area.setMaxHeight(110)"));
+        assertFalse(method.contains("ScrollPane scroller"));
+        assertFalse(source.contains("newRequestClock"));
+        assertFalse(source.contains("NewRequestDraft"));
+        assertFalse(source.contains("plusMonths(1)"));
     }
 
     private static int count(String source, String needle) {

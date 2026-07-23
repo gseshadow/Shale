@@ -84,7 +84,6 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(placeholder.contains("TextField titleField=new TextField()"));
     assertTrue(placeholder.contains("titleField.setPromptText(\"New Request\")"));
     assertFalse(placeholder.contains("MaterialRequestForm"));
-    assertTrue(placeholder.contains("DatePicker dueDate=newDatePicker(\"Select due date\")"));
     assertTrue(placeholder.contains("ColorCodedComboBox<MaterialTypeDto> materialType"));
     assertFalse(placeholder.contains("new ComboBox<MaterialTypeDto>"));
     assertFalse(placeholder.contains("ChoiceBox"));
@@ -95,32 +94,21 @@ final class CaseMaterialsPhase4UiContractTest {
     assertFalse(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
   }
-  @Test void newRequestRequestedFromUsesSharedPartyEntityChooserWithoutCasePartyMutation() {
+  @Test void newRequestDescriptionIsMinimalAndDoesNotIntroduceRequestedFromOrPersistenceMutation() {
     String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
-    String dialog = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
-    String body = requestController.substring(requestController.indexOf("VBox newRequestBody"), requestController.indexOf("private void loadNewRequestLookups"));
-    assertTrue(body.contains("add(fields,1,\"Requested From:\",requestedFromBox)"));
-    assertTrue(body.contains("ActionButtonFactory.primary(\"Add\",null)"));
-    assertTrue(body.contains("requestedFromAction.setText(v==null?\"Add\":\"Change\")"));
-    assertTrue(body.contains("ActionButtonFactory.neutral(\"Remove\",null)"));
-    assertTrue(body.contains("AtomicReference<RequestedFromSelection>"));
-    assertTrue(requestController.contains("record RequestedFromSelection(String entityType, Long entityId, String label, ContactCardFactory.ContactCardModel contactModel, OrganizationCardFactory.OrganizationCardModel organizationModel)"));
-    assertTrue(body.contains("contactCards.create(v.contactModel(),ContactCardFactory.Variant.MINI)"));
-    assertTrue(body.contains("organizationCards.create(v.organizationModel(),OrganizationCardFactory.Variant.MINI)"));
-    assertTrue(body.contains("showRequestedFromChooser(stage)"));
-    assertTrue(requestController.contains("RequestedFromWorkflowDialog.show"));
-    assertTrue(requestController.contains("caseDao.findSelectableContactsForTenant()"));
-    assertTrue(requestController.contains("caseDao.findSelectableOrganizationsForTenant()"));
-    assertTrue(requestController.contains("contactDao.createContact(new ContactDao.CreateContactRequest"));
-    assertTrue(requestController.contains("organizationDao.create(new OrganizationDao.OrganizationCreateRequest"));
+    String body = requestController.substring(requestController.indexOf("VBox newRequestBody"), requestController.indexOf("private static UserSelectionField"));
+    assertTrue(body.contains("add(fields,6,\"Description:\",description)"));
+    assertTrue(body.contains("TextArea description=newRequestDescriptionArea()"));
+    assertTrue(requestController.contains("area.setPromptText(\"Add request details\")"));
+    assertTrue(requestController.contains("area.setWrapText(true)"));
+    assertTrue(requestController.contains("area.setPrefRowCount(3)"));
+    assertTrue(requestController.contains("area.setMaxHeight(110)"));
+    assertFalse(body.contains("ScrollPane scroller"));
+    assertFalse(requestController.contains("RequestedFromSelection"));
     assertFalse(requestController.contains("caseDao.addCaseParty"));
     assertFalse(requestController.contains("createMaterialRequest"));
     assertFalse(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
-    assertTrue(dialog.contains("public record Selection"));
-    assertTrue(dialog.contains("public static Selection show"));
-    assertTrue(dialog.contains("Select Existing or Create New"));
-    assertTrue(dialog.contains("Contact or Organization"));
   }
 
 

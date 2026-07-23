@@ -75,7 +75,7 @@ final class OrganizationCardMiniStyleTest {
         String caseController = Files.readString(CASE_CONTROLLER);
 
         assertTrue(requestedFrom.contains("OrganizationCardFactory.Variant.MINI"));
-        assertTrue(caseMaterials.contains("OrganizationCardFactory.Variant.MINI"));
+        assertFalse(caseMaterials.contains("OrganizationCardFactory.Variant.MINI"));
         assertFalse(caseController.contains("OrganizationCardFactory.Variant.MINI"));
     }
 }

@@ -34,13 +34,8 @@ final class RequestedFromWorkflowDialogTest {
         assertFalse(s.contains("setText(empty || item == null ? null : item.label())"));
     }
 
-    @Test void requestedFromLoadsCompleteTenantDirectoryAndKeepsAddPartyFilteringSeparate() throws Exception {
-        String c = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
+    @Test void requestedFromDirectoryDaoRemainsTenantScopedAndSeparateFromAddPartyFiltering() throws Exception {
         String d = read("../shale-data/src/main/java/com/shale/data/dao/CaseDao.java");
-        assertTrue(c.contains("caseDao.findSelectableContactsForTenant()"));
-        assertTrue(c.contains("caseDao.findSelectableOrganizationsForTenant()"));
-        assertFalse(c.contains("findLinkableContacts(cid())"));
-        assertFalse(c.contains("findLinkableOrganizations(cid())"));
         assertTrue(d.substring(d.indexOf("public List<SelectableContactRow> findSelectableContactsForTenant()"), d.indexOf("public List<PartyRoleRow> listPartyRoles()"))
                 .contains("ct.ShaleClientId = ?"));
         assertTrue(d.substring(d.indexOf("public List<SelectableContactRow> findSelectableContactsForTenant()"), d.indexOf("public List<PartyRoleRow> listPartyRoles()"))
@@ -64,7 +59,6 @@ final class RequestedFromWorkflowDialogTest {
         String s = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
         String c = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
         assertTrue(s.contains("new Selection(state.entityType,state.selected.id(),state.selected.label(),false"));
-        assertTrue(c.contains("return id==null?null:newRequestedFromSelection(r,id,label)"));
         assertFalse(s.contains("addCaseParty"));
         assertFalse(c.contains("caseDao.addCaseParty"));
         assertFalse(c.contains("createMaterialRequest"));
@@ -78,10 +72,8 @@ final class RequestedFromWorkflowDialogTest {
         String css = read("src/main/resources/css/app.css");
         assertTrue(c.contains("root.setPrefSize(NEW_REQUEST_WIDTH,NEW_REQUEST_HEIGHT)"));
         assertTrue(c.contains("root.setMinSize(NEW_REQUEST_MIN_WIDTH,NEW_REQUEST_MIN_HEIGHT)"));
-        assertTrue(c.indexOf("requestedFromDisplay.getChildren().addAll(card,requestedFromActions)") > 0);
-        assertTrue(c.contains("else requestedFromDisplay.getChildren().add(requestedFromActions)"));
-        assertTrue(c.contains("removeRequestedFrom.setVisible(v!=null)"));
-        assertTrue(c.contains("applyNewRequestStageSize(stage,(Region)stage.getScene().getRoot())"));
+        assertTrue(c.contains("applyNewRequestStageSize(stage,root)"));
+        assertFalse(c.contains("requestedFromDisplay.getChildren().addAll(card,requestedFromActions)"));
         assertTrue(d.contains("results.setPrefHeight(420)"));
         assertTrue(d.contains("results.setMinHeight(300)"));
         assertTrue(d.contains("VBox.setVgrow(results, Priority.ALWAYS)"));
