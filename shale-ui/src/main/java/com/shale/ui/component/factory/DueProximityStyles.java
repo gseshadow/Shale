@@ -45,12 +45,12 @@ public final class DueProximityStyles {
         String accent = accentColor(dueAt, completedAt, clock);
         String surface = hovered ? HOVER_SURFACE : DEFAULT_SURFACE;
         String dueColor = (accent == null || accent.isBlank()) ? NEUTRAL_RAIL_COLOR : accent;
-        double leadingOpacity = accent == null || accent.isBlank() ? (hovered ? 0.16 : 0.12) : (hovered ? 0.18 : 0.14);
-        double fadeOpacity = accent == null || accent.isBlank() ? (hovered ? 0.09 : 0.07) : (hovered ? 0.10 : 0.08);
+        double leadingOpacity = accent == null || accent.isBlank() ? (hovered ? 0.24 : 0.22) : (hovered ? 0.18 : 0.14);
+        double fadeOpacity = accent == null || accent.isBlank() ? (hovered ? 0.15 : 0.13) : (hovered ? 0.10 : 0.08);
         String wash = "linear-gradient(to right, "
                 + ColorUtil.toCssRgba(dueColor, leadingOpacity) + " 0%, "
-                + ColorUtil.toCssRgba(dueColor, fadeOpacity) + " 18%, "
-                + surface + " 58%, "
+                + ColorUtil.toCssRgba(dueColor, fadeOpacity) + " 24%, "
+                + surface + " 62%, "
                 + surface + " 100%)";
         return new Presentation(dueColor, wash, accent != null && !accent.isBlank());
     }

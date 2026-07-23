@@ -17,6 +17,7 @@ import com.shale.core.dto.MaterialRequestSummaryDto;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.geometry.Insets;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -71,6 +72,48 @@ final class MaterialRequestCardFactoryRenderingTest {
             assertTrue(rendered.card().getStyle().contains("linear-gradient(to right"), rendered.card().getStyle());
             assertTrue(rendered.card().getStyle().contains("rgba(203,213,225"), rendered.card().getStyle());
             assertTrue(rendered.rail().getStyle().contains("#2F80ED"), rendered.rail().getStyle());
+        } finally {
+            runFxAndWait(rendered.stage()::close);
+        }
+    }
+
+
+    @Test
+    void listInsetsExposeParentAroundMultipleRoundedCardsAndPreserveResponsiveWidth() throws Exception {
+        AtomicReference<RenderedList> ref = new AtomicReference<>();
+        runFxAndWait(() -> {
+            HBox first = (HBox) new MaterialRequestCardFactory(id -> { }).create(summary(LocalDateTime.of(2026, 8, 22, 0, 0)), MaterialRequestCardFactory.Variant.LIST);
+            HBox second = (HBox) new MaterialRequestCardFactory(id -> { }).create(summary(LocalDateTime.of(2026, 7, 25, 12, 0)), MaterialRequestCardFactory.Variant.LIST);
+            VBox list = new VBox(10, first, second);
+            list.setPadding(new Insets(8));
+            list.setFillWidth(true);
+            list.setStyle("-fx-background-color: #D9E2EC;");
+            StackPane root = new StackPane(list);
+            root.setStyle("-fx-background-color: #001122;");
+            Scene scene = new Scene(root, 520, 420);
+            scene.getStylesheets().add(MaterialRequestCardFactoryRenderingTest.class.getResource("/css/app.css").toExternalForm());
+            Stage stage = new Stage();
+            stage.setScene(scene);
+            stage.show();
+            root.applyCss();
+            root.layout();
+            ref.set(new RenderedList(stage, list, first, second));
+        });
+        RenderedList rendered = ref.get();
+        try {
+            Insets padding = rendered.list().getPadding();
+            assertEquals(8.0, padding.getTop(), 0.1);
+            assertEquals(8.0, padding.getRight(), 0.1);
+            assertEquals(8.0, padding.getBottom(), 0.1);
+            assertEquals(8.0, padding.getLeft(), 0.1);
+            assertEquals(10.0, rendered.second().getBoundsInParent().getMinY() - rendered.first().getBoundsInParent().getMaxY(), 1.0,
+                    "Only VBox spacing should separate multiple request cards, avoiding doubled margins.");
+            assertEquals(rendered.list().getWidth() - padding.getLeft() - padding.getRight(), rendered.first().getWidth(), 1.0,
+                    "Card should resize to the container width minus the intended external insets.");
+            assertTrue(rendered.first().getBoundsInParent().getMinX() >= padding.getLeft() - 0.1);
+            assertTrue(rendered.first().getBoundsInParent().getMinY() >= padding.getTop() - 0.1);
+            assertSame(rendered.first().getParent(), rendered.list(), "No wrapper should be inserted between the list and the request card surface.");
+            assertNotNull(rendered.first().getClip(), "Rounded card clip remains on the only card surface.");
         } finally {
             runFxAndWait(rendered.stage()::close);
         }
@@ -141,4 +184,5 @@ final class MaterialRequestCardFactoryRenderingTest {
     }
 
     private record RenderedMaterialRequestCard(Stage stage, HBox card, Region rail, VBox body, Region userMiniCard) {}
+    private record RenderedList(Stage stage, VBox list, HBox first, HBox second) {}
 }
