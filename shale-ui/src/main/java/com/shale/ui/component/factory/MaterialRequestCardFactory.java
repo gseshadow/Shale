@@ -1,7 +1,6 @@
 package com.shale.ui.component.factory;
 
 import com.shale.core.dto.MaterialRequestSummaryDto;
-import com.shale.ui.util.ColorUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
