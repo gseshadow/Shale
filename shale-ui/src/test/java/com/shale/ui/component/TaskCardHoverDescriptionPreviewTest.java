@@ -19,17 +19,29 @@ class TaskCardHoverDescriptionPreviewTest {
     }
 
     @Test
-    void longDescriptionsAreNotTruncatedBeforeTooltipDisplay() {
-        String singleLine = "A".repeat(900);
+    void shortDescriptionsDisplayInFullAndStayCompact() {
+        String shortDescription = "Review the signed intake packet.";
 
-        String normalized = TaskCard.normalizeTaskDetailsText(singleLine);
-
-        assertEquals(900, normalized.length());
-        assertFalse(normalized.endsWith("..."));
+        assertEquals(shortDescription, TaskCard.descriptionForTooltip(shortDescription));
+        assertTrue(TaskCard.wrappedDescriptionLineCount(shortDescription) <= 2);
     }
 
     @Test
-    void shortDescriptionsEstimateBelowScrollThreshold() {
-        assertTrue(TaskCard.estimatedTooltipDescriptionHeight("short task note") < 220);
+    void mediumDescriptionsExpandNaturallyWithoutTruncation() {
+        String mediumDescription = "Confirm the client uploaded the medical release, then send the records request to the provider before Friday afternoon.";
+
+        assertEquals(mediumDescription, TaskCard.descriptionForTooltip(mediumDescription));
+        assertTrue(TaskCard.wrappedDescriptionLineCount(mediumDescription) > 1);
+    }
+
+    @Test
+    void longDescriptionsAreTruncatedToWrappedLineLimitWithEllipsis() {
+        String longDescription = "Long task description. ".repeat(80);
+
+        String displayed = TaskCard.descriptionForTooltip(longDescription);
+
+        assertTrue(displayed.endsWith("..."));
+        assertTrue(displayed.length() < longDescription.length());
+        assertTrue(TaskCard.wrappedDescriptionLineCount(displayed) <= 8);
     }
 }

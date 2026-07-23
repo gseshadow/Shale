@@ -31,27 +31,28 @@ final class TaskCardHoverTooltipBehaviorTest {
     }
 
     @Test
-    void shortHoverPopupUsesContentSizedHeight() {
-        assertTrue(taskCard.contains("content.setMinHeight(Region.USE_PREF_SIZE)"));
-        assertTrue(taskCard.contains("content.setPrefHeight(Region.USE_COMPUTED_SIZE)"));
-        assertTrue(taskCard.contains("content.setMaxHeight(Region.USE_PREF_SIZE)"));
-        assertTrue(taskCard.contains("tooltip.setPrefHeight(Region.USE_COMPUTED_SIZE)"));
-        assertTrue(taskCard.contains("tooltip.setMaxHeight(Region.USE_PREF_SIZE)"));
-        assertTrue(taskCard.contains("VBox.setVgrow(descriptionNode, javafx.scene.layout.Priority.NEVER)"));
+    void hoverPopupUsesNaturalContentHeightWithoutFixedVerticalReservations() {
+        assertFalse(taskCard.contains("content.setMinHeight"));
+        assertFalse(taskCard.contains("content.setPrefHeight"));
+        assertFalse(taskCard.contains("content.setMaxHeight"));
+        assertFalse(taskCard.contains("tooltip.setPrefHeight"));
+        assertFalse(taskCard.contains("tooltip.setMaxHeight"));
+        assertFalse(taskCard.contains("VBox.setVgrow"));
     }
 
     @Test
-    void longHoverDescriptionsScrollOnlyAfterMaximumContentHeight() {
-        assertTrue(taskCard.contains("TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT = 220"));
-        assertTrue(taskCard.contains("estimatedTooltipDescriptionHeight(normalizedDescription) > TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT"));
-        assertTrue(taskCard.contains("new ScrollPane(descriptionNode)"));
-        assertTrue(taskCard.contains("scroller.setPrefViewportHeight(TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT)"));
-        assertTrue(taskCard.contains("scroller.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED)"));
+    void longHoverDescriptionsAreMultilineTruncatedWithoutScrollbars() {
+        assertTrue(taskCard.contains("TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES = 8"));
+        assertTrue(taskCard.contains("descriptionForTooltip(description)"));
+        assertTrue(taskCard.contains("wrappedDescriptionLineCount(candidate) <= TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES"));
+        assertTrue(taskCard.contains("appendInlineEllipsis"));
+        assertFalse(taskCard.contains("new ScrollPane"));
+        assertFalse(taskCard.contains("ScrollBarPolicy"));
     }
 
     @Test
     void blankDescriptionLeavesPopupTitleOnly() {
-        assertTrue(taskCard.contains("if (!normalizedDescription.isBlank())"));
+        assertTrue(taskCard.contains("if (!displayedDescription.isBlank())"));
         assertTrue(taskCard.contains("VBox content = new VBox(4, titleNode)"));
         assertTrue(taskCard.contains("normalizeTaskDetailsText(description)"));
     }
