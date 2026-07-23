@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 class CaseMaterialsNewRequestWindowTest {
     private static final Path SOURCE = Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
     private static final Path CASE_CONTROLLER = Path.of("src/main/java/com/shale/ui/controller/CaseController.java");
+    private static final Path USER_SELECTION_FIELD = Path.of("src/main/java/com/shale/ui/component/UserSelectionField.java");
+    private static final Path ASSIGNED_PICKER = Path.of("src/main/java/com/shale/ui/component/dialog/AssignedUserPickerDialog.java");
 
     @Test
     void newRequestWindowDefinesFinalFieldsInOrder() throws Exception {
@@ -30,16 +32,22 @@ class CaseMaterialsNewRequestWindowTest {
     void newRequestWindowUsesSharedComponentsForLookupsAndUsers() throws Exception {
         String source = Files.readString(SOURCE);
         String method = methodBody(source, "VBox newRequestBody");
-        String userFactory = methodBody(source, "private static UserSelector<CaseTaskService.AssignableUserOption> newUserSelector");
+        String userFactory = methodBody(source, "private static UserSelectionField<CaseTaskService.AssignableUserOption> newUserSelectionField");
+        String fieldSource = Files.readString(USER_SELECTION_FIELD);
+        String pickerSource = Files.readString(ASSIGNED_PICKER);
         assertTrue(source.contains("import com.shale.ui.component.ColorCodedComboBox;"));
-        assertTrue(source.contains("import com.shale.ui.component.UserSelector;"));
+        assertTrue(source.contains("import com.shale.ui.component.UserSelectionField;"));
+        assertTrue(fieldSource.contains("import com.shale.ui.component.factory.UserCardFactory;"));
+        assertTrue(pickerSource.contains("new UserSelector<>("));
         assertTrue(method.contains("ColorCodedComboBox<MaterialTypeDto> materialType=newLookupSelector(MaterialTypeDto::name,MaterialTypeDto::color,MaterialTypeDto::description)"));
         assertTrue(method.contains("ColorCodedComboBox<RequestMethodDto> requestMethod=newLookupSelector(RequestMethodDto::name)"));
         assertTrue(method.contains("ColorCodedComboBox<RequestStatusDto> requestStatus=newLookupSelector(RequestStatusDto::name)"));
-        assertTrue(method.contains("UserSelector<CaseTaskService.AssignableUserOption> requestedBy=newUserSelector(\"Select requested by\",\"No users available\")"));
-        assertTrue(method.contains("UserSelector<CaseTaskService.AssignableUserOption> assignedTo=newUserSelector(\"Select assigned user\",\"No users available\")"));
-        assertTrue(userFactory.contains("new UserSelector<>(CaseTaskService.AssignableUserOption::id,CaseTaskService.AssignableUserOption::displayName,CaseTaskService.AssignableUserOption::color)"));
+        assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> requestedBy=newUserSelectionField(stage,false)"));
+        assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> assignedTo=newUserSelectionField(stage,true)"));
+        assertTrue(userFactory.contains("new UserSelectionField<>(CaseTaskService.AssignableUserOption::id,CaseTaskService.AssignableUserOption::displayName,CaseTaskService.AssignableUserOption::color"));
+        assertTrue(userFactory.contains("AssignedUserPickerDialog.show(pickerOwner,candidates,CaseMaterialRequestsTabController.class)"));
         assertFalse(method.contains("new ComboBox<CaseTaskService.AssignableUserOption>"));
+        assertFalse(method.contains("newUserSelector("));
         assertFalse(source.contains("private VBox userSelector"));
     }
 
@@ -123,6 +131,46 @@ class CaseMaterialsNewRequestWindowTest {
         for (String forbidden : new String[]{"CreateMaterialRequestCommand","UpdateMaterialRequestCommand","createMaterialRequest","updateMaterialRequest","MaterialRequestDao","materialRequestDao","UserDao","userDao","RequestedByUserId","AssignedToUserId"}) {
             assertFalse(requestController.contains(forbidden), forbidden);
         }
+    }
+
+    @Test
+    void compactUserRowsDoNotEmbedExpandedSelectorsAndUsePickerActions() throws Exception {
+        String source = Files.readString(SOURCE);
+        String method = methodBody(source, "VBox newRequestBody");
+        String fieldSource = Files.readString(USER_SELECTION_FIELD);
+        String pickerSource = Files.readString(ASSIGNED_PICKER);
+        assertFalse(method.contains("newUserSelector(\"Select requested by\""));
+        assertFalse(method.contains("newUserSelector(\"Select assigned user\""));
+        assertTrue(fieldSource.contains("private final Button addButton = secondary(\"Add\")"));
+        assertTrue(fieldSource.contains("private final Button changeButton = secondary(\"Change\")"));
+        assertTrue(fieldSource.contains("private final Button removeButton = secondary(\"Remove\")"));
+        assertTrue(fieldSource.contains("UserCardFactory.Variant.MINI"));
+        assertTrue(fieldSource.contains("picker.apply(this, List.copyOf(candidates)).ifPresent(this::setSelectedUser)"));
+        assertTrue(pickerSource.contains("selector.selectedUserProperty().addListener"));
+        assertTrue(pickerSource.contains("stage.close()"));
+    }
+
+    @Test
+    void compactUserRowsKeepCandidatesSharedStableAndNonPersisted() throws Exception {
+        String source = Files.readString(SOURCE);
+        String loader = methodBody(source, "private void loadNewRequestUsers");
+        String fieldSource = Files.readString(USER_SELECTION_FIELD);
+        assertEquals(1, count(loader, "caseTaskService.loadAssignableUsers(tid)"));
+        assertTrue(loader.contains("requestedBy.setCandidates(safe)"));
+        assertTrue(loader.contains("assignedTo.setCandidates(safe)"));
+        assertTrue(loader.contains("u!=null&&u.id()==currentUserId"));
+        assertFalse(loader.contains("setExcludedUserIds"));
+        assertFalse(fieldSource.contains("createMaterialRequest"));
+        assertFalse(fieldSource.contains("updateMaterialRequest"));
+        assertFalse(fieldSource.toLowerCase().contains("dao"));
+    }
+
+    @Test
+    void newRequestDialogUsesCompactHeightInsteadOfExpandedSelectorHeight() throws Exception {
+        String source = Files.readString(SOURCE);
+        assertTrue(source.contains("NEW_REQUEST_WIDTH=560, NEW_REQUEST_HEIGHT=500, NEW_REQUEST_MIN_WIDTH=500, NEW_REQUEST_MIN_HEIGHT=460"));
+        assertFalse(source.contains("NEW_REQUEST_HEIGHT=760"));
+        assertFalse(source.contains("NEW_REQUEST_MIN_HEIGHT=720"));
     }
 
     private static int count(String source, String needle) {
