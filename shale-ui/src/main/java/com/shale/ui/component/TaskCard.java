@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.Consumer;
 
+import javafx.util.Duration;
 
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
@@ -39,6 +40,7 @@ public final class TaskCard extends VBox {
 	private static final double TASK_DETAILS_TOOLTIP_MAX_WIDTH = 360;
 	private static final double TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_HEIGHT = 220;
 	private static final double TASK_DETAILS_TOOLTIP_LINE_HEIGHT = 17;
+	private static final Duration TASK_DETAILS_TOOLTIP_HIDE_DELAY = Duration.millis(120);
 
 	private final Label titleLabel = new Label();
 	private final Label dueLabel = new Label();
@@ -514,6 +516,8 @@ public final class TaskCard extends VBox {
 		tooltip.setPrefHeight(Region.USE_COMPUTED_SIZE);
 		tooltip.setMaxHeight(Region.USE_PREF_SIZE);
 		tooltip.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
+		tooltip.setShowDuration(Duration.INDEFINITE);
+		tooltip.setHideDelay(TASK_DETAILS_TOOLTIP_HIDE_DELAY);
 		return tooltip;
 	}
 

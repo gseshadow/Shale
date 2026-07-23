@@ -57,6 +57,19 @@ final class TaskCardHoverTooltipBehaviorTest {
     }
 
     @Test
+    void hoverPopupRemainsOpenBeyondDefaultTooltipTimeout() {
+        assertTrue(taskCard.contains("tooltip.setShowDuration(Duration.INDEFINITE)"));
+        assertFalse(taskCard.contains("Duration.seconds(5)"));
+        assertFalse(taskCard.contains("Duration.millis(5000)"));
+    }
+
+    @Test
+    void hoverPopupUsesGracefulExitDelayToAvoidCardPopupFlicker() {
+        assertTrue(taskCard.contains("TASK_DETAILS_TOOLTIP_HIDE_DELAY = Duration.millis(120)"));
+        assertTrue(taskCard.contains("tooltip.setHideDelay(TASK_DETAILS_TOOLTIP_HIDE_DELAY)"));
+    }
+
+    @Test
     void hoverPopupIsCleanedUpWhenCardIsReused() {
         assertTrue(taskCard.contains("if (taskDetailsTooltip != null)"));
         assertTrue(taskCard.contains("Tooltip.uninstall(this, taskDetailsTooltip)"));
