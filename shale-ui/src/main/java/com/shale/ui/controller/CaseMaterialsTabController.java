@@ -49,7 +49,33 @@ final class CaseMaterialRequestsTabController {
     private static UserSelectionField<CaseTaskService.AssignableUserOption> newUserSelectionField(Window pickerOwner,boolean clearable){ UserSelectionField<CaseTaskService.AssignableUserOption> field=new UserSelectionField<>(CaseTaskService.AssignableUserOption::id,CaseTaskService.AssignableUserOption::displayName,CaseTaskService.AssignableUserOption::color,(ownerField,candidates)->AssignedUserPickerDialog.show(pickerOwner,candidates,CaseMaterialRequestsTabController.class),clearable); field.setMaxWidth(Double.MAX_VALUE); return field; }
     private void loadNewRequestUsers(UserSelectionField<CaseTaskService.AssignableUserOption> requestedBy,UserSelectionField<CaseTaskService.AssignableUserOption> assignedTo,Window dialogOwner){ setUserSelectorsLoading(requestedBy,assignedTo,true); int tid=tenant(); Integer currentUserId=state==null?null:state.getUserId(); ex.submit(()->{try{ if(Platform.isFxApplicationThread()) throw new IllegalStateException("User candidates must load off the JavaFX application thread."); List<CaseTaskService.AssignableUserOption> users=caseTaskService==null?List.of():caseTaskService.loadAssignableUsers(tid); Platform.runLater(()->{List<CaseTaskService.AssignableUserOption> safe=users==null?List.of():users; requestedBy.setCandidates(safe); assignedTo.setCandidates(safe); if(currentUserId!=null&&currentUserId>0) safe.stream().filter(u->u!=null&&u.id()==currentUserId).findFirst().ifPresent(requestedBy::setSelectedUser); assignedTo.clearSelection(); setUserSelectorsLoading(requestedBy,assignedTo,false);});}catch(Exception x){LOG.warn("New Material Request user lookup failed tenantId={}",tid,x);Platform.runLater(()->{requestedBy.clearSelection();assignedTo.clearSelection();requestedBy.setLoading(false);assignedTo.setLoading(false);requestedBy.setDisable(true);assignedTo.setDisable(true);AppDialogs.showError(dialogOwner,"Requests","User choices could not be loaded. Please try again.");});}}); }
     private static void setUserSelectorsLoading(UserSelectionField<?> requestedBy,UserSelectionField<?> assignedTo,boolean loading){ requestedBy.setDisable(loading); assignedTo.setDisable(loading); requestedBy.setLoading(loading); assignedTo.setLoading(loading); }
-    private static void applyNewRequestStageSize(Stage stage,Region root){ stage.getScene().getRoot().applyCss(); stage.getScene().getRoot().layout(); stage.sizeToScene(); var bounds=Screen.getScreensForRectangle(stage.getX(),stage.getY(),Math.max(stage.getWidth(),1),Math.max(stage.getHeight(),1)).stream().findFirst().orElse(Screen.getPrimary()).getVisualBounds(); double width=Math.min(Math.max(NEW_REQUEST_WIDTH,NEW_REQUEST_MIN_WIDTH),bounds.getWidth()); double height=Math.min(Math.max(NEW_REQUEST_HEIGHT,NEW_REQUEST_MIN_HEIGHT),bounds.getHeight()); root.setPrefSize(width,height); root.setMinSize(Math.min(NEW_REQUEST_MIN_WIDTH,width),Math.min(NEW_REQUEST_MIN_HEIGHT,height)); stage.setMinWidth(Math.min(NEW_REQUEST_MIN_WIDTH,width)); stage.setMinHeight(Math.min(NEW_REQUEST_MIN_HEIGHT,height)); stage.setWidth(width); stage.setHeight(height); stage.centerOnScreen(); if(stage.getX()<bounds.getMinX())stage.setX(bounds.getMinX()); if(stage.getY()<bounds.getMinY())stage.setY(bounds.getMinY()); if(stage.getX()+stage.getWidth()>bounds.getMaxX())stage.setX(bounds.getMaxX()-stage.getWidth()); if(stage.getY()+stage.getHeight()>bounds.getMaxY())stage.setY(bounds.getMaxY()-stage.getHeight()); }
+    private static void applyNewRequestStageSize(Stage stage, Region root) {
+        stage.getScene().getRoot().applyCss();
+        stage.getScene().getRoot().layout();
+        stage.sizeToScene();
+        var bounds = Screen.getScreensForRectangle(
+                stage.getX(), stage.getY(), Math.max(stage.getWidth(), 1), Math.max(stage.getHeight(), 1))
+                .stream().findFirst().orElse(Screen.getPrimary()).getVisualBounds();
+        double width = Math.min(Math.max(NEW_REQUEST_WIDTH, NEW_REQUEST_MIN_WIDTH), bounds.getWidth());
+        double height = Math.min(Math.max(NEW_REQUEST_HEIGHT, NEW_REQUEST_MIN_HEIGHT), bounds.getHeight());
+        root.setPrefSize(width, height);
+        root.setMinSize(Math.min(NEW_REQUEST_MIN_WIDTH, width), Math.min(NEW_REQUEST_MIN_HEIGHT, height));
+        stage.setMinWidth(Math.min(NEW_REQUEST_MIN_WIDTH, width));
+        stage.setMinHeight(Math.min(NEW_REQUEST_MIN_HEIGHT, height));
+        stage.setWidth(width);
+        stage.setHeight(height);
+        Window dialogOwner = stage.getOwner();
+        if (dialogOwner != null) {
+            stage.setX(dialogOwner.getX() + (dialogOwner.getWidth() - stage.getWidth()) / 2);
+            stage.setY(dialogOwner.getY() + (dialogOwner.getHeight() - stage.getHeight()) / 2);
+        } else {
+            stage.centerOnScreen();
+        }
+        if (stage.getX() < bounds.getMinX()) stage.setX(bounds.getMinX());
+        if (stage.getY() < bounds.getMinY()) stage.setY(bounds.getMinY());
+        if (stage.getX() + stage.getWidth() > bounds.getMaxX()) stage.setX(bounds.getMaxX() - stage.getWidth());
+        if (stage.getY() + stage.getHeight() > bounds.getMaxY()) stage.setY(bounds.getMaxY() - stage.getHeight());
+    }
     private void loadNewRequestLookups(ColorCodedComboBox<MaterialTypeDto> materialType,ColorCodedComboBox<RequestMethodDto> requestMethod,ColorCodedComboBox<RequestStatusDto> requestStatus,Window dialogOwner){ loadLookup("material-types",materialType,()->svc.listEffectiveMaterialTypes(tenant()),null,dialogOwner,"Material Type choices could not be loaded. Please try again."); loadLookup("request-methods",requestMethod,()->svc.listEffectiveRequestMethods(tenant()),null,dialogOwner,"Request Method choices could not be loaded. Please try again."); loadLookup("request-statuses",requestStatus,()->svc.listEffectiveRequestStatuses(tenant()),CaseMaterialRequestsTabController::selectRequestedStatus,dialogOwner,"Request Status choices could not be loaded. Please try again."); }
     private <T> void loadLookup(String op,ComboBox<T> lookup,Supplier<List<T>> loader,java.util.function.Consumer<ComboBox<T>> afterLoad,Window dialogOwner,String errorMessage){ lookup.setDisable(true); int tid=tenant(); ex.submit(()->{try{List<T> rows=loader.get();Platform.runLater(()->{lookup.getItems().setAll(rows==null?List.of():rows);if(afterLoad!=null)afterLoad.accept(lookup);lookup.setDisable(false);});}catch(Exception x){LOG.warn("New Material Request lookup failed op={} tenantId={}",op,tid,x);Platform.runLater(()->AppDialogs.showError(dialogOwner,"Requests",errorMessage));}}); }
     private static void selectRequestedStatus(ComboBox<RequestStatusDto> requestStatus){ requestStatus.getSelectionModel().clearSelection(); requestStatus.getItems().stream().filter(s->s!=null&&"requested".equalsIgnoreCase(s.systemKey())).findFirst().ifPresent(requestStatus.getSelectionModel()::select); }

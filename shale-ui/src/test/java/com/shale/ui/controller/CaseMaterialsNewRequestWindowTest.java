@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.*;
 import org.junit.jupiter.api.Test;
 
 class CaseMaterialsNewRequestWindowTest {
@@ -15,17 +16,20 @@ class CaseMaterialsNewRequestWindowTest {
     @Test
     void newRequestWindowDefinesFinalFieldsInOrder() throws Exception {
         String method = methodBody(Files.readString(SOURCE), "VBox newRequestBody");
-        assertTrue(method.contains("new TextField()"));
+        assertTrue(method.contains("new TextField(draft.title())"));
         assertTrue(method.contains("titleField.setPromptText(\"New Request\")"));
         assertFalse(method.contains("new TextField(\"New Request\")"));
         assertFalse(method.contains("titleField.setText(\"New Request\")"));
         assertInOrder(method,
                 "add(fields,0,\"Title:\",titleField)",
-                "add(fields,1,\"Material Type:\",materialType)",
-                "add(fields,2,\"Request Method:\",requestMethod)",
-                "add(fields,3,\"Status:\",requestStatus)",
-                "add(fields,4,\"Requested By:\",requestedBy)",
-                "add(fields,5,\"Assigned To:\",assignedTo)");
+                "add(fields,1,\"Requested From:\",requestedBy)",
+                "add(fields,2,\"Material Type:\",materialType)",
+                "add(fields,3,\"Request Method:\",requestMethod)",
+                "add(fields,4,\"Status:\",requestStatus)",
+                "add(fields,5,\"Due Date:\",dueDate)",
+                "add(fields,6,\"Inactivity Reminder Period:\",reminder)",
+                "add(fields,7,\"Description:\",description)",
+                "HBox footer=new HBox(10,save,cancel)");
     }
 
     @Test
