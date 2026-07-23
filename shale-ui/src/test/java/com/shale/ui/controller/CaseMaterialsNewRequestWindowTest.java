@@ -21,11 +21,13 @@ class CaseMaterialsNewRequestWindowTest {
         assertFalse(method.contains("titleField.setText(\"New Request\")"));
         assertInOrder(method,
                 "add(fields,0,\"Title:\",titleField)",
-                "add(fields,1,\"Material Type:\",materialType)",
-                "add(fields,2,\"Request Method:\",requestMethod)",
-                "add(fields,3,\"Status:\",requestStatus)",
-                "add(fields,4,\"Requested By:\",requestedBy)",
-                "add(fields,5,\"Assigned To:\",assignedTo)");
+                "add(fields,1,\"Requested From:\",requestedFromBox)",
+                "add(fields,2,\"Material Type:\",materialType)",
+                "add(fields,3,\"Request Method:\",requestMethod)",
+                "add(fields,4,\"Status:\",requestStatus)",
+                "add(fields,5,\"Requested By:\",requestedBy)",
+                "add(fields,6,\"Assigned To:\",assignedTo)",
+                "add(fields,7,\"Description:\",description)");
     }
 
     @Test
@@ -67,7 +69,7 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(loader.contains("assignedTo.setCandidates(safe)"));
         assertTrue(loader.contains("setUserSelectorsLoading(requestedBy,assignedTo,true)"));
         assertTrue(loader.contains("setUserSelectorsLoading(requestedBy,assignedTo,false)"));
-        assertTrue(caseController.contains("caseMaterialRequestsTabController.init(materialRequestService, caseTaskService, appState"));
+        assertTrue(caseController.contains("caseMaterialRequestsTabController.init(materialRequestService, caseTaskService, appState, caseDao, contactDao, organizationDao"));
         assertFalse(loader.toLowerCase().contains("dao"));
     }
 
@@ -128,7 +130,7 @@ class CaseMaterialsNewRequestWindowTest {
     void requestControllerDoesNotIntroducePersistenceDatabaseOrPermissionChanges() throws Exception {
         String source = Files.readString(SOURCE);
         String requestController = source.substring(source.indexOf("final class CaseMaterialRequestsTabController"), source.indexOf("final class CaseMaterialItemsTabController"));
-        for (String forbidden : new String[]{"CreateMaterialRequestCommand","UpdateMaterialRequestCommand","createMaterialRequest","updateMaterialRequest","MaterialRequestDao","materialRequestDao","UserDao","userDao","RequestedByUserId","AssignedToUserId"}) {
+        for (String forbidden : new String[]{"CreateMaterialRequestCommand","UpdateMaterialRequestCommand","createMaterialRequest","updateMaterialRequest","MaterialRequestDao","materialRequestDao","UserDao","userDao","RequestedByUserId","AssignedToUserId","addCaseParty"}) {
             assertFalse(requestController.contains(forbidden), forbidden);
         }
     }
@@ -168,7 +170,7 @@ class CaseMaterialsNewRequestWindowTest {
     @Test
     void newRequestDialogUsesCompactHeightInsteadOfExpandedSelectorHeight() throws Exception {
         String source = Files.readString(SOURCE);
-        assertTrue(source.contains("NEW_REQUEST_WIDTH=560, NEW_REQUEST_HEIGHT=500, NEW_REQUEST_MIN_WIDTH=500, NEW_REQUEST_MIN_HEIGHT=460"));
+        assertTrue(source.contains("NEW_REQUEST_WIDTH=560, NEW_REQUEST_HEIGHT=580, NEW_REQUEST_MIN_WIDTH=500, NEW_REQUEST_MIN_HEIGHT=540"));
         assertFalse(source.contains("NEW_REQUEST_HEIGHT=760"));
         assertFalse(source.contains("NEW_REQUEST_MIN_HEIGHT=720"));
     }

@@ -84,7 +84,8 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(placeholder.contains("TextField titleField=new TextField()"));
     assertTrue(placeholder.contains("titleField.setPromptText(\"New Request\")"));
     assertFalse(placeholder.contains("MaterialRequestForm"));
-    assertTrue(placeholder.contains("DatePicker dueDate=newDatePicker(\"Select due date\")"));
+    assertTrue(placeholder.contains("add(fields,1,\"Requested From:\",requestedFromBox)"));
+    assertTrue(placeholder.contains("TextArea description=new TextArea()"));
     assertTrue(placeholder.contains("ColorCodedComboBox<MaterialTypeDto> materialType"));
     assertFalse(placeholder.contains("new ComboBox<MaterialTypeDto>"));
     assertFalse(placeholder.contains("ChoiceBox"));
