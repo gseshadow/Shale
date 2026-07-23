@@ -56,6 +56,11 @@ class MaterialRequestCardFactoryTest {
         assertEquals(DueProximityStyles.NEUTRAL_RAIL_COLOR, DueProximityStyles.presentation(null, null, false, fixed).dueColorCss());
         assertTrue(DueProximityStyles.presentation(now.minusSeconds(1), null, false, fixed).washCss().startsWith("linear-gradient(to right"));
         assertTrue(DueProximityStyles.presentation(null, null, false, fixed).washCss().startsWith("linear-gradient(to right"));
+        String neutralWash = DueProximityStyles.presentation(now.plusWeeks(4), null, false, fixed).washCss();
+        assertTrue(neutralWash.contains("rgba(203,213,225,0.220) 0%"), neutralWash);
+        assertTrue(neutralWash.contains("rgba(203,213,225,0.130) 24%"), neutralWash);
+        assertTrue(neutralWash.contains(DueProximityStyles.DEFAULT_SURFACE + " 62%"), neutralWash);
+        assertFalse(DueProximityStyles.presentation(now.plusWeeks(4), null, false, fixed).urgent());
     }
 
     @Test
@@ -90,6 +95,22 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("request.requestedByUserColor()"));
         assertTrue(source.contains("request.assignedToUserColor()"));
         assertFalse(source.contains("setStyle(\"-fx-background-color: transparent;\")"));
+    }
+
+
+    @Test
+    void requestsListAddsExternalInsetsWithoutWrappingCardsOrDoublingSpacing() throws Exception {
+        String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java"));
+        assertTrue(controller.contains("REQUEST_LIST_INSETS = new Insets(8)"),
+                "Requests list should own the external breathing room around first, last, and intermediate cards.");
+        assertTrue(controller.contains("list=new VBox(10); list.setPadding(REQUEST_LIST_INSETS)"),
+                "Card separation should come from the list VBox spacing plus one transparent list inset, not per-card doubled margins.");
+        assertTrue(controller.contains("requestCardFactory.create(r, MaterialRequestCardFactory.Variant.LIST)"),
+                "The production request card should remain the only card surface added to the list.");
+        assertFalse(controller.contains("new StackPane(requestCardFactory.create"),
+                "Do not add an opaque or nested card wrapper around request cards.");
+        assertFalse(controller.contains("VBox.setMargin(requestCardFactory.create"),
+                "List padding avoids doubled gaps between multiple request cards.");
     }
 
     @Test
