@@ -7,6 +7,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -35,6 +36,9 @@ public final class MaterialRequestCardFactory {
     public enum Variant { LIST }
 
     private final Consumer<Long> onOpenRequest;
+    private final Consumer<Integer> onOpenContact;
+    private final Consumer<Integer> onOpenOrganization;
+    private final Consumer<Integer> onOpenUser;
     private final ContactCardFactory contactCardFactory = new ContactCardFactory(id -> { });
     private final OrganizationCardFactory organizationCardFactory = new OrganizationCardFactory(id -> { });
     private final UserCardFactory userCardFactory = new UserCardFactory(id -> { });
@@ -42,7 +46,14 @@ public final class MaterialRequestCardFactory {
     public MaterialRequestCardFactory() { this(null); }
 
     public MaterialRequestCardFactory(Consumer<Long> onOpenRequest) {
+        this(onOpenRequest, null, null, null);
+    }
+
+    public MaterialRequestCardFactory(Consumer<Long> onOpenRequest, Consumer<Integer> onOpenContact, Consumer<Integer> onOpenOrganization, Consumer<Integer> onOpenUser) {
         this.onOpenRequest = onOpenRequest;
+        this.onOpenContact = onOpenContact;
+        this.onOpenOrganization = onOpenOrganization;
+        this.onOpenUser = onOpenUser;
     }
 
     public Node create(MaterialRequestSummaryDto request, Variant variant) {
@@ -102,7 +113,9 @@ public final class MaterialRequestCardFactory {
         card.setOnMouseExited(e -> applyCardStyle(card, urgency, false));
         if (onOpenRequest != null) {
             card.setCursor(Cursor.HAND);
-            card.setOnMouseClicked(e -> onOpenRequest.accept(request.id()));
+            card.setOnMouseClicked(e -> {
+                if (e.getButton() == MouseButton.PRIMARY) onOpenRequest.accept(request.id());
+            });
         }
         return card;
     }
@@ -157,10 +170,14 @@ public final class MaterialRequestCardFactory {
 
     private Node requestedFromNode(MaterialRequestSummaryDto r) {
         if (r.requestedFromContactId() != null && has(r.requestedFromContactDisplayName())) {
-            return contactCardFactory.create(new ContactCardFactory.ContactCardModel(r.requestedFromContactId(), r.requestedFromContactDisplayName(), null, null, null), ContactCardFactory.Variant.MINI);
+            Node card = contactCardFactory.create(new ContactCardFactory.ContactCardModel(r.requestedFromContactId(), r.requestedFromContactDisplayName(), null, null, null), ContactCardFactory.Variant.MINI);
+            installEmbeddedNavigation(card, r.requestedFromContactId(), onOpenContact);
+            return card;
         }
         if (r.requestedFromOrganizationId() != null && has(r.requestedFromOrganizationName())) {
-            return organizationCardFactory.create(new OrganizationCardFactory.OrganizationCardModel(r.requestedFromOrganizationId(), r.requestedFromOrganizationName(), null, null, null, null, null, null, null, null, null, null, null, null, null), OrganizationCardFactory.Variant.MINI);
+            Node card = organizationCardFactory.create(new OrganizationCardFactory.OrganizationCardModel(r.requestedFromOrganizationId(), r.requestedFromOrganizationName(), null, null, null, null, null, null, null, null, null, null, null, null, null), OrganizationCardFactory.Variant.MINI);
+            installEmbeddedNavigation(card, r.requestedFromOrganizationId(), onOpenOrganization);
+            return card;
         }
         if (has(r.requestedFromText())) return valueLabel(r.requestedFromText());
         return null;
@@ -168,7 +185,19 @@ public final class MaterialRequestCardFactory {
 
     private Node userNode(Integer userId, String displayName, String color) {
         if (userId == null || !has(displayName)) return null;
-        return userCardFactory.create(new UserCardFactory.UserCardModel(userId, displayName, color, null), UserCardFactory.Variant.MINI);
+        Node card = userCardFactory.create(new UserCardFactory.UserCardModel(userId, displayName, color, null), UserCardFactory.Variant.MINI);
+        installEmbeddedNavigation(card, userId, onOpenUser);
+        return card;
+    }
+
+    private static void installEmbeddedNavigation(Node node, Integer entityId, Consumer<Integer> onOpenEntity) {
+        if (node == null || entityId == null || onOpenEntity == null) return;
+        node.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY) {
+                onOpenEntity.accept(entityId);
+                e.consume();
+            }
+        });
     }
 
     private static void keepMiniCardCompact(Node node) {

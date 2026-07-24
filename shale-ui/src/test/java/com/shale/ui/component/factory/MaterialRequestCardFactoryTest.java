@@ -142,6 +142,38 @@ class MaterialRequestCardFactoryTest {
 
 
     @Test
+    void embeddedMiniCardNavigationConsumesHandledPrimaryClicksOnly() throws Exception {
+        String source = Files.readString(FACTORY);
+        assertTrue(source.contains("installEmbeddedNavigation(card, r.requestedFromContactId(), onOpenContact)"));
+        assertTrue(source.contains("installEmbeddedNavigation(card, r.requestedFromOrganizationId(), onOpenOrganization)"));
+        assertTrue(source.contains("installEmbeddedNavigation(card, userId, onOpenUser)"));
+        assertTrue(source.contains("if (node == null || entityId == null || onOpenEntity == null) return;"));
+        assertTrue(source.contains("if (e.getButton() == MouseButton.PRIMARY)"));
+        assertTrue(source.contains("onOpenEntity.accept(entityId);"));
+        assertTrue(source.contains("e.consume();"));
+        assertTrue(source.contains("if (e.getButton() == MouseButton.PRIMARY) onOpenRequest.accept(request.id())"));
+    }
+
+    @Test
+    void factsUseSingleCompactResponsiveFlowWithoutResizeRebuilding() throws Exception {
+        String source = Files.readString(FACTORY);
+        assertTrue(source.contains("FlowPane facts = new FlowPane(18, 7)"));
+        assertTrue(source.contains("material-request-card__facts"));
+        assertTrue(source.indexOf("addEntityFact(facts, \"Requested From\"")
+                < source.indexOf("addTextFact(facts, \"Requested\""),
+                "Entity facts should keep logical order ahead of date facts.");
+        assertTrue(source.contains("fact.setMinWidth(Region.USE_PREF_SIZE)"));
+        assertTrue(source.contains("fact.setMaxWidth(Region.USE_PREF_SIZE)"));
+        assertTrue(source.contains("facts.setColumnHalignment(javafx.geometry.HPos.LEFT)"));
+        assertFalse(source.contains("widthProperty().addListener"),
+                "FlowPane should perform responsive wrapping without card width listeners that rebuild content.");
+        assertFalse(source.contains("getChildren().clear()"),
+                "Responsive reflow should not repeatedly reconstruct fact nodes.");
+        assertFalse(source.contains("setPrefHeight("));
+    }
+
+
+    @Test
     void roundedClipTracksComputedCardDimensionsWithoutObsoleteFixedSize() throws Exception {
         String source = Files.readString(FACTORY);
         assertTrue(source.contains("clip.widthProperty().bind(card.widthProperty())"));

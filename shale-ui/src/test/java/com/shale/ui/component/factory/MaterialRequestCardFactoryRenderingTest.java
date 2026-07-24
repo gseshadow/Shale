@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -24,6 +25,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
 
 final class MaterialRequestCardFactoryRenderingTest {
@@ -74,6 +77,53 @@ final class MaterialRequestCardFactoryRenderingTest {
             assertTrue(rendered.card().getStyle().contains("linear-gradient(to right"), rendered.card().getStyle());
             assertTrue(rendered.card().getStyle().contains("rgba(203,213,225"), rendered.card().getStyle());
             assertTrue(rendered.rail().getStyle().contains("#2F80ED"), rendered.rail().getStyle());
+        } finally {
+            runFxAndWait(rendered.stage()::close);
+        }
+    }
+
+
+    @Test
+    void embeddedMiniPrimaryClicksNavigateAndDoNotBubbleToRequestCard() throws Exception {
+        AtomicInteger requestOpens = new AtomicInteger();
+        AtomicInteger organizationOpens = new AtomicInteger();
+        AtomicInteger userOpens = new AtomicInteger();
+        AtomicReference<RenderedMaterialRequestCard> ref = new AtomicReference<>();
+        runFxAndWait(() -> ref.set(render(summary(LocalDateTime.of(2026, 8, 22, 0, 0)), requestOpens, new AtomicInteger(), organizationOpens, userOpens)));
+        RenderedMaterialRequestCard rendered = ref.get();
+        try {
+            Node organization = findFirst(rendered.card(), com.shale.ui.component.OrganizationCard.class);
+            Node user = findFirst(rendered.card(), com.shale.ui.component.UserCard.class);
+            assertNotNull(organization);
+            assertNotNull(user);
+
+            organization.fireEvent(click(MouseButton.PRIMARY));
+            user.fireEvent(click(MouseButton.PRIMARY));
+            organization.fireEvent(click(MouseButton.SECONDARY));
+            rendered.card().fireEvent(click(MouseButton.PRIMARY));
+
+            assertEquals(1, organizationOpens.get(), "Organization MINI primary click should navigate once.");
+            assertEquals(1, userOpens.get(), "User MINI primary click should navigate once.");
+            assertEquals(1, requestOpens.get(), "Only the explicit card-background primary click should open the request.");
+        } finally {
+            runFxAndWait(rendered.stage()::close);
+        }
+    }
+
+    @Test
+    void contactMiniPrimaryClickNavigatesWithoutOpeningRequest() throws Exception {
+        AtomicInteger requestOpens = new AtomicInteger();
+        AtomicInteger contactOpens = new AtomicInteger();
+        AtomicReference<RenderedMaterialRequestCard> ref = new AtomicReference<>();
+        runFxAndWait(() -> ref.set(render(contactSummary(), requestOpens, contactOpens, new AtomicInteger(), new AtomicInteger())));
+        RenderedMaterialRequestCard rendered = ref.get();
+        try {
+            Node contact = findFirst(rendered.card(), com.shale.ui.component.ContactCard.class);
+            assertNotNull(contact);
+            contact.fireEvent(click(MouseButton.PRIMARY));
+            contact.fireEvent(click(MouseButton.SECONDARY));
+            assertEquals(1, contactOpens.get(), "Contact MINI primary click should navigate once.");
+            assertEquals(0, requestOpens.get(), "Handled embedded MINI click must not bubble to request navigation.");
         } finally {
             runFxAndWait(rendered.stage()::close);
         }
@@ -184,8 +234,12 @@ final class MaterialRequestCardFactoryRenderingTest {
 
     private static RenderedMaterialRequestCard render(MaterialRequestSummaryDto summary) throws Exception {
         AtomicReference<RenderedMaterialRequestCard> ref = new AtomicReference<>();
-        runFxAndWait(() -> {
-            Node cardNode = new MaterialRequestCardFactory(id -> { }).create(summary, MaterialRequestCardFactory.Variant.LIST);
+        runFxAndWait(() -> ref.set(render(summary, new AtomicInteger(), new AtomicInteger(), new AtomicInteger(), new AtomicInteger())));
+        return ref.get();
+    }
+
+    private static RenderedMaterialRequestCard render(MaterialRequestSummaryDto summary, AtomicInteger requestOpens, AtomicInteger contactOpens, AtomicInteger organizationOpens, AtomicInteger userOpens) {
+            Node cardNode = new MaterialRequestCardFactory(id -> requestOpens.incrementAndGet(), id -> contactOpens.incrementAndGet(), id -> organizationOpens.incrementAndGet(), id -> userOpens.incrementAndGet()).create(summary, MaterialRequestCardFactory.Variant.LIST);
             HBox card = (HBox) cardNode;
             StackPane root = new StackPane(card);
             root.setStyle("-fx-background-color: #001122; -fx-padding: 24;");
@@ -199,9 +253,7 @@ final class MaterialRequestCardFactoryRenderingTest {
             Region rail = (Region) card.lookup(".material-request-card__material-type-rail");
             VBox body = (VBox) card.lookup(".material-request-card__body");
             Region userMiniCard = findFirstUserMiniCard(card);
-            ref.set(new RenderedMaterialRequestCard(stage, card, rail, body, userMiniCard));
-        });
-        return ref.get();
+            return new RenderedMaterialRequestCard(stage, card, rail, body, userMiniCard);
     }
 
     private static <T> T findFirst(Node root, Class<T> type) {
@@ -231,6 +283,20 @@ final class MaterialRequestCardFactoryRenderingTest {
                 1L, 10, 6502L, 3, "Medical records", null, "#2F80ED", title,
                 11, "Brian Downing", "#7C3AED", 11, "Brian Downing", "#7C3AED",
                 null, null, 22, "Blue Cross Blue Shield", null, "Portal", LocalDateTime.of(2026, 7, 23, 9, 0),
+                "REQUESTED", LocalDateTime.of(2026, 8, 22, 0, 0), LocalDateTime.of(2026, 7, 30, 9, 0), null, LocalDateTime.of(2026, 7, 23, 9, 0),
+                new byte[]{1});
+    }
+
+    private static MouseEvent click(MouseButton button) {
+        return new MouseEvent(MouseEvent.MOUSE_CLICKED, 4, 4, 4, 4, button, 1,
+                false, false, false, false, button == MouseButton.PRIMARY, button == MouseButton.MIDDLE, button == MouseButton.SECONDARY, false, false, false, null);
+    }
+
+    private static MaterialRequestSummaryDto contactSummary() {
+        return new MaterialRequestSummaryDto(
+                2L, 10, 6502L, 3, "Medical records", null, "#2F80ED", "Contact Request",
+                11, "Brian Downing", "#7C3AED", 12, "Assigned User", "#059669",
+                44, "Chris Contact", null, null, null, "Portal", LocalDateTime.of(2026, 7, 23, 9, 0),
                 "REQUESTED", LocalDateTime.of(2026, 8, 22, 0, 0), LocalDateTime.of(2026, 7, 30, 9, 0), null, LocalDateTime.of(2026, 7, 23, 9, 0),
                 new byte[]{1});
     }

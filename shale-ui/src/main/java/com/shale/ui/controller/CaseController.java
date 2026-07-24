@@ -858,12 +858,14 @@ public class CaseController {
 		this.materialRequestService = materialRequestService;
 		this.materialItemService = materialItemService;
 		caseMaterialRequestsTabController.init(materialRequestService, caseTaskService, appState, caseDao, contactDao, organizationDao, () -> caseId == null ? 0L : caseId.longValue(), this::caseMaterialsOwner);
+		caseMaterialRequestsTabController.setEntityNavigation(onOpenContact, onOpenOrganization, onOpenUser);
 		caseMaterialItemsTabController.init(materialRequestService, materialItemService, appState, () -> caseId == null ? 0L : caseId.longValue(), this::caseMaterialsOwner);
 	}
 
 	public void setOnOpenUser(Consumer<Integer> onOpenUser) {
 		this.onOpenUser = onOpenUser;
 		this.userCardFactory = new UserCardFactory(onOpenUser);
+		caseMaterialRequestsTabController.setEntityNavigation(onOpenContact, onOpenOrganization, onOpenUser);
 	}
 
 	public void setOnOpenStatus(Consumer<Integer> onOpenStatus) {
@@ -874,6 +876,7 @@ public class CaseController {
 	public void setOnOpenContact(Consumer<Integer> onOpenContact) {
 		this.onOpenContact = onOpenContact;
 		this.contactCardFactory = new ContactCardFactory(onOpenContact);
+		caseMaterialRequestsTabController.setEntityNavigation(onOpenContact, onOpenOrganization, onOpenUser);
 	}
 
 	public void setOnOpenCase(Consumer<Integer> onOpenCase) {
@@ -906,6 +909,7 @@ public class CaseController {
 	public void setOnOpenOrganization(Consumer<Integer> onOpenOrganization) {
 		this.onOpenOrganization = onOpenOrganization;
 		this.organizationCardFactory = new OrganizationCardFactory(onOpenOrganization);
+		caseMaterialRequestsTabController.setEntityNavigation(onOpenContact, onOpenOrganization, onOpenUser);
 	}
 
 	private TaskCardFactory buildTaskCardFactory(Consumer<Long> openTaskHandler) {
