@@ -18,7 +18,9 @@ import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.geometry.Insets;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -72,6 +74,65 @@ final class MaterialRequestCardFactoryRenderingTest {
             assertTrue(rendered.card().getStyle().contains("linear-gradient(to right"), rendered.card().getStyle());
             assertTrue(rendered.card().getStyle().contains("rgba(203,213,225"), rendered.card().getStyle());
             assertTrue(rendered.rail().getStyle().contains("#2F80ED"), rendered.rail().getStyle());
+        } finally {
+            runFxAndWait(rendered.stage()::close);
+        }
+    }
+
+    @Test
+    void cardUsesComputedContentHeightAndNormalGapBeforeDates() throws Exception {
+        RenderedMaterialRequestCard rendered = render(summary(LocalDateTime.of(2026, 8, 22, 0, 0)));
+        try {
+            VBox entityFacts = (VBox) rendered.card().lookup(".material-request-card__entity-facts");
+            GridPane dates = findFirst(rendered.card(), GridPane.class);
+            assertNotNull(entityFacts);
+            assertNotNull(dates);
+            assertEquals(Priority.NEVER, VBox.getVgrow(rendered.userMiniCard()),
+                    "MINI cards should not grow vertically to push date facts down.");
+            assertNull(VBox.getVgrow(entityFacts), "Entity section must keep natural height.");
+            assertNull(VBox.getVgrow(dates), "Date row must not be bottom-anchored by VBox grow.");
+            assertEquals(Region.USE_PREF_SIZE, rendered.card().getMaxHeight(), 0.1,
+                    "The card should refuse parent-provided spare height and use its computed content height.");
+
+            double actualGap = dates.getBoundsInParent().getMinY() - entityFacts.getBoundsInParent().getMaxY();
+            assertEquals(7.0, actualGap, 1.0,
+                    "Date facts should follow the last entity section with the normal card body spacing.");
+            assertTrue(dates.getBoundsInParent().getMaxY() <= rendered.body().getHeight() - rendered.body().getPadding().getBottom() + 0.5,
+                    "Date row remains fully visible inside modest bottom padding.");
+            assertTrue(rendered.card().getHeight() < rendered.stage().getScene().getHeight() - 80,
+                    "A short request should not stretch to fill the available scene height.");
+            assertEquals(rendered.card().getHeight(), rendered.card().getClip().getBoundsInLocal().getHeight(), 0.5,
+                    "Rounded clip height tracks the final computed card height.");
+        } finally {
+            runFxAndWait(rendered.stage()::close);
+        }
+    }
+
+    @Test
+    void wrappedTitleGrowsOnlyItsOwnCardAndDoesNotResizeSiblingCards() throws Exception {
+        AtomicReference<RenderedList> ref = new AtomicReference<>();
+        runFxAndWait(() -> {
+            HBox shortCard = (HBox) new MaterialRequestCardFactory(id -> { }).create(summary(LocalDateTime.of(2026, 8, 22, 0, 0)), MaterialRequestCardFactory.Variant.LIST);
+            HBox wrappedCard = (HBox) new MaterialRequestCardFactory(id -> { }).create(summaryWithTitle("A very long material request title that should wrap onto multiple lines at narrower widths while preserving every field and growing naturally"), MaterialRequestCardFactory.Variant.LIST);
+            VBox list = new VBox(10, shortCard, wrappedCard);
+            list.setPadding(new Insets(8));
+            list.setFillWidth(true);
+            StackPane root = new StackPane(list);
+            Scene scene = new Scene(root, 360, 520);
+            scene.getStylesheets().add(MaterialRequestCardFactoryRenderingTest.class.getResource("/css/app.css").toExternalForm());
+            Stage stage = new Stage();
+            stage.setScene(scene);
+            stage.show();
+            root.applyCss();
+            root.layout();
+            ref.set(new RenderedList(stage, list, shortCard, wrappedCard));
+        });
+        RenderedList rendered = ref.get();
+        try {
+            assertTrue(rendered.second().getHeight() > rendered.first().getHeight(),
+                    "Wrapped title should grow its own card naturally.");
+            assertTrue(rendered.first().getHeight() < rendered.second().getHeight() - 8,
+                    "Sibling cards must not inherit the tallest card height.");
         } finally {
             runFxAndWait(rendered.stage()::close);
         }
@@ -141,6 +202,17 @@ final class MaterialRequestCardFactoryRenderingTest {
         return ref.get();
     }
 
+    private static <T> T findFirst(Node root, Class<T> type) {
+        if (type.isInstance(root)) return type.cast(root);
+        if (root instanceof javafx.scene.Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                T found = findFirst(child, type);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
     private static Region findFirstUserMiniCard(Node root) {
         if (root instanceof com.shale.ui.component.UserCard userCard) return userCard;
         if (root instanceof javafx.scene.Parent parent) {
@@ -150,6 +222,15 @@ final class MaterialRequestCardFactoryRenderingTest {
             }
         }
         return null;
+    }
+
+    private static MaterialRequestSummaryDto summaryWithTitle(String title) {
+        return new MaterialRequestSummaryDto(
+                1L, 10, 6502L, 3, "Medical records", null, "#2F80ED", title,
+                11, "Brian Downing", "#7C3AED", 11, "Brian Downing", "#7C3AED",
+                null, null, 22, "Blue Cross Blue Shield", null, "Portal", LocalDateTime.of(2026, 7, 23, 9, 0),
+                "REQUESTED", LocalDateTime.of(2026, 8, 22, 0, 0), LocalDateTime.of(2026, 7, 30, 9, 0), null, LocalDateTime.of(2026, 7, 23, 9, 0),
+                new byte[]{1});
     }
 
     private static MaterialRequestSummaryDto summary(LocalDateTime due) {

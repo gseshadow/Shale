@@ -104,6 +104,7 @@ public final class MaterialRequestCardFactory {
         card.getStyleClass().addAll("material-request-card", "material-request-list-card");
         card.setMinWidth(0);
         card.setMaxWidth(Double.MAX_VALUE);
+        card.setMaxHeight(Region.USE_PREF_SIZE);
         installRoundedClip(card);
         applyCardStyle(card, urgency, false);
         card.setOnMouseEntered(e -> applyCardStyle(card, DueProximityStyles.presentation(request.expectedResponseDate(), null, true), true));
