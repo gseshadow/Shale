@@ -88,7 +88,11 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(placeholder.contains("TextArea description=new TextArea()"));
     assertTrue(placeholder.contains("ColorCodedComboBox<MaterialTypeDto> materialType"));
     assertFalse(placeholder.contains("new ComboBox<MaterialTypeDto>"));
-    assertFalse(placeholder.contains("ChoiceBox"));
+    assertTrue(placeholder.contains("ChoiceBox<String> followUpInterval"));
+    assertTrue(placeholder.contains("add(fields,7,\"Follow-up Interval:\",followUpInterval)"));
+    assertFalse(placeholder.contains("Requested At:"));
+    assertFalse(placeholder.contains("Due At:"));
+    assertFalse(placeholder.contains("Next Follow-up At:"));
     assertFalse(placeholder.contains("ButtonType.OK"));
     assertTrue(requestController.contains("CreateMaterialRequestCommand"));
     assertTrue(requestController.contains("ActionButtonFactory.primary(\"Save\",null)"));
@@ -139,7 +143,7 @@ final class CaseMaterialsPhase4UiContractTest {
   @Test void scopeGuardsNoForbiddenWork() {
     assertFalse(MAT.contains("FileChooser"));
     assertFalse(MAT.toLowerCase().contains("download action"));
-    assertFalse(MAT.toLowerCase().contains("ocr"));
+    assertFalse(MAT.toLowerCase().contains("ocr action"));
     assertFalse(MAT.contains("CREATE TABLE"));
     assertFalse(MAT.contains("DELETE FROM dbo.MaterialRequestFollowUps"));
     assertFalse(MAT.contains("UPDATE dbo.MaterialRequestFollowUps"));

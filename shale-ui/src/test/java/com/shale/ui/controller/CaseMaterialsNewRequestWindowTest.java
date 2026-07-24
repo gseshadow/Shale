@@ -27,10 +27,12 @@ class CaseMaterialsNewRequestWindowTest {
                 "add(fields,4,\"Status:\",requestStatus)",
                 "add(fields,5,\"Requested By:\",requestedBy)",
                 "add(fields,6,\"Assigned To:\",assignedTo)",
-                "add(fields,7,\"Requested At:\",requestedAt)",
-                "add(fields,8,\"Due At:\",dueAt)",
-                "add(fields,9,\"Next Follow-up At:\",nextFollowUpAt)",
-                "add(fields,10,\"Description:\",description)");
+                "add(fields,7,\"Follow-up Interval:\",followUpInterval)",
+                "add(fields,8,\"Description:\",description)");
+        assertFalse(method.contains("\"Requested At:\""));
+        assertFalse(method.contains("\"Due At:\""));
+        assertFalse(method.contains("\"Next Follow-up At:\""));
+        assertFalse(method.contains("new DatePicker"));
     }
 
     @Test
@@ -127,6 +129,23 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(source.contains("svc.createMaterialRequest(cmd)"));
         assertFalse(method.contains("updateMaterialRequest"));
         assertFalse(method.contains("mutate("));
+    }
+
+    @Test
+    void followUpIntervalIsVisibleButDeferredAndDoesNotDriveDateValidation() throws Exception {
+        String source = Files.readString(SOURCE);
+        String method = methodBody(source, "VBox newRequestBody");
+        String validation = methodBody(source, "private String validateNewRequest");
+        String mapping = methodBody(source, "private LocalDateTime nextFollowUpAtFromInterval");
+        assertTrue(method.contains("ChoiceBox<String> followUpInterval=new ChoiceBox<>()"));
+        assertTrue(method.contains("add(fields,7,\"Follow-up Interval:\",followUpInterval)"));
+        assertTrue(method.contains("followUpInterval.setDisable(true)"));
+        assertTrue(method.contains("new Tooltip(\"Coming soon\")"));
+        assertFalse(validation.contains("followUpInterval"));
+        assertFalse(validation.contains("Requested At is required"));
+        assertFalse(validation.contains("Due date cannot be before Requested At"));
+        assertFalse(validation.contains("Next follow-up cannot be before Requested At"));
+        assertTrue(mapping.contains("return null"));
     }
 
     @Test
