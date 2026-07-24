@@ -49,7 +49,7 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(requestController.contains("primary(\"New Request\")"));
     assertFalse(requestController.contains("ButtonType(\"Edit\")"));
     assertFalse(requestController.contains("openEditor"));
-    assertFalse(requestController.contains("createMaterialRequest"));
+    assertTrue(requestController.contains("createMaterialRequest"));
     assertFalse(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
     assertTrue(requestController.contains("listMaterialRequests(cid,tid)"));
@@ -65,7 +65,7 @@ final class CaseMaterialsPhase4UiContractTest {
   }
 
 
-  @Test void requestTabNewRequestActionIsHeaderOnlyStyledAndPlaceholderOnly() {
+  @Test void requestTabNewRequestActionIsHeaderStyledAndCreatesThroughService() {
     String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
     String materialsUi = MAT.substring(MAT.indexOf("final class MaterialsUi"));
     int headerAction = requestController.indexOf("Button add=primary(\"New Request\")");
@@ -90,9 +90,9 @@ final class CaseMaterialsPhase4UiContractTest {
     assertFalse(placeholder.contains("new ComboBox<MaterialTypeDto>"));
     assertFalse(placeholder.contains("ChoiceBox"));
     assertFalse(placeholder.contains("ButtonType.OK"));
-    assertFalse(placeholder.contains("CreateMaterialRequest"));
-    assertTrue(placeholder.contains("ActionButtonFactory.primary(\"Save\",e->{ })"));
-    assertFalse(requestController.contains("createMaterialRequest"));
+    assertTrue(requestController.contains("CreateMaterialRequestCommand"));
+    assertTrue(requestController.contains("ActionButtonFactory.primary(\"Save\",null)"));
+    assertTrue(requestController.contains("createMaterialRequest"));
     assertFalse(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
   }
@@ -115,7 +115,7 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(requestController.contains("contactDao.createContact(new ContactDao.CreateContactRequest"));
     assertTrue(requestController.contains("organizationDao.create(new OrganizationDao.OrganizationCreateRequest"));
     assertFalse(requestController.contains("caseDao.addCaseParty"));
-    assertFalse(requestController.contains("createMaterialRequest"));
+    assertTrue(requestController.contains("createMaterialRequest"));
     assertFalse(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
     assertTrue(dialog.contains("public record Selection"));

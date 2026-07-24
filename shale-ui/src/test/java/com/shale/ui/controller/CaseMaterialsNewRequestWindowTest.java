@@ -27,7 +27,10 @@ class CaseMaterialsNewRequestWindowTest {
                 "add(fields,4,\"Status:\",requestStatus)",
                 "add(fields,5,\"Requested By:\",requestedBy)",
                 "add(fields,6,\"Assigned To:\",assignedTo)",
-                "add(fields,7,\"Description:\",description)");
+                "add(fields,7,\"Requested At:\",requestedAt)",
+                "add(fields,8,\"Due At:\",dueAt)",
+                "add(fields,9,\"Next Follow-up At:\",nextFollowUpAt)",
+                "add(fields,10,\"Description:\",description)");
     }
 
     @Test
@@ -59,7 +62,7 @@ class CaseMaterialsNewRequestWindowTest {
         String body = methodBody(source, "VBox newRequestBody");
         String loader = methodBody(source, "private void loadNewRequestUsers");
         String caseController = Files.readString(CASE_CONTROLLER);
-        assertTrue(body.contains("loadNewRequestUsers(requestedBy,assignedTo,stage)"));
+        assertTrue(body.contains("loadNewRequestUsers(requestedBy,assignedTo,stage,loading,validate)"));
         assertTrue(loader.contains("caseTaskService.loadAssignableUsers(tid)"));
         assertEquals(1, count(loader, "loadAssignableUsers(tid)"));
         assertTrue(loader.contains("ex.submit"));
@@ -102,7 +105,7 @@ class CaseMaterialsNewRequestWindowTest {
         String body = methodBody(source, "VBox newRequestBody");
         String loader = methodBody(source, "private void loadNewRequestLookups");
         String select = methodBody(source, "private static void selectRequestedStatus");
-        assertTrue(body.contains("loadNewRequestLookups(materialType,requestMethod,requestStatus,stage)"));
+        assertTrue(body.contains("loadNewRequestLookups(materialType,requestMethod,requestStatus,stage,loading,validate)"));
         assertTrue(loader.contains("svc.listEffectiveMaterialTypes(tenant())"));
         assertTrue(loader.contains("svc.listEffectiveRequestMethods(tenant())"));
         assertTrue(loader.contains("svc.listEffectiveRequestStatuses(tenant())"));
@@ -113,15 +116,15 @@ class CaseMaterialsNewRequestWindowTest {
     }
 
     @Test
-    void footerSaveIsNonfunctionalAndCancelStillConfirmsDiscard() throws Exception {
+    void footerSaveCreatesRequestAndCancelStillConfirmsDiscard() throws Exception {
         String source = Files.readString(SOURCE);
         String method = methodBody(source, "VBox newRequestBody");
         String confirmMethod = methodBody(source, "boolean confirmDiscardNewRequest");
-        assertTrue(method.contains("ActionButtonFactory.primary(\"Save\",e->{ })"));
+        assertTrue(source.contains("Button save=ActionButtonFactory.primary(\"Save\",null)"));
         assertTrue(method.contains("if(confirmDiscardNewRequest(stage))stage.close()"));
         assertTrue(confirmMethod.contains("AppDialogs.showChoice"));
         assertTrue(confirmMethod.contains("\"Discard New Request?\""));
-        assertFalse(method.contains("createMaterialRequest"));
+        assertTrue(source.contains("svc.createMaterialRequest(cmd)"));
         assertFalse(method.contains("updateMaterialRequest"));
         assertFalse(method.contains("mutate("));
     }
@@ -130,7 +133,7 @@ class CaseMaterialsNewRequestWindowTest {
     void requestControllerDoesNotIntroducePersistenceDatabaseOrPermissionChanges() throws Exception {
         String source = Files.readString(SOURCE);
         String requestController = source.substring(source.indexOf("final class CaseMaterialRequestsTabController"), source.indexOf("final class CaseMaterialItemsTabController"));
-        for (String forbidden : new String[]{"CreateMaterialRequestCommand","UpdateMaterialRequestCommand","createMaterialRequest","updateMaterialRequest","MaterialRequestDao","materialRequestDao","UserDao","userDao","RequestedByUserId","AssignedToUserId","addCaseParty"}) {
+        for (String forbidden : new String[]{"UpdateMaterialRequestCommand","updateMaterialRequest","MaterialRequestDao","materialRequestDao","UserDao","userDao","addCaseParty"}) {
             assertFalse(requestController.contains(forbidden), forbidden);
         }
     }

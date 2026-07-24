@@ -24,7 +24,7 @@ class MaterialRequestCardArchitectureTest {
         assertTrue(controller.contains("No material requests yet."));
         assertTrue(controller.contains("showInlineError"));
         assertTrue(controller.contains("Button r=new Button(\"Retry\")"));
-        assertTrue(controller.contains("Button save=ActionButtonFactory.primary(\"Save\",e->{ })"), "New Request save remains the existing no-op.");
+        assertTrue(controller.contains("svc.createMaterialRequest(cmd)"), "New Request save uses MaterialRequestServicePort create.");
     }
 
     @Test
