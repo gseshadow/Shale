@@ -53,6 +53,25 @@ final class MaterialRequestLookupContractTest {
         assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
     }
 
+    @Test void lookupQueriesOnlySelectColorFromTablesWhoseDeployedSchemaDefinesIt() {
+        String materialSchema = read("docs/sql/2026-07-21_case_materials_foundation_phase1.sql");
+        String requestSchema = read("docs/sql/2026-07-21_request_lookup_overlay.sql");
+
+        assertTrue(materialSchema.contains("CREATE TABLE dbo.MaterialTypes"));
+        assertTrue(materialSchema.contains("Color nvarchar(20) NULL"));
+        assertTrue(requestSchema.contains("CREATE TABLE dbo.RequestMethods"));
+        assertFalse(requestSchema.substring(requestSchema.indexOf("CREATE TABLE dbo.RequestMethods"),
+                requestSchema.indexOf("CREATE TABLE dbo.RequestStatuses")).contains("Color"));
+        assertTrue(requestSchema.substring(requestSchema.indexOf("CREATE TABLE dbo.RequestStatuses"),
+                requestSchema.indexOf("DECLARE @methods")).contains("Color varchar(32) NULL"));
+
+        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Description,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.MaterialTypes"));
+        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
+        assertFalse(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
+        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestStatuses"));
+        assertTrue(DAO.contains("tableName.endsWith(\"RequestStatuses\") ? \"Color,\" : \"\""));
+    }
+
     @Test void requestLookupsVerifyTenantContextAndDoNotReadOtherTenantRows() {
         assertTrue(DAO.contains("verifyTenant(con, shaleClientId)"));
         assertFalse(DAO.contains("FROM dbo.RequestMethods\n                WHERE SystemKey IS NULL"));
