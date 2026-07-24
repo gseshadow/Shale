@@ -57,10 +57,14 @@ public final class MaterialRequestCardFactory {
     }
 
     public Node create(MaterialRequestSummaryDto request, Variant variant) {
-        return create(request, variant, null);
+        return create(request, variant, request == null ? null : request.status(), null);
     }
 
     public Node create(MaterialRequestSummaryDto request, Variant variant, String configuredStatusColor) {
+        return create(request, variant, request == null ? null : request.status(), configuredStatusColor);
+    }
+
+    public Node create(MaterialRequestSummaryDto request, Variant variant, String statusDisplayName, String configuredStatusColor) {
         Objects.requireNonNull(request, "request");
         if (variant != Variant.LIST) throw new IllegalArgumentException("Unsupported material request card variant: " + variant);
 
@@ -78,7 +82,7 @@ public final class MaterialRequestCardFactory {
         title.setMaxWidth(Double.MAX_VALUE);
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #112542;");
 
-        HBox header = new HBox(8, title, spacer(), materialTypePill(request.materialTypeName(), request.materialTypeColor()), statusPill(request.status(), statusColor));
+        HBox header = new HBox(8, title, spacer(), materialTypePill(request.materialTypeName(), request.materialTypeColor()), statusPill(statusDisplayName, statusColor));
         header.setAlignment(Pos.TOP_LEFT);
         header.setMinWidth(0);
         HBox.setHgrow(title, Priority.ALWAYS);

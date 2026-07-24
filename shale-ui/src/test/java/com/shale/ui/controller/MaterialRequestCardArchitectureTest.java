@@ -17,7 +17,7 @@ class MaterialRequestCardArchitectureTest {
         assertTrue(Files.exists(FACTORY), "Repository inspection found no pre-existing reusable request card, so one canonical factory is introduced.");
         String controller = Files.readString(CONTROLLER);
         assertTrue(controller.contains("new MaterialRequestCardFactory(this::openDetail)"));
-        assertTrue(controller.contains("requestCardFactory.create(r, MaterialRequestCardFactory.Variant.LIST)"));
+        assertTrue(controller.contains("requestCardFactory.create(r, MaterialRequestCardFactory.Variant.LIST, presentation.name(), presentation.color())"));
         assertFalse(controller.contains("private Node card(MaterialRequestSummaryDto r)"));
         assertFalse(controller.contains("Requested / Due / Follow-up"));
         assertTrue(controller.contains("show(status,\"Loading material requests…\")"));
