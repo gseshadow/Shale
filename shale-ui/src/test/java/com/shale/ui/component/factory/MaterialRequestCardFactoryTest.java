@@ -97,6 +97,41 @@ class MaterialRequestCardFactoryTest {
         assertFalse(source.contains("setStyle(\"-fx-background-color: transparent;\")"));
     }
 
+    @Test
+    void listCardUsesNaturalContentHeightWithoutVerticalSpacerOrFixedCardHeight() throws Exception {
+        String source = Files.readString(FACTORY);
+        assertTrue(source.contains("card.setMaxHeight(Region.USE_PREF_SIZE)"),
+                "The list card must opt out of parent vertical fill while still using its computed preferred height.");
+        assertFalse(source.contains("card.setPrefHeight("),
+                "Do not pin request cards to a brittle preferred height.");
+        assertFalse(source.contains("card.setMinHeight("),
+                "Do not keep an unnecessary fixed minimum card height.");
+        assertFalse(source.contains("body.setPrefHeight("));
+        assertFalse(source.contains("body.setMinHeight("));
+        assertFalse(source.contains("body.setMaxHeight("));
+        assertFalse(source.contains("VBox.setVgrow(entityFacts, Priority.ALWAYS)"),
+                "Entity facts must not consume spare vertical space to push the date row down.");
+        assertFalse(source.contains("VBox.setVgrow(dates, Priority.ALWAYS)"),
+                "Date facts must follow the entity facts rather than be anchored to the bottom.");
+        assertFalse(source.contains("new Region(); VBox.setVgrow"),
+                "No structural vertical spacer should be inserted in the card body.");
+        assertTrue(source.contains("VBox body = new VBox(7)"),
+                "The final gap between the entity section and date row is the card body's 7px design-system spacing.");
+        assertTrue(source.contains("body.setPadding(new Insets(10, 12, 10, 12))"),
+                "Padding should remain modest instead of hiding a fixed height problem.");
+        assertTrue(source.contains("body.getChildren().add(dates)"),
+                "The date row must remain present and visible after entity facts.");
+    }
+
+    @Test
+    void roundedClipTracksComputedCardDimensionsWithoutObsoleteFixedSize() throws Exception {
+        String source = Files.readString(FACTORY);
+        assertTrue(source.contains("clip.widthProperty().bind(card.widthProperty())"));
+        assertTrue(source.contains("clip.heightProperty().bind(card.heightProperty())"));
+        assertFalse(source.contains("clip.setWidth("));
+        assertFalse(source.contains("clip.setHeight("));
+    }
+
 
     @Test
     void requestsListAddsExternalInsetsWithoutWrappingCardsOrDoublingSpacing() throws Exception {
