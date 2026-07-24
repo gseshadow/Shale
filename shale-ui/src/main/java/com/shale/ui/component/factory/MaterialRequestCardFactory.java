@@ -7,7 +7,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -68,32 +68,23 @@ public final class MaterialRequestCardFactory {
         header.setMinWidth(0);
         HBox.setHgrow(title, Priority.ALWAYS);
 
-        VBox entityFacts = new VBox(6);
-        entityFacts.getStyleClass().add("material-request-card__entity-facts");
-        entityFacts.setFillWidth(false);
-        entityFacts.setAlignment(Pos.CENTER_LEFT);
-        addEntityFact(entityFacts, "Requested From", requestedFromNode(request));
-        addEntityFact(entityFacts, "Requested By", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()));
-        addEntityFact(entityFacts, "Assigned To", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()));
-
-        GridPane dates = new GridPane();
-        dates.setHgap(16);
-        dates.setVgap(5);
-        for (int i = 0; i < 3; i++) {
-            ColumnConstraints c = new ColumnConstraints();
-            c.setHgrow(Priority.ALWAYS);
-            c.setMinWidth(0);
-            dates.getColumnConstraints().add(c);
-        }
-        addTextFact(dates, 0, "Requested", fmt(request.requestedAt()));
-        addTextFact(dates, 1, "Due", fmt(request.expectedResponseDate()));
-        addTextFact(dates, 2, "Next Follow-up", fmt(request.nextFollowUpAt()));
+        FlowPane facts = new FlowPane(18, 7);
+        facts.getStyleClass().add("material-request-card__facts");
+        facts.setAlignment(Pos.TOP_LEFT);
+        facts.setColumnHalignment(javafx.geometry.HPos.LEFT);
+        facts.setRowValignment(javafx.geometry.VPos.TOP);
+        facts.setMinWidth(0);
+        addEntityFact(facts, "Requested From", requestedFromNode(request));
+        addEntityFact(facts, "Requested By", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()));
+        addEntityFact(facts, "Assigned To", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()));
+        addTextFact(facts, "Requested", fmt(request.requestedAt()));
+        addTextFact(facts, "Due", fmt(request.expectedResponseDate()));
+        addTextFact(facts, "Next Follow-up", fmt(request.nextFollowUpAt()));
 
         Label timing = dueIndicator(request);
         body.getChildren().add(header);
+        if (!facts.getChildren().isEmpty()) body.getChildren().add(facts);
         if (timing != null) body.getChildren().add(timing);
-        if (!entityFacts.getChildren().isEmpty()) body.getChildren().add(entityFacts);
-        body.getChildren().add(dates);
 
         Region rail = new Region();
         rail.getStyleClass().add("material-request-card__material-type-rail");
@@ -137,24 +128,31 @@ public final class MaterialRequestCardFactory {
         return StatusIndicatorFactory.createStatusPill(nvl(status, "Unknown"), nvl(configuredColor, NEUTRAL_STATUS_COLOR), StatusIndicatorFactory.PillSize.COMPACT);
     }
 
-    private void addEntityFact(VBox box, String label, Node node) {
+    private void addEntityFact(FlowPane facts, String label, Node node) {
         if (node == null) return;
-        VBox fact = new VBox(3, key(label), node);
-        fact.setMinWidth(0);
-        fact.setAlignment(Pos.CENTER_LEFT);
-        fact.setFillWidth(false);
+        VBox fact = factBox("material-request-card__entity-fact", 3);
         keepMiniCardCompact(node);
-        box.getChildren().add(fact);
+        fact.getChildren().addAll(key(label), node);
+        facts.getChildren().add(fact);
     }
 
-    private static void addTextFact(GridPane grid, int index, String label, String value) {
+    private static void addTextFact(FlowPane facts, String label, String value) {
         if (value == null || value.isBlank()) return;
-        VBox fact = new VBox(1);
-        Label v = new Label(value.trim());
-        v.setWrapText(true);
-        v.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.90);");
+        VBox fact = factBox("material-request-card__date-fact", 1);
+        Label v = valueLabel(value);
         fact.getChildren().addAll(key(label), v);
-        grid.add(fact, index, 0);
+        facts.getChildren().add(fact);
+    }
+
+    private static VBox factBox(String styleClass, double spacing) {
+        VBox fact = new VBox(spacing);
+        fact.getStyleClass().add(styleClass);
+        fact.setMinWidth(Region.USE_PREF_SIZE);
+        fact.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        fact.setMaxWidth(Region.USE_PREF_SIZE);
+        fact.setAlignment(Pos.TOP_LEFT);
+        fact.setFillWidth(false);
+        return fact;
     }
 
     private Node requestedFromNode(MaterialRequestSummaryDto r) {

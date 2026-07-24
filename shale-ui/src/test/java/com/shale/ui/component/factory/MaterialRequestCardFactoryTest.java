@@ -72,9 +72,9 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("r.requestedFromContactId() != null"));
         assertTrue(source.contains("r.requestedFromOrganizationId() != null"));
         assertTrue(source.contains("if (has(r.requestedFromText())) return valueLabel(r.requestedFromText())"));
-        assertTrue(source.contains("addEntityFact(entityFacts, \"Requested From\", requestedFromNode(request))"));
-        assertTrue(source.contains("addEntityFact(entityFacts, \"Requested By\", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()))"));
-        assertTrue(source.contains("addEntityFact(entityFacts, \"Assigned To\", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()))"));
+        assertTrue(source.contains("addEntityFact(facts, \"Requested From\", requestedFromNode(request))"));
+        assertTrue(source.contains("addEntityFact(facts, \"Requested By\", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()))"));
+        assertTrue(source.contains("addEntityFact(facts, \"Assigned To\", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()))"));
         assertTrue(source.contains("if (node == null) return;"));
         assertFalse(source.contains("MaterialRequestService"));
         assertFalse(source.contains("MaterialRequestDao"));
@@ -83,9 +83,9 @@ class MaterialRequestCardFactoryTest {
     @Test
     void miniCardsRemainCompactLeftAlignedAndKeepCanonicalColors() throws Exception {
         String source = Files.readString(FACTORY);
-        assertTrue(source.contains("entityFacts.setFillWidth(false)"));
-        assertTrue(source.contains("entityFacts.setAlignment(Pos.CENTER_LEFT)"));
-        assertTrue(source.contains("fact.setAlignment(Pos.CENTER_LEFT)"));
+        assertTrue(source.contains("fact.setFillWidth(false)"));
+        assertTrue(source.contains("facts.setAlignment(Pos.TOP_LEFT)"));
+        assertTrue(source.contains("fact.setAlignment(Pos.TOP_LEFT)"));
         assertTrue(source.contains("fact.setFillWidth(false)"));
         assertTrue(source.contains("keepMiniCardCompact(node)"));
         assertTrue(source.contains("region.setMaxWidth(Region.USE_PREF_SIZE)"));
@@ -109,9 +109,9 @@ class MaterialRequestCardFactoryTest {
         assertFalse(source.contains("body.setPrefHeight("));
         assertFalse(source.contains("body.setMinHeight("));
         assertFalse(source.contains("body.setMaxHeight("));
-        assertFalse(source.contains("VBox.setVgrow(entityFacts, Priority.ALWAYS)"),
+        assertFalse(source.contains("VBox.setVgrow(facts, Priority.ALWAYS)"),
                 "Entity facts must not consume spare vertical space to push the date row down.");
-        assertFalse(source.contains("VBox.setVgrow(dates, Priority.ALWAYS)"),
+        assertFalse(source.contains("VBox.setVgrow(facts, Priority.ALWAYS)"),
                 "Date facts must follow the entity facts rather than be anchored to the bottom.");
         assertFalse(source.contains("new Region(); VBox.setVgrow"),
                 "No structural vertical spacer should be inserted in the card body.");
@@ -119,9 +119,27 @@ class MaterialRequestCardFactoryTest {
                 "The final gap between the entity section and date row is the card body's 7px design-system spacing.");
         assertTrue(source.contains("body.setPadding(new Insets(10, 12, 10, 12))"),
                 "Padding should remain modest instead of hiding a fixed height problem.");
-        assertTrue(source.contains("body.getChildren().add(dates)"),
+        assertTrue(source.contains("body.getChildren().add(facts)"),
                 "The date row must remain present and visible after entity facts.");
     }
+    @Test
+    void factsUseSingleCompactResponsiveFlowWithoutResizeRebuilding() throws Exception {
+        String source = Files.readString(FACTORY);
+        assertTrue(source.contains("FlowPane facts = new FlowPane(18, 7)"));
+        assertTrue(source.contains("material-request-card__facts"));
+        assertTrue(source.indexOf("addEntityFact(facts, \"Requested From\"")
+                < source.indexOf("addTextFact(facts, \"Requested\""),
+                "Entity facts should keep logical order ahead of date facts.");
+        assertTrue(source.contains("fact.setMinWidth(Region.USE_PREF_SIZE)"));
+        assertTrue(source.contains("fact.setMaxWidth(Region.USE_PREF_SIZE)"));
+        assertTrue(source.contains("facts.setColumnHalignment(javafx.geometry.HPos.LEFT)"));
+        assertFalse(source.contains("widthProperty().addListener"),
+                "FlowPane should perform responsive wrapping without card width listeners that rebuild content.");
+        assertFalse(source.contains("getChildren().clear()"),
+                "Responsive reflow should not repeatedly reconstruct fact nodes.");
+        assertFalse(source.contains("setPrefHeight("));
+    }
+
 
     @Test
     void roundedClipTracksComputedCardDimensionsWithoutObsoleteFixedSize() throws Exception {

@@ -18,7 +18,7 @@ import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.geometry.Insets;
-import javafx.scene.layout.GridPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -83,22 +83,24 @@ final class MaterialRequestCardFactoryRenderingTest {
     void cardUsesComputedContentHeightAndNormalGapBeforeDates() throws Exception {
         RenderedMaterialRequestCard rendered = render(summary(LocalDateTime.of(2026, 8, 22, 0, 0)));
         try {
-            VBox entityFacts = (VBox) rendered.card().lookup(".material-request-card__entity-facts");
-            GridPane dates = findFirst(rendered.card(), GridPane.class);
-            assertNotNull(entityFacts);
-            assertNotNull(dates);
+            FlowPane facts = (FlowPane) rendered.card().lookup(".material-request-card__facts");
+            assertNotNull(facts);
+            assertEquals(6, facts.getChildren().size(), "Typical hydrated request should render six compact facts.");
             assertEquals(Priority.NEVER, VBox.getVgrow(rendered.userMiniCard()),
                     "MINI cards should not grow vertically to push date facts down.");
-            assertNull(VBox.getVgrow(entityFacts), "Entity section must keep natural height.");
-            assertNull(VBox.getVgrow(dates), "Date row must not be bottom-anchored by VBox grow.");
+            assertNull(VBox.getVgrow(facts), "Facts section must keep natural height.");
             assertEquals(Region.USE_PREF_SIZE, rendered.card().getMaxHeight(), 0.1,
                     "The card should refuse parent-provided spare height and use its computed content height.");
 
-            double actualGap = dates.getBoundsInParent().getMinY() - entityFacts.getBoundsInParent().getMaxY();
-            assertEquals(7.0, actualGap, 1.0,
-                    "Date facts should follow the last entity section with the normal card body spacing.");
-            assertTrue(dates.getBoundsInParent().getMaxY() <= rendered.body().getHeight() - rendered.body().getPadding().getBottom() + 0.5,
-                    "Date row remains fully visible inside modest bottom padding.");
+            assertTrue(facts.getBoundsInParent().getMaxY() <= rendered.body().getHeight() - rendered.body().getPadding().getBottom() + 0.5,
+                    "Facts remain fully visible inside modest bottom padding.");
+            double firstY = facts.getChildren().get(0).getBoundsInParent().getMinY();
+            for (Node fact : facts.getChildren()) {
+                assertEquals(firstY, fact.getBoundsInParent().getMinY(), 1.0,
+                        "At representative wide width all six facts should share one horizontal row.");
+            }
+            assertTrue(rendered.card().getHeight() <= 150,
+                    "Compact facts should materially reduce typical card height at the wide width.");
             assertTrue(rendered.card().getHeight() < rendered.stage().getScene().getHeight() - 80,
                     "A short request should not stretch to fill the available scene height.");
             assertEquals(rendered.card().getHeight(), rendered.card().getClip().getBoundsInLocal().getHeight(), 0.5,
