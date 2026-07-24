@@ -16,7 +16,7 @@ final class CaseMaterialRequestCreateSaveContractTest {
         String c = Files.readString(CONTROLLER);
         assertTrue(c.contains("svc.createMaterialRequest(cmd)"));
         assertTrue(c.contains("new MaterialRequestServicePort.CreateMaterialRequestCommand"));
-        assertTrue(c.contains("materialType.getValue().id()"));
+        assertTrue(c.contains("materialType.id()"));
         assertTrue(c.contains("by.id()"));
         assertTrue(c.contains("assignee==null?null:assignee.id()"));
         assertTrue(c.contains("rf!=null&&rf.contact()?rf.entityId().intValue():null"));
@@ -33,6 +33,19 @@ final class CaseMaterialRequestCreateSaveContractTest {
         assertTrue(c.contains("if(Platform.isFxApplicationThread()) throw new IllegalStateException"));
         assertTrue(c.contains("if(stage.getScene()==null||stage.getOwner()==null||stale(g,c))return"));
         assertTrue(c.contains("stage.close(); refresh();"));
+    }
+
+    @Test
+    void hiddenDateDefaultsDoNotExposeOrRequireRemovedDateFields() throws Exception {
+        String c = Files.readString(CONTROLLER);
+        assertTrue(c.contains("defaultRequestedAt()"));
+        assertTrue(c.contains("private LocalDateTime defaultRequestedAt(){ return LocalDateTime.now(); }"));
+        assertTrue(c.contains("null,nextFollowUpAtFromInterval(followUpInterval)"));
+        assertTrue(c.contains("private LocalDateTime nextFollowUpAtFromInterval(String followUpInterval){ return null; }"));
+        assertFalse(c.contains("DatePicker requestedAt"));
+        assertFalse(c.contains("DatePicker dueAt"));
+        assertFalse(c.contains("DatePicker nextFollowUpAt"));
+        assertFalse(c.contains("Requested At is required."));
     }
 
     @Test
