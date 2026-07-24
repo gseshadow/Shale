@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import com.shale.core.dto.MaterialTypeDto;
 import org.junit.jupiter.api.Test;
 
 class CaseMaterialsNewRequestWindowTest {
@@ -263,6 +264,55 @@ class CaseMaterialsNewRequestWindowTest {
             pos = next;
         }
     }
+    @Test
+    void automaticTitleSuggestionFormatsUseMaterialTypeAndRequestedFromDisplayNamesOnly() throws Exception {
+        CaseMaterialRequestsTabController.NewRequestTitleSuggester s = new CaseMaterialRequestsTabController.NewRequestTitleSuggester();
+        MaterialTypeDto police = new MaterialTypeDto(10, null, "police_report", "Police Report", "", "#fff", 0);
+        MaterialTypeDto medical = new MaterialTypeDto(11, null, "medical_records", "Medical Records", "", "#000", 0);
+        var contact = new CaseMaterialRequestsTabController.RequestedFromSelection("contact", 1L, "John Smith", null, null);
+        var org = new CaseMaterialRequestsTabController.RequestedFromSelection("organization", 2L, "Blue Cross Blue Shield", null, null);
+        assertEquals("Police Report request", s.suggest(police, null));
+        assertEquals("Request from John Smith", s.suggest(null, contact));
+        assertEquals("Medical Records requested from Blue Cross Blue Shield", s.suggest(medical, org));
+        assertEquals("", s.suggest(null, null));
+    }
+
+    @Test
+    void automaticTitleListenersAreAttachedOnceAndDrivenOnlyByTypeAndRequestedFromChanges() throws Exception {
+        String method = methodBody(Files.readString(SOURCE), "VBox newRequestBody");
+        assertEquals(1, count(method, "new NewRequestTitleSuggester()"));
+        assertEquals(1, count(method, "titleField.textProperty().addListener"));
+        assertEquals(1, count(method, "materialType.valueProperty().addListener"));
+        assertEquals(2, count(method, "updateSuggestedTitleRef.get().run()"));
+        assertEquals(1, count(method, "requestedFrom.set(null); updateSuggestedTitleRef.get().run()"));
+        assertFalse(method.contains("requestMethod.valueProperty().addListener((o,a,b)->{updateSuggestedTitle"));
+        assertFalse(method.contains("requestStatus.valueProperty().addListener((o,a,b)->{updateSuggestedTitle"));
+        assertFalse(method.contains("requestedBy.selectedUserProperty().addListener((o,a,b)->{updateSuggestedTitle"));
+        assertFalse(method.contains("assignedTo.selectedUserProperty().addListener((o,a,b)->{updateSuggestedTitle"));
+        assertFalse(method.contains("description.textProperty().addListener((o,a,b)->{updateSuggestedTitle"));
+    }
+
+    @Test
+    void automaticTitleManualOverrideProgrammaticUpdateAndValidationContract() throws Exception {
+        String source = Files.readString(SOURCE);
+        String suggester = source.substring(source.indexOf("static final class NewRequestTitleSuggester"), source.indexOf("    VBox newRequestBody"));
+        String body = methodBody(source, "VBox newRequestBody");
+        String mapping = methodBody(source, "private MaterialRequestServicePort.CreateMaterialRequestCommand toCreateCommand");
+        String validation = methodBody(source, "private String validateNewRequest");
+        assertTrue(suggester.contains("private String lastAutomaticTitle = \"\""));
+        assertTrue(suggester.contains("private boolean programmaticUpdate"));
+        assertTrue(suggester.contains("private boolean manualOverride"));
+        assertTrue(suggester.contains("if (programmaticUpdate) return"));
+        assertTrue(suggester.contains("if (current.isBlank()) { manualOverride = false; return; }"));
+        assertTrue(suggester.contains("manualOverride = !Objects.equals(current, lastAutomaticTitle)"));
+        assertTrue(suggester.contains("if (manualOverride && !current.isBlank() && !Objects.equals(current, lastAutomaticTitle)) return"));
+        assertTrue(suggester.contains("try { titleField.setText(next); } finally { programmaticUpdate = false; }"));
+        assertTrue(body.contains("titleField.textProperty().addListener((o,a,b)->{titleSuggester.userEdited(a,b);validate.run();})"));
+        assertTrue(mapping.contains("materialType.id(),title,description"));
+        assertTrue(body.contains("toCreateCommand(rf,materialType.getValue(),titleField.getText(),description.getText()"));
+        assertTrue(validation.contains("if(titleField.getText()==null||titleField.getText().trim().isEmpty())return \"Title is required.\""));
+    }
+
 
     private static String methodBody(String source, String signatureStart) {
         int start = source.indexOf(signatureStart);
