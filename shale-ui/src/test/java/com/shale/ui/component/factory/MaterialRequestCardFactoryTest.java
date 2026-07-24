@@ -122,6 +122,24 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("body.getChildren().add(facts)"),
                 "The date row must remain present and visible after entity facts.");
     }
+    @Test
+    void factsUseSingleCompactResponsiveFlowWithoutResizeRebuilding() throws Exception {
+        String source = Files.readString(FACTORY);
+        assertTrue(source.contains("FlowPane facts = new FlowPane(18, 7)"));
+        assertTrue(source.contains("material-request-card__facts"));
+        assertTrue(source.indexOf("addEntityFact(facts, \"Requested From\"")
+                < source.indexOf("addTextFact(facts, \"Requested\""),
+                "Entity facts should keep logical order ahead of date facts.");
+        assertTrue(source.contains("fact.setMinWidth(Region.USE_PREF_SIZE)"));
+        assertTrue(source.contains("fact.setMaxWidth(Region.USE_PREF_SIZE)"));
+        assertTrue(source.contains("facts.setColumnHalignment(javafx.geometry.HPos.LEFT)"));
+        assertFalse(source.contains("widthProperty().addListener"),
+                "FlowPane should perform responsive wrapping without card width listeners that rebuild content.");
+        assertFalse(source.contains("getChildren().clear()"),
+                "Responsive reflow should not repeatedly reconstruct fact nodes.");
+        assertFalse(source.contains("setPrefHeight("));
+    }
+
 
     @Test
     void embeddedMiniCardNavigationConsumesHandledPrimaryClicksOnly() throws Exception {
