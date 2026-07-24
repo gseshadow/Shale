@@ -3,7 +3,11 @@ package com.shale.ui.controller;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.LinkTypeDto;
+import com.shale.core.dto.MaterialTypeDto;
+import com.shale.core.dto.RequestMethodDto;
+import com.shale.core.dto.RequestStatusDto;
 import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.data.dao.UserDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.notification.NotificationPreferenceKey;
@@ -100,6 +104,16 @@ public final class SettingsController {
 	private HBox linkTypeActionRow;
 	@FXML
 	private Label linkTypeSettingsStatusLabel;
+	@FXML private VBox requestAdministrationSection;
+	@FXML private VBox materialTypeCardsContainer;
+	@FXML private HBox materialTypeActionRow;
+	@FXML private Label materialTypeSettingsStatusLabel;
+	@FXML private VBox requestMethodCardsContainer;
+	@FXML private HBox requestMethodActionRow;
+	@FXML private Label requestMethodSettingsStatusLabel;
+	@FXML private VBox requestStatusCardsContainer;
+	@FXML private HBox requestStatusActionRow;
+	@FXML private Label requestStatusSettingsStatusLabel;
 	@FXML
 	private TableView<UserManagementViewRow> userManagementTable;
 	@FXML
@@ -128,6 +142,7 @@ public final class SettingsController {
 	private NotificationPreferencesService notificationPreferencesService;
 	private AppState appState;
 	private CaseServicePort caseService;
+	private MaterialRequestServicePort materialRequestService;
 	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
@@ -139,6 +154,12 @@ public final class SettingsController {
 	private CaseStatusViewRow selectedCaseStatusRow;
 	private PracticeAreaViewRow selectedPracticeAreaRow;
 	private LinkTypeViewRow selectedLinkTypeRow;
+	private RequestLookupSelection selectedMaterialTypeRow;
+	private RequestLookupSelection selectedRequestMethodRow;
+	private RequestLookupSelection selectedRequestStatusRow;
+	private boolean materialTypeMutationRunning;
+	private boolean requestMethodMutationRunning;
+	private boolean requestStatusMutationRunning;
 	private int caseStatusLoadGeneration;
 	private int practiceAreaLoadGeneration;
 	private int linkTypeLoadGeneration;
@@ -162,19 +183,33 @@ public final class SettingsController {
 		loadAdminSectionsAsync();
 	}
 
-	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.onOpenAuditLog = Objects.requireNonNull(onOpenAuditLog, "onOpenAuditLog");
 		this.runtimeBridge = runtimeBridge;
 		if (this.runtimeBridge != null) this.runtimeBridge.subscribeEntityUpdated(linkTypeLiveHandler);
 		this.caseService = Objects.requireNonNull(caseService, "caseService");
+		this.materialRequestService = Objects.requireNonNull(materialRequestService, "materialRequestService");
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		if (fxmlReady) {
 			loadFromPreferences();
 			updateAdminControlsVisibility();
 			loadAdminSectionsAsync();
 		}
+	}
+
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
+		init(notificationPreferencesService, appState, onOpenAuditLog, caseService, new MaterialRequestServicePort() {
+			@Override public List<MaterialTypeDto> listEffectiveMaterialTypes(int tenantId) { return List.of(); }
+			@Override public List<RequestMethodDto> listEffectiveRequestMethods(int tenantId) { return List.of(); }
+			@Override public List<RequestStatusDto> listEffectiveRequestStatuses(int tenantId) { return List.of(); }
+			@Override public List<com.shale.core.dto.MaterialRequestSummaryDto> listMaterialRequests(long caseId, int tenantId) { return List.of(); }
+			@Override public Optional<com.shale.core.dto.MaterialRequestDetailDto> getMaterialRequest(long caseId, long materialRequestId, int tenantId, int actorUserId) { return Optional.empty(); }
+			@Override public List<com.shale.core.dto.MaterialRequestFollowUpDto> listFollowUps(long caseId, long materialRequestId, int tenantId, int actorUserId) { return List.of(); }
+			@Override public com.shale.core.dto.MaterialRequestDetailDto createMaterialRequest(CreateMaterialRequestCommand command) { throw new UnsupportedOperationException(); }
+			@Override public com.shale.core.dto.MaterialRequestDetailDto updateMaterialRequest(UpdateMaterialRequestCommand command) { throw new UnsupportedOperationException(); }
+		}, userDao, runtimeBridge);
 	}
 
 	@FXML
@@ -241,7 +276,32 @@ public final class SettingsController {
 		loadCaseStatusesAsync(null);
 		loadPracticeAreasAsync(null);
 		loadLinkTypesAsync(null);
+		loadRequestLookupsAsync();
 		loadManagedUsersAsync(null);
+	}
+
+	private void loadRequestLookupsAsync() {
+		if (materialRequestService == null) return;
+		final int tenantId;
+		final int actorUserId;
+		try { tenantId = requireTenantId(); actorUserId = requireActorUserId(); } catch (RuntimeException ex) { setMaterialTypeMessage(rootMessage(ex)); return; }
+		if (materialTypeCardsContainer != null) materialTypeCardsContainer.getChildren().setAll(loadingLabel("Loading material types…"));
+		if (requestMethodCardsContainer != null) requestMethodCardsContainer.getChildren().setAll(loadingLabel("Loading request methods…"));
+		if (requestStatusCardsContainer != null) requestStatusCardsContainer.getChildren().setAll(loadingLabel("Loading request statuses…"));
+		settingsLoadExecutor.submit(() -> {
+			try {
+				List<MaterialTypeDto> materialTypes = buildMaterialTypeRows(materialRequestService.listMaterialTypesForAdministration(tenantId, actorUserId), tenantId);
+				List<RequestMethodDto> methods = buildRequestMethodRows(materialRequestService.listRequestMethodsForAdministration(tenantId, actorUserId), tenantId);
+				List<RequestStatusDto> statuses = buildRequestStatusRows(materialRequestService.listRequestStatusesForAdministration(tenantId, actorUserId), tenantId);
+				Platform.runLater(() -> { renderMaterialTypeCards(materialTypes); renderRequestMethodCards(methods); renderRequestStatusCards(statuses); });
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> {
+					if (materialTypeCardsContainer != null) materialTypeCardsContainer.getChildren().setAll(loadingLabel("Failed to load material types. " + rootMessage(ex)));
+					if (requestMethodCardsContainer != null) requestMethodCardsContainer.getChildren().setAll(loadingLabel("Failed to load request methods. " + rootMessage(ex)));
+					if (requestStatusCardsContainer != null) requestStatusCardsContainer.getChildren().setAll(loadingLabel("Failed to load request statuses. " + rootMessage(ex)));
+				});
+			}
+		});
 	}
 
 	private void setCaseStatusLoadingState(String message) {
@@ -311,7 +371,16 @@ public final class SettingsController {
 					ActionButtonFactory.neutral("Remove Practice Area", event -> onRemovePracticeArea()),
 					practiceAreaSettingsStatusLabel);
 		}
+		if (materialTypeActionRow != null) materialTypeActionRow.getChildren().setAll(ActionButtonFactory.primary("Add Material Type", e -> onAddMaterialType()), ActionButtonFactory.neutral("Edit/Customize", e -> onEditMaterialType()), ActionButtonFactory.neutral("Activate/Deactivate", e -> onToggleMaterialTypeActive()), ActionButtonFactory.neutral("Reset/Remove", e -> onResetOrRemoveMaterialType()), materialTypeSettingsStatusLabel);
+		if (requestMethodActionRow != null) requestMethodActionRow.getChildren().setAll(ActionButtonFactory.primary("Add Request Method", e -> onAddRequestMethod()), ActionButtonFactory.neutral("Edit/Customize", e -> onEditRequestMethod()), ActionButtonFactory.neutral("Activate/Deactivate", e -> onToggleRequestMethodActive()), ActionButtonFactory.neutral("Reset/Remove", e -> onResetOrRemoveRequestMethod()), requestMethodSettingsStatusLabel);
+		if (requestStatusActionRow != null) requestStatusActionRow.getChildren().setAll(ActionButtonFactory.primary("Add Request Status", e -> onAddRequestStatus()), ActionButtonFactory.neutral("Edit/Customize", e -> onEditRequestStatus()), ActionButtonFactory.neutral("Activate/Deactivate", e -> onToggleRequestStatusActive()), ActionButtonFactory.neutral("Reset/Remove", e -> onResetOrRemoveRequestStatus()), requestStatusSettingsStatusLabel);
 	}
+
+	private void renderMaterialTypeCards(List<MaterialTypeDto> rows) { if (materialTypeCardsContainer == null) return; List<MaterialTypeDto> effective = rows == null ? List.of() : rows; materialTypeCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No material types are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.MATERIAL_TYPE, RequestLookupSelection.material(r))).toList()); setMaterialTypeMessage(""); }
+	private void renderRequestMethodCards(List<RequestMethodDto> rows) { if (requestMethodCardsContainer == null) return; List<RequestMethodDto> effective = rows == null ? List.of() : rows; requestMethodCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No request methods are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.REQUEST_METHOD, RequestLookupSelection.method(r))).toList()); setRequestMethodMessage(""); }
+	private void renderRequestStatusCards(List<RequestStatusDto> rows) { if (requestStatusCardsContainer == null) return; List<RequestStatusDto> effective = rows == null ? List.of() : rows; requestStatusCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No request statuses are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.REQUEST_STATUS, RequestLookupSelection.status(r))).toList()); setRequestStatusMessage(""); }
+	private VBox buildRequestLookupCard(RequestLookupKind kind, RequestLookupSelection row) { VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact"); if (selectedRequestLookup(kind) != null && selectedRequestLookup(kind).id() == row.id()) card.getStyleClass().add("link-type-card-selected"); card.setOnMouseClicked(e -> selectRequestLookup(kind, row)); HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String css = safe(ColorUtil.toCssBackgroundColorOrNull(row.color())); if (!css.isBlank()) dot.setStyle("-fx-background-color: " + css + "; -fx-fill: " + css + ";"); Label name = new Label(row.name()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer); if (kind != RequestLookupKind.REQUEST_METHOD) header.getChildren().add(LinkTypeIndicatorFactory.createLinkTypePill(row.name(), row.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.active() ? "Active" : "Inactive"), metadataPill(row.scopeLabel())); if (!row.systemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.systemKey())); if (!row.color().isBlank()) metadata.getChildren().add(metadataPill(row.color())); HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", "app-toolbar-button-neutral"); edit.setOnAction(e -> { selectRequestLookup(kind,row); editRequestLookup(kind); e.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", "app-toolbar-button-neutral"); toggle.setOnAction(e -> { selectRequestLookup(kind,row); toggleRequestLookup(kind); e.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", row.custom() ? "app-toolbar-button-danger" : "app-toolbar-button-neutral"); reset.setDisable(row.global()); reset.setOnAction(e -> { selectRequestLookup(kind,row); resetRequestLookup(kind); e.consume(); }); Label help = new Label(row.description().isBlank() ? row.lifecycleText() : row.description()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit,toggle,reset,help); card.getChildren().addAll(header,metadata,actions); return card; }
+
 
 
 	@FXML
@@ -1116,6 +1185,9 @@ public final class SettingsController {
 
 	private void setPracticeAreaMessage(String message) { if (practiceAreaSettingsStatusLabel != null) practiceAreaSettingsStatusLabel.setText(message == null ? "" : message); }
 	private void setLinkTypeMessage(String message) { if (linkTypeSettingsStatusLabel != null) linkTypeSettingsStatusLabel.setText(message == null ? "" : message); }
+	private void setMaterialTypeMessage(String message) { if (materialTypeSettingsStatusLabel != null) materialTypeSettingsStatusLabel.setText(message == null ? "" : message); }
+	private void setRequestMethodMessage(String message) { if (requestMethodSettingsStatusLabel != null) requestMethodSettingsStatusLabel.setText(message == null ? "" : message); }
+	private void setRequestStatusMessage(String message) { if (requestStatusSettingsStatusLabel != null) requestStatusSettingsStatusLabel.setText(message == null ? "" : message); }
 	private static String safe(String value) { return value == null ? "" : value; }
 	private static String rootMessage(Throwable ex) { Throwable t = ex; while (t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? t.toString() : t.getMessage(); }
 
@@ -1137,6 +1209,31 @@ public final class SettingsController {
 
 
 	public enum LinkTypeScope { GLOBAL_DEFAULT, TENANT_OVERRIDE, TENANT_CUSTOM }
+
+	public enum RequestLookupKind { MATERIAL_TYPE, REQUEST_METHOD, REQUEST_STATUS }
+
+	private RequestLookupSelection selectedRequestLookup(RequestLookupKind kind) { return switch (kind) { case MATERIAL_TYPE -> selectedMaterialTypeRow; case REQUEST_METHOD -> selectedRequestMethodRow; case REQUEST_STATUS -> selectedRequestStatusRow; }; }
+	private void selectRequestLookup(RequestLookupKind kind, RequestLookupSelection row) { switch (kind) { case MATERIAL_TYPE -> selectedMaterialTypeRow = row; case REQUEST_METHOD -> selectedRequestMethodRow = row; case REQUEST_STATUS -> selectedRequestStatusRow = row; } renderRequestLookupCards(kind); }
+
+	private void renderRequestLookupCards(RequestLookupKind kind) { loadRequestLookupsAsync(); }
+	private void onAddMaterialType(){ addRequestLookup(RequestLookupKind.MATERIAL_TYPE); } private void onEditMaterialType(){ editRequestLookup(RequestLookupKind.MATERIAL_TYPE); } private void onToggleMaterialTypeActive(){ toggleRequestLookup(RequestLookupKind.MATERIAL_TYPE); } private void onResetOrRemoveMaterialType(){ resetRequestLookup(RequestLookupKind.MATERIAL_TYPE); }
+	private void onAddRequestMethod(){ addRequestLookup(RequestLookupKind.REQUEST_METHOD); } private void onEditRequestMethod(){ editRequestLookup(RequestLookupKind.REQUEST_METHOD); } private void onToggleRequestMethodActive(){ toggleRequestLookup(RequestLookupKind.REQUEST_METHOD); } private void onResetOrRemoveRequestMethod(){ resetRequestLookup(RequestLookupKind.REQUEST_METHOD); }
+	private void onAddRequestStatus(){ addRequestLookup(RequestLookupKind.REQUEST_STATUS); } private void onEditRequestStatus(){ editRequestLookup(RequestLookupKind.REQUEST_STATUS); } private void onToggleRequestStatusActive(){ toggleRequestLookup(RequestLookupKind.REQUEST_STATUS); } private void onResetOrRemoveRequestStatus(){ resetRequestLookup(RequestLookupKind.REQUEST_STATUS); }
+	private void addRequestLookup(RequestLookupKind kind){ if (!requireAdminLookupManagement(label(kind)) || mutationRunning(kind)) return; showRequestLookupDialog(kind,null).ifPresent(input -> mutateRequestLookup(kind, () -> { switch(kind){ case MATERIAL_TYPE -> materialRequestService.createMaterialType(new MaterialRequestServicePort.MaterialTypeCommand(null,requireTenantId(),requireActorUserId(),input.name(),input.description(),input.color(),input.active(),input.systemKey(),input.sortOrder(),null)); case REQUEST_METHOD -> materialRequestService.createRequestMethod(new MaterialRequestServicePort.RequestMethodCommand(null,requireTenantId(),requireActorUserId(),input.name(),input.active(),input.systemKey(),input.sortOrder(),null)); case REQUEST_STATUS -> materialRequestService.createRequestStatus(new MaterialRequestServicePort.RequestStatusCommand(null,requireTenantId(),requireActorUserId(),input.name(),input.color(),input.active(),input.systemKey(),input.sortOrder(),null)); } }, label(kind)+" added.")); }
+	private void editRequestLookup(RequestLookupKind kind){ RequestLookupSelection row=selectedRequestLookup(kind); if(row==null){message(kind,"Select a "+label(kind).toLowerCase(java.util.Locale.ROOT)+" first.");return;} if(mutationRunning(kind))return; showRequestLookupDialog(kind,row).ifPresent(input -> mutateRequestLookup(kind, () -> { switch(kind){ case MATERIAL_TYPE -> materialRequestService.updateMaterialType(new MaterialRequestServicePort.MaterialTypeCommand(row.id(),requireTenantId(),requireActorUserId(),input.name(),input.description(),input.color(),input.active(),row.systemKey().isBlank()?input.systemKey():row.systemKey(),input.sortOrder(),row.rowVer())); case REQUEST_METHOD -> materialRequestService.updateRequestMethod(new MaterialRequestServicePort.RequestMethodCommand(row.id(),requireTenantId(),requireActorUserId(),input.name(),input.active(),row.systemKey().isBlank()?input.systemKey():row.systemKey(),input.sortOrder(),row.rowVer())); case REQUEST_STATUS -> materialRequestService.updateRequestStatus(new MaterialRequestServicePort.RequestStatusCommand(row.id(),requireTenantId(),requireActorUserId(),input.name(),input.color(),input.active(),row.systemKey().isBlank()?input.systemKey():row.systemKey(),input.sortOrder(),row.rowVer())); } }, row.global()?"Tenant override saved.":label(kind)+" updated.")); }
+	private void toggleRequestLookup(RequestLookupKind kind){ RequestLookupSelection row=selectedRequestLookup(kind); if(row==null){message(kind,"Select a "+label(kind).toLowerCase(java.util.Locale.ROOT)+" first.");return;} mutateRequestLookup(kind, () -> { var c=new MaterialRequestServicePort.SetLookupActiveCommand(requireTenantId(),requireActorUserId(),row.id(),!row.active(),row.rowVer()); switch(kind){ case MATERIAL_TYPE -> materialRequestService.setMaterialTypeActive(c); case REQUEST_METHOD -> materialRequestService.setRequestMethodActive(c); case REQUEST_STATUS -> materialRequestService.setRequestStatusActive(c); } }, row.active()?label(kind)+" deactivated for future selections.":label(kind)+" activated."); }
+	private void resetRequestLookup(RequestLookupKind kind){ RequestLookupSelection row=selectedRequestLookup(kind); if(row==null){message(kind,"Select a "+label(kind).toLowerCase(java.util.Locale.ROOT)+" first.");return;} String action=row.custom()?"Remove":"Reset to Default"; if(row.global()){message(kind,"Global defaults do not need reset.");return;} if(!AppDialogs.showConfirmation(null,label(kind),action+" "+row.name()+"?","Existing records retain their stored lookup relationship.",action,row.custom()?AppDialogs.DialogActionKind.DANGER:AppDialogs.DialogActionKind.PRIMARY))return; mutateRequestLookup(kind, () -> { var c=new MaterialRequestServicePort.ResetLookupOverrideCommand(requireTenantId(),requireActorUserId(),row.id()); switch(kind){ case MATERIAL_TYPE -> materialRequestService.resetMaterialTypeOverride(c); case REQUEST_METHOD -> materialRequestService.resetRequestMethodOverride(c); case REQUEST_STATUS -> materialRequestService.resetRequestStatusOverride(c); } }, row.custom()?label(kind)+" removed from future selections.":"Tenant override reset to global default."); }
+	private Optional<RequestLookupInput> showRequestLookupDialog(RequestLookupKind kind, RequestLookupSelection existing){ Dialog<RequestLookupInput> d=new Dialog<>(); String title=(existing==null?"Add ":existing.global()?"Customize ":"Edit ")+label(kind); d.setTitle(title); AppDialogs.applySecondaryDialogShell(d,title); d.getDialogPane().getButtonTypes().setAll(ButtonType.OK,ButtonType.CANCEL); TextField name=new TextField(existing==null?"":existing.name()); TextField description=new TextField(existing==null?"":existing.description()); TextField sort=new TextField(existing==null?"0":String.valueOf(existing.sortOrder())); CheckBox active=new CheckBox("Active"); active.setSelected(existing==null||existing.active()); ColorPicker colorPicker=new ColorPicker(dbColorToFx(existing==null?null:existing.color())); GridPane grid=new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Name"),0,0);grid.add(name,1,0); int r=1; if(kind==RequestLookupKind.MATERIAL_TYPE){grid.add(new Label("Description"),0,r);grid.add(description,1,r++);} if(kind!=RequestLookupKind.REQUEST_METHOD){grid.add(new Label("Color"),0,r);grid.add(colorPicker,1,r++);} grid.add(new Label("Sort Order"),0,r);grid.add(sort,1,r++); grid.add(active,1,r++); if(existing!=null&&!existing.systemKey().isBlank()){grid.add(new Label("System Key"),0,r);grid.add(new Label(existing.systemKey()),1,r);} d.getDialogPane().setContent(grid); d.setResultConverter(b->{if(b!=ButtonType.OK)return null; String nm=trim(name.getText()); if(nm.isBlank())throw new IllegalArgumentException("Name is required."); int sortOrder; try{sortOrder=Integer.parseInt(trim(sort.getText()).isBlank()?"0":trim(sort.getText()));}catch(NumberFormatException ex){throw new IllegalArgumentException("Sort Order must be a number.");} return new RequestLookupInput(nm, kind==RequestLookupKind.MATERIAL_TYPE?trim(description.getText()):null, kind==RequestLookupKind.REQUEST_METHOD?null:fxColorToDb(colorPicker.getValue()), active.isSelected(), existing==null?null:existing.systemKey(), sortOrder);}); try{return d.showAndWait();}catch(RuntimeException ex){AppDialogs.showError(null,label(kind),rootMessage(ex));return Optional.empty();}}
+	private void mutateRequestLookup(RequestLookupKind kind,Runnable work,String success){ if(mutationRunning(kind))return; setMutationRunning(kind,true); message(kind,"Saving…"); settingsLoadExecutor.submit(()->{try{work.run(); Platform.runLater(()->{setMutationRunning(kind,false);message(kind,success);loadRequestLookupsAsync();});}catch(RuntimeException ex){Platform.runLater(()->{setMutationRunning(kind,false);AppDialogs.showError(null,label(kind),rootMessage(ex));message(kind,rootMessage(ex));});}});}
+	private boolean mutationRunning(RequestLookupKind kind){return switch(kind){case MATERIAL_TYPE->materialTypeMutationRunning;case REQUEST_METHOD->requestMethodMutationRunning;case REQUEST_STATUS->requestStatusMutationRunning;};}
+	private void setMutationRunning(RequestLookupKind kind,boolean v){switch(kind){case MATERIAL_TYPE->materialTypeMutationRunning=v;case REQUEST_METHOD->requestMethodMutationRunning=v;case REQUEST_STATUS->requestStatusMutationRunning=v;}}
+	private void message(RequestLookupKind kind,String m){switch(kind){case MATERIAL_TYPE->setMaterialTypeMessage(m);case REQUEST_METHOD->setRequestMethodMessage(m);case REQUEST_STATUS->setRequestStatusMessage(m);}}
+	private static String label(RequestLookupKind kind){return switch(kind){case MATERIAL_TYPE->"Material Type";case REQUEST_METHOD->"Request Method";case REQUEST_STATUS->"Request Status";};}
+	static List<MaterialTypeDto> buildMaterialTypeRows(List<MaterialTypeDto> rows,int tenantId){Map<String,MaterialTypeDto> g=new java.util.LinkedHashMap<>(),t=new java.util.LinkedHashMap<>();List<MaterialTypeDto> out=new ArrayList<>();for(MaterialTypeDto r:rows==null?List.<MaterialTypeDto>of():rows){if(r.shaleClientId()!=null&&r.shaleClientId()!=tenantId)continue;String k=safe(r.systemKey()).toLowerCase(java.util.Locale.ROOT);if(r.shaleClientId()==null&&!k.isBlank())g.put(k,r);else if(!k.isBlank())t.put(k,r);else if(!r.deleted())out.add(r);}for(var e:g.entrySet()){MaterialTypeDto o=t.get(e.getKey());out.add(o==null||o.deleted()?e.getValue():o);}for(var e:t.entrySet())if(!g.containsKey(e.getKey())&&!e.getValue().deleted())out.add(e.getValue());out.sort(java.util.Comparator.comparing(MaterialTypeDto::sortOrder).thenComparing(MaterialTypeDto::name,String.CASE_INSENSITIVE_ORDER));return List.copyOf(out);}
+	static List<RequestMethodDto> buildRequestMethodRows(List<RequestMethodDto> rows,int tenantId){Map<String,RequestMethodDto> g=new java.util.LinkedHashMap<>(),t=new java.util.LinkedHashMap<>();List<RequestMethodDto> out=new ArrayList<>();for(RequestMethodDto r:rows==null?List.<RequestMethodDto>of():rows){if(r.shaleClientId()!=null&&r.shaleClientId()!=tenantId)continue;String k=safe(r.systemKey()).toLowerCase(java.util.Locale.ROOT);if(r.shaleClientId()==null&&!k.isBlank())g.put(k,r);else if(!k.isBlank())t.put(k,r);else if(!r.deleted())out.add(r);}for(var e:g.entrySet()){RequestMethodDto o=t.get(e.getKey());out.add(o==null||o.deleted()?e.getValue():o);}for(var e:t.entrySet())if(!g.containsKey(e.getKey())&&!e.getValue().deleted())out.add(e.getValue());out.sort(java.util.Comparator.comparing(RequestMethodDto::sortOrder).thenComparing(RequestMethodDto::name,String.CASE_INSENSITIVE_ORDER));return List.copyOf(out);}
+	static List<RequestStatusDto> buildRequestStatusRows(List<RequestStatusDto> rows,int tenantId){Map<String,RequestStatusDto> g=new java.util.LinkedHashMap<>(),t=new java.util.LinkedHashMap<>();List<RequestStatusDto> out=new ArrayList<>();for(RequestStatusDto r:rows==null?List.<RequestStatusDto>of():rows){if(r.shaleClientId()!=null&&r.shaleClientId()!=tenantId)continue;String k=safe(r.systemKey()).toLowerCase(java.util.Locale.ROOT);if(r.shaleClientId()==null&&!k.isBlank())g.put(k,r);else if(!k.isBlank())t.put(k,r);else if(!r.deleted())out.add(r);}for(var e:g.entrySet()){RequestStatusDto o=t.get(e.getKey());out.add(o==null||o.deleted()?e.getValue():o);}for(var e:t.entrySet())if(!g.containsKey(e.getKey())&&!e.getValue().deleted())out.add(e.getValue());out.sort(java.util.Comparator.comparing(RequestStatusDto::sortOrder).thenComparing(RequestStatusDto::name,String.CASE_INSENSITIVE_ORDER));return List.copyOf(out);}
+	private record RequestLookupInput(String name,String description,String color,boolean active,String systemKey,int sortOrder){}
+	private record RequestLookupSelection(int id, String name, String description, String color, String systemKey, int sortOrder, boolean active, boolean global, byte[] rowVer) { static RequestLookupSelection material(MaterialTypeDto d){return new RequestLookupSelection(d.id(),safe(d.name()),safe(d.description()),safe(d.color()),safe(d.systemKey()),d.sortOrder(),d.active()&&!d.deleted(),d.shaleClientId()==null,d.rowVer());} static RequestLookupSelection method(RequestMethodDto d){return new RequestLookupSelection(d.id(),safe(d.name()),"", "",safe(d.systemKey()),d.sortOrder(),d.active()&&!d.deleted(),d.shaleClientId()==null,d.rowVer());} static RequestLookupSelection status(RequestStatusDto d){return new RequestLookupSelection(d.id(),safe(d.name()),"",safe(d.color()),safe(d.systemKey()),d.sortOrder(),d.active()&&!d.deleted(),d.shaleClientId()==null,d.rowVer());} boolean custom(){return !global&&systemKey.isBlank();} String scopeLabel(){return global?"Global/default":custom()?"Tenant custom":"Tenant override";} String lifecycleText(){return global?"Editing or changing active state creates a tenant override; global rows are never changed.":custom()?"Tenant custom value can be edited, activated/deactivated, or removed.":"Tenant override masks the global default until reset.";} }
 
 	public static final class LinkTypeViewRow {
 		private final LinkTypeDto linkType;
@@ -1269,6 +1366,10 @@ public final class SettingsController {
 		if (linkTypeAdministrationSection != null) {
 			linkTypeAdministrationSection.setVisible(visible);
 			linkTypeAdministrationSection.setManaged(visible);
+		}
+		if (requestAdministrationSection != null) {
+			requestAdministrationSection.setVisible(visible);
+			requestAdministrationSection.setManaged(visible);
 		}
 		if (userAdministrationSection != null) {
 			userAdministrationSection.setVisible(visible);

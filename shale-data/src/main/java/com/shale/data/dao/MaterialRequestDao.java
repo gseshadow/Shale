@@ -3,6 +3,11 @@ package com.shale.data.dao;
 import com.shale.core.dto.*;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.service.MaterialRequestServicePort.CreateMaterialRequestCommand;
+import com.shale.core.service.MaterialRequestServicePort.MaterialTypeCommand;
+import com.shale.core.service.MaterialRequestServicePort.RequestMethodCommand;
+import com.shale.core.service.MaterialRequestServicePort.RequestStatusCommand;
+import com.shale.core.service.MaterialRequestServicePort.ResetLookupOverrideCommand;
+import com.shale.core.service.MaterialRequestServicePort.SetLookupActiveCommand;
 import com.shale.core.service.MaterialRequestServicePort.UpdateMaterialRequestCommand;
 import java.sql.*;
 import java.time.*;
@@ -15,22 +20,22 @@ public final class MaterialRequestDao {
     public List<MaterialTypeDto> listEffectiveMaterialTypes(int shaleClientId) {
         String sql = """
                 WITH visible AS (
-                  SELECT Id, ShaleClientId, SystemKey, Name, Description, Color, SortOrder, IsActive, IsDeleted,
+                  SELECT Id, ShaleClientId, SystemKey, Name, Description, Color, SortOrder, IsActive, IsDeleted, RowVer,
                          ROW_NUMBER() OVER (PARTITION BY SystemKey ORDER BY CASE WHEN ShaleClientId = ? THEN 0 ELSE 1 END, Id) AS rn
                   FROM dbo.MaterialTypes
                   WHERE (ShaleClientId = ? OR ShaleClientId IS NULL) AND SystemKey IS NOT NULL
                 )
-                SELECT Id, ShaleClientId, SystemKey, Name, Description, Color, SortOrder FROM visible
+                SELECT Id, ShaleClientId, SystemKey, Name, Description, Color, SortOrder, IsActive, IsDeleted, RowVer FROM visible
                 WHERE rn = 1 AND IsDeleted = 0 AND IsActive = 1
                 UNION ALL
-                SELECT Id, ShaleClientId, SystemKey, Name, Description, Color, SortOrder
+                SELECT Id, ShaleClientId, SystemKey, Name, Description, Color, SortOrder, IsActive, IsDeleted, RowVer
                 FROM dbo.MaterialTypes
                 WHERE ShaleClientId = ? AND SystemKey IS NULL AND IsDeleted = 0 AND IsActive = 1
                 ORDER BY SortOrder, Name, Id
                 """;
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
             verifyTenant(con, shaleClientId); ps.setInt(1, shaleClientId); ps.setInt(2, shaleClientId); ps.setInt(3, shaleClientId);
-            try (ResultSet rs = ps.executeQuery()) { List<MaterialTypeDto> out = new ArrayList<>(); while (rs.next()) out.add(new MaterialTypeDto(rs.getInt(1), (Integer)rs.getObject(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getInt(7))); return out; }
+            try (ResultSet rs = ps.executeQuery()) { List<MaterialTypeDto> out = new ArrayList<>(); while (rs.next()) out.add(new MaterialTypeDto(rs.getInt(1), (Integer)rs.getObject(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getInt(7), rs.getBoolean(8), rs.getBoolean(9), rs.getBytes(10))); return out; }
         } catch (SQLException e) { throw sqlFailure(e); }
     }
 
@@ -41,7 +46,7 @@ public final class MaterialRequestDao {
             ps.setInt(1, shaleClientId); ps.setInt(2, shaleClientId); ps.setInt(3, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<RequestMethodDto> out = new ArrayList<>();
-                while (rs.next()) out.add(new RequestMethodDto(rs.getInt(1), (Integer) rs.getObject(2), rs.getString(3), rs.getString(4), rs.getInt(5), rs.getBoolean(6), rs.getBoolean(7)));
+                while (rs.next()) out.add(new RequestMethodDto(rs.getInt(1), (Integer) rs.getObject(2), rs.getString(3), rs.getString(4), rs.getInt(5), rs.getBoolean(6), rs.getBoolean(7), rs.getBytes(8)));
                 return out;
             }
         } catch (SQLException e) { throw sqlFailure(e); }
@@ -54,28 +59,82 @@ public final class MaterialRequestDao {
             ps.setInt(1, shaleClientId); ps.setInt(2, shaleClientId); ps.setInt(3, shaleClientId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<RequestStatusDto> out = new ArrayList<>();
-                while (rs.next()) out.add(new RequestStatusDto(rs.getInt(1), (Integer) rs.getObject(2), rs.getString(3), rs.getString(4), rs.getInt(5), rs.getBoolean(6), rs.getBoolean(7)));
+                while (rs.next()) out.add(new RequestStatusDto(rs.getInt(1), (Integer) rs.getObject(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getInt(6), rs.getBoolean(7), rs.getBoolean(8), rs.getBytes(9)));
                 return out;
             }
         } catch (SQLException e) { throw sqlFailure(e); }
     }
 
+    public List<MaterialTypeDto> listMaterialTypesForAdministration(int shaleClientId, int actorUserId) {
+        return listMaterialTypes("WHERE ShaleClientId IS NULL OR ShaleClientId = ? ORDER BY SortOrder, Name, Id", shaleClientId, actorUserId);
+    }
+
+    public List<RequestMethodDto> listRequestMethodsForAdministration(int shaleClientId, int actorUserId) {
+        return listRequestMethods("WHERE ShaleClientId IS NULL OR ShaleClientId = ? ORDER BY SortOrder, Name, Id", shaleClientId, actorUserId);
+    }
+
+    public List<RequestStatusDto> listRequestStatusesForAdministration(int shaleClientId, int actorUserId) {
+        return listRequestStatuses("WHERE ShaleClientId IS NULL OR ShaleClientId = ? ORDER BY SortOrder, Name, Id", shaleClientId, actorUserId);
+    }
+
+    public MaterialTypeDto createMaterialType(MaterialTypeCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> insertMaterialType(con, c)); }
+    public MaterialTypeDto updateMaterialType(MaterialTypeCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> {
+        requireRowVer(c.expectedRowVer()); MaterialTypeDto existing = findMaterialType(con, c.id()); requireAvailable(existing, c.shaleClientId(), "Material type");
+        if (existing.shaleClientId() == null) { assertRowVer(con, "dbo.MaterialTypes", existing.id(), c.expectedRowVer(), "material type changed."); return upsertMaterialTypeOverride(con, c, existing); }
+        return updateMaterialTypeRow(con, c, existing.id(), c.expectedRowVer());
+    }); }
+    public MaterialTypeDto setMaterialTypeActive(SetLookupActiveCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> {
+        requireRowVer(c.expectedRowVer()); MaterialTypeDto e = findMaterialType(con, c.id()); requireAvailable(e, c.shaleClientId(), "Material type");
+        MaterialTypeCommand cmd = new MaterialTypeCommand(e.shaleClientId() == null ? null : e.id(), c.shaleClientId(), c.actorUserId(), e.name(), e.description(), e.color(), c.active(), e.systemKey(), e.sortOrder(), e.shaleClientId() == null ? c.expectedRowVer() : e.rowVer());
+        if (e.shaleClientId() == null) { assertRowVer(con, "dbo.MaterialTypes", e.id(), c.expectedRowVer(), "material type changed."); return upsertMaterialTypeOverride(con, cmd, e); }
+        return updateMaterialTypeRow(con, cmd, e.id(), c.expectedRowVer());
+    }); }
+    public void resetMaterialTypeOverride(ResetLookupOverrideCommand c) { mutateVoid(c.shaleClientId(), c.actorUserId(), con -> softDeleteOverride(con, "dbo.MaterialTypes", c.id(), c.shaleClientId(), c.actorUserId(), findMaterialType(con, c.id()) == null ? null : findMaterialType(con, c.id()).systemKey())); }
+
+    public RequestMethodDto createRequestMethod(RequestMethodCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> insertRequestMethod(con, c)); }
+    public RequestMethodDto updateRequestMethod(RequestMethodCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> {
+        requireRowVer(c.expectedRowVer()); RequestMethodDto e = findRequestMethod(con, c.id()); requireAvailable(e, c.shaleClientId(), "Request method");
+        if (e.shaleClientId() == null) { assertRowVer(con, "dbo.RequestMethods", e.id(), c.expectedRowVer(), "request method changed."); return upsertRequestMethodOverride(con, c, e); }
+        return updateRequestMethodRow(con, c, e.id(), c.expectedRowVer());
+    }); }
+    public RequestMethodDto setRequestMethodActive(SetLookupActiveCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> {
+        requireRowVer(c.expectedRowVer()); RequestMethodDto e = findRequestMethod(con, c.id()); requireAvailable(e, c.shaleClientId(), "Request method");
+        RequestMethodCommand cmd = new RequestMethodCommand(e.shaleClientId() == null ? null : e.id(), c.shaleClientId(), c.actorUserId(), e.name(), c.active(), e.systemKey(), e.sortOrder(), e.shaleClientId() == null ? c.expectedRowVer() : e.rowVer());
+        if (e.shaleClientId() == null) { assertRowVer(con, "dbo.RequestMethods", e.id(), c.expectedRowVer(), "request method changed."); return upsertRequestMethodOverride(con, cmd, e); }
+        return updateRequestMethodRow(con, cmd, e.id(), c.expectedRowVer());
+    }); }
+    public void resetRequestMethodOverride(ResetLookupOverrideCommand c) { mutateVoid(c.shaleClientId(), c.actorUserId(), con -> softDeleteOverride(con, "dbo.RequestMethods", c.id(), c.shaleClientId(), c.actorUserId(), findRequestMethod(con, c.id()) == null ? null : findRequestMethod(con, c.id()).systemKey())); }
+
+    public RequestStatusDto createRequestStatus(RequestStatusCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> insertRequestStatus(con, c)); }
+    public RequestStatusDto updateRequestStatus(RequestStatusCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> {
+        requireRowVer(c.expectedRowVer()); RequestStatusDto e = findRequestStatus(con, c.id()); requireAvailable(e, c.shaleClientId(), "Request status");
+        if (e.shaleClientId() == null) { assertRowVer(con, "dbo.RequestStatuses", e.id(), c.expectedRowVer(), "request status changed."); return upsertRequestStatusOverride(con, c, e); }
+        return updateRequestStatusRow(con, c, e.id(), c.expectedRowVer());
+    }); }
+    public RequestStatusDto setRequestStatusActive(SetLookupActiveCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> {
+        requireRowVer(c.expectedRowVer()); RequestStatusDto e = findRequestStatus(con, c.id()); requireAvailable(e, c.shaleClientId(), "Request status");
+        RequestStatusCommand cmd = new RequestStatusCommand(e.shaleClientId() == null ? null : e.id(), c.shaleClientId(), c.actorUserId(), e.name(), e.color(), c.active(), e.systemKey(), e.sortOrder(), e.shaleClientId() == null ? c.expectedRowVer() : e.rowVer());
+        if (e.shaleClientId() == null) { assertRowVer(con, "dbo.RequestStatuses", e.id(), c.expectedRowVer(), "request status changed."); return upsertRequestStatusOverride(con, cmd, e); }
+        return updateRequestStatusRow(con, cmd, e.id(), c.expectedRowVer());
+    }); }
+    public void resetRequestStatusOverride(ResetLookupOverrideCommand c) { mutateVoid(c.shaleClientId(), c.actorUserId(), con -> softDeleteOverride(con, "dbo.RequestStatuses", c.id(), c.shaleClientId(), c.actorUserId(), findRequestStatus(con, c.id()) == null ? null : findRequestStatus(con, c.id()).systemKey())); }
+
     private static String effectiveRequestLookupSql(String tableName) {
         return """
                 WITH visible AS (
-                  SELECT Id, ShaleClientId, SystemKey, Name, SortOrder, IsActive, IsDeleted,
+                  SELECT Id, ShaleClientId, SystemKey, Name, %s SortOrder, IsActive, IsDeleted, RowVer,
                          ROW_NUMBER() OVER (PARTITION BY SystemKey ORDER BY CASE WHEN ShaleClientId = ? THEN 0 ELSE 1 END, Id) AS rn
                   FROM %s
                   WHERE (ShaleClientId = ? OR ShaleClientId IS NULL) AND SystemKey IS NOT NULL
                 )
-                SELECT Id, ShaleClientId, SystemKey, Name, SortOrder, IsActive, IsDeleted FROM visible
+                SELECT Id, ShaleClientId, SystemKey, Name, %s SortOrder, IsActive, IsDeleted, RowVer FROM visible
                 WHERE rn = 1 AND IsDeleted = 0 AND IsActive = 1
                 UNION ALL
-                SELECT Id, ShaleClientId, SystemKey, Name, SortOrder, IsActive, IsDeleted
+                SELECT Id, ShaleClientId, SystemKey, Name, %s SortOrder, IsActive, IsDeleted, RowVer
                 FROM %s
                 WHERE ShaleClientId = ? AND SystemKey IS NULL AND IsDeleted = 0 AND IsActive = 1
                 ORDER BY SortOrder, Name, Id
-                """.formatted(tableName, tableName);
+                """.formatted(tableName.endsWith("RequestStatuses") ? "Color," : "", tableName, tableName.endsWith("RequestStatuses") ? "Color," : "", tableName.endsWith("RequestStatuses") ? "Color," : "", tableName);
     }
 
     public List<MaterialRequestSummaryDto> listMaterialRequests(long caseId, int tenant) {
@@ -133,4 +192,32 @@ public final class MaterialRequestDao {
     private static String norm(String s){return s==null?null:s.trim().toUpperCase(Locale.ROOT);} private static String blank(String s){return s==null||s.trim().isEmpty()?null:s.trim();}
     private static LocalDateTime ldt(ResultSet rs,String c)throws SQLException{Timestamp t=rs.getTimestamp(c);return t==null?null:t.toLocalDateTime();} private static LocalDate ld(ResultSet rs,String c)throws SQLException{java.sql.Date d=rs.getDate(c);return d==null?null:d.toLocalDate();}
     private static void setTs(PreparedStatement ps,int i,LocalDateTime v)throws SQLException{if(v==null)ps.setNull(i,Types.TIMESTAMP);else ps.setTimestamp(i,Timestamp.valueOf(v));} private static void setDate(PreparedStatement ps,int i,LocalDate v)throws SQLException{if(v==null)ps.setNull(i,Types.DATE);else ps.setDate(i,java.sql.Date.valueOf(v));} private static void setInt(PreparedStatement ps,int i,Integer v)throws SQLException{if(v==null)ps.setNull(i,Types.INTEGER);else ps.setInt(i,v);}
+    private interface SqlWork<T>{T run(Connection con)throws Exception;} private interface SqlVoid{void run(Connection con)throws Exception;}
+    private <T>T mutate(int t,int actor,SqlWork<T>w){try(Connection con=db.requireConnection()){verifyTenant(con,t);con.setAutoCommit(false);try{validateAdmin(con,t,actor);T out=w.run(con);con.commit();return out;}catch(RuntimeException e){rollback(con);throw e;}catch(Exception e){rollback(con);throw new IllegalStateException("Database operation failed.", e);}finally{con.setAutoCommit(true);}}catch(SQLException e){throw sqlFailure(e);}}
+    private void mutateVoid(int t,int actor,SqlVoid w){mutate(t,actor,con->{w.run(con);return null;});}
+    private void validateAdmin(Connection con,int t,int actor)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE Id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND is_admin=1")){ps.setInt(1,actor);ps.setInt(2,t);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Actor user is not an active admin for this tenant.");}}}
+    private static void requireRowVer(byte[] rv){if(rv==null||rv.length==0)throw new IllegalArgumentException("Request version is required.");}
+    private static String nreq(String v,int max){String s=blank(v);if(s==null)throw new IllegalArgumentException("Name is required.");if(s.length()>max)throw new IllegalArgumentException("Name is too long.");return s;}
+    private static String nopt(String v,int max){String s=blank(v);if(s!=null&&s.length()>max)throw new IllegalArgumentException("Value is too long.");return s;}
+    private static String sk(String v){String s=blank(v);return s==null?null:s.toLowerCase(Locale.ROOT);}
+    private static int so(Integer v){return v==null?0:v;}
+    private static void assertRowVer(Connection con,String table,int id,byte[] rv,String msg)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM "+table+" WHERE Id=? AND RowVer=?")){ps.setInt(1,id);ps.setBytes(2,rv);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalStateException("Optimistic conflict: "+msg);}}}
+    private static void requireAvailable(Object dto,int t,String label){Integer owner=null;if(dto instanceof MaterialTypeDto d)owner=d.shaleClientId();else if(dto instanceof RequestMethodDto d)owner=d.shaleClientId();else if(dto instanceof RequestStatusDto d)owner=d.shaleClientId();if(dto==null||(owner!=null&&owner!=t))throw new IllegalArgumentException(label+" is not available for this tenant.");}
+    private List<MaterialTypeDto> listMaterialTypes(String where,int t,int actor){try(Connection con=db.requireConnection();PreparedStatement ps=con.prepareStatement("SELECT Id,ShaleClientId,SystemKey,Name,Description,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.MaterialTypes "+where)){verifyTenant(con,t);validateAdmin(con,t,actor);ps.setInt(1,t);try(ResultSet rs=ps.executeQuery()){List<MaterialTypeDto> out=new ArrayList<>();while(rs.next())out.add(new MaterialTypeDto(rs.getInt(1),(Integer)rs.getObject(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6),rs.getInt(7),rs.getBoolean(8),rs.getBoolean(9),rs.getBytes(10)));return out;}}catch(SQLException e){throw sqlFailure(e);}}
+    private List<RequestMethodDto> listRequestMethods(String where,int t,int actor){try(Connection con=db.requireConnection();PreparedStatement ps=con.prepareStatement("SELECT Id,ShaleClientId,SystemKey,Name,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods "+where)){verifyTenant(con,t);validateAdmin(con,t,actor);ps.setInt(1,t);try(ResultSet rs=ps.executeQuery()){List<RequestMethodDto> out=new ArrayList<>();while(rs.next())out.add(new RequestMethodDto(rs.getInt(1),(Integer)rs.getObject(2),rs.getString(3),rs.getString(4),rs.getInt(5),rs.getBoolean(6),rs.getBoolean(7),rs.getBytes(8)));return out;}}catch(SQLException e){throw sqlFailure(e);}}
+    private List<RequestStatusDto> listRequestStatuses(String where,int t,int actor){try(Connection con=db.requireConnection();PreparedStatement ps=con.prepareStatement("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestStatuses "+where)){verifyTenant(con,t);validateAdmin(con,t,actor);ps.setInt(1,t);try(ResultSet rs=ps.executeQuery()){List<RequestStatusDto> out=new ArrayList<>();while(rs.next())out.add(new RequestStatusDto(rs.getInt(1),(Integer)rs.getObject(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getInt(6),rs.getBoolean(7),rs.getBoolean(8),rs.getBytes(9)));return out;}}catch(SQLException e){throw sqlFailure(e);}}
+    private MaterialTypeDto findMaterialType(Connection con,Integer id)throws SQLException{if(id==null)return null;try(PreparedStatement ps=con.prepareStatement("SELECT Id,ShaleClientId,SystemKey,Name,Description,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.MaterialTypes WHERE Id=?")){ps.setInt(1,id);try(ResultSet rs=ps.executeQuery()){return rs.next()?new MaterialTypeDto(rs.getInt(1),(Integer)rs.getObject(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6),rs.getInt(7),rs.getBoolean(8),rs.getBoolean(9),rs.getBytes(10)):null;}}}
+    private RequestMethodDto findRequestMethod(Connection con,Integer id)throws SQLException{if(id==null)return null;try(PreparedStatement ps=con.prepareStatement("SELECT Id,ShaleClientId,SystemKey,Name,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods WHERE Id=?")){ps.setInt(1,id);try(ResultSet rs=ps.executeQuery()){return rs.next()?new RequestMethodDto(rs.getInt(1),(Integer)rs.getObject(2),rs.getString(3),rs.getString(4),rs.getInt(5),rs.getBoolean(6),rs.getBoolean(7),rs.getBytes(8)):null;}}}
+    private RequestStatusDto findRequestStatus(Connection con,Integer id)throws SQLException{if(id==null)return null;try(PreparedStatement ps=con.prepareStatement("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestStatuses WHERE Id=?")){ps.setInt(1,id);try(ResultSet rs=ps.executeQuery()){return rs.next()?new RequestStatusDto(rs.getInt(1),(Integer)rs.getObject(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getInt(6),rs.getBoolean(7),rs.getBoolean(8),rs.getBytes(9)):null;}}}
+    private Integer findTenantOverrideId(Connection con,String table,int t,String key)throws SQLException{if(key==null)return null;try(PreparedStatement ps=con.prepareStatement("SELECT Id FROM "+table+" WHERE ShaleClientId=? AND SystemKey=?")){ps.setInt(1,t);ps.setString(2,key);try(ResultSet rs=ps.executeQuery()){return rs.next()?rs.getInt(1):null;}}}
+    private MaterialTypeDto insertMaterialType(Connection con,MaterialTypeCommand c)throws SQLException{try(PreparedStatement ps=con.prepareStatement("INSERT dbo.MaterialTypes(ShaleClientId,SystemKey,Name,Description,Color,SortOrder,IsActive,IsDeleted,CreatedByUserId,UpdatedByUserId,CreatedAt,UpdatedAt) VALUES(?,?,?,?,?,?,?,0,?,?,SYSUTCDATETIME(),SYSUTCDATETIME())",Statement.RETURN_GENERATED_KEYS)){ps.setInt(1,c.shaleClientId());ps.setString(2,sk(c.systemKey()));ps.setString(3,nreq(c.name(),120));ps.setString(4,nopt(c.description(),4000));ps.setString(5,nopt(c.color(),32));ps.setInt(6,so(c.sortOrder()));ps.setBoolean(7,c.active());ps.setInt(8,c.actorUserId());ps.setInt(9,c.actorUserId());ps.executeUpdate();try(ResultSet rs=ps.getGeneratedKeys()){rs.next();return findMaterialType(con,rs.getInt(1));}}}
+    private RequestMethodDto insertRequestMethod(Connection con,RequestMethodCommand c)throws SQLException{try(PreparedStatement ps=con.prepareStatement("INSERT dbo.RequestMethods(ShaleClientId,SystemKey,Name,SortOrder,IsActive,IsDeleted,CreatedAt,UpdatedAt) VALUES(?,?,?,?,?,0,SYSUTCDATETIME(),SYSUTCDATETIME())",Statement.RETURN_GENERATED_KEYS)){ps.setInt(1,c.shaleClientId());ps.setString(2,sk(c.systemKey()));ps.setString(3,nreq(c.name(),120));ps.setInt(4,so(c.sortOrder()));ps.setBoolean(5,c.active());ps.executeUpdate();try(ResultSet rs=ps.getGeneratedKeys()){rs.next();return findRequestMethod(con,rs.getInt(1));}}}
+    private RequestStatusDto insertRequestStatus(Connection con,RequestStatusCommand c)throws SQLException{try(PreparedStatement ps=con.prepareStatement("INSERT dbo.RequestStatuses(ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,CreatedAt,UpdatedAt) VALUES(?,?,?,?,?,?,0,SYSUTCDATETIME(),SYSUTCDATETIME())",Statement.RETURN_GENERATED_KEYS)){ps.setInt(1,c.shaleClientId());ps.setString(2,sk(c.systemKey()));ps.setString(3,nreq(c.name(),120));ps.setString(4,nopt(c.color(),32));ps.setInt(5,so(c.sortOrder()));ps.setBoolean(6,c.active());ps.executeUpdate();try(ResultSet rs=ps.getGeneratedKeys()){rs.next();return findRequestStatus(con,rs.getInt(1));}}}
+    private MaterialTypeDto upsertMaterialTypeOverride(Connection con,MaterialTypeCommand c,MaterialTypeDto g)throws SQLException{Integer id=findTenantOverrideId(con,"dbo.MaterialTypes",c.shaleClientId(),g.systemKey());return id==null?insertMaterialType(con,new MaterialTypeCommand(null,c.shaleClientId(),c.actorUserId(),c.name(),c.description(),c.color(),c.active(),g.systemKey(),c.sortOrder(),null)):updateMaterialTypeRow(con,new MaterialTypeCommand(id,c.shaleClientId(),c.actorUserId(),c.name(),c.description(),c.color(),c.active(),g.systemKey(),c.sortOrder(),findMaterialType(con,id).rowVer()),id,findMaterialType(con,id).rowVer());}
+    private RequestMethodDto upsertRequestMethodOverride(Connection con,RequestMethodCommand c,RequestMethodDto g)throws SQLException{Integer id=findTenantOverrideId(con,"dbo.RequestMethods",c.shaleClientId(),g.systemKey());return id==null?insertRequestMethod(con,new RequestMethodCommand(null,c.shaleClientId(),c.actorUserId(),c.name(),c.active(),g.systemKey(),c.sortOrder(),null)):updateRequestMethodRow(con,new RequestMethodCommand(id,c.shaleClientId(),c.actorUserId(),c.name(),c.active(),g.systemKey(),c.sortOrder(),findRequestMethod(con,id).rowVer()),id,findRequestMethod(con,id).rowVer());}
+    private RequestStatusDto upsertRequestStatusOverride(Connection con,RequestStatusCommand c,RequestStatusDto g)throws SQLException{Integer id=findTenantOverrideId(con,"dbo.RequestStatuses",c.shaleClientId(),g.systemKey());return id==null?insertRequestStatus(con,new RequestStatusCommand(null,c.shaleClientId(),c.actorUserId(),c.name(),c.color(),c.active(),g.systemKey(),c.sortOrder(),null)):updateRequestStatusRow(con,new RequestStatusCommand(id,c.shaleClientId(),c.actorUserId(),c.name(),c.color(),c.active(),g.systemKey(),c.sortOrder(),findRequestStatus(con,id).rowVer()),id,findRequestStatus(con,id).rowVer());}
+    private MaterialTypeDto updateMaterialTypeRow(Connection con,MaterialTypeCommand c,int id,byte[] rv)throws SQLException{try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.MaterialTypes SET Name=?,Description=?,Color=?,SortOrder=?,IsActive=?,IsDeleted=0,SystemKey=?,UpdatedByUserId=?,UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND RowVer=?")){ps.setString(1,nreq(c.name(),120));ps.setString(2,nopt(c.description(),4000));ps.setString(3,nopt(c.color(),32));ps.setInt(4,so(c.sortOrder()));ps.setBoolean(5,c.active());ps.setString(6,sk(c.systemKey()));ps.setInt(7,c.actorUserId());ps.setInt(8,id);ps.setInt(9,c.shaleClientId());ps.setBytes(10,rv);if(ps.executeUpdate()!=1)throw new IllegalStateException("Optimistic conflict: material type changed.");return findMaterialType(con,id);}}
+    private RequestMethodDto updateRequestMethodRow(Connection con,RequestMethodCommand c,int id,byte[] rv)throws SQLException{try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.RequestMethods SET Name=?,SortOrder=?,IsActive=?,IsDeleted=0,SystemKey=?,UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND RowVer=?")){ps.setString(1,nreq(c.name(),120));ps.setInt(2,so(c.sortOrder()));ps.setBoolean(3,c.active());ps.setString(4,sk(c.systemKey()));ps.setInt(5,id);ps.setInt(6,c.shaleClientId());ps.setBytes(7,rv);if(ps.executeUpdate()!=1)throw new IllegalStateException("Optimistic conflict: request method changed.");return findRequestMethod(con,id);}}
+    private RequestStatusDto updateRequestStatusRow(Connection con,RequestStatusCommand c,int id,byte[] rv)throws SQLException{try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.RequestStatuses SET Name=?,Color=?,SortOrder=?,IsActive=?,IsDeleted=0,SystemKey=?,UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND RowVer=?")){ps.setString(1,nreq(c.name(),120));ps.setString(2,nopt(c.color(),32));ps.setInt(3,so(c.sortOrder()));ps.setBoolean(4,c.active());ps.setString(5,sk(c.systemKey()));ps.setInt(6,id);ps.setInt(7,c.shaleClientId());ps.setBytes(8,rv);if(ps.executeUpdate()!=1)throw new IllegalStateException("Optimistic conflict: request status changed.");return findRequestStatus(con,id);}}
+    private void softDeleteOverride(Connection con,String table,int id,int t,int actor,String key)throws SQLException{Integer target=id;try(PreparedStatement own=con.prepareStatement("SELECT ShaleClientId,SystemKey FROM "+table+" WHERE Id=?")){own.setInt(1,id);try(ResultSet rs=own.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Lookup value is not available for this tenant.");Integer owner=(Integer)rs.getObject(1);String k=rs.getString(2);if(owner==null)target=findTenantOverrideId(con,table,t,k);else if(owner!=t)throw new IllegalArgumentException("Lookup value is not available for this tenant.");}} if(target==null)return;try(PreparedStatement ps=con.prepareStatement("UPDATE "+table+" SET IsDeleted=1,IsActive=0,UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=?")){ps.setInt(1,target);ps.setInt(2,t);if(ps.executeUpdate()!=1)throw new IllegalArgumentException("Lookup value is not available for this tenant.");}}
 }
