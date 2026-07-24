@@ -7,7 +7,8 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -35,6 +36,9 @@ public final class MaterialRequestCardFactory {
     public enum Variant { LIST }
 
     private final Consumer<Long> onOpenRequest;
+    private final Consumer<Integer> onOpenContact;
+    private final Consumer<Integer> onOpenOrganization;
+    private final Consumer<Integer> onOpenUser;
     private final ContactCardFactory contactCardFactory = new ContactCardFactory(id -> { });
     private final OrganizationCardFactory organizationCardFactory = new OrganizationCardFactory(id -> { });
     private final UserCardFactory userCardFactory = new UserCardFactory(id -> { });
@@ -42,7 +46,14 @@ public final class MaterialRequestCardFactory {
     public MaterialRequestCardFactory() { this(null); }
 
     public MaterialRequestCardFactory(Consumer<Long> onOpenRequest) {
+        this(onOpenRequest, null, null, null);
+    }
+
+    public MaterialRequestCardFactory(Consumer<Long> onOpenRequest, Consumer<Integer> onOpenContact, Consumer<Integer> onOpenOrganization, Consumer<Integer> onOpenUser) {
         this.onOpenRequest = onOpenRequest;
+        this.onOpenContact = onOpenContact;
+        this.onOpenOrganization = onOpenOrganization;
+        this.onOpenUser = onOpenUser;
     }
 
     public Node create(MaterialRequestSummaryDto request, Variant variant) {
@@ -68,32 +79,23 @@ public final class MaterialRequestCardFactory {
         header.setMinWidth(0);
         HBox.setHgrow(title, Priority.ALWAYS);
 
-        VBox entityFacts = new VBox(6);
-        entityFacts.getStyleClass().add("material-request-card__entity-facts");
-        entityFacts.setFillWidth(false);
-        entityFacts.setAlignment(Pos.CENTER_LEFT);
-        addEntityFact(entityFacts, "Requested From", requestedFromNode(request));
-        addEntityFact(entityFacts, "Requested By", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()));
-        addEntityFact(entityFacts, "Assigned To", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()));
-
-        GridPane dates = new GridPane();
-        dates.setHgap(16);
-        dates.setVgap(5);
-        for (int i = 0; i < 3; i++) {
-            ColumnConstraints c = new ColumnConstraints();
-            c.setHgrow(Priority.ALWAYS);
-            c.setMinWidth(0);
-            dates.getColumnConstraints().add(c);
-        }
-        addTextFact(dates, 0, "Requested", fmt(request.requestedAt()));
-        addTextFact(dates, 1, "Due", fmt(request.expectedResponseDate()));
-        addTextFact(dates, 2, "Next Follow-up", fmt(request.nextFollowUpAt()));
+        FlowPane facts = new FlowPane(18, 7);
+        facts.getStyleClass().add("material-request-card__facts");
+        facts.setAlignment(Pos.TOP_LEFT);
+        facts.setColumnHalignment(javafx.geometry.HPos.LEFT);
+        facts.setRowValignment(javafx.geometry.VPos.TOP);
+        facts.setMinWidth(0);
+        addEntityFact(facts, "Requested From", requestedFromNode(request));
+        addEntityFact(facts, "Requested By", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()));
+        addEntityFact(facts, "Assigned To", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()));
+        addTextFact(facts, "Requested", fmt(request.requestedAt()));
+        addTextFact(facts, "Due", fmt(request.expectedResponseDate()));
+        addTextFact(facts, "Next Follow-up", fmt(request.nextFollowUpAt()));
 
         Label timing = dueIndicator(request);
         body.getChildren().add(header);
+        if (!facts.getChildren().isEmpty()) body.getChildren().add(facts);
         if (timing != null) body.getChildren().add(timing);
-        if (!entityFacts.getChildren().isEmpty()) body.getChildren().add(entityFacts);
-        body.getChildren().add(dates);
 
         Region rail = new Region();
         rail.getStyleClass().add("material-request-card__material-type-rail");
@@ -111,7 +113,9 @@ public final class MaterialRequestCardFactory {
         card.setOnMouseExited(e -> applyCardStyle(card, urgency, false));
         if (onOpenRequest != null) {
             card.setCursor(Cursor.HAND);
-            card.setOnMouseClicked(e -> onOpenRequest.accept(request.id()));
+            card.setOnMouseClicked(e -> {
+                if (e.getButton() == MouseButton.PRIMARY) onOpenRequest.accept(request.id());
+            });
         }
         return card;
     }
@@ -137,32 +141,43 @@ public final class MaterialRequestCardFactory {
         return StatusIndicatorFactory.createStatusPill(nvl(status, "Unknown"), nvl(configuredColor, NEUTRAL_STATUS_COLOR), StatusIndicatorFactory.PillSize.COMPACT);
     }
 
-    private void addEntityFact(VBox box, String label, Node node) {
+    private void addEntityFact(FlowPane facts, String label, Node node) {
         if (node == null) return;
-        VBox fact = new VBox(3, key(label), node);
-        fact.setMinWidth(0);
-        fact.setAlignment(Pos.CENTER_LEFT);
-        fact.setFillWidth(false);
+        VBox fact = factBox("material-request-card__entity-fact", 3);
         keepMiniCardCompact(node);
-        box.getChildren().add(fact);
+        fact.getChildren().addAll(key(label), node);
+        facts.getChildren().add(fact);
     }
 
-    private static void addTextFact(GridPane grid, int index, String label, String value) {
+    private static void addTextFact(FlowPane facts, String label, String value) {
         if (value == null || value.isBlank()) return;
-        VBox fact = new VBox(1);
-        Label v = new Label(value.trim());
-        v.setWrapText(true);
-        v.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.90);");
+        VBox fact = factBox("material-request-card__date-fact", 1);
+        Label v = valueLabel(value);
         fact.getChildren().addAll(key(label), v);
-        grid.add(fact, index, 0);
+        facts.getChildren().add(fact);
+    }
+
+    private static VBox factBox(String styleClass, double spacing) {
+        VBox fact = new VBox(spacing);
+        fact.getStyleClass().add(styleClass);
+        fact.setMinWidth(Region.USE_PREF_SIZE);
+        fact.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        fact.setMaxWidth(Region.USE_PREF_SIZE);
+        fact.setAlignment(Pos.TOP_LEFT);
+        fact.setFillWidth(false);
+        return fact;
     }
 
     private Node requestedFromNode(MaterialRequestSummaryDto r) {
         if (r.requestedFromContactId() != null && has(r.requestedFromContactDisplayName())) {
-            return contactCardFactory.create(new ContactCardFactory.ContactCardModel(r.requestedFromContactId(), r.requestedFromContactDisplayName(), null, null, null), ContactCardFactory.Variant.MINI);
+            Node card = contactCardFactory.create(new ContactCardFactory.ContactCardModel(r.requestedFromContactId(), r.requestedFromContactDisplayName(), null, null, null), ContactCardFactory.Variant.MINI);
+            installEmbeddedNavigation(card, r.requestedFromContactId(), onOpenContact);
+            return card;
         }
         if (r.requestedFromOrganizationId() != null && has(r.requestedFromOrganizationName())) {
-            return organizationCardFactory.create(new OrganizationCardFactory.OrganizationCardModel(r.requestedFromOrganizationId(), r.requestedFromOrganizationName(), null, null, null, null, null, null, null, null, null, null, null, null, null), OrganizationCardFactory.Variant.MINI);
+            Node card = organizationCardFactory.create(new OrganizationCardFactory.OrganizationCardModel(r.requestedFromOrganizationId(), r.requestedFromOrganizationName(), null, null, null, null, null, null, null, null, null, null, null, null, null), OrganizationCardFactory.Variant.MINI);
+            installEmbeddedNavigation(card, r.requestedFromOrganizationId(), onOpenOrganization);
+            return card;
         }
         if (has(r.requestedFromText())) return valueLabel(r.requestedFromText());
         return null;
@@ -170,7 +185,19 @@ public final class MaterialRequestCardFactory {
 
     private Node userNode(Integer userId, String displayName, String color) {
         if (userId == null || !has(displayName)) return null;
-        return userCardFactory.create(new UserCardFactory.UserCardModel(userId, displayName, color, null), UserCardFactory.Variant.MINI);
+        Node card = userCardFactory.create(new UserCardFactory.UserCardModel(userId, displayName, color, null), UserCardFactory.Variant.MINI);
+        installEmbeddedNavigation(card, userId, onOpenUser);
+        return card;
+    }
+
+    private static void installEmbeddedNavigation(Node node, Integer entityId, Consumer<Integer> onOpenEntity) {
+        if (node == null || entityId == null || onOpenEntity == null) return;
+        node.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY) {
+                onOpenEntity.accept(entityId);
+                e.consume();
+            }
+        });
     }
 
     private static void keepMiniCardCompact(Node node) {
