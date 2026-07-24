@@ -57,10 +57,14 @@ public final class MaterialRequestCardFactory {
     }
 
     public Node create(MaterialRequestSummaryDto request, Variant variant) {
+        return create(request, variant, null);
+    }
+
+    public Node create(MaterialRequestSummaryDto request, Variant variant, String configuredStatusColor) {
         Objects.requireNonNull(request, "request");
         if (variant != Variant.LIST) throw new IllegalArgumentException("Unsupported material request card variant: " + variant);
 
-        DueProximityStyles.Presentation urgency = DueProximityStyles.presentation(request.expectedResponseDate(), null, false);
+        String statusColor = resolvedStatusColor(configuredStatusColor);
         String materialTypeRailColor = ColorUtil.toCssBackgroundColor(request.materialTypeColor());
         VBox body = new VBox(7);
         body.getStyleClass().add("material-request-card__body");
@@ -74,7 +78,7 @@ public final class MaterialRequestCardFactory {
         title.setMaxWidth(Double.MAX_VALUE);
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #112542;");
 
-        HBox header = new HBox(8, title, spacer(), materialTypePill(request.materialTypeName(), request.materialTypeColor()), statusPill(request.status(), null));
+        HBox header = new HBox(8, title, spacer(), materialTypePill(request.materialTypeName(), request.materialTypeColor()), statusPill(request.status(), statusColor));
         header.setAlignment(Pos.TOP_LEFT);
         header.setMinWidth(0);
         HBox.setHgrow(title, Priority.ALWAYS);
@@ -108,9 +112,9 @@ public final class MaterialRequestCardFactory {
         card.setMaxWidth(Double.MAX_VALUE);
         card.setMaxHeight(Region.USE_PREF_SIZE);
         installRoundedClip(card);
-        applyCardStyle(card, urgency, false);
-        card.setOnMouseEntered(e -> applyCardStyle(card, DueProximityStyles.presentation(request.expectedResponseDate(), null, true), true));
-        card.setOnMouseExited(e -> applyCardStyle(card, urgency, false));
+        applyCardStyle(card, statusColor, false);
+        card.setOnMouseEntered(e -> applyCardStyle(card, statusColor, true));
+        card.setOnMouseExited(e -> applyCardStyle(card, statusColor, false));
         if (onOpenRequest != null) {
             card.setCursor(Cursor.HAND);
             card.setOnMouseClicked(e -> {
@@ -120,8 +124,20 @@ public final class MaterialRequestCardFactory {
         return card;
     }
 
-    private static void applyCardStyle(HBox card, DueProximityStyles.Presentation urgency, boolean hovered) {
-        card.setStyle("-fx-background-color: " + urgency.washCss() + "; -fx-background-radius: " + CARD_RADIUS + "; -fx-border-radius: " + CARD_RADIUS + "; -fx-border-color: " + (hovered ? "rgba(74,104,138,0.34)" : "rgba(74,104,138,0.24)") + "; -fx-border-width: 1; -fx-effect: dropshadow(gaussian, " + (hovered ? "rgba(7,23,44,0.18), 24, 0.2, 0, 8" : "rgba(7,23,44,0.14), 18, 0.18, 0, 4") + ");");
+    private static void applyCardStyle(HBox card, String statusColor, boolean hovered) {
+        card.setStyle("-fx-background-color: " + statusWashCss(statusColor, hovered) + "; -fx-background-radius: " + CARD_RADIUS + "; -fx-border-radius: " + CARD_RADIUS + "; -fx-border-color: " + (hovered ? "rgba(74,104,138,0.34)" : "rgba(74,104,138,0.24)") + "; -fx-border-width: 1; -fx-effect: dropshadow(gaussian, " + (hovered ? "rgba(7,23,44,0.18), 24, 0.2, 0, 8" : "rgba(7,23,44,0.14), 18, 0.18, 0, 4") + ");");
+    }
+
+    static String statusWashCss(String configuredColor, boolean hovered) {
+        String color = resolvedStatusColor(configuredColor);
+        double leadingOpacity = hovered ? 0.20 : 0.15;
+        double trailingOpacity = hovered ? 0.10 : 0.07;
+        return "linear-gradient(to right, " + ColorUtil.toCssRgba(color, leadingOpacity) + " 0%, "
+                + ColorUtil.toCssRgba(color, trailingOpacity) + " 30%, rgba(255,255,255,0.96) 68%, #FFFFFF 100%)";
+    }
+
+    private static String resolvedStatusColor(String configuredColor) {
+        return ColorUtil.normalizeStoredColor(configuredColor) == null ? NEUTRAL_STATUS_COLOR : configuredColor;
     }
 
     private static void installRoundedClip(Region card) {

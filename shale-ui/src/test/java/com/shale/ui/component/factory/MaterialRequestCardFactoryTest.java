@@ -17,28 +17,21 @@ class MaterialRequestCardFactoryTest {
     private static final Path DAO = Path.of("../shale-data/src/main/java/com/shale/data/dao/MaterialRequestDao.java");
 
     @Test
-    void listCardUsesRoundedUrgencySurfaceInsteadOfMaterialTypeWash() throws Exception {
+    void listCardUsesRequestStatusColorForPillAndLeftEdgeWash() throws Exception {
         String source = Files.readString(FACTORY);
         assertTrue(source.contains("CARD_RADIUS = DueProximityStyles.CARD_RADIUS"));
-        assertTrue(source.contains("-fx-background-radius: " + "\" + CARD_RADIUS"));
-        assertTrue(source.contains("-fx-border-radius: " + "\" + CARD_RADIUS"));
-        assertTrue(source.contains("-fx-background-radius: " + "\" + CARD_RADIUS + \" 0 0 \" + CARD_RADIUS"),
-                "Accent rail must carry matching left-side rounded corners instead of a square rail over the card.");
-        assertTrue(source.contains("DueProximityStyles.presentation(request.expectedResponseDate(), null, false)"));
         assertTrue(source.contains("materialTypeRailColor = ColorUtil.toCssBackgroundColor(request.materialTypeColor())"));
         assertTrue(source.contains("rail.setStyle(\"-fx-background-color: \" + materialTypeRailColor"));
-        assertTrue(source.contains("urgency.washCss()"));
-        assertTrue(source.contains("setOnMouseEntered"));
-        assertTrue(source.contains("DueProximityStyles.presentation(request.expectedResponseDate(), null, true)"),
-                "Hover must recompute the urgency wash instead of installing a square hover fill.");
+        assertTrue(source.contains("statusPill(request.status(), statusColor)"));
+        assertTrue(source.contains("statusWashCss(statusColor, hovered)"));
+        assertTrue(source.contains("linear-gradient(to right"));
+        assertTrue(source.contains("ColorUtil.toCssRgba(color, leadingOpacity) + \" 0%"));
+        assertTrue(source.contains("ColorUtil.toCssRgba(color, trailingOpacity) + \" 30%"));
+        assertTrue(source.contains("applyCardStyle(card, statusColor, false)"));
+        assertTrue(source.contains("setOnMouseEntered(e -> applyCardStyle(card, statusColor, true))"));
         assertTrue(source.contains("installRoundedClip(card)"));
-        assertTrue(source.contains("clip.setArcWidth(CARD_RADIUS_PX * 2.0)"));
-        assertFalse(source.contains("card.getStyleClass().add(\"shale-entity-card-clickable\")"),
-                "The shared clickable hover selector supplies a square background when used without the base card class.");
-        assertTrue(source.contains("materialTypePill(request.materialTypeName(), request.materialTypeColor())"));
-        assertFalse(source.contains("ColorUtil.toCssRgba(request.materialTypeColor(), 0.08)"));
-        assertFalse(source.contains("String accent = ColorUtil.toCssBackgroundColor(request.materialTypeColor())"));
-        assertFalse(source.contains("rail.setStyle(\"-fx-background-color: \" + urgency"));
+        assertFalse(source.contains("statusPill(request.status(), null)"));
+        assertFalse(source.contains("urgency.washCss()"));
     }
 
     @Test
@@ -173,12 +166,20 @@ class MaterialRequestCardFactoryTest {
                 "Requests list should own the external breathing room around first, last, and intermediate cards.");
         assertTrue(controller.contains("list=new VBox(10); list.setPadding(REQUEST_LIST_INSETS)"),
                 "Card separation should come from the list VBox spacing plus one transparent list inset, not per-card doubled margins.");
-        assertTrue(controller.contains("requestCardFactory.create(r, MaterialRequestCardFactory.Variant.LIST)"),
-                "The production request card should remain the only card surface added to the list.");
+        assertTrue(controller.contains("requestCardFactory.create(r, MaterialRequestCardFactory.Variant.LIST, resolveRequestStatusColor(statuses,r.status()))"),
+                "The production request card should receive the tenant-effective Request Status color.");
         assertFalse(controller.contains("new StackPane(requestCardFactory.create"),
                 "Do not add an opaque or nested card wrapper around request cards.");
         assertFalse(controller.contains("VBox.setMargin(requestCardFactory.create"),
                 "List padding avoids doubled gaps between multiple request cards.");
+    }
+
+    @Test
+    void requestListLoadsEffectiveStatusesOnceAndResolvesSavedKeysCaseInsensitively() throws Exception {
+        String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java"));
+        assertTrue(controller.contains("new RequestListData(svc.listMaterialRequests(cid,tid),svc.listEffectiveRequestStatuses(tid))"));
+        assertTrue(controller.contains("lookupValueMatches(s.systemKey(),s.name(),savedStatus)"));
+        assertTrue(controller.contains("map(RequestStatusDto::color)"));
     }
 
     @Test
