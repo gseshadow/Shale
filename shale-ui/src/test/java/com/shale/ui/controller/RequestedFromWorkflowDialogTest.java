@@ -67,8 +67,8 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(c.contains("return id==null?null:newRequestedFromSelection(r,id,label)"));
         assertFalse(s.contains("addCaseParty"));
         assertFalse(c.contains("caseDao.addCaseParty"));
-        assertFalse(c.contains("createMaterialRequest"));
-        assertTrue(c.contains("Button save=ActionButtonFactory.primary(\"Save\",e->{ })"));
+        assertTrue(c.contains("createMaterialRequest"));
+        assertTrue(c.contains("Button save=ActionButtonFactory.primary(\"Save\",null)"));
     }
 
 

@@ -56,20 +56,20 @@ final class MaterialRequestDaoPhase2ContractTest {
         assertTrue(DAO.contains("ISNULL(c.IsDeleted,0)=0"));
     }
 
-    @Test void requestMutationCommandsAreRemovedForReadOnlyDesktopRequests() {
+    @Test void requestMutationCommandsExposeFocusedCreateOnly() {
         String port = read("shale-core/src/main/java/com/shale/core/service/MaterialRequestServicePort.java");
         String adapter = read("shale-data/src/main/java/com/shale/data/service/adapter/MaterialRequestServiceAdapter.java");
-        assertFalse(port.contains("CreateMaterialRequestCommand"));
+        assertTrue(port.contains("CreateMaterialRequestCommand"));
         assertFalse(port.contains("UpdateMaterialRequestCommand"));
         assertFalse(port.contains("ChangeMaterialRequestStatusCommand"));
         assertFalse(port.contains("DeleteMaterialRequestCommand"));
         assertFalse(port.contains("RecordMaterialRequestFollowUpCommand"));
-        assertFalse(adapter.contains("createMaterialRequest"));
+        assertTrue(adapter.contains("createMaterialRequest"));
         assertFalse(adapter.contains("updateMaterialRequest"));
         assertFalse(adapter.contains("changeMaterialRequestStatus"));
         assertFalse(adapter.contains("deleteMaterialRequest"));
         assertFalse(adapter.contains("recordFollowUp"));
-        assertFalse(DAO.contains("INSERT dbo.MaterialRequests"));
+        assertTrue(DAO.contains("INSERT dbo.MaterialRequests"));
         assertFalse(DAO.contains("UPDATE dbo.MaterialRequests SET MaterialTypeId"));
         assertFalse(DAO.contains("UPDATE dbo.MaterialRequests SET Status"));
         assertFalse(DAO.contains("UPDATE dbo.MaterialRequests SET IsDeleted=1"));
