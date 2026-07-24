@@ -28,8 +28,34 @@ final class RequestMethodEditorContractTest {
     }
 
     @Test void requestMethodColorIsUsedByMaterialRequestSelectorsWhileValueContractStaysTextBased() {
-        assertTrue(MATERIALS.contains("newLookupSelector(RequestMethodDto::name,RequestMethodDto::color)"));
+        assertTrue(MATERIALS.contains("newLookupSelector(RequestMethodDto::name,RequestMethodDto::color,item->null)"));
         assertTrue(MATERIALS.contains("effective(requestMethod.systemKey(),requestMethod.name())"));
+    }
+
+    @Test void everyRequestLookupRowUsesTheSharedColoredNamePill() {
+        String card = method("buildRequestLookupCard");
+        String pill = "LinkTypeIndicatorFactory.createLinkTypePill(row.name(), row.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)";
+
+        assertTrue(card.replace(" ", "").contains(("header.getChildren().addAll(dot, name, spacer, " + pill + ")").replace(" ", "")),
+                "The common row header must place the shared name/color pill after its growing spacer.");
+        assertFalse(card.contains("kind != RequestLookupKind.REQUEST_METHOD"),
+                "Request Methods must not be excluded from the pill shared with Request Statuses.");
+        assertTrue(card.contains("row.active() ? \"Active\" : \"Inactive\""));
+        assertTrue(card.contains("metadataPill(row.scopeLabel())"));
+        assertTrue(card.contains("metadataPill(\"System: \" + row.systemKey())"));
+        assertTrue(card.contains("metadataPill(row.color())"));
+        assertTrue(card.contains("row.global() ? \"Customize\" : \"Edit\""));
+        assertTrue(card.contains("row.active() ? \"Deactivate\" : \"Activate\""));
+        assertTrue(card.contains("row.custom() ? \"Remove\" : \"Reset to Default\""));
+    }
+
+    @Test void lookupNamePillRetainsSharedReadableTextAndInvalidColorFallback() {
+        String indicator = read("src/main/java/com/shale/ui/component/factory/LinkTypeIndicatorFactory.java");
+        String colorUtil = read("src/main/java/com/shale/ui/util/ColorUtil.java");
+
+        assertTrue(indicator.contains("ColorUtil.toCssBackgroundColor(storedColor)"));
+        assertTrue(indicator.contains("ColorUtil.readableTextColor(storedColor)"));
+        assertTrue(colorUtil.contains("normalized == null ? \"rgba(0,0,0,0.06)\""));
     }
 
     @Test void sharedDialogButtonBarClipsItsBackgroundToBothBottomCorners() {
@@ -39,7 +65,14 @@ final class RequestMethodEditorContractTest {
     }
 
     private static String method(String name) {
-        int start = SETTINGS.indexOf(" " + name + "(");
+        int start = -1;
+        int searchFrom = 0;
+        while ((searchFrom = SETTINGS.indexOf("private ", searchFrom)) >= 0) {
+            int brace = SETTINGS.indexOf('{', searchFrom);
+            int candidate = SETTINGS.indexOf(" " + name + "(", searchFrom);
+            if (candidate >= 0 && candidate < brace) { start = candidate; break; }
+            searchFrom += "private ".length();
+        }
         assertTrue(start >= 0, name);
         int brace = SETTINGS.indexOf('{', start);
         int depth = 0;
