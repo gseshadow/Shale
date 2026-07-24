@@ -28,7 +28,7 @@ final class RequestMethodEditorContractTest {
     }
 
     @Test void requestMethodColorIsUsedByMaterialRequestSelectorsWhileValueContractStaysTextBased() {
-        assertTrue(MATERIALS.contains("newLookupSelector(RequestMethodDto::name,RequestMethodDto::color)"));
+        assertTrue(MATERIALS.contains("newLookupSelector(RequestMethodDto::name,RequestMethodDto::color,item->null)"));
         assertTrue(MATERIALS.contains("effective(requestMethod.systemKey(),requestMethod.name())"));
     }
 
@@ -36,7 +36,7 @@ final class RequestMethodEditorContractTest {
         String card = method("buildRequestLookupCard");
         String pill = "LinkTypeIndicatorFactory.createLinkTypePill(row.name(), row.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)";
 
-        assertTrue(card.contains("header.getChildren().addAll(dot, name, spacer, " + pill + ")"),
+        assertTrue(card.replace(" ", "").contains(("header.getChildren().addAll(dot, name, spacer, " + pill + ")").replace(" ", "")),
                 "The common row header must place the shared name/color pill after its growing spacer.");
         assertFalse(card.contains("kind != RequestLookupKind.REQUEST_METHOD"),
                 "Request Methods must not be excluded from the pill shared with Request Statuses.");
@@ -65,7 +65,14 @@ final class RequestMethodEditorContractTest {
     }
 
     private static String method(String name) {
-        int start = SETTINGS.indexOf(" " + name + "(");
+        int start = -1;
+        int searchFrom = 0;
+        while ((searchFrom = SETTINGS.indexOf("private ", searchFrom)) >= 0) {
+            int brace = SETTINGS.indexOf('{', searchFrom);
+            int candidate = SETTINGS.indexOf(" " + name + "(", searchFrom);
+            if (candidate >= 0 && candidate < brace) { start = candidate; break; }
+            searchFrom += "private ".length();
+        }
         assertTrue(start >= 0, name);
         int brace = SETTINGS.indexOf('{', start);
         int depth = 0;
