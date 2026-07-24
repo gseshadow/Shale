@@ -210,9 +210,41 @@ class CaseMaterialsNewRequestWindowTest {
     }
 
     @Test
+    void newRequestWindowUsesFixedHeaderFlexibleScrollAndFixedFooter() throws Exception {
+        String source = Files.readString(SOURCE);
+        String open = methodBody(source, "private void openNewRequestWindow");
+        String body = methodBody(source, "VBox newRequestBody");
+        assertTrue(open.contains("AppDialogs.createSecondaryWindowShell(stage,\"New Request\",stage::close,body)"));
+        assertTrue(open.contains("stage.setResizable(true)"));
+        assertTrue(open.contains("AppDialogs.installSecondaryWindowResizeHandlers(stage,root)"));
+        assertTrue(body.contains("ScrollPane formScroll=new ScrollPane(formContent)"));
+        assertTrue(body.contains("formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED)"));
+        assertTrue(body.contains("formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER)"));
+        assertTrue(body.contains("formScroll.setFitToWidth(true)"));
+        assertTrue(body.contains("formContent.prefWidthProperty().bind(formScroll.viewportBoundsProperty().map(b->b.getWidth()))"));
+        assertTrue(body.contains("VBox.setVgrow(formScroll,Priority.ALWAYS)"));
+        assertTrue(body.contains("VBox body=new VBox(12,formScroll,footer)"));
+        assertFalse(body.contains("new VBox(18,fields,formError,footer)"));
+        assertTrue(body.indexOf("ScrollPane formScroll") < body.indexOf("VBox body=new VBox(12,formScroll,footer)"));
+    }
+
+    @Test
+    void newRequestSizingClampsToVisualBoundsAndCentersAfterLayout() throws Exception {
+        String source = Files.readString(SOURCE);
+        String sizing = methodBody(source, "private static void applyNewRequestStageSize");
+        assertTrue(sizing.contains("applyCss()"));
+        assertTrue(sizing.contains("layout()"));
+        assertTrue(sizing.contains("root.prefHeight(width)"));
+        assertTrue(sizing.contains("getVisualBounds()"));
+        assertTrue(sizing.contains("stage.getOwner()"));
+        assertTrue(sizing.contains("owner.getX()+(owner.getWidth()-width)/2.0"));
+        assertTrue(sizing.contains("bounds.getMaxY()-stage.getHeight()"));
+    }
+
+    @Test
     void newRequestDialogUsesCompactHeightInsteadOfExpandedSelectorHeight() throws Exception {
         String source = Files.readString(SOURCE);
-        assertTrue(source.contains("NEW_REQUEST_WIDTH=560, NEW_REQUEST_HEIGHT=580, NEW_REQUEST_MIN_WIDTH=500, NEW_REQUEST_MIN_HEIGHT=540"));
+        assertTrue(source.contains("NEW_REQUEST_WIDTH=560, NEW_REQUEST_HEIGHT=640, NEW_REQUEST_MIN_WIDTH=500, NEW_REQUEST_MIN_HEIGHT=420"));
         assertFalse(source.contains("NEW_REQUEST_HEIGHT=760"));
         assertFalse(source.contains("NEW_REQUEST_MIN_HEIGHT=720"));
     }
