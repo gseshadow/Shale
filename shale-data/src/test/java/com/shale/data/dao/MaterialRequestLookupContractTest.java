@@ -20,13 +20,12 @@ final class MaterialRequestLookupContractTest {
     @Test void requestLookupDtosExposeSelectionDisplayAndLifecycleFields() throws Exception {
         assertTrue(RequestMethodDto.class.isRecord());
         assertTrue(RequestStatusDto.class.isRecord());
-        assertEquals(9, RequestMethodDto.class.getRecordComponents().length);
+        assertEquals(8, RequestMethodDto.class.getRecordComponents().length);
         assertEquals(9, RequestStatusDto.class.getRecordComponents().length);
         assertHasRecordComponent(RequestMethodDto.class, "id");
         assertHasRecordComponent(RequestMethodDto.class, "shaleClientId");
         assertHasRecordComponent(RequestMethodDto.class, "systemKey");
         assertHasRecordComponent(RequestMethodDto.class, "name");
-        assertHasRecordComponent(RequestMethodDto.class, "color");
         assertHasRecordComponent(RequestMethodDto.class, "sortOrder");
         assertHasRecordComponent(RequestMethodDto.class, "active");
         assertHasRecordComponent(RequestMethodDto.class, "deleted");
@@ -50,26 +49,6 @@ final class MaterialRequestLookupContractTest {
         assertTrue(DAO.contains("WHERE rn = 1 AND IsDeleted = 0 AND IsActive = 1"));
         assertTrue(DAO.contains("WHERE ShaleClientId = ? AND SystemKey IS NULL AND IsDeleted = 0 AND IsActive = 1"));
         assertTrue(DAO.contains("ORDER BY SortOrder, Name, Id"));
-        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
-    }
-
-    @Test void lookupQueriesOnlySelectColorFromTablesWhoseDeployedSchemaDefinesIt() {
-        String materialSchema = read("docs/sql/2026-07-21_case_materials_foundation_phase1.sql");
-        String requestSchema = read("docs/sql/2026-07-21_request_lookup_overlay.sql");
-
-        assertTrue(materialSchema.contains("CREATE TABLE dbo.MaterialTypes"));
-        assertTrue(materialSchema.contains("Color nvarchar(20) NULL"));
-        assertTrue(requestSchema.contains("CREATE TABLE dbo.RequestMethods"));
-        assertFalse(requestSchema.substring(requestSchema.indexOf("CREATE TABLE dbo.RequestMethods"),
-                requestSchema.indexOf("CREATE TABLE dbo.RequestStatuses")).contains("Color"));
-        assertTrue(requestSchema.substring(requestSchema.indexOf("CREATE TABLE dbo.RequestStatuses"),
-                requestSchema.indexOf("DECLARE @methods")).contains("Color varchar(32) NULL"));
-
-        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Description,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.MaterialTypes"));
-        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
-        assertFalse(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
-        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestStatuses"));
-        assertTrue(DAO.contains("tableName.endsWith(\"RequestStatuses\") ? \"Color,\" : \"\""));
     }
 
     @Test void requestLookupsVerifyTenantContextAndDoNotReadOtherTenantRows() {
@@ -98,8 +77,6 @@ final class MaterialRequestLookupContractTest {
         assertTrue(DAO.contains("INSERT dbo.RequestStatuses"));
         assertTrue(DAO.contains("UPDATE dbo.RequestMethods"));
         assertTrue(DAO.contains("UPDATE dbo.RequestStatuses"));
-        assertTrue(DAO.contains("INSERT dbo.RequestMethods(ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted"));
-        assertTrue(DAO.contains("UPDATE dbo.RequestMethods SET Name=?,Color=?,SortOrder=?,IsActive=?"));
         assertTrue(DAO.contains("IsDeleted=1,IsActive=0"));
         assertFalse(DAO.contains("DELETE FROM dbo.RequestMethods"));
         assertFalse(DAO.contains("DELETE FROM dbo.RequestStatuses"));
