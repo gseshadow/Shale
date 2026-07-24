@@ -936,4 +936,20 @@ If a combined All-mode load partially fails, the viewer must not present incompl
 
 ### Request workflow lookup overlays (2026-07-21)
 
-`dbo.RequestMethods` and `dbo.RequestStatuses` provide the Requests Settings tenant/global overlay model for Material Request creation. `RequestMethods` stores `ShaleClientId`, stable `SystemKey`, `Name`, nullable `Color`, `SortOrder`, active/deleted flags, timestamps, and `RowVer`. `RequestStatuses` stores the same overlay metadata plus `Color` for colored status selectors and cards. Global rows seed the approved request methods (`email`, `phone`, `fax`, `mail`, `portal`, `in_person`, `other`) and lifecycle statuses including the creation default `requested`. The legacy `dbo.MaterialRequests.RequestMethod` and `dbo.MaterialRequests.Status` text columns remain in place for compatibility in this phase; services continue to validate semantic values and preserve inactive historical display values while Settings administration migrates to the overlay tables.
+`dbo.RequestMethods` and `dbo.RequestStatuses` provide the Requests Settings tenant/global overlay model for Material Request creation. The authoritative `dbo.RequestMethods` shape after the Phase 1 database prerequisite is:
+
+| Column | Type | Nullability / notes |
+| --- | --- | --- |
+| `Id` | `int IDENTITY(1,1)` | Not null; primary key |
+| `ShaleClientId` | `int` | Nullable global/tenant overlay scope |
+| `SystemKey` | `varchar(64)` | Nullable stable overlay key |
+| `Name` | `nvarchar(120)` | Not null |
+| `Color` | `nvarchar(20)` | Nullable presentation value; added by `2026-07-24_request_methods_color.sql` |
+| `SortOrder` | `int` | Not null; default `0` |
+| `IsActive` | `bit` | Not null; default `1` |
+| `IsDeleted` | `bit` | Not null; default `0` |
+| `CreatedAt` | `datetime2` | Not null; UTC default |
+| `UpdatedAt` | `datetime2` | Nullable |
+| `RowVer` | `rowversion` | Not null; database generated |
+
+`Color` uses the standard optional `nvarchar(20)` presentation contract documented for customizable lookups and already established by the authoritative `MaterialTypes` schema. The Phase 1 migration stores built-in defaults but **the application does not read or mutate `RequestMethods.Color` yet**. `RequestStatuses` retains its independent color implementation. Global rows seed the approved request methods (`email`, `phone`, `fax`, `mail`, `portal`, `in_person`, `other`) and lifecycle statuses including the creation default `requested`. The legacy `dbo.MaterialRequests.RequestMethod` and `dbo.MaterialRequests.Status` text columns remain in place; no Request Method foreign key is introduced.
