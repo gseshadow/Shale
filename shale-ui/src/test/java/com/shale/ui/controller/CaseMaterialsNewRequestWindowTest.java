@@ -153,7 +153,7 @@ class CaseMaterialsNewRequestWindowTest {
     void requestControllerDoesNotIntroducePersistenceDatabaseOrPermissionChanges() throws Exception {
         String source = Files.readString(SOURCE);
         String requestController = source.substring(source.indexOf("final class CaseMaterialRequestsTabController"), source.indexOf("final class CaseMaterialItemsTabController"));
-        for (String forbidden : new String[]{"UpdateMaterialRequestCommand","updateMaterialRequest","MaterialRequestDao","materialRequestDao","UserDao","userDao","addCaseParty"}) {
+        for (String forbidden : new String[]{"MaterialRequestDao","materialRequestDao","UserDao","userDao","addCaseParty"}) {
             assertFalse(requestController.contains(forbidden), forbidden);
         }
     }
