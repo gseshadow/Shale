@@ -20,12 +20,13 @@ final class MaterialRequestLookupContractTest {
     @Test void requestLookupDtosExposeSelectionDisplayAndLifecycleFields() throws Exception {
         assertTrue(RequestMethodDto.class.isRecord());
         assertTrue(RequestStatusDto.class.isRecord());
-        assertEquals(8, RequestMethodDto.class.getRecordComponents().length);
+        assertEquals(9, RequestMethodDto.class.getRecordComponents().length);
         assertEquals(9, RequestStatusDto.class.getRecordComponents().length);
         assertHasRecordComponent(RequestMethodDto.class, "id");
         assertHasRecordComponent(RequestMethodDto.class, "shaleClientId");
         assertHasRecordComponent(RequestMethodDto.class, "systemKey");
         assertHasRecordComponent(RequestMethodDto.class, "name");
+        assertHasRecordComponent(RequestMethodDto.class, "color");
         assertHasRecordComponent(RequestMethodDto.class, "sortOrder");
         assertHasRecordComponent(RequestMethodDto.class, "active");
         assertHasRecordComponent(RequestMethodDto.class, "deleted");
@@ -49,6 +50,7 @@ final class MaterialRequestLookupContractTest {
         assertTrue(DAO.contains("WHERE rn = 1 AND IsDeleted = 0 AND IsActive = 1"));
         assertTrue(DAO.contains("WHERE ShaleClientId = ? AND SystemKey IS NULL AND IsDeleted = 0 AND IsActive = 1"));
         assertTrue(DAO.contains("ORDER BY SortOrder, Name, Id"));
+        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
     }
 
     @Test void requestLookupsVerifyTenantContextAndDoNotReadOtherTenantRows() {
@@ -77,6 +79,8 @@ final class MaterialRequestLookupContractTest {
         assertTrue(DAO.contains("INSERT dbo.RequestStatuses"));
         assertTrue(DAO.contains("UPDATE dbo.RequestMethods"));
         assertTrue(DAO.contains("UPDATE dbo.RequestStatuses"));
+        assertTrue(DAO.contains("INSERT dbo.RequestMethods(ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted"));
+        assertTrue(DAO.contains("UPDATE dbo.RequestMethods SET Name=?,Color=?,SortOrder=?,IsActive=?"));
         assertTrue(DAO.contains("IsDeleted=1,IsActive=0"));
         assertFalse(DAO.contains("DELETE FROM dbo.RequestMethods"));
         assertFalse(DAO.contains("DELETE FROM dbo.RequestStatuses"));

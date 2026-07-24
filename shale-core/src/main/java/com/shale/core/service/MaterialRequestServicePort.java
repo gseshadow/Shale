@@ -31,7 +31,7 @@ public interface MaterialRequestServicePort {
     MaterialRequestDetailDto updateMaterialRequest(UpdateMaterialRequestCommand command);
 
     record MaterialTypeCommand(Integer id, int shaleClientId, int actorUserId, String name, String description, String color, boolean active, String systemKey, Integer sortOrder, byte[] expectedRowVer) {}
-    record RequestMethodCommand(Integer id, int shaleClientId, int actorUserId, String name, boolean active, String systemKey, Integer sortOrder, byte[] expectedRowVer) {}
+    record RequestMethodCommand(Integer id, int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey, Integer sortOrder, byte[] expectedRowVer) {}
     record RequestStatusCommand(Integer id, int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey, Integer sortOrder, byte[] expectedRowVer) {}
     record SetLookupActiveCommand(int shaleClientId, int actorUserId, int id, boolean active, byte[] expectedRowVer) {}
     record ResetLookupOverrideCommand(int shaleClientId, int actorUserId, int id) {}
