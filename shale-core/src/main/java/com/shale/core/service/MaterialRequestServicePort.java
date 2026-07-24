@@ -13,6 +13,7 @@ public interface MaterialRequestServicePort {
     Optional<MaterialRequestDetailDto> getMaterialRequest(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
     List<MaterialRequestFollowUpDto> listFollowUps(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
     MaterialRequestDetailDto createMaterialRequest(CreateMaterialRequestCommand command);
+    MaterialRequestDetailDto updateMaterialRequest(UpdateMaterialRequestCommand command);
 
     record CreateMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, int materialTypeId,
                                         String title, String description, Integer requestedFromContactId,
@@ -20,4 +21,13 @@ public interface MaterialRequestServicePort {
                                         String requestMethod, String status, int requestedByUserId,
                                         Integer assignedToUserId, LocalDateTime requestedAt,
                                         LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt) {}
+
+    record UpdateMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, int materialTypeId,
+                                        String title, String description, Integer requestedFromContactId,
+                                        Integer requestedFromOrganizationId, String requestedFromText,
+                                        String requestMethod, String status, int requestedByUserId,
+                                        Integer assignedToUserId, LocalDateTime requestedAt, LocalDate relevantStartDate,
+                                        LocalDate relevantEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt,
+                                        LocalDateTime firstReceivedAt, LocalDateTime fullyReceivedAt, LocalDateTime closedAt,
+                                        Integer closedByUserId, String closureReason, String notes, byte[] rowVer) {}
 }

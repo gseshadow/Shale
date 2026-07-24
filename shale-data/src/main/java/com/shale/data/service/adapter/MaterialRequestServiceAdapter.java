@@ -18,4 +18,5 @@ public final class MaterialRequestServiceAdapter implements MaterialRequestServi
     public Optional<MaterialRequestDetailDto> getMaterialRequest(long caseId,long materialRequestId,int shaleClientId,int actorUserId){ if(readAuditSink!=null) readAuditSink.auditRead("MaterialRequest.Detail", "CASE_MATERIALS_REQUEST_DETAIL", "MaterialRequest", materialRequestId); return Optional.ofNullable(dao.findMaterialRequest(caseId,materialRequestId,shaleClientId));}
     public List<MaterialRequestFollowUpDto> listFollowUps(long caseId,long materialRequestId,int shaleClientId,int actorUserId){ if(readAuditSink!=null) readAuditSink.auditRead("MaterialRequest.FollowUps", "CASE_MATERIALS_FOLLOW_UP_HISTORY", "MaterialRequest", materialRequestId); return dao.listFollowUps(caseId,materialRequestId,shaleClientId);}
     public MaterialRequestDetailDto createMaterialRequest(CreateMaterialRequestCommand command){return dao.create(command);}
+    public MaterialRequestDetailDto updateMaterialRequest(UpdateMaterialRequestCommand command){return dao.update(command);}
 }

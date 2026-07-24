@@ -44,17 +44,17 @@ final class CaseMaterialsPhase4UiContractTest {
     assertFalse(MAT.contains("list-material-items\",()->{activeRequests=req.listMaterialRequests"));
   }
 
-  @Test void requestTabIsReadOnlyWhileCaseMaterialsStillUseItemForms() {
+  @Test void requestTabSupportsEditableRequestsWhileCaseMaterialsStillUseItemForms() {
     String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
     assertTrue(requestController.contains("primary(\"New Request\")"));
     assertFalse(requestController.contains("ButtonType(\"Edit\")"));
     assertFalse(requestController.contains("openEditor"));
     assertTrue(requestController.contains("createMaterialRequest"));
-    assertFalse(requestController.contains("updateMaterialRequest"));
+    assertTrue(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
     assertTrue(requestController.contains("listMaterialRequests(cid,tid)"));
-    assertTrue(requestController.contains("getMaterialRequest(c,id,t,a)"));
-    assertTrue(requestController.contains("ButtonType.CLOSE"));
+    assertTrue(requestController.contains("svc.getMaterialRequest(capturedCase,requestId,capturedTenant,capturedActor)"));
+    assertFalse(requestController.contains("ButtonType.CLOSE"));
     assertTrue(MAT.contains("final class MaterialItemForm extends Dialog"));
     assertTrue(MAT.contains("CreateMaterialItemCommand"));
     assertTrue(MAT.contains("Identity: Material Type *"));
@@ -97,7 +97,7 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(requestController.contains("CreateMaterialRequestCommand"));
     assertTrue(requestController.contains("ActionButtonFactory.primary(\"Save\",null)"));
     assertTrue(requestController.contains("createMaterialRequest"));
-    assertFalse(requestController.contains("updateMaterialRequest"));
+    assertTrue(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
   }
   @Test void newRequestRequestedFromUsesSharedPartyEntityChooserWithoutCasePartyMutation() {
@@ -120,7 +120,7 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(requestController.contains("organizationDao.create(new OrganizationDao.OrganizationCreateRequest"));
     assertFalse(requestController.contains("caseDao.addCaseParty"));
     assertTrue(requestController.contains("createMaterialRequest"));
-    assertFalse(requestController.contains("updateMaterialRequest"));
+    assertTrue(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
     assertTrue(dialog.contains("public record Selection"));
     assertTrue(dialog.contains("public static Selection show"));
