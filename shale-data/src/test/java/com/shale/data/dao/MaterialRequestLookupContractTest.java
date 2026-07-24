@@ -20,12 +20,13 @@ final class MaterialRequestLookupContractTest {
     @Test void requestLookupDtosExposeSelectionDisplayAndLifecycleFields() throws Exception {
         assertTrue(RequestMethodDto.class.isRecord());
         assertTrue(RequestStatusDto.class.isRecord());
-        assertEquals(8, RequestMethodDto.class.getRecordComponents().length);
+        assertEquals(9, RequestMethodDto.class.getRecordComponents().length);
         assertEquals(9, RequestStatusDto.class.getRecordComponents().length);
         assertHasRecordComponent(RequestMethodDto.class, "id");
         assertHasRecordComponent(RequestMethodDto.class, "shaleClientId");
         assertHasRecordComponent(RequestMethodDto.class, "systemKey");
         assertHasRecordComponent(RequestMethodDto.class, "name");
+        assertHasRecordComponent(RequestMethodDto.class, "color");
         assertHasRecordComponent(RequestMethodDto.class, "sortOrder");
         assertHasRecordComponent(RequestMethodDto.class, "active");
         assertHasRecordComponent(RequestMethodDto.class, "deleted");
@@ -42,13 +43,25 @@ final class MaterialRequestLookupContractTest {
     }
 
     @Test void requestMethodsAndStatusesUseTheSameEffectiveOverlayQueryRules() {
-        assertTrue(DAO.contains("effectiveRequestLookupSql(\"dbo.RequestMethods\")"));
+        assertTrue(DAO.contains("effectiveRequestMethodSql()"));
+        assertTrue(DAO.contains("effectiveRequestLookupSql(\"dbo.RequestMethods\").replace(\"Name,  SortOrder\", \"Name, Color, SortOrder\")"));
         assertTrue(DAO.contains("effectiveRequestLookupSql(\"dbo.RequestStatuses\")"));
         assertTrue(DAO.contains("ROW_NUMBER() OVER (PARTITION BY SystemKey ORDER BY CASE WHEN ShaleClientId = ? THEN 0 ELSE 1 END, Id) AS rn"));
         assertTrue(DAO.contains("WHERE (ShaleClientId = ? OR ShaleClientId IS NULL) AND SystemKey IS NOT NULL"));
         assertTrue(DAO.contains("WHERE rn = 1 AND IsDeleted = 0 AND IsActive = 1"));
         assertTrue(DAO.contains("WHERE ShaleClientId = ? AND SystemKey IS NULL AND IsDeleted = 0 AND IsActive = 1"));
         assertTrue(DAO.contains("ORDER BY SortOrder, Name, Id"));
+    }
+
+    @Test void requestMethodColorAndAutomaticOrderingAreTableSpecific() {
+        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
+        assertTrue(DAO.contains("INSERT dbo.RequestMethods(ShaleClientId,SystemKey,Name,Color,SortOrder"));
+        assertTrue(DAO.contains("UPDATE dbo.RequestMethods SET Name=?,Color=?,SortOrder=?"));
+        assertTrue(DAO.contains("c.sortOrder()==null?nextRequestMethodSortOrder"));
+        assertTrue(DAO.contains("SELECT COALESCE(MAX(SortOrder),0)+10 FROM dbo.RequestMethods WHERE ShaleClientId=?"));
+        assertTrue(DAO.contains("g.systemKey(),g.sortOrder()"), "global overrides preserve the global row's ordering");
+        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Description,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.MaterialTypes"));
+        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestStatuses"));
     }
 
     @Test void requestLookupsVerifyTenantContextAndDoNotReadOtherTenantRows() {

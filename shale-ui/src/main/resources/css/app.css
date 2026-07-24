@@ -1830,6 +1830,8 @@
 
 .dialog-pane.secondary-window-shell > .button-bar {
     -fx-padding: 8 14 14 14;
+    -fx-background-radius: 0 0 16 16;
+    -fx-border-radius: 0 0 16 16;
 }
 
 
