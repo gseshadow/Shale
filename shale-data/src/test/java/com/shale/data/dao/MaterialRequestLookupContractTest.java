@@ -20,8 +20,8 @@ final class MaterialRequestLookupContractTest {
     @Test void requestLookupDtosExposeSelectionDisplayAndLifecycleFields() throws Exception {
         assertTrue(RequestMethodDto.class.isRecord());
         assertTrue(RequestStatusDto.class.isRecord());
-        assertEquals(7, RequestMethodDto.class.getRecordComponents().length);
-        assertEquals(7, RequestStatusDto.class.getRecordComponents().length);
+        assertEquals(8, RequestMethodDto.class.getRecordComponents().length);
+        assertEquals(9, RequestStatusDto.class.getRecordComponents().length);
         assertHasRecordComponent(RequestMethodDto.class, "id");
         assertHasRecordComponent(RequestMethodDto.class, "shaleClientId");
         assertHasRecordComponent(RequestMethodDto.class, "systemKey");
@@ -29,13 +29,16 @@ final class MaterialRequestLookupContractTest {
         assertHasRecordComponent(RequestMethodDto.class, "sortOrder");
         assertHasRecordComponent(RequestMethodDto.class, "active");
         assertHasRecordComponent(RequestMethodDto.class, "deleted");
+        assertHasRecordComponent(RequestMethodDto.class, "rowVer");
         assertHasRecordComponent(RequestStatusDto.class, "id");
         assertHasRecordComponent(RequestStatusDto.class, "shaleClientId");
         assertHasRecordComponent(RequestStatusDto.class, "systemKey");
         assertHasRecordComponent(RequestStatusDto.class, "name");
+        assertHasRecordComponent(RequestStatusDto.class, "color");
         assertHasRecordComponent(RequestStatusDto.class, "sortOrder");
         assertHasRecordComponent(RequestStatusDto.class, "active");
         assertHasRecordComponent(RequestStatusDto.class, "deleted");
+        assertHasRecordComponent(RequestStatusDto.class, "rowVer");
     }
 
     @Test void requestMethodsAndStatusesUseTheSameEffectiveOverlayQueryRules() {
@@ -69,11 +72,12 @@ final class MaterialRequestLookupContractTest {
         assertNotNull(MaterialRequestServiceAdapter.class.getMethod("listEffectiveRequestStatuses", int.class));
     }
 
-    @Test void noUiPersistenceOrDatabaseMigrationChangesAreIntroduced() {
-        assertFalse(DAO.contains("INSERT dbo.RequestMethods"));
-        assertFalse(DAO.contains("INSERT dbo.RequestStatuses"));
-        assertFalse(DAO.contains("UPDATE dbo.RequestMethods"));
-        assertFalse(DAO.contains("UPDATE dbo.RequestStatuses"));
+    @Test void requestLookupAdministrationMutationsUseSoftDeleteAndServiceLayerOnly() {
+        assertTrue(DAO.contains("INSERT dbo.RequestMethods"));
+        assertTrue(DAO.contains("INSERT dbo.RequestStatuses"));
+        assertTrue(DAO.contains("UPDATE dbo.RequestMethods"));
+        assertTrue(DAO.contains("UPDATE dbo.RequestStatuses"));
+        assertTrue(DAO.contains("IsDeleted=1,IsActive=0"));
         assertFalse(DAO.contains("DELETE FROM dbo.RequestMethods"));
         assertFalse(DAO.contains("DELETE FROM dbo.RequestStatuses"));
     }
