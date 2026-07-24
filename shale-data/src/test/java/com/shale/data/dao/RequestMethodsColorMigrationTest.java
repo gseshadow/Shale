@@ -47,12 +47,12 @@ final class RequestMethodsColorMigrationTest {
         assertEquals(7, count(sql, "UPDATE dbo.RequestMethods SET Color ="));
     }
 
-    @Test void productionDaoDoesNotConsumeRequestMethodColorInPhaseOne() throws Exception {
+    @Test void productionDaoConsumesDeployedRequestMethodColor() throws Exception {
         String dao = Files.readString(Path.of("src/main/java/com/shale/data/dao/MaterialRequestDao.java"));
-        assertFalse(dao.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
-        assertFalse(dao.contains("INSERT dbo.RequestMethods(ShaleClientId,SystemKey,Name,Color"));
-        assertFalse(dao.contains("UPDATE dbo.RequestMethods SET Name=?,Color=?"));
-        assertTrue(dao.contains("SELECT Id,ShaleClientId,SystemKey,Name,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
+        assertTrue(dao.contains("SELECT Id,ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
+        assertTrue(dao.contains("INSERT dbo.RequestMethods(ShaleClientId,SystemKey,Name,Color"));
+        assertTrue(dao.contains("UPDATE dbo.RequestMethods SET Name=?,Color=?"));
+        assertFalse(dao.contains("SELECT Id,ShaleClientId,SystemKey,Name,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.RequestMethods"));
     }
 
     private static String migration() throws Exception {
