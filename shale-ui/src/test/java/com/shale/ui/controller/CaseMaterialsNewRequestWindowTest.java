@@ -29,7 +29,8 @@ class CaseMaterialsNewRequestWindowTest {
                 "add(fields,5,\"Requested By:\",requestedBy)",
                 "add(fields,6,\"Assigned To:\",assignedTo)",
                 "add(fields,7,\"Follow-up Interval:\",followUpInterval)",
-                "add(fields,8,\"Description:\",description)");
+                "add(fields,8,\"Next Follow-up:\",nextFollowUpDisplay)",
+                "add(fields,9,\"Description:\",description)");
         assertFalse(method.contains("\"Requested At:\""));
         assertFalse(method.contains("\"Due At:\""));
         assertFalse(method.contains("\"Next Follow-up At:\""));
@@ -135,20 +136,17 @@ class CaseMaterialsNewRequestWindowTest {
     }
 
     @Test
-    void followUpIntervalIsVisibleButDeferredAndDoesNotDriveDateValidation() throws Exception {
+    void followUpIntervalIsEnabledAndDisplaysCalculatedOccurrence() throws Exception {
         String source = Files.readString(SOURCE);
         String method = methodBody(source, "VBox newRequestBody");
-        String validation = methodBody(source, "private String validateNewRequest");
-        String mapping = methodBody(source, "private LocalDateTime nextFollowUpAtFromInterval");
         assertTrue(method.contains("ChoiceBox<String> followUpInterval=new ChoiceBox<>()"));
+        assertTrue(method.contains("configureFollowUpInterval(followUpInterval)"));
         assertTrue(method.contains("add(fields,7,\"Follow-up Interval:\",followUpInterval)"));
-        assertTrue(method.contains("followUpInterval.setDisable(true)"));
-        assertTrue(method.contains("new Tooltip(\"Coming soon\")"));
-        assertFalse(validation.contains("followUpInterval"));
-        assertFalse(validation.contains("Requested At is required"));
-        assertFalse(validation.contains("Due date cannot be before Requested At"));
-        assertFalse(validation.contains("Next follow-up cannot be before Requested At"));
-        assertTrue(mapping.contains("return null"));
+        assertTrue(method.contains("add(fields,8,\"Next Follow-up:\",nextFollowUpDisplay)"));
+        assertFalse(method.contains("followUpInterval.setDisable(true)"));
+        assertTrue(source.contains("case \"Daily\"->1"));
+        assertTrue(source.contains("case \"Every 30 days\"->30"));
+        assertTrue(source.contains("Calculated when saved"));
     }
 
     @Test

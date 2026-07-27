@@ -32,6 +32,20 @@ final class MaterialRequestNotificationContractTest {
         assertTrue(generator.contains("\":due:\" + candidate.dueAt() + \":\" + recipient"));
     }
 
+    @Test void recurringOccurrencesHaveDistinctIdentityRecipientFallbackAndAtomicDismissal() {
+        String dao = source("src/main/java/com/shale/data/dao/MaterialRequestDao.java");
+        String notifications = source("src/main/java/com/shale/data/dao/NotificationDao.java");
+        String generator = source("../shale-ui/src/main/java/com/shale/ui/notification/TaskDueDateNotificationGenerator.java");
+        assertTrue(dao.contains("mr.FollowUpIntervalDays IS NOT NULL"));
+        assertTrue(dao.contains("assignedToUserId!=null?assignedToUserId:requestedByUserId"));
+        assertTrue(generator.contains("\":follow-up:\"+candidate.nextFollowUpAt()"));
+        assertTrue(notifications.contains("FOLLOW_UP_DUE"));
+        assertTrue(notifications.contains("WITH (UPDLOCK,ROWLOCK)"));
+        assertTrue(notifications.contains("current.equals(occurrence)"));
+        assertTrue(notifications.contains("DATEADD(day,FollowUpIntervalDays,SYSUTCDATETIME())"));
+        assertTrue(notifications.contains("con.rollback()"));
+    }
+
     @Test void materialRequestRowsHydrateTypedEntityAndCaseRoute() {
         String notifications = source("src/main/java/com/shale/data/dao/NotificationDao.java");
         String main = source("../shale-ui/src/main/java/com/shale/ui/controller/MainController.java");

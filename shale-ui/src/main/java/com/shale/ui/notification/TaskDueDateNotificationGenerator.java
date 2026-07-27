@@ -3,6 +3,7 @@ package com.shale.ui.notification;
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.MaterialRequestDao;
 import com.shale.data.dao.MaterialRequestDao.MaterialRequestDueNotificationCandidate;
+import com.shale.data.dao.MaterialRequestDao.MaterialRequestFollowUpNotificationCandidate;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.TaskDao.TaskDueNotificationCandidate;
 import com.shale.ui.state.AppState;
@@ -122,6 +123,13 @@ public final class TaskDueDateNotificationGenerator {
 				String eventKey = "material-request:" + candidate.requestId() + ":due:" + candidate.dueAt() + ":" + recipient;
 				notificationDao.createMaterialRequestDueNotification(candidate.shaleClientId(), recipient,
 						"Material request due", "A material request is due: " + candidate.title(), candidate.requestId(), eventKey);
+			}
+			LocalDateTime now=LocalDateTime.now(clock.withZone(zoneId));
+			for(MaterialRequestFollowUpNotificationCandidate candidate:materialRequestDao.listFollowUpNotificationCandidates(shaleClientId,now)){
+				Integer recipient=candidate.recipientUserId();if(recipient==null||recipient<=0)continue;
+				String eventKey="material-request:"+candidate.requestId()+":follow-up:"+candidate.nextFollowUpAt()+":"+recipient;
+				notificationDao.createMaterialRequestFollowUpNotification(candidate.shaleClientId(),recipient,"Material request follow-up",
+						"Follow up on "+candidate.title()+" in its case.",candidate.requestId(),eventKey);
 			}
 		} catch (Exception ex) {
 			System.err.println("Task due-date generator failed: " + ex.getMessage());

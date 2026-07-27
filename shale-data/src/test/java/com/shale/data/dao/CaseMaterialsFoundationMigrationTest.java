@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 final class CaseMaterialsFoundationMigrationTest {
     private static final Path MIGRATION = resolve("docs/sql/2026-07-21_case_materials_foundation_phase1.sql");
+    private static final Path INTERVAL = resolve("docs/sql/2026-07-27_material_request_recurring_follow_up_interval.sql");
     private static final Path RLS = resolve("docs/sql/verification/case_materials_tenant7_tenant8_rls.sql");
 
     @Test
@@ -23,6 +24,16 @@ final class CaseMaterialsFoundationMigrationTest {
         String sql = read(MIGRATION);
         for (String token : new String[]{"PK_MaterialTypes", "PK_MaterialRequests", "PK_MaterialRequestFollowUps", "PK_MaterialItems", "RowVer rowversion NOT NULL", "IsDeleted bit NOT NULL", "DeletedAt datetime2 NULL", "DeletedByUserId int NULL", "UX_MaterialTypes_ShaleClientId_SystemKey_NonNull", "IX_MaterialRequests_Case_Active", "IX_MaterialRequests_Assignee_Open", "IX_MaterialRequests_Type_Status", "IX_MaterialRequestFollowUps_Request_Chronology", "IX_MaterialItems_Case_Active", "IX_MaterialItems_Request", "IX_MaterialItems_Type", "IX_MaterialItems_ExternalLink", "CK_MaterialRequests_Method", "CK_MaterialRequests_Status", "CK_MaterialRequests_Source", "CK_MaterialRequests_Closure", "CK_MaterialItems_Format", "CK_MaterialItems_Completeness", "CK_MaterialItems_CustodyStatus"}) assertContains(sql, token);
         assertContains(sql, "CONSTRAINT CK_MaterialRequests_Closure CHECK ((Status IN ('CLOSED','CANCELLED') AND ClosedAt IS NOT NULL AND ClosedByUserId IS NOT NULL AND ClosureReason IS NOT NULL) OR (Status NOT IN ('CLOSED','CANCELLED') AND ClosedAt IS NULL AND ClosedByUserId IS NULL AND ClosureReason IS NULL))");
+    }
+
+    @Test
+    void recurringFollowUpMigrationIsIdempotentNullableAndRangeConstrained() throws Exception {
+        String sql = read(INTERVAL);
+        assertContains(sql, "COL_LENGTH(N'dbo.MaterialRequests', N'FollowUpIntervalDays') IS NULL");
+        assertContains(sql, "ADD FollowUpIntervalDays int NULL");
+        assertContains(sql, "OBJECT_ID(N'dbo.CK_MaterialRequests_FollowUpIntervalDays', N'C') IS NULL");
+        assertContains(sql, "FollowUpIntervalDays IS NULL OR FollowUpIntervalDays BETWEEN 1 AND 365");
+        assertFalse(sql.contains("CK_MaterialRequests_Closure"));
     }
 
     @Test
