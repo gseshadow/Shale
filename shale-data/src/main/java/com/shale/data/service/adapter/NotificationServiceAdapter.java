@@ -30,9 +30,10 @@ public final class NotificationServiceAdapter implements NotificationServicePort
 						shaleClientId,
 						userId,
 						row.category(),
-						row.title(),
-						row.message(),
-						row.createdAt(), row.isRead(), row.entityType()))
+						row.severity(), row.title(), row.message(), row.entityType(), row.entityId(), row.actionType(), row.eventKey(),
+						row.actorDisplayName(), row.entityTitle(), row.caseId(), row.caseName(), row.caseResponsibleAttorney(),
+						row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.casePrimaryStatusName(),
+						row.casePrimaryStatusColor(), row.casePracticeAreaColor(), row.createdAt(), row.isRead()))
 				.toList();
 	}
 
@@ -42,8 +43,11 @@ public final class NotificationServiceAdapter implements NotificationServicePort
 		NotificationDao.NotificationPageRow page = notificationGateway.listNotificationsForUser(
 				shaleClientId, userId, cursor.afterNotificationId(), limit);
 		List<NotificationSummary> items = page.items().stream().map(row -> new NotificationSummary(
-				row.id(), shaleClientId, userId, row.category(), row.title(), row.message(), row.createdAt(), row.read(), row.entityType())).toList();
-		NotificationCursor next = items.isEmpty() ? cursor : NotificationCursor.after(items.get(items.size() - 1).id());
+				row.id(), shaleClientId, userId, row.category(), row.severity(), row.title(), row.message(), row.entityType(), row.entityId(),
+				row.actionType(), row.eventKey(), row.actorDisplayName(), row.entityTitle(), row.caseId(), row.caseName(),
+				row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(),
+				row.casePrimaryStatusName(), row.casePrimaryStatusColor(), row.casePracticeAreaColor(), row.createdAt(), row.isRead())).toList();
+		NotificationCursor next = NotificationCursor.after(page.nextScannedId());
 		return new NotificationPage(items, next, page.hasMore());
 	}
 

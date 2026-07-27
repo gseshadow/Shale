@@ -4,7 +4,8 @@ import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.NotificationServicePort.NotificationCursor;
 import com.shale.core.service.NotificationServicePort.NotificationPage;
 import com.shale.core.service.NotificationServicePort.NotificationSummary;
-import java.time.Clock;
+import com.shale.core.service.NotificationServicePort.NotificationRetrievalException;
+import com.shale.core.service.NotificationServicePort.RetrievalFailureKind;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
@@ -23,13 +24,12 @@ import org.slf4j.LoggerFactory;
 public final class NotificationPollingService implements AutoCloseable {
 	private static final Logger log = LoggerFactory.getLogger(NotificationPollingService.class);
 	private final NotificationServicePort source;
-	private final NotificationCenterService center;
-	private final DurableNotificationService mapper;
+	private final Consumer<AppNotification> merger;
+	private final CandidateMapper mapper;
 	private final NotificationPrivacyProjector projector;
 	private final DesktopNotificationPresenter presenter;
 	private final ScheduledExecutorService scheduler;
 	private final Consumer<Runnable> uiExecutor;
-	private final Clock clock;
 	private final DoubleSupplier jitter;
 	private final Config config;
 	private final boolean ownsScheduler;
@@ -42,22 +42,27 @@ public final class NotificationPollingService implements AutoCloseable {
 	public NotificationPollingService(NotificationServicePort source, NotificationCenterService center,
 			DurableNotificationService mapper, DesktopNotificationPresenter presenter, Consumer<Runnable> uiExecutor) {
 		this(source, center, mapper, new NotificationPrivacyProjector(), presenter, daemonScheduler(), uiExecutor,
-				Clock.systemUTC(), Math::random, Config.defaults(), true);
+				Math::random, Config.defaults(), true);
 	}
 
 	NotificationPollingService(NotificationServicePort source, NotificationCenterService center,
 			DurableNotificationService mapper, NotificationPrivacyProjector projector,
 			DesktopNotificationPresenter presenter, ScheduledExecutorService scheduler,
-			Consumer<Runnable> uiExecutor, Clock clock, DoubleSupplier jitter, Config config,
+			Consumer<Runnable> uiExecutor, DoubleSupplier jitter, Config config,
 			boolean ownsScheduler) {
+		this(source, mapper::fromSummary, center::pushNotification, projector, presenter, scheduler, uiExecutor, jitter, config, ownsScheduler);
+	}
+
+	NotificationPollingService(NotificationServicePort source, CandidateMapper mapper, Consumer<AppNotification> merger,
+			NotificationPrivacyProjector projector, DesktopNotificationPresenter presenter, ScheduledExecutorService scheduler,
+			Consumer<Runnable> uiExecutor, DoubleSupplier jitter, Config config, boolean ownsScheduler) {
 		this.source = Objects.requireNonNull(source, "source");
-		this.center = Objects.requireNonNull(center, "center");
 		this.mapper = Objects.requireNonNull(mapper, "mapper");
+		this.merger = Objects.requireNonNull(merger, "merger");
 		this.projector = Objects.requireNonNull(projector, "projector");
 		this.presenter = Objects.requireNonNull(presenter, "presenter");
 		this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
 		this.uiExecutor = Objects.requireNonNull(uiExecutor, "uiExecutor");
-		this.clock = Objects.requireNonNull(clock, "clock");
 		this.jitter = Objects.requireNonNull(jitter, "jitter");
 		this.config = Objects.requireNonNull(config, "config");
 		this.ownsScheduler = ownsScheduler;
@@ -113,7 +118,11 @@ public final class NotificationPollingService implements AutoCloseable {
 		} catch (IllegalArgumentException | SecurityException failClosed) {
 			log.warn("Notification polling stopped tenantId={} userId={} code=fail_closed", snapshot.tenantId(), snapshot.userId());
 			stopIfActive(token);
-		} catch (RuntimeException transientFailure) {
+		} catch (NotificationRetrievalException retrievalFailure) {
+			if (retrievalFailure.kind() != RetrievalFailureKind.TRANSIENT) {
+				log.warn("Notification polling stopped tenantId={} userId={} code=authorization", snapshot.tenantId(), snapshot.userId());
+				stopIfActive(token); return;
+			}
 			if (!active(token)) return;
 			int failures = Math.min(30, snapshot.failures() + 1);
 			Session failed = snapshot.withFailures(failures);
@@ -122,15 +131,18 @@ public final class NotificationPollingService implements AutoCloseable {
 			log.warn("Notification polling retry tenantId={} userId={} retry={} delayMs={} code=transient",
 					snapshot.tenantId(), snapshot.userId(), failures, delay.toMillis());
 			schedule(token, delay);
+		} catch (RuntimeException unexpectedFailure) {
+			log.warn("Notification polling stopped tenantId={} userId={} code=permanent", snapshot.tenantId(), snapshot.userId());
+			stopIfActive(token);
 		}
 	}
 
 	private void reconcileAndPresent(long token, List<NotificationSummary> rows) {
 		for (NotificationSummary row : rows) {
 			if (!active(token)) return;
-			AppNotification appNotification = mapper.fromSummary(row);
-			if (appNotification != null) uiExecutor.accept(() -> { if (active(token)) center.pushNotification(appNotification); });
-			if (appNotification == null || !mapper.isPresentationEnabled(row)) continue;
+			AppNotification appNotification = mapper.map(row);
+			if (appNotification != null) uiExecutor.accept(() -> { if (active(token)) merger.accept(appNotification); });
+			if (appNotification == null) continue;
 			synchronized (this) { if (!active(token) || !presentedOrAttempted.add(row.id())) continue; }
 			try {
 				presenter.present(projector.project(row));
@@ -144,13 +156,15 @@ public final class NotificationPollingService implements AutoCloseable {
 	private static void validatePage(NotificationCursor prior, NotificationPage page) {
 		if (page == null || page.nextCursor() == null) throw new IllegalArgumentException("Invalid cursor page");
 		long previous = prior.afterNotificationId();
+		long next = page.nextCursor().afterNotificationId();
+		if (next < previous) throw new IllegalArgumentException("Invalid cursor page");
 		long last = previous;
 		for (NotificationSummary row : page.items()) {
 			if (row == null || row.id() <= previous || row.id() < last) throw new IllegalArgumentException("Invalid cursor page");
 			last = row.id();
 		}
-		if (!page.items().isEmpty() && page.nextCursor().afterNotificationId() < last) throw new IllegalArgumentException("Invalid cursor page");
-		if (page.hasMore() && page.items().isEmpty()) throw new IllegalArgumentException("Invalid cursor page");
+		if (!page.items().isEmpty() && next < last) throw new IllegalArgumentException("Invalid cursor page");
+		if (page.hasMore() && next == previous) throw new IllegalArgumentException("Invalid cursor page");
 	}
 
 	private Duration retryDelay(int failures) {
@@ -182,6 +196,8 @@ public final class NotificationPollingService implements AutoCloseable {
 		Session withCursor(NotificationCursor value, boolean baseline) { return new Session(tenantId,userId,generation,value,baseline,failures); }
 		Session withFailures(int value) { return new Session(tenantId,userId,generation,cursor,baselineEstablished,value); }
 	}
+
+	@FunctionalInterface interface CandidateMapper { AppNotification map(NotificationSummary row); }
 
 	public record Config(Duration pollInterval, Duration initialRetryDelay, Duration maximumRetryDelay,
 			double jitterFraction, int pageSize) {

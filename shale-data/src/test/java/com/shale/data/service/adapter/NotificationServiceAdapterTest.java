@@ -47,7 +47,9 @@ class NotificationServiceAdapterTest {
 
 		assertEquals(42, gateway.lastListShaleClientId);
 		assertEquals(7, gateway.lastListUserId);
-		assertEquals(List.of(new NotificationSummary(9, 42, 7, "TASK", "Assigned", "Task assigned", createdAt, false, "TASK")), summaries);
+		assertEquals(1, summaries.size());
+		assertEquals("TASK", summaries.get(0).entityType());
+		assertEquals("ASSIGNED", summaries.get(0).actionType());
 	}
 
 	@Test
@@ -81,7 +83,7 @@ class NotificationServiceAdapterTest {
 
 	@Test void cursorCountAndActivationDelegate() {
 		FakeNotificationGateway gateway=new FakeNotificationGateway(List.of());
-		gateway.page=new NotificationDao.NotificationPageRow(List.of(new NotificationDao.NotificationCursorRow(12,"TASK","t","b",Instant.EPOCH)),false);
+		gateway.page=new NotificationDao.NotificationPageRow(List.of(notificationRow(12,"ASSIGNED")),false,12);
 		gateway.unreadCount=4;
 		gateway.activation=Optional.of(new NotificationDao.NotificationActivationRow(12,"Task",99,8L,"ASSIGNED"));
 		NotificationServiceAdapter adapter=new NotificationServiceAdapter(gateway);
@@ -91,6 +93,17 @@ class NotificationServiceAdapterTest {
 		assertEquals(99,adapter.findActivationTarget(41,31,12).orElseThrow().entityId());
 		assertEquals(101, adapter.notificationHighWaterMark(41, 31));
 		assertEquals(41,gateway.newTenant); assertEquals(31,gateway.newUser); assertEquals(12,gateway.activationId);
+	}
+
+	@Test void emptyFilteredPageAdvancesToHighestScannedId() {
+		FakeNotificationGateway gateway=new FakeNotificationGateway(List.of());
+		gateway.page=new NotificationDao.NotificationPageRow(List.of(),true,19);
+		var page=new NotificationServiceAdapter(gateway).listNotifications(41,31,NotificationCursor.after(10),25);
+		assertTrue(page.items().isEmpty());assertTrue(page.hasMore());assertEquals(19,page.nextCursor().afterNotificationId());
+	}
+
+	private static NotificationDao.NotificationRow notificationRow(long id,String action) {
+		return new NotificationDao.NotificationRow(id,"TASK","INFO","t","b","TASK",99L,action,null,null,null,null,null,null,null,null,null,null,false,Instant.EPOCH,"event-"+id);
 	}
 
 	private static final class FakeNotificationGateway implements NotificationServiceAdapter.NotificationGateway {

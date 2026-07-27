@@ -14,7 +14,7 @@ import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class DurableNotificationService {
+public final class DurableNotificationService implements AutoCloseable {
 	private static final Logger log = LoggerFactory.getLogger(DurableNotificationService.class);
 
 	private final NotificationDao notificationDao;
@@ -82,17 +82,17 @@ public final class DurableNotificationService {
 
 	/** Maps a cursor result for incremental reconciliation without mutating durable state. */
 	public AppNotification fromSummary(NotificationSummary row) {
-		NotificationCategory category = parseCategory(row.category());
-		if (!isEnabled(category, null)) return null;
-		return new AppNotification("db-" + row.id(), category, NotificationSeverity.INFO,
-				Objects.toString(row.title(), "Notification"), Objects.toString(row.body(), ""),
-				row.createdAt(), !row.read(), false, NotificationTargetScope.USER_SCOPED,
-				row.id(), null);
+		return toAppNotification(new NotificationRow(row.id(),row.category(),row.severity(),row.title(),row.body(),row.entityType(),row.entityId(),
+				row.actionType(),row.actorDisplayName(),row.entityTitle(),row.caseId(),row.caseName(),row.caseResponsibleAttorney(),
+				row.caseResponsibleAttorneyColor(),row.caseNonEngagementLetterSent(),row.casePrimaryStatusName(),row.casePrimaryStatusColor(),
+				row.casePracticeAreaColor(),row.read(),row.createdAt(),row.eventKey()));
 	}
 
 	public boolean isPresentationEnabled(NotificationSummary row) {
-		return row != null && isEnabled(parseCategory(row.category()), null);
+		return row != null && isEnabled(parseCategory(row.category()), row.actionType());
 	}
+
+	@Override public void close() { persistenceExecutor.shutdownNow(); }
 
 	public void markRead(List<AppNotification> notifications) {
 		if (notifications == null || notifications.isEmpty()) {
@@ -221,16 +221,14 @@ public final class DurableNotificationService {
 	}
 
 	private boolean isEnabled(NotificationCategory category, String actionType) {
-		if (category != NotificationCategory.TASK) {
-			return true;
-		}
-		String normalizedAction = actionType == null ? "" : actionType.trim().toUpperCase();
-		return switch (normalizedAction) {
-			case "DUE_OVERDUE" -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_OVERDUE);
-			case "DUE_TODAY" -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_TODAY);
-			case "DUE_TOMORROW" -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_DUE_TOMORROW);
-			default -> notificationPreferencesService.isEnabled(NotificationPreferenceKey.TASK_ASSIGNED_TO_ME);
-		};
+		NotificationPreferenceKey key=preferenceKey(category,actionType);
+		return key==null||notificationPreferencesService.isEnabled(key);
+	}
+
+	static NotificationPreferenceKey preferenceKey(NotificationCategory category,String actionType) {
+		if(category!=NotificationCategory.TASK)return null;
+		String normalizedAction=actionType==null?"":actionType.trim().toUpperCase();
+		return switch(normalizedAction){case "DUE_OVERDUE"->NotificationPreferenceKey.TASK_DUE_OVERDUE;case "DUE_TODAY"->NotificationPreferenceKey.TASK_DUE_TODAY;case "DUE_TOMORROW"->NotificationPreferenceKey.TASK_DUE_TOMORROW;default->NotificationPreferenceKey.TASK_ASSIGNED_TO_ME;};
 	}
 
 	private boolean shouldShowAsBanner(NotificationCategory category, String actionType, NotificationSeverity severity) {

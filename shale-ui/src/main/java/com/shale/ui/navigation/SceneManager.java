@@ -1253,6 +1253,7 @@ public final class SceneManager {
 	/** Deterministically releases all SceneManager-owned background work. */
 	public void shutdown() {
 		notificationPollingService.close();
+		durableNotificationService.close();
 		taskDueDateNotificationGenerator.stop();
 		updatePollingService.stop();
 		liveUpdateNotificationBridge.stop();
