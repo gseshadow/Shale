@@ -24,10 +24,10 @@ final class MaterialRequestDaoPhase2ContractTest {
         assertTrue(DAO.contains("verifyTenant(con, shaleClientId)"));
     }
 
-    @Test void requestReadsAreTenantCaseScopedAndSummaryDoesNotSelectPhiDescription() {
-        assertTrue(DAO.contains("mr.ShaleClientId=? AND mr.CaseId=? AND mr.IsDeleted=0"));
+    @Test void requestReadsAreTenantCaseScopedAndSummaryIncludesSearchableDescription() {
+        assertTrue(DAO.contains("mr.ShaleClientId=? AND mr.CaseId=? AND (?=1 OR mr.IsDeleted=0)"));
         assertTrue(DAO.contains("JOIN dbo.Cases c ON c.Id=mr.CaseId AND c.ShaleClientId=mr.ShaleClientId"));
-        assertTrue(DAO.contains("CAST(NULL AS nvarchar(max)) AS Description"));
+        assertTrue(DAO.contains("mr.Description"));
         assertTrue(DAO.contains("mt.ShaleClientId=mr.ShaleClientId OR mt.ShaleClientId IS NULL"));
         assertTrue(DAO.contains("rs.getBytes(\"RowVer\")"));
     }
@@ -52,7 +52,7 @@ final class MaterialRequestDaoPhase2ContractTest {
         for (String label : new String[]{"Id","ShaleClientId","CaseId","MaterialTypeId","MaterialTypeName","MaterialTypeSystemKey","Status","RequestedByDisplayName","AssignedToDisplayName","RequestedFromContactDisplayName","RequestedFromOrganizationName","RequestedAt","ExpectedResponseDate","NextFollowUpAt","LastFollowUpAt","UpdatedAt","RowVer"}) {
             assertTrue(DAO.contains("\"" + label + "\""), label);
         }
-        assertTrue(DAO.contains("mr.ShaleClientId=? AND mr.CaseId=? AND mr.IsDeleted=0"));
+        assertTrue(DAO.contains("mr.ShaleClientId=? AND mr.CaseId=? AND (?=1 OR mr.IsDeleted=0)"));
         assertTrue(DAO.contains("ISNULL(c.IsDeleted,0)=0"));
     }
 
@@ -62,17 +62,17 @@ final class MaterialRequestDaoPhase2ContractTest {
         assertTrue(port.contains("CreateMaterialRequestCommand"));
         assertTrue(port.contains("UpdateMaterialRequestCommand"));
         assertFalse(port.contains("ChangeMaterialRequestStatusCommand"));
-        assertFalse(port.contains("DeleteMaterialRequestCommand"));
+        assertTrue(port.contains("DeleteMaterialRequestCommand"));
         assertFalse(port.contains("RecordMaterialRequestFollowUpCommand"));
         assertTrue(adapter.contains("createMaterialRequest"));
         assertTrue(adapter.contains("updateMaterialRequest"));
         assertFalse(adapter.contains("changeMaterialRequestStatus"));
-        assertFalse(adapter.contains("deleteMaterialRequest"));
+        assertTrue(adapter.contains("deleteMaterialRequest"));
         assertFalse(adapter.contains("recordFollowUp"));
         assertTrue(DAO.contains("INSERT dbo.MaterialRequests"));
         assertTrue(DAO.contains("UPDATE dbo.MaterialRequests SET MaterialTypeId"));
         assertFalse(DAO.contains("UPDATE dbo.MaterialRequests SET Status"));
-        assertFalse(DAO.contains("UPDATE dbo.MaterialRequests SET IsDeleted=1"));
+        assertTrue(DAO.contains("UPDATE dbo.MaterialRequests SET IsDeleted=1"));
         assertFalse(DAO.contains("INSERT dbo.MaterialRequestFollowUps"));
     }
 
