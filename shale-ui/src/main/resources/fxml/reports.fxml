@@ -18,6 +18,7 @@
                 <MenuButton fx:id="statusFilterMenuButton" text="Statuses (0/0)" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
                 <Button fx:id="refreshButton" text="Apply" onAction="#onRefresh" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
                 <Button fx:id="showAllResultsButton" text="Show all results" onAction="#onShowAllResults" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                <Button fx:id="exportButton" text="Export" onAction="#onExport" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
                 <Label fx:id="statusLabel" styleClass="search-summary-text" />
             </HBox>
             <HBox fx:id="summaryMetricsBox" spacing="10" alignment="CENTER_LEFT">

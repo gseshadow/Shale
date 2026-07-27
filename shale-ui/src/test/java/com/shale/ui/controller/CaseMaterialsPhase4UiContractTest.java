@@ -10,15 +10,16 @@ final class CaseMaterialsPhase4UiContractTest {
   private static final String FXML = read("src/main/resources/fxml/case.fxml");
   private static final String MAT = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
 
-  @Test void requestsAndCaseMaterialsAreFirstClassTabsInOrder() {
-    assertEquals(java.util.List.of("Overview", "Details", "Parties", "Tasks", "Calendar", "Requests", "Case Materials", "Links", "Timeline"),
+  @Test void requestsRemainInTabOrderWhileCaseMaterialsUiIsAbsent() {
+    assertEquals(java.util.List.of("Overview", "Details", "Parties", "Tasks", "Calendar", "Requests", "Links", "Timeline"),
         CaseController.sectionOrderForTesting());
     assertTrue(CTRL.contains("case \"Requests\" -> showRequestsTab();"));
-    assertTrue(CTRL.contains("case \"Case Materials\" -> showMaterialsTab();"));
-    assertFalse(CTRL.contains("case \"Materials\""));
+    assertFalse(CTRL.contains("case \"Case Materials\""));
+    assertFalse(CTRL.contains("showMaterialsTab"));
     assertTrue(FXML.contains("fx:id=\"caseCalendarTabPane\""));
     assertTrue(FXML.contains("fx:id=\"caseRequestsTabPane\""));
-    assertTrue(FXML.contains("fx:id=\"caseMaterialsTabPane\""));
+    assertFalse(FXML.contains("fx:id=\"caseMaterialsTabPane\""));
+    assertFalse(FXML.contains("fx:id=\"caseMaterialsContentHost\""));
     assertTrue(FXML.contains("fx:id=\"caseLinksTabPane\""));
   }
 

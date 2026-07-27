@@ -973,6 +973,29 @@ public final class CaseDao {
 		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, query, selectedStatusIds, knownTotal);
 	}
 
+	/** Complete Cases-view result set for exports; deliberately independent of UI page size. */
+	public List<CaseRow> listCasesViewForExport(CaseSort sort,
+			boolean includeClosedDenied,
+			String query,
+			Set<Integer> selectedStatusIds) {
+		final int exportBatchSize = 500;
+		return collectAllExportPages(page -> findPageInternal(page, exportBatchSize, sort,
+					includeClosedDenied, null, query, selectedStatusIds,
+					null));
+	}
+
+	static <T> List<T> collectAllExportPages(java.util.function.IntFunction<PagedResult<T>> loader) {
+		List<T> rows = new ArrayList<>();
+		long total = Long.MAX_VALUE;
+		for (int page = 0; rows.size() < total; page++) {
+			PagedResult<T> batch = loader.apply(page);
+			total = batch.total();
+			rows.addAll(batch.items());
+			if (batch.items().isEmpty()) break;
+		}
+		return List.copyOf(rows);
+	}
+
 	/** page is 0-based */
 	public PagedResult<CaseRow> findMyCasesPage(int userId, int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
 		if (userId <= 0) {
@@ -1367,7 +1390,6 @@ public final class CaseDao {
 			throw new RuntimeException("Failed to load case status report cases.", e);
 		}
 	}
-
 
 	public List<CaseRow> listAssignedCasesForBoard(int userId) {
 		if (userId <= 0) {

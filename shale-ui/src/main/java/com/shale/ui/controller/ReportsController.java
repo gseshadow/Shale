@@ -6,6 +6,9 @@ import com.shale.core.dto.CaseStatusDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.ui.component.StatisticCard;
 import com.shale.ui.state.AppState;
+import com.shale.ui.services.CaseExportService;
+import com.shale.ui.export.CaseXlsxExporter;
+import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.util.ColorUtil;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyLongWrapper;
@@ -29,6 +32,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.Tooltip;
 import javafx.scene.Node;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.layout.BorderPane;
 
 import java.text.DecimalFormat;
@@ -42,6 +46,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javafx.stage.FileChooser;
+import java.io.File;
 
 public final class ReportsController {
     private static final DecimalFormat PERCENT_FORMAT = new DecimalFormat("0.0");
@@ -52,6 +58,7 @@ public final class ReportsController {
     @FXML private MenuButton statusFilterMenuButton;
     @FXML private Button refreshButton;
     @FXML private Button showAllResultsButton;
+    @FXML private Button exportButton;
     @FXML private Label statusLabel;
     @FXML private TableView<CaseStatusReportRowDto> statusReportTable;
     @FXML private TableColumn<CaseStatusReportRowDto, String> caseStatusColumn;
@@ -71,10 +78,14 @@ public final class ReportsController {
     private final Map<String, CaseStatusReportRowDto> reportRowsBySliceName = new LinkedHashMap<>();
     private AppState appState;
     private CaseDao caseDao;
+    private CaseExportService caseExportService;
+    private final CaseXlsxExporter xlsxExporter = new CaseXlsxExporter();
+    private boolean exportInProgress;
 
-    public void init(AppState appState, CaseDao caseDao) {
+    public void init(AppState appState, CaseDao caseDao, CaseExportService caseExportService) {
         this.appState = Objects.requireNonNull(appState, "appState");
         this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
+        this.caseExportService = Objects.requireNonNull(caseExportService, "caseExportService");
         loadStatusesAndReport();
     }
 
@@ -274,11 +285,12 @@ public final class ReportsController {
         }
         LocalDate startDate = startDatePicker == null ? null : startDatePicker.getValue();
         LocalDate endDate = endDatePicker == null ? null : endDatePicker.getValue();
+        CaseExportService.ReportCriteria criteria = new CaseExportService.ReportCriteria(shaleClientId, startDate, endDate, List.of(row.statusId()));
         setLoading(true);
         executor.submit(() -> {
             try {
                 List<ReportCaseDetailRowDto> rows = caseDao.listCaseStatusReportCases(shaleClientId, row.statusId(), startDate, endDate);
-                Platform.runLater(() -> showCaseDetailsDialog(row.caseStatus(), startDate, endDate, rows));
+                Platform.runLater(() -> showCaseDetailsDialog(row.caseStatus(), startDate, endDate, rows, criteria));
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> setStatus("Unable to load cases for " + row.caseStatus() + ". Please try again."));
             } finally {
@@ -287,10 +299,12 @@ public final class ReportsController {
         });
     }
 
-    private void showCaseDetailsDialog(String statusName, LocalDate startDate, LocalDate endDate, List<ReportCaseDetailRowDto> rows) {
+    private void showCaseDetailsDialog(String statusName, LocalDate startDate, LocalDate endDate, List<ReportCaseDetailRowDto> rows,
+                                       CaseExportService.ReportCriteria criteria) {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle(statusName + " — " + dateRangeLabel(startDate, endDate));
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        ButtonType exportType = new ButtonType("Export", ButtonBar.ButtonData.LEFT);
+        dialog.getDialogPane().getButtonTypes().addAll(exportType, ButtonType.CLOSE);
         DialogPane pane = dialog.getDialogPane();
         pane.setPrefSize(1200, 650);
         pane.setMinSize(800, 420);
@@ -315,8 +329,64 @@ public final class ReportsController {
         BorderPane content = new BorderPane(table);
         content.setPrefSize(1180, 600);
         pane.setContent(content);
+        Button drillExport = (Button) pane.lookupButton(exportType);
+        drillExport.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-primary");
+        drillExport.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            event.consume();
+            exportReport(criteria, statusName, statusName + " Cases", drillExport);
+        });
         dialog.initOwner(statusPieChart == null || statusPieChart.getScene() == null ? null : statusPieChart.getScene().getWindow());
         dialog.showAndWait();
+    }
+
+    @FXML
+    private void onExport() {
+        if (appState == null) return;
+        Integer tenantId = appState.getShaleClientId();
+        if (tenantId == null || tenantId <= 0) { setStatus("No tenant is selected."); return; }
+        exportReport(new CaseExportService.ReportCriteria(tenantId,
+                startDatePicker == null ? null : startDatePicker.getValue(),
+                endDatePicker == null ? null : endDatePicker.getValue(), selectedStatusIds()),
+                "Case Status Report", "Case Status Report", exportButton);
+    }
+
+    private void exportReport(CaseExportService.ReportCriteria criteria, String fileLabel, String sheetName, Button button) {
+        if (exportInProgress || criteria.statusIds().isEmpty()) return;
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Export Report to XLSX");
+        chooser.setInitialFileName(safeFileName(fileLabel) + ".xlsx");
+        chooser.getExtensionFilters().setAll(new FileChooser.ExtensionFilter("Excel Workbook (*.xlsx)", "*.xlsx"));
+        File file = chooser.showSaveDialog(statusPieChart == null || statusPieChart.getScene() == null ? null : statusPieChart.getScene().getWindow());
+        if (file == null) return;
+        Map<Integer, String> statusNames = new LinkedHashMap<>();
+        availableStatusesById.forEach((id, status) -> statusNames.put(id, status.name()));
+        Map<Integer, String> namesSnapshot = Map.copyOf(statusNames);
+        exportInProgress = true;
+        if (button != null) button.setDisable(true);
+        executor.submit(() -> {
+            try {
+                var rows = caseExportService.exportReport(criteria, namesSnapshot);
+                xlsxExporter.writeReport(file.toPath(), sheetName, rows);
+                Platform.runLater(() -> finishExport(button, () -> AppDialogs.showInfo(fileChooserOwner(), "Export Complete", "Report exported to:\n" + file.getAbsolutePath())));
+            } catch (RuntimeException | java.io.IOException ex) {
+                Platform.runLater(() -> finishExport(button, () -> AppDialogs.showError(fileChooserOwner(), "Export Failed", "Unable to export the report. Please try again.")));
+            }
+        });
+    }
+
+    private void finishExport(Button button, Runnable feedback) {
+        exportInProgress = false;
+        if (button != null) button.setDisable(false);
+        feedback.run();
+    }
+
+    private javafx.stage.Window fileChooserOwner() {
+        return statusPieChart == null || statusPieChart.getScene() == null ? null : statusPieChart.getScene().getWindow();
+    }
+
+    private String safeFileName(String value) {
+        String safe = value == null ? "report" : value.replaceAll("[^A-Za-z0-9._ -]", "_").trim();
+        return safe.isEmpty() ? "report" : safe;
     }
 
     private interface CaseDetailTextProvider {
@@ -409,6 +479,7 @@ public final class ReportsController {
     private void setLoading(boolean loading) {
         if (refreshButton != null) refreshButton.setDisable(loading);
         if (showAllResultsButton != null) showAllResultsButton.setDisable(loading);
+        if (exportButton != null) exportButton.setDisable(loading || exportInProgress);
         if (loading) setStatus("Loading report…");
     }
 

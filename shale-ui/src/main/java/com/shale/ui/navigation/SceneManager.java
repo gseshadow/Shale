@@ -8,10 +8,8 @@ import com.shale.data.dao.CalendarEventDao;
 import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseDao;
-import com.shale.data.dao.MaterialItemDao;
 import com.shale.data.dao.MaterialRequestDao;
 import com.shale.data.service.adapter.CaseServiceAdapter;
-import com.shale.data.service.adapter.MaterialItemServiceAdapter;
 import com.shale.data.service.adapter.MaterialRequestServiceAdapter;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
@@ -45,6 +43,7 @@ import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.CaseExportService;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
@@ -580,7 +579,8 @@ public final class SceneManager {
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase);
+			c.init(appState, runtimeBridge, caseDao, caseTaskService,
+					new CaseExportService(caseDao, appState, phiReadAuditService), onOpenCase);
 			return c;
 		});
 	}
@@ -619,7 +619,8 @@ public final class SceneManager {
 		return load("/fxml/reports.fxml", controller ->
 		{
 			ReportsController c = (ReportsController) controller;
-			c.init(appState, new CaseDao(dbSessionProvider));
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			c.init(appState, caseDao, new CaseExportService(caseDao, appState, phiReadAuditService));
 			return c;
 		});
 	}
@@ -807,7 +808,7 @@ public final class SceneManager {
 			CalendarFeedDao calendarFeedDao = new CalendarFeedDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), calendarFeedDao, notificationDao, runtimeBridge);
 			c.init(caseId, caseDao, caseDetailService, caseTaskService, calendarService, calendarFeedDao, new CaseServiceAdapter(caseDao), organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted, phiReadAuditService);
-			c.setMaterialServices(new MaterialRequestServiceAdapter(new MaterialRequestDao(dbSessionProvider)), new MaterialItemServiceAdapter(new MaterialItemDao(dbSessionProvider)));
+			c.setMaterialRequestService(new MaterialRequestServiceAdapter(new MaterialRequestDao(dbSessionProvider)));
 			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);
