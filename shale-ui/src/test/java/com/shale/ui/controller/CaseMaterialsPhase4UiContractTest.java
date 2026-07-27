@@ -11,13 +11,15 @@ final class CaseMaterialsPhase4UiContractTest {
   private static final String MAT = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
 
   @Test void requestsAndCaseMaterialsAreFirstClassTabsInOrder() {
-    assertTrue(CTRL.contains("\"Calendar\",\n\t\t\t\"Requests\",\n\t\t\t\"Case Materials\",\n\t\t\t\"Links\""));
+    assertEquals(java.util.List.of("Overview", "Details", "Parties", "Tasks", "Calendar", "Requests", "Case Materials", "Links", "Timeline"),
+        CaseController.sectionOrderForTesting());
     assertTrue(CTRL.contains("case \"Requests\" -> showRequestsTab();"));
     assertTrue(CTRL.contains("case \"Case Materials\" -> showMaterialsTab();"));
     assertFalse(CTRL.contains("case \"Materials\""));
-    assertTrue(FXML.indexOf("caseCalendarTabPane") < FXML.indexOf("caseRequestsTabPane"));
-    assertTrue(FXML.indexOf("caseRequestsTabPane") < FXML.indexOf("caseMaterialsTabPane"));
-    assertTrue(FXML.indexOf("caseMaterialsTabPane") < FXML.indexOf("caseLinksTabPane"));
+    assertTrue(FXML.contains("fx:id=\"caseCalendarTabPane\""));
+    assertTrue(FXML.contains("fx:id=\"caseRequestsTabPane\""));
+    assertTrue(FXML.contains("fx:id=\"caseMaterialsTabPane\""));
+    assertTrue(FXML.contains("fx:id=\"caseLinksTabPane\""));
   }
 
   @Test void eachTabHasIndependentControllerAndLoadFailureMessaging() {

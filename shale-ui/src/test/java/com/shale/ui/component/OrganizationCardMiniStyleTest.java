@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,12 +25,14 @@ final class OrganizationCardMiniStyleTest {
         String miniBlock = source.substring(source.indexOf("public void applyMini()"), source.indexOf("public void applyCompact()"));
 
         assertTrue(miniBlock.contains("resetNameLabelVariantStyles()"));
-        assertTrue(miniBlock.contains("nameLabel.getStyleClass().addAll(\"organization-card-name\", \"organization-card-name-mini\")"));
+        assertTrue(Pattern.compile("nameLabel\\.getStyleClass\\(\\)\\.addAll\\(\\s*\"organization-card-name\"\\s*,\\s*\"organization-card-name-mini\"\\s*\\)")
+                .matcher(miniBlock).find());
         assertTrue(miniBlock.contains("nameLabel.setStyle(null);"));
         assertFalse(miniBlock.contains("-fx-text-fill: white"));
         assertFalse(miniBlock.contains("-fx-text-fill: #fff"));
-        assertTrue(css.contains(".contact-card-name,\n.organization-card-name {\n    -fx-text-fill: -shale-color-text-primary;\n}"));
-        assertTrue(css.contains(".contact-card-name-mini,\n.organization-card-name-mini"));
+        assertTrue(cssRuleContains(css, ".organization-card-name", "-fx-text-fill", "-shale-color-text-primary"));
+        assertTrue(cssRuleContains(css, ".organization-card-name-mini", "-fx-font-size", "12px"));
+        assertTrue(cssRuleContains(css, ".organization-card-name-mini", "-fx-font-weight", "600"));
     }
 
     @Test
@@ -77,5 +80,19 @@ final class OrganizationCardMiniStyleTest {
         assertTrue(requestedFrom.contains("OrganizationCardFactory.Variant.MINI"));
         assertTrue(caseMaterials.contains("OrganizationCardFactory.Variant.MINI"));
         assertFalse(caseController.contains("OrganizationCardFactory.Variant.MINI"));
+    }
+
+    private static boolean cssRuleContains(String css, String selector, String property, String value) {
+        Pattern rule = Pattern.compile("([^{}]+)\\{([^}]*)}");
+        var matcher = rule.matcher(css);
+        while (matcher.find()) {
+            boolean selectorMatches = Pattern.compile("(?:^|,)\\s*" + Pattern.quote(selector) + "\\s*(?:,|$)")
+                    .matcher(matcher.group(1)).find();
+            if (selectorMatches && Pattern.compile(Pattern.quote(property) + "\\s*:\\s*" + Pattern.quote(value) + "\\s*;")
+                    .matcher(matcher.group(2)).find()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

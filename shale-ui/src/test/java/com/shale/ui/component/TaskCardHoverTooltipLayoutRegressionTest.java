@@ -3,16 +3,14 @@ package com.shale.ui.component;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import javafx.application.Platform;
+import com.shale.ui.testutil.JavaFxTestSupport;
+
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.stage.Popup;
@@ -20,20 +18,12 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
 final class TaskCardHoverTooltipLayoutRegressionTest {
-    private static final AtomicBoolean TOOLKIT_STARTED = new AtomicBoolean();
     private final AtomicReference<Stage> stageRef = new AtomicReference<>();
 
     @BeforeAll
-    static void startJavaFxToolkit() throws Exception {
+    static void startJavaFxToolkit() {
         assumeTrue(hasDisplay(), "JavaFX tooltip layout regression test requires a graphical display.");
-        if (TOOLKIT_STARTED.compareAndSet(false, true)) {
-            CountDownLatch latch = new CountDownLatch(1);
-            Platform.startup(() -> {
-                Platform.setImplicitExit(false);
-                latch.countDown();
-            });
-            assertTrue(latch.await(10, TimeUnit.SECONDS));
-        }
+        JavaFxTestSupport.ensureToolkitStarted();
     }
 
     @AfterEach
@@ -100,21 +90,7 @@ final class TaskCardHoverTooltipLayoutRegressionTest {
     }
 
     private static void runFxAndWait(Runnable action) throws Exception {
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicReference<Throwable> failure = new AtomicReference<>();
-        Platform.runLater(() -> {
-            try {
-                action.run();
-            } catch (Throwable t) {
-                failure.set(t);
-            } finally {
-                latch.countDown();
-            }
-        });
-        assertTrue(latch.await(10, TimeUnit.SECONDS));
-        if (failure.get() != null) {
-            throw new AssertionError(failure.get());
-        }
+        JavaFxTestSupport.runAndWait(action::run);
     }
 
     private static String describeNodeTree(Node node, String indent) {
