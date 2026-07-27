@@ -1,6 +1,8 @@
 package com.shale.core.service;
 
+import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +15,12 @@ import java.util.Optional;
 public interface NotificationServicePort {
 
 	List<NotificationSummary> listUnreadNotifications(int shaleClientId, int userId);
+
+	NotificationPage listNotifications(int shaleClientId, int userId, NotificationCursor cursor, int limit);
+
+	int countUnreadNotifications(int shaleClientId, int userId);
+
+	Optional<NotificationActivationTarget> findActivationTarget(int shaleClientId, int userId, long notificationId);
 
 	void markRead(int shaleClientId, int userId, long notificationId);
 
@@ -36,6 +44,50 @@ public interface NotificationServicePort {
 			String title,
 			String body,
 			Instant createdAt) {
+	}
+
+	record NotificationCursor(String value) {
+		public NotificationCursor {
+			value = value == null ? "" : value.trim();
+			if (!value.isEmpty()) {
+				try {
+					byte[] decoded = Base64.getUrlDecoder().decode(value);
+					if (decoded.length != Long.BYTES || ByteBuffer.wrap(decoded).getLong() < 0) {
+						throw new IllegalArgumentException("Invalid notification cursor.");
+					}
+				} catch (IllegalArgumentException ex) {
+					throw new IllegalArgumentException("Invalid notification cursor.");
+				}
+			}
+		}
+
+		public static NotificationCursor start() {
+			return new NotificationCursor("");
+		}
+
+		public static NotificationCursor after(long notificationId) {
+			if (notificationId < 0) throw new IllegalArgumentException("notificationId must not be negative");
+			return new NotificationCursor(Base64.getUrlEncoder().withoutPadding()
+					.encodeToString(ByteBuffer.allocate(Long.BYTES).putLong(notificationId).array()));
+		}
+
+		public long afterNotificationId() {
+			return value.isEmpty() ? 0 : ByteBuffer.wrap(Base64.getUrlDecoder().decode(value)).getLong();
+		}
+	}
+
+	record NotificationPage(List<NotificationSummary> items, NotificationCursor nextCursor, boolean hasMore) {
+		public NotificationPage {
+			items = List.copyOf(items);
+		}
+	}
+
+	record NotificationActivationTarget(
+			long notificationId,
+			String entityType,
+			long entityId,
+			Long parentCaseId,
+			String actionType) {
 	}
 
 	record TaskNotificationCommand(
