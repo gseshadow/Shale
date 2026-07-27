@@ -43,6 +43,7 @@ import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.CaseExportService;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
@@ -578,7 +579,8 @@ public final class SceneManager {
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase);
+			c.init(appState, runtimeBridge, caseDao, caseTaskService,
+					new CaseExportService(caseDao, appState, phiReadAuditService), onOpenCase);
 			return c;
 		});
 	}
@@ -617,7 +619,8 @@ public final class SceneManager {
 		return load("/fxml/reports.fxml", controller ->
 		{
 			ReportsController c = (ReportsController) controller;
-			c.init(appState, new CaseDao(dbSessionProvider));
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			c.init(appState, caseDao, new CaseExportService(caseDao, appState, phiReadAuditService));
 			return c;
 		});
 	}
