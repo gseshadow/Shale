@@ -83,7 +83,7 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(c.contains("removeRequestedFrom.setVisible(v!=null)"));
         assertTrue(c.contains("applyNewRequestStageSize(stage,(Region)stage.getScene().getRoot())"));
         assertTrue(d.contains("results.setPrefHeight(420)"));
-        assertTrue(d.contains("results.setMinHeight(300)"));
+        assertTrue(d.contains("results.setMinHeight(0)"));
         assertTrue(d.contains("VBox.setVgrow(results, Priority.ALWAYS)"));
         assertTrue(d.contains("applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box)"));
         assertTrue(d.contains("WindowSizingUtil.sizeModalStage(stage, owner, prefWidth, prefHeight, minWidth, minHeight)"));
@@ -98,7 +98,7 @@ final class RequestedFromWorkflowDialogTest {
 
     @Test void workflowSizingUpdatesActualStageAfterContentIsInstalled() throws Exception {
         String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
-        int renderContent = d.indexOf("box.getChildren().addAll(search, status, results)");
+        int renderContent = d.indexOf("box.getChildren().addAll(caseSection,allSection)");
         int sizing = d.indexOf("applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box)");
         int helper = d.indexOf("static void applyWorkflowScreenSizing");
         assertTrue(renderContent >= 0 && sizing > renderContent);
@@ -111,6 +111,61 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(d.contains("pane.resize(stage.getWidth(), stage.getHeight())"));
         assertTrue(d.contains("WindowSizingUtil.constrainToVisualBounds(stage, owner)"));
         assertTrue(d.contains("dialog.setOnShown(e -> applyWorkflowScreenSizing"));
+    }
+
+    @Test void footerRemainsOutsideAConstrainedScrollableContentRegion() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        int buttons = d.indexOf("dialog.getDialogPane().getButtonTypes().addAll(backType, addType, ButtonType.CANCEL)");
+        int contentRoot = d.indexOf("BorderPane contentRegion = new BorderPane()");
+        int installContent = d.indexOf("dialog.getDialogPane().setContent(contentRegion)");
+        assertTrue(buttons >= 0 && contentRoot > buttons && installContent > contentRoot);
+        assertTrue(d.contains("contentRegion.setCenter(box)"));
+        assertTrue(d.contains("contentRegion.setMinSize(0,0)"));
+        assertTrue(d.contains("box.setPadding(new Insets(18,18,12,18))"));
+        assertTrue(d.contains("box.setMinHeight(0)"));
+        assertTrue(d.contains("allSection.setMinHeight(0)"));
+        assertTrue(d.contains("results.setMinHeight(0)"));
+        assertTrue(d.contains("adaptiveCasePartyScrollPane(caseResults, 180)"));
+        assertFalse(d.contains("box.getChildren().addAll(caseSection,allSection,back"));
+    }
+
+    @Test void allSectionFollowsTheCompleteAdaptivelySizedCasePartySection() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        int caseSection = d.indexOf("VBox caseSection=new VBox(8,caseHeading,caseResultsScroll)");
+        int allSection = d.indexOf("VBox allSection=new VBox(8,allHeading,search,status,results)");
+        int normalOrder = d.indexOf("box.getChildren().addAll(caseSection,allSection)");
+        assertTrue(caseSection >= 0 && allSection > caseSection && normalOrder > allSection);
+        assertTrue(d.contains("content.prefHeight(width)+12"));
+        assertTrue(d.contains("scroll.viewportBoundsProperty().addListener"));
+        assertTrue(d.contains("scroll.setMinHeight(Region.USE_PREF_SIZE)"));
+        assertFalse(d.contains("caseResultsScroll.setPrefHeight("));
+        assertFalse(d.contains("caseResultsScroll.setMinHeight("));
+        assertFalse(d.contains("caseResultsScroll.setMaxHeight("));
+    }
+
+    @Test void casePartySectionsAreSingleSelectDeduplicatedAndShareDirectorySelectionState() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        String c = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
+        assertTrue(d.contains("Case Contacts"));
+        assertTrue(d.contains("Case Organizations"));
+        assertTrue(d.contains("All Contacts"));
+        assertTrue(d.contains("All Organizations"));
+        assertTrue(d.indexOf("caseSection,allSection") > 0);
+        assertTrue(d.contains("unique.putIfAbsent(r.entityId()"));
+        assertTrue(d.contains("state.selected=option"));
+        assertTrue(d.contains("selectDirectoryMatch(results,option)"));
+        assertTrue(d.contains("sameEntity(state.selected,option)"));
+        assertFalse(d.contains("MultipleSelectionModel"));
+        assertTrue(d.contains("No available Case "));
+        assertTrue(c.contains("listRequestedFromCaseParties(cid(),tenant())"));
+    }
+
+    @Test void casePartyLoadIsAsyncAndClosedDialogsRejectStaleSuccessAndFailure() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        assertTrue(d.contains("Task<DirectoryData>"));
+        assertTrue(d.contains("dialog.setOnHidden(e -> open.set(false))"));
+        assertEquals(2, d.split("if\\(!open.get\\(\\)\\)return", -1).length - 1);
+        assertTrue(d.contains("task.setOnFailed"));
     }
 
     @Test void normalAddPartyStillUsesLinkableCandidatesAndCasePartyFields() throws Exception {

@@ -14,6 +14,7 @@ import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
+import com.shale.core.dto.CasePartyEntityOptionDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.PracticeAreaDto;
 
@@ -82,6 +83,7 @@ public interface CaseServicePort {
 	default List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { throw unsupportedCaseLinkOperation("searchCaseLinkShareContacts"); }
 	default List<CaseLinkContactOptionDto> listCaseLinkShareContacts(int shaleClientId) { throw unsupportedCaseLinkOperation("listCaseLinkShareContacts"); }
 	default List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int shaleClientId) { throw unsupportedCaseLinkOperation("listCaseLinkShareCaseContacts"); }
+	default List<CasePartyEntityOptionDto> listRequestedFromCaseParties(long caseId, int shaleClientId) { throw unsupportedCaseLinkOperation("listRequestedFromCaseParties"); }
 
 	default List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) { throw unsupportedCaseLinkOperation("listCaseLinkShares"); }
 
