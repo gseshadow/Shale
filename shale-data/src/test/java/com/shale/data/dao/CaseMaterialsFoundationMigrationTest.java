@@ -22,6 +22,7 @@ final class CaseMaterialsFoundationMigrationTest {
     void schemaIncludesKeysConstraintsIndexesRowVersionsAndSoftDeleteColumns() throws Exception {
         String sql = read(MIGRATION);
         for (String token : new String[]{"PK_MaterialTypes", "PK_MaterialRequests", "PK_MaterialRequestFollowUps", "PK_MaterialItems", "RowVer rowversion NOT NULL", "IsDeleted bit NOT NULL", "DeletedAt datetime2 NULL", "DeletedByUserId int NULL", "UX_MaterialTypes_ShaleClientId_SystemKey_NonNull", "IX_MaterialRequests_Case_Active", "IX_MaterialRequests_Assignee_Open", "IX_MaterialRequests_Type_Status", "IX_MaterialRequestFollowUps_Request_Chronology", "IX_MaterialItems_Case_Active", "IX_MaterialItems_Request", "IX_MaterialItems_Type", "IX_MaterialItems_ExternalLink", "CK_MaterialRequests_Method", "CK_MaterialRequests_Status", "CK_MaterialRequests_Source", "CK_MaterialRequests_Closure", "CK_MaterialItems_Format", "CK_MaterialItems_Completeness", "CK_MaterialItems_CustodyStatus"}) assertContains(sql, token);
+        assertContains(sql, "CONSTRAINT CK_MaterialRequests_Closure CHECK ((Status IN ('CLOSED','CANCELLED') AND ClosedAt IS NOT NULL AND ClosedByUserId IS NOT NULL AND ClosureReason IS NOT NULL) OR (Status NOT IN ('CLOSED','CANCELLED') AND ClosedAt IS NULL AND ClosedByUserId IS NULL AND ClosureReason IS NULL))");
     }
 
     @Test
