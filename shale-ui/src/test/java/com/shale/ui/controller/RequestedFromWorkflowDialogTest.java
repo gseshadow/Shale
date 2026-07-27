@@ -98,7 +98,7 @@ final class RequestedFromWorkflowDialogTest {
 
     @Test void workflowSizingUpdatesActualStageAfterContentIsInstalled() throws Exception {
         String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
-        int renderContent = d.indexOf("box.getChildren().addAll(search, status, results)");
+        int renderContent = d.indexOf("box.getChildren().addAll(caseSection,allSection)");
         int sizing = d.indexOf("applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box)");
         int helper = d.indexOf("static void applyWorkflowScreenSizing");
         assertTrue(renderContent >= 0 && sizing > renderContent);
@@ -111,6 +111,31 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(d.contains("pane.resize(stage.getWidth(), stage.getHeight())"));
         assertTrue(d.contains("WindowSizingUtil.constrainToVisualBounds(stage, owner)"));
         assertTrue(d.contains("dialog.setOnShown(e -> applyWorkflowScreenSizing"));
+    }
+
+    @Test void casePartySectionsAreSingleSelectDeduplicatedAndShareDirectorySelectionState() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        String c = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
+        assertTrue(d.contains("Case Contacts"));
+        assertTrue(d.contains("Case Organizations"));
+        assertTrue(d.contains("All Contacts"));
+        assertTrue(d.contains("All Organizations"));
+        assertTrue(d.indexOf("caseSection,allSection") > 0);
+        assertTrue(d.contains("unique.putIfAbsent(r.entityId()"));
+        assertTrue(d.contains("state.selected=option"));
+        assertTrue(d.contains("selectDirectoryMatch(results,option)"));
+        assertTrue(d.contains("sameEntity(state.selected,option)"));
+        assertFalse(d.contains("MultipleSelectionModel"));
+        assertTrue(d.contains("No available Case "));
+        assertTrue(c.contains("listRequestedFromCaseParties(cid(),tenant())"));
+    }
+
+    @Test void casePartyLoadIsAsyncAndClosedDialogsRejectStaleSuccessAndFailure() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        assertTrue(d.contains("Task<DirectoryData>"));
+        assertTrue(d.contains("dialog.setOnHidden(e -> open.set(false))"));
+        assertEquals(2, d.split("if\\(!open.get\\(\\)\\)return", -1).length - 1);
+        assertTrue(d.contains("task.setOnFailed"));
     }
 
     @Test void normalAddPartyStillUsesLinkableCandidatesAndCasePartyFields() throws Exception {

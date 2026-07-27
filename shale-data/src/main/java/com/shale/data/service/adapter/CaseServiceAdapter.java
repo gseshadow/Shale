@@ -16,6 +16,7 @@ import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
+import com.shale.core.dto.CasePartyEntityOptionDto;
 import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.LinkTypeDto;
@@ -385,6 +386,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public List<CasePartyEntityOptionDto> listRequestedFromCaseParties(long caseId, int shaleClientId) {
+		return caseGateway.listRequestedFromCaseParties(caseId, shaleClientId);
+	}
+
+	@Override
 	public List<CaseLinkShareDto> listCaseLinkShares(long caseId, long caseLinkId, int shaleClientId) {
 		return caseGateway.listCaseLinkShares(caseId, caseLinkId, shaleClientId);
 	}
@@ -622,6 +628,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		default List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { throw unsupportedCaseLinkGatewayOperation("searchCaseLinkShareContacts"); }
 		default List<CaseLinkContactOptionDto> listCaseLinkShareContacts(int shaleClientId) { throw unsupportedCaseLinkGatewayOperation("listCaseLinkShareContacts"); }
 		default List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int shaleClientId) { throw unsupportedCaseLinkGatewayOperation("listCaseLinkShareCaseContacts"); }
+		default List<CasePartyEntityOptionDto> listRequestedFromCaseParties(long caseId, int shaleClientId) { throw unsupportedCaseLinkGatewayOperation("listRequestedFromCaseParties"); }
 		CaseLinkDto setPrimaryCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId);
 		List<CaseLinkDto> reorderCaseLinks(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds);
 		void deleteCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer);
@@ -784,6 +791,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override public List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int shaleClientId, String query, int limit) { return caseDao.searchCaseLinkShareContacts(shaleClientId, query, limit); }
 		@Override public List<CaseLinkContactOptionDto> listCaseLinkShareContacts(int shaleClientId) { return caseDao.listCaseLinkShareContacts(shaleClientId); }
 		@Override public List<CaseLinkContactOptionDto> listCaseLinkShareCaseContacts(long caseId, int shaleClientId) { return caseDao.listCaseLinkShareCaseContacts(caseId, shaleClientId); }
+		@Override public List<CasePartyEntityOptionDto> listRequestedFromCaseParties(long caseId, int shaleClientId) { return caseDao.listRequestedFromCaseParties(caseId, shaleClientId); }
 		@Override public CaseLinkDto setPrimaryCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId) { return caseDao.setPrimaryCaseLink(shaleClientId, actorUserId, caseId, caseLinkId); }
 		@Override public List<CaseLinkDto> reorderCaseLinks(int shaleClientId, int actorUserId, long caseId, List<Long> orderedCaseLinkIds) { return caseDao.reorderCaseLinks(shaleClientId, actorUserId, caseId, orderedCaseLinkIds); }
 		@Override public void deleteCaseLink(int shaleClientId, int actorUserId, long caseId, long caseLinkId, byte[] expectedCaseLinkRowVer) { caseDao.deleteCaseLink(shaleClientId, actorUserId, caseId, caseLinkId, expectedCaseLinkRowVer); }
