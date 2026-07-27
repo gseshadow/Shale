@@ -16,7 +16,7 @@ set DIST=%ROOT%\dist
 set STORAGE_ACCOUNT=shalestorage
 set CONTAINER=$web
 
-set EXE_FILE=%DIST%\Shale-%VERSION%.exe
+set EXE_FILE=%DIST%\Shale-%VERSION%.msi
 set ZIP_FILE=%DIST%\ShaleApp-%VERSION%.zip
 set MAC_ZIP_FILE=%DIST%\ShaleApp-%VERSION%-mac.zip
 set JSON_FILE=%DIST%\shale-stable.json
@@ -44,7 +44,7 @@ call az account show || exit /b 1
 echo.
 
 echo Uploading installer...
-call az storage blob upload --account-name "%STORAGE_ACCOUNT%" --container-name "%CONTAINER%" --name "Shale-%VERSION%.exe" --file "%EXE_FILE%" --overwrite true --auth-mode login --no-progress --only-show-errors --output none || exit /b 1
+call az storage blob upload --account-name "%STORAGE_ACCOUNT%" --container-name "%CONTAINER%" --name "Shale-%VERSION%.msi" --file "%EXE_FILE%" --overwrite true --auth-mode login --no-progress --only-show-errors --output none || exit /b 1
 echo Installer uploaded.
 echo.
 
@@ -76,7 +76,7 @@ powershell -NoProfile -Command ^
   "$acct='%STORAGE_ACCOUNT%';" ^
   "$container='%CONTAINER%';" ^
   "$blobs = az storage blob list --account-name $acct --container-name $container --auth-mode login | ConvertFrom-Json;" ^
-  "$installers = $blobs | Where-Object { $_.name -match '^Shale-\d+\.\d+\.\d+\.exe$' } | Sort-Object lastModified -Descending;" ^
+  "$installers = $blobs | Where-Object { $_.name -match '^Shale-\d+\.\d+\.\d+\.msi$' } | Sort-Object lastModified -Descending;" ^
   "$winZips    = $blobs | Where-Object { $_.name -match '^ShaleApp-\d+\.\d+\.\d+\.zip$' } | Sort-Object lastModified -Descending;" ^
   "$macZips    = $blobs | Where-Object { $_.name -match '^ShaleApp-\d+\.\d+\.\d+-mac\.zip$' } | Sort-Object lastModified -Descending;" ^
   "$installers | Select-Object -Skip 2 | ForEach-Object { Write-Host ('Deleting ' + $_.name); az storage blob delete --account-name $acct --container-name $container --name $_.name --auth-mode login --only-show-errors --output none | Out-Null };" ^

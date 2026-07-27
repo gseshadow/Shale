@@ -125,7 +125,7 @@ echo Release %VERSION% complete
 echo ====================================
 echo.
 echo Files ready to upload:
-echo %DIST%\Shale-%VERSION%.exe
+echo %DIST%\Shale-%VERSION%.msi
 echo %DIST%\ShaleApp-%VERSION%.zip
 if not "!MAC_ZIP_NAME!"=="" echo %DIST%\!MAC_ZIP_NAME!
 echo %DIST%\shale-stable.json
