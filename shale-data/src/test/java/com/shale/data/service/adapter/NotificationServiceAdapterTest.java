@@ -47,7 +47,7 @@ class NotificationServiceAdapterTest {
 
 		assertEquals(42, gateway.lastListShaleClientId);
 		assertEquals(7, gateway.lastListUserId);
-		assertEquals(List.of(new NotificationSummary(9, 42, 7, "TASK", "Assigned", "Task assigned", createdAt)), summaries);
+		assertEquals(List.of(new NotificationSummary(9, 42, 7, "TASK", "Assigned", "Task assigned", createdAt, false, "TASK")), summaries);
 	}
 
 	@Test
@@ -89,10 +89,12 @@ class NotificationServiceAdapterTest {
 		assertEquals(12,page.items().get(0).id()); assertEquals(12,page.nextCursor().afterNotificationId());
 		assertEquals(4,adapter.countUnreadNotifications(41,31));
 		assertEquals(99,adapter.findActivationTarget(41,31,12).orElseThrow().entityId());
+		assertEquals(101, adapter.notificationHighWaterMark(41, 31));
 		assertEquals(41,gateway.newTenant); assertEquals(31,gateway.newUser); assertEquals(12,gateway.activationId);
 	}
 
 	private static final class FakeNotificationGateway implements NotificationServiceAdapter.NotificationGateway {
+		@Override public long notificationHighWaterMark(int shaleClientId, int userId) { return 101; }
 		private final List<NotificationDao.NotificationRow> rows;
 		private int lastListShaleClientId;
 		private int lastListUserId;

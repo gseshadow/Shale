@@ -230,7 +230,7 @@ public final class NotificationDao {
 		if (shaleClientId <= 0 || userId <= 0 || afterNotificationId < 0) return new NotificationPageRow(List.of(), false);
 		int limit = Math.max(1, Math.min(requestedLimit, 100));
 		String sql = """
-				SELECT TOP (?) n.Id,n.Category,n.Title,n.Message,n.CreatedAt
+				SELECT TOP (?) n.Id,n.Category,n.Title,n.Message,n.CreatedAt,n.IsRead,n.EntityType
 				FROM dbo.Notifications n
 				WHERE n.ShaleClientId=? AND n.UserId=? AND n.Id>?
 				  AND ISNULL(n.IsDismissed,0)=0
@@ -241,12 +241,24 @@ public final class NotificationDao {
 			ps.setInt(1, limit + 1); ps.setInt(2, shaleClientId); ps.setInt(3, userId); ps.setLong(4, afterNotificationId);
 			try (ResultSet rs=ps.executeQuery()) {
 				List<NotificationCursorRow> rows=new ArrayList<>();
-				while(rs.next()) rows.add(new NotificationCursorRow(rs.getLong("Id"),rs.getString("Category"),rs.getString("Title"),rs.getString("Message"),toInstant(rs.getTimestamp("CreatedAt"))));
+				while(rs.next()) rows.add(new NotificationCursorRow(rs.getLong("Id"),rs.getString("Category"),rs.getString("Title"),rs.getString("Message"),toInstant(rs.getTimestamp("CreatedAt")),rs.getBoolean("IsRead"),rs.getString("EntityType")));
 				boolean more=rows.size()>limit;
 				if(more) rows=new ArrayList<>(rows.subList(0,limit));
 				return new NotificationPageRow(List.copyOf(rows),more);
 			}
 		} catch(SQLException e){throw new RuntimeException("Failed to list notifications",e);}
+	}
+
+	public long notificationHighWaterMark(int shaleClientId, int userId) {
+		if (shaleClientId <= 0 || userId <= 0) return 0;
+		String sql = "SELECT COALESCE(MAX(n.Id),0) FROM dbo.Notifications n WHERE n.ShaleClientId=? AND n.UserId=?";
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			ps.setInt(2, userId);
+			try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getLong(1) : 0; }
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to read notification high-water mark", e);
+		}
 	}
 
 	public java.util.Optional<NotificationActivationRow> findActivationTarget(int shaleClientId,int userId,long notificationId) {
@@ -573,7 +585,11 @@ public final class NotificationDao {
 			String eventKey) {
 	}
 
-	public record NotificationCursorRow(long id,String category,String title,String message,Instant createdAt) {}
+	public record NotificationCursorRow(long id,String category,String title,String message,Instant createdAt,boolean read,String entityType) {
+		public NotificationCursorRow(long id,String category,String title,String message,Instant createdAt) {
+			this(id, category, title, message, createdAt, false, null);
+		}
+	}
 	public record NotificationPageRow(List<NotificationCursorRow> items,boolean hasMore) {}
 	public record NotificationActivationRow(long notificationId,String entityType,long entityId,Long parentCaseId,String actionType) {}
 }

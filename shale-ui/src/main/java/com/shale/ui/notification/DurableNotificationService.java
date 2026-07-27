@@ -3,6 +3,7 @@ package com.shale.ui.notification;
 import com.shale.ui.util.PerfLog;
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.NotificationDao.NotificationRow;
+import com.shale.core.service.NotificationServicePort.NotificationSummary;
 import com.shale.ui.privacy.PhiFieldRegistry;
 import com.shale.ui.state.AppState;
 
@@ -77,6 +78,20 @@ public final class DurableNotificationService {
 			return;
 		}
 		notificationCenterService.pushNotifications(notifications);
+	}
+
+	/** Maps a cursor result for incremental reconciliation without mutating durable state. */
+	public AppNotification fromSummary(NotificationSummary row) {
+		NotificationCategory category = parseCategory(row.category());
+		if (!isEnabled(category, null)) return null;
+		return new AppNotification("db-" + row.id(), category, NotificationSeverity.INFO,
+				Objects.toString(row.title(), "Notification"), Objects.toString(row.body(), ""),
+				row.createdAt(), !row.read(), false, NotificationTargetScope.USER_SCOPED,
+				row.id(), null);
+	}
+
+	public boolean isPresentationEnabled(NotificationSummary row) {
+		return row != null && isEnabled(parseCategory(row.category()), null);
 	}
 
 	public void markRead(List<AppNotification> notifications) {

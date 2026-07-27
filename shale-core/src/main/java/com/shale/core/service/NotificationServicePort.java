@@ -18,6 +18,9 @@ public interface NotificationServicePort {
 
 	NotificationPage listNotifications(int shaleClientId, int userId, NotificationCursor cursor, int limit);
 
+	/** Returns the greatest durable id currently visible to this tenant/user, or zero. */
+	long notificationHighWaterMark(int shaleClientId, int userId);
+
 	int countUnreadNotifications(int shaleClientId, int userId);
 
 	Optional<NotificationActivationTarget> findActivationTarget(int shaleClientId, int userId, long notificationId);
@@ -43,7 +46,13 @@ public interface NotificationServicePort {
 			String category,
 			String title,
 			String body,
-			Instant createdAt) {
+			Instant createdAt,
+			boolean read,
+			String entityType) {
+		public NotificationSummary(long id, int shaleClientId, int userId, String category,
+				String title, String body, Instant createdAt) {
+			this(id, shaleClientId, userId, category, title, body, createdAt, false, null);
+		}
 	}
 
 	record NotificationCursor(String value) {

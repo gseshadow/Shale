@@ -76,4 +76,8 @@ public final class SceneRouter {
 	public void close() {
 		stage.close();
 	}
+
+	public void shutdown() {
+		sceneManager.shutdown();
+	}
 }
