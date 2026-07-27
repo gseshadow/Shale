@@ -41,14 +41,14 @@ public interface MaterialRequestServicePort {
                                         Integer requestedFromOrganizationId, String requestedFromText,
                                         String requestMethod, String status, int requestedByUserId,
                                         Integer assignedToUserId, LocalDateTime requestedAt,
-                                        LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt) {}
+                                        LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays) {}
 
     record UpdateMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, int materialTypeId,
                                         String title, String description, Integer requestedFromContactId,
                                         Integer requestedFromOrganizationId, String requestedFromText,
                                         String requestMethod, String status, int requestedByUserId,
                                         Integer assignedToUserId, LocalDateTime requestedAt, LocalDate relevantStartDate,
-                                        LocalDate relevantEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt,
+                                        LocalDate relevantEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays,
                                         LocalDateTime firstReceivedAt, LocalDateTime fullyReceivedAt, LocalDateTime closedAt,
                                         Integer closedByUserId, String closureReason, String notes, byte[] rowVer) {}
 }

@@ -96,7 +96,7 @@ final class MaterialRequestDaoPhase2ContractTest {
     @Test void scopeGuardsNoMaterialItemApplicationOrUiApiStorage() {
         assertFalse(DAO.contains("MaterialItemDao"));
         assertFalse(DAO.contains("CaseTimeline"));
-        assertFalse(DAO.contains("Notification"));
+        assertTrue(DAO.contains("NotificationDao")); // established Material Request notification integration
         assertFalse(DAO.contains("ExternalLinks"));
         assertFalse(DAO.contains("Calendar"));
         assertTrue(MaterialRequestFollowUpDto.class.isRecord());

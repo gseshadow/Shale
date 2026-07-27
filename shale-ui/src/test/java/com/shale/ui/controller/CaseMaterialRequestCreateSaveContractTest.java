@@ -40,8 +40,9 @@ final class CaseMaterialRequestCreateSaveContractTest {
         String c = Files.readString(CONTROLLER);
         assertTrue(c.contains("defaultRequestedAt()"));
         assertTrue(c.contains("private LocalDateTime defaultRequestedAt(){ return LocalDateTime.now(); }"));
-        assertTrue(c.contains("null,nextFollowUpAtFromInterval(followUpInterval)"));
-        assertTrue(c.contains("private LocalDateTime nextFollowUpAtFromInterval(String followUpInterval){ return null; }"));
+        assertTrue(c.contains("configureFollowUpInterval(followUpInterval)"));
+        assertTrue(c.contains("intervalDays(followUpInterval)"));
+        assertTrue(c.contains("Calculated when saved"));
         assertFalse(c.contains("DatePicker requestedAt"));
         assertFalse(c.contains("DatePicker dueAt"));
         assertFalse(c.contains("DatePicker nextFollowUpAt"));
@@ -51,7 +52,7 @@ final class CaseMaterialRequestCreateSaveContractTest {
     @Test
     void createCommandContainsDialogFieldsAndNullableDates() throws Exception {
         String p = Files.readString(PORT);
-        for (String field : new String[]{"materialTypeId", "title", "description", "requestedFromContactId", "requestedFromOrganizationId", "requestedFromText", "requestMethod", "status", "requestedByUserId", "assignedToUserId", "requestedAt", "expectedResponseDate", "nextFollowUpAt"}) {
+        for (String field : new String[]{"materialTypeId", "title", "description", "requestedFromContactId", "requestedFromOrganizationId", "requestedFromText", "requestMethod", "status", "requestedByUserId", "assignedToUserId", "requestedAt", "expectedResponseDate", "nextFollowUpAt", "followUpIntervalDays"}) {
             assertTrue(p.contains(field), field);
         }
     }
