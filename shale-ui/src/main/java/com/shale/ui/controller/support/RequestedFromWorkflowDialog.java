@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -43,6 +44,28 @@ public final class RequestedFromWorkflowDialog {
     }
 
     private RequestedFromWorkflowDialog() {}
+
+    /** The shared select-existing layout used for both entity types and both callers. */
+    static final class SelectionLayout {
+        final VBox root;
+        final VBox caseSection;
+        final Label caseHeading;
+        final VBox directorySection;
+        final Label directoryHeading;
+        final TextField search;
+        final ListView<?> results;
+
+        SelectionLayout(VBox root, VBox caseSection, Label caseHeading, VBox directorySection,
+                        Label directoryHeading, TextField search, ListView<?> results) {
+            this.root = root;
+            this.caseSection = caseSection;
+            this.caseHeading = caseHeading;
+            this.directorySection = directorySection;
+            this.directoryHeading = directoryHeading;
+            this.search = search;
+            this.results = results;
+        }
+    }
 
     public static Selection show(Window owner, Supplier<DirectoryData> directoryLoader, Executor executor) {
         class State { int step=1; String mode; String entityType; boolean loading; EntityOption selected; DirectoryData data = new DirectoryData(List.of(), List.of(), List.of(), List.of()); }
@@ -70,6 +93,7 @@ public final class RequestedFromWorkflowDialog {
         ListView<EntityOption> results = new ListView<>(); results.setPrefHeight(420); results.setMinHeight(0); results.getStyleClass().addAll("app-dialog-list", "requested-from-results"); VBox.setVgrow(results, Priority.ALWAYS);
         FlowPane caseResults = new FlowPane(8, 8); caseResults.getStyleClass().add("case-link-share-selection-flow"); caseResults.setPrefWrapLength(700);
         ScrollPane caseResultsScroll = adaptiveCasePartyScrollPane(caseResults, 180); caseResultsScroll.getStyleClass().add("case-link-case-contacts-scroll");
+        AtomicReference<SelectionLayout> selectionLayout = new AtomicReference<>();
         ContactCardFactory contactCards = new ContactCardFactory(id -> {});
         OrganizationCardFactory organizationCards = new OrganizationCardFactory(id -> {});
         results.setCellFactory(lv -> new ListCell<>() { @Override protected void updateItem(EntityOption item, boolean empty) { super.updateItem(item, empty); setText(null); if (empty || item == null) { setGraphic(null); return; } Node card = "contact".equals(item.entityType())
@@ -84,14 +108,16 @@ public final class RequestedFromWorkflowDialog {
         renderCaseParties[0] = () -> {
             caseResults.getChildren().clear();
             List<EntityOption> options = caseOptions(state.data.caseParties(), state.entityType);
-            if (options.isEmpty()) { Label empty=new Label("No available Case " + ("contact".equals(state.entityType)?"Contacts.":"Organizations.")); empty.getStyleClass().add("search-summary-text"); caseResults.getChildren().add(empty); return; }
+            SelectionLayout layout = selectionLayout.get();
+            if (layout != null) setCaseSectionVisible(layout, !options.isEmpty());
+            if (options.isEmpty()) return;
             for (EntityOption option : options) caseResults.getChildren().add(selectableCaseCard(option, sameEntity(state.selected,option), () -> { state.selected=option; selectDirectoryMatch(results,option); renderCaseParties[0].run(); add.setDisable(false); }));
         };
         Runnable filter = () -> { if (!"select".equals(state.mode) || state.entityType == null) return; String q = safe(search.getText()).toLowerCase(Locale.ROOT); List<EntityOption> opts = ("contact".equals(state.entityType) ? state.data.contacts().stream().map(c -> new EntityOption("contact", (long)c.id(), label(c), c.email(), c.phone(), null)) : state.data.organizations().stream().map(o -> new EntityOption("organization", (long)o.id(), safe(o.name()).isBlank()?"Organization #"+o.id():o.name(), null, null, o.organizationTypeName()))).filter(o -> q.isBlank() || haystack(o).contains(q)).toList(); results.getItems().setAll(opts); status.setText(opts.isEmpty() ? (q.isBlank()?"No " + state.entityType + "s exist.":"No records match the search.") : ""); };
         Runnable[] render = new Runnable[1];
         render[0] = () -> { box.getChildren().setAll(title, subtitle); add.setVisible(state.step==3); add.setManaged(state.step==3); back.setVisible(state.step>1); back.setManaged(state.step>1); add.setDisable(true); if(state.step==1){title.setText("Select Existing or Create New"); subtitle.setText("Choose how to add Requested From."); Button s=new Button("Select Existing"), c=new Button("Create New"); PartyAddWorkflowDialog.applySharedDialogButtonStyle(s,true); PartyAddWorkflowDialog.applySharedDialogButtonStyle(c,true); s.setMinWidth(200); c.setMinWidth(200); s.setOnAction(e->{state.mode="select";state.step=2;render[0].run();}); c.setOnAction(e->{state.mode="create";state.step=2;render[0].run();}); HBox h=new HBox(14,s,c);h.setAlignment(Pos.CENTER);box.getChildren().add(h);}
             else if(state.step==2){title.setText("Contact or Organization"); subtitle.setText("Choose the Requested From type."); Button c=new Button("Contact"), o=new Button("Organization"); PartyAddWorkflowDialog.applySharedDialogButtonStyle(c,true); PartyAddWorkflowDialog.applySharedDialogButtonStyle(o,true); c.setMinWidth(200); o.setMinWidth(200); c.setOnAction(e->{state.entityType="contact"; state.step=3; render[0].run();}); o.setOnAction(e->{state.entityType="organization"; state.step=3; render[0].run();}); HBox h=new HBox(14,c,o);h.setAlignment(Pos.CENTER);box.getChildren().add(h);}
-            else if("select".equals(state.mode)){title.setText("Select Existing " + ("contact".equals(state.entityType)?"Contact":"Organization")); subtitle.setText("Choose a case-associated entry or search the eligible tenant directory."); search.setPromptText("contact".equals(state.entityType)?"Search contacts":"Search organizations"); search.getStyleClass().add("app-dialog-search-field"); search.setMaxWidth(Double.MAX_VALUE); Label caseHeading=sectionHeading("contact".equals(state.entityType)?"Case Contacts":"Case Organizations"); VBox caseSection=new VBox(8,caseHeading,caseResultsScroll); caseSection.setMinHeight(0); caseSection.getStyleClass().addAll("case-link-dialog-section","shale-embedded-card-surface","requested-from-case-section"); Label allHeading=sectionHeading("contact".equals(state.entityType)?"All Contacts":"All Organizations"); VBox allSection=new VBox(8,allHeading,search,status,results); allSection.setMinHeight(0); allSection.getStyleClass().addAll("case-link-dialog-section","shale-embedded-card-surface","requested-from-all-section"); VBox.setVgrow(allSection,Priority.ALWAYS); VBox.setVgrow(results,Priority.ALWAYS); box.getChildren().addAll(caseSection,allSection); renderCaseParties[0].run(); filter.run(); add.setDisable(state.selected==null || state.loading);}
+            else if("select".equals(state.mode)){title.setText("Select Existing " + ("contact".equals(state.entityType)?"Contact":"Organization")); subtitle.setText("Choose a case-associated entry or search the eligible tenant directory."); search.setPromptText("contact".equals(state.entityType)?"Search contacts":"Search organizations"); search.getStyleClass().add("app-dialog-search-field"); search.setMaxWidth(Double.MAX_VALUE); SelectionLayout layout=buildSelectionLayout(state.entityType,caseResultsScroll,search,status,results); selectionLayout.set(layout); box.getChildren().add(layout.root); VBox.setVgrow(layout.root,Priority.ALWAYS); renderCaseParties[0].run(); filter.run(); add.setDisable(state.selected==null || state.loading);}
             else {title.setText("Create New " + ("contact".equals(state.entityType)?"Contact":"Organization")); subtitle.setText("Enter Requested From details."); javafx.scene.layout.GridPane g=new javafx.scene.layout.GridPane(); g.setHgap(10); g.setVgap(10); if("contact".equals(state.entityType)){g.add(new Label("First Name"),0,0); g.add(first,1,0); g.add(new Label("Last Name"),0,1); g.add(last,1,1);} else {orgType.getItems().setAll(state.data.organizationTypes()); if(orgType.getValue()==null&&!orgType.getItems().isEmpty())orgType.setValue(orgType.getItems().get(0)); g.add(new Label("Name"),0,0); g.add(orgName,1,0); g.add(new Label("Organization Type"),0,1); g.add(orgType,1,1);} g.setMinHeight("contact".equals(state.entityType)?190:220); g.setMaxWidth(Double.MAX_VALUE); first.setMaxWidth(Double.MAX_VALUE); last.setMaxWidth(Double.MAX_VALUE); orgName.setMaxWidth(Double.MAX_VALUE); orgType.setMaxWidth(Double.MAX_VALUE); box.getChildren().add(g); VBox.setVgrow(g, Priority.ALWAYS); add.setDisable(!createValid(state.entityType, first, last, orgName, orgType));}
             applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box); };
         search.textProperty().addListener((o,a,b)->{state.selected=null; results.getSelectionModel().clearSelection(); filter.run(); renderCaseParties[0].run(); add.setDisable(true);});
@@ -147,7 +173,29 @@ public final class RequestedFromWorkflowDialog {
     private static boolean sameEntity(EntityOption a,EntityOption b){return a!=null&&b!=null&&a.id().equals(b.id())&&a.entityType().equals(b.entityType());}
     private static void selectDirectoryMatch(ListView<EntityOption> results,EntityOption option){for(EntityOption row:results.getItems())if(sameEntity(row,option)){results.getSelectionModel().select(row);return;}results.getSelectionModel().clearSelection();}
     private static Label sectionHeading(String text){Label label=new Label(text);label.getStyleClass().add("section-heading");return label;}
-    private static ScrollPane adaptiveCasePartyScrollPane(FlowPane content,double maxHeight){ScrollPane scroll=new ScrollPane(content);scroll.setFitToWidth(true);scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);scroll.setMinHeight(Region.USE_PREF_SIZE);scroll.setMaxHeight(maxHeight);Runnable update=()->{double width=Math.max(160,scroll.getViewportBounds().getWidth());double height=Math.min(maxHeight,Math.max(42,content.prefHeight(width)+12));scroll.setPrefHeight(height);scroll.setVbarPolicy(height>=maxHeight-1?ScrollPane.ScrollBarPolicy.AS_NEEDED:ScrollPane.ScrollBarPolicy.NEVER);};content.layoutBoundsProperty().addListener((o,a,b)->update.run());scroll.viewportBoundsProperty().addListener((o,a,b)->update.run());Platform.runLater(update);return scroll;}
+    static SelectionLayout buildSelectionLayout(String entityType, ScrollPane caseResultsScroll, TextField search,
+                                                Label status, ListView<?> results) {
+        boolean contact = "contact".equals(entityType);
+        Label caseHeading = sectionHeading(contact ? "Case Contacts" : "Case Organizations");
+        VBox caseSection = new VBox(8, caseHeading, caseResultsScroll);
+        caseSection.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface", "requested-from-case-section");
+
+        Label directoryHeading = sectionHeading(contact ? "All Contacts" : "All Organizations");
+        VBox directorySection = new VBox(8, directoryHeading, search, status, results);
+        directorySection.setMinHeight(0);
+        directorySection.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface", "requested-from-all-section");
+        VBox.setVgrow(results, Priority.ALWAYS);
+
+        VBox root = new VBox(12, caseSection, directorySection);
+        root.setMinHeight(0);
+        VBox.setVgrow(directorySection, Priority.ALWAYS);
+        return new SelectionLayout(root, caseSection, caseHeading, directorySection, directoryHeading, search, results);
+    }
+    static void setCaseSectionVisible(SelectionLayout layout, boolean hasCaseEntries) {
+        layout.caseSection.setVisible(hasCaseEntries);
+        layout.caseSection.setManaged(hasCaseEntries);
+    }
+    static ScrollPane adaptiveCasePartyScrollPane(FlowPane content,double maxHeight){ScrollPane scroll=new ScrollPane(content);scroll.setFitToWidth(true);scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);scroll.setMinHeight(Region.USE_PREF_SIZE);scroll.setMaxHeight(maxHeight);Runnable update=()->{double width=Math.max(160,scroll.getViewportBounds().getWidth());double height=Math.min(maxHeight,Math.max(42,content.prefHeight(width)+12));scroll.setPrefHeight(height);scroll.setVbarPolicy(height>=maxHeight-1?ScrollPane.ScrollBarPolicy.AS_NEEDED:ScrollPane.ScrollBarPolicy.NEVER);};content.layoutBoundsProperty().addListener((o,a,b)->update.run());scroll.viewportBoundsProperty().addListener((o,a,b)->update.run());Platform.runLater(update);return scroll;}
     private static Node selectableCaseCard(EntityOption option,boolean selected,Runnable select){Node card="contact".equals(option.entityType())?new ContactCardFactory(id->{}).create(option.contactModel(),ContactCardFactory.Variant.MINI):new OrganizationCardFactory(id->{}).create(option.organizationModel(),OrganizationCardFactory.Variant.MINI);card.getStyleClass().addAll("shale-entity-card-selectable","case-link-selectable-contact-card","requested-from-case-card");if(selected)card.getStyleClass().add("case-link-selectable-contact-card-selected");StackPane wrapper=new StackPane(card);wrapper.getStyleClass().add("case-link-selectable-contact-wrapper");wrapper.setFocusTraversable(true);wrapper.setAccessibleText((selected?"Selected ":"Not selected ")+option.label());wrapper.setOnMouseClicked(e->{select.run();e.consume();});wrapper.setOnKeyPressed(e->{if(e.getCode()==javafx.scene.input.KeyCode.SPACE||e.getCode()==javafx.scene.input.KeyCode.ENTER){select.run();e.consume();}});return wrapper;}
 
     private static boolean createValid(String t, TextField f, TextField l, TextField o, ChoiceBox<OrganizationDao.OrganizationTypeRow> ot){return "contact".equals(t)?!safe(f.getText()).isBlank()||!safe(l.getText()).isBlank():!safe(o.getText()).isBlank()&&ot.getValue()!=null;}
