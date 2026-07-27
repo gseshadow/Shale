@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import com.shale.core.service.NotificationServicePort.NotificationSummary;
+import com.shale.core.service.NotificationServicePort.NotificationCursor;
 import com.shale.core.service.NotificationServicePort.TaskNotificationCommand;
 import com.shale.data.dao.NotificationDao;
 
@@ -78,6 +79,19 @@ class NotificationServiceAdapterTest {
 		assertTrue(id.isEmpty());
 	}
 
+	@Test void cursorCountAndActivationDelegate() {
+		FakeNotificationGateway gateway=new FakeNotificationGateway(List.of());
+		gateway.page=new NotificationDao.NotificationPageRow(List.of(new NotificationDao.NotificationCursorRow(12,"TASK","t","b",Instant.EPOCH)),false);
+		gateway.unreadCount=4;
+		gateway.activation=Optional.of(new NotificationDao.NotificationActivationRow(12,"Task",99,8L,"ASSIGNED"));
+		NotificationServiceAdapter adapter=new NotificationServiceAdapter(gateway);
+		var page=adapter.listNotifications(41,31,NotificationCursor.after(10),25);
+		assertEquals(12,page.items().get(0).id()); assertEquals(12,page.nextCursor().afterNotificationId());
+		assertEquals(4,adapter.countUnreadNotifications(41,31));
+		assertEquals(99,adapter.findActivationTarget(41,31,12).orElseThrow().entityId());
+		assertEquals(41,gateway.newTenant); assertEquals(31,gateway.newUser); assertEquals(12,gateway.activationId);
+	}
+
 	private static final class FakeNotificationGateway implements NotificationServiceAdapter.NotificationGateway {
 		private final List<NotificationDao.NotificationRow> rows;
 		private int lastListShaleClientId;
@@ -90,6 +104,9 @@ class NotificationServiceAdapterTest {
 		private long lastCreateEntityId;
 		private int lastCreateCreatedByUserId;
 		private String lastCreateEventKey;
+		private NotificationDao.NotificationPageRow page=new NotificationDao.NotificationPageRow(List.of(),false);
+		private int unreadCount,newTenant,newUser; private long activationId;
+		private Optional<NotificationDao.NotificationActivationRow> activation=Optional.empty();
 
 		private FakeNotificationGateway(List<NotificationDao.NotificationRow> rows) {
 			this.rows = rows;
@@ -101,6 +118,9 @@ class NotificationServiceAdapterTest {
 			lastListUserId = userId;
 			return rows;
 		}
+		@Override public NotificationDao.NotificationPageRow listNotificationsForUser(int tenant,int user,long after,int limit){newTenant=tenant;newUser=user;return page;}
+		@Override public int countUnreadNotificationsForUser(int tenant,int user){newTenant=tenant;newUser=user;return unreadCount;}
+		@Override public Optional<NotificationDao.NotificationActivationRow> findActivationTarget(int tenant,int user,long id){newTenant=tenant;newUser=user;activationId=id;return activation;}
 
 		@Override
 		public void markNotificationRead(int shaleClientId, int userId, long notificationId) {

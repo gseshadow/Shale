@@ -35,6 +35,9 @@ import com.shale.core.service.ContactServicePort.ContactDetail;
 import com.shale.core.service.ContactServicePort.ContactSummary;
 import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.NotificationServicePort.NotificationSummary;
+import com.shale.core.service.NotificationServicePort.NotificationCursor;
+import com.shale.core.service.NotificationServicePort.NotificationPage;
+import com.shale.core.service.NotificationServicePort.NotificationActivationTarget;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.OrganizationServicePort.OrganizationDetail;
 import com.shale.core.service.OrganizationServicePort.OrganizationSummary;
@@ -658,6 +661,43 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         return notificationServicePort.listUnreadNotifications(shaleClientId, userId);
+    }
+
+    @Operation(summary = "List notifications", description = "Returns a stable cursor page for the current authenticated user and tenant.")
+    @GetMapping("/api/notifications")
+    public NotificationPage notifications(
+            @RequestParam(name = "cursor", defaultValue = "") String cursor,
+            @RequestParam(name = "limit", defaultValue = "50") int limit) {
+        if (limit < 1 || limit > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be between 1 and 100.");
+        }
+        NotificationCursor parsedCursor;
+        try {
+            parsedCursor = new NotificationCursor(cursor);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cursor is invalid.");
+        }
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        return notificationServicePort.listNotifications(shaleClientId, userId, parsedCursor, limit);
+    }
+
+    @Operation(summary = "Count unread notifications", description = "Returns the unread count for the current authenticated user and tenant.")
+    @GetMapping("/api/notifications/unread-count")
+    public java.util.Map<String, Integer> unreadNotificationCount() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        return java.util.Map.of("count", notificationServicePort.countUnreadNotifications(shaleClientId, userId));
+    }
+
+    @Operation(summary = "Resolve a notification activation target", description = "Returns non-presentation routing identifiers for an owned active notification.")
+    @GetMapping("/api/notifications/{notificationId:\\d+}/activation-target")
+    public NotificationActivationTarget notificationActivationTarget(@PathVariable("notificationId") long notificationId) {
+        long safeId = ApiValidation.positiveId(notificationId, "notificationId");
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        return notificationServicePort.findActivationTarget(shaleClientId, userId, safeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found."));
     }
 
 

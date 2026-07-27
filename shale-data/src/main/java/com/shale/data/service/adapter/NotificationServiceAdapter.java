@@ -37,6 +37,28 @@ public final class NotificationServiceAdapter implements NotificationServicePort
 	}
 
 	@Override
+	public NotificationPage listNotifications(int shaleClientId, int userId, NotificationCursor cursor, int limit) {
+		Objects.requireNonNull(cursor, "cursor");
+		NotificationDao.NotificationPageRow page = notificationGateway.listNotificationsForUser(
+				shaleClientId, userId, cursor.afterNotificationId(), limit);
+		List<NotificationSummary> items = page.items().stream().map(row -> new NotificationSummary(
+				row.id(), shaleClientId, userId, row.category(), row.title(), row.message(), row.createdAt())).toList();
+		NotificationCursor next = items.isEmpty() ? cursor : NotificationCursor.after(items.get(items.size() - 1).id());
+		return new NotificationPage(items, next, page.hasMore());
+	}
+
+	@Override
+	public int countUnreadNotifications(int shaleClientId, int userId) {
+		return notificationGateway.countUnreadNotificationsForUser(shaleClientId, userId);
+	}
+
+	@Override
+	public Optional<NotificationActivationTarget> findActivationTarget(int shaleClientId, int userId, long notificationId) {
+		return notificationGateway.findActivationTarget(shaleClientId, userId, notificationId)
+				.map(row -> new NotificationActivationTarget(row.notificationId(), row.entityType(), row.entityId(), row.parentCaseId(), row.actionType()));
+	}
+
+	@Override
 	public void markRead(int shaleClientId, int userId, long notificationId) {
 		notificationGateway.markNotificationRead(shaleClientId, userId, notificationId);
 	}
@@ -88,6 +110,9 @@ public final class NotificationServiceAdapter implements NotificationServicePort
 
 	interface NotificationGateway {
 		List<NotificationDao.NotificationRow> listUnreadNotificationsForUser(int shaleClientId, int userId);
+		NotificationDao.NotificationPageRow listNotificationsForUser(int shaleClientId, int userId, long afterNotificationId, int limit);
+		int countUnreadNotificationsForUser(int shaleClientId, int userId);
+		Optional<NotificationDao.NotificationActivationRow> findActivationTarget(int shaleClientId, int userId, long notificationId);
 
 		void markNotificationRead(int shaleClientId, int userId, long notificationId);
 
@@ -118,6 +143,10 @@ public final class NotificationServiceAdapter implements NotificationServicePort
 		public List<NotificationDao.NotificationRow> listUnreadNotificationsForUser(int shaleClientId, int userId) {
 			return notificationDao.listUnreadNotificationsForUser(shaleClientId, userId);
 		}
+
+		@Override public NotificationDao.NotificationPageRow listNotificationsForUser(int shaleClientId,int userId,long afterNotificationId,int limit){return notificationDao.listNotificationsForUser(shaleClientId,userId,afterNotificationId,limit);}
+		@Override public int countUnreadNotificationsForUser(int shaleClientId,int userId){return notificationDao.countUnreadNotificationsForUser(shaleClientId,userId);}
+		@Override public Optional<NotificationDao.NotificationActivationRow> findActivationTarget(int shaleClientId,int userId,long notificationId){return notificationDao.findActivationTarget(shaleClientId,userId,notificationId);}
 
 		@Override
 		public void markNotificationRead(int shaleClientId, int userId, long notificationId) {
