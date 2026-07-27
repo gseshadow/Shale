@@ -83,7 +83,7 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(c.contains("removeRequestedFrom.setVisible(v!=null)"));
         assertTrue(c.contains("applyNewRequestStageSize(stage,(Region)stage.getScene().getRoot())"));
         assertTrue(d.contains("results.setPrefHeight(420)"));
-        assertTrue(d.contains("results.setMinHeight(300)"));
+        assertTrue(d.contains("results.setMinHeight(0)"));
         assertTrue(d.contains("VBox.setVgrow(results, Priority.ALWAYS)"));
         assertTrue(d.contains("applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box)"));
         assertTrue(d.contains("WindowSizingUtil.sizeModalStage(stage, owner, prefWidth, prefHeight, minWidth, minHeight)"));
@@ -111,6 +111,22 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(d.contains("pane.resize(stage.getWidth(), stage.getHeight())"));
         assertTrue(d.contains("WindowSizingUtil.constrainToVisualBounds(stage, owner)"));
         assertTrue(d.contains("dialog.setOnShown(e -> applyWorkflowScreenSizing"));
+    }
+
+    @Test void footerRemainsOutsideAConstrainedScrollableContentRegion() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        int buttons = d.indexOf("dialog.getDialogPane().getButtonTypes().addAll(backType, addType, ButtonType.CANCEL)");
+        int contentRoot = d.indexOf("BorderPane contentRegion = new BorderPane()");
+        int installContent = d.indexOf("dialog.getDialogPane().setContent(contentRegion)");
+        assertTrue(buttons >= 0 && contentRoot > buttons && installContent > contentRoot);
+        assertTrue(d.contains("contentRegion.setCenter(box)"));
+        assertTrue(d.contains("contentRegion.setMinSize(0,0)"));
+        assertTrue(d.contains("box.setPadding(new Insets(18,18,12,18))"));
+        assertTrue(d.contains("box.setMinHeight(0)"));
+        assertTrue(d.contains("allSection.setMinHeight(0)"));
+        assertTrue(d.contains("results.setMinHeight(0)"));
+        assertTrue(d.contains("caseResultsScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED)"));
+        assertFalse(d.contains("box.getChildren().addAll(caseSection,allSection,back"));
     }
 
     @Test void casePartySectionsAreSingleSelectDeduplicatedAndShareDirectorySelectionState() throws Exception {
