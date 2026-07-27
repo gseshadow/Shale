@@ -125,8 +125,22 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(d.contains("box.setMinHeight(0)"));
         assertTrue(d.contains("allSection.setMinHeight(0)"));
         assertTrue(d.contains("results.setMinHeight(0)"));
-        assertTrue(d.contains("caseResultsScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED)"));
+        assertTrue(d.contains("adaptiveCasePartyScrollPane(caseResults, 180)"));
         assertFalse(d.contains("box.getChildren().addAll(caseSection,allSection,back"));
+    }
+
+    @Test void allSectionFollowsTheCompleteAdaptivelySizedCasePartySection() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        int caseSection = d.indexOf("VBox caseSection=new VBox(8,caseHeading,caseResultsScroll)");
+        int allSection = d.indexOf("VBox allSection=new VBox(8,allHeading,search,status,results)");
+        int normalOrder = d.indexOf("box.getChildren().addAll(caseSection,allSection)");
+        assertTrue(caseSection >= 0 && allSection > caseSection && normalOrder > allSection);
+        assertTrue(d.contains("content.prefHeight(width)+12"));
+        assertTrue(d.contains("scroll.viewportBoundsProperty().addListener"));
+        assertTrue(d.contains("scroll.setMinHeight(Region.USE_PREF_SIZE)"));
+        assertFalse(d.contains("caseResultsScroll.setPrefHeight("));
+        assertFalse(d.contains("caseResultsScroll.setMinHeight("));
+        assertFalse(d.contains("caseResultsScroll.setMaxHeight("));
     }
 
     @Test void casePartySectionsAreSingleSelectDeduplicatedAndShareDirectorySelectionState() throws Exception {
