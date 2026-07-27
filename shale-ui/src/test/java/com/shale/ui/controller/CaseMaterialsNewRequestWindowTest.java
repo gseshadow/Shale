@@ -22,7 +22,7 @@ class CaseMaterialsNewRequestWindowTest {
         assertFalse(method.contains("titleField.setText(\"New Request\")"));
         assertInOrder(method,
                 "add(fields,0,\"Title:\",titleField)",
-                "add(fields,1,\"Requested From:\",requestedFromBox)",
+                "add(fields,1,\"Requested From *:\",requestedFromBox)",
                 "add(fields,2,\"Material Type:\",materialType)",
                 "add(fields,3,\"Request Method:\",requestMethod)",
                 "add(fields,4,\"Status:\",requestStatus)",
@@ -298,7 +298,7 @@ class CaseMaterialsNewRequestWindowTest {
         String suggester = source.substring(source.indexOf("static final class NewRequestTitleSuggester"), source.indexOf("    VBox newRequestBody"));
         String body = methodBody(source, "VBox newRequestBody");
         String mapping = methodBody(source, "private MaterialRequestServicePort.CreateMaterialRequestCommand toCreateCommand");
-        String validation = methodBody(source, "private String validateNewRequest");
+        String validation = methodBody(source, "private String validateRequest");
         assertTrue(suggester.contains("private String lastAutomaticTitle = \"\""));
         assertTrue(suggester.contains("private boolean programmaticUpdate"));
         assertTrue(suggester.contains("private boolean manualOverride"));

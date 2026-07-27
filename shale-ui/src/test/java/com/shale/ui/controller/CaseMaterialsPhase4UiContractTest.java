@@ -84,7 +84,7 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(placeholder.contains("TextField titleField=new TextField()"));
     assertTrue(placeholder.contains("titleField.setPromptText(\"New Request\")"));
     assertFalse(placeholder.contains("MaterialRequestForm"));
-    assertTrue(placeholder.contains("add(fields,1,\"Requested From:\",requestedFromBox)"));
+    assertTrue(placeholder.contains("add(fields,1,\"Requested From *:\",requestedFromBox)"));
     assertTrue(placeholder.contains("TextArea description=new TextArea()"));
     assertTrue(placeholder.contains("ColorCodedComboBox<MaterialTypeDto> materialType"));
     assertFalse(placeholder.contains("new ComboBox<MaterialTypeDto>"));
@@ -104,7 +104,7 @@ final class CaseMaterialsPhase4UiContractTest {
     String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
     String dialog = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
     String body = requestController.substring(requestController.indexOf("VBox newRequestBody"), requestController.indexOf("private void loadNewRequestLookups"));
-    assertTrue(body.contains("add(fields,1,\"Requested From:\",requestedFromBox)"));
+    assertTrue(body.contains("add(fields,1,\"Requested From *:\",requestedFromBox)"));
     assertTrue(body.contains("ActionButtonFactory.primary(\"Add\",null)"));
     assertTrue(body.contains("requestedFromAction.setText(v==null?\"Add\":\"Change\")"));
     assertTrue(body.contains("ActionButtonFactory.neutral(\"Remove\",null)"));
