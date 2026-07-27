@@ -15,10 +15,10 @@ final class RequestLookupSystemKeyUniqueIndexesPhase2MigrationTest {
     void migrationDefinesAllFourExactFilteredUniqueIndexes() throws Exception {
         String sql = read(MIGRATION);
 
-        assertContains(sql, "CREATE UNIQUE NONCLUSTERED INDEX UX_RequestMethods_Global_SystemKey\n        ON dbo.RequestMethods (SystemKey)\n        WHERE ShaleClientId IS NULL AND SystemKey IS NOT NULL");
-        assertContains(sql, "CREATE UNIQUE NONCLUSTERED INDEX UX_RequestMethods_Tenant_SystemKey\n        ON dbo.RequestMethods (ShaleClientId, SystemKey)\n        WHERE ShaleClientId IS NOT NULL AND SystemKey IS NOT NULL");
-        assertContains(sql, "CREATE UNIQUE NONCLUSTERED INDEX UX_RequestStatuses_Global_SystemKey\n        ON dbo.RequestStatuses (SystemKey)\n        WHERE ShaleClientId IS NULL AND SystemKey IS NOT NULL");
-        assertContains(sql, "CREATE UNIQUE NONCLUSTERED INDEX UX_RequestStatuses_Tenant_SystemKey\n        ON dbo.RequestStatuses (ShaleClientId, SystemKey)\n        WHERE ShaleClientId IS NOT NULL AND SystemKey IS NOT NULL");
+        assertContainsIgnoringWhitespace(sql, "CREATE UNIQUE NONCLUSTERED INDEX UX_RequestMethods_Global_SystemKey ON dbo.RequestMethods (SystemKey) WHERE ShaleClientId IS NULL AND SystemKey IS NOT NULL");
+        assertContainsIgnoringWhitespace(sql, "CREATE UNIQUE NONCLUSTERED INDEX UX_RequestMethods_Tenant_SystemKey ON dbo.RequestMethods (ShaleClientId, SystemKey) WHERE ShaleClientId IS NOT NULL AND SystemKey IS NOT NULL");
+        assertContainsIgnoringWhitespace(sql, "CREATE UNIQUE NONCLUSTERED INDEX UX_RequestStatuses_Global_SystemKey ON dbo.RequestStatuses (SystemKey) WHERE ShaleClientId IS NULL AND SystemKey IS NOT NULL");
+        assertContainsIgnoringWhitespace(sql, "CREATE UNIQUE NONCLUSTERED INDEX UX_RequestStatuses_Tenant_SystemKey ON dbo.RequestStatuses (ShaleClientId, SystemKey) WHERE ShaleClientId IS NOT NULL AND SystemKey IS NOT NULL");
     }
 
     @Test
@@ -83,5 +83,7 @@ final class RequestLookupSystemKeyUniqueIndexesPhase2MigrationTest {
     private static String read(Path p) throws Exception { return Files.readString(p); }
     private static Path resolve(String repoRelative) { Path p = Path.of("..", repoRelative); return Files.exists(p) ? p : Path.of(repoRelative); }
     private static void assertContains(String s, String n) { assertTrue(s.contains(n), () -> "Expected to contain: " + n); }
+    private static void assertContainsIgnoringWhitespace(String s, String n) { assertContains(normalizeWhitespace(s), normalizeWhitespace(n)); }
+    private static String normalizeWhitespace(String s) { return s.replaceAll("\\s+", " ").trim(); }
     private static int countOccurrences(String s, String n) { int count = 0, index = 0; while ((index = s.indexOf(n, index)) >= 0) { count++; index += n.length(); } return count; }
 }
