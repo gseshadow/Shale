@@ -29,6 +29,7 @@ import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
+import com.shale.core.dto.CasePartyEntityOptionDto;
 import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.LinkTypeDto;
@@ -8005,6 +8006,38 @@ public final class CaseDao {
 			ps.setLong(1, caseId); ps.setInt(2, tenant); ps.setInt(3, tenant);
 			try (ResultSet rs = ps.executeQuery()) { return mapCaseLinkContactOptions(rs); }
 		} catch (SQLException e) { throw new RuntimeException("Failed to list CaseParties-backed case share contacts", e); }
+	}
+
+	/** Uses the same authoritative CaseParties/tenant/deletion rules as Shared With, for both entity kinds. */
+	public List<CasePartyEntityOptionDto> listRequestedFromCaseParties(long caseId, int tenant) {
+		String contactName = caseLinkShareContactDisplayNameExpression("ct");
+		String sql = """
+			SELECT EntityType, EntityId, DisplayName, Email, Phone, OrganizationTypeName
+			FROM (
+			  SELECT 'contact' EntityType, ct.Id EntityId, %s DisplayName,
+			         COALESCE(ct.EmailPersonal,ct.EmailWork,ct.EmailOther) Email,
+			         NULLIF(LTRIM(RTRIM(ct.PhoneCell)),'') Phone,
+			         CAST(NULL AS nvarchar(255)) OrganizationTypeName
+			  FROM dbo.CaseParties cp JOIN dbo.Cases c ON c.Id=cp.CaseId
+			  JOIN dbo.Contacts ct ON ct.Id=cp.ContactId
+			  WHERE cp.CaseId=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+			    AND ct.ShaleClientId=? AND ISNULL(ct.IsDeleted,0)=0 AND %s IS NOT NULL
+			  UNION
+			  SELECT 'organization', org.Id, NULLIF(LTRIM(RTRIM(org.Name)),''), NULL, NULL, ot.Name
+			  FROM dbo.CaseParties cp JOIN dbo.Cases c ON c.Id=cp.CaseId
+			  JOIN dbo.Organizations org ON org.Id=cp.OrganizationId
+			  LEFT JOIN dbo.OrganizationTypes ot ON ot.OrganizationTypeId=org.OrganizationTypeId AND ot.ShaleClientId=org.ShaleClientId
+			  WHERE cp.CaseId=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+			    AND org.ShaleClientId=? AND ISNULL(org.IsDeleted,0)=0 AND NULLIF(LTRIM(RTRIM(org.Name)),'') IS NOT NULL
+			) eligible
+			GROUP BY EntityType, EntityId, DisplayName, Email, Phone, OrganizationTypeName
+			ORDER BY EntityType, DisplayName, EntityId
+			""".formatted(contactName, contactName);
+		try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) {
+			ps.setLong(1,caseId); ps.setInt(2,tenant); ps.setInt(3,tenant);
+			ps.setLong(4,caseId); ps.setInt(5,tenant); ps.setInt(6,tenant);
+			try(ResultSet rs=ps.executeQuery()) { List<CasePartyEntityOptionDto> out=new ArrayList<>(); while(rs.next()) out.add(new CasePartyEntityOptionDto(rs.getString(1),rs.getInt(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6))); return out; }
+		} catch(SQLException e) { throw new RuntimeException("Failed to list requested-from CaseParties",e); }
 	}
 
 	private static String caseLinkShareContactDisplayNameExpression(String alias) {
