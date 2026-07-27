@@ -2,10 +2,12 @@ package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -47,18 +49,30 @@ final class SettingsFxmlLoadTest {
             });
 
             Parent root = assertDoesNotThrow((org.junit.jupiter.api.function.ThrowingSupplier<Parent>) loader::load);
-            assertNotNull(loader.getController());
-            assertNotNull(root.lookup("#taskAssignedToMeCheck"), "Existing Settings notification checkbox should remain wired.");
-            assertNotNull(root.lookup("#showInactiveUsersCheck"), "Existing Settings user-management checkbox should remain wired.");
+            SettingsController controller = loader.getController();
+            assertNotNull(controller);
+            CheckBox notificationCheck = (CheckBox) loader.getNamespace().get("taskAssignedToMeCheck");
+            assertNotNull(notificationCheck, "Existing Settings notification checkbox fx:id should resolve.");
+            assertSame(notificationCheck, injectedField(controller, "taskAssignedToMeCheck"),
+                    "Existing Settings notification checkbox should remain injected into its controller field.");
+            CheckBox inactiveUsers = (CheckBox) loader.getNamespace().get("showInactiveUsersCheck");
+            assertNotNull(inactiveUsers, "Existing Settings user-management checkbox should remain wired.");
 
-            Button auditButton = (Button) root.lookup("#viewAuditLogButton");
+            Button auditButton = (Button) loader.getNamespace().get("viewAuditLogButton");
             assertNotNull(auditButton, "Audit-log action button should be present when audit viewing is supported.");
             assertNotNull(auditButton.getOnAction(), "FXML should resolve the audit-log action handler.");
             auditButton.fire();
             assertTrue(!auditOpened.get(), "Non-admin Settings users must not open the audit log.");
 
-            CheckBox inactiveUsers = (CheckBox) root.lookup("#showInactiveUsersCheck");
             assertNotNull(inactiveUsers.getOnAction(), "Existing Settings controls should keep resolving their handlers.");
+        });
+    }
+
+    private static Object injectedField(SettingsController controller, String fieldName) {
+        return assertDoesNotThrow(() -> {
+            Field field = SettingsController.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field.get(controller);
         });
     }
 
