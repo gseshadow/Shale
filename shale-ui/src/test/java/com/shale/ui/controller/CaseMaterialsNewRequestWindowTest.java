@@ -78,7 +78,7 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(loader.contains("assignedTo.setCandidates(safe)"));
         assertTrue(loader.contains("setUserSelectorsLoading(requestedBy,assignedTo,true)"));
         assertTrue(loader.contains("setUserSelectorsLoading(requestedBy,assignedTo,false)"));
-        assertTrue(caseController.contains("caseMaterialRequestsTabController.init(materialRequestService, caseTaskService, appState, caseDao, contactDao, organizationDao"));
+        assertTrue(caseController.contains("caseMaterialRequestsTabController.init(materialRequestService, caseTaskService, caseService, appState, caseDao, contactDao, organizationDao"));
         assertFalse(loader.toLowerCase().contains("dao"));
     }
 
