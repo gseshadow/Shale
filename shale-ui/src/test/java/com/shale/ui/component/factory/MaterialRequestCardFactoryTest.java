@@ -22,7 +22,7 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("CARD_RADIUS = DueProximityStyles.CARD_RADIUS"));
         assertTrue(source.contains("materialTypeRailColor = ColorUtil.toCssBackgroundColor(request.materialTypeColor())"));
         assertTrue(source.contains("rail.setStyle(\"-fx-background-color: \" + materialTypeRailColor"));
-        assertTrue(source.contains("statusPill(request.status(), statusColor)"));
+        assertTrue(source.contains("statusPill(statusDisplayName, statusColor)"));
         assertTrue(source.contains("statusWashCss(statusColor, hovered)"));
         assertTrue(source.contains("linear-gradient(to right"));
         assertTrue(source.contains("ColorUtil.toCssRgba(color, leadingOpacity) + \" 0%"));
@@ -166,8 +166,8 @@ class MaterialRequestCardFactoryTest {
                 "Requests list should own the external breathing room around first, last, and intermediate cards.");
         assertTrue(controller.contains("list=new VBox(10); list.setPadding(REQUEST_LIST_INSETS)"),
                 "Card separation should come from the list VBox spacing plus one transparent list inset, not per-card doubled margins.");
-        assertTrue(controller.contains("requestCardFactory.create(r, MaterialRequestCardFactory.Variant.LIST, resolveRequestStatusColor(statuses,r.status()))"),
-                "The production request card should receive the tenant-effective Request Status color.");
+        assertTrue(controller.contains("presentation.name(), presentation.color()"),
+                "The production request card should receive the tenant-effective Request Status name and color.");
         assertFalse(controller.contains("new StackPane(requestCardFactory.create"),
                 "Do not add an opaque or nested card wrapper around request cards.");
         assertFalse(controller.contains("VBox.setMargin(requestCardFactory.create"),
@@ -179,7 +179,7 @@ class MaterialRequestCardFactoryTest {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java"));
         assertTrue(controller.contains("new RequestListData(svc.listMaterialRequests(cid,tid),svc.listEffectiveRequestStatuses(tid))"));
         assertTrue(controller.contains("lookupValueMatches(s.systemKey(),s.name(),savedStatus)"));
-        assertTrue(controller.contains("map(RequestStatusDto::color)"));
+        assertTrue(controller.contains("new RequestStatusPresentation(resolved.name()==null||resolved.name().isBlank()?readableStatusLabel(savedStatus):resolved.name().trim(),resolved.color())"));
     }
 
     @Test
