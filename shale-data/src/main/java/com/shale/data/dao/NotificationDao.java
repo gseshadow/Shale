@@ -176,6 +176,26 @@ public final class NotificationDao {
 		}
 	}
 
+	/** Writes a material-request notification on the caller's transaction. */
+	public Long createMaterialRequestNotification(Connection con, int shaleClientId, int userId,
+			String title, String message, long materialRequestId, int createdByUserId,
+			String actionType, String eventKey) throws SQLException {
+		Objects.requireNonNull(con, "con");
+		return createIfAbsent(con, shaleClientId, userId, title, message, materialRequestId,
+				createdByUserId, "CASE", "MaterialRequest", actionType, "INFO", eventKey);
+	}
+
+	/** Writes a scheduler-generated material-request notification. */
+	public Long createMaterialRequestDueNotification(int shaleClientId, int userId, String title,
+			String message, long materialRequestId, String eventKey) {
+		try (Connection con = db.requireConnection()) {
+			return createIfAbsent(con, shaleClientId, userId, title, message, materialRequestId,
+					0, "CASE", "MaterialRequest", "DUE", "INFO", eventKey);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create material-request due notification", e);
+		}
+	}
+
 	public int countUnreadNotificationsForUser(int shaleClientId, int userId) {
 		if (shaleClientId <= 0 || userId <= 0) {
 			return 0;
@@ -221,38 +241,40 @@ public final class NotificationDao {
 				       )) AS ActorDisplayName,
 				       CASE
 				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.Title
+                         WHEN UPPER(ISNULL(n.EntityType, '')) = 'MATERIALREQUEST' THEN mr.Title
 				         ELSE NULL
 				       END AS EntityTitle,
 				       CASE
 				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.CaseId
+                         WHEN UPPER(ISNULL(n.EntityType, '')) = 'MATERIALREQUEST' THEN mr.CaseId
 				         ELSE NULL
 				       END AS CaseId,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN c.Name
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN c.Name
 				         ELSE NULL
 				       END AS CaseName,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN caseAttorney.DisplayName
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN caseAttorney.DisplayName
 				         ELSE NULL
 				       END AS CaseResponsibleAttorney,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN caseAttorney.Color
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN caseAttorney.Color
 				         ELSE NULL
 				       END AS CaseResponsibleAttorneyColor,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN c.NonEngagementLetterSent
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN c.NonEngagementLetterSent
 				         ELSE NULL
 				       END AS CaseNonEngagementLetterSent,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN current_status.CurrentStatusName
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN current_status.CurrentStatusName
 				         ELSE NULL
 				       END AS CasePrimaryStatusName,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN current_status.PrimaryStatusColor
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN current_status.PrimaryStatusColor
 				         ELSE NULL
 				       END AS CasePrimaryStatusColor,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN pa.Color
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN pa.Color
 				         ELSE NULL
 				       END AS CasePracticeAreaColor,
 				       n.IsRead AS IsRead,
@@ -267,9 +289,11 @@ public final class NotificationDao {
 				 AND t.Id = n.EntityId
 				 AND t.ShaleClientId = n.ShaleClientId
 				 AND ISNULL(t.IsDeleted, 0) = 0
-				LEFT JOIN dbo.Cases c
-				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'
-				 AND c.Id = t.CaseId
+				LEFT JOIN dbo.MaterialRequests mr
+                  ON UPPER(ISNULL(n.EntityType, '')) = 'MATERIALREQUEST'
+                 AND mr.Id = n.EntityId AND mr.ShaleClientId = n.ShaleClientId AND mr.IsDeleted = 0
+                LEFT JOIN dbo.Cases c
+                  ON c.Id = COALESCE(t.CaseId, mr.CaseId)
 				 AND c.ShaleClientId = n.ShaleClientId
 				LEFT JOIN dbo.PracticeAreas pa
 				  ON pa.Id = c.PracticeAreaId

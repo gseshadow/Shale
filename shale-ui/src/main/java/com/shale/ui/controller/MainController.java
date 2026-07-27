@@ -249,6 +249,13 @@ public final class MainController {
 		if (notification == null) {
 			return;
 		}
+		if (isMaterialRequestNotification(notification)) {
+			Long caseId = notification.getCaseId();
+			if (caseId != null && caseId > 0 && caseId <= Integer.MAX_VALUE) {
+				sceneManager.openCaseProfile(caseId.intValue(), "REQUESTS");
+			}
+			return;
+		}
 		if (isCalendarAssignmentNotification(notification)) {
 			Long calendarEventId = notification.getEntityId();
 			if (calendarEventId != null && calendarEventId > 0) {
@@ -260,6 +267,12 @@ public final class MainController {
 			return;
 		}
 		updateFlowCoordinator.presentAvailableUpdate(isMandatoryUpdateNotification(notification), () -> {});
+	}
+
+	private static boolean isMaterialRequestNotification(AppNotification notification) {
+		String entityType = notification == null ? null : notification.getEntityType();
+		return entityType != null && "MaterialRequest".equalsIgnoreCase(entityType.trim())
+				&& notification.getEntityId() != null && notification.getEntityId() > 0;
 	}
 
 	private static boolean isCalendarAssignmentNotification(AppNotification notification) {
