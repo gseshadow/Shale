@@ -1,12 +1,12 @@
 ﻿{
-    "version":  "1.0.104",
+    "version":  "1.0.107",
     "channel":  "stable",
-    "zipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.104.zip",
-    "installerUrl":  "https://shalestorage.z13.web.core.windows.net/Shale-1.0.104.exe",
-    "notes":  "Release 1.0.104",
+    "zipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.107.zip",
+    "installerUrl":  "https://shalestorage.z13.web.core.windows.net/Shale-1.0.107.exe",
+    "notes":  "Release 1.0.107",
     "mandatory":  true,
-    "sha256":  "9958222b7b556e0f6d9661de57f6515a8afe0ccd878181d4e21fae4b582eea55",
-    "publishedAt":  "2026-07-15T15:59:59Z",
-    "macZipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.104-mac.zip",
-    "macSha256":  "4b9f263818ee44a483f60da34544ea6e903429ceafee56e84552fb42c1d30426"
+    "sha256":  "9486ecaa5796930a488b607e8d9c6076335cb79f15c821df238c1ed195fba466",
+    "publishedAt":  "2026-07-27T19:08:13Z",
+    "macZipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.107-mac.zip",
+    "macSha256":  "db0fb693c26d7291ef60c25c77028d98de4aa2e663d6a287173e0c0ba0fbc529"
 }
