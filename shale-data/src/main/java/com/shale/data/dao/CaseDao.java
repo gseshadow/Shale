@@ -29,6 +29,7 @@ import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
+import com.shale.core.dto.CasePartyEntityOptionDto;
 import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.LinkTypeDto;
@@ -290,7 +291,8 @@ public final class CaseDao {
 
 	public record PartyRoleRow(
 			long id,
-			String name
+			String name,
+			String systemKey
 	) {
 	}
 
@@ -1064,7 +1066,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -1565,7 +1567,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -1723,7 +1725,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -1913,7 +1915,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -2427,8 +2429,8 @@ public final class CaseDao {
 		boolean hasSystemKey = tableHasColumn(con, PARTY_ROLES_TABLE, "SystemKey");
 		String normalizedRole = roleName == null ? "" : roleName.trim().toLowerCase(Locale.ROOT);
 		String rolePredicate = hasSystemKey
-				? "(LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = ? OR LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?)"
-				: "LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = ?";
+				? "LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = ?"
+				: "1 = 0";
 		String sql = """
 				SELECT
 				  cp.ContactId,
@@ -2460,7 +2462,6 @@ public final class CaseDao {
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setLong(1, caseId);
 			int idx = 2;
-			ps.setString(idx++, normalizedRole);
 			if (hasSystemKey) {
 				ps.setString(idx++, normalizedRole);
 			}
@@ -3960,7 +3961,7 @@ public final class CaseDao {
 			for (PartyRoleLookupRow row : effective) {
 				if (row == null)
 					continue;
-				out.add(new PartyRoleRow(row.id(), row.name()));
+				out.add(new PartyRoleRow(row.id(), row.name(), row.systemKey()));
 			}
 			return out;
 		} catch (SQLException e) {
@@ -5588,34 +5589,17 @@ public final class CaseDao {
 		return normalized.isBlank() ? null : normalized;
 	}
 
-	private static String resolveLegacyPartyRoleSystemKeyFromName(String roleName) {
-		String normalized = (roleName == null) ? "" : roleName.trim().toLowerCase(Locale.ROOT);
-		return switch (normalized) {
-		case PARTY_ROLE_NAME_CALLER, PARTY_ROLE_NAME_PARTY, PARTY_ROLE_NAME_COUNSEL -> normalized;
-		default -> null;
-		};
+	static boolean isBuiltinPartyRoleSystemKey(String systemKey) {
+		String normalizedSystemKey = normalizeSystemKey(systemKey);
+		return PARTY_ROLE_NAME_PARTY.equals(normalizedSystemKey);
 	}
 
 	private static String resolvePartyRoleSystemKey(String systemKey, String roleName) {
-		String normalizedSystemKey = normalizeSystemKey(systemKey);
-		if (normalizedSystemKey != null)
-			return normalizedSystemKey;
-		return resolveLegacyPartyRoleSystemKeyFromName(roleName);
-	}
-
-	private static String resolveLegacyPartySideSystemKeyFromName(String sideName) {
-		String normalized = (sideName == null) ? "" : sideName.trim().toLowerCase(Locale.ROOT);
-		return switch (normalized) {
-		case PARTY_SIDE_KEY_REPRESENTED, PARTY_SIDE_KEY_OPPOSING, PARTY_SIDE_KEY_NEUTRAL -> normalized;
-		default -> null;
-		};
+		return normalizeSystemKey(systemKey);
 	}
 
 	private static String resolvePartySideSystemKey(String systemKey, String sideName) {
-		String normalizedSystemKey = normalizeSystemKey(systemKey);
-		if (normalizedSystemKey != null)
-			return normalizedSystemKey;
-		return resolveLegacyPartySideSystemKeyFromName(sideName);
+		return normalizeSystemKey(systemKey);
 	}
 
 	private record PartyRoleLookupRow(
@@ -7068,7 +7052,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -7213,7 +7197,7 @@ public final class CaseDao {
 					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
 					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
 					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.Name, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
 					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
 					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
@@ -8022,6 +8006,38 @@ public final class CaseDao {
 			ps.setLong(1, caseId); ps.setInt(2, tenant); ps.setInt(3, tenant);
 			try (ResultSet rs = ps.executeQuery()) { return mapCaseLinkContactOptions(rs); }
 		} catch (SQLException e) { throw new RuntimeException("Failed to list CaseParties-backed case share contacts", e); }
+	}
+
+	/** Uses the same authoritative CaseParties/tenant/deletion rules as Shared With, for both entity kinds. */
+	public List<CasePartyEntityOptionDto> listRequestedFromCaseParties(long caseId, int tenant) {
+		String contactName = caseLinkShareContactDisplayNameExpression("ct");
+		String sql = """
+			SELECT EntityType, EntityId, DisplayName, Email, Phone, OrganizationTypeName
+			FROM (
+			  SELECT 'contact' EntityType, ct.Id EntityId, %s DisplayName,
+			         COALESCE(ct.EmailPersonal,ct.EmailWork,ct.EmailOther) Email,
+			         NULLIF(LTRIM(RTRIM(ct.PhoneCell)),'') Phone,
+			         CAST(NULL AS nvarchar(255)) OrganizationTypeName
+			  FROM dbo.CaseParties cp JOIN dbo.Cases c ON c.Id=cp.CaseId
+			  JOIN dbo.Contacts ct ON ct.Id=cp.ContactId
+			  WHERE cp.CaseId=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+			    AND ct.ShaleClientId=? AND ISNULL(ct.IsDeleted,0)=0 AND %s IS NOT NULL
+			  UNION
+			  SELECT 'organization', org.Id, NULLIF(LTRIM(RTRIM(org.Name)),''), NULL, NULL, ot.Name
+			  FROM dbo.CaseParties cp JOIN dbo.Cases c ON c.Id=cp.CaseId
+			  JOIN dbo.Organizations org ON org.Id=cp.OrganizationId
+			  LEFT JOIN dbo.OrganizationTypes ot ON ot.OrganizationTypeId=org.OrganizationTypeId AND ot.ShaleClientId=org.ShaleClientId
+			  WHERE cp.CaseId=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+			    AND org.ShaleClientId=? AND ISNULL(org.IsDeleted,0)=0 AND NULLIF(LTRIM(RTRIM(org.Name)),'') IS NOT NULL
+			) eligible
+			GROUP BY EntityType, EntityId, DisplayName, Email, Phone, OrganizationTypeName
+			ORDER BY EntityType, DisplayName, EntityId
+			""".formatted(contactName, contactName);
+		try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) {
+			ps.setLong(1,caseId); ps.setInt(2,tenant); ps.setInt(3,tenant);
+			ps.setLong(4,caseId); ps.setInt(5,tenant); ps.setInt(6,tenant);
+			try(ResultSet rs=ps.executeQuery()) { List<CasePartyEntityOptionDto> out=new ArrayList<>(); while(rs.next()) out.add(new CasePartyEntityOptionDto(rs.getString(1),rs.getInt(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6))); return out; }
+		} catch(SQLException e) { throw new RuntimeException("Failed to list requested-from CaseParties",e); }
 	}
 
 	private static String caseLinkShareContactDisplayNameExpression(String alias) {

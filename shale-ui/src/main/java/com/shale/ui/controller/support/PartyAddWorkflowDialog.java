@@ -47,10 +47,32 @@ public final class PartyAddWorkflowDialog {
 	private record PartyRoleOption(long id, String label) {
 	}
 
+	public record PartyEntitySelection(String entityType, Long id, String label, boolean createNew, String contactFirstName, String contactLastName, String organizationName, Integer organizationTypeId) {
+	}
+
 	private record PartyEntityOption(String entityType, Long id, String label) {
 	}
 
 	private PartyAddWorkflowDialog() {
+	}
+
+	public static PartyEntitySelection showEntityChooser(Window owner,
+			List<CaseDao.SelectableContactRow> contacts,
+			List<CaseDao.SelectableOrganizationRow> organizations,
+			List<OrganizationDao.OrganizationTypeRow> organizationTypes) {
+		AddPartyDraft draft = show(owner,
+				List.of(new CaseDao.PartyRoleRow(1L, "Party", "party")),
+				contacts == null ? List.of() : contacts,
+				organizations == null ? List.of() : organizations,
+				organizationTypes == null ? List.of() : organizationTypes,
+				List.of(new PartySideOption("Requested From", "requested_from")),
+				"Requested From",
+				"Choose Requested From");
+		if (draft == null) {
+			return null;
+		}
+		return new PartyEntitySelection(draft.entityType(), draft.entityId(), draft.entityLabel(), draft.createNew(),
+				draft.contactFirstName(), draft.contactLastName(), draft.organizationName(), draft.organizationTypeId());
 	}
 
 	public static AddPartyDraft show(Window owner,
@@ -59,8 +81,19 @@ public final class PartyAddWorkflowDialog {
 			List<CaseDao.SelectableOrganizationRow> organizations,
 			List<OrganizationDao.OrganizationTypeRow> organizationTypes,
 			List<PartySideOption> sideOptions) {
+		return show(owner, partyRoles, contacts, organizations, organizationTypes, sideOptions, "Add Party", "Add Party");
+	}
+
+	private static AddPartyDraft show(Window owner,
+			List<CaseDao.PartyRoleRow> partyRoles,
+			List<CaseDao.SelectableContactRow> contacts,
+			List<CaseDao.SelectableOrganizationRow> organizations,
+			List<OrganizationDao.OrganizationTypeRow> organizationTypes,
+			List<PartySideOption> sideOptions,
+			String dialogTitle,
+			String commitButtonText) {
 		Long defaultPartyRoleId = partyRoles.stream()
-				.filter(r -> "party".equalsIgnoreCase(safeText(r.name())))
+				.filter(r -> "party".equalsIgnoreCase(safeText(r.systemKey()).trim()))
 				.map(CaseDao.PartyRoleRow::id)
 				.findFirst()
 				.orElse(partyRoles.isEmpty() ? null : partyRoles.get(0).id());
@@ -82,13 +115,13 @@ public final class PartyAddWorkflowDialog {
 		WizardState state = new WizardState();
 
 		Dialog<AddPartyDraft> dialog = new Dialog<>();
-		AppDialogs.applySecondaryDialogShell(dialog, "Add Party");
-		dialog.setTitle("Add Party");
+		AppDialogs.applySecondaryDialogShell(dialog, dialogTitle);
+		dialog.setTitle(dialogTitle);
 		if (owner != null) {
 			dialog.initOwner(owner);
 		}
 		ButtonType backType = new ButtonType("Back", ButtonData.LEFT);
-		ButtonType addType = new ButtonType("Add Party", ButtonData.OK_DONE);
+		ButtonType addType = new ButtonType(commitButtonText, ButtonData.OK_DONE);
 		dialog.getDialogPane().getButtonTypes().addAll(backType, addType, ButtonType.CANCEL);
 
 		Node backButton = dialog.getDialogPane().lookupButton(backType);
@@ -438,6 +471,10 @@ public final class PartyAddWorkflowDialog {
 			tokens[i] = token.substring(0, 1).toUpperCase(Locale.ROOT) + token.substring(1).toLowerCase(Locale.ROOT);
 		}
 		return String.join(" ", tokens);
+	}
+
+	public static void applySharedDialogButtonStyle(Button button, boolean primary) {
+		applyToolbarButtonClasses(button, primary ? "app-toolbar-button-primary" : "app-toolbar-button-neutral");
 	}
 
 	private static Button asButton(Node node) {

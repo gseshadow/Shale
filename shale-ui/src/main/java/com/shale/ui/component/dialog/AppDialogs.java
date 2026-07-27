@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -17,6 +18,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -170,6 +172,43 @@ public final class AppDialogs {
 		root.getStyleClass().add("app-dialog-root");
 		root.setSpacing(0);
 		return root;
+	}
+
+	public static void installSecondaryWindowResizeHandlers(Stage stage, Node root) {
+		Objects.requireNonNull(stage, "stage");
+		Objects.requireNonNull(root, "root");
+		final double margin = 8.0;
+		final double[] start = new double[6];
+		root.addEventHandler(MouseEvent.MOUSE_MOVED, event -> root.setCursor(resizeCursor(event, root, margin)));
+		root.addEventHandler(MouseEvent.MOUSE_EXITED, event -> root.setCursor(Cursor.DEFAULT));
+		root.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+			Cursor cursor = resizeCursor(event, root, margin);
+			if (cursor == Cursor.DEFAULT) return;
+			start[0] = event.getScreenX(); start[1] = event.getScreenY(); start[2] = stage.getX();
+			start[3] = stage.getY(); start[4] = stage.getWidth(); start[5] = stage.getHeight();
+			root.setUserData(cursor); event.consume();
+		});
+		root.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> {
+			if (!(root.getUserData() instanceof Cursor cursor) || cursor == Cursor.DEFAULT) return;
+			double dx = event.getScreenX() - start[0], dy = event.getScreenY() - start[1];
+			boolean left = cursor == Cursor.W_RESIZE || cursor == Cursor.NW_RESIZE || cursor == Cursor.SW_RESIZE;
+			boolean right = cursor == Cursor.E_RESIZE || cursor == Cursor.NE_RESIZE || cursor == Cursor.SE_RESIZE;
+			boolean top = cursor == Cursor.N_RESIZE || cursor == Cursor.NW_RESIZE || cursor == Cursor.NE_RESIZE;
+			boolean bottom = cursor == Cursor.S_RESIZE || cursor == Cursor.SW_RESIZE || cursor == Cursor.SE_RESIZE;
+			if (right) stage.setWidth(Math.max(stage.getMinWidth(), start[4] + dx));
+			if (bottom) stage.setHeight(Math.max(stage.getMinHeight(), start[5] + dy));
+			if (left) { double w = Math.max(stage.getMinWidth(), start[4] - dx); stage.setX(start[2] + start[4] - w); stage.setWidth(w); }
+			if (top) { double h = Math.max(stage.getMinHeight(), start[5] - dy); stage.setY(start[3] + start[5] - h); stage.setHeight(h); }
+			event.consume();
+		});
+		root.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> root.setUserData(null));
+	}
+
+	private static Cursor resizeCursor(MouseEvent event, Node root, double margin) {
+		double x=event.getX(), y=event.getY(), w=root.getBoundsInLocal().getWidth(), h=root.getBoundsInLocal().getHeight();
+		boolean l=x>=0&&x<=margin, r=x>=w-margin&&x<=w, t=y>=0&&y<=margin, b=y>=h-margin&&y<=h;
+		if (t&&l) return Cursor.NW_RESIZE; if (t&&r) return Cursor.NE_RESIZE; if (b&&l) return Cursor.SW_RESIZE; if (b&&r) return Cursor.SE_RESIZE;
+		if (l) return Cursor.W_RESIZE; if (r) return Cursor.E_RESIZE; if (t) return Cursor.N_RESIZE; if (b) return Cursor.S_RESIZE; return Cursor.DEFAULT;
 	}
 
 	public static void installDragToMove(Stage stage, Node dragHandle) {

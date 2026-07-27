@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -176,6 +177,30 @@ public final class NotificationDao {
 		}
 	}
 
+	/** Writes a material-request notification on the caller's transaction. */
+	public Long createMaterialRequestNotification(Connection con, int shaleClientId, int userId,
+			String title, String message, long materialRequestId, int createdByUserId,
+			String actionType, String eventKey) throws SQLException {
+		Objects.requireNonNull(con, "con");
+		return createIfAbsent(con, shaleClientId, userId, title, message, materialRequestId,
+				createdByUserId, "CASE", "MaterialRequest", actionType, "INFO", eventKey);
+	}
+
+	/** Writes a scheduler-generated material-request notification. */
+	public Long createMaterialRequestDueNotification(int shaleClientId, int userId, String title,
+			String message, long materialRequestId, String eventKey) {
+		try (Connection con = db.requireConnection()) {
+			return createIfAbsent(con, shaleClientId, userId, title, message, materialRequestId,
+					0, "CASE", "MaterialRequest", "DUE", "INFO", eventKey);
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to create material-request due notification", e);
+		}
+	}
+
+	public Long createMaterialRequestFollowUpNotification(int shaleClientId,int userId,String title,String message,long materialRequestId,String eventKey) {
+		try(Connection con=db.requireConnection()){return createIfAbsent(con,shaleClientId,userId,title,message,materialRequestId,0,"CASE","MaterialRequest","FOLLOW_UP_DUE","INFO",eventKey);}catch(SQLException e){throw new RuntimeException("Failed to create material-request follow-up notification",e);}
+	}
+
 	public int countUnreadNotificationsForUser(int shaleClientId, int userId) {
 		if (shaleClientId <= 0 || userId <= 0) {
 			return 0;
@@ -221,38 +246,40 @@ public final class NotificationDao {
 				       )) AS ActorDisplayName,
 				       CASE
 				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.Title
+                         WHEN UPPER(ISNULL(n.EntityType, '')) = 'MATERIALREQUEST' THEN mr.Title
 				         ELSE NULL
 				       END AS EntityTitle,
 				       CASE
 				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN t.CaseId
+                         WHEN UPPER(ISNULL(n.EntityType, '')) = 'MATERIALREQUEST' THEN mr.CaseId
 				         ELSE NULL
 				       END AS CaseId,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN c.Name
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN c.Name
 				         ELSE NULL
 				       END AS CaseName,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN caseAttorney.DisplayName
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN caseAttorney.DisplayName
 				         ELSE NULL
 				       END AS CaseResponsibleAttorney,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN caseAttorney.Color
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN caseAttorney.Color
 				         ELSE NULL
 				       END AS CaseResponsibleAttorneyColor,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN c.NonEngagementLetterSent
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN c.NonEngagementLetterSent
 				         ELSE NULL
 				       END AS CaseNonEngagementLetterSent,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN current_status.CurrentStatusName
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN current_status.CurrentStatusName
 				         ELSE NULL
 				       END AS CasePrimaryStatusName,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN current_status.PrimaryStatusColor
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN current_status.PrimaryStatusColor
 				         ELSE NULL
 				       END AS CasePrimaryStatusColor,
 				       CASE
-				         WHEN UPPER(ISNULL(n.EntityType, '')) = 'TASK' THEN pa.Color
+				         WHEN UPPER(ISNULL(n.EntityType, '')) IN ('TASK','MATERIALREQUEST') THEN pa.Color
 				         ELSE NULL
 				       END AS CasePracticeAreaColor,
 				       n.IsRead AS IsRead,
@@ -267,9 +294,11 @@ public final class NotificationDao {
 				 AND t.Id = n.EntityId
 				 AND t.ShaleClientId = n.ShaleClientId
 				 AND ISNULL(t.IsDeleted, 0) = 0
-				LEFT JOIN dbo.Cases c
-				  ON UPPER(ISNULL(n.EntityType, '')) = 'TASK'
-				 AND c.Id = t.CaseId
+				LEFT JOIN dbo.MaterialRequests mr
+                  ON UPPER(ISNULL(n.EntityType, '')) = 'MATERIALREQUEST'
+                 AND mr.Id = n.EntityId AND mr.ShaleClientId = n.ShaleClientId AND mr.IsDeleted = 0
+                LEFT JOIN dbo.Cases c
+                  ON c.Id = COALESCE(t.CaseId, mr.CaseId)
 				 AND c.ShaleClientId = n.ShaleClientId
 				LEFT JOIN dbo.PracticeAreas pa
 				  ON pa.Id = c.PracticeAreaId
@@ -439,32 +468,26 @@ public final class NotificationDao {
 	}
 
 	public void markNotificationsDismissed(int shaleClientId, int userId, List<Long> notificationIds) {
-		if (shaleClientId <= 0 || userId <= 0 || notificationIds == null || notificationIds.isEmpty()) {
-			return;
-		}
-		String sql = """
-				UPDATE dbo.Notifications
-				SET IsDismissed = 1, DismissedAt = SYSUTCDATETIME()
-				WHERE Id = ?
-				  AND ShaleClientId = ?
-				  AND UserId = ?
-				  AND ISNULL(IsDismissed,0)=0
-				""";
-		try (Connection con = db.requireConnection();
-		     PreparedStatement ps = con.prepareStatement(sql)) {
-			for (Long id : notificationIds) {
-				if (id == null || id <= 0) {
-					continue;
-				}
-				ps.setLong(1, id);
-				ps.setInt(2, shaleClientId);
-				ps.setInt(3, userId);
-				ps.addBatch();
-			}
-			ps.executeBatch();
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to mark notifications dismissed", e);
-		}
+		if(shaleClientId<=0||userId<=0||notificationIds==null||notificationIds.isEmpty())return;
+		try(Connection con=db.requireConnection()){con.setAutoCommit(false);try{for(Long id:notificationIds)if(id!=null&&id>0)dismissOne(con,shaleClientId,userId,id);con.commit();}catch(Exception e){try{con.rollback();}catch(SQLException ignored){}throw e;}}catch(SQLException e){throw new RuntimeException("Failed to mark notifications dismissed",e);}
+	}
+
+	private static void dismissOne(Connection con,int tenant,int user,long id)throws SQLException{
+		String eventKey=null;Long requestId=null;String action=null;boolean dismissed;
+		try(PreparedStatement ps=con.prepareStatement("SELECT EventKey,EntityId,ActionType,IsDismissed FROM dbo.Notifications WITH (UPDLOCK,ROWLOCK) WHERE Id=? AND ShaleClientId=? AND UserId=?")){ps.setLong(1,id);ps.setInt(2,tenant);ps.setInt(3,user);try(ResultSet rs=ps.executeQuery()){if(!rs.next())return;eventKey=rs.getString(1);requestId=(Long)rs.getObject(2);action=rs.getString(3);dismissed=rs.getBoolean(4);}}
+		if(dismissed)return;
+		LocalDateTime occurrence=parseFollowUpOccurrence(eventKey,requestId,user,action);
+		try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Notifications SET IsDismissed=1,DismissedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND UserId=? AND ISNULL(IsDismissed,0)=0")){ps.setLong(1,id);ps.setInt(2,tenant);ps.setInt(3,user);if(ps.executeUpdate()!=1)return;}
+		if(occurrence==null)return;
+		long caseId;Integer interval;LocalDateTime current;String status;
+		String q="SELECT mr.CaseId,mr.FollowUpIntervalDays,mr.NextFollowUpAt,LOWER(LTRIM(RTRIM(COALESCE(rs.SystemKey,mr.Status)))) FROM dbo.MaterialRequests mr WITH (UPDLOCK,ROWLOCK) OUTER APPLY (SELECT TOP (1) r.SystemKey FROM dbo.RequestStatuses r WHERE (r.ShaleClientId=mr.ShaleClientId OR r.ShaleClientId IS NULL) AND r.IsDeleted=0 AND r.SystemKey IS NOT NULL AND (LOWER(LTRIM(RTRIM(r.SystemKey)))=LOWER(LTRIM(RTRIM(mr.Status))) OR LOWER(LTRIM(RTRIM(r.Name)))=LOWER(LTRIM(RTRIM(mr.Status)))) ORDER BY CASE WHEN r.ShaleClientId=mr.ShaleClientId THEN 0 ELSE 1 END,r.Id) rs WHERE mr.Id=? AND mr.ShaleClientId=? AND mr.IsDeleted=0";
+		try(PreparedStatement ps=con.prepareStatement(q)){ps.setLong(1,requestId);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){if(!rs.next())return;caseId=rs.getLong(1);interval=(Integer)rs.getObject(2);Timestamp t=rs.getTimestamp(3);current=t==null?null:t.toLocalDateTime();status=rs.getString(4);}}
+		if(interval==null||current==null||!current.equals(occurrence)||"closed".equals(status)||"cancelled".equals(status))return;
+		try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.MaterialRequests SET NextFollowUpAt=DATEADD(day,FollowUpIntervalDays,SYSUTCDATETIME()),UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND FollowUpIntervalDays IS NOT NULL AND NextFollowUpAt=?")){ps.setLong(1,requestId);ps.setInt(2,tenant);ps.setTimestamp(3,Timestamp.valueOf(occurrence));if(ps.executeUpdate()!=1)throw new SQLException("Recurring follow-up schedule changed during dismissal.");}
+		try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Cases SET UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=?")){ps.setLong(1,caseId);ps.setInt(2,tenant);ps.executeUpdate();}
+	}
+	private static LocalDateTime parseFollowUpOccurrence(String key,Long requestId,int user,String action){
+		if(requestId==null||!"FOLLOW_UP_DUE".equalsIgnoreCase(action)||key==null)return null;String prefix="material-request:"+requestId+":follow-up:",suffix=":"+user;if(!key.startsWith(prefix)||!key.endsWith(suffix))return null;try{return LocalDateTime.parse(key.substring(prefix.length(),key.length()-suffix.length()));}catch(Exception ignored){return null;}
 	}
 
 	private static Instant toInstant(Timestamp timestamp) {

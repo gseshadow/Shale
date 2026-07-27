@@ -260,7 +260,7 @@ class CaseServiceAdapterTest {
 		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
 				"src/main/java/com/shale/data/service/adapter/CaseServiceAdapter.java"));
 		for (Method method : CaseServiceAdapter.CaseGateway.class.getDeclaredMethods()) {
-			if (!method.getName().matches("listCaseLinksSharedWithContact|createCaseLinkWithShares|updateCaseLinkWithShares|searchCaseLinkShareContacts|listCaseLinkShareContacts|listCaseLinkShareCaseContacts|listCaseLinkShares|addCaseLinkShare|updateCaseLinkShare|removeCaseLinkShare")) {
+			if (!method.getName().matches("listCaseLinksSharedWithContact|createCaseLinkWithShares|updateCaseLinkWithShares|searchCaseLinkShareContacts|listCaseLinkShareContacts|listCaseLinkShareCaseContacts|listRequestedFromCaseParties|listCaseLinkShares|addCaseLinkShare|updateCaseLinkShare|removeCaseLinkShare")) {
 				continue;
 			}
 			assertTrue(method.isDefault(), () -> method.getName() + " must be an explicit rejecting default when not implemented");
@@ -272,7 +272,7 @@ class CaseServiceAdapterTest {
 	@Test
 	void daoCaseGatewayOverridesEveryCaseLinkDefault() throws Exception {
 		for (Method method : CaseServiceAdapter.CaseGateway.class.getDeclaredMethods()) {
-			if (!method.isDefault() || !method.getName().matches("listCaseLinksSharedWithContact|createCaseLinkWithShares|updateCaseLinkWithShares|searchCaseLinkShareContacts|listCaseLinkShareContacts|listCaseLinkShareCaseContacts|listCaseLinkShares|addCaseLinkShare|updateCaseLinkShare|removeCaseLinkShare")) {
+			if (!method.isDefault() || !method.getName().matches("listCaseLinksSharedWithContact|createCaseLinkWithShares|updateCaseLinkWithShares|searchCaseLinkShareContacts|listCaseLinkShareContacts|listCaseLinkShareCaseContacts|listRequestedFromCaseParties|listCaseLinkShares|addCaseLinkShare|updateCaseLinkShare|removeCaseLinkShare")) {
 				continue;
 			}
 			try {

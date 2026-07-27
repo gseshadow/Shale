@@ -1,0 +1,181 @@
+package com.shale.ui.controller;
+
+import org.junit.jupiter.api.Test;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+final class RequestedFromWorkflowDialogTest {
+    private static String read(String path) throws Exception { return Files.readString(Path.of(path)); }
+
+    @Test void requestedFromPreservesModeThenTypeFlowAndOmitsCasePartyFields() throws Exception {
+        String s = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        assertTrue(s.contains("Select Existing or Create New"));
+        assertTrue(s.contains("Select Existing"));
+        assertTrue(s.contains("Create New"));
+        assertTrue(s.contains("Contact or Organization"));
+        assertTrue(s.contains("Contact"));
+        assertTrue(s.contains("Organization"));
+        assertFalse(s.contains("Party Role"));
+        assertFalse(s.contains("Affiliation"));
+        assertFalse(s.contains("Primary"));
+        assertFalse(s.contains("Case Party notes"));
+    }
+
+    @Test void selectExistingUsesSearchPromptsAndMiniCardsInsteadOfPlainTextRows() throws Exception {
+        String s = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        assertTrue(s.contains("Search contacts"));
+        assertTrue(s.contains("Search organizations"));
+        assertTrue(s.contains("ContactCardFactory.Variant.MINI"));
+        assertTrue(s.contains("OrganizationCardFactory.Variant.MINI"));
+        assertTrue(s.contains("setGraphic(card)"));
+        assertFalse(s.contains("setText(empty || item == null ? null : item.label())"));
+    }
+
+    @Test void requestedFromLoadsCompleteTenantDirectoryAndKeepsAddPartyFilteringSeparate() throws Exception {
+        String c = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
+        String d = read("../shale-data/src/main/java/com/shale/data/dao/CaseDao.java");
+        assertTrue(c.contains("caseDao.findSelectableContactsForTenant()"));
+        assertTrue(c.contains("caseDao.findSelectableOrganizationsForTenant()"));
+        assertFalse(c.contains("findLinkableContacts(cid())"));
+        assertFalse(c.contains("findLinkableOrganizations(cid())"));
+        assertTrue(d.substring(d.indexOf("public List<SelectableContactRow> findSelectableContactsForTenant()"), d.indexOf("public List<PartyRoleRow> listPartyRoles()"))
+                .contains("ct.ShaleClientId = ?"));
+        assertTrue(d.substring(d.indexOf("public List<SelectableContactRow> findSelectableContactsForTenant()"), d.indexOf("public List<PartyRoleRow> listPartyRoles()"))
+                .contains("ct.IsDeleted = 0 OR ct.IsDeleted IS NULL"));
+        assertFalse(d.substring(d.indexOf("public List<SelectableContactRow> findSelectableContactsForTenant()"), d.indexOf("public List<PartyRoleRow> listPartyRoles()"))
+                .contains("NOT EXISTS"));
+    }
+
+    @Test void searchIsResponsiveCaseInsensitivePartialAndAsync() throws Exception {
+        String s = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        assertTrue(s.contains("Task<DirectoryData>"));
+        assertTrue(s.contains("executor.execute(task)"));
+        assertTrue(s.contains("toLowerCase(Locale.ROOT)"));
+        assertTrue(s.contains("haystack(o).contains(q)"));
+        assertTrue(s.contains("Loading…"));
+        assertTrue(s.contains("No records match the search."));
+        assertTrue(s.contains("Loading failed."));
+    }
+
+    @Test void addReturnsSelectedOrCreatedEntityWithoutCasePartyOrMaterialRequestMutation() throws Exception {
+        String s = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        String c = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
+        assertTrue(s.contains("new Selection(state.entityType,state.selected.id(),state.selected.label(),false"));
+        assertTrue(c.contains("return id==null?null:newRequestedFromSelection(r,id,label)"));
+        assertFalse(s.contains("addCaseParty"));
+        assertFalse(c.contains("caseDao.addCaseParty"));
+        assertTrue(c.contains("createMaterialRequest"));
+        assertTrue(c.contains("Button save=ActionButtonFactory.primary(\"Save\",null)"));
+    }
+
+
+    @Test void requestedFromPresentationLayoutAndSelectionStylesAreScoped() throws Exception {
+        String c = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        String css = read("src/main/resources/css/app.css");
+        assertTrue(c.contains("root.setPrefSize(NEW_REQUEST_WIDTH,NEW_REQUEST_HEIGHT)"));
+        assertTrue(c.contains("root.setMinSize(NEW_REQUEST_MIN_WIDTH,NEW_REQUEST_MIN_HEIGHT)"));
+        assertTrue(c.indexOf("requestedFromDisplay.getChildren().addAll(card,requestedFromActions)") > 0);
+        assertTrue(c.contains("else requestedFromDisplay.getChildren().add(requestedFromActions)"));
+        assertTrue(c.contains("removeRequestedFrom.setVisible(v!=null)"));
+        assertTrue(c.contains("applyNewRequestStageSize(stage,(Region)stage.getScene().getRoot())"));
+        assertTrue(d.contains("results.setPrefHeight(420)"));
+        assertTrue(d.contains("results.setMinHeight(0)"));
+        assertTrue(d.contains("VBox.setVgrow(results, Priority.ALWAYS)"));
+        assertTrue(d.contains("applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box)"));
+        assertTrue(d.contains("WindowSizingUtil.sizeModalStage(stage, owner, prefWidth, prefHeight, minWidth, minHeight)"));
+        assertTrue(d.contains("Platform.runLater(() ->"));
+        assertTrue(d.contains("stage.setResizable(true)"));
+        assertTrue(css.contains(".requested-from-results .list-cell:filled:selected"));
+        assertTrue(css.contains("-fx-background-color: transparent;"));
+        assertTrue(css.contains("-fx-border-color: rgba(74, 131, 210, 0.82)"));
+        assertFalse(css.contains(".list-cell:filled:selected {\n    -fx-background-color: white"));
+    }
+
+
+    @Test void workflowSizingUpdatesActualStageAfterContentIsInstalled() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        int renderContent = d.indexOf("box.getChildren().addAll(caseSection,allSection)");
+        int sizing = d.indexOf("applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box)");
+        int helper = d.indexOf("static void applyWorkflowScreenSizing");
+        assertTrue(renderContent >= 0 && sizing > renderContent);
+        assertTrue(helper > sizing);
+        assertTrue(d.contains("boolean selectFinal = step == 3 && \"select\".equals(mode)"));
+        assertTrue(d.contains("boolean createFinal = step == 3 && \"create\".equals(mode)"));
+        assertTrue(d.contains("double prefHeight = selectFinal ? 700 : createFinal ? 520 : 300"));
+        assertTrue(d.contains("double minHeight = selectFinal ? 600 : createFinal ? 440 : 280"));
+        assertTrue(d.contains("Window window = pane.getScene() == null ? null : pane.getScene().getWindow()"));
+        assertTrue(d.contains("pane.resize(stage.getWidth(), stage.getHeight())"));
+        assertTrue(d.contains("WindowSizingUtil.constrainToVisualBounds(stage, owner)"));
+        assertTrue(d.contains("dialog.setOnShown(e -> applyWorkflowScreenSizing"));
+    }
+
+    @Test void footerRemainsOutsideAConstrainedScrollableContentRegion() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        int buttons = d.indexOf("dialog.getDialogPane().getButtonTypes().addAll(backType, addType, ButtonType.CANCEL)");
+        int contentRoot = d.indexOf("BorderPane contentRegion = new BorderPane()");
+        int installContent = d.indexOf("dialog.getDialogPane().setContent(contentRegion)");
+        assertTrue(buttons >= 0 && contentRoot > buttons && installContent > contentRoot);
+        assertTrue(d.contains("contentRegion.setCenter(box)"));
+        assertTrue(d.contains("contentRegion.setMinSize(0,0)"));
+        assertTrue(d.contains("box.setPadding(new Insets(18,18,12,18))"));
+        assertTrue(d.contains("box.setMinHeight(0)"));
+        assertTrue(d.contains("allSection.setMinHeight(0)"));
+        assertTrue(d.contains("results.setMinHeight(0)"));
+        assertTrue(d.contains("adaptiveCasePartyScrollPane(caseResults, 180)"));
+        assertFalse(d.contains("box.getChildren().addAll(caseSection,allSection,back"));
+    }
+
+    @Test void allSectionFollowsTheCompleteAdaptivelySizedCasePartySection() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        int caseSection = d.indexOf("VBox caseSection=new VBox(8,caseHeading,caseResultsScroll)");
+        int allSection = d.indexOf("VBox allSection=new VBox(8,allHeading,search,status,results)");
+        int normalOrder = d.indexOf("box.getChildren().addAll(caseSection,allSection)");
+        assertTrue(caseSection >= 0 && allSection > caseSection && normalOrder > allSection);
+        assertTrue(d.contains("content.prefHeight(width)+12"));
+        assertTrue(d.contains("scroll.viewportBoundsProperty().addListener"));
+        assertTrue(d.contains("scroll.setMinHeight(Region.USE_PREF_SIZE)"));
+        assertFalse(d.contains("caseResultsScroll.setPrefHeight("));
+        assertFalse(d.contains("caseResultsScroll.setMinHeight("));
+        assertFalse(d.contains("caseResultsScroll.setMaxHeight("));
+    }
+
+    @Test void casePartySectionsAreSingleSelectDeduplicatedAndShareDirectorySelectionState() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        String c = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
+        assertTrue(d.contains("Case Contacts"));
+        assertTrue(d.contains("Case Organizations"));
+        assertTrue(d.contains("All Contacts"));
+        assertTrue(d.contains("All Organizations"));
+        assertTrue(d.indexOf("caseSection,allSection") > 0);
+        assertTrue(d.contains("unique.putIfAbsent(r.entityId()"));
+        assertTrue(d.contains("state.selected=option"));
+        assertTrue(d.contains("selectDirectoryMatch(results,option)"));
+        assertTrue(d.contains("sameEntity(state.selected,option)"));
+        assertFalse(d.contains("MultipleSelectionModel"));
+        assertTrue(d.contains("No available Case "));
+        assertTrue(c.contains("listRequestedFromCaseParties(cid(),tenant())"));
+    }
+
+    @Test void casePartyLoadIsAsyncAndClosedDialogsRejectStaleSuccessAndFailure() throws Exception {
+        String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+        assertTrue(d.contains("Task<DirectoryData>"));
+        assertTrue(d.contains("dialog.setOnHidden(e -> open.set(false))"));
+        assertEquals(2, d.split("if\\(!open.get\\(\\)\\)return", -1).length - 1);
+        assertTrue(d.contains("task.setOnFailed"));
+    }
+
+    @Test void normalAddPartyStillUsesLinkableCandidatesAndCasePartyFields() throws Exception {
+        String c = read("src/main/java/com/shale/ui/controller/CaseController.java");
+        String p = read("src/main/java/com/shale/ui/controller/support/PartyAddWorkflowDialog.java");
+        assertTrue(c.contains("caseDao.addCaseParty("));
+        assertTrue(p.contains("Party Role"));
+        assertTrue(p.contains("Affiliation"));
+        assertTrue(p.contains("Primary"));
+        assertTrue(p.contains("Notes"));
+        assertTrue(p.contains("AddPartyDraft"));
+    }
+}

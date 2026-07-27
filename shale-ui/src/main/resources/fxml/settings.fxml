@@ -108,6 +108,45 @@
             </VBox>
 
 
+            <VBox fx:id="requestAdministrationSection" spacing="8" styleClass="strong-panel">
+                <padding>
+                    <Insets top="12" right="12" bottom="12" left="12"/>
+                </padding>
+                <Label text="Requests" styleClass="search-section-title"/>
+                <Label text="Manage Material Types, Request Methods, and Request Statuses together. Tenant/global overlay behavior preserves active, inactive, system-key, color, origin, RowVer, and admin authorization semantics."
+                       styleClass="search-summary-text" wrapText="true"/>
+                <VBox spacing="14" styleClass="shale-density-card-compact">
+                    <VBox spacing="8" styleClass="strong-panel">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label text="Material Types" styleClass="search-section-title"/>
+                        <Label text="Colored tenant/global lookup values used by material request and material item selectors. Global defaults can be customized with tenant overrides." styleClass="search-summary-text" wrapText="true"/>
+                        <VBox fx:id="materialTypeCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
+                        <HBox fx:id="materialTypeActionRow" spacing="8">
+                            <Label fx:id="materialTypeSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+                        </HBox>
+                    </VBox>
+                    <VBox spacing="8" styleClass="strong-panel">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label text="Request Methods" styleClass="search-section-title"/>
+                        <Label text="Effective tenant/global lookup values seeded from Email, Phone, Fax, Mail, Portal, In Person, and Other. Global defaults can be customized with tenant overrides." styleClass="search-summary-text" wrapText="true"/>
+                        <VBox fx:id="requestMethodCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
+                        <HBox fx:id="requestMethodActionRow" spacing="8">
+                            <Label fx:id="requestMethodSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+                        </HBox>
+                    </VBox>
+                    <VBox spacing="8" styleClass="strong-panel">
+                        <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                        <Label text="Request Statuses" styleClass="search-section-title"/>
+                        <Label text="Colored lifecycle lookup values. New requests default by SystemKey requested while inactive historical values remain displayable." styleClass="search-summary-text" wrapText="true"/>
+                        <VBox fx:id="requestStatusCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
+                        <HBox fx:id="requestStatusActionRow" spacing="8">
+                            <Label fx:id="requestStatusSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+                        </HBox>
+                    </VBox>
+                </VBox>
+            </VBox>
+
+
             <VBox fx:id="userAdministrationSection" spacing="8" styleClass="strong-panel">
                 <padding>
                     <Insets top="12" right="12" bottom="12" left="12"/>

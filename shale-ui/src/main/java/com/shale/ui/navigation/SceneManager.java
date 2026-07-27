@@ -8,7 +8,9 @@ import com.shale.data.dao.CalendarEventDao;
 import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.MaterialRequestDao;
 import com.shale.data.service.adapter.CaseServiceAdapter;
+import com.shale.data.service.adapter.MaterialRequestServiceAdapter;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
@@ -137,6 +139,7 @@ public final class SceneManager {
 		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
 		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
 				new TaskDao(dbSessionProvider),
+				new MaterialRequestDao(dbSessionProvider),
 				new NotificationDao(dbSessionProvider),
 				appState,
 				notificationPreferencesService,
@@ -649,7 +652,7 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new UserDao(dbSessionProvider), runtimeBridge);
+			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(new MaterialRequestDao(dbSessionProvider)), new UserDao(dbSessionProvider), runtimeBridge);
 			return c;
 		});
 	}
@@ -802,6 +805,7 @@ public final class SceneManager {
 			CalendarFeedDao calendarFeedDao = new CalendarFeedDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), calendarFeedDao, notificationDao, runtimeBridge);
 			c.init(caseId, caseDao, caseDetailService, caseTaskService, calendarService, calendarFeedDao, new CaseServiceAdapter(caseDao), organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted, phiReadAuditService);
+			c.setMaterialRequestService(new MaterialRequestServiceAdapter(new MaterialRequestDao(dbSessionProvider)));
 			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);
 			c.setOnOpenStatus(this::openStatusProfile);

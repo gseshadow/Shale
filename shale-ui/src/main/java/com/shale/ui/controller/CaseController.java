@@ -36,6 +36,7 @@ import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.caseupdates.MedicalRecordRequestKeywordMatcher;
@@ -66,6 +67,7 @@ import com.shale.ui.document.CaseDocumentType;
 import com.shale.ui.document.GeneratedDocument;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
+import com.shale.ui.component.ColorCodedComboBox;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
@@ -225,6 +227,10 @@ public class CaseController {
 	private StackPane tasksUpdatesHost;
 	@FXML
 	private VBox caseCalendarTabPane;
+	@FXML
+	private VBox caseRequestsTabPane;
+	@FXML
+	private StackPane caseRequestsContentHost;
 	@FXML
 	private VBox caseLinksTabPane;
 	@FXML
@@ -593,9 +599,14 @@ public class CaseController {
 			"Parties",
 			"Tasks",
 			"Calendar",
+			"Requests",
 			"Links",
 			"Timeline"
 	);
+
+	static List<String> sectionOrderForTesting() {
+		return SECTIONS;
+	}
 
 	// ----------------------------
 	// Dependencies / callbacks
@@ -621,6 +632,8 @@ public class CaseController {
 	private CalendarService calendarService;
 	private CalendarFeedDao calendarFeedDao;
 	private CaseServicePort caseService;
+	private MaterialRequestServicePort materialRequestService;
+	private final CaseMaterialRequestsTabController caseMaterialRequestsTabController = new CaseMaterialRequestsTabController();
 	private final CaseLinkCardFactory caseLinkCardFactory = new CaseLinkCardFactory();
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
 		private final java.util.concurrent.atomic.AtomicInteger sequence = new java.util.concurrent.atomic.AtomicInteger();
@@ -791,6 +804,7 @@ public class CaseController {
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
 		resetCaseLinksState();
+		resetMaterialRequestsState();
 		resetOverviewPrimaryLinkState();
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
@@ -809,6 +823,7 @@ public class CaseController {
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
 		resetCaseLinksState();
+		resetMaterialRequestsState();
 		resetOverviewPrimaryLinkState();
 		this.caseUpdatesLoadedOnce = false;
 		this.caseUpdatesStale = true;
@@ -835,9 +850,16 @@ public class CaseController {
 		refreshHeader();
 	}
 
+	public void setMaterialRequestService(MaterialRequestServicePort materialRequestService) {
+		this.materialRequestService = materialRequestService;
+		caseMaterialRequestsTabController.init(materialRequestService, caseTaskService, caseService, appState, caseDao, contactDao, organizationDao, () -> caseId == null ? 0L : caseId.longValue(), this::caseRequestsOwner);
+		caseMaterialRequestsTabController.setEntityNavigation(onOpenContact, onOpenOrganization, onOpenUser);
+	}
+
 	public void setOnOpenUser(Consumer<Integer> onOpenUser) {
 		this.onOpenUser = onOpenUser;
 		this.userCardFactory = new UserCardFactory(onOpenUser);
+		caseMaterialRequestsTabController.setEntityNavigation(onOpenContact, onOpenOrganization, onOpenUser);
 	}
 
 	public void setOnOpenStatus(Consumer<Integer> onOpenStatus) {
@@ -848,6 +870,7 @@ public class CaseController {
 	public void setOnOpenContact(Consumer<Integer> onOpenContact) {
 		this.onOpenContact = onOpenContact;
 		this.contactCardFactory = new ContactCardFactory(onOpenContact);
+		caseMaterialRequestsTabController.setEntityNavigation(onOpenContact, onOpenOrganization, onOpenUser);
 	}
 
 	public void setOnOpenCase(Consumer<Integer> onOpenCase) {
@@ -880,6 +903,7 @@ public class CaseController {
 	public void setOnOpenOrganization(Consumer<Integer> onOpenOrganization) {
 		this.onOpenOrganization = onOpenOrganization;
 		this.organizationCardFactory = new OrganizationCardFactory(onOpenOrganization);
+		caseMaterialRequestsTabController.setEntityNavigation(onOpenContact, onOpenOrganization, onOpenUser);
 	}
 
 	private TaskCardFactory buildTaskCardFactory(Consumer<Long> openTaskHandler) {
@@ -1453,6 +1477,7 @@ public class CaseController {
 		case "Parties" -> showParties();
 		case "Tasks" -> showTasksTab();
 		case "Calendar" -> showCalendarTab();
+		case "Requests" -> showRequestsTab();
 		case "Links" -> showLinksTab();
 		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
@@ -1954,12 +1979,42 @@ public class CaseController {
 		onSectionSelected("Links", true);
 	}
 
+	private void resetMaterialRequestsState() {
+		if (caseRequestsContentHost != null) {
+			caseRequestsContentHost.getChildren().clear();
+		}
+	}
+
+	private void showRequestsTab() {
+		showRequestsSurface();
+		if (caseRequestsContentHost != null && caseRequestsContentHost.getChildren().isEmpty() && materialRequestService != null) {
+			caseRequestsContentHost.getChildren().setAll(caseMaterialRequestsTabController.view());
+		}
+		if (materialRequestService != null) caseMaterialRequestsTabController.load();
+		loadCaseUpdatesAsync();
+	}
+
+	private void showRequestsSurface() {
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
+		setPaneVisible(overviewScrollPane, false);
+		setPaneVisible(detailsSectionPane, false);
+		setPaneVisible(tasksTabPane, false);
+		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseRequestsTabPane, true);
+		setPaneVisible(caseLinksTabPane, false);
+		setPaneVisible(genericPane, false);
+		setPaneVisible(tasksPanel, false);
+	}
+
+	private Window caseRequestsOwner() { return caseRequestsTabPane != null && caseRequestsTabPane.getScene() != null ? caseRequestsTabPane.getScene().getWindow() : taskDialogOwner(); }
+
 	private void showLinksTab() {
 		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
 		setPaneVisible(overviewScrollPane, false);
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, true);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -2231,9 +2286,7 @@ public class CaseController {
 
 	private Optional<CaseLinkInput> showCaseLinkDialog(CaseLinkDto existing, List<LinkTypeDto> linkTypes) {
 		Dialog<CaseLinkInput> dialog = new Dialog<>(); String title = existing == null ? "Add Link" : "Edit Link"; dialog.setTitle(title); if (caseLinksOwner() != null) dialog.initOwner(caseLinksOwner()); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
-		ComboBox<LinkTypeDto> type = new ComboBox<>(); type.getItems().setAll(linkTypes); type.setMaxWidth(Double.MAX_VALUE); type.setConverter(new javafx.util.StringConverter<>() { public String toString(LinkTypeDto t) { return t == null ? "" : t.name(); } public LinkTypeDto fromString(String s) { return null; }});
-		type.setCellFactory(list -> new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); setGraphic(empty || item == null ? null : LinkTypeIndicatorFactory.createLinkTypePill(item.name(), item.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); }});
-		type.setButtonCell(new javafx.scene.control.ListCell<>() { protected void updateItem(LinkTypeDto item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? null : item.name()); }});
+		ColorCodedComboBox<LinkTypeDto> type = new ColorCodedComboBox<>(LinkTypeDto::name, LinkTypeDto::color); type.getItems().setAll(linkTypes);
 		TextField name = new TextField(existing == null ? "" : safeText(existing.displayName())); TextField url = new TextField(existing == null ? "" : safeText(existing.url())); TextArea description = new TextArea(existing == null ? "" : safeText(existing.description())); description.setPrefRowCount(3); TextArea notes = new TextArea(existing == null ? "" : safeText(existing.notes())); notes.setPrefRowCount(3); CheckBox primary = new CheckBox("Make primary"); primary.setSelected(existing != null && existing.primary());
 		SharedWithEditor sharedWithEditor = new SharedWithEditor(existing);
 		VBox sharedWithBox = sharedWithEditor.root();
@@ -2627,6 +2680,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, true);
@@ -2644,6 +2698,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -2664,6 +2719,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
 		setPaneVisible(tasksPanel, false);
@@ -2680,6 +2736,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -2707,6 +2764,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -2733,6 +2791,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
 		setPaneVisible(tasksPanel, false);
@@ -4596,11 +4655,7 @@ public class CaseController {
 			return false;
 		}
 		String partySystemKey = safeText(party.getPartyRoleSystemKey()).trim().toLowerCase(Locale.ROOT);
-		if (normalizedKey.equals(partySystemKey)) {
-			return true;
-		}
-		String legacyNameFallback = safeText(party.getPartyRoleName()).trim().toLowerCase(Locale.ROOT);
-		return normalizedKey.equals(legacyNameFallback);
+		return normalizedKey.equals(partySystemKey);
 	}
 
 	private void applyLastUpdatedLabel(LocalDateTime updatedAt) {

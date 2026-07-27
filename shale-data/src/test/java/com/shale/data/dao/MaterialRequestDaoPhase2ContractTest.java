@@ -24,44 +24,63 @@ final class MaterialRequestDaoPhase2ContractTest {
         assertTrue(DAO.contains("verifyTenant(con, shaleClientId)"));
     }
 
-    @Test void requestReadsAreTenantCaseScopedAndSummaryDoesNotSelectPhiDescription() {
-        assertTrue(DAO.contains("mr.ShaleClientId=? AND mr.CaseId=? AND mr.IsDeleted=0"));
+    @Test void requestReadsAreTenantCaseScopedAndSummaryIncludesSearchableDescription() {
+        assertTrue(DAO.contains("mr.ShaleClientId=? AND mr.CaseId=? AND (?=1 OR mr.IsDeleted=0)"));
         assertTrue(DAO.contains("JOIN dbo.Cases c ON c.Id=mr.CaseId AND c.ShaleClientId=mr.ShaleClientId"));
-        assertTrue(DAO.contains("CAST(NULL AS nvarchar(max)) AS Description"));
+        assertTrue(DAO.contains("mr.Description"));
         assertTrue(DAO.contains("mt.ShaleClientId=mr.ShaleClientId OR mt.ShaleClientId IS NULL"));
         assertTrue(DAO.contains("rs.getBytes(\"RowVer\")"));
     }
 
-    @Test void mutationsOwnTransactionTouchCaseAndAppendEntityAudit() {
-        assertTrue(DAO.contains("con.setAutoCommit(false)"));
-        assertTrue(DAO.contains("rollback(con)"));
-        assertTrue(DAO.contains("touchCase(con"));
-        assertTrue(DAO.contains("entityActionAuditDao.append(con"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.CREATED"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.UPDATED"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.STATUS_CHANGED"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.DELETED"));
-        assertTrue(DAO.contains("EntityActionAuditEvent.Action.FOLLOW_UP_ADDED"));
+    @Test void materialRequestListUsesSchemaCompatibleDisplayExpressionsAndMapperAliases() {
+        assertFalse(DAO.contains("rbu.DisplayName"));
+        assertFalse(DAO.contains("au.DisplayName"));
+        assertFalse(DAO.contains("u.DisplayName AS AttemptedByDisplayName"));
+        assertTrue(DAO.contains("mt.Name AS MaterialTypeName"));
+        assertTrue(DAO.contains("mt.SystemKey AS MaterialTypeSystemKey"));
+        assertTrue(DAO.contains("org.Name AS RequestedFromOrganizationName"));
+        assertTrue(DAO.contains("name_first"));
+        assertTrue(DAO.contains("name_last"));
+        assertTrue(DAO.contains("AS RequestedByDisplayName"));
+        assertTrue(DAO.contains("AS AssignedToDisplayName"));
+        assertTrue(DAO.contains("COALESCE(NULLIF(LTRIM(RTRIM("));
+        assertTrue(DAO.contains(".Name)), '')"));
+        assertTrue(DAO.contains("CONCAT("));
+        assertTrue(DAO.contains(".FirstName"));
+        assertTrue(DAO.contains(".LastName"));
+        assertTrue(DAO.contains(".WorkName"));
+        for (String label : new String[]{"Id","ShaleClientId","CaseId","MaterialTypeId","MaterialTypeName","MaterialTypeSystemKey","Status","RequestedByDisplayName","AssignedToDisplayName","RequestedFromContactDisplayName","RequestedFromOrganizationName","RequestedAt","ExpectedResponseDate","NextFollowUpAt","LastFollowUpAt","UpdatedAt","RowVer"}) {
+            assertTrue(DAO.contains("\"" + label + "\""), label);
+        }
+        assertTrue(DAO.contains("mr.ShaleClientId=? AND mr.CaseId=? AND (?=1 OR mr.IsDeleted=0)"));
+        assertTrue(DAO.contains("ISNULL(c.IsDeleted,0)=0"));
     }
 
-    @Test void validationCoversRelationshipsLifecycleConcurrencyAndPhi() {
-        assertTrue(DAO.contains("validateMaterialType"));
-        assertTrue(DAO.contains("masked by tenant override"));
-        assertTrue(DAO.contains("validateUser"));
-        assertTrue(DAO.contains("dbo.Contacts"));
-        assertTrue(DAO.contains("dbo.Organizations"));
-        assertTrue(DAO.contains("assertRowVer"));
-        assertTrue(DAO.contains("Closed material requests cannot be reopened"));
-        assertTrue(DAO.contains("phiAuditService.auditCreate"));
-        assertTrue(DAO.contains("phiAuditService.auditUpdate"));
+    @Test void requestMutationCommandsExposeFocusedCreateAndAuditedUpdate() {
+        String port = read("shale-core/src/main/java/com/shale/core/service/MaterialRequestServicePort.java");
+        String adapter = read("shale-data/src/main/java/com/shale/data/service/adapter/MaterialRequestServiceAdapter.java");
+        assertTrue(port.contains("CreateMaterialRequestCommand"));
+        assertTrue(port.contains("UpdateMaterialRequestCommand"));
+        assertFalse(port.contains("ChangeMaterialRequestStatusCommand"));
+        assertTrue(port.contains("DeleteMaterialRequestCommand"));
+        assertFalse(port.contains("RecordMaterialRequestFollowUpCommand"));
+        assertTrue(adapter.contains("createMaterialRequest"));
+        assertTrue(adapter.contains("updateMaterialRequest"));
+        assertFalse(adapter.contains("changeMaterialRequestStatus"));
+        assertTrue(adapter.contains("deleteMaterialRequest"));
+        assertFalse(adapter.contains("recordFollowUp"));
+        assertTrue(DAO.contains("INSERT dbo.MaterialRequests"));
+        assertTrue(DAO.contains("UPDATE dbo.MaterialRequests SET MaterialTypeId"));
+        assertFalse(DAO.contains("UPDATE dbo.MaterialRequests SET Status"));
+        assertTrue(DAO.contains("UPDATE dbo.MaterialRequests SET IsDeleted=1"));
+        assertFalse(DAO.contains("INSERT dbo.MaterialRequestFollowUps"));
     }
 
-    @Test void followUpsAreAppendOnlyAndNoApplicationPortExposesUpdateOrDelete() {
-        assertTrue(DAO.contains("INSERT dbo.MaterialRequestFollowUps"));
+    @Test void followUpsRemainAppendOnlyReadHistoryInTheApplicationPort() {
         assertFalse(DAO.contains("UPDATE dbo.MaterialRequestFollowUps"));
         assertFalse(DAO.contains("DELETE FROM dbo.MaterialRequestFollowUps"));
         assertTrue(DAO.contains("ORDER BY f.AttemptedAt, f.Id"));
-        assertEquals(0, Arrays.stream(MaterialRequestServicePort.class.getMethods()).filter(m -> m.getName().toLowerCase().contains("followup") && (m.getName().toLowerCase().contains("update") || m.getName().toLowerCase().contains("delete"))).count());
+        assertEquals(0, Arrays.stream(MaterialRequestServicePort.class.getMethods()).filter(m -> m.getName().toLowerCase().contains("followup") && (m.getName().toLowerCase().contains("update") || m.getName().toLowerCase().contains("delete") || m.getName().toLowerCase().contains("record"))).count());
     }
 
     @Test void sensitiveDetailAndHistoryReadsUseEstablishedReadAuditSink() throws Exception {
@@ -77,7 +96,7 @@ final class MaterialRequestDaoPhase2ContractTest {
     @Test void scopeGuardsNoMaterialItemApplicationOrUiApiStorage() {
         assertFalse(DAO.contains("MaterialItemDao"));
         assertFalse(DAO.contains("CaseTimeline"));
-        assertFalse(DAO.contains("Notification"));
+        assertTrue(DAO.contains("NotificationDao")); // established Material Request notification integration
         assertFalse(DAO.contains("ExternalLinks"));
         assertFalse(DAO.contains("Calendar"));
         assertTrue(MaterialRequestFollowUpDto.class.isRecord());

@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import com.shale.core.dto.CaseStatusDto;
 
 import javafx.scene.paint.Color;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
 
 final class SettingsControllerLifecycleTest {
 
@@ -191,6 +195,28 @@ final class SettingsControllerLifecycleTest {
         assertTrue(method.contains("event.consume()"));
         assertTrue(!method.contains("throw new IllegalArgumentException(\"Passwords"),
                 "Reset password validation failures should keep the dialog open with inline feedback, not throw from the result converter.");
+    }
+
+
+    @Test
+    void settingsAuditButtonUsesImplementedAdminGuardedHandler() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+        String method = methodSource(source, "onViewAuditLog");
+
+        assertTrue(fxml.contains("fx:id=\"viewAuditLogButton\""));
+        assertTrue(fxml.contains("onAction=\"#onViewAuditLog\""));
+        Method handler = SettingsController.class.getDeclaredMethod("onViewAuditLog", ActionEvent.class);
+        assertTrue(Modifier.isPrivate(handler.getModifiers()));
+        assertEquals(void.class, handler.getReturnType());
+        assertTrue(handler.isAnnotationPresent(FXML.class),
+                "FXML action handlers declared private must be annotated and accept the JavaFX action event.");
+        assertTrue(method.contains("if (!isAdminUser() || onOpenAuditLog == null)"),
+                "Settings audit-log navigation must preserve the existing admin permission guard.");
+        assertTrue(method.contains("onOpenAuditLog.run();"),
+                "Settings audit-log action should route through the SceneManager-supplied navigation callback.");
+        assertTrue(method.contains("AppDialogs.showError"),
+                "Audit-log navigation failures should be shown as sanitized user-facing errors.");
     }
 
 

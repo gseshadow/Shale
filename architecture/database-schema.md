@@ -183,6 +183,11 @@ The live schema does **not** include these columns:
 | `CaseStatusId`             | Not present in the live `dbo.Cases` output. Do not use unless a future migration adds it. |
 | `CasePracticeAreaId`       | Not present in the live `dbo.Cases` output.                                               |
 
+
+### Customizable lookup type standard
+
+For future design and modernization of tenant/global overlay lookup definition tables, use [customizable-lookup-types.md](customizable-lookup-types.md). That standard distinguishes recommended future shape from this file's live-schema facts, including `Statuses` as the case-status definition table and `CaseStatuses` as transactional history.
+
 ### Case status warning
 
 `dbo.Statuses` exists, but the current live `dbo.Cases` schema output does **not** include `CaseStatusId`.
@@ -928,3 +933,23 @@ Entity activity timestamps are stored as UTC `OccurredAt` values and converted t
 Entity activity metadata rendering is allowlist based. Only stable ID/state keys such as case, case-link, share, external-link, link-type, contact, primary-link, reorder count, and active state are rendered. Unknown, malformed, nested, oversized, or sensitive metadata is ignored; raw Metadata JSON is never displayed. Prohibited content includes URLs, link titles/descriptions/notes, share notes, Contact names/emails/phones, RowVer, credentials, SQL, exception text, commands, and DTO payloads.
 
 If a combined All-mode load partially fails, the viewer must not present incomplete history as complete; it should report the failed category, log the exception, and provide a retry/refresh path. Future API Source values may be shown only as subtle safe labels such as Desktop, API, or System.
+
+### Request workflow lookup overlays (2026-07-21)
+
+`dbo.RequestMethods` and `dbo.RequestStatuses` provide the Requests Settings tenant/global overlay model for Material Request creation. The authoritative `dbo.RequestMethods` shape after the Phase 1 database prerequisite is:
+
+| Column | Type | Nullability / notes |
+| --- | --- | --- |
+| `Id` | `int IDENTITY(1,1)` | Not null; primary key |
+| `ShaleClientId` | `int` | Nullable global/tenant overlay scope |
+| `SystemKey` | `varchar(64)` | Nullable stable overlay key |
+| `Name` | `nvarchar(120)` | Not null |
+| `Color` | `nvarchar(20)` | Nullable presentation value; added by `2026-07-24_request_methods_color.sql` |
+| `SortOrder` | `int` | Not null; default `0` |
+| `IsActive` | `bit` | Not null; default `1` |
+| `IsDeleted` | `bit` | Not null; default `0` |
+| `CreatedAt` | `datetime2` | Not null; UTC default |
+| `UpdatedAt` | `datetime2` | Nullable |
+| `RowVer` | `rowversion` | Not null; database generated |
+
+`Color` uses the standard optional `nvarchar(20)` presentation contract documented for customizable lookups and already established by the authoritative `MaterialTypes` schema. The Phase 1 migration stores built-in defaults but **the application does not read or mutate `RequestMethods.Color` yet**. `RequestStatuses` retains its independent color implementation. Global rows seed the approved request methods (`email`, `phone`, `fax`, `mail`, `portal`, `in_person`, `other`) and lifecycle statuses including the creation default `requested`. The legacy `dbo.MaterialRequests.RequestMethod` and `dbo.MaterialRequests.Status` text columns remain in place; no Request Method foreign key is introduced.

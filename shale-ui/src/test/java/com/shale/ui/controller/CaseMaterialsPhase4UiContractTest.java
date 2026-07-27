@@ -1,0 +1,155 @@
+package com.shale.ui.controller;
+
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+import java.nio.file.*;
+
+final class CaseMaterialsPhase4UiContractTest {
+  private static String read(String p){ try { return Files.readString(Path.of(p)); } catch(Exception e){ throw new RuntimeException(e);} }
+  private static final String CTRL = read("src/main/java/com/shale/ui/controller/CaseController.java");
+  private static final String FXML = read("src/main/resources/fxml/case.fxml");
+  private static final String MAT = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
+
+  @Test void requestsRemainInTabOrderWhileCaseMaterialsUiIsAbsent() {
+    assertEquals(java.util.List.of("Overview", "Details", "Parties", "Tasks", "Calendar", "Requests", "Links", "Timeline"),
+        CaseController.sectionOrderForTesting());
+    assertTrue(CTRL.contains("case \"Requests\" -> showRequestsTab();"));
+    assertFalse(CTRL.contains("case \"Case Materials\""));
+    assertFalse(CTRL.contains("showMaterialsTab"));
+    assertTrue(FXML.contains("fx:id=\"caseCalendarTabPane\""));
+    assertTrue(FXML.contains("fx:id=\"caseRequestsTabPane\""));
+    assertFalse(FXML.contains("fx:id=\"caseMaterialsTabPane\""));
+    assertFalse(FXML.contains("fx:id=\"caseMaterialsContentHost\""));
+    assertTrue(FXML.contains("fx:id=\"caseLinksTabPane\""));
+  }
+
+  @Test void eachTabHasIndependentControllerAndLoadFailureMessaging() {
+    assertTrue(MAT.contains("final class CaseMaterialRequestsTabController"));
+    assertTrue(MAT.contains("final class CaseMaterialItemsTabController"));
+    assertTrue(MAT.contains("case-material-requests-worker"));
+    assertTrue(MAT.contains("case-material-items-worker"));
+    assertTrue(MAT.contains("Material requests could not be loaded."));
+    assertTrue(MAT.contains("Case materials could not be loaded."));
+    assertTrue(MAT.contains("LOG.warn"));
+    assertTrue(MAT.contains("listMaterialRequests(cid,tid,include)"));
+    assertTrue(MAT.contains("listMaterialItems(c,t)"));
+    assertFalse(MAT.contains("The materials change could not be completed"));
+  }
+
+  @Test void caseMaterialsPrimaryLoadIsDecoupledFromRequestChoices() {
+    String refresh = MAT.substring(MAT.indexOf("void refresh(){long c=cid();int t=tenant();int g=gen.incrementAndGet();", MAT.indexOf("final class CaseMaterialItemsTabController")), MAT.indexOf("private void render(List<MaterialItemSummaryDto>", MAT.indexOf("final class CaseMaterialItemsTabController")));
+    assertTrue(refresh.contains("runRead(\"list-material-items\",()->svc.listMaterialItems(c,t)"));
+    assertFalse(refresh.contains("req.listMaterialRequests"));
+    assertTrue(MAT.contains("requestChoiceGen"));
+    assertTrue(MAT.contains("requestChoicesOrShowError"));
+    assertTrue(MAT.contains("Material request choices could not be loaded"));
+    assertTrue(MAT.contains("Case Materials auxiliary lookup failed"));
+    assertFalse(MAT.contains("list-material-items\",()->{activeRequests=req.listMaterialRequests"));
+  }
+
+  @Test void requestTabSupportsEditableRequestsWhileCaseMaterialsStillUseItemForms() {
+    String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
+    assertTrue(requestController.contains("primary(\"New Request\")"));
+    assertFalse(requestController.contains("ButtonType(\"Edit\")"));
+    assertFalse(requestController.contains("openEditor"));
+    assertTrue(requestController.contains("createMaterialRequest"));
+    assertTrue(requestController.contains("updateMaterialRequest"));
+    assertFalse(MAT.contains("final class MaterialRequestForm"));
+    assertTrue(requestController.contains("listMaterialRequests(cid,tid,include)"));
+    assertTrue(requestController.contains("svc.getMaterialRequest(capturedCase,requestId,capturedTenant,capturedActor)"));
+    assertFalse(requestController.contains("ButtonType.CLOSE"));
+    assertTrue(MAT.contains("final class MaterialItemForm extends Dialog"));
+    assertTrue(MAT.contains("CreateMaterialItemCommand"));
+    assertTrue(MAT.contains("Identity: Material Type *"));
+    assertTrue(MAT.contains("Optional associated Material Request"));
+    assertTrue(MAT.contains("ExternalLink reference selector"));
+    assertTrue(MAT.contains("Storage location (not a file upload)"));
+    assertFalse(MAT.contains("setTitle(\"Confirmation\")"));
+  }
+
+
+  @Test void requestTabNewRequestActionIsHeaderStyledAndCreatesThroughService() {
+    String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
+    String materialsUi = MAT.substring(MAT.indexOf("final class MaterialsUi"));
+    int headerAction = requestController.indexOf("Button add=primary(\"New Request\")");
+    int rootSection = requestController.indexOf("section(title,add,status,list)");
+    int listCreation = requestController.indexOf("list=new VBox(10)");
+    assertTrue(headerAction >= 0);
+    assertTrue(rootSection > headerAction);
+    assertTrue(listCreation >= 0 && headerAction > listCreation);
+    assertTrue(requestController.contains("add.setOnAction(e->openNewRequestWindow())"));
+    assertTrue(materialsUi.contains("ActionButtonFactory.primary(s,null)"));
+    assertTrue(requestController.contains("AppDialogs.createModalStage(owner.get(),\"New Request\")"));
+    assertTrue(requestController.contains("AppDialogs.createSecondaryWindowShell(stage,\"New Request\",stage::close,body)"));
+    assertTrue(requestController.contains("private void openNewRequestWindow()"));
+    String placeholder = requestController.substring(requestController.indexOf("private void openNewRequestWindow()"), requestController.indexOf("private void openDetail"));
+    assertTrue(placeholder.contains("VBox body=newRequestBody(stage)"));
+    assertTrue(placeholder.contains("TextField titleField=new TextField()"));
+    assertTrue(placeholder.contains("titleField.setPromptText(\"New Request\")"));
+    assertFalse(placeholder.contains("MaterialRequestForm"));
+    assertTrue(placeholder.contains("add(fields,1,\"Requested From *:\",requestedFromBox)"));
+    assertTrue(placeholder.contains("TextArea description=new TextArea()"));
+    assertTrue(placeholder.contains("ColorCodedComboBox<MaterialTypeDto> materialType"));
+    assertFalse(placeholder.contains("new ComboBox<MaterialTypeDto>"));
+    assertTrue(placeholder.contains("ChoiceBox<String> followUpInterval"));
+    assertTrue(placeholder.contains("add(fields,7,\"Follow-up Interval:\",followUpInterval)"));
+    assertFalse(placeholder.contains("Requested At:"));
+    assertFalse(placeholder.contains("Due At:"));
+    assertFalse(placeholder.contains("Next Follow-up At:"));
+    assertFalse(placeholder.contains("ButtonType.OK"));
+    assertTrue(requestController.contains("CreateMaterialRequestCommand"));
+    assertTrue(requestController.contains("ActionButtonFactory.primary(\"Save\",null)"));
+    assertTrue(requestController.contains("createMaterialRequest"));
+    assertTrue(requestController.contains("updateMaterialRequest"));
+    assertFalse(MAT.contains("final class MaterialRequestForm"));
+  }
+  @Test void newRequestRequestedFromUsesSharedPartyEntityChooserWithoutCasePartyMutation() {
+    String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
+    String dialog = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
+    String body = requestController.substring(requestController.indexOf("VBox newRequestBody"), requestController.indexOf("private void loadNewRequestLookups"));
+    assertTrue(body.contains("add(fields,1,\"Requested From *:\",requestedFromBox)"));
+    assertTrue(body.contains("ActionButtonFactory.primary(\"Add\",null)"));
+    assertTrue(body.contains("requestedFromAction.setText(v==null?\"Add\":\"Change\")"));
+    assertTrue(body.contains("ActionButtonFactory.neutral(\"Remove\",null)"));
+    assertTrue(body.contains("AtomicReference<RequestedFromSelection>"));
+    assertTrue(requestController.contains("record RequestedFromSelection(String entityType, Long entityId, String label, ContactCardFactory.ContactCardModel contactModel, OrganizationCardFactory.OrganizationCardModel organizationModel)"));
+    assertTrue(body.contains("contactCards.create(v.contactModel(),ContactCardFactory.Variant.MINI)"));
+    assertTrue(body.contains("organizationCards.create(v.organizationModel(),OrganizationCardFactory.Variant.MINI)"));
+    assertTrue(body.contains("showRequestedFromChooser(stage)"));
+    assertTrue(requestController.contains("RequestedFromWorkflowDialog.show"));
+    assertTrue(requestController.contains("caseDao.findSelectableContactsForTenant()"));
+    assertTrue(requestController.contains("caseDao.findSelectableOrganizationsForTenant()"));
+    assertTrue(requestController.contains("contactDao.createContact(new ContactDao.CreateContactRequest"));
+    assertTrue(requestController.contains("organizationDao.create(new OrganizationDao.OrganizationCreateRequest"));
+    assertFalse(requestController.contains("caseDao.addCaseParty"));
+    assertTrue(requestController.contains("createMaterialRequest"));
+    assertTrue(requestController.contains("updateMaterialRequest"));
+    assertFalse(MAT.contains("final class MaterialRequestForm"));
+    assertTrue(dialog.contains("public record Selection"));
+    assertTrue(dialog.contains("public static Selection show"));
+    assertTrue(dialog.contains("Select Existing or Create New"));
+    assertTrue(dialog.contains("Contact or Organization"));
+  }
+
+
+
+  @Test void itemDetailsAndExplicitItemOperationsRemainSeparated() {
+    for (String command : new String[]{"UpdateMaterialItemCommand","ChangeMaterialItemLocationCommand","LinkMaterialItemToRequestCommand","UnlinkMaterialItemFromRequestCommand","ReleaseOrReturnMaterialItemCommand","SoftDeleteMaterialItemCommand"}) assertTrue(MAT.contains(command), command);
+    assertTrue(MAT.contains("Edit Metadata"));
+    assertTrue(MAT.contains("Link/Unlink Request"));
+    assertTrue(MAT.contains("Location/Reference"));
+    assertTrue(MAT.contains("Record Return/Release"));
+    assertTrue(MAT.contains("d.rowVer()"));
+    assertTrue(MAT.contains("e.rowVer()"));
+  }
+
+  @Test void scopeGuardsNoForbiddenWork() {
+    assertFalse(MAT.contains("FileChooser"));
+    assertFalse(MAT.toLowerCase().contains("download action"));
+    assertFalse(MAT.toLowerCase().contains("ocr action"));
+    assertFalse(MAT.contains("CREATE TABLE"));
+    assertFalse(MAT.contains("DELETE FROM dbo.MaterialRequestFollowUps"));
+    assertFalse(MAT.contains("UPDATE dbo.MaterialRequestFollowUps"));
+    assertFalse(MAT.toLowerCase().contains("timeline"));
+  }
+}
