@@ -28,8 +28,9 @@ class NotificationPrivacyProjectorTest {
 		Set<String> fields = Arrays.stream(NativeNotificationPresentation.class.getRecordComponents())
 				.map(RecordComponent::getName).collect(Collectors.toSet());
 		assertEquals(Set.of("notificationId", "heading", "message", "categoryCode"), fields);
-		assertEquals(NativeNotificationPresentation.class,
-				DesktopNotificationPresenter.class.getDeclaredMethods()[0].getParameterTypes()[0]);
+		var present = Arrays.stream(DesktopNotificationPresenter.class.getDeclaredMethods())
+				.filter(method -> method.getName().equals("present")).findFirst().orElseThrow();
+		assertArrayEquals(new Class<?>[] { NativeNotificationPresentation.class }, present.getParameterTypes());
 		assertEquals(PresentationResult.UNSUPPORTED, new NoOpDesktopNotificationPresenter().present(project("TASK")));
 	}
 

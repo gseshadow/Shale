@@ -88,6 +88,7 @@ public final class NotificationPollingService implements AutoCloseable {
 		scheduled = null;
 		session = null;
 		presentedOrAttempted.clear();
+		presenter.invalidate();
 	}
 
 	private synchronized void schedule(long token, Duration delay) {
@@ -186,6 +187,7 @@ public final class NotificationPollingService implements AutoCloseable {
 		closed = true;
 		generation++;
 		if (ownsScheduler) scheduler.shutdownNow();
+		presenter.close();
 	}
 
 	private static ScheduledExecutorService daemonScheduler() {

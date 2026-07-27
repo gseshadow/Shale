@@ -93,6 +93,7 @@ import com.shale.ui.notification.AssignedUserTaskDueNotificationRecipientResolve
 import com.shale.ui.notification.TaskDueDateNotificationGenerator;
 import com.shale.ui.notification.NotificationPollingService;
 import com.shale.ui.notification.NoOpDesktopNotificationPresenter;
+import com.shale.ui.notification.DesktopNotificationPresenter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 
 public final class SceneManager {
@@ -131,7 +132,14 @@ public final class SceneManager {
 			UiAuthService authService,
 			UiRuntimeBridge runtimeBridge,
 			DbSessionProvider dbSessionProvider,
-			UiUpdateLauncher updateLauncher) {
+				UiUpdateLauncher updateLauncher) {
+		this(stage, appState, authService, runtimeBridge, dbSessionProvider, updateLauncher,
+				new NoOpDesktopNotificationPresenter());
+	}
+
+	public SceneManager(Stage stage, AppState appState, UiAuthService authService,
+			UiRuntimeBridge runtimeBridge, DbSessionProvider dbSessionProvider,
+			UiUpdateLauncher updateLauncher, DesktopNotificationPresenter notificationPresenter) {
 		this.stage = stage;
 		this.appState = appState;
 		this.authService = authService;
@@ -144,7 +152,7 @@ public final class SceneManager {
 		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
 		this.notificationPollingService = new NotificationPollingService(
 				new NotificationServiceAdapter(new NotificationDao(dbSessionProvider)), notificationCenterService,
-				durableNotificationService, new NoOpDesktopNotificationPresenter(), Platform::runLater);
+				durableNotificationService, Objects.requireNonNull(notificationPresenter), Platform::runLater);
 		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
 				new TaskDao(dbSessionProvider),
 				new MaterialRequestDao(dbSessionProvider),

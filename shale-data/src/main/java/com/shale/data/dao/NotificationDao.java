@@ -309,18 +309,6 @@ public final class NotificationDao {
 				rs.getString("CasePrimaryStatusName"),rs.getString("CasePrimaryStatusColor"),rs.getString("CasePracticeAreaColor"),rs.getBoolean("IsRead"),toInstant(rs.getTimestamp("CreatedAt")),rs.getString("EventKey"));
 	}
 
-	public long notificationHighWaterMark(int shaleClientId, int userId) {
-		if (shaleClientId <= 0 || userId <= 0) return 0;
-		String sql = "SELECT COALESCE(MAX(n.Id),0) FROM dbo.Notifications n WHERE n.ShaleClientId=? AND n.UserId=?";
-		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, shaleClientId);
-			ps.setInt(2, userId);
-			try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getLong(1) : 0; }
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to read notification high-water mark", e);
-		}
-	}
-
 	public java.util.Optional<NotificationActivationRow> findActivationTarget(int shaleClientId,int userId,long notificationId) {
 		if(shaleClientId<=0||userId<=0||notificationId<=0)return java.util.Optional.empty();
 		String sql="""
