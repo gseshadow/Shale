@@ -1,6 +1,8 @@
 package com.shale.ui.notification;
 
 import com.shale.data.dao.NotificationDao;
+import com.shale.data.dao.MaterialRequestDao;
+import com.shale.data.dao.MaterialRequestDao.MaterialRequestDueNotificationCandidate;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.TaskDao.TaskDueNotificationCandidate;
 import com.shale.ui.state.AppState;
@@ -19,6 +21,7 @@ public final class TaskDueDateNotificationGenerator {
 	private static final long CADENCE_MINUTES = 30;
 
 	private final TaskDao taskDao;
+	private final MaterialRequestDao materialRequestDao;
 	private final NotificationDao notificationDao;
 	private final AppState appState;
 	private final NotificationPreferencesService notificationPreferencesService;
@@ -29,15 +32,17 @@ public final class TaskDueDateNotificationGenerator {
 
 	public TaskDueDateNotificationGenerator(
 			TaskDao taskDao,
+			MaterialRequestDao materialRequestDao,
 			NotificationDao notificationDao,
 			AppState appState,
 			NotificationPreferencesService notificationPreferencesService,
 			TaskDueNotificationRecipientResolver recipientResolver) {
-		this(taskDao, notificationDao, appState, notificationPreferencesService, recipientResolver, Clock.systemDefaultZone(), ZoneId.systemDefault());
+		this(taskDao, materialRequestDao, notificationDao, appState, notificationPreferencesService, recipientResolver, Clock.systemDefaultZone(), ZoneId.systemDefault());
 	}
 
 	TaskDueDateNotificationGenerator(
 			TaskDao taskDao,
+			MaterialRequestDao materialRequestDao,
 			NotificationDao notificationDao,
 			AppState appState,
 			NotificationPreferencesService notificationPreferencesService,
@@ -45,6 +50,7 @@ public final class TaskDueDateNotificationGenerator {
 			Clock clock,
 			ZoneId zoneId) {
 		this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
+		this.materialRequestDao = Objects.requireNonNull(materialRequestDao, "materialRequestDao");
 		this.notificationDao = Objects.requireNonNull(notificationDao, "notificationDao");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
@@ -109,6 +115,13 @@ public final class TaskDueDateNotificationGenerator {
 							state.severity(),
 							eventKey);
 				}
+			}
+			for (MaterialRequestDueNotificationCandidate candidate : materialRequestDao.listDueNotificationCandidates(shaleClientId, today)) {
+				Integer recipient = candidate.recipientUserId();
+				if (recipient == null || recipient <= 0) continue;
+				String eventKey = "material-request:" + candidate.requestId() + ":due:" + candidate.dueAt() + ":" + recipient;
+				notificationDao.createMaterialRequestDueNotification(candidate.shaleClientId(), recipient,
+						"Material request due", "A material request is due: " + candidate.title(), candidate.requestId(), eventKey);
 			}
 		} catch (Exception ex) {
 			System.err.println("Task due-date generator failed: " + ex.getMessage());

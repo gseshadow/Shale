@@ -141,6 +141,7 @@ public final class SceneManager {
 		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
 		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
 				new TaskDao(dbSessionProvider),
+				new MaterialRequestDao(dbSessionProvider),
 				new NotificationDao(dbSessionProvider),
 				appState,
 				notificationPreferencesService,
