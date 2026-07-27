@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import com.shale.core.dto.CaseStatusDto;
 
 import javafx.scene.paint.Color;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
 
 final class SettingsControllerLifecycleTest {
 
@@ -202,8 +206,10 @@ final class SettingsControllerLifecycleTest {
 
         assertTrue(fxml.contains("fx:id=\"viewAuditLogButton\""));
         assertTrue(fxml.contains("onAction=\"#onViewAuditLog\""));
-        assertTrue(source.contains("@FXML\n\tprivate void onViewAuditLog(javafx.event.ActionEvent event)")
-                        || source.contains("@FXML\n\tprivate void onViewAuditLog(ActionEvent event)"),
+        Method handler = SettingsController.class.getDeclaredMethod("onViewAuditLog", ActionEvent.class);
+        assertTrue(Modifier.isPrivate(handler.getModifiers()));
+        assertEquals(void.class, handler.getReturnType());
+        assertTrue(handler.isAnnotationPresent(FXML.class),
                 "FXML action handlers declared private must be annotated and accept the JavaFX action event.");
         assertTrue(method.contains("if (!isAdminUser() || onOpenAuditLog == null)"),
                 "Settings audit-log navigation must preserve the existing admin permission guard.");

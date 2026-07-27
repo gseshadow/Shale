@@ -4,9 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -14,8 +11,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import com.shale.core.dto.MaterialRequestSummaryDto;
+import com.shale.ui.testutil.JavaFxTestSupport;
 
-import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.geometry.Insets;
@@ -30,19 +27,10 @@ import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
 
 final class MaterialRequestCardFactoryRenderingTest {
-    private static final AtomicBoolean TOOLKIT_STARTED = new AtomicBoolean();
-
     @BeforeAll
-    static void startJavaFxToolkit() throws Exception {
+    static void startJavaFxToolkit() {
         assumeTrue(hasDisplay(), "Material Request rendered card test requires a graphical display.");
-        if (TOOLKIT_STARTED.compareAndSet(false, true)) {
-            CountDownLatch latch = new CountDownLatch(1);
-            Platform.startup(() -> {
-                Platform.setImplicitExit(false);
-                latch.countDown();
-            });
-            assertTrue(latch.await(10, TimeUnit.SECONDS));
-        }
+        JavaFxTestSupport.ensureToolkitStarted();
     }
 
     @Test
@@ -311,19 +299,7 @@ final class MaterialRequestCardFactoryRenderingTest {
     }
 
     private static void runFxAndWait(Runnable action) throws Exception {
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicReference<Throwable> failure = new AtomicReference<>();
-        Platform.runLater(() -> {
-            try {
-                action.run();
-            } catch (Throwable t) {
-                failure.set(t);
-            } finally {
-                latch.countDown();
-            }
-        });
-        assertTrue(latch.await(10, TimeUnit.SECONDS));
-        if (failure.get() != null) throw new AssertionError(failure.get());
+        JavaFxTestSupport.runAndWait(action::run);
     }
 
     private static boolean hasDisplay() {

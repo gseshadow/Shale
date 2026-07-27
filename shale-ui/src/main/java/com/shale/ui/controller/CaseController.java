@@ -610,6 +610,10 @@ public class CaseController {
 			"Timeline"
 	);
 
+	static List<String> sectionOrderForTesting() {
+		return SECTIONS;
+	}
+
 	// ----------------------------
 	// Dependencies / callbacks
 	// ----------------------------

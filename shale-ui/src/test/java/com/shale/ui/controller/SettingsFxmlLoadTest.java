@@ -8,8 +8,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -21,51 +19,47 @@ import com.shale.data.dao.UserPreferencesDao;
 import com.shale.ui.notification.NotificationPreferencesService;
 import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
+import com.shale.ui.testutil.JavaFxTestSupport;
 
-import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 
 final class SettingsFxmlLoadTest {
-    private static final AtomicBoolean TOOLKIT_STARTED = new AtomicBoolean();
-
     @BeforeAll
-    static void startJavaFxToolkit() throws Exception {
+    static void startJavaFxToolkit() {
         assumeTrue(hasDisplay(), "JavaFX FXML load test requires a graphical display.");
-        if (TOOLKIT_STARTED.compareAndSet(false, true)) {
-            CountDownLatch latch = new CountDownLatch(1);
-            Platform.startup(latch::countDown);
-            assertTrue(latch.await(10, TimeUnit.SECONDS), "JavaFX toolkit should start for real FXML loading.");
-        }
+        JavaFxTestSupport.ensureToolkitStarted();
     }
 
     @Test
     void settingsFxmlLoadsWithSceneManagerControllerConstructionAndAuditActionResolves() throws Exception {
         AtomicBoolean auditOpened = new AtomicBoolean(false);
-        FXMLLoader loader = new FXMLLoader(SettingsFxmlLoadTest.class.getResource("/fxml/settings.fxml"));
-        loader.setControllerFactory(type -> {
-            Object controller = assertDoesNotThrow(() -> type.getDeclaredConstructor().newInstance());
-            if (controller instanceof SettingsController settingsController) {
-                settingsController.init(notificationPreferences(), nonAdminState(), () -> auditOpened.set(true), noDatabaseCaseService(), noDatabaseUserDao(), null);
-            }
-            return controller;
+        JavaFxTestSupport.runAndWait(() -> {
+            FXMLLoader loader = new FXMLLoader(SettingsFxmlLoadTest.class.getResource("/fxml/settings.fxml"));
+            loader.setControllerFactory(type -> {
+                Object controller = assertDoesNotThrow(() -> type.getDeclaredConstructor().newInstance());
+                if (controller instanceof SettingsController settingsController) {
+                    settingsController.init(notificationPreferences(), nonAdminState(), () -> auditOpened.set(true), noDatabaseCaseService(), noDatabaseUserDao(), null);
+                }
+                return controller;
+            });
+
+            Parent root = assertDoesNotThrow((org.junit.jupiter.api.function.ThrowingSupplier<Parent>) loader::load);
+            assertNotNull(loader.getController());
+            assertNotNull(root.lookup("#taskAssignedToMeCheck"), "Existing Settings notification checkbox should remain wired.");
+            assertNotNull(root.lookup("#showInactiveUsersCheck"), "Existing Settings user-management checkbox should remain wired.");
+
+            Button auditButton = (Button) root.lookup("#viewAuditLogButton");
+            assertNotNull(auditButton, "Audit-log action button should be present when audit viewing is supported.");
+            assertNotNull(auditButton.getOnAction(), "FXML should resolve the audit-log action handler.");
+            auditButton.fire();
+            assertTrue(!auditOpened.get(), "Non-admin Settings users must not open the audit log.");
+
+            CheckBox inactiveUsers = (CheckBox) root.lookup("#showInactiveUsersCheck");
+            assertNotNull(inactiveUsers.getOnAction(), "Existing Settings controls should keep resolving their handlers.");
         });
-
-        Parent root = assertDoesNotThrow((org.junit.jupiter.api.function.ThrowingSupplier<Parent>) loader::load);
-        assertNotNull(loader.getController());
-        assertNotNull(root.lookup("#taskAssignedToMeCheck"), "Existing Settings notification checkbox should remain wired.");
-        assertNotNull(root.lookup("#showInactiveUsersCheck"), "Existing Settings user-management checkbox should remain wired.");
-
-        Button auditButton = (Button) root.lookup("#viewAuditLogButton");
-        assertNotNull(auditButton, "Audit-log action button should be present when audit viewing is supported.");
-        assertNotNull(auditButton.getOnAction(), "FXML should resolve the audit-log action handler.");
-        auditButton.fire();
-        assertTrue(!auditOpened.get(), "Non-admin Settings users must not open the audit log.");
-
-        CheckBox inactiveUsers = (CheckBox) root.lookup("#showInactiveUsersCheck");
-        assertNotNull(inactiveUsers.getOnAction(), "Existing Settings controls should keep resolving their handlers.");
     }
 
     private static boolean hasDisplay() {
