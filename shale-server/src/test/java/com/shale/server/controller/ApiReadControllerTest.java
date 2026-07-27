@@ -692,6 +692,10 @@ class ApiReadControllerTest {
                 .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
                 .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.count").value(3));
+		mvc.perform(get("/api/notifications/high-water")
+				.header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+				.header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.cursor").isNotEmpty());
         mvc.perform(get("/api/notifications/101/activation-target")
                 .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
                 .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
@@ -1194,7 +1198,8 @@ class ApiReadControllerTest {
         }
     }
 
-    private static final class RecordingNotificationServicePort implements NotificationServicePort {
+	private static final class RecordingNotificationServicePort implements NotificationServicePort {
+		@Override public long notificationHighWaterMark(int shaleClientId, int userId) { return 101; }
         private int shaleClientId;
         private int userId;
 
