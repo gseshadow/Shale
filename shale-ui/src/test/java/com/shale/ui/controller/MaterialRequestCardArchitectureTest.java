@@ -17,7 +17,7 @@ class MaterialRequestCardArchitectureTest {
         assertTrue(Files.exists(FACTORY), "Repository inspection found no pre-existing reusable request card, so one canonical factory is introduced.");
         String controller = Files.readString(CONTROLLER);
         assertTrue(controller.contains("new MaterialRequestCardFactory(this::openDetail)"));
-        assertTrue(controller.contains("requestCardFactory.create(r, MaterialRequestCardFactory.Variant.LIST, presentation.name(), presentation.color())"));
+        assertTrue(controller.contains("requestCardFactory.create(r,MaterialRequestCardFactory.Variant.LIST,presentation.name(),presentation.color())"));
         assertFalse(controller.contains("private Node card(MaterialRequestSummaryDto r)"));
         assertFalse(controller.contains("Requested / Due / Follow-up"));
         assertTrue(controller.contains("show(status,\"Loading material requests…\")"));
@@ -32,7 +32,7 @@ class MaterialRequestCardArchitectureTest {
         String dao = Files.readString(DAO);
         String factory = Files.readString(FACTORY);
         assertTrue(dao.contains("mt.Color AS MaterialTypeColor"));
-        assertTrue(dao.contains("WHERE mr.ShaleClientId=? AND mr.CaseId=? AND mr.IsDeleted=0"));
+        assertTrue(dao.contains("WHERE mr.ShaleClientId=? AND mr.CaseId=? AND (?=1 OR mr.IsDeleted=0)"));
         assertFalse(factory.contains("MaterialRequestDao"));
         assertFalse(factory.contains("MaterialRequestService"));
         assertFalse(factory.contains("createMaterialRequest"));

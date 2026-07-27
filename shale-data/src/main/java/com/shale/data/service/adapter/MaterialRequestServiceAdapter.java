@@ -29,11 +29,14 @@ public final class MaterialRequestServiceAdapter implements MaterialRequestServi
     public RequestStatusDto updateRequestStatus(RequestStatusCommand c){if(c.id()==null)throw new IllegalArgumentException("Request status id is required.");rv(c.expectedRowVer());validate(c.name(),120);return dao.updateRequestStatus(c);}
     public RequestStatusDto setRequestStatusActive(SetLookupActiveCommand c){rv(c.expectedRowVer());return dao.setRequestStatusActive(c);}
     public void resetRequestStatusOverride(ResetLookupOverrideCommand c){dao.resetRequestStatusOverride(c);}
-    public List<MaterialRequestSummaryDto> listMaterialRequests(long caseId,int shaleClientId){return dao.listMaterialRequests(caseId,shaleClientId);}    
+    public List<MaterialRequestSummaryDto> listMaterialRequests(long caseId,int shaleClientId){auditList(caseId);return dao.listMaterialRequests(caseId,shaleClientId);}
+    public List<MaterialRequestSummaryDto> listMaterialRequests(long caseId,int shaleClientId,boolean includeDeleted){auditList(caseId);return dao.listMaterialRequests(caseId,shaleClientId,includeDeleted);}
     public Optional<MaterialRequestDetailDto> getMaterialRequest(long caseId,long materialRequestId,int shaleClientId,int actorUserId){ if(readAuditSink!=null) readAuditSink.auditRead("MaterialRequest.Detail", "CASE_MATERIALS_REQUEST_DETAIL", "MaterialRequest", materialRequestId); return Optional.ofNullable(dao.findMaterialRequest(caseId,materialRequestId,shaleClientId));}
     public List<MaterialRequestFollowUpDto> listFollowUps(long caseId,long materialRequestId,int shaleClientId,int actorUserId){ if(readAuditSink!=null) readAuditSink.auditRead("MaterialRequest.FollowUps", "CASE_MATERIALS_FOLLOW_UP_HISTORY", "MaterialRequest", materialRequestId); return dao.listFollowUps(caseId,materialRequestId,shaleClientId);}
     public MaterialRequestDetailDto createMaterialRequest(CreateMaterialRequestCommand command){return dao.create(command);}
     public MaterialRequestDetailDto updateMaterialRequest(UpdateMaterialRequestCommand command){return dao.update(command);}
+    public void deleteMaterialRequest(DeleteMaterialRequestCommand command){rv(command.rowVer());dao.softDelete(command);}
+    private void auditList(long caseId){if(readAuditSink!=null)readAuditSink.auditRead("MaterialRequest.Description","CASE_MATERIALS_REQUEST_LIST","Case",caseId);}
     private static void validate(String name,int max){if(name==null||name.trim().isEmpty())throw new IllegalArgumentException("Name is required.");if(name.trim().length()>max)throw new IllegalArgumentException("Name is too long.");}
     private static void rv(byte[] v){if(v==null||v.length==0)throw new IllegalArgumentException("Request version is required.");}
 }

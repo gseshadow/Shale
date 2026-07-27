@@ -28,7 +28,7 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(MAT.contains("Material requests could not be loaded."));
     assertTrue(MAT.contains("Case materials could not be loaded."));
     assertTrue(MAT.contains("LOG.warn"));
-    assertTrue(MAT.contains("listMaterialRequests(cid,tid)"));
+    assertTrue(MAT.contains("listMaterialRequests(cid,tid,include)"));
     assertTrue(MAT.contains("listMaterialItems(c,t)"));
     assertFalse(MAT.contains("The materials change could not be completed"));
   }
@@ -52,7 +52,7 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(requestController.contains("createMaterialRequest"));
     assertTrue(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
-    assertTrue(requestController.contains("listMaterialRequests(cid,tid)"));
+    assertTrue(requestController.contains("listMaterialRequests(cid,tid,include)"));
     assertTrue(requestController.contains("svc.getMaterialRequest(capturedCase,requestId,capturedTenant,capturedActor)"));
     assertFalse(requestController.contains("ButtonType.CLOSE"));
     assertTrue(MAT.contains("final class MaterialItemForm extends Dialog"));

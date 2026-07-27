@@ -82,7 +82,7 @@ public final class MaterialRequestCardFactory {
         title.setMaxWidth(Double.MAX_VALUE);
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #112542;");
 
-        HBox header = new HBox(8, title, spacer(), materialTypePill(request.materialTypeName(), request.materialTypeColor()), statusPill(statusDisplayName, statusColor));
+        HBox header = new HBox(8, title, spacer(), materialTypePill(request.materialTypeName(), request.materialTypeColor()), statusPill(statusDisplayName, statusColor)); if(request.deleted()){Label deleted=new Label("Deleted");deleted.getStyleClass().add("shale-status-pill");deleted.setStyle("-fx-text-fill:#9b1c1c;-fx-background-color:#fee2e2;");header.getChildren().add(deleted);body.setOpacity(0.68);}
         header.setAlignment(Pos.TOP_LEFT);
         header.setMinWidth(0);
         HBox.setHgrow(title, Priority.ALWAYS);
