@@ -25,10 +25,12 @@ public interface MaterialRequestServicePort {
     default RequestStatusDto setRequestStatusActive(SetLookupActiveCommand command) { throw new UnsupportedOperationException("setRequestStatusActive"); }
     default void resetRequestStatusOverride(ResetLookupOverrideCommand command) { throw new UnsupportedOperationException("resetRequestStatusOverride"); }
     List<MaterialRequestSummaryDto> listMaterialRequests(long caseId, int shaleClientId);
+    default List<MaterialRequestSummaryDto> listMaterialRequests(long caseId, int shaleClientId, boolean includeDeleted) { return listMaterialRequests(caseId, shaleClientId); }
     Optional<MaterialRequestDetailDto> getMaterialRequest(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
     List<MaterialRequestFollowUpDto> listFollowUps(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
     MaterialRequestDetailDto createMaterialRequest(CreateMaterialRequestCommand command);
     MaterialRequestDetailDto updateMaterialRequest(UpdateMaterialRequestCommand command);
+    default void deleteMaterialRequest(DeleteMaterialRequestCommand command) { throw new UnsupportedOperationException("deleteMaterialRequest"); }
 
     record MaterialTypeCommand(Integer id, int shaleClientId, int actorUserId, String name, String description, String color, boolean active, String systemKey, Integer sortOrder, byte[] expectedRowVer) {}
     record RequestMethodCommand(Integer id, int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey, Integer sortOrder, byte[] expectedRowVer) {}
@@ -51,4 +53,5 @@ public interface MaterialRequestServicePort {
                                         LocalDate relevantEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays,
                                         LocalDateTime firstReceivedAt, LocalDateTime fullyReceivedAt, LocalDateTime closedAt,
                                         Integer closedByUserId, String closureReason, String notes, byte[] rowVer) {}
+    record DeleteMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, byte[] rowVer) {}
 }

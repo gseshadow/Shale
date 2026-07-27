@@ -166,7 +166,7 @@ class MaterialRequestCardFactoryTest {
                 "Requests list should own the external breathing room around first, last, and intermediate cards.");
         assertTrue(controller.contains("list=new VBox(10); list.setPadding(REQUEST_LIST_INSETS)"),
                 "Card separation should come from the list VBox spacing plus one transparent list inset, not per-card doubled margins.");
-        assertTrue(controller.contains("presentation.name(), presentation.color()"),
+        assertTrue(controller.contains("presentation.name(),presentation.color()"),
                 "The production request card should receive the tenant-effective Request Status name and color.");
         assertFalse(controller.contains("new StackPane(requestCardFactory.create"),
                 "Do not add an opaque or nested card wrapper around request cards.");
@@ -177,7 +177,7 @@ class MaterialRequestCardFactoryTest {
     @Test
     void requestListLoadsEffectiveStatusesOnceAndResolvesSavedKeysCaseInsensitively() throws Exception {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java"));
-        assertTrue(controller.contains("new RequestListData(svc.listMaterialRequests(cid,tid),svc.listEffectiveRequestStatuses(tid))"));
+        assertTrue(controller.contains("new RequestListData(svc.listMaterialRequests(cid,tid,include),svc.listEffectiveRequestStatuses(tid),svc.listEffectiveRequestMethods(tid))"));
         assertTrue(controller.contains("lookupValueMatches(s.systemKey(),s.name(),savedStatus)"));
         assertTrue(controller.contains("new RequestStatusPresentation(resolved.name()==null||resolved.name().isBlank()?readableStatusLabel(savedStatus):resolved.name().trim(),resolved.color())"));
     }
@@ -191,7 +191,7 @@ class MaterialRequestCardFactoryTest {
         assertTrue(dao.contains("LEFT JOIN dbo.Users au ON au.Id=mr.AssignedToUserId AND au.ShaleClientId=mr.ShaleClientId"));
         assertTrue(dao.contains("LEFT JOIN dbo.Contacts ct ON ct.Id=mr.RequestedFromContactId AND ct.ShaleClientId=mr.ShaleClientId"));
         assertTrue(dao.contains("LEFT JOIN dbo.Organizations org ON org.Id=mr.RequestedFromOrganizationId AND org.ShaleClientId=mr.ShaleClientId"));
-        assertTrue(dao.contains("WHERE mr.ShaleClientId=? AND mr.CaseId=? AND mr.IsDeleted=0"));
+        assertTrue(dao.contains("WHERE mr.ShaleClientId=? AND mr.CaseId=? AND (?=1 OR mr.IsDeleted=0)"));
         assertFalse(dao.contains("listMaterialRequests(long caseId, int tenant) {\n        for"));
     }
 
