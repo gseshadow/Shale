@@ -5,11 +5,28 @@ set ROOT=%~dp0..\..
 for %%I in ("%ROOT%") do set ROOT=%%~fI
 for /f %%i in ('powershell -NoProfile -Command "$m = [regex]::Match((Get-Content '%ROOT%\pom.xml' -Raw), '<version>([^<]+)</version>'); if ($m.Success) { $m.Groups[1].Value }"') do set VERSION=%%i
 if "%VERSION%"=="" exit /b 10
-for /f "tokens=2" %%i in ('java -version 2^>^&1 ^| findstr /r "version \"21\."') do set JDK21=%%i
-if "%JDK21%"=="" (echo JDK 21 is required.& exit /b 11)
-where candle.exe >nul 2>nul || (echo WiX 3 candle.exe is required.& exit /b 12)
-where light.exe >nul 2>nul || (echo WiX 3 light.exe is required.& exit /b 13)
-where dark.exe >nul 2>nul || (echo WiX 3 dark.exe is required.& exit /b 14)
+
+echo Validating Windows MSI toolchain...
+set JDK_VERSION_LOG=%TEMP%\shale-jdk-version-%RANDOM%.txt
+java -version >"%JDK_VERSION_LOG%" 2>&1
+if errorlevel 1 goto :missing_jdk21
+findstr /r /c:"version \"21\." "%JDK_VERSION_LOG%" >nul
+if errorlevel 1 goto :missing_jdk21
+del /q "%JDK_VERSION_LOG%" >nul 2>nul
+call :require_tool candle.exe 12
+if errorlevel 1 exit /b %errorlevel%
+call :require_tool light.exe 13
+if errorlevel 1 exit /b %errorlevel%
+call :require_tool dark.exe 14
+if errorlevel 1 exit /b %errorlevel%
+goto :toolchain_ready
+
+:missing_jdk21
+del /q "%JDK_VERSION_LOG%" >nul 2>nul
+echo JDK 21 is required.
+exit /b 11
+
+:toolchain_ready
 
 set STAGE=%ROOT%\build\staging\windows-msi
 set PRELIM=%STAGE%\preliminary
@@ -28,7 +45,7 @@ jpackage --type msi --name Shale --input "%APPINPUT%" --dest "%PRELIM%" --temp "
  --description "Shale Desktop" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --install-dir Shale || exit /b 18
 
 for /r "%TEMP%" %%F in (bundle.wxf) do set BUNDLE=%%F
-if not defined BUNDLE (echo bundle.wxf not found.& exit /b 19)
+if not defined BUNDLE goto :missing_bundle
 python "%ROOT%\build\scripts\windows_msi_identity.py" mutate "%BUNDLE%" || exit /b 20
 for %%I in ("%BUNDLE%") do set CONFIG=%%~dpI
 for /r "%TEMP%" %%F in (bundle.wixobj) do set BUNDLEOBJ=%%F
@@ -44,9 +61,29 @@ light.exe -nologo -spdb -ext WixUtilExtension -sice:ICE27 -sice:ICE91 !LOC! -cul
 mkdir "%STAGE%\dark" || exit /b 24
 dark.exe -x "%STAGE%\dark\payload" -o "%STAGE%\dark\final.wxs" "%FINALMSI%" || exit /b 25
 python "%ROOT%\build\scripts\windows_msi_identity.py" validate "%STAGE%\dark\final.wxs" || exit /b 26
-dir /s /b "%STAGE%\dark\payload\shale-windows-toast.properties" >nul 2>nul || (echo Installed marker missing.& exit /b 27)
-dir /s /b "%STAGE%\dark\payload\shale_windows_toast.dll" >nul 2>nul || (echo JNI DLL missing.& exit /b 28)
+dir /s /b "%STAGE%\dark\payload\shale-windows-toast.properties" >nul 2>nul
+if errorlevel 1 goto :missing_marker
+dir /s /b "%STAGE%\dark\payload\shale_windows_toast.dll" >nul 2>nul
+if errorlevel 1 goto :missing_dll
 copy /y "%FINALMSI%" "%ROOT%\dist\Shale-%VERSION%.msi.new" >nul || exit /b 29
 move /y "%ROOT%\dist\Shale-%VERSION%.msi.new" "%ROOT%\dist\Shale-%VERSION%.msi" >nul || exit /b 30
 echo Validated MSI published: Shale-%VERSION%.msi
 exit /b 0
+
+:missing_bundle
+echo bundle.wxf not found.
+exit /b 19
+
+:missing_marker
+echo Installed marker missing.
+exit /b 27
+
+:missing_dll
+echo JNI DLL missing.
+exit /b 28
+
+:require_tool
+where "%~1" >nul 2>nul
+if not errorlevel 1 exit /b 0
+echo Required Windows MSI tool not found: %~1
+exit /b %~2

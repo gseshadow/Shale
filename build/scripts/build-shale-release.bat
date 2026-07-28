@@ -35,6 +35,7 @@ echo.
 call mvn -f "%ROOT%\pom.xml" -pl shale-desktop -am clean package || goto :fail
 call "%ROOT%\build\scripts\build-updater.bat" || goto :fail
 
+echo Building desktop application image...
 jpackage ^
   --type app-image ^
   --name Shale ^
@@ -48,6 +49,7 @@ jpackage ^
 
 powershell -NoProfile -Command "Compress-Archive -Path '%DIST_APP%\Shale\*' -DestinationPath '%DIST%\ShaleApp-%VERSION%.zip' -Force" || goto :fail
 
+echo Starting validated Windows MSI build...
 call "%ROOT%\build\scripts\build-shale-windows-msi.bat" || goto :fail
 
 echo Release build complete.
