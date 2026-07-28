@@ -127,6 +127,13 @@ public final class NotificationCenterService {
 		pushNotificationsInternal(List.of(notification), "single");
 	}
 
+	/** Deterministic reconciliation seam; callers must already be on their UI executor. */
+	boolean mergeIncrementalOnUiThread(AppNotification notification) {
+		if (notification == null || isKnownNotification(notification)) return false;
+		pushNotificationsInternal(List.of(notification), "incremental");
+		return true;
+	}
+
 	public void pushNotifications(List<AppNotification> notificationsToAdd) {
 		if (notificationsToAdd == null || notificationsToAdd.isEmpty()) {
 			return;
@@ -311,6 +318,8 @@ public final class NotificationCenterService {
 		}
 	}
 
+	void dismissOnUiThread(AppNotification notification) { dismissInternal(notification); }
+
 	public void dismissAll(List<AppNotification> notificationsToDismiss) {
 		if (notificationsToDismiss == null || notificationsToDismiss.isEmpty()) {
 			return;
@@ -395,16 +404,8 @@ public final class NotificationCenterService {
 		long startNanos = System.nanoTime();
 		long unreadRemoved = removed.stream().filter(AppNotification::isUnread).count();
 		notifications.removeAll(removed);
-		for (AppNotification notification : removed) {
-			Long durableId = notification.getDurableNotificationId();
-			if (durableId != null) {
-				durableNotificationIds.remove(durableId);
-			}
-			String eventKey = notification.getEventKey();
-			if (eventKey != null && !eventKey.isBlank()) {
-				eventKeys.remove(eventKey);
-			}
-		}
+		// Keep durable/event-key tombstones for this authenticated center lifetime so
+		// a stale live or polling result cannot recreate a locally dismissed card.
 		if (serverUnreadCount != null && unreadRemoved > 0) {
 			serverUnreadCount = Math.max(0, serverUnreadCount - Math.toIntExact(unreadRemoved));
 		}
