@@ -30,6 +30,8 @@ import com.shale.ui.export.CaseXlsxExporter;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -67,6 +69,7 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 
 public final class CasesController {
+	private static final Logger LOG = LoggerFactory.getLogger(CasesController.class);
 
 	private static final int LATEST_CASE_UPDATE_PREVIEW_LIMIT = 100;
 	private static final int DESCRIPTION_PREVIEW_LIMIT = 100;
@@ -503,6 +506,8 @@ public final class CasesController {
 				else writeCsv(file, daoRows.stream().map(this::toViewModel).toList());
 				Platform.runLater(() -> finishExport(() -> showExportSuccess(file)));
 			} catch (Exception ex) {
+				LOG.error("Cases export failed format={} tenantId={} outputPath={} criteriaIncludeClosedDenied={}",
+						format, tenantId, file.toPath().toAbsolutePath(), criteria.includeClosedDenied(), ex);
 				Platform.runLater(() -> finishExport(() -> showExportError(file)));
 			}
 		});

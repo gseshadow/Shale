@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,6 +29,9 @@ final class CompleteExportContractTest {
         assertTrue(controller.contains("caseExportService.exportCases(criteria)"));
         assertFalse(controller.contains("currentExportRows()"));
         assertTrue(controller.contains("dbExec.submit"));
+        assertTrue(controller.contains("LOG.error(\"Cases export failed"));
+        assertTrue(controller.contains("finishExport(() -> showExportSuccess(file))"));
+        assertTrue(controller.contains("finishExport(() -> showExportError(file))"));
     }
 
     @Test void daoExportWalksPastFirstHundredWithoutChangingUiPage() {
@@ -79,6 +83,32 @@ final class CompleteExportContractTest {
                 assertEquals(CellType.NUMERIC, sheet.getRow(1).getCell(3).getCellType());
                 assertEquals(1, sheet.getPaneInformation().getHorizontalSplitPosition());
                 assertTrue(sheet.getCTWorksheet().isSetAutoFilter());
+            }
+        } finally { Files.deleteIfExists(file); }
+    }
+
+    @Test void casesXlsxHandlesMoreThanOneThousandRowsNullsLongTextAndDates() throws Exception {
+        Path file = Files.createTempFile("shale-cases-export", ".xlsx");
+        try {
+            List<CaseRow> rows = new ArrayList<>();
+            for (int i = 0; i < 1_127; i++) {
+                String description = i == 417 ? "x".repeat(40_000) : (i % 2 == 0 ? null : "Description");
+                rows.add(new CaseRow(i + 1L, "Case " + i,
+                        i % 3 == 0 ? null : LocalDate.of(2026, 1, 1).plusDays(i),
+                        LocalDate.of(2027, 12, 31), 1, null, null, null, null,
+                        "Open", null, null, null, null, null, description,
+                        i % 5 == 0 ? null : LocalDate.of(2025, 6, 15), null, null));
+            }
+
+            new CaseXlsxExporter().writeCases(file, rows);
+
+            try (var workbook = new XSSFWorkbook(Files.newInputStream(file))) {
+                var sheet = workbook.getSheet("Cases");
+                assertEquals(1_127, sheet.getLastRowNum());
+                assertEquals(1_127, sheet.getPhysicalNumberOfRows() - 1);
+                assertEquals(32_767, sheet.getRow(418).getCell(6).getStringCellValue().length());
+                assertEquals(CellType.NUMERIC, sheet.getRow(2).getCell(2).getCellType());
+                assertEquals("", sheet.getRow(1).getCell(2).getStringCellValue());
             }
         } finally { Files.deleteIfExists(file); }
     }
