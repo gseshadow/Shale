@@ -2,6 +2,8 @@ package com.shale.data.dao;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
+import com.shale.core.service.NotificationServicePort.NotificationRetrievalException;
+import com.shale.core.service.NotificationServicePort.RetrievalFailureKind;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -227,26 +229,84 @@ public final class NotificationDao {
 	}
 
 	public NotificationPageRow listNotificationsForUser(int shaleClientId, int userId, long afterNotificationId, int requestedLimit) {
-		if (shaleClientId <= 0 || userId <= 0 || afterNotificationId < 0) return new NotificationPageRow(List.of(), false);
+		if (shaleClientId <= 0 || userId <= 0 || afterNotificationId < 0) return new NotificationPageRow(List.of(), false, Math.max(0,afterNotificationId));
 		int limit = Math.max(1, Math.min(requestedLimit, 100));
 		String sql = """
-				SELECT TOP (?) n.Id,n.Category,n.Title,n.Message,n.CreatedAt
+				SELECT TOP (?) n.Id,
+				       CASE WHEN ISNULL(n.IsDismissed,0)=0
+				                  AND (n.ExpiresAt IS NULL OR n.ExpiresAt>SYSUTCDATETIME())
+				            THEN 1 ELSE 0 END AS Eligible
 				FROM dbo.Notifications n
 				WHERE n.ShaleClientId=? AND n.UserId=? AND n.Id>?
-				  AND ISNULL(n.IsDismissed,0)=0
-				  AND (n.ExpiresAt IS NULL OR n.ExpiresAt>SYSUTCDATETIME())
 				ORDER BY n.Id ASC
 				""";
 		try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) {
 			ps.setInt(1, limit + 1); ps.setInt(2, shaleClientId); ps.setInt(3, userId); ps.setLong(4, afterNotificationId);
 			try (ResultSet rs=ps.executeQuery()) {
-				List<NotificationCursorRow> rows=new ArrayList<>();
-				while(rs.next()) rows.add(new NotificationCursorRow(rs.getLong("Id"),rs.getString("Category"),rs.getString("Title"),rs.getString("Message"),toInstant(rs.getTimestamp("CreatedAt"))));
-				boolean more=rows.size()>limit;
-				if(more) rows=new ArrayList<>(rows.subList(0,limit));
-				return new NotificationPageRow(List.copyOf(rows),more);
+				List<Long> scannedIds=new ArrayList<>();
+				List<Long> eligibleIds=new ArrayList<>();
+				while(rs.next()) {
+					long id=rs.getLong("Id");
+					scannedIds.add(id);
+					if(scannedIds.size()<=limit && rs.getBoolean("Eligible")) eligibleIds.add(id);
+				}
+				boolean more=scannedIds.size()>limit;
+				if(more) scannedIds=new ArrayList<>(scannedIds.subList(0,limit));
+				long nextScannedId=scannedIds.isEmpty()?afterNotificationId:scannedIds.get(scannedIds.size()-1);
+				return new NotificationPageRow(hydrateNotificationRows(con,shaleClientId,userId,eligibleIds),more,nextScannedId);
 			}
-		} catch(SQLException e){throw new RuntimeException("Failed to list notifications",e);}
+		} catch(SQLException e){throw notificationRetrievalFailure(e);}
+	}
+
+	public long notificationHighWaterMark(int shaleClientId, int userId) {
+		if (shaleClientId <= 0 || userId <= 0) return 0;
+		String sql = "SELECT COALESCE(MAX(n.Id),0) FROM dbo.Notifications n WHERE n.ShaleClientId=? AND n.UserId=?";
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			ps.setInt(2, userId);
+			try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getLong(1) : 0; }
+		} catch (SQLException e) { throw notificationRetrievalFailure(e); }
+	}
+
+	private List<NotificationRow> hydrateNotificationRows(Connection con,int shaleClientId,int userId,List<Long> ids) throws SQLException {
+		if(ids.isEmpty()) return List.of();
+		List<NotificationRow> rows=new ArrayList<>(ids.size());
+		for(Long id:ids){NotificationRow row=hydrateNotificationRow(con,shaleClientId,userId,id);if(row!=null)rows.add(row);}
+		return List.copyOf(rows);
+	}
+
+	private NotificationRow hydrateNotificationRow(Connection con,int shaleClientId,int userId,long id) throws SQLException {
+		String sql="""
+				SELECT n.Id,n.Category,n.Severity,n.Title,n.Message,n.EntityType,n.EntityId,n.ActionType,
+				 n.IsRead,n.CreatedAt,n.EventKey,
+				 LTRIM(RTRIM(COALESCE(actor.name_first,'')+CASE WHEN COALESCE(actor.name_first,'')='' OR COALESCE(actor.name_last,'')='' THEN '' ELSE ' ' END+COALESCE(actor.name_last,''))) ActorDisplayName,
+				 CASE WHEN UPPER(ISNULL(n.EntityType,''))='TASK' THEN t.Title WHEN UPPER(ISNULL(n.EntityType,''))='MATERIALREQUEST' THEN mr.Title END EntityTitle,
+				 CASE WHEN UPPER(ISNULL(n.EntityType,''))='TASK' THEN t.CaseId WHEN UPPER(ISNULL(n.EntityType,''))='MATERIALREQUEST' THEN mr.CaseId END CaseId,
+				 c.Name CaseName,caseAttorney.DisplayName CaseResponsibleAttorney,caseAttorney.Color CaseResponsibleAttorneyColor,
+				 c.NonEngagementLetterSent CaseNonEngagementLetterSent,current_status.CurrentStatusName CasePrimaryStatusName,
+				 current_status.PrimaryStatusColor CasePrimaryStatusColor,pa.Color CasePracticeAreaColor
+				FROM dbo.Notifications n
+				LEFT JOIN dbo.Users actor ON actor.id=n.CreatedByUserId AND actor.ShaleClientId=n.ShaleClientId
+				LEFT JOIN dbo.Tasks t ON UPPER(ISNULL(n.EntityType,''))='TASK' AND t.Id=n.EntityId AND t.ShaleClientId=n.ShaleClientId AND ISNULL(t.IsDeleted,0)=0
+				LEFT JOIN dbo.MaterialRequests mr ON UPPER(ISNULL(n.EntityType,''))='MATERIALREQUEST' AND mr.Id=n.EntityId AND mr.ShaleClientId=n.ShaleClientId AND mr.IsDeleted=0
+				LEFT JOIN dbo.Cases c ON c.Id=COALESCE(t.CaseId,mr.CaseId) AND c.ShaleClientId=n.ShaleClientId
+				LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId
+				OUTER APPLY (SELECT TOP (1) s.Name CurrentStatusName,s.Color PrimaryStatusColor FROM dbo.CaseStatuses cs INNER JOIN dbo.Statuses s ON s.Id=cs.StatusId WHERE cs.CaseId=c.Id AND cs.IsPrimary=1 ORDER BY cs.UpdatedAt DESC,cs.CreatedAt DESC,cs.Id DESC) current_status
+				OUTER APPLY (SELECT TOP (1) LTRIM(RTRIM(COALESCE(u.name_first,'')+CASE WHEN COALESCE(u.name_first,'')='' OR COALESCE(u.name_last,'')='' THEN '' ELSE ' ' END+COALESCE(u.name_last,''))) DisplayName,u.Color FROM dbo.CaseUsers cu INNER JOIN dbo.Users u ON u.id=cu.UserId AND u.ShaleClientId=c.ShaleClientId WHERE cu.CaseId=c.Id AND cu.RoleId=? AND cu.IsPrimary=1 ORDER BY cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) caseAttorney
+				WHERE n.Id=? AND n.ShaleClientId=? AND n.UserId=?
+				""";
+		try(PreparedStatement ps=con.prepareStatement(sql)){
+			ps.setInt(1,ROLE_RESPONSIBLE_ATTORNEY);ps.setLong(2,id);ps.setInt(3,shaleClientId);ps.setInt(4,userId);
+			try(ResultSet rs=ps.executeQuery()){return rs.next()?mapNotificationRow(rs):null;}
+		}
+	}
+
+	private static NotificationRow mapNotificationRow(ResultSet rs) throws SQLException {
+		return new NotificationRow(rs.getLong("Id"),rs.getString("Category"),rs.getString("Severity"),rs.getString("Title"),rs.getString("Message"),
+				rs.getString("EntityType"),rs.getObject("EntityId")==null?null:rs.getLong("EntityId"),rs.getString("ActionType"),safeUserDisplayName(rs.getString("ActorDisplayName")),
+				rs.getString("EntityTitle"),rs.getObject("CaseId")==null?null:rs.getLong("CaseId"),rs.getString("CaseName"),rs.getString("CaseResponsibleAttorney"),
+				rs.getString("CaseResponsibleAttorneyColor"),rs.getObject("CaseNonEngagementLetterSent")==null?null:rs.getBoolean("CaseNonEngagementLetterSent"),
+				rs.getString("CasePrimaryStatusName"),rs.getString("CasePrimaryStatusColor"),rs.getString("CasePracticeAreaColor"),rs.getBoolean("IsRead"),toInstant(rs.getTimestamp("CreatedAt")),rs.getString("EventKey"));
 	}
 
 	public java.util.Optional<NotificationActivationRow> findActivationTarget(int shaleClientId,int userId,long notificationId) {
@@ -549,6 +609,12 @@ public final class NotificationDao {
 		return null;
 	}
 
+	private static NotificationRetrievalException notificationRetrievalFailure(SQLException error) {
+		String state=error.getSQLState();int code=error.getErrorCode();
+		boolean authorization=(state!=null&&state.startsWith("28"))||code==18456||code==229||code==916;
+		return new NotificationRetrievalException(authorization?RetrievalFailureKind.AUTHORIZATION:RetrievalFailureKind.TRANSIENT,error);
+	}
+
 	public record NotificationRow(
 			long id,
 			String category,
@@ -573,7 +639,8 @@ public final class NotificationDao {
 			String eventKey) {
 	}
 
-	public record NotificationCursorRow(long id,String category,String title,String message,Instant createdAt) {}
-	public record NotificationPageRow(List<NotificationCursorRow> items,boolean hasMore) {}
+	public record NotificationPageRow(List<NotificationRow> items,boolean hasMore,long nextScannedId) {
+		public NotificationPageRow(List<NotificationRow> items,boolean hasMore){this(items,hasMore,items.isEmpty()?0:items.get(items.size()-1).id());}
+	}
 	public record NotificationActivationRow(long notificationId,String entityType,long entityId,Long parentCaseId,String actionType) {}
 }
