@@ -10,7 +10,7 @@ echo Validating Windows MSI toolchain...
 set JDK_VERSION_LOG=%TEMP%\shale-jdk-version-%RANDOM%.txt
 java -version >"%JDK_VERSION_LOG%" 2>&1
 if errorlevel 1 goto :missing_jdk21
-findstr /r /c:"version \"21\." "%JDK_VERSION_LOG%" >nul
+findstr /r /c:"^openjdk version .*21[.]" /c:"^java version .*21[.]" "%JDK_VERSION_LOG%" >nul
 if errorlevel 1 goto :missing_jdk21
 del /q "%JDK_VERSION_LOG%" >nul 2>nul
 call :require_tool candle.exe 12
