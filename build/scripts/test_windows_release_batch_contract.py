@@ -4,6 +4,47 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 
 class WindowsReleaseBatchContractTest(unittest.TestCase):
+    def test_full_release_requires_and_forwards_boolean_mandatory_flag(self):
+        source = (ROOT / "build/scripts/release-all.bat").read_text(encoding="utf-8")
+        self.assertIn('if "%~2"=="" goto :usage', source)
+        self.assertIn('if not "%~3"=="" goto :usage', source)
+        self.assertIn('if /I not "%MANDATORY_UPDATE%"=="true" if /I not "%MANDATORY_UPDATE%"=="false" goto :invalid_mandatory', source)
+        self.assertIn('set "MANDATORY_UPDATE=%~2"', source)
+        self.assertNotIn("set MANDATORY_UPDATE=false", source)
+        self.assertIn('call "%DOWNSTREAM_SCRIPT%" "%VERSION%" "%MANDATORY_UPDATE%"', source)
+        for downstream in ("release-and-publish.bat", "release.bat"):
+            text = (ROOT / "build/scripts" / downstream).read_text(encoding="utf-8")
+            self.assertIn('set "MANDATORY_UPDATE=%~2"', text)
+            self.assertIn('if /I not "%MANDATORY_UPDATE%"=="true" if /I not "%MANDATORY_UPDATE%"=="false"', text)
+
+    def test_full_release_windows_stage_is_rooted_diagnostic_and_fail_closed(self):
+        source = (ROOT / "build/scripts/release-all.bat").read_text(encoding="utf-8")
+        self.assertIn('for %%I in ("%~dp0..\\..") do set "ROOT=%%~fI"', source)
+        self.assertIn('set "DOWNSTREAM_SCRIPT=%SCRIPT_DIR%\\release-and-publish.bat"', source)
+        self.assertIn('cd /d "%ROOT%" || goto :root_unavailable', source)
+        for diagnostic in (
+                "Windows stage repository root:", "Windows stage downstream script:",
+                "Windows stage working directory:", "Windows stage version:",
+                "Windows stage mandatory flag:", "Windows stage Mac ZIP:",
+                "Windows stage Mac metadata:"):
+            self.assertIn(diagnostic, source)
+        self.assertIn('if not exist "%DOWNSTREAM_SCRIPT%" goto :missing_downstream', source)
+        self.assertIn('echo Windows downstream release script was not found: "%DOWNSTREAM_SCRIPT%"', source)
+        call = source.index('call "%DOWNSTREAM_SCRIPT%"')
+        failure = source.index("if errorlevel 1 goto :windows_stage_failed", call)
+        complete = source.index("Full release complete", failure)
+        self.assertLess(call, failure)
+        self.assertLess(failure, complete)
+
+    def test_release_script_paths_are_caller_independent_and_space_safe(self):
+        for filename in ("release-all.bat", "release-and-publish.bat", "release.bat", "build-shale-release.bat"):
+            source = (ROOT / "build/scripts" / filename).read_text(encoding="utf-8")
+            self.assertIn("%~dp0", source)
+            self.assertIn('set "ROOT=', source)
+        for filename in ("release-and-publish.bat", "release.bat", "build-shale-release.bat"):
+            source = (ROOT / "build/scripts" / filename).read_text(encoding="utf-8")
+            self.assertIn('set "SCRIPT_DIR=%~dp0"', source)
+
     def test_msi_toolchain_check_avoids_nested_cmd_metacharacter_parsing(self):
         source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
         self.assertNotIn("2^>^&1", source)

@@ -2,9 +2,8 @@
 setlocal
 cd /d "%~dp0"
 
-set SCRIPT_DIR=%~dp0
-set ROOT=%SCRIPT_DIR%..\..
-for %%I in ("%ROOT%") do set ROOT=%%~fI
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..\..") do set "ROOT=%%~fI"
 
 for /f %%i in ('powershell -NoProfile -Command "$m = [regex]::Match((Get-Content \"%ROOT%\pom.xml\" -Raw), '<version>([^<]+)</version>'); if ($m.Success) { $m.Groups[1].Value }"') do set VERSION=%%i
 if "%VERSION%"=="" (
