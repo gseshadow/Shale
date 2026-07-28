@@ -11,7 +11,7 @@ class IdentityMutationTest(unittest.TestCase):
     def file(self, body):
         p=Path(tempfile.mkdtemp())/'bundle.wxf'; p.write_text(wix(body), encoding='utf-8'); return p
     def test_inserts_expected_child(self):
-        p=self.file(GOOD); m.mutate(p); m.validate(p); self.assertIn(m.APP_ID,p.read_text())
+        p=self.file(GOOD); m.inspect(p); m.mutate(p); m.validate(p); self.assertIn(m.APP_ID,p.read_text())
     def test_missing_and_duplicate_fail(self):
         with self.assertRaises(ValueError): m.mutate(self.file(''))
         with self.assertRaises(ValueError): m.mutate(self.file(GOOD+GOOD))

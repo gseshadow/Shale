@@ -67,5 +67,40 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         msi = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
         self.assertLess(msi.index("build-native.bat"), msi.index("Starting jpackage and WiX MSI construction..."))
 
+    def test_generated_wix_source_and_objects_use_authoritative_directories(self):
+        source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        self.assertIn("set JPACKAGE_TEMP=%STAGE%\\jpackage-temp", source)
+        self.assertIn("set GENERATED_CONFIG_DIR=%JPACKAGE_TEMP%\\config", source)
+        self.assertIn("set BUNDLE_SOURCE=%GENERATED_CONFIG_DIR%\\bundle.wxf", source)
+        self.assertIn("set WIXOBJ_DIR=%JPACKAGE_TEMP%\\wixobj", source)
+        self.assertIn("set BUNDLE_WIXOBJ=%WIXOBJ_DIR%\\bundle.wixobj", source)
+        self.assertNotIn("%WIXOBJ_DIR%\\bundle.wxf", source)
+        self.assertNotIn('for /r "%JPACKAGE_TEMP%" %%F in (bundle.wxf)', source)
+
+        exists = source.index('if not exist "%BUNDLE_SOURCE%" goto :missing_bundle')
+        inspect = source.index('windows_msi_identity.py" inspect "%BUNDLE_SOURCE%"')
+        mutate = source.index('windows_msi_identity.py" mutate "%BUNDLE_SOURCE%"')
+        candle = source.index('candle.exe -nologo "%BUNDLE_SOURCE%"')
+        light = source.index('"%BUNDLE_WIXOBJ%" "%UI_WIXOBJ%"')
+        dark = source.index("dark.exe -x")
+        compiled_validation = source.index('windows_msi_identity.py" validate')
+        publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"')
+        self.assertEqual([exists, inspect, mutate, candle, light, dark, compiled_validation, publish],
+                         sorted([exists, inspect, mutate, candle, light, dark, compiled_validation, publish]))
+
+    def test_msi_stages_are_distinct_and_fail_closed(self):
+        source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        for message in (
+            "Preliminary jpackage MSI completed.",
+            "Generated bundle.wxf location verified:",
+            "Generated WiX identity validation passed.",
+            "bundle.wxf identity and shortcut mutation completed.",
+            "Starting final candle and light MSI reconstruction...",
+            "Starting compiled final MSI validation...",
+            "Final MSI publication completed:",
+        ):
+            self.assertIn(message, source)
+        self.assertIn('echo Generated bundle.wxf was not found at expected path: "%BUNDLE_SOURCE%"', source)
+
 if __name__ == "__main__":
     unittest.main()
