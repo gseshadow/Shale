@@ -302,7 +302,7 @@ class CaseMaterialsNewRequestWindowTest {
         String suggester = source.substring(source.indexOf("static final class NewRequestTitleSuggester"), source.indexOf("    VBox newRequestBody"));
         String body = methodBody(source, "VBox newRequestBody");
         String mapping = methodBody(source, "private MaterialRequestServicePort.CreateMaterialRequestCommand toCreateCommand");
-        String validation = methodBody(source, "private String validateRequest");
+        String validation = methodBody(source, "static String validateRequestFields");
         assertTrue(suggester.contains("private String lastAutomaticTitle = \"\""));
         assertTrue(suggester.contains("private boolean programmaticUpdate"));
         assertTrue(suggester.contains("private boolean manualOverride"));
@@ -314,7 +314,7 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(body.contains("titleField.textProperty().addListener((o,a,b)->{titleSuggester.userEdited(a,b);validate.run();})"));
         assertTrue(mapping.contains("materialType.id(),title,description"));
         assertTrue(body.contains("toCreateCommand(rf,materialType.getValue(),titleField.getText(),description.getText()"));
-        assertTrue(validation.contains("if(titleField.getText()==null||titleField.getText().trim().isEmpty())return \"Title is required.\""));
+        assertTrue(validation.contains("if(title==null||title.trim().isEmpty())return \"Title is required.\""));
     }
 
 
