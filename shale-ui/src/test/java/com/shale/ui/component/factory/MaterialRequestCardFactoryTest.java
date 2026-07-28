@@ -121,7 +121,7 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("FlowPane facts = new FlowPane(18, 7)"));
         assertTrue(source.contains("material-request-card__facts"));
         assertTrue(source.indexOf("addEntityFact(facts, \"Requested From\"")
-                < source.indexOf("addTextFact(facts, \"Requested\""),
+                < source.indexOf("addTextFact(facts, \"Request Date\""),
                 "Entity facts should keep logical order ahead of date facts.");
         assertTrue(source.contains("fact.setMinWidth(Region.USE_PREF_SIZE)"));
         assertTrue(source.contains("fact.setMaxWidth(Region.USE_PREF_SIZE)"));

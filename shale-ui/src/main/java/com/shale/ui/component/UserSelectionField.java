@@ -81,8 +81,12 @@ public class UserSelectionField<T> extends HBox {
         setSpacing(8);
         setFillHeight(false);
         setMaxWidth(Double.MAX_VALUE);
+        addButton.setAccessibleText("Add user");
         addButton.setOnAction(e -> openPicker());
+        changeButton.setAccessibleText("Change selected user");
         changeButton.setOnAction(e -> openPicker());
+        removeButton.getStyleClass().add("app-dialog-small-action");
+        removeButton.setAccessibleText("Remove selected user");
         removeButton.setOnAction(e -> clearSelection());
     }
 

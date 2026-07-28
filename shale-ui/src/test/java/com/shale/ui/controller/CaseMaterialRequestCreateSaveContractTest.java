@@ -17,7 +17,7 @@ final class CaseMaterialRequestCreateSaveContractTest {
         assertTrue(c.contains("svc.createMaterialRequest(cmd)"));
         assertTrue(c.contains("new MaterialRequestServicePort.CreateMaterialRequestCommand"));
         assertTrue(c.contains("materialType.id()"));
-        assertTrue(c.contains("by.id()"));
+        assertTrue(c.contains("by==null?null:by.id()"));
         assertTrue(c.contains("assignee==null?null:assignee.id()"));
         assertTrue(c.contains("rf!=null&&rf.contact()?rf.entityId().intValue():null"));
         assertTrue(c.contains("rf!=null&&rf.organization()?rf.entityId().intValue():null"));

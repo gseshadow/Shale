@@ -102,5 +102,21 @@ final class MaterialRequestDaoPhase2ContractTest {
         assertTrue(MaterialRequestFollowUpDto.class.isRecord());
     }
 
+    @Test void requestedByIsNullableAcrossCommandsReadsAndMutationsWithoutWeakeningTransactionContracts() throws Exception {
+        String port = read("shale-core/src/main/java/com/shale/core/service/MaterialRequestServicePort.java");
+        assertTrue(port.contains("Integer requestedByUserId"));
+        assertTrue(DAO.contains("LEFT JOIN dbo.Users rbu ON rbu.Id=mr.RequestedByUserId"));
+        assertTrue(DAO.contains("(Integer)rs.getObject(\"RequestedByUserId\")"));
+        assertTrue(DAO.contains("setInt(ps,i++,c.requestedByUserId())"));
+        assertTrue(DAO.contains("if(c.requestedByUserId()!=null)validateUser"));
+        assertFalse(DAO.contains("Requested By is required."));
+        assertTrue(DAO.contains("AND RowVer=?"));
+        assertTrue(DAO.contains("touchCase(con,c.caseId(),c.shaleClientId())"));
+        assertTrue(DAO.contains("EntityActionAuditEvent.Action.UPDATED"));
+        assertTrue(DAO.contains("createRecipientNotifications"));
+        assertTrue(DAO.contains("con.commit()"));
+        assertFalse(DAO.contains("CreatedByUserId=?"));
+    }
+
     private static String read(String path) { try { return Files.readString(Files.exists(Path.of(path)) ? Path.of(path) : Path.of("..").resolve(path)); } catch (Exception e) { throw new AssertionError(e); } }
 }
