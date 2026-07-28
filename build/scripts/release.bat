@@ -2,31 +2,31 @@
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
-set SCRIPT_DIR=%~dp0
-set ROOT=%SCRIPT_DIR%..\..
-for %%I in ("%ROOT%") do set ROOT=%%~fI
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..\..") do set "ROOT=%%~fI"
 
 if "%~1"=="" (
     echo ====================================
-    echo Usage: release.bat ^<version^> [mandatory^|--mandatory]
-    echo Example: release.bat 1.0.10 mandatory
+    echo Usage: release.bat ^<version^> ^<true^|false^>
+    echo Example: release.bat 1.0.10 true
     echo ====================================
     exit /b 1
 )
 
-set VERSION=%~1
-set MANDATORY_UPDATE=false
-shift
-
-:parse_args
-if "%~1"=="" goto :args_done
-if /I "%~1"=="mandatory" set MANDATORY_UPDATE=true
-if /I "%~1"=="--mandatory" set MANDATORY_UPDATE=true
-if /I "%~1"=="true" set MANDATORY_UPDATE=true
-shift
-goto :parse_args
-
-:args_done
+if "%~2"=="" (
+    echo Missing mandatory update flag. Expected true or false.
+    exit /b 1
+)
+if not "%~3"=="" (
+    echo Unexpected release argument: "%~3"
+    exit /b 1
+)
+set "VERSION=%~1"
+set "MANDATORY_UPDATE=%~2"
+if /I not "%MANDATORY_UPDATE%"=="true" if /I not "%MANDATORY_UPDATE%"=="false" (
+    echo Invalid mandatory update flag: "%MANDATORY_UPDATE%". Expected true or false.
+    exit /b 1
+)
 set DIST=%ROOT%\dist
 set MANIFEST_SRC=%ROOT%\build\assets\shale-stable.json
 set MANIFEST_DIST=%DIST%\shale-stable.json
@@ -46,7 +46,7 @@ echo ====================================
 echo.
 
 echo Step 1: Updating Maven version
-call "%SCRIPT_DIR%\bump-version.bat" %VERSION% || goto :fail
+call "%SCRIPT_DIR%\bump-version.bat" "%VERSION%" || goto :fail
 
 echo.
 echo Step 2: Building Windows release
@@ -125,7 +125,7 @@ echo Release %VERSION% complete
 echo ====================================
 echo.
 echo Files ready to upload:
-echo %DIST%\Shale-%VERSION%.exe
+echo %DIST%\Shale-%VERSION%.msi
 echo %DIST%\ShaleApp-%VERSION%.zip
 if not "!MAC_ZIP_NAME!"=="" echo %DIST%\!MAC_ZIP_NAME!
 echo %DIST%\shale-stable.json
