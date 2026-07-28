@@ -1,30 +1,54 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
-set ROOT=%~dp0..\..
-for %%I in ("%ROOT%") do set ROOT=%%~fI
+set "VALIDATOR=%~dp0validate_windows_msi_toolchain.py"
+for %%I in ("%~dp0..\..") do set "ROOT=%%~fI"
 for /f %%i in ('powershell -NoProfile -Command "$m = [regex]::Match((Get-Content '%ROOT%\pom.xml' -Raw), '<version>([^<]+)</version>'); if ($m.Success) { $m.Groups[1].Value }"') do set VERSION=%%i
 if "%VERSION%"=="" exit /b 10
 
 echo Validating Windows MSI toolchain...
-set JDK_VERSION_LOG=%TEMP%\shale-jdk-version-%RANDOM%.txt
+echo Toolchain validator: "%VALIDATOR%"
+set "JDK_VERSION_LOG=%TEMP%\shale-jdk-version-%RANDOM%.txt"
+echo Toolchain check: JDK 21 via java -version
+set "JAVA_PATH="
+for /f "delims=" %%J in ('where java 2^>nul') do if not defined JAVA_PATH set "JAVA_PATH=%%~fJ"
+if not defined JAVA_PATH goto :missing_java
+echo Toolchain check tool=java resolved="!JAVA_PATH!" check=java-version-21
 java -version >"%JDK_VERSION_LOG%" 2>&1
-if errorlevel 1 goto :missing_jdk21
+if errorlevel 1 goto :jdk_invocation_failed
 findstr /r /c:"^openjdk version .*21[.]" /c:"^java version .*21[.]" "%JDK_VERSION_LOG%" >nul
 if errorlevel 1 goto :missing_jdk21
 del /q "%JDK_VERSION_LOG%" >nul 2>nul
-call :require_tool candle.exe 12
-if errorlevel 1 exit /b %errorlevel%
-call :require_tool light.exe 13
-if errorlevel 1 exit /b %errorlevel%
-call :require_tool dark.exe 14
-if errorlevel 1 exit /b %errorlevel%
+if not exist "%VALIDATOR%" goto :missing_toolchain_validator
+python "%VALIDATOR%"
+if errorlevel 1 goto :wix_toolchain_failed
 goto :toolchain_ready
 
-:missing_jdk21
+:jdk_invocation_failed
+set "JDK_EXIT=%ERRORLEVEL%"
+echo Windows MSI prerequisite failed: tool=java classification=invocation_failure check=java-version exit=%JDK_EXIT%
+if exist "%JDK_VERSION_LOG%" type "%JDK_VERSION_LOG%"
 del /q "%JDK_VERSION_LOG%" >nul 2>nul
-echo JDK 21 is required.
 exit /b 11
+
+:missing_java
+echo Windows MSI prerequisite failed: tool=java classification=missing resolved=^<not-found^> check=PATH-resolution exit=unavailable
+exit /b 11
+
+:missing_jdk21
+echo Windows MSI prerequisite failed: tool=java classification=incompatible_version resolved="!JAVA_PATH!" check=java-version-21 exit=0
+if exist "%JDK_VERSION_LOG%" type "%JDK_VERSION_LOG%"
+del /q "%JDK_VERSION_LOG%" >nul 2>nul
+exit /b 11
+
+:missing_toolchain_validator
+echo Windows MSI prerequisite failed: validator script missing: "%VALIDATOR%"
+exit /b 12
+
+:wix_toolchain_failed
+set "WIX_VALIDATION_EXIT=%ERRORLEVEL%"
+echo Windows MSI prerequisite failed: validator="%VALIDATOR%" classification=WiX-toolchain exit=%WIX_VALIDATION_EXIT%
+exit /b 13
 
 :toolchain_ready
 
@@ -191,9 +215,3 @@ exit /b 40
 :dark_failed
 echo dark.exe compiled-MSI inspection failed for: "%FINAL_MSI%"
 exit /b 25
-
-:require_tool
-where "%~1" >nul 2>nul
-if not errorlevel 1 exit /b 0
-echo Required Windows MSI tool not found: %~1
-exit /b %~2

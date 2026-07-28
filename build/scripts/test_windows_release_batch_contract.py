@@ -57,9 +57,12 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertTrue(findstr_line.endswith('"%JDK_VERSION_LOG%" >nul'))
         self.assertNotIn('" ^>nul', findstr_line)
         self.assertIn("if errorlevel 1 goto :missing_jdk21", source)
-        self.assertIn("call :require_tool candle.exe 12", source)
-        self.assertIn("call :require_tool light.exe 13", source)
-        self.assertIn("call :require_tool dark.exe 14", source)
+        self.assertIn('set "VALIDATOR=%~dp0validate_windows_msi_toolchain.py"', source)
+        self.assertIn('python "%VALIDATOR%"', source)
+        self.assertIn('if errorlevel 1 goto :wix_toolchain_failed', source)
+        self.assertIn('echo Toolchain validator: "%VALIDATOR%"', source)
+        self.assertIn('classification=WiX-toolchain exit=%WIX_VALIDATION_EXIT%', source)
+        self.assertNotIn("call :require_tool", source)
         self.assertIn('call "%ROOT%\\build\\native\\windows-toast\\build-native.bat"', source)
         self.assertIn('--main-class com.shale.desktop.ShaleLauncher', source)
         self.assertNotIn('--main-class com.shale.desktop.MainApp', source)
@@ -68,6 +71,19 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn("dark.exe -x", source)
         self.assertIn("windows_msi_identity.py\" validate", source)
         self.assertIn('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', source)
+
+    def test_wix_validator_diagnostics_precede_msi_construction_and_publication(self):
+        source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        validation = source.index('python "%VALIDATOR%"')
+        failure = source.index('if errorlevel 1 goto :wix_toolchain_failed', validation)
+        construction = source.index("Starting jpackage and WiX MSI construction...", failure)
+        publication = source.index("Final MSI publication completed:", construction)
+        self.assertEqual([validation, failure, construction, publication], sorted([validation, failure, construction, publication]))
+        validator = (ROOT / "build/scripts/validate_windows_msi_toolchain.py").read_text(encoding="utf-8")
+        for tool in ("candle.exe", "light.exe", "dark.exe"):
+            self.assertIn(tool, validator)
+        for diagnostic in ("classification=missing", "classification=invocation_failure", "classification=incompatible_version", "exit="):
+            self.assertIn(diagnostic, validator)
 
     def test_release_reports_the_first_post_updater_stage(self):
         source = (ROOT / "build/scripts/build-shale-release.bat").read_text(encoding="utf-8")
