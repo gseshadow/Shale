@@ -22,13 +22,21 @@ final class NotificationPhase0FoundationContractTest {
 
     @Test void daoCursorAndMutationsRemainTenantAndRecipientScoped() throws Exception {
         String source=Files.readString(Path.of("src/main/java/com/shale/data/dao/NotificationDao.java"));
-        assertTrue(source.contains("n.ShaleClientId=? AND n.UserId=? AND n.Id>?"));
-        assertTrue(source.contains("ORDER BY n.Id ASC"));
-        assertTrue(source.contains("n.ExpiresAt IS NULL OR n.ExpiresAt>SYSUTCDATETIME()"));
-        assertTrue(source.contains("WHERE Id = ?\n\t\t\t\t  AND ShaleClientId = ?\n\t\t\t\t  AND UserId = ?"));
+        String sql=normalizeSql(source);
+        assertTrue(sql.contains("WHERE n.ShaleClientId=? AND n.UserId=? AND n.Id>? ORDER BY n.Id ASC"));
+        assertTrue(sql.contains("n.ExpiresAt IS NULL OR n.ExpiresAt>SYSUTCDATETIME()"));
+        assertTrue(sql.contains("MAX(n.Id),0) FROM dbo.Notifications n WHERE n.ShaleClientId=? AND n.UserId=?"));
+        assertTrue(sql.contains("WHERE n.Id=? AND n.ShaleClientId=? AND n.UserId=?"));
+        assertTrue(sql.contains("UPDATE dbo.Notifications SET IsRead = 1, ReadAt = SYSUTCDATETIME() WHERE Id = ? AND ShaleClientId = ? AND UserId = ?"));
+        assertTrue(sql.contains("SELECT EventKey,EntityId,ActionType,IsDismissed FROM dbo.Notifications WITH (UPDLOCK,ROWLOCK) WHERE Id=? AND ShaleClientId=? AND UserId=?"));
+        assertTrue(sql.contains("UPDATE dbo.Notifications SET IsDismissed=1,DismissedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND UserId=?"));
         assertFalse(source.contains("public void markNotificationRead(long notificationId)"));
         assertFalse(source.contains("public void markNotificationDismissed(long notificationId)"));
         assertFalse(source.contains("public void markNotificationsRead(List<Long>"));
         assertFalse(source.contains("public void markNotificationsDismissed(List<Long>"));
+    }
+
+    private static String normalizeSql(String source) {
+        return source.replaceAll("\\s+", " ").trim();
     }
 }

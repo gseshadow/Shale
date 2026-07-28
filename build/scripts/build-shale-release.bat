@@ -35,6 +35,7 @@ echo.
 call mvn -f "%ROOT%\pom.xml" -pl shale-desktop -am clean package || goto :fail
 call "%ROOT%\build\scripts\build-updater.bat" || goto :fail
 
+echo Building desktop application image...
 jpackage ^
   --type app-image ^
   --name Shale ^
@@ -48,24 +49,8 @@ jpackage ^
 
 powershell -NoProfile -Command "Compress-Archive -Path '%DIST_APP%\Shale\*' -DestinationPath '%DIST%\ShaleApp-%VERSION%.zip' -Force" || goto :fail
 
-jpackage ^
-  --type exe ^
-  --name Shale ^
-  --input "%DESKTOP_TARGET%" ^
-  --dest "%DIST%" ^
-  --main-jar "shale-desktop-%VERSION%.jar" ^
-  --main-class "com.shale.desktop.MainApp" ^
-  --module-path "%JMODS_DIR%" ^
-  --add-modules javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec ^
-  --icon "%ASSETS_DIR%\Shale.ico" ^
-  --app-version "%VERSION%" ^
-  --vendor "Get Downing" ^
-  --description "Shale Desktop" ^
-  --win-menu ^
-  --win-shortcut ^
-  --win-dir-chooser ^
-  --win-per-user-install ^
-  --install-dir "Shale" || goto :fail
+echo Starting validated Windows MSI build...
+call "%ROOT%\build\scripts\build-shale-windows-msi.bat" || goto :fail
 
 echo Release build complete.
 exit /b 0
