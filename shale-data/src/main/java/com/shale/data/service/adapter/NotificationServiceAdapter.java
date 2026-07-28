@@ -30,10 +30,41 @@ public final class NotificationServiceAdapter implements NotificationServicePort
 						shaleClientId,
 						userId,
 						row.category(),
-						row.title(),
-						row.message(),
-						row.createdAt()))
+						row.severity(), row.title(), row.message(), row.entityType(), row.entityId(), row.actionType(), row.eventKey(),
+						row.actorDisplayName(), row.entityTitle(), row.caseId(), row.caseName(), row.caseResponsibleAttorney(),
+						row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.casePrimaryStatusName(),
+						row.casePrimaryStatusColor(), row.casePracticeAreaColor(), row.createdAt(), row.isRead()))
 				.toList();
+	}
+
+	@Override
+	public NotificationPage listNotifications(int shaleClientId, int userId, NotificationCursor cursor, int limit) {
+		Objects.requireNonNull(cursor, "cursor");
+		NotificationDao.NotificationPageRow page = notificationGateway.listNotificationsForUser(
+				shaleClientId, userId, cursor.afterNotificationId(), limit);
+		List<NotificationSummary> items = page.items().stream().map(row -> new NotificationSummary(
+				row.id(), shaleClientId, userId, row.category(), row.severity(), row.title(), row.message(), row.entityType(), row.entityId(),
+				row.actionType(), row.eventKey(), row.actorDisplayName(), row.entityTitle(), row.caseId(), row.caseName(),
+				row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(),
+				row.casePrimaryStatusName(), row.casePrimaryStatusColor(), row.casePracticeAreaColor(), row.createdAt(), row.isRead())).toList();
+		NotificationCursor next = NotificationCursor.after(page.nextScannedId());
+		return new NotificationPage(items, next, page.hasMore());
+	}
+
+	@Override
+	public long notificationHighWaterMark(int shaleClientId, int userId) {
+		return notificationGateway.notificationHighWaterMark(shaleClientId, userId);
+	}
+
+	@Override
+	public int countUnreadNotifications(int shaleClientId, int userId) {
+		return notificationGateway.countUnreadNotificationsForUser(shaleClientId, userId);
+	}
+
+	@Override
+	public Optional<NotificationActivationTarget> findActivationTarget(int shaleClientId, int userId, long notificationId) {
+		return notificationGateway.findActivationTarget(shaleClientId, userId, notificationId)
+				.map(row -> new NotificationActivationTarget(row.notificationId(), row.entityType(), row.entityId(), row.parentCaseId(), row.actionType()));
 	}
 
 	@Override
@@ -88,6 +119,10 @@ public final class NotificationServiceAdapter implements NotificationServicePort
 
 	interface NotificationGateway {
 		List<NotificationDao.NotificationRow> listUnreadNotificationsForUser(int shaleClientId, int userId);
+		NotificationDao.NotificationPageRow listNotificationsForUser(int shaleClientId, int userId, long afterNotificationId, int limit);
+		long notificationHighWaterMark(int shaleClientId, int userId);
+		int countUnreadNotificationsForUser(int shaleClientId, int userId);
+		Optional<NotificationDao.NotificationActivationRow> findActivationTarget(int shaleClientId, int userId, long notificationId);
 
 		void markNotificationRead(int shaleClientId, int userId, long notificationId);
 
@@ -118,6 +153,11 @@ public final class NotificationServiceAdapter implements NotificationServicePort
 		public List<NotificationDao.NotificationRow> listUnreadNotificationsForUser(int shaleClientId, int userId) {
 			return notificationDao.listUnreadNotificationsForUser(shaleClientId, userId);
 		}
+
+		@Override public NotificationDao.NotificationPageRow listNotificationsForUser(int shaleClientId,int userId,long afterNotificationId,int limit){return notificationDao.listNotificationsForUser(shaleClientId,userId,afterNotificationId,limit);}
+		@Override public long notificationHighWaterMark(int shaleClientId,int userId){return notificationDao.notificationHighWaterMark(shaleClientId,userId);}
+		@Override public int countUnreadNotificationsForUser(int shaleClientId,int userId){return notificationDao.countUnreadNotificationsForUser(shaleClientId,userId);}
+		@Override public Optional<NotificationDao.NotificationActivationRow> findActivationTarget(int shaleClientId,int userId,long notificationId){return notificationDao.findActivationTarget(shaleClientId,userId,notificationId);}
 
 		@Override
 		public void markNotificationRead(int shaleClientId, int userId, long notificationId) {

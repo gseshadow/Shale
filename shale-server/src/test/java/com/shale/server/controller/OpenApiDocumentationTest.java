@@ -33,6 +33,9 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath("$.paths['/api/cases/search-page']").exists())
                 .andExpect(jsonPath("$.paths['/api/contacts/search']").exists())
                 .andExpect(jsonPath("$.paths['/api/contacts/search-page']").exists())
-                .andExpect(jsonPath("$.paths['/api/notifications/unread']").exists());
+                .andExpect(jsonPath("$.paths['/api/notifications/unread']").exists())
+                .andExpect(jsonPath("$.paths['/api/notifications']").exists())
+                .andExpect(jsonPath("$.paths['/api/notifications/unread-count']").exists())
+                .andExpect(jsonPath("$.paths['/api/notifications/{notificationId}/activation-target']").exists());
     }
 }

@@ -2,6 +2,8 @@ package com.shale.data.dao;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
+import com.shale.core.service.NotificationServicePort.NotificationRetrievalException;
+import com.shale.core.service.NotificationServicePort.RetrievalFailureKind;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -212,6 +214,7 @@ public final class NotificationDao {
 				  AND n.UserId = ?
 				  AND ISNULL(n.IsDismissed, 0) = 0
 				  AND ISNULL(n.IsRead, 0) = 0
+				  AND (n.ExpiresAt IS NULL OR n.ExpiresAt > SYSUTCDATETIME())
 				""";
 		try (Connection con = db.requireConnection();
 		     PreparedStatement ps = con.prepareStatement(sql)) {
@@ -223,6 +226,105 @@ public final class NotificationDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to count unread notifications", e);
 		}
+	}
+
+	public NotificationPageRow listNotificationsForUser(int shaleClientId, int userId, long afterNotificationId, int requestedLimit) {
+		if (shaleClientId <= 0 || userId <= 0 || afterNotificationId < 0) return new NotificationPageRow(List.of(), false, Math.max(0,afterNotificationId));
+		int limit = Math.max(1, Math.min(requestedLimit, 100));
+		String sql = """
+				SELECT TOP (?) n.Id,
+				       CASE WHEN ISNULL(n.IsDismissed,0)=0
+				                  AND (n.ExpiresAt IS NULL OR n.ExpiresAt>SYSUTCDATETIME())
+				            THEN 1 ELSE 0 END AS Eligible
+				FROM dbo.Notifications n
+				WHERE n.ShaleClientId=? AND n.UserId=? AND n.Id>?
+				ORDER BY n.Id ASC
+				""";
+		try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) {
+			ps.setInt(1, limit + 1); ps.setInt(2, shaleClientId); ps.setInt(3, userId); ps.setLong(4, afterNotificationId);
+			try (ResultSet rs=ps.executeQuery()) {
+				List<Long> scannedIds=new ArrayList<>();
+				List<Long> eligibleIds=new ArrayList<>();
+				while(rs.next()) {
+					long id=rs.getLong("Id");
+					scannedIds.add(id);
+					if(scannedIds.size()<=limit && rs.getBoolean("Eligible")) eligibleIds.add(id);
+				}
+				boolean more=scannedIds.size()>limit;
+				if(more) scannedIds=new ArrayList<>(scannedIds.subList(0,limit));
+				long nextScannedId=scannedIds.isEmpty()?afterNotificationId:scannedIds.get(scannedIds.size()-1);
+				return new NotificationPageRow(hydrateNotificationRows(con,shaleClientId,userId,eligibleIds),more,nextScannedId);
+			}
+		} catch(SQLException e){throw notificationRetrievalFailure(e);}
+	}
+
+	public long notificationHighWaterMark(int shaleClientId, int userId) {
+		if (shaleClientId <= 0 || userId <= 0) return 0;
+		String sql = "SELECT COALESCE(MAX(n.Id),0) FROM dbo.Notifications n WHERE n.ShaleClientId=? AND n.UserId=?";
+		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId);
+			ps.setInt(2, userId);
+			try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getLong(1) : 0; }
+		} catch (SQLException e) { throw notificationRetrievalFailure(e); }
+	}
+
+	private List<NotificationRow> hydrateNotificationRows(Connection con,int shaleClientId,int userId,List<Long> ids) throws SQLException {
+		if(ids.isEmpty()) return List.of();
+		List<NotificationRow> rows=new ArrayList<>(ids.size());
+		for(Long id:ids){NotificationRow row=hydrateNotificationRow(con,shaleClientId,userId,id);if(row!=null)rows.add(row);}
+		return List.copyOf(rows);
+	}
+
+	private NotificationRow hydrateNotificationRow(Connection con,int shaleClientId,int userId,long id) throws SQLException {
+		String sql="""
+				SELECT n.Id,n.Category,n.Severity,n.Title,n.Message,n.EntityType,n.EntityId,n.ActionType,
+				 n.IsRead,n.CreatedAt,n.EventKey,
+				 LTRIM(RTRIM(COALESCE(actor.name_first,'')+CASE WHEN COALESCE(actor.name_first,'')='' OR COALESCE(actor.name_last,'')='' THEN '' ELSE ' ' END+COALESCE(actor.name_last,''))) ActorDisplayName,
+				 CASE WHEN UPPER(ISNULL(n.EntityType,''))='TASK' THEN t.Title WHEN UPPER(ISNULL(n.EntityType,''))='MATERIALREQUEST' THEN mr.Title END EntityTitle,
+				 CASE WHEN UPPER(ISNULL(n.EntityType,''))='TASK' THEN t.CaseId WHEN UPPER(ISNULL(n.EntityType,''))='MATERIALREQUEST' THEN mr.CaseId END CaseId,
+				 c.Name CaseName,caseAttorney.DisplayName CaseResponsibleAttorney,caseAttorney.Color CaseResponsibleAttorneyColor,
+				 c.NonEngagementLetterSent CaseNonEngagementLetterSent,current_status.CurrentStatusName CasePrimaryStatusName,
+				 current_status.PrimaryStatusColor CasePrimaryStatusColor,pa.Color CasePracticeAreaColor
+				FROM dbo.Notifications n
+				LEFT JOIN dbo.Users actor ON actor.id=n.CreatedByUserId AND actor.ShaleClientId=n.ShaleClientId
+				LEFT JOIN dbo.Tasks t ON UPPER(ISNULL(n.EntityType,''))='TASK' AND t.Id=n.EntityId AND t.ShaleClientId=n.ShaleClientId AND ISNULL(t.IsDeleted,0)=0
+				LEFT JOIN dbo.MaterialRequests mr ON UPPER(ISNULL(n.EntityType,''))='MATERIALREQUEST' AND mr.Id=n.EntityId AND mr.ShaleClientId=n.ShaleClientId AND mr.IsDeleted=0
+				LEFT JOIN dbo.Cases c ON c.Id=COALESCE(t.CaseId,mr.CaseId) AND c.ShaleClientId=n.ShaleClientId
+				LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId
+				OUTER APPLY (SELECT TOP (1) s.Name CurrentStatusName,s.Color PrimaryStatusColor FROM dbo.CaseStatuses cs INNER JOIN dbo.Statuses s ON s.Id=cs.StatusId WHERE cs.CaseId=c.Id AND cs.IsPrimary=1 ORDER BY cs.UpdatedAt DESC,cs.CreatedAt DESC,cs.Id DESC) current_status
+				OUTER APPLY (SELECT TOP (1) LTRIM(RTRIM(COALESCE(u.name_first,'')+CASE WHEN COALESCE(u.name_first,'')='' OR COALESCE(u.name_last,'')='' THEN '' ELSE ' ' END+COALESCE(u.name_last,''))) DisplayName,u.Color FROM dbo.CaseUsers cu INNER JOIN dbo.Users u ON u.id=cu.UserId AND u.ShaleClientId=c.ShaleClientId WHERE cu.CaseId=c.Id AND cu.RoleId=? AND cu.IsPrimary=1 ORDER BY cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) caseAttorney
+				WHERE n.Id=? AND n.ShaleClientId=? AND n.UserId=?
+				""";
+		try(PreparedStatement ps=con.prepareStatement(sql)){
+			ps.setInt(1,ROLE_RESPONSIBLE_ATTORNEY);ps.setLong(2,id);ps.setInt(3,shaleClientId);ps.setInt(4,userId);
+			try(ResultSet rs=ps.executeQuery()){return rs.next()?mapNotificationRow(rs):null;}
+		}
+	}
+
+	private static NotificationRow mapNotificationRow(ResultSet rs) throws SQLException {
+		return new NotificationRow(rs.getLong("Id"),rs.getString("Category"),rs.getString("Severity"),rs.getString("Title"),rs.getString("Message"),
+				rs.getString("EntityType"),rs.getObject("EntityId")==null?null:rs.getLong("EntityId"),rs.getString("ActionType"),safeUserDisplayName(rs.getString("ActorDisplayName")),
+				rs.getString("EntityTitle"),rs.getObject("CaseId")==null?null:rs.getLong("CaseId"),rs.getString("CaseName"),rs.getString("CaseResponsibleAttorney"),
+				rs.getString("CaseResponsibleAttorneyColor"),rs.getObject("CaseNonEngagementLetterSent")==null?null:rs.getBoolean("CaseNonEngagementLetterSent"),
+				rs.getString("CasePrimaryStatusName"),rs.getString("CasePrimaryStatusColor"),rs.getString("CasePracticeAreaColor"),rs.getBoolean("IsRead"),toInstant(rs.getTimestamp("CreatedAt")),rs.getString("EventKey"));
+	}
+
+	public java.util.Optional<NotificationActivationRow> findActivationTarget(int shaleClientId,int userId,long notificationId) {
+		if(shaleClientId<=0||userId<=0||notificationId<=0)return java.util.Optional.empty();
+		String sql="""
+				SELECT n.Id,n.EntityType,n.EntityId,
+				 CASE WHEN UPPER(ISNULL(n.EntityType,''))='TASK' THEN t.CaseId
+				      WHEN UPPER(ISNULL(n.EntityType,''))='MATERIALREQUEST' THEN mr.CaseId
+				      WHEN UPPER(ISNULL(n.EntityType,''))='CASE' THEN n.EntityId END AS ParentCaseId,
+				 n.ActionType
+				FROM dbo.Notifications n
+				LEFT JOIN dbo.Tasks t ON UPPER(ISNULL(n.EntityType,''))='TASK' AND t.Id=n.EntityId AND t.ShaleClientId=n.ShaleClientId AND ISNULL(t.IsDeleted,0)=0
+				LEFT JOIN dbo.MaterialRequests mr ON UPPER(ISNULL(n.EntityType,''))='MATERIALREQUEST' AND mr.Id=n.EntityId AND mr.ShaleClientId=n.ShaleClientId AND mr.IsDeleted=0
+				WHERE n.Id=? AND n.ShaleClientId=? AND n.UserId=? AND n.EntityId IS NOT NULL
+				 AND ISNULL(n.IsDismissed,0)=0 AND (n.ExpiresAt IS NULL OR n.ExpiresAt>SYSUTCDATETIME())
+				 AND (UPPER(ISNULL(n.EntityType,'')) NOT IN ('TASK','MATERIALREQUEST') OR t.Id IS NOT NULL OR mr.Id IS NOT NULL)
+				""";
+		try(Connection con=db.requireConnection();PreparedStatement ps=con.prepareStatement(sql)){ps.setLong(1,notificationId);ps.setInt(2,shaleClientId);ps.setInt(3,userId);try(ResultSet rs=ps.executeQuery()){if(!rs.next())return java.util.Optional.empty();Long parent=(Long)rs.getObject("ParentCaseId");return java.util.Optional.of(new NotificationActivationRow(rs.getLong("Id"),rs.getString("EntityType"),rs.getLong("EntityId"),parent,rs.getString("ActionType")));}}catch(SQLException e){throw new RuntimeException("Failed to resolve notification activation target",e);}
 	}
 
 	public List<NotificationRow> listUnreadNotificationsForUser(int shaleClientId, int userId) {
@@ -330,6 +432,7 @@ public final class NotificationDao {
 				  AND n.UserId = ?
 				  AND ISNULL(n.IsDismissed, 0) = 0
 				  AND ISNULL(n.IsRead, 0) = 0
+				  AND (n.ExpiresAt IS NULL OR n.ExpiresAt > SYSUTCDATETIME())
 				ORDER BY n.CreatedAt DESC, n.Id DESC;
 				""";
 		try (Connection con = db.requireConnection();
@@ -370,38 +473,11 @@ public final class NotificationDao {
 		}
 	}
 
-	public void markNotificationRead(long notificationId) {
-		if (notificationId <= 0) {
-			return;
-		}
-		markNotificationsRead(List.of(notificationId));
-	}
-
 	public void markNotificationRead(int shaleClientId, int userId, long notificationId) {
 		if (notificationId <= 0) {
 			return;
 		}
 		markNotificationsRead(shaleClientId, userId, List.of(notificationId));
-	}
-
-	public void markNotificationsRead(List<Long> notificationIds) {
-		if (notificationIds == null || notificationIds.isEmpty()) {
-			return;
-		}
-		String sql = "UPDATE dbo.Notifications SET IsRead = 1, ReadAt = SYSUTCDATETIME() WHERE Id = ? AND ISNULL(IsRead,0)=0";
-		try (Connection con = db.requireConnection();
-		     PreparedStatement ps = con.prepareStatement(sql)) {
-			for (Long id : notificationIds) {
-				if (id == null || id <= 0) {
-					continue;
-				}
-				ps.setLong(1, id);
-				ps.addBatch();
-			}
-			ps.executeBatch();
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to mark notifications read", e);
-		}
 	}
 
 	public void markNotificationsRead(int shaleClientId, int userId, List<Long> notificationIds) {
@@ -433,38 +509,11 @@ public final class NotificationDao {
 		}
 	}
 
-	public void markNotificationDismissed(long notificationId) {
-		if (notificationId <= 0) {
-			return;
-		}
-		markNotificationsDismissed(List.of(notificationId));
-	}
-
 	public void markNotificationDismissed(int shaleClientId, int userId, long notificationId) {
 		if (notificationId <= 0) {
 			return;
 		}
 		markNotificationsDismissed(shaleClientId, userId, List.of(notificationId));
-	}
-
-	public void markNotificationsDismissed(List<Long> notificationIds) {
-		if (notificationIds == null || notificationIds.isEmpty()) {
-			return;
-		}
-		String sql = "UPDATE dbo.Notifications SET IsDismissed = 1, DismissedAt = SYSUTCDATETIME() WHERE Id = ? AND ISNULL(IsDismissed,0)=0";
-		try (Connection con = db.requireConnection();
-		     PreparedStatement ps = con.prepareStatement(sql)) {
-			for (Long id : notificationIds) {
-				if (id == null || id <= 0) {
-					continue;
-				}
-				ps.setLong(1, id);
-				ps.addBatch();
-			}
-			ps.executeBatch();
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to mark notifications dismissed", e);
-		}
 	}
 
 	public void markNotificationsDismissed(int shaleClientId, int userId, List<Long> notificationIds) {
@@ -560,6 +609,12 @@ public final class NotificationDao {
 		return null;
 	}
 
+	private static NotificationRetrievalException notificationRetrievalFailure(SQLException error) {
+		String state=error.getSQLState();int code=error.getErrorCode();
+		boolean authorization=(state!=null&&state.startsWith("28"))||code==18456||code==229||code==916;
+		return new NotificationRetrievalException(authorization?RetrievalFailureKind.AUTHORIZATION:RetrievalFailureKind.TRANSIENT,error);
+	}
+
 	public record NotificationRow(
 			long id,
 			String category,
@@ -583,4 +638,9 @@ public final class NotificationDao {
 			Instant createdAt,
 			String eventKey) {
 	}
+
+	public record NotificationPageRow(List<NotificationRow> items,boolean hasMore,long nextScannedId) {
+		public NotificationPageRow(List<NotificationRow> items,boolean hasMore){this(items,hasMore,items.isEmpty()?0:items.get(items.size()-1).id());}
+	}
+	public record NotificationActivationRow(long notificationId,String entityType,long entityId,Long parentCaseId,String actionType) {}
 }

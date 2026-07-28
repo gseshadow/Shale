@@ -98,7 +98,7 @@ final class RequestedFromWorkflowDialogTest {
 
     @Test void workflowSizingUpdatesActualStageAfterContentIsInstalled() throws Exception {
         String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
-        int renderContent = d.indexOf("box.getChildren().addAll(caseSection,allSection)");
+        int renderContent = d.indexOf("box.getChildren().add(layout.root)");
         int sizing = d.indexOf("applyWorkflowScreenSizing(dialog, owner, state.step, state.mode, box)");
         int helper = d.indexOf("static void applyWorkflowScreenSizing");
         assertTrue(renderContent >= 0 && sizing > renderContent);
@@ -123,7 +123,7 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(d.contains("contentRegion.setMinSize(0,0)"));
         assertTrue(d.contains("box.setPadding(new Insets(18,18,12,18))"));
         assertTrue(d.contains("box.setMinHeight(0)"));
-        assertTrue(d.contains("allSection.setMinHeight(0)"));
+        assertTrue(d.contains("directorySection.setMinHeight(0)"));
         assertTrue(d.contains("results.setMinHeight(0)"));
         assertTrue(d.contains("adaptiveCasePartyScrollPane(caseResults, 180)"));
         assertFalse(d.contains("box.getChildren().addAll(caseSection,allSection,back"));
@@ -131,9 +131,9 @@ final class RequestedFromWorkflowDialogTest {
 
     @Test void allSectionFollowsTheCompleteAdaptivelySizedCasePartySection() throws Exception {
         String d = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
-        int caseSection = d.indexOf("VBox caseSection=new VBox(8,caseHeading,caseResultsScroll)");
-        int allSection = d.indexOf("VBox allSection=new VBox(8,allHeading,search,status,results)");
-        int normalOrder = d.indexOf("box.getChildren().addAll(caseSection,allSection)");
+        int caseSection = d.indexOf("VBox caseSection = new VBox(8, caseHeading, caseResultsScroll)");
+        int allSection = d.indexOf("VBox directorySection = new VBox(8, directoryHeading, search, status, results)");
+        int normalOrder = d.indexOf("VBox root = new VBox(12, caseSection, directorySection)");
         assertTrue(caseSection >= 0 && allSection > caseSection && normalOrder > allSection);
         assertTrue(d.contains("content.prefHeight(width)+12"));
         assertTrue(d.contains("scroll.viewportBoundsProperty().addListener"));
@@ -141,6 +141,7 @@ final class RequestedFromWorkflowDialogTest {
         assertFalse(d.contains("caseResultsScroll.setPrefHeight("));
         assertFalse(d.contains("caseResultsScroll.setMinHeight("));
         assertFalse(d.contains("caseResultsScroll.setMaxHeight("));
+        assertFalse(d.contains("caseSection.setMinHeight(0)"));
     }
 
     @Test void casePartySectionsAreSingleSelectDeduplicatedAndShareDirectorySelectionState() throws Exception {
@@ -150,13 +151,13 @@ final class RequestedFromWorkflowDialogTest {
         assertTrue(d.contains("Case Organizations"));
         assertTrue(d.contains("All Contacts"));
         assertTrue(d.contains("All Organizations"));
-        assertTrue(d.indexOf("caseSection,allSection") > 0);
+        assertTrue(d.indexOf("caseSection, directorySection") > 0);
         assertTrue(d.contains("unique.putIfAbsent(r.entityId()"));
         assertTrue(d.contains("state.selected=option"));
         assertTrue(d.contains("selectDirectoryMatch(results,option)"));
         assertTrue(d.contains("sameEntity(state.selected,option)"));
         assertFalse(d.contains("MultipleSelectionModel"));
-        assertTrue(d.contains("No available Case "));
+        assertTrue(d.contains("setCaseSectionVisible(layout, !options.isEmpty())"));
         assertTrue(c.contains("listRequestedFromCaseParties(cid(),tenant())"));
     }
 

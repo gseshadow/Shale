@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import com.shale.core.service.NotificationServicePort.NotificationSummary;
+import com.shale.core.service.NotificationServicePort.NotificationCursor;
 import com.shale.core.service.NotificationServicePort.TaskNotificationCommand;
 import com.shale.data.dao.NotificationDao;
 
@@ -46,7 +47,9 @@ class NotificationServiceAdapterTest {
 
 		assertEquals(42, gateway.lastListShaleClientId);
 		assertEquals(7, gateway.lastListUserId);
-		assertEquals(List.of(new NotificationSummary(9, 42, 7, "TASK", "Assigned", "Task assigned", createdAt)), summaries);
+		assertEquals(1, summaries.size());
+		assertEquals("TASK", summaries.get(0).entityType());
+		assertEquals("ASSIGNED", summaries.get(0).actionType());
 	}
 
 	@Test
@@ -78,7 +81,33 @@ class NotificationServiceAdapterTest {
 		assertTrue(id.isEmpty());
 	}
 
+	@Test void cursorCountAndActivationDelegate() {
+		FakeNotificationGateway gateway=new FakeNotificationGateway(List.of());
+		gateway.page=new NotificationDao.NotificationPageRow(List.of(notificationRow(12,"ASSIGNED")),false,12);
+		gateway.unreadCount=4;
+		gateway.activation=Optional.of(new NotificationDao.NotificationActivationRow(12,"Task",99,8L,"ASSIGNED"));
+		NotificationServiceAdapter adapter=new NotificationServiceAdapter(gateway);
+		var page=adapter.listNotifications(41,31,NotificationCursor.after(10),25);
+		assertEquals(12,page.items().get(0).id()); assertEquals(12,page.nextCursor().afterNotificationId());
+		assertEquals(4,adapter.countUnreadNotifications(41,31));
+		assertEquals(99,adapter.findActivationTarget(41,31,12).orElseThrow().entityId());
+		assertEquals(101, adapter.notificationHighWaterMark(41, 31));
+		assertEquals(41,gateway.newTenant); assertEquals(31,gateway.newUser); assertEquals(12,gateway.activationId);
+	}
+
+	@Test void emptyFilteredPageAdvancesToHighestScannedId() {
+		FakeNotificationGateway gateway=new FakeNotificationGateway(List.of());
+		gateway.page=new NotificationDao.NotificationPageRow(List.of(),true,19);
+		var page=new NotificationServiceAdapter(gateway).listNotifications(41,31,NotificationCursor.after(10),25);
+		assertTrue(page.items().isEmpty());assertTrue(page.hasMore());assertEquals(19,page.nextCursor().afterNotificationId());
+	}
+
+	private static NotificationDao.NotificationRow notificationRow(long id,String action) {
+		return new NotificationDao.NotificationRow(id,"TASK","INFO","t","b","TASK",99L,action,null,null,null,null,null,null,null,null,null,null,false,Instant.EPOCH,"event-"+id);
+	}
+
 	private static final class FakeNotificationGateway implements NotificationServiceAdapter.NotificationGateway {
+		@Override public long notificationHighWaterMark(int shaleClientId, int userId) { return 101; }
 		private final List<NotificationDao.NotificationRow> rows;
 		private int lastListShaleClientId;
 		private int lastListUserId;
@@ -90,6 +119,9 @@ class NotificationServiceAdapterTest {
 		private long lastCreateEntityId;
 		private int lastCreateCreatedByUserId;
 		private String lastCreateEventKey;
+		private NotificationDao.NotificationPageRow page=new NotificationDao.NotificationPageRow(List.of(),false);
+		private int unreadCount,newTenant,newUser; private long activationId;
+		private Optional<NotificationDao.NotificationActivationRow> activation=Optional.empty();
 
 		private FakeNotificationGateway(List<NotificationDao.NotificationRow> rows) {
 			this.rows = rows;
@@ -101,6 +133,9 @@ class NotificationServiceAdapterTest {
 			lastListUserId = userId;
 			return rows;
 		}
+		@Override public NotificationDao.NotificationPageRow listNotificationsForUser(int tenant,int user,long after,int limit){newTenant=tenant;newUser=user;return page;}
+		@Override public int countUnreadNotificationsForUser(int tenant,int user){newTenant=tenant;newUser=user;return unreadCount;}
+		@Override public Optional<NotificationDao.NotificationActivationRow> findActivationTarget(int tenant,int user,long id){newTenant=tenant;newUser=user;activationId=id;return activation;}
 
 		@Override
 		public void markNotificationRead(int shaleClientId, int userId, long notificationId) {

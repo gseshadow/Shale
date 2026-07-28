@@ -43,6 +43,7 @@ import com.shale.ui.component.dialog.TaskDetailDialog;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.CaseExportService;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.services.UiAuthService;
@@ -90,6 +91,10 @@ import com.shale.ui.notification.NotificationPreferencesService;
 import com.shale.ui.notification.DurableNotificationService;
 import com.shale.ui.notification.AssignedUserTaskDueNotificationRecipientResolver;
 import com.shale.ui.notification.TaskDueDateNotificationGenerator;
+import com.shale.ui.notification.NotificationPollingService;
+import com.shale.ui.notification.NoOpDesktopNotificationPresenter;
+import com.shale.ui.notification.DesktopNotificationPresenter;
+import com.shale.data.service.adapter.NotificationServiceAdapter;
 
 public final class SceneManager {
 	private static final Logger log = LoggerFactory.getLogger(SceneManager.class);
@@ -112,6 +117,7 @@ public final class SceneManager {
 	private Integer pendingCalendarNotificationEventId;
 	private final DurableNotificationService durableNotificationService;
 	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
+	private final NotificationPollingService notificationPollingService;
 	private final UpdatePollingService updatePollingService;
 	private final PhiReadAuditService phiReadAuditService;
 	private final ExecutorService notificationBadgeCountExecutor;
@@ -126,7 +132,14 @@ public final class SceneManager {
 			UiAuthService authService,
 			UiRuntimeBridge runtimeBridge,
 			DbSessionProvider dbSessionProvider,
-			UiUpdateLauncher updateLauncher) {
+				UiUpdateLauncher updateLauncher) {
+		this(stage, appState, authService, runtimeBridge, dbSessionProvider, updateLauncher,
+				new NoOpDesktopNotificationPresenter());
+	}
+
+	public SceneManager(Stage stage, AppState appState, UiAuthService authService,
+			UiRuntimeBridge runtimeBridge, DbSessionProvider dbSessionProvider,
+			UiUpdateLauncher updateLauncher, DesktopNotificationPresenter notificationPresenter) {
 		this.stage = stage;
 		this.appState = appState;
 		this.authService = authService;
@@ -137,6 +150,9 @@ public final class SceneManager {
 		UserPreferencesService userPreferencesService = new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState);
 		this.notificationPreferencesService = new NotificationPreferencesService(appState, userPreferencesService);
 		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
+		this.notificationPollingService = new NotificationPollingService(
+				new NotificationServiceAdapter(new NotificationDao(dbSessionProvider)), notificationCenterService,
+				durableNotificationService, Objects.requireNonNull(notificationPresenter), Platform::runLater);
 		this.taskDueDateNotificationGenerator = new TaskDueDateNotificationGenerator(
 				new TaskDao(dbSessionProvider),
 				new MaterialRequestDao(dbSessionProvider),
@@ -156,7 +172,9 @@ public final class SceneManager {
 		});
 		this.notificationCenterService.setReadListener(durableNotificationService::markRead);
 		this.notificationCenterService.setDismissListener(durableNotificationService::dismiss);
-		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
+		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState,
+				notificationCenterService, notificationPreferencesService,
+				notificationPollingService::offerNewlyVisible);
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
 		this.updatePollingService = new UpdatePollingService(updateLauncher, this::onUpdateCheckCompleted);
@@ -187,6 +205,7 @@ public final class SceneManager {
 		liveUpdateNotificationBridge.stop();
 		connectivityNotificationProducer.stop();
 		taskDueDateNotificationGenerator.stop();
+		notificationPollingService.stop();
 		updatePollingService.stop();
 		notificationCenterService.clearAll();
 		var root = load("/fxml/login.fxml", controller ->
@@ -212,9 +231,14 @@ public final class SceneManager {
 		Platform.runLater(() -> System.out.println("[StartupTiming] main shell visible"));
 		startNotificationBadgeCountAsync();
 		notificationPreferencesService.refreshActivePreferences();
-		liveUpdateNotificationBridge.start();
 		connectivityNotificationProducer.start();
 		taskDueDateNotificationGenerator.start();
+		Integer pollingTenantId = appState.getShaleClientId();
+		Integer pollingUserId = appState.getUserId();
+		if (pollingTenantId != null && pollingTenantId > 0 && pollingUserId != null && pollingUserId > 0) {
+			notificationPollingService.start(pollingTenantId, pollingUserId);
+		}
+		liveUpdateNotificationBridge.start();
 		updatePollingService.start();
 		startNotificationBootstrapAsync();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
@@ -578,7 +602,8 @@ public final class SceneManager {
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService, onOpenCase);
+			c.init(appState, runtimeBridge, caseDao, caseTaskService,
+					new CaseExportService(caseDao, appState, phiReadAuditService), onOpenCase);
 			return c;
 		});
 	}
@@ -617,7 +642,8 @@ public final class SceneManager {
 		return load("/fxml/reports.fxml", controller ->
 		{
 			ReportsController c = (ReportsController) controller;
-			c.init(appState, new CaseDao(dbSessionProvider));
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			c.init(appState, caseDao, new CaseExportService(caseDao, appState, phiReadAuditService));
 			return c;
 		});
 	}
@@ -1232,5 +1258,17 @@ public final class SceneManager {
 
 	public void showError(String message) {
 		System.out.println("*******************SceneManager.showError() " + message);
+	}
+
+	/** Deterministically releases all SceneManager-owned background work. */
+	public void shutdown() {
+		notificationPollingService.close();
+		durableNotificationService.close();
+		taskDueDateNotificationGenerator.stop();
+		updatePollingService.stop();
+		liveUpdateNotificationBridge.stop();
+		connectivityNotificationProducer.stop();
+		notificationBadgeCountExecutor.shutdownNow();
+		notificationStartupExecutor.shutdownNow();
 	}
 }

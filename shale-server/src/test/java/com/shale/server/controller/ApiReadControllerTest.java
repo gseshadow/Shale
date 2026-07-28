@@ -32,6 +32,9 @@ import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.NotificationServicePort.CalendarEventNotificationCommand;
 import com.shale.core.service.NotificationServicePort.NotificationSummary;
+import com.shale.core.service.NotificationServicePort.NotificationCursor;
+import com.shale.core.service.NotificationServicePort.NotificationPage;
+import com.shale.core.service.NotificationServicePort.NotificationActivationTarget;
 import com.shale.core.service.NotificationServicePort.TaskActionNotificationCommand;
 import com.shale.core.service.NotificationServicePort.TaskDueDateNotificationCommand;
 import com.shale.core.service.NotificationServicePort.TaskNotificationCommand;
@@ -678,6 +681,43 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(41, notificationServicePort.shaleClientId);
     }
 
+    @Test void notificationFoundationEndpointsUseAuthenticatedSessionIdentity() throws Exception {
+        RecordingNotificationServicePort port=new RecordingNotificationServicePort();
+        MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),unusedPort(ContactServicePort.class),port);
+        mvc.perform(get("/api/notifications").param("limit","25")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(101));
+        mvc.perform(get("/api/notifications/unread-count")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.count").value(3));
+		mvc.perform(get("/api/notifications/high-water")
+				.header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+				.header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.cursor").isNotEmpty());
+        mvc.perform(get("/api/notifications/101/activation-target")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.entityType").value("Task"))
+                .andExpect(jsonPath("$.entityId").value(77)).andExpect(jsonPath("$.title").doesNotExist());
+        org.junit.jupiter.api.Assertions.assertEquals(41,port.shaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(31,port.userId);
+    }
+
+    @Test void notificationActivationFailsClosedAndCursorValidationIsSanitized() throws Exception {
+        RecordingNotificationServicePort port=new RecordingNotificationServicePort();
+        MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),unusedPort(ContactServicePort.class),port);
+        mvc.perform(get("/api/notifications/999/activation-target")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/notifications").param("cursor","not-a-cursor")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     void caseSearchPageReturnsPageContractWithDevelopmentHeaders() throws Exception {
         RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
@@ -1158,7 +1198,8 @@ class ApiReadControllerTest {
         }
     }
 
-    private static final class RecordingNotificationServicePort implements NotificationServicePort {
+	private static final class RecordingNotificationServicePort implements NotificationServicePort {
+		@Override public long notificationHighWaterMark(int shaleClientId, int userId) { return 101; }
         private int shaleClientId;
         private int userId;
 
@@ -1169,6 +1210,15 @@ class ApiReadControllerTest {
             return List.of(new NotificationSummary(100L, shaleClientId, userId, "INFO",
                     "Development proof notification", "Request context reached service layer.", Instant.EPOCH));
         }
+
+		@Override
+		public NotificationPage listNotifications(int shaleClientId,int userId,NotificationCursor cursor,int limit){
+			this.shaleClientId=shaleClientId;this.userId=userId;
+			return new NotificationPage(List.of(new NotificationSummary(101,shaleClientId,userId,"TASK","Title","Body",Instant.EPOCH)),NotificationCursor.after(101),false);
+		}
+
+		@Override public int countUnreadNotifications(int shaleClientId,int userId){this.shaleClientId=shaleClientId;this.userId=userId;return 3;}
+		@Override public Optional<NotificationActivationTarget> findActivationTarget(int shaleClientId,int userId,long id){this.shaleClientId=shaleClientId;this.userId=userId;return id==101?Optional.of(new NotificationActivationTarget(id,"Task",77,55L,"ASSIGNED")):Optional.empty();}
 
         @Override
         public void markRead(int shaleClientId, int userId, long notificationId) {
