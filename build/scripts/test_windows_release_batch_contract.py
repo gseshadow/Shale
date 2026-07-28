@@ -81,7 +81,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         inspect = source.index('windows_msi_identity.py" inspect "%BUNDLE_SOURCE%"')
         mutate = source.index('windows_msi_identity.py" mutate "%BUNDLE_SOURCE%"')
         candle = source.index('candle.exe -nologo "%BUNDLE_SOURCE%"')
-        light = source.index('"%BUNDLE_WIXOBJ%" "%UI_WIXOBJ%"')
+        light = source.index("Final light.exe reconstruction started.")
         dark = source.index("dark.exe -x")
         compiled_validation = source.index('windows_msi_identity.py" validate')
         publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"')
@@ -95,12 +95,59 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
             "Generated bundle.wxf location verified:",
             "Generated WiX identity validation passed.",
             "bundle.wxf identity and shortcut mutation completed.",
-            "Starting final candle and light MSI reconstruction...",
-            "Starting compiled final MSI validation...",
+            "Modified bundle.wxf recompilation started.",
+            "Recompiled bundle.wixobj verified:",
+            "Final WiX link inputs verified:",
+            "Final light.exe reconstruction started.",
+            "Final light.exe reconstruction completed.",
+            "Compiled final MSI validation started.",
+            "dark.exe inspection completed.",
+            "Final identity and payload validation passed.",
             "Final MSI publication completed:",
         ):
             self.assertIn(message, source)
         self.assertIn('echo Generated bundle.wxf was not found at expected path: "%BUNDLE_SOURCE%"', source)
+
+    def test_final_light_reuses_complete_jpackage_link_contract(self):
+        source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        light = next(line for line in source.splitlines() if line.startswith("light.exe "))
+        self.assertIn("-ext WixUtilExtension", light)
+        self.assertIn("-ext WixUIExtension", light)
+        self.assertIn('-b "%GENERATED_CONFIG_DIR%"', light)
+        self.assertNotIn("-sice:ICE61", source)
+        self.assertNotIn("-sice:ICE69", source)
+        for variable, filename in (
+            ("MAIN_WIXOBJ", "main.wixobj"),
+            ("UI_WIXOBJ", "ui.wixobj"),
+            ("INSTALLDIR_DIALOG_WIXOBJ", "InstallDirNotEmptyDlg.wixobj"),
+            ("BUNDLE_WIXOBJ", "bundle.wixobj"),
+        ):
+            self.assertIn(f"set {variable}=%WIXOBJ_DIR%\\{filename}", source)
+            self.assertIn(f'if not exist "%{variable}%"', source)
+        self.assertIn('for %%F in ("%WIXOBJ_DIR%\\*.wixobj")', source)
+        self.assertIn("if not !BUNDLE_OBJECT_COUNT! EQU 1 goto :duplicate_bundle_object", source)
+        self.assertIn('candle.exe -nologo "%BUNDLE_SOURCE%"', source)
+        self.assertIn("if errorlevel 1 goto :candle_failed", source)
+        self.assertIn("if errorlevel 1 goto :light_failed", source)
+
+    def test_final_light_requires_localization_binding_and_post_link_validation(self):
+        source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        for variable, filename in (
+            ("LOC_DE", "MsiInstallerStrings_de.wxl"),
+            ("LOC_EN", "MsiInstallerStrings_en.wxl"),
+            ("LOC_JA", "MsiInstallerStrings_ja.wxl"),
+            ("LOC_ZH_CN", "MsiInstallerStrings_zh_CN.wxl"),
+        ):
+            self.assertIn(f"set {variable}=%GENERATED_CONFIG_DIR%\\{filename}", source)
+            self.assertIn(f'if not exist "%{variable}%"', source)
+        light = source.index("Final light.exe reconstruction started.")
+        dark = source.index("dark.exe -x", light)
+        identity = source.index('windows_msi_identity.py" validate', dark)
+        marker = source.index("shale-windows-toast.properties", identity)
+        dll = source.index("shale_windows_toast.dll", marker)
+        publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', dll)
+        self.assertEqual([light, dark, identity, marker, dll, publish], sorted([light, dark, identity, marker, dll, publish]))
+        self.assertNotIn('copy /y "%PRELIMINARY_MSI%"', source)
 
 if __name__ == "__main__":
     unittest.main()
