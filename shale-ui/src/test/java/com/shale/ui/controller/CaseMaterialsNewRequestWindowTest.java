@@ -28,13 +28,17 @@ class CaseMaterialsNewRequestWindowTest {
                 "add(fields,4,\"Status:\",requestStatus)",
                 "add(fields,5,\"Requested By:\",requestedBy)",
                 "add(fields,6,\"Assigned To:\",assignedTo)",
-                "add(fields,7,\"Follow-up Interval:\",followUpInterval)",
-                "add(fields,8,\"Next Follow-up:\",nextFollowUpDisplay)",
-                "add(fields,9,\"Description:\",description)");
+                "add(fields,7,\"Request Date:\",requestDate)",
+                "add(fields,8,\"Due Date:\",dueDate)",
+                "add(fields,9,\"Next Follow-up:\",nextFollowUpDisplay)",
+                "add(fields,10,\"Follow-up Interval:\",followUpInterval)",
+                "add(fields,11,\"Requested Date Start:\",requestedRangeStart)",
+                "add(fields,12,\"Requested Date End:\",requestedRangeEnd)",
+                "add(fields,13,\"Description:\",description)");
         assertFalse(method.contains("\"Requested At:\""));
         assertFalse(method.contains("\"Due At:\""));
         assertFalse(method.contains("\"Next Follow-up At:\""));
-        assertFalse(method.contains("new DatePicker"));
+        assertTrue(method.contains("new DatePicker"));
     }
 
     @Test
@@ -53,7 +57,7 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(method.contains("ColorCodedComboBox<RequestStatusDto> requestStatus=newLookupSelector(RequestStatusDto::name,RequestStatusDto::color,item->null)"));
         String editMethod = methodBody(source, "VBox editRequestBody");
         assertTrue(editMethod.contains("ColorCodedComboBox<RequestStatusDto> requestStatus=newLookupSelector(RequestStatusDto::name,RequestStatusDto::color,item->null)"));
-        assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> requestedBy=newUserSelectionField(stage,false)"));
+        assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> requestedBy=newUserSelectionField(stage,true)"));
         assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> assignedTo=newUserSelectionField(stage,true)"));
         assertTrue(userFactory.contains("new UserSelectionField<>(CaseTaskService.AssignableUserOption::id,CaseTaskService.AssignableUserOption::displayName,CaseTaskService.AssignableUserOption::color"));
         assertTrue(userFactory.contains("AssignedUserPickerDialog.show(pickerOwner,candidates,CaseMaterialRequestsTabController.class)"));
@@ -141,8 +145,8 @@ class CaseMaterialsNewRequestWindowTest {
         String method = methodBody(source, "VBox newRequestBody");
         assertTrue(method.contains("ChoiceBox<String> followUpInterval=new ChoiceBox<>()"));
         assertTrue(method.contains("configureFollowUpInterval(followUpInterval)"));
-        assertTrue(method.contains("add(fields,7,\"Follow-up Interval:\",followUpInterval)"));
-        assertTrue(method.contains("add(fields,8,\"Next Follow-up:\",nextFollowUpDisplay)"));
+        assertTrue(method.contains("add(fields,10,\"Follow-up Interval:\",followUpInterval)"));
+        assertTrue(method.contains("add(fields,9,\"Next Follow-up:\",nextFollowUpDisplay)"));
         assertFalse(method.contains("followUpInterval.setDisable(true)"));
         assertTrue(source.contains("case \"Daily\"->1"));
         assertTrue(source.contains("case \"Every 30 days\"->30"));
@@ -298,7 +302,7 @@ class CaseMaterialsNewRequestWindowTest {
         String suggester = source.substring(source.indexOf("static final class NewRequestTitleSuggester"), source.indexOf("    VBox newRequestBody"));
         String body = methodBody(source, "VBox newRequestBody");
         String mapping = methodBody(source, "private MaterialRequestServicePort.CreateMaterialRequestCommand toCreateCommand");
-        String validation = methodBody(source, "private String validateRequest");
+        String validation = methodBody(source, "static String validateRequestFields");
         assertTrue(suggester.contains("private String lastAutomaticTitle = \"\""));
         assertTrue(suggester.contains("private boolean programmaticUpdate"));
         assertTrue(suggester.contains("private boolean manualOverride"));
@@ -310,9 +314,30 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(body.contains("titleField.textProperty().addListener((o,a,b)->{titleSuggester.userEdited(a,b);validate.run();})"));
         assertTrue(mapping.contains("materialType.id(),title,description"));
         assertTrue(body.contains("toCreateCommand(rf,materialType.getValue(),titleField.getText(),description.getText()"));
-        assertTrue(validation.contains("if(titleField.getText()==null||titleField.getText().trim().isEmpty())return \"Title is required.\""));
+        assertTrue(validation.contains("if(title==null||title.trim().isEmpty())return \"Title is required.\""));
     }
 
+
+    @Test
+    void requestedBySupportsRemoveInBothEditorsAndCreatedByRemainsReadOnly() throws Exception {
+        String source = Files.readString(SOURCE);
+        String newBody = methodBody(source, "VBox newRequestBody");
+        String editBody = methodBody(source, "VBox editRequestBody");
+        String fieldSource = Files.readString(USER_SELECTION_FIELD);
+        assertTrue(newBody.contains("requestedBy=newUserSelectionField(stage,true)"));
+        assertTrue(editBody.contains("requestedBy=newUserSelectionField(stage,true)"));
+        assertTrue(fieldSource.contains("getChildren().addAll(card, changeButton)"));
+        assertTrue(fieldSource.contains("if (clearable) getChildren().add(removeButton)"));
+        assertTrue(fieldSource.contains("removeButton.setOnAction(e -> clearSelection())"));
+        assertTrue(fieldSource.contains("getChildren().setAll(addButton)"));
+        assertTrue(editBody.contains("add(fields,7,\"Created By:\",createdBy)"));
+        assertTrue(editBody.contains("d.createdByDisplayName()"));
+        assertTrue(editBody.contains("\"Unknown\""));
+        assertFalse(editBody.contains("createdBy=newUserSelectionField"));
+        assertFalse(editBody.contains("selectUser(createdBy"));
+        assertTrue(editBody.contains("ScrollPane formScroll"));
+        assertTrue(editBody.contains("VBox body=new VBox(12,formScroll,footer)"));
+    }
 
     private static String methodBody(String source, String signatureStart) {
         int start = source.indexOf(signatureStart);

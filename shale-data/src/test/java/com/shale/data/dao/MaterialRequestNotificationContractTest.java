@@ -16,7 +16,7 @@ final class MaterialRequestNotificationContractTest {
         String dao = source("src/main/java/com/shale/data/dao/MaterialRequestDao.java");
         assertTrue(dao.contains("RecipientSnapshot previous=findRecipientSnapshot(con,c)"));
         assertTrue(dao.contains("LinkedHashSet<Integer> recipients"));
-        assertTrue(dao.contains("newRequester!=actor"));
+        assertTrue(dao.contains("!Objects.equals(newRequester,actor)"));
         assertTrue(dao.contains("newAssignee!=actor"));
         assertTrue(dao.contains("notifications.createMaterialRequestNotification(con"));
         assertTrue(dao.indexOf("createRecipientNotifications(con,id") < dao.indexOf("con.commit();return findMaterialRequest"));
