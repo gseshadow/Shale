@@ -13,10 +13,23 @@ import java.util.Optional;
  * classes and should be backed by NotificationDao in a later adapter step.</p>
  */
 public interface NotificationServicePort {
+	enum RetrievalFailureKind { AUTHORIZATION, TRANSIENT }
+
+	final class NotificationRetrievalException extends RuntimeException {
+		private final RetrievalFailureKind kind;
+		public NotificationRetrievalException(RetrievalFailureKind kind, Throwable cause) {
+			super("Notification retrieval failed.", cause);
+			this.kind = java.util.Objects.requireNonNull(kind, "kind");
+		}
+		public RetrievalFailureKind kind() { return kind; }
+	}
 
 	List<NotificationSummary> listUnreadNotifications(int shaleClientId, int userId);
 
 	NotificationPage listNotifications(int shaleClientId, int userId, NotificationCursor cursor, int limit);
+
+	/** Returns the greatest durable id currently visible to this tenant/user, or zero. */
+	long notificationHighWaterMark(int shaleClientId, int userId);
 
 	int countUnreadNotifications(int shaleClientId, int userId);
 
@@ -41,9 +54,30 @@ public interface NotificationServicePort {
 			int shaleClientId,
 			int userId,
 			String category,
+			String severity,
 			String title,
 			String body,
-			Instant createdAt) {
+			String entityType,
+			Long entityId,
+			String actionType,
+			String eventKey,
+			String actorDisplayName,
+			String entityTitle,
+			Long caseId,
+			String caseName,
+			String caseResponsibleAttorney,
+			String caseResponsibleAttorneyColor,
+			Boolean caseNonEngagementLetterSent,
+			String casePrimaryStatusName,
+			String casePrimaryStatusColor,
+			String casePracticeAreaColor,
+			Instant createdAt,
+			boolean read) {
+		public NotificationSummary(long id, int shaleClientId, int userId, String category,
+				String title, String body, Instant createdAt) {
+			this(id, shaleClientId, userId, category, "INFO", title, body, null, null, null, null,
+					null, null, null, null, null, null, null, null, null, null, createdAt, false);
+		}
 	}
 
 	record NotificationCursor(String value) {

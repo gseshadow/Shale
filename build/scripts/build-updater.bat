@@ -19,17 +19,21 @@ echo ====================================
 set UPDATER_TARGET=%ROOT%\shale-updater\target
 set DESKTOP_TARGET=%ROOT%\shale-desktop\target
 set DIST_UPDATER=%ROOT%\dist-updater
+set UPDATER_INPUT=%ROOT%\build\staging\updater-input
 
 if not exist "%DIST_UPDATER%" mkdir "%DIST_UPDATER%"
 
 call mvn -f "%ROOT%\pom.xml" -pl shale-updater -am clean package || goto :fail
 
 rmdir /s /q "%DIST_UPDATER%\ShaleUpdater" 2>nul
+rmdir /s /q "%UPDATER_INPUT%" 2>nul
+mkdir "%UPDATER_INPUT%" || goto :fail
+copy /y "%UPDATER_TARGET%\shale-updater-%VERSION%.jar" "%UPDATER_INPUT%\" >nul || goto :fail
 
 jpackage ^
   --type app-image ^
   --name ShaleUpdater ^
-  --input "%UPDATER_TARGET%" ^
+  --input "%UPDATER_INPUT%" ^
   --dest "%DIST_UPDATER%" ^
   --main-jar "shale-updater-%VERSION%.jar" ^
   --main-class "com.shale.updater.Main" ^
