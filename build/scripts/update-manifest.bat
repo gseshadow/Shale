@@ -105,7 +105,7 @@ powershell -NoProfile -Command ^
   "  version='%VERSION%';" ^
   "  channel=if ($existing -and $existing.channel) { $existing.channel } else { 'stable' };" ^
   "  zipUrl='https://shalestorage.z13.web.core.windows.net/ShaleApp-%VERSION%.zip';" ^
-  "  installerUrl='https://shalestorage.z13.web.core.windows.net/Shale-%VERSION%.exe';" ^
+  "  installerUrl='https://shalestorage.z13.web.core.windows.net/Shale-%VERSION%.msi';" ^
   "  notes='Release %VERSION%';" ^
   "  mandatory=$mandatory;" ^
   "  sha256='%SHA256%';" ^
